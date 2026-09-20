@@ -5,6 +5,7 @@ import { DemoRequestForm } from "../../components/marketing/demo-request-form";
 import { env } from "../../env";
 import { DEMO_SOURCES } from "../../server/marketing/demo-requests";
 import { hasBookableSlots } from "../../server/marketing/demo-slots";
+import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 import "./demo.css";
 
@@ -48,13 +49,15 @@ export default async function ScheduleDemoPage({
       : "schedule-demo";
 
   return (
-    <main className="content-page content-narrow">
-      <h1>Book a demo</h1>
-      <p className="content-lead">
-        Twenty minutes, on a call, watching a real auction run: teams and purses, players going
-        under the hammer, the gavel, and the receipts that come out the other side. Not slides.
-      </p>
-
+    <ContentPage
+      eyebrow="See it run"
+      title={
+        <>
+          Book a <em>demo</em>
+        </>
+      }
+      lede="Twenty minutes, on a call, watching a real auction run: teams and purses, players going under the hammer, the gavel, and the receipts that come out the other side. Not slides."
+    >
       <ol className="demo-steps">
         <li>
           <strong>Tell us about your tournament.</strong> How many teams, and when your auction is —
@@ -88,6 +91,6 @@ export default async function ScheduleDemoPage({
         </a>
         .
       </p>
-    </main>
+    </ContentPage>
   );
 }

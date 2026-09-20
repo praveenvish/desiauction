@@ -1205,6 +1205,30 @@ p + .date-row {
   background: var(--surface-sunken);
 }
 
+.share-reg-closed {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.share-reg-closed strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.share-reg-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+  transform: translateY(-1px);
+}
+
 .share-reg-label {
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
@@ -2081,20 +2105,6 @@ p + .date-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-}
-
-.roster-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  flex-shrink: 0;
 }
 
 .roster-person {
@@ -3422,4 +3432,17 @@ p + .date-row {
 /* Send squad sheets: the button keeps the list's rhythm below the hint. */
 .squad-sheets-actions {
   margin-top: var(--space-4);
+}
+
+/* Team detail tabs (Squad · Team settings): the tab rule is the section's top
+   edge, so the first block inside a tab drops its own. */
+.team-squad-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.team-squad-tab > .pd-presign:first-child {
+  border-top: 0;
+  padding-top: 0;
 }

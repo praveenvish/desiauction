@@ -1,6 +1,6 @@
-/* The public door: a quiet floodlight wash behind the form, the `mk-` type
-   scale on the heading. Layout overrides only — the flow itself (steps,
-   fields, cards) is the certified PX-5 markup untouched. */
+/* The player's door: a quiet floodlight wash behind one compact card, the
+   season named above it. Tokens only, so Daylight and Floodlight both hold.
+   Motion is colour/border/transform only — nothing animates text opacity. */
 .register {
   min-height: calc(100dvh - 64px);
   background:
@@ -13,190 +13,62 @@
 }
 
 .register-panel {
-  max-width: 640px;
+  max-width: 600px;
+  gap: var(--space-4);
+}
+
+/* --- Page header: the season, not the form -------------------------------- */
+.reg-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.reg-kicker {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent);
 }
 
 .register h1 {
-  font-size: clamp(2rem, 4.5vw, var(--display-sm-size));
+  font-size: clamp(1.75rem, 4.5vw, var(--display-sm-size));
+  line-height: 1.1;
   letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
 }
 
-.register-status-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-2);
-}
-
-.register-status-head h2 {
+.reg-meta {
   margin: 0;
-  font-size: var(--text-lg-size);
-  color: var(--text-heading);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
 }
 
+/* --- Shared bits ----------------------------------------------------------- */
 .register-hint {
   color: var(--text-secondary);
   font-size: var(--text-sm-size);
-  margin: 0 0 var(--space-3);
-}
-
-.register-progress {
-  list-style: none;
-  display: flex;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-4);
-  padding: 0;
-  flex-wrap: wrap;
-}
-
-.register-step {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-sm-size);
-  color: var(--text-muted);
-}
-
-.register-step-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-strong);
-  font-size: var(--text-xs-size);
-}
-
-.register-step-current {
-  color: var(--text-primary);
-  font-weight: var(--font-weight-semibold);
-}
-
-.register-step-current .register-step-number {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--text-on-accent);
-}
-
-.register-step-done .register-step-number {
-  background: var(--success-subtle);
-  border-color: var(--success-base);
-  color: var(--success-strong);
-}
-
-.register-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.register-actions {
-  display: flex;
-  gap: var(--space-2);
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
-
-.register-review {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-1) var(--space-4);
-  margin: 0;
-  font-size: var(--text-md-size);
-}
-
-.register-review dt {
-  color: var(--text-muted);
-}
-
-.register-review dd {
-  margin: 0;
-}
-
-/* The player's own public page, shown to them on the approved status card. */
-.register-public {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  margin-bottom: var(--space-3);
-}
-
-.register-public-head {
-  margin: 0;
-  font-size: var(--text-md-size);
-  line-height: var(--text-md-line);
-  color: var(--text-primary);
-}
-
-/* A URL, so it wraps at the slashes on a 320px screen instead of pushing the
-   card sideways. */
-.register-public-url {
-  margin: 0;
-  font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  margin: 0;
 }
 
 .register-error {
   color: var(--danger-strong);
   font-size: var(--text-sm-size);
-  margin: 0;
-}
-
-/* DA-35: the signed-out preview. A share link used to be a login wall that
-   never named the tournament — this is the "what for", and the list of what
-   the form will ask, before anyone is asked to prove a phone number. */
-.register-asks {
-  margin: 0 0 var(--space-4);
-  padding-left: var(--space-5);
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* The publication disclosure, at the moment of submission. Given a surface of
-   its own rather than another grey hint, because it is the one paragraph on
-   this screen that changes what a person would decide. */
-.register-consent {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-}
-
-.register-consent-head {
   margin: 0;
-  font-size: var(--text-md-size);
-  line-height: var(--text-md-line);
-  color: var(--text-primary);
 }
 
-.register-consent-line {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
+.reg-card .register-form {
+  max-width: none;
+  gap: var(--space-4);
 }
 
-.register-consent-line strong {
-  color: var(--text-primary);
-}
-
-/* Sits immediately above the Submit row. The 44px min-height keeps the whole
-   label — not just the 16px box — inside the platform's touch target. */
+/* The whole label — not just the 20px box — is the touch target (44px). */
 .register-consent-check {
   display: flex;
   align-items: flex-start;
@@ -213,7 +85,882 @@
   flex: none;
   width: 20px;
   height: 20px;
-  margin-top: 2px;
+  margin: 0;
+  margin-top: 1px;
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+/* --- Signed-out preview ---------------------------------------------------- */
+.reg-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reg-preview-lede {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.reg-preview-pitch {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  color: var(--text-primary);
+}
+
+.reg-preview-head {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.reg-needs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.reg-needs li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+}
+
+.reg-needs li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.reg-needs svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-accent);
+}
+
+.reg-needs li > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-needs strong {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.reg-needs li > span > span {
+  color: var(--text-secondary);
+}
+
+.reg-preview-cta {
+  width: 100%;
+  justify-content: center;
+}
+
+.reg-preview-foot {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  text-align: center;
+}
+
+/* --- Stepper --------------------------------------------------------------- */
+.reg-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.reg-stepper {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.reg-stepper-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-muted);
+}
+
+/* The rail between steps: drawn after each item except the last. */
+.reg-stepper-item:not(:last-child)::after {
+  content: "";
+  flex: 1 1 auto;
+  min-width: var(--space-3);
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--border-subtle);
+}
+
+.reg-stepper-item.is-done:not(:last-child)::after {
+  background: var(--accent);
+}
+
+.reg-stepper-item:last-child {
+  flex: 0 0 auto;
+}
+
+.reg-stepper-dot {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-strong);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-raised);
+  transition:
+    background var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+}
+
+.reg-stepper-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The current step's word is never clipped; the rails give way instead. */
+.reg-stepper-item.is-current .reg-stepper-label {
+  flex: none;
+  overflow: visible;
+}
+
+.reg-stepper-item.is-current {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.reg-stepper-item.is-current .reg-stepper-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.reg-stepper-item.is-done {
+  color: var(--text-secondary);
+}
+
+.reg-stepper-item.is-done .reg-stepper-dot {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+/* On a phone only the current step keeps its word; the others are numbered
+   dots (the full list is still read out — the label is clipped, not removed). */
+@media (width <= 520px) {
+  .reg-stepper-item:not(.is-current) .reg-stepper-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+/* --- A step ---------------------------------------------------------------- */
+.reg-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reg-step-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.reg-step-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+/* Clear of the sticky header above and the pinned action bar below. */
+.reg-card input,
+.reg-card select,
+.reg-step-title {
+  scroll-margin: 120px 0 120px;
+}
+
+.reg-step-title:focus {
+  outline: none;
+}
+
+.reg-step-title:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.reg-step-lede {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+/* --- Photo ----------------------------------------------------------------- */
+.reg-photo {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.reg-photo-hero {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-2) 0 var(--space-1);
+}
+
+.reg-photo-inline {
+  align-items: center;
+}
+
+.reg-photo-frame {
+  display: inline-flex;
+  border-radius: var(--radius-full);
+  box-shadow:
+    0 0 0 3px var(--surface-raised),
+    0 0 0 5px var(--accent-subtle);
+}
+
+.reg-photo-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.reg-photo-hero .reg-photo-body {
+  align-items: center;
+}
+
+.reg-photo-inline .reg-photo-body {
+  align-items: flex-start;
+  flex: 1 1 auto;
+}
+
+.reg-photo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.reg-photo-why {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+}
+
+/* --- How you play ---------------------------------------------------------- */
+.reg-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.reg-who-text {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-who-text strong {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.reg-who-text span {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.reg-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.reg-choice-legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.reg-required {
+  color: var(--danger-strong);
+}
+
+.reg-choice-options {
+  display: grid;
+  /* Two across at every width: four roles read as a 2 × 2 block, never 3 + 1. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+/* A choice chip: the native radio stays in the tree (keyboard arrows, the
+   group's name, checked state) and is drawn over by the label. */
+.reg-chip {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.reg-chip input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.reg-chip-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-strong);
+  color: transparent;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.reg-chip:hover {
+  border-color: var(--border-interactive);
+}
+
+.reg-chip:active {
+  transform: scale(0.98);
+}
+
+.reg-chip:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.reg-chip:has(input:checked) .reg-chip-mark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.reg-chip:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.reg-section-label {
+  margin: var(--space-1) 0 calc(-1 * var(--space-2));
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.reg-grid {
+  display: grid;
+  grid-auto-flow: row dense;
+  grid-template-columns: 1fr;
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+}
+
+@media (width >= 560px) {
+  .reg-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Directly under the date that raised it, across the whole row. */
+.reg-guardian {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--warning-base);
+  border-radius: var(--radius-lg);
+  background: var(--warning-subtle);
+}
+
+.reg-guardian-head {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-saved {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+}
+
+/* --- Actions: pinned to the thumb on a phone ------------------------------- */
+.reg-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (width <= 640px) {
+  .register {
+    padding: var(--space-6) var(--space-4) var(--space-8);
+  }
+
+  .reg-step > .reg-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
+    padding: var(--space-3) var(--space-5) calc(var(--space-3) + env(safe-area-inset-bottom));
+    background: var(--surface-raised);
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+
+  .reg-step > .reg-actions > button:last-child {
+    flex: 1 1 auto;
+  }
+}
+
+/* --- Confirm --------------------------------------------------------------- */
+.reg-restored {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--info-subtle);
+  color: var(--info-strong);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.reg-summary-name {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: 600;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.reg-summary-sub {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-edit {
+  flex: none;
+  padding: var(--space-1) var(--space-2);
+  margin: calc(-1 * var(--space-1)) 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.reg-edit:hover {
+  background: var(--accent-subtle);
+}
+
+.reg-edit:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.reg-facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.reg-fact {
+  display: grid;
+  grid-template-columns: minmax(7rem, 38%) 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-fact:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.reg-fact dt {
+  color: var(--text-secondary);
+}
+
+.reg-fact dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.reg-private {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.reg-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.reg-notice-line {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-notice-line svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-accent);
+}
+
+.reg-notice-line strong {
+  color: var(--text-primary);
+}
+
+.reg-disclosure {
+  margin-left: calc(18px + var(--space-2));
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.reg-disclosure summary {
+  cursor: pointer;
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.reg-disclosure summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.reg-disclosure ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.reg-checks {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-2);
+}
+
+.reg-check-quiet {
+  color: var(--text-secondary);
+}
+
+/* --- Mobile step ----------------------------------------------------------- */
+.reg-phone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.reg-phone-stale {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--warning-subtle);
+}
+
+/* --- Status: the confirmation and every visit after ------------------------ */
+.reg-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.reg-status-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.reg-status-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.reg-status-title h2 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: 600;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.reg-status-title h2:focus {
+  outline: none;
+}
+
+.reg-status-facts {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.reg-track-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-muted);
+}
+
+/* Each stage is a bar with its dot: filled when done, ringed when current. */
+.reg-track-step::before {
+  content: "";
+  order: -1;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--border-subtle);
+}
+
+.reg-track-done::before,
+.reg-track-current::before {
+  background: var(--accent);
+}
+
+.reg-track-current::before {
+  background: linear-gradient(90deg, var(--accent) 0 50%, var(--border-subtle) 50% 100%);
+}
+
+.reg-track-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.reg-track-label svg {
+  flex: none;
+  color: var(--text-accent);
+}
+
+.reg-track-done {
+  color: var(--text-secondary);
+}
+
+.reg-track-current {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.reg-status-body {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-status-body strong {
+  color: var(--text-primary);
+}
+
+.reg-status-public {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.reg-status-public-head {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+/* A URL, so it wraps at the slashes on a 320px screen. */
+.reg-status-public-url {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.reg-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (width <= 480px) {
+  .reg-status-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .reg-status-actions > * {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+.reg-status-foot {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
 }

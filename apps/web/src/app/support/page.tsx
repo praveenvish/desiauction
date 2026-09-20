@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ReportProblemButton } from "../../components/report-problem/report-problem";
 import { env } from "../../env";
 import { SUPPORT } from "../../content/support";
+import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 import { IconArrowRight } from "@desiauction/ui";
 
@@ -21,10 +22,7 @@ export const metadata: Metadata = {
  */
 export default function SupportPage() {
   return (
-    <main className="content-page">
-      <h1>Support</h1>
-      <p className="content-lead">{SUPPORT.intro}</p>
-
+    <ContentPage eyebrow="Support" title="Support" lede={SUPPORT.intro}>
       <section className="content-section" aria-labelledby="channels">
         <h2 id="channels">Contact channels</h2>
         <div className="support-channels">
@@ -102,6 +100,6 @@ export default function SupportPage() {
           — and put AUCTION NIGHT in the subject if an auction is running.
         </p>
       </section>
-    </main>
+    </ContentPage>
   );
 }

@@ -10,6 +10,24 @@ import styles from "./image-uploader.module.css";
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
 
+/** The file picker's `accept` list, for callers that compose their own control. */
+export const IMAGE_UPLOAD_ACCEPT = ALLOWED.join(",");
+
+/**
+ * The same client-side check this uploader runs, for a surface that lays its
+ * own picker out (the player registration avatar) — one rule, one wording.
+ * Returns the refusal to show, or null when the file may be sent.
+ */
+export function imageFileProblem(file: File): string | null {
+  if (!ALLOWED.includes(file.type)) {
+    return "Choose a JPEG, PNG or WebP image.";
+  }
+  if (file.size > MAX_BYTES) {
+    return "Image must be 5 MB or smaller.";
+  }
+  return null;
+}
+
 export type UploadOutcome = { ok: true; url: string } | { ok: false; error: string };
 
 export interface ImageUploaderProps {
@@ -44,13 +62,9 @@ export function ImageUploader({
   const [error, setError] = useState<string | null>(null);
 
   async function handleFile(file: File) {
-    setError(null);
-    if (!ALLOWED.includes(file.type)) {
-      setError("Choose a JPEG, PNG or WebP image.");
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setError("Image must be 5 MB or smaller.");
+    const problem = imageFileProblem(file);
+    setError(problem);
+    if (problem !== null) {
       return;
     }
     const objectUrl = URL.createObjectURL(file);
@@ -109,7 +123,7 @@ export function ImageUploader({
           aria-hidden="true"
           tabIndex={-1}
           type="file"
-          accept={ALLOWED.join(",")}
+          accept={IMAGE_UPLOAD_ACCEPT}
           className={styles["input"]}
           onChange={(event) => {
             const file = event.target.files?.[0];

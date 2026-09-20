@@ -2,10 +2,12 @@
 
 import { useMemo } from "react";
 
+import { lotSeed } from "../../../../../lib/player-seed";
 import { roleLabeller } from "../../../../../lib/role-label";
 import { formatPaiseINR, paise } from "@desiauction/core";
 import { GoldDrift, PlayerImage } from "@desiauction/ui";
 
+import { BrandLockup } from "../../../../../components/shell/brand";
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
 import { useAuctionSocket } from "../use-auction-socket";
@@ -117,6 +119,14 @@ export function OverlayPanel({
               ? [...sold, ...sold].map((entry, index) => (
                   <span className="obs-ticker-item" key={`${entry.lotId}-${String(index)}`}>
                     <span className="obs-ticker-tag">Sold</span>
+                    <PlayerImage
+                      name={entry.playerName ?? entry.lotNumber}
+                      seed={entry.registrationId ?? lotSeed(entry.lotId, lotMedia)}
+                      src={lotMedia[entry.lotId]?.photoUrl}
+                      size="xs"
+                      shape="round"
+                      decorative
+                    />
                     <b>{entry.playerName ?? entry.lotNumber}</b>
                     {entry.teamName !== null ? <span>→ {entry.teamName}</span> : null}
                     {entry.soldPrice !== null ? (
@@ -161,9 +171,9 @@ export function OverlayPanel({
               <figure className="obs-lt-face" data-testid="obs-lt-face">
                 <PlayerImage
                   name={facing.playerName ?? facing.lotNumber}
-                  seed={faceNumber ?? facing.lotId}
+                  seed={lotSeed(facing.lotId, lotMedia)}
                   size="xl"
-                  {...(facePhoto !== null ? { src: facePhoto } : {})}
+                  src={facePhoto}
                 />
                 {/* The REGISTRATION number — the identity the player already
                     carries on their public page. The eyebrow above keeps
@@ -258,6 +268,15 @@ export function OverlayPanel({
             below ~800px the lower third and the brand cluster overlapped by
             73px. They share one flex footer now and can never collide. */}
         <div className="obs-brand">
+          {/* THE BUG. A stream frame carried the player, the price and the watch
+              URL and nothing that said whose product this is — the one surface
+              that reaches an audience with no account at all. Plated, because a
+              transparent overlay is composited over somebody else's video and
+              the lockup has to survive whatever is behind it. */}
+          <div className="obs-bug" data-testid="obs-bug">
+            <span className="obs-bug-kicker">Powered by</span>
+            <BrandLockup tone="bug" />
+          </div>
           {sponsor !== null ? (
             <div className="obs-sponsor">
               <span>Presented by</span>

@@ -1,18 +1,49 @@
 "use client";
 
 import { isMinor, type AttributeOption } from "@desiauction/core";
-import { Badge, Button, Card, Field, Select } from "@desiauction/ui";
-import { Fragment, useState, useTransition } from "react";
+import {
+  Button,
+  Card,
+  Field,
+  IconCheck,
+  IconEye,
+  PlayerImage,
+  Select,
+  VisuallyHidden,
+} from "@desiauction/ui";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
+import { formatDate } from "../../../../lib/format-date";
 import { formatPhone } from "../../../../lib/format-phone";
 import { useHydrated } from "../../../../lib/use-hydrated";
 import { WHATSAPP_CONSENT_LABEL } from "../../../../lib/whatsapp-consent";
 import { track } from "../../../../lib/telemetry";
 import { updateProfileAction } from "../../../../server/auth/actions";
 import { submitRegistrationAction } from "../../../../server/competition/actions";
+import { AddPhoneStep } from "./add-phone-step";
+import { RegistrationStatus } from "./registration-status";
 import { SelfPhotoUploader } from "./self-photo-uploader";
 
-type Step = "profile" | "role" | "review";
+/**
+ * The steps that can exist. Only the ones that APPLY are shown and numbered:
+ * `mobile` for an email account with no number, `you` for a nameless account.
+ * Somebody who already has both starts at "How you play" as step 1 of 2.
+ */
+type Step = "mobile" | "you" | "play" | "confirm";
+
+const STEP_LABEL: Record<Step, string> = {
+  mobile: "Mobile",
+  you: "You",
+  play: "How you play",
+  confirm: "Confirm",
+};
+
+const STEP_TITLE: Record<Step, string> = {
+  mobile: "Add your mobile number",
+  you: "About you",
+  play: "How you play",
+  confirm: "Check and confirm",
+};
 
 const draftKey = (slug: string) => `da:reg-draft:${slug}`;
 
@@ -25,7 +56,7 @@ const draftKey = (slug: string) => `da:reg-draft:${slug}`;
  * once v3 is gone. What a person agreed to has to survive the copy changing.
  */
 const PUBLICATION_CONSENT_LABEL =
-  "I understand that my name, playing role and the other details above will be published on public pages anyone with the link can read, and that my mobile number will not.";
+  "I understand my name, role and the details above will be published on public pages anyone with the link can read — and my mobile number will not.";
 
 /**
  * PRR P0-2 (DPDP Act 2023 §9): the guardian consent shown when the date of birth
@@ -116,17 +147,26 @@ function readDraft(slug: string): Draft | null {
   return { role: saved, dob: "", attributes: {} };
 }
 
+/** The step the device-local draft should resume at, if any. */
+function resumeStep(draft: Draft): Step {
+  // Straight to Confirm only when there is a role to confirm; a draft holding
+  // just a birth date resumes where the role is chosen.
+  return draft.role === "" ? "play" : "confirm";
+}
+
 /**
- * Three steps, two truths: the name persists to people.name the moment step 1
- * completes (server truth — a browser restart resumes at step 2), and the role
- * choice autosaves device-locally until submission creates the registration
- * row. All validation is the server's; errors render verbatim.
+ * Up to four steps, two truths: the name persists to people.name the moment
+ * "You" completes (server truth — a browser restart resumes past it), and the
+ * "How you play" answers autosave device-locally until submission creates the
+ * registration row. All validation is the server's; errors render verbatim.
  */
 export function RegisterFlow({
   slug,
   competitionName,
+  listed,
   phone,
   initialName,
+  initialPhotoUrl,
   source,
   roles,
   attributes,
@@ -134,46 +174,50 @@ export function RegisterFlow({
 }: {
   slug: string;
   competitionName: string;
-  phone: string;
+  /** The season is published — the confirmation links its public page. */
+  listed: boolean;
+  /**
+   * The verified number, or null for an account anchored by email alone (0062).
+   * Null puts a "Mobile" step first; a player is reached by text, so a season
+   * entry needs one and the server refuses a registration without it.
+   */
+  phone: string | null;
   initialName: string;
+  /** The person's own photo (consented), or null — the initials mark stands in. */
+  initialPhotoUrl: string | null;
   /** Share-attribution `?ref` from the landing URL; "" when direct. */
   source: string;
   /**
    * THE SEASON'S OWN ROLES, as plain {key,label} pairs.
    *
-   * This dropdown was built from `REGISTRATION_ROLES` — an alias for CRICKET's
+   * This control was built from `REGISTRATION_ROLES` — an alias for CRICKET's
    * four — so the registration form for a football season offered Batter,
    * Bowler, All-rounder and Wicket-keeper, and a footballer had no role to
-   * pick. The sport packs shipped and this form never heard about it.
-   *
-   * Plain strings rather than the pack itself: a pack carries functions (a
-   * tiebreaker's `compute`) and cannot cross into a client component.
+   * pick. Plain strings rather than the pack itself: a pack carries functions
+   * (a tiebreaker's `compute`) and cannot cross into a client component.
    */
   roles: readonly { key: string; label: string }[];
   /**
    * THE SEASON'S OWN OPTIONAL PLAYER DETAIL, as plain {key,label,options} data.
    *
-   * This form asked every registrant for a batting style and a bowling style,
-   * in cricket's words, whatever the season's sport was — so a footballer was
-   * offered "Right-arm fast" and was never asked which foot they kick with, a
-   * kabaddi raider was asked both, and `registrations.attributes` (the column
-   * the pack contract says every sport after cricket writes to) had no writer
-   * anywhere in the product. The dropdown for roles was fixed when the packs
-   * shipped; these two were missed because they are not roles.
-   *
-   * Cricket is unchanged by this: its pack declares the same two attributes,
-   * with the same labels and the same options, and records that they live in
-   * their own columns — so the form renders what it always rendered and the
-   * writer still fills `batting_style` and `bowling_style`.
+   * This form once asked every registrant for cricket's batting and bowling
+   * style whatever the season's sport was. Cricket is unchanged by the fix: its
+   * pack declares the same two attributes with the same labels and options,
+   * and records that they live in their own columns.
    */
   attributes: readonly AttributeOption[];
-  /** PI-1: the person-level profile for THIS sport, prefilling step 2. A
-   *  device-local draft still wins over it — the draft is this season's newer
-   *  intent. */
+  /** PI-1: the person-level profile for THIS sport, prefilling "How you play".
+   *  A device-local draft still wins over it — the draft is this season's
+   *  newer intent. */
   profileDefaults: { role: string; dob: string; attributes: Record<string, string> } | null;
 }) {
+  // Which steps apply is decided once, from what the account held on arrival:
+  // finishing "Mobile" or "You" must tick that step off, not delete it from the
+  // progress bar and renumber everything under the person's thumb.
+  const [askPhone] = useState(phone === null);
+  const [askName] = useState(initialName.trim() === "");
   const [name, setName] = useState(initialName);
-  const [nameDone, setNameDone] = useState(initialName.trim() !== "");
+  const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
   const [role, setRole] = useState(profileDefaults?.role ?? "");
   // Optional player profile (parity §3.2). Not gated — a bare role still submits.
   const [dob, setDob] = useState(profileDefaults?.dob ?? "");
@@ -183,12 +227,10 @@ export function RegisterFlow({
   // PRR P0-2: guardian consent, required only when the entered DOB is under 18.
   const [guardianName, setGuardianName] = useState("");
   const [guardianConsent, setGuardianConsent] = useState(false);
-  /**
-   * Kept apart from `error`, which step 2 pipes into the Playing role field —
-   * a guardian message rendered under "Playing role" blames the wrong control.
-   */
+  /** Kept apart from `error`: a guardian message belongs beside the guardian fields. */
   const [guardianError, setGuardianError] = useState<string | null>(null);
-  const [step, setStep] = useState<Step>(nameDone ? "role" : "profile");
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>(askName ? "you" : "play");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   // Deliberately NOT part of the device-local draft: consent is an act at the
@@ -199,12 +241,38 @@ export function RegisterFlow({
   // Meta and DPDP both need it to be a choice made now (Phase 3).
   const [whatsapp, setWhatsapp] = useState(false);
   const [pending, startTransition] = useTransition();
-
   const [restored, setRestored] = useState(false);
 
-  // Draft recovery: restore EVERY saved answer and resume at review after a
-  // refresh or a browser restart. The review below now shows all four, so
-  // landing there is a chance to check them, not a way to hide what was lost.
+  // The number is server truth: it arrives through a page refresh once the
+  // "Mobile" step verifies it, and every other step waits behind it.
+  const current: Step = phone === null ? "mobile" : step;
+
+  /*
+   * FOCUS FOLLOWS THE STEP. Each step swaps the whole panel, which left focus
+   * on a button that no longer existed — a screen reader heard nothing, and a
+   * keyboard user restarted from the top of the document. Moving to the new
+   * step's heading announces where they are and scrolls it into view. Only
+   * after a move: on arrival the name field keeps its autofocus.
+   */
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // Where Continue sends focus when it refuses — the refusal is often below
+  // the fold on a phone, and an error nobody can see is no error at all.
+  const firstRoleRef = useRef<HTMLInputElement>(null);
+  const guardianRef = useRef<HTMLInputElement>(null);
+  const moved = useRef(false);
+  const goTo = (next: Step) => {
+    moved.current = true;
+    setStep(next);
+  };
+  useEffect(() => {
+    if (moved.current) {
+      moved.current = false;
+      headingRef.current?.focus();
+    }
+  }, [current]);
+
+  // Draft recovery: restore EVERY saved answer and resume at Confirm after a
+  // refresh or a browser restart, where all of them are shown to be checked.
   //
   // Read once per season, in the first render after hydration (the server has
   // no localStorage, so an earlier read would mismatch the markup it sent).
@@ -219,16 +287,20 @@ export function RegisterFlow({
       setRole(saved.role);
       setDob(saved.dob);
       setAttrs(saved.attributes);
-      if (initialName.trim() !== "") {
-        setStep("review");
-        setRestored(true);
+      if (!askName) {
+        setStep(resumeStep(saved));
+        setRestored(resumeStep(saved) === "confirm");
       }
     }
   }
 
   const saveDraft = (next: Partial<Draft>) => {
-    const current = readDraft(slug) ?? { role, dob, attributes: attrs };
-    window.localStorage.setItem(draftKey(slug), JSON.stringify({ ...current, ...next }));
+    const currentDraft = readDraft(slug) ?? { role, dob, attributes: attrs };
+    try {
+      window.localStorage.setItem(draftKey(slug), JSON.stringify({ ...currentDraft, ...next }));
+    } catch {
+      // Storage blocked: the answers live in this tab only. Nothing to tell.
+    }
   };
 
   const saveName = (formData: FormData) => {
@@ -241,14 +313,14 @@ export function RegisterFlow({
       }
       const value = (formData.get("name") as string | null) ?? "";
       setName(value.trim().replace(/\s+/g, " "));
-      setNameDone(true);
       track("profile.completed");
-      setStep("role");
+      goTo("play");
     });
   };
 
   const chooseRole = (value: string) => {
     setRole(value);
+    setRoleError(null);
     // Autosave the draft the moment it changes.
     saveDraft({ role: value });
   };
@@ -257,6 +329,8 @@ export function RegisterFlow({
   // `dob` is "" until the user types one (the draft loads client-side after
   // mount), so this is false during SSR and cannot cause a hydration mismatch.
   const dobIsMinor = dob !== "" && isMinor(dob, new Date());
+  const guardianMissing = dobIsMinor && (guardianName.trim() === "" || !guardianConsent);
+  const roleLabel = roles.find((entry) => entry.key === role)?.label ?? role;
 
   const submit = () => {
     setError(null);
@@ -266,15 +340,11 @@ export function RegisterFlow({
       );
       return;
     }
-    if (dobIsMinor && (guardianName.trim() === "" || !guardianConsent)) {
-      /*
-       * The guardian fields live on "How you play", not here — so this refusal
-       * used to point at a box the reader could not see, on a screen with
-       * nothing on it that could satisfy the demand. Send them to the fields
-       * and mark them, rather than describing where they are.
-       */
+    if (guardianMissing) {
+      // The guardian fields live on "How you play" — send them there and mark
+      // the fields, rather than describing a box they cannot see from here.
       setGuardianError(GUARDIAN_REQUIRED);
-      setStep("role");
+      goTo("play");
       return;
     }
     startTransition(async () => {
@@ -304,15 +374,10 @@ export function RegisterFlow({
         formData.set("source", source);
       }
       /*
-       * The consent travels to the server, for two reasons.
-       *
-       * It has to be ENFORCED there: the check above is a client gate, and a
-       * client gate is a courtesy. And it has to be RECORDED there, with the
-       * wording actually shown, because "what did they agree to?" is a question
-       * about a past moment and today's copy is not evidence of it.
-       *
-       * The label is sent verbatim rather than as a version number so the
-       * record survives this file being edited — which it will be.
+       * The consent travels to the server, to be ENFORCED there (a client gate
+       * is a courtesy) and RECORDED there with the wording actually shown —
+       * verbatim rather than a version number, so the record survives this
+       * file being edited.
        */
       formData.set("publicationConsent", "true");
       formData.set("publicationConsentText", PUBLICATION_CONSENT_LABEL);
@@ -325,7 +390,11 @@ export function RegisterFlow({
       }
       const result = await submitRegistrationAction(slug, {}, formData);
       if (result.done === true) {
-        window.localStorage.removeItem(draftKey(slug));
+        try {
+          window.localStorage.removeItem(draftKey(slug));
+        } catch {
+          // Storage blocked: there was no draft to clear.
+        }
         setDone(true);
       } else {
         setError(result.error ?? "That didn't save. Try again.");
@@ -339,369 +408,489 @@ export function RegisterFlow({
 
   if (done) {
     return (
-      <Card>
-        {/* DA-31: the page kept its scroll position on submit, so the
-            confirmation landed above the fold and a player could not tell
-            whether anything had happened. Focus moves here, which scrolls it
-            into view and announces it to a screen reader in one act. */}
-        <p
-          data-testid="registration-submitted"
-          ref={(node) => {
-            node?.focus();
-          }}
-          tabIndex={-1}
-          role="status"
-        >
-          You&apos;re in — status <Badge tone="info">submitted</Badge>. The organizer reviews every
-          registration; your status updates on this page and on Home.
-        </p>
-      </Card>
+      <RegistrationStatus
+        justSubmitted
+        competitionName={competitionName}
+        slug={slug}
+        listed={listed}
+        status="submitted"
+        number={null}
+        name={name}
+        photoUrl={photoUrl}
+        roleLabel={roleLabel}
+        rejectionReason={null}
+      />
     );
   }
 
-  const steps: { key: Step; label: string }[] = [
-    { key: "profile", label: "Your name" },
-    { key: "role", label: "How you play" },
-    { key: "review", label: "Review" },
+  const steps: Step[] = [
+    ...(askPhone ? (["mobile"] as const) : []),
+    ...(askName ? (["you"] as const) : []),
+    "play",
+    "confirm",
   ];
-  const stepIndex = steps.findIndex((entry) => entry.key === step);
+  const stepIndex = steps.indexOf(current);
+  const returnTo = `/seasons/${slug}/register${source === "" ? "" : `?ref=${encodeURIComponent(source)}`}`;
+
+  const heading = (lede: ReactNode) => (
+    <header className="reg-step-head">
+      <h2 ref={headingRef} tabIndex={-1} className="reg-step-title">
+        {STEP_TITLE[current]}
+      </h2>
+      {lede === null ? null : <p className="reg-step-lede">{lede}</p>}
+    </header>
+  );
+
+  /** A small inline "Edit" that returns to the step owning a fact. */
+  const edit = (target: Step, what: string) =>
+    steps.includes(target) ? (
+      <button
+        type="button"
+        className="reg-edit"
+        aria-label={`Edit ${what}`}
+        onClick={() => {
+          goTo(target);
+        }}
+      >
+        Edit
+      </button>
+    ) : null;
 
   return (
-    <Card data-testid="register-card">
-      <p className="register-hint">
-        Registering for <strong>{competitionName}</strong> as {formatPhone(phone)} — verified.
-      </p>
-      <ol className="register-progress" aria-label="Registration progress">
+    <Card data-testid="register-card" className="reg-card" elevation="floating">
+      <ol className="reg-stepper" aria-label="Registration progress">
         {steps.map((entry, index) => (
           <li
-            key={entry.key}
-            className={`register-step ${index === stepIndex ? "register-step-current" : index < stepIndex ? "register-step-done" : ""}`}
+            key={entry}
+            className={`reg-stepper-item ${index === stepIndex ? "is-current" : index < stepIndex ? "is-done" : ""}`}
             aria-current={index === stepIndex ? "step" : undefined}
           >
-            <span className="register-step-number">{index + 1}</span>
-            {entry.label}
+            <span className="reg-stepper-dot" aria-hidden>
+              {index < stepIndex ? <IconCheck size={14} /> : index + 1}
+            </span>
+            <span className="reg-stepper-label">{STEP_LABEL[entry]}</span>
+            {index < stepIndex ? <VisuallyHidden>, done</VisuallyHidden> : null}
           </li>
         ))}
       </ol>
 
-      {step === "profile" ? (
-        <form action={saveName} className="register-form" data-testid="register-step-profile">
-          <Field
-            label="Your name"
-            name="name"
-            required
-            autoFocus
-            autoComplete="name"
-            defaultValue={name}
-            placeholder="Rohan Kulkarni"
-            help="Published on this season's public page and on a player page of your own once the organizer publishes the season."
-            {...(error !== null ? { error } : {})}
+      {current === "mobile" ? (
+        <section className="reg-step" data-testid="register-step-mobile">
+          {heading(
+            <span data-testid="registration-needs-phone">
+              Organizers text players about their registration and on auction day. Your number is
+              never published.
+            </span>,
+          )}
+          <AddPhoneStep
+            returnTo={returnTo}
+            onVerified={() => {
+              moved.current = true;
+            }}
           />
-          <Button type="submit" loading={pending}>
-            Continue
-          </Button>
-        </form>
+        </section>
       ) : null}
 
-      {step === "role" ? (
-        <div className="register-form" data-testid="register-step-role">
-          <Select
-            label="Playing role"
-            name="role"
-            required
-            value={role}
-            onChange={(event) => {
-              chooseRole(event.target.value);
-            }}
-            help="Saved as you go — you can come back any time."
-            {...(error !== null ? { error } : {})}
+      {current === "you" ? (
+        <section className="reg-step" data-testid="register-step-profile">
+          {heading(null)}
+          <SelfPhotoUploader
+            slug={slug}
+            name={name}
+            photoUrl={photoUrl}
+            onUploaded={setPhotoUrl}
+            variant="hero"
           >
-            <option value="">Choose your role…</option>
-            {roles.map((entry) => (
-              <option key={entry.key} value={entry.key}>
-                {entry.label}
-              </option>
-            ))}
-          </Select>
-          {/* PRR P0-2 (DPDP Act 2023 §9): an under-18 date of birth now triggers
-              a guardian-consent step below, and a minor's age and photo are never
-              published on any public surface (server/competition/public.ts). An
-              adult's age is still published; the date itself never is. */}
-          <Field
-            label="Date of birth (optional)"
-            name="dateOfBirth"
-            type="date"
-            value={dob}
-            onChange={(event) => {
-              setDob(event.target.value);
-              saveDraft({ dob: event.target.value });
-            }}
-            help="For an adult player, your AGE (not the date) is shown on your public player card. For an under-18 player, neither age nor photo is ever public, and a parent or guardian must consent below."
-          />
-          {dobIsMinor ? (
-            <div className="register-guardian" data-testid="guardian-block">
-              <Field
-                label="Parent or guardian's name"
-                name="guardianName"
-                value={guardianName}
-                onChange={(event) => {
-                  setGuardianName(event.target.value);
-                  if (event.target.value.trim() !== "") {
-                    setError(null);
-                    setGuardianError(null);
-                  }
-                }}
-                required
-                help="This player is under 18, so a parent or guardian must consent to the registration."
-                data-testid="guardian-name"
-              />
-              <label className="register-consent-check" htmlFor="guardian-consent-box">
-                <input
-                  id="guardian-consent-box"
-                  type="checkbox"
-                  checked={guardianConsent}
-                  data-testid="guardian-consent"
+            <p className="reg-photo-why">
+              Optional — a photo puts your face on your player card and the auction screen.
+            </p>
+          </SelfPhotoUploader>
+          <form action={saveName} className="register-form">
+            <Field
+              label="Your name"
+              name="name"
+              required
+              autoFocus
+              autoComplete="name"
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+              }}
+              placeholder="Rohan Kulkarni"
+              help="As teammates know you — it's shown on the season's public page."
+              {...(error !== null ? { error } : {})}
+            />
+            <div className="reg-actions">
+              <Button type="submit" size="touch" loading={pending}>
+                Continue
+              </Button>
+            </div>
+          </form>
+        </section>
+      ) : null}
+
+      {current === "play" ? (
+        <section className="reg-step" data-testid="register-step-role">
+          {heading(null)}
+          <div className="reg-who">
+            <PlayerImage
+              name={name}
+              size="md"
+              shape="round"
+              {...(photoUrl !== null ? { src: photoUrl } : {})}
+            />
+            <p className="reg-who-text">
+              <strong>{name}</strong>
+              {phone === null ? null : <span>{formatPhone(phone)} · verified</span>}
+            </p>
+          </div>
+          <fieldset
+            className="reg-choice"
+            aria-describedby={roleError !== null ? "reg-role-error" : undefined}
+          >
+            <legend className="reg-choice-legend">
+              Playing role
+              <span className="reg-required" aria-hidden>
+                {" "}
+                *
+              </span>
+            </legend>
+            <div className="reg-choice-options">
+              {roles.map((entry, index) => (
+                <label key={entry.key} className="reg-chip">
+                  <input
+                    ref={index === 0 ? firstRoleRef : undefined}
+                    type="radio"
+                    name="role"
+                    value={entry.key}
+                    checked={role === entry.key}
+                    required
+                    onChange={() => {
+                      chooseRole(entry.key);
+                    }}
+                  />
+                  <span className="reg-chip-mark" aria-hidden>
+                    <IconCheck size={14} />
+                  </span>
+                  {entry.label}
+                </label>
+              ))}
+            </div>
+            {roleError !== null ? (
+              <p id="reg-role-error" role="alert" className="register-error">
+                {roleError}
+              </p>
+            ) : null}
+          </fieldset>
+
+          <p className="reg-section-label">Optional</p>
+          <div className="reg-grid">
+            {/* PRR P0-2 (DPDP Act 2023 §9): an under-18 date of birth opens the
+                guardian consent below, and a minor's age and photo are never
+                published (server/competition/public.ts). An adult's AGE is
+                published; the date itself never is. */}
+            <Field
+              label="Date of birth"
+              name="dateOfBirth"
+              type="date"
+              value={dob}
+              onChange={(event) => {
+                setDob(event.target.value);
+                saveDraft({ dob: event.target.value });
+              }}
+              help="Only your age is shown — never the date."
+            />
+            {dobIsMinor ? (
+              <div className="reg-guardian" data-testid="guardian-block">
+                <p className="reg-guardian-head">Under 18 — a parent or guardian confirms</p>
+                <p className="register-hint">
+                  A minor&apos;s age and photo are never shown on public pages.
+                </p>
+                <Field
+                  label="Parent or guardian's name"
+                  name="guardianName"
+                  value={guardianName}
                   onChange={(event) => {
-                    setGuardianConsent(event.target.checked);
-                    if (event.target.checked) {
-                      setError(null);
+                    setGuardianName(event.target.value);
+                    if (event.target.value.trim() !== "") {
                       setGuardianError(null);
                     }
                   }}
+                  required
+                  ref={guardianRef}
+                  data-testid="guardian-name"
                 />
-                <span>{GUARDIAN_CONSENT_LABEL}</span>
-              </label>
-              {guardianError !== null ? (
-                <p role="alert" className="register-error" data-testid="guardian-error">
-                  {guardianError}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-          {attributes.map((attribute) => (
-            <Select
-              key={attribute.key}
-              label={`${attribute.label} (optional)`}
-              name={`attr.${attribute.key}`}
-              value={attrs[attribute.key] ?? ""}
-              onChange={(event) => {
-                const next = { ...attrs, [attribute.key]: event.target.value };
-                setAttrs(next);
-                saveDraft({ attributes: next });
-              }}
-            >
-              <option value="">Not specified</option>
-              {attribute.options.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          ))}
-          <div className="register-actions">
-            {!nameDone ? null : (
+                <label className="register-consent-check" htmlFor="guardian-consent-box">
+                  <input
+                    id="guardian-consent-box"
+                    type="checkbox"
+                    checked={guardianConsent}
+                    data-testid="guardian-consent"
+                    onChange={(event) => {
+                      setGuardianConsent(event.target.checked);
+                      if (event.target.checked) {
+                        setGuardianError(null);
+                      }
+                    }}
+                  />
+                  <span>{GUARDIAN_CONSENT_LABEL}</span>
+                </label>
+                {guardianError !== null ? (
+                  <p role="alert" className="register-error" data-testid="guardian-error">
+                    {guardianError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {attributes.map((attribute) => (
+              <Select
+                key={attribute.key}
+                label={attribute.label}
+                name={`attr.${attribute.key}`}
+                value={attrs[attribute.key] ?? ""}
+                onChange={(event) => {
+                  const next = { ...attrs, [attribute.key]: event.target.value };
+                  setAttrs(next);
+                  saveDraft({ attributes: next });
+                }}
+              >
+                <option value="">Not specified</option>
+                {attribute.options.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            ))}
+          </div>
+
+          <p className="reg-saved">Saved on this device as you go.</p>
+          <div className="reg-actions">
+            {askName ? (
               <Button
                 variant="ghost"
+                size="touch"
                 onClick={() => {
-                  setStep("profile");
+                  goTo("you");
                 }}
               >
                 Back
               </Button>
-            )}
+            ) : null}
             <Button
-              disabled={role === ""}
+              size="touch"
               data-testid="register-continue"
               onClick={() => {
-                /*
-                 * The guardian block is required, and this step is where it is
-                 * collected — so this is where it is checked. Letting Continue
-                 * through carried an under-18 registration to a Review screen
-                 * that showed no guardian at all, and the refusal only arrived
-                 * on submit, from the server, pointing at fields two screens
-                 * back. The server check stays; it is no longer the first one.
-                 */
-                if (dobIsMinor && (guardianName.trim() === "" || !guardianConsent)) {
+                // Held at the step that collects them, so Confirm never shows a
+                // registration the server is going to refuse.
+                if (!roles.some((entry) => entry.key === role)) {
+                  setRoleError("Choose your playing role to continue.");
+                  firstRoleRef.current?.focus();
+                  return;
+                }
+                if (guardianMissing) {
                   setGuardianError(GUARDIAN_REQUIRED);
+                  guardianRef.current?.focus();
                   return;
                 }
                 setError(null);
                 setGuardianError(null);
-                setStep("review");
+                goTo("confirm");
               }}
             >
               Continue
             </Button>
           </div>
-        </div>
+        </section>
       ) : null}
 
-      {step === "review" ? (
-        <div className="register-form" data-testid="register-step-review">
+      {current === "confirm" ? (
+        <section className="reg-step" data-testid="register-step-review">
+          {heading(null)}
           {restored ? (
-            <p className="register-hint" role="status" data-testid="draft-restored">
-              We brought back the answers you had already given. Check them, or go Back to change
-              anything.
+            <p className="reg-restored" role="status" data-testid="draft-restored">
+              We brought back the answers you had already given — check them below.
             </p>
           ) : null}
-          <dl className="register-review">
-            <dt>Name</dt>
-            <dd>{name}</dd>
-            <dt>Mobile</dt>
-            <dd>{formatPhone(phone)}</dd>
-            <dt>Playing role</dt>
-            <dd>{roles.find((entry) => entry.key === role)?.label ?? role}</dd>
-            {/* DA-21: step 2 collects date of birth and both styles, and the
-                review showed none of them — you could not check what you were
-                about to submit. Omitted rows stay omitted rather than printing
-                "Not specified" three times for someone who skipped them. */}
-            {dob !== "" ? (
-              <>
-                <dt>Date of birth</dt>
-                <dd>{dob}</dd>
-              </>
-            ) : null}
-            {attributes.map((attribute) => {
-              const chosen = attribute.options.find(
-                (option) => option.key === (attrs[attribute.key] ?? ""),
-              );
-              return chosen === undefined ? null : (
-                <Fragment key={attribute.key}>
-                  <dt>{attribute.label}</dt>
-                  <dd>{chosen.label}</dd>
-                </Fragment>
-              );
-            })}
-          </dl>
-          <div className="register-photo">
-            <SelfPhotoUploader slug={slug} name={name} />
-            {/* DA-35: the form asks a stranger for their face and their date of
-                birth, and the only thing it said about either was that a photo
-                "makes your player card stand out". Where the photo goes is not
-                a detail — it goes on public pages. */}
-            <p className="competitions-hint" data-testid="photo-privacy">
-              A photo is optional. If you add one it becomes public: it appears on this
-              season&apos;s public page, on the auction board and screen, and on link previews when
-              the season is shared. You can remove it any time and it disappears from all of them.
-            </p>
+
+          <div className="reg-summary">
+            <SelfPhotoUploader
+              slug={slug}
+              name={name}
+              photoUrl={photoUrl}
+              onUploaded={setPhotoUrl}
+              variant="inline"
+            >
+              <p className="reg-summary-name">
+                {name}
+                {edit("you", "your name")}
+              </p>
+              {phone === null ? null : (
+                <p className="reg-summary-sub">
+                  {formatPhone(phone)} <span className="reg-private">· private</span>
+                </p>
+              )}
+            </SelfPhotoUploader>
+            {/* DA-21: every answer "How you play" collects is shown here, so a
+                player can check what they are about to submit. Skipped
+                optional rows stay omitted rather than printing "Not
+                specified" three times. */}
+            <dl className="reg-facts">
+              <div className="reg-fact">
+                <dt>Playing role</dt>
+                <dd>
+                  <span>{roleLabel}</span>
+                  {edit("play", "playing role")}
+                </dd>
+              </div>
+              {dob !== "" ? (
+                <div className="reg-fact">
+                  <dt>Date of birth</dt>
+                  <dd>
+                    <span>{formatDate(dob)}</span>
+                    {edit("play", "date of birth")}
+                  </dd>
+                </div>
+              ) : null}
+              {attributes.map((attribute) => {
+                const chosen = attribute.options.find(
+                  (option) => option.key === (attrs[attribute.key] ?? ""),
+                );
+                return chosen === undefined ? null : (
+                  <div className="reg-fact" key={attribute.key}>
+                    <dt>{attribute.label}</dt>
+                    <dd>
+                      <span>{chosen.label}</span>
+                      {edit("play", attribute.label.toLowerCase())}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
           </div>
-          {/* This said "What the organizer of {name} RECEIVES: your name, your
-              mobile number, your playing role and anything optional you filled
-              in above." Receives. A reasonable person reads that as "this goes
-              to the club" — and then nine of those fields are published on the
-              open internet, of which exactly one, the photo, was disclosed as
-              public. The paragraph above about the photo is what a real
-              disclosure reads like ("Where the photo goes is not a detail — it
-              goes on public pages"); this is the rest of the form held to that
-              same standard. The split is the point: one line for what stays
-              private, one for what does not. */}
-          <div className="register-consent" data-testid="register-privacy">
-            {/* h2, not h3: the only heading above this on the page is the h1,
-                and the review step renders no h2 of its own — an h3 here skips
-                a level and axe fails `heading-order`. */}
-            <h2 className="register-consent-head">Before you submit: what becomes public</h2>
-            <p className="register-consent-line">
-              <strong>Your mobile number stays private.</strong> It goes to the organizer of{" "}
-              {competitionName} so they can reach you about this season, and it is published on no
-              page, ever — not on the season page, not on your player page, not on a shared link.
+
+          {/* What becomes public, said in one sentence where the decision is
+              made — and in full one tap away. The split is the point: one line
+              for what stays private, one for what does not. */}
+          <div className="reg-notice" data-testid="register-privacy">
+            <p className="reg-notice-line">
+              <IconEye size={18} />
+              <span>
+                Your name, role, photo and the details above are published on this season&apos;s
+                public pages. <strong>Your mobile number never is.</strong>
+              </span>
             </p>
-            <p className="register-consent-line">
-              <strong>Everything else here is published</strong> once the organizer publishes this
-              season: your name, your registration number, your playing role, your age if you gave a
-              date of birth
-              {attributes.length === 0
-                ? ""
-                : `, your ${attributes
-                    .map((attribute) => attribute.label.toLowerCase())
-                    .join(" and ")} if you gave ${attributes.length === 1 ? "it" : "them"}`}
-              , your photo if you add one, and later which team signs you. Anyone with the link can
-              read it — no account, no sign-in.
-            </p>
-            <p className="register-consent-line">
-              It appears in two places: this season&apos;s public player list, and a page of your
-              own at a web address you can share. Both produce a preview card carrying your name and
-              role when the link is pasted into WhatsApp or posted anywhere else. Player pages are
-              marked not to be indexed by search engines, so they do not turn up in web searches.
-            </p>
-            <p className="register-consent-line">
-              You can withdraw your registration from this page at any time, which takes both pages
-              down. Full detail:{" "}
-              <a href="/legal/privacy" target="_blank" rel="noreferrer">
-                Privacy policy
-              </a>{" "}
-              ·{" "}
-              <a href="/help/whats-public" target="_blank" rel="noreferrer">
-                What&apos;s public about you
-              </a>
-              .
-            </p>
+            <details className="reg-disclosure">
+              <summary>What becomes public</summary>
+              <ul>
+                <li>
+                  Once the organizer publishes the season: your name, registration number, playing
+                  role, your age if you gave a date of birth (never the date)
+                  {attributes.length === 0
+                    ? ""
+                    : `, your ${attributes
+                        .map((attribute) => attribute.label.toLowerCase())
+                        .join(" and ")} if you gave ${attributes.length === 1 ? "it" : "them"}`}
+                  , your photo if you add one, and later the team that signs you.
+                </li>
+                <li>
+                  It appears on the season&apos;s public player list and on a player page of your
+                  own. Both make a preview card with your name and role when the link is shared.
+                  Anyone with the link can read them; search engines are asked not to index player
+                  pages.
+                </li>
+                <li>
+                  Your photo shows on the auction board and screen too. For a player under 18,
+                  neither age nor photo is ever public.
+                </li>
+                <li>Your mobile number goes to the organizer of {competitionName} only.</li>
+                <li>
+                  Withdraw any time from this page — it takes both pages down.{" "}
+                  <a href="/help/whats-public" target="_blank" rel="noreferrer">
+                    What&apos;s public about you
+                  </a>{" "}
+                  ·{" "}
+                  <a href="/legal/privacy" target="_blank" rel="noreferrer">
+                    Privacy policy
+                  </a>
+                </li>
+              </ul>
+            </details>
           </div>
-          {/* An affirmative act, adjacent to Submit — not a paragraph above the
-              fold-break that a thumb scrolls past. Submit stays ENABLED and
+
+          {/* An affirmative act, adjacent to Submit. Submit stays ENABLED and
               refuses out loud: a greyed-out button with no spoken reason is the
               same silence this whole block exists to end. */}
-          <label className="register-consent-check" htmlFor="register-consent-box">
-            <input
-              id="register-consent-box"
-              type="checkbox"
-              checked={consented}
-              data-testid="register-consent"
-              onChange={(event) => {
-                setConsented(event.target.checked);
-                if (event.target.checked) {
-                  setError(null);
-                }
-              }}
-            />
-            <span>{PUBLICATION_CONSENT_LABEL}</span>
-          </label>
-          {/* PI-1 write-back. A convenience, not a consent — so it sits apart
-              from the consent box above and defaults on. */}
-          <label className="register-consent-check" htmlFor="register-remember-box">
-            <input
-              id="register-remember-box"
-              type="checkbox"
-              checked={remember}
-              data-testid="register-remember"
-              onChange={(event) => {
-                setRemember(event.target.checked);
-              }}
-            />
-            <span>Remember these answers on my profile, so the next form starts filled in.</span>
-          </label>
-          {/* Phase 3: WhatsApp instead of SMS for auction and team news.
-              Unticked; leaving it unticked changes nothing already chosen. */}
-          <label className="register-consent-check" htmlFor="register-whatsapp-box">
-            <input
-              id="register-whatsapp-box"
-              type="checkbox"
-              checked={whatsapp}
-              data-testid="register-whatsapp"
-              onChange={(event) => {
-                setWhatsapp(event.target.checked);
-              }}
-            />
-            <span>{WHATSAPP_CONSENT_LABEL}</span>
-          </label>
+          <div className="reg-checks">
+            <label className="register-consent-check" htmlFor="register-consent-box">
+              <input
+                id="register-consent-box"
+                type="checkbox"
+                checked={consented}
+                data-testid="register-consent"
+                onChange={(event) => {
+                  setConsented(event.target.checked);
+                  if (event.target.checked) {
+                    setError(null);
+                  }
+                }}
+              />
+              <span>{PUBLICATION_CONSENT_LABEL}</span>
+            </label>
+            {/* Phase 3: WhatsApp instead of SMS for auction and team news.
+                Unticked; leaving it unticked changes nothing already chosen. */}
+            <label
+              className="register-consent-check reg-check-quiet"
+              htmlFor="register-whatsapp-box"
+            >
+              <input
+                id="register-whatsapp-box"
+                type="checkbox"
+                checked={whatsapp}
+                data-testid="register-whatsapp"
+                onChange={(event) => {
+                  setWhatsapp(event.target.checked);
+                }}
+              />
+              <span>{WHATSAPP_CONSENT_LABEL}</span>
+            </label>
+            {/* PI-1 write-back. A convenience, not a consent — defaults on. */}
+            <label
+              className="register-consent-check reg-check-quiet"
+              htmlFor="register-remember-box"
+            >
+              <input
+                id="register-remember-box"
+                type="checkbox"
+                checked={remember}
+                data-testid="register-remember"
+                onChange={(event) => {
+                  setRemember(event.target.checked);
+                }}
+              />
+              <span>Remember these answers for my next registration.</span>
+            </label>
+          </div>
           {error !== null ? (
             <p role="alert" className="register-error">
               {error}
             </p>
           ) : null}
-          <div className="register-actions">
+          <div className="reg-actions">
             <Button
               variant="ghost"
+              size="touch"
               onClick={() => {
-                setStep("role");
+                goTo("play");
               }}
             >
               Back
             </Button>
-            <Button loading={pending} data-testid="register-submit" onClick={submit}>
+            <Button size="touch" loading={pending} data-testid="register-submit" onClick={submit}>
               Submit registration
             </Button>
           </div>
-        </div>
+        </section>
       ) : null}
     </Card>
   );

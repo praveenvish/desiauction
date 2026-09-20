@@ -13,6 +13,16 @@
   box-sizing: border-box;
 }
 
+/* A content page that opens with the kit's hero gives up its own 960px box:
+   the band is the full width of the viewport and `PageBody` re-constrains
+   everything under it. Without this the hero drew a dark rectangle floating in
+   the middle of a cream page — a card, not a band. `:has()` keeps it to the
+   pages that have actually been converted. */
+.content-page:has(> .pk-hero) {
+  max-width: none;
+  padding: 0;
+}
+
 .content-narrow {
   max-width: 760px;
 }
@@ -682,4 +692,33 @@ a.content-card:focus-visible {
   gap: var(--space-4);
   max-width: 28rem;
   justify-items: start;
+}
+
+/* ---- help index, in the public kit (app/help/page.tsx) ---- */
+
+/* The search bar sits in the hero now, on the floodlit band rather than on the
+   page. It keeps its own layout — a field and its button on one line — and its
+   width is bounded so it does not stretch to the hero's full column. */
+.pk-hero .content-searchbar {
+  width: min(520px, 100%);
+  margin: 0;
+}
+
+.content-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+  color: var(--text-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.content-view-all::after {
+  content: "→";
+}
+
+.content-view-all:hover {
+  text-decoration: underline;
 }

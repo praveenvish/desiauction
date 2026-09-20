@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { latestOtp } from "./otp";
+import { issuePaddleTo, showAuctionTab } from "./auction-tabs";
 
 // M-IP4-1 founder demonstration: AuctionReady generation, auction creation,
 // paddles, the lot queue, the frozen state machines, the replay proof and the
@@ -112,18 +113,20 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
   await page.getByTestId("accept-short-squads").check();
   await page.getByTestId("create-auction").click();
   await expect(page.getByTestId("auction-status")).toHaveText("scheduled", { timeout: 20_000 });
+  await showAuctionTab(page, "Players");
   await expect(page.getByTestId("lot-L001")).toContainText("prepared");
   await expect(page.getByTestId("lot-L004")).toBeVisible();
 
   // Paddles: immutable identity, one per team.
   for (const team of ["Andheri Arrows", "Bandra Blasters"]) {
-    await page.getByLabel("Team", { exact: true }).selectOption({ label: team });
-    await page.getByTestId("issue-paddle").click();
+    await issuePaddleTo(page, team);
   }
   await expect(page.getByTestId("paddle-P01")).toBeVisible();
   await expect(page.getByTestId("paddle-P02")).toBeVisible();
 
   // Queue all lots, open the auction (guard now satisfied), pause + resume.
+  // Back on Setup, the open step is "Lot order" — the owners step is done.
+  await showAuctionTab(page, "Setup");
   await page.getByTestId("queue-all").click();
   await expect(page.getByTestId("lot-L001")).toContainText("queued");
   await page.getByTestId("accept-short-open").check();
@@ -135,8 +138,9 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
   await expect(page.getByTestId("auction-status")).toHaveText("live");
 
   // Replay visualization: fold the event log, verify the projection matches.
+  await showAuctionTab(page, "Log");
   await page.getByTestId("verify-replay").click();
-  await expect(page.getByTestId("replay-report")).toContainText("matches persisted state", {
+  await expect(page.getByTestId("replay-report")).toContainText("everything matches", {
     timeout: 20_000,
   });
 });

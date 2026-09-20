@@ -1,9 +1,11 @@
 "use client";
 
 import { formatPaiseINR, paise, type AuctionSnapshot } from "@desiauction/core";
-import { Badge } from "@desiauction/ui";
+import { Badge, PlayerImage } from "@desiauction/ui";
 
 import { SoundToggle } from "../../../../components/shell/sound-toggle";
+import { lotSeed } from "../../../../lib/player-seed";
+import type { LotMedia } from "../../../../server/auction/live-summary";
 
 import type { ConnectionState } from "./use-auction-socket";
 
@@ -82,6 +84,8 @@ export function StatusRibbon({
   audience = "operator",
   /** The device itself has no network — a stronger statement than "reconnecting". */
   offline = false,
+  /** Faces keyed by lot id (`lotMediaOf`) — the lot cell shows who is on the block. */
+  lotMedia = {},
 }: {
   snapshot: AuctionSnapshot | null;
   connection: ConnectionState;
@@ -90,6 +94,7 @@ export function StatusRibbon({
   variant?: "page" | "shell";
   audience?: "operator" | "public";
   offline?: boolean;
+  lotMedia?: Readonly<Record<string, LotMedia>>;
 }) {
   const lot = snapshot?.currentLot ?? null;
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
@@ -130,6 +135,14 @@ export function StatusRibbon({
           <RibbonGap />
           <strong>{lot.lotNumber}</strong>
           <RibbonGap />
+          <PlayerImage
+            name={lot.playerName ?? "Unnamed"}
+            seed={lotSeed(lot.lotId, lotMedia)}
+            src={lotMedia[lot.lotId]?.photoUrl}
+            size="xs"
+            shape="round"
+            decorative
+          />
           <span>{lot.playerName ?? "Unnamed"}</span>
         </span>
       ) : null}

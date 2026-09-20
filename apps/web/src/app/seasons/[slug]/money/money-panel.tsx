@@ -2,19 +2,33 @@
 
 import { formatPaiseINR, paise } from "@desiauction/core";
 import {
-  Badge,
   Button,
   ButtonLink,
-  Card,
   Dialog,
-  EmptyState,
   Field,
+  IconAlert,
+  IconArrowRight,
+  IconCheck,
+  IconCheckCircle,
+  IconClock,
+  IconFileCheck,
+  IconGavel,
+  IconLedger,
+  IconLock,
+  IconReceipt,
+  IconRupee,
+  IconShieldCheck,
+  IconUsers,
+  IconWallet,
+  Pill,
+  SectionCard,
   Select,
+  StatCard,
+  StatGrid,
   useAnnouncer,
   useToast,
   VisuallyHidden,
-  type BadgeTone,
-  IconCheck,
+  type KitTone,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -38,6 +52,7 @@ import type { CaseView, ObligationView, PaymentView } from "../../../../server/s
 import { formatDateTime } from "../../../../lib/format-date";
 import { CASE_STATE, PAYMENT_STATE } from "./money-words";
 import "./money.css";
+import "./season-money.css";
 import { useHydrated } from "../../../../lib/use-hydrated";
 
 /**
@@ -50,15 +65,15 @@ import { useHydrated } from "../../../../lib/use-hydrated";
  * courtesy, never a control.
  */
 
-const STATUS_TONE = {
-  opened: "info",
-  verified: "info",
-  discrepant: "danger",
-  settling: "warning",
-  settled: "success",
-  closed: "success",
+const STATUS_TONE: Record<string, KitTone> = {
+  opened: "blue",
+  verified: "blue",
+  discrepant: "red",
+  settling: "amber",
+  settled: "green",
+  closed: "green",
   voided: "neutral",
-} as const;
+};
 
 /** The lifecycle as an organizer walks it. `discrepant` is a detour off `verify`. */
 const STEPS: { key: string; label: string }[] = [
@@ -86,13 +101,13 @@ const METHODS: { value: string; label: string }[] = [
 ];
 
 /** Keyed loosely on purpose: the payment status arrives as projection text. */
-const PAYMENT_TONE: Record<string, BadgeTone> = {
-  created: "info",
-  authorized: "info",
-  captured: "success",
+const PAYMENT_TONE: Record<string, KitTone> = {
+  created: "blue",
+  authorized: "blue",
+  captured: "green",
   refunded: "neutral",
-  failed: "danger",
-  disputed: "warning",
+  failed: "red",
+  disputed: "amber",
 };
 
 function inr(value: number): string {
@@ -125,22 +140,24 @@ function CaseStepper({ status }: { status: string }) {
    */
   const finished = status === "closed";
   return (
-    <ol className="case-stepper" data-testid="case-stepper" aria-label="Settlement progress">
+    <ol className="mn-stepper" data-testid="case-stepper" aria-label="Settlement progress">
       {STEPS.map((step, index) => {
         const state = finished || index < at ? "done" : index === at ? "current" : "blocked";
         return (
           <li
             key={step.key}
-            className="case-step"
+            className="mn-step"
             data-state={state}
             data-step={step.key}
             {...(state === "current" ? { "aria-current": "step" as const } : {})}
           >
-            <span className="case-step-mark" aria-hidden>
+            <span className="mn-step-mark" aria-hidden>
               {state === "done" ? <IconCheck size={14} /> : String(index + 1)}
             </span>
-            {step.label}
-            {state === "done" ? <VisuallyHidden> (done)</VisuallyHidden> : null}
+            <span className="mn-step-label">
+              {step.label}
+              {state === "done" ? <VisuallyHidden> (done)</VisuallyHidden> : null}
+            </span>
           </li>
         );
       })}
@@ -230,14 +247,18 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
 
   if (auction === null) {
     return (
-      <Card data-testid="money-panel" data-hydrated={hydrated ? "true" : "false"}>
-        <EmptyState
-          headingLevel={2}
+      <div data-testid="money-panel" data-hydrated={hydrated ? "true" : "false"}>
+        <EmptyCard
+          icon={<IconGavel size={26} />}
           title="Settlement opens after the auction"
-          description="There is no auction for this season yet. Once the auction is created, conducted and completed, its settlement case opens here."
-          action={<ButtonLink href={`/seasons/${slug}/auction`}>Go to the auction</ButtonLink>}
+          body="There is no auction for this season yet. Once the auction is created, conducted and completed, its settlement case opens here."
+          action={
+            <ButtonLink href={`/seasons/${slug}/auction`} size="sm">
+              Go to the auction
+            </ButtonLink>
+          }
         />
-      </Card>
+      </div>
     );
   }
 
@@ -258,42 +279,52 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
 
   return (
     <div data-testid="money-panel" data-hydrated={hydrated ? "true" : "false"}>
-      <Card>
-        <div className="competition-title-row">
-          <div>
-            <CaseStepper status={settlementCase.status} />
-          </div>
-          <Badge tone={STATUS_TONE[settlementCase.status]} data-testid="case-status">
+      <CaseMoney settlementCase={settlementCase} />
+
+      <SectionCard
+        icon={<IconShieldCheck />}
+        tone={STATUS_TONE[settlementCase.status] ?? "neutral"}
+        title="Settlement case"
+        description={`Case ${settlementCase.caseId.slice(-8)} · opened ${formatDateTime(settlementCase.openedAt)}`}
+        action={
+          <Pill tone={STATUS_TONE[settlementCase.status] ?? "neutral"} dot testId="case-status">
             {CASE_STATE[settlementCase.status] ?? settlementCase.status}
-          </Badge>
-        </div>
-        {/* The case's identity: number, date, what it stands on, where it is.
-            The header band above carried none of it — 110px of empty rule. */}
-        <dl className="case-identity" data-testid="case-identity">
-          <dt>Case</dt>
-          <dd className="digest">{settlementCase.caseId.slice(-8)}</dd>
-          <dt>Opened</dt>
-          <dd>{formatDateTime(settlementCase.openedAt)}</dd>
-          <dt>Dues</dt>
-          <dd>
-            {settlementCase.basis === "committed"
-              ? "from what teams committed in the auction"
-              : settlementCase.basis === "fixed"
-                ? "from fixed amounts set when the case opened"
-                : "as nothing owed"}
-          </dd>
-        </dl>
-        <CaseMoney settlementCase={settlementCase} />
-        <p className="section-note">
+          </Pill>
+        }
+      >
+        <div className="mn-case">
+          <CaseStepper status={settlementCase.status} />
+          {/* The case's identity: number, date, what it stands on, where it is.
+              The header band above carried none of it — 110px of empty rule. */}
+          <dl className="mn-identity" data-testid="case-identity">
+            <div>
+              <dt>Case</dt>
+              <dd className="digest">{settlementCase.caseId.slice(-8)}</dd>
+            </div>
+            <div>
+              <dt>Opened</dt>
+              <dd>{formatDateTime(settlementCase.openedAt)}</dd>
+            </div>
+            <div>
+              <dt>Dues</dt>
+              <dd>
+                {settlementCase.basis === "committed"
+                  ? "From what teams committed in the auction"
+                  : settlementCase.basis === "fixed"
+                    ? "From fixed amounts set when the case opened"
+                    : "Nothing owed"}
+              </dd>
+            </div>
+          </dl>
           <a
-            className="money-inline-link"
+            className="st-link mn-review-link"
             href={`/seasons/${slug}/money/case/${settlementCase.caseId}`}
           >
-            Open case review
-          </a>{" "}
-          — every event, every posting, and the evidence closure sealed.
-        </p>
-      </Card>
+            Open the case review
+            <IconArrowRight size={16} aria-hidden />
+          </a>
+        </div>
+      </SectionCard>
 
       {outcomeNote}
 
@@ -381,37 +412,36 @@ function OpenCase({
   // Saying so BEFORE the click is the whole point of a console.
   if (auctionStatus !== "completed" && auctionStatus !== "reconciled") {
     return (
-      <Card>
-        <EmptyState
-          headingLevel={2}
-          title="The auction has not finished"
-          description="A settlement case can only open on a completed auction — that is what freezes the log the money is worked out from. Close the auction first."
-          action={<ButtonLink href={`/seasons/${slug}/auction`}>Go to the auction</ButtonLink>}
-        />
-      </Card>
+      <EmptyCard
+        icon={<IconGavel size={26} />}
+        title="The auction has not finished"
+        body="A settlement case can only open on a completed auction — that is what freezes the log the money is worked out from. Close the auction first."
+        action={
+          <ButtonLink href={`/seasons/${slug}/auction`} size="sm">
+            Go to the auction
+          </ButtonLink>
+        }
+      />
     );
   }
 
   if (!canManage) {
     return (
-      <Card>
-        <EmptyState
-          headingLevel={2}
-          title="No settlement case yet"
-          description="The auction is finished and ready to settle, but you do not have permission to open the case. Ask an organization owner for a settlement grant."
-        />
-      </Card>
+      <EmptyCard
+        icon={<IconLock size={26} />}
+        title="No settlement case yet"
+        body="The auction is finished and ready to settle, but you do not have permission to open the case. Ask an organization owner for a settlement grant."
+      />
     );
   }
 
   return (
-    <Card>
-      <h2>Open the settlement case</h2>
-      <p className="section-note">
-        Opening the case pins the auction log exactly as it stands now. Everything owed is worked
-        out from that pin, and it never moves again.
-      </p>
-      <div className="money-form">
+    <SectionCard
+      icon={<IconShieldCheck />}
+      title="Open the settlement case"
+      description="Opening the case pins the auction log exactly as it stands now. Everything owed is worked out from that pin, and it never moves again."
+    >
+      <div className="money-form mn-form">
         <Select
           label="How are the dues worked out?"
           value={basis}
@@ -436,7 +466,7 @@ function OpenCase({
         </Button>
       </div>
       {basis === "fixed" ? (
-        <fieldset className="fixed-dues">
+        <fieldset className="fixed-dues mn-fixed">
           <legend>What each team owes</legend>
           {teams.length === 0 ? (
             <p className="section-note">This season has no teams to charge.</p>
@@ -457,7 +487,7 @@ function OpenCase({
           )}
         </fieldset>
       ) : null}
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -465,28 +495,84 @@ function OpenCase({
 
 function CaseMoney({ settlementCase }: { settlementCase: CaseView }) {
   const { financial } = settlementCase;
-  const tiles: { label: string; value: number; testId: string }[] = [
-    { label: "Total dues", value: financial.totalObligations, testId: "total-obligations" },
-    { label: "Collected", value: financial.discharged, testId: "discharged" },
-    { label: "Waived", value: financial.waived, testId: "waived" },
-    { label: "Outstanding", value: financial.outstanding, testId: "outstanding" },
-    // Recorded but not yet attested. Without it, writing ₹10,000.50 against a
-    // ₹25,000 due changed no tile and no row — the money was simply invisible.
-    ...(settlementCase.pending > 0
-      ? [{ label: "Awaiting confirmation", value: settlementCase.pending, testId: "pending" }]
-      : []),
-  ];
+  const collectedShare =
+    financial.totalObligations > 0
+      ? ((financial.discharged + financial.waived) / financial.totalObligations) * 100
+      : undefined;
   return (
-    <div className="stat-row">
-      {tiles.map((tile) => (
-        <div className="stat-tile" key={tile.label}>
-          <span className="stat-value" data-testid={tile.testId}>
-            <Amount value={tile.value} />
-          </span>
-          <span className="stat-label">{tile.label}</span>
-        </div>
-      ))}
-    </div>
+    <StatGrid>
+      <StatCard
+        icon={<IconReceipt />}
+        tone="gold"
+        value={<Amount value={financial.totalObligations} />}
+        label="Total dues"
+        hint={`${String(settlementCase.obligations.length)} team${settlementCase.obligations.length === 1 ? "" : "s"}`}
+        testId="total-obligations"
+      />
+      <StatCard
+        icon={<IconWallet />}
+        tone="green"
+        value={<Amount value={financial.discharged} />}
+        label="Collected"
+        hint="Confirmed as received"
+        {...(collectedShare !== undefined ? { progress: collectedShare } : {})}
+        testId="discharged"
+      />
+      <StatCard
+        icon={<IconFileCheck />}
+        tone="blue"
+        value={<Amount value={financial.waived} />}
+        label="Waived"
+        hint="Forgiven, with a reason"
+        testId="waived"
+      />
+      <StatCard
+        icon={financial.outstanding === 0 ? <IconCheckCircle /> : <IconAlert />}
+        tone={financial.outstanding === 0 ? "green" : "red"}
+        value={<Amount value={financial.outstanding} />}
+        label="Outstanding"
+        hint={financial.outstanding === 0 ? "Nothing still owed" : "Still owed by teams"}
+        testId="outstanding"
+      />
+      {/* Recorded but not yet attested. Without it, writing ₹10,000.50 against a
+          ₹25,000 due changed no tile and no row — the money was simply invisible. */}
+      {settlementCase.pending > 0 ? (
+        <StatCard
+          icon={<IconClock />}
+          tone="amber"
+          value={<Amount value={settlementCase.pending} />}
+          label="Awaiting confirmation"
+          hint="Recorded, not yet in hand"
+          testId="pending"
+        />
+      ) : null}
+    </StatGrid>
+  );
+}
+
+/** An empty state in the card language: a glyph, a sentence, a way on. */
+function EmptyCard({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: ReactNode;
+  title: string;
+  body: string;
+  action?: ReactNode;
+}) {
+  return (
+    <SectionCard icon={<IconRupee />} title="Settlement">
+      <div className="st-empty">
+        <span className="st-empty-glyph" aria-hidden>
+          {icon}
+        </span>
+        <h3>{title}</h3>
+        <p>{body}</p>
+        {action !== undefined ? <div className="st-empty-actions">{action}</div> : null}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -544,8 +630,12 @@ function NextStep({
 
   if (settlementCase.status === "discrepant") {
     return (
-      <Card>
-        <h2>The auction log no longer matches</h2>
+      <SectionCard
+        icon={<IconAlert />}
+        tone="red"
+        title="The auction log no longer matches"
+        className="mn-step-card"
+      >
         <p className="section-note">
           What the auction log says today is not what this case pinned when it opened. Money is
           frozen: nothing can be collected, waived or closed while the case is discrepant. Verifying
@@ -580,7 +670,7 @@ function NextStep({
         ) : (
           <p className="section-note">Only a settlement controller can resolve a discrepancy.</p>
         )}
-      </Card>
+      </SectionCard>
     );
   }
 
@@ -612,13 +702,17 @@ function NextStep({
     const clear = settlementCase.financial.outstanding === 0;
     const pending = settlementCase.pending;
     return (
-      <Card>
-        {/*
-         * The headline used to read "Everything is accounted for" directly
-         * under a COLLECTING badge — a contradiction in one glance. The case IS
-         * still collecting; what has changed is that nothing is outstanding.
-         */}
-        <h2>{clear ? "Nothing is outstanding — ready to settle" : "Collect what is still owed"}</h2>
+      /*
+       * The headline used to read "Everything is accounted for" directly
+       * under a COLLECTING badge — a contradiction in one glance. The case IS
+       * still collecting; what has changed is that nothing is outstanding.
+       */
+      <SectionCard
+        icon={clear ? <IconCheckCircle /> : <IconWallet />}
+        tone={clear ? "green" : "amber"}
+        title={clear ? "Nothing is outstanding — ready to settle" : "Collect what is still owed"}
+        className="mn-step-card"
+      >
         <p className="section-note">
           {clear
             ? "No team owes anything. Settling locks the amounts so they can no longer change."
@@ -637,16 +731,18 @@ function NextStep({
           still be reopened; a closed one has a sealed record saying it was right.
         </p>
         {viewer.canManage ? (
-          <Button
-            onClick={() => {
-              setConfirming("settle");
-            }}
-            disabled={busy || !clear}
-            data-testid="settle-case"
-            size="touch"
-          >
-            Settle case
-          </Button>
+          <div className="mn-step-actions">
+            <Button
+              onClick={() => {
+                setConfirming("settle");
+              }}
+              disabled={busy || !clear}
+              data-testid="settle-case"
+              size="touch"
+            >
+              Settle case
+            </Button>
+          </div>
         ) : (
           <p className="section-note">You need a settlement grant to settle this case.</p>
         )}
@@ -678,31 +774,32 @@ function NextStep({
             record. Closing, the step after this one, is not.
           </p>
         </Confirm>
-      </Card>
+      </SectionCard>
     );
   }
 
   if (settlementCase.status === "settled") {
     const blocked = readiness !== null && !readiness.ready;
     return (
-      <Card>
-        <h2>Close the case</h2>
+      <SectionCard icon={<IconLock />} tone="green" title="Close the case" className="mn-step-card">
         <p className="section-note">
           Closing runs the full financial verification and seals an evidence package that can be
           replayed for ever. Once closed, the auction reads as Reconciled.
         </p>
         {readiness !== null ? <Readiness readiness={readiness} /> : null}
         {viewer.canManage ? (
-          <Button
-            onClick={() => {
-              setConfirming("close");
-            }}
-            disabled={busy || blocked}
-            data-testid="close-case"
-            size="touch"
-          >
-            Close case
-          </Button>
+          <div className="mn-step-actions">
+            <Button
+              onClick={() => {
+                setConfirming("close");
+              }}
+              disabled={busy || blocked}
+              data-testid="close-case"
+              size="touch"
+            >
+              Close case
+            </Button>
+          </div>
         ) : (
           <p className="section-note">You need a settlement grant to close this case.</p>
         )}
@@ -735,19 +832,23 @@ function NextStep({
             Nothing you do later can change what was sealed here.
           </p>
         </Confirm>
-      </Card>
+      </SectionCard>
     );
   }
 
   if (settlementCase.status === "closed") {
     return (
-      <Card>
-        <h2>Settlement complete</h2>
+      <SectionCard
+        icon={<IconCheckCircle />}
+        tone="green"
+        title="Settlement complete"
+        className="mn-step-card"
+      >
         <p className="section-note">
           This case is closed and the auction reads as Reconciled. The evidence sealed at closure is
           on the case review, where it can be replayed and checked against the log.
         </p>
-        <div className="money-row-actions" style={{ justifyContent: "flex-start" }}>
+        <div className="mn-step-actions">
           <ButtonLink
             href={`/seasons/${slug}/money/case/${caseId}`}
             size="touch"
@@ -756,17 +857,17 @@ function NextStep({
             View closure evidence
           </ButtonLink>
         </div>
-      </Card>
+      </SectionCard>
     );
   }
 
   return (
-    <Card>
-      <h2>This case was voided</h2>
-      <p className="section-note">
-        A voided case settles nothing and moves no money. Its history stays on the case review.
-      </p>
-    </Card>
+    <SectionCard
+      icon={<IconAlert />}
+      tone="neutral"
+      title="This case was voided"
+      description="A voided case settles nothing and moves no money. Its history stays on the case review."
+    />
   );
 }
 
@@ -832,12 +933,11 @@ function Step({
   denied: string | null;
 }) {
   return (
-    <Card>
-      <h2>{title}</h2>
+    <SectionCard icon={<IconShieldCheck />} tone="blue" title={title} className="mn-step-card">
       <p className="section-note">{body}</p>
-      {action}
+      {action !== null ? <div className="mn-step-actions">{action}</div> : null}
       {denied !== null ? <p className="section-note">{denied}</p> : null}
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -864,10 +964,10 @@ function Readiness({
     );
   }
   return (
-    <ul className="check-list" data-testid="closure-blockers">
+    <ul className="check-list mn-checks" data-testid="closure-blockers">
       {readiness.blockers.map((blocker) => (
         <li key={blocker}>
-          <Badge tone="danger">Blocked</Badge>
+          <Pill tone="red">Blocked</Pill>
           <span>{CHECK_LABEL[blocker] ?? blocker}</span>
         </li>
       ))}
@@ -900,16 +1000,13 @@ function Obligations({
 
   if (settlementCase.obligations.length === 0) {
     return (
-      <Card>
-        {/* The card's own body already said "what each team owes"; the heading
-            said "Obligations". The prose was the better of the two. */}
-        <h2>What each team owes</h2>
-        <EmptyState
-          headingLevel={3}
-          title="Nothing has been worked out yet"
-          description="Once the case is verified and the amounts are worked out, every team's due appears here."
-        />
-      </Card>
+      /* The card's own body already said "what each team owes"; the heading
+         said "Obligations". The prose was the better of the two. */
+      <SectionCard
+        icon={<IconUsers />}
+        title="What each team owes"
+        description="Nothing has been worked out yet. Once the case is verified and the amounts are worked out, every team's due appears here."
+      />
     );
   }
 
@@ -917,40 +1014,44 @@ function Obligations({
   const anyPending = settlementCase.obligations.some((obligation) => obligation.pending > 0);
 
   return (
-    <Card>
-      <h2>What each team owes</h2>
+    <SectionCard
+      icon={<IconUsers />}
+      title="What each team owes"
+      description={`${String(settlementCase.obligations.length)} team${settlementCase.obligations.length === 1 ? "" : "s"} · ${String(settlementCase.obligations.filter((o) => o.outstanding === 0).length)} clear`}
+      flush
+    >
       <div
-        className="table-scroll money-scroll"
+        className="st-table-wrap mn-scroll"
         tabIndex={0}
         role="region"
         aria-label="What each team owes"
       >
-        <table className="money-table" data-testid="obligations-table">
+        <table className="st-table mn-table" data-stack="" data-testid="obligations-table">
           <caption>
             <VisuallyHidden>What each team owes, has paid, and still owes</VisuallyHidden>
           </caption>
           <thead>
             <tr>
               <th scope="col">Team</th>
-              <th scope="col" className="num">
+              <th scope="col" className="st-num">
                 Owes
               </th>
-              <th scope="col" className="num">
+              <th scope="col" className="st-num">
                 Collected
               </th>
-              <th scope="col" className="num">
+              <th scope="col" className="st-num">
                 Waived
               </th>
               {anyPending ? (
-                <th scope="col" className="num">
+                <th scope="col" className="st-num">
                   Awaiting confirmation
                 </th>
               ) : null}
-              <th scope="col" className="num">
+              <th scope="col" className="st-num">
                 Outstanding
               </th>
               {canWaive ? (
-                <th scope="col" className="num">
+                <th scope="col" className="st-num">
                   <VisuallyHidden>Actions</VisuallyHidden>
                 </th>
               ) : null}
@@ -965,36 +1066,40 @@ function Obligations({
               >
                 {/* The team is the ROW HEADER — the word that makes every
                     figure beside it mean something to a screen reader. */}
-                <th scope="row" data-label="Team">
+                <th scope="row" data-label="" data-span="full" className="mn-team">
                   {obligation.teamName}
                 </th>
-                <td data-label="Owes" className="num">
+                <td data-label="Owes" className="st-num">
                   <Amount value={obligation.amount + obligation.increased} />
                 </td>
-                <td data-label="Collected" className="num">
+                <td data-label="Collected" className="st-num">
                   <Amount value={obligation.discharged} />
                 </td>
-                <td data-label="Waived" className="num">
+                <td data-label="Waived" className="st-num">
                   <Amount value={obligation.waived} />
                 </td>
                 {anyPending ? (
-                  <td data-label="Awaiting confirmation" className="num">
+                  <td data-label="Awaiting confirmation" className="st-num">
                     <Amount value={obligation.pending} />
                   </td>
                 ) : null}
                 <td
                   data-label="Outstanding"
-                  className="num"
+                  className="st-num"
                   data-outstanding={obligation.outstanding}
                 >
                   {obligation.outstanding === 0 ? (
-                    <Badge tone="success">Clear</Badge>
+                    <Pill tone="green" dot>
+                      Clear
+                    </Pill>
                   ) : (
-                    <Amount value={obligation.outstanding} />
+                    <span className="mn-owed">
+                      <Amount value={obligation.outstanding} />
+                    </span>
                   )}
                 </td>
                 {canWaive ? (
-                  <td data-label="" className="num">
+                  <td data-label="" className="st-num">
                     <div className="money-row-actions">
                       <Button
                         variant="secondary"
@@ -1018,24 +1123,24 @@ function Obligations({
           </tbody>
           <tfoot>
             <tr>
-              <th scope="row" data-label="">
+              <th scope="row" data-label="" data-span="full">
                 Total
               </th>
-              <td data-label="Owes" className="num">
+              <td data-label="Owes" className="st-num">
                 <Amount value={settlementCase.financial.totalObligations} />
               </td>
-              <td data-label="Collected" className="num">
+              <td data-label="Collected" className="st-num">
                 <Amount value={settlementCase.financial.discharged} />
               </td>
-              <td data-label="Waived" className="num">
+              <td data-label="Waived" className="st-num">
                 <Amount value={settlementCase.financial.waived} />
               </td>
               {anyPending ? (
-                <td data-label="Awaiting confirmation" className="num">
+                <td data-label="Awaiting confirmation" className="st-num">
                   <Amount value={settlementCase.pending} />
                 </td>
               ) : null}
-              <td data-label="Outstanding" className="num">
+              <td data-label="Outstanding" className="st-num">
                 <Amount value={settlementCase.financial.outstanding} />
               </td>
               {canWaive ? <td data-label="" /> : null}
@@ -1117,7 +1222,7 @@ function Obligations({
           data-testid="waive-reason"
         />
       </Dialog>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -1160,14 +1265,13 @@ function Collect({
   }
 
   return (
-    <Card>
-      <h2>Record a payment</h2>
-      <p className="section-note">
-        Record the money as it arrives. A payment is written down first and confirmed once it is
-        actually in hand — confirming is what puts it on the books and takes it off what the team
-        owes. Until then it shows as awaiting confirmation.
-      </p>
-      <div className="money-form">
+    <SectionCard
+      icon={<IconRupee />}
+      tone="green"
+      title="Record a payment"
+      description="Record the money as it arrives. It is confirmed once it is actually in hand — confirming puts it on the books and takes it off what the team owes."
+    >
+      <div className="money-form mn-form">
         <Select
           label="Which team paid?"
           value={teamId}
@@ -1231,7 +1335,7 @@ function Collect({
           Record payment
         </Button>
       </div>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -1261,27 +1365,30 @@ function Payments({
 
   if (settlementCase.payments.length === 0) {
     return (
-      <Card>
-        <h2>Payments</h2>
-        <EmptyState
-          headingLevel={3}
-          title="No money has been recorded yet"
-          description="Every payment recorded against this case appears here with the day it was recorded, how it arrived, and who confirmed it."
-        />
-      </Card>
+      <SectionCard
+        icon={<IconLedger />}
+        tone="purple"
+        title="Payments"
+        description="No money has been recorded yet. Every payment appears here with the day it was recorded, how it arrived, and who confirmed it."
+      />
     );
   }
 
   return (
-    <Card>
-      <h2>Payments</h2>
+    <SectionCard
+      icon={<IconLedger />}
+      tone="purple"
+      title="Payments"
+      description={`${String(settlementCase.payments.length)} recorded against this case`}
+      flush
+    >
       <div
-        className="table-scroll money-scroll"
+        className="st-table-wrap mn-scroll"
         tabIndex={0}
         role="region"
         aria-label="Payments recorded against this case"
       >
-        <table className="money-table" data-testid="payments-table">
+        <table className="st-table mn-table" data-stack="" data-testid="payments-table">
           <caption>
             <VisuallyHidden>Every payment recorded against this case</VisuallyHidden>
           </caption>
@@ -1293,13 +1400,13 @@ function Payments({
               <th scope="col">Recorded</th>
               <th scope="col">Method</th>
               <th scope="col">State</th>
-              <th scope="col" className="num">
+              <th scope="col" className="st-num">
                 Amount
               </th>
-              <th scope="col" className="num">
+              <th scope="col" className="st-num">
                 Collected
               </th>
-              <th scope="col" className="num">
+              <th scope="col" className="st-num">
                 <VisuallyHidden>Actions</VisuallyHidden>
               </th>
             </tr>
@@ -1405,7 +1512,7 @@ function Payments({
           data-testid="refund-reason"
         />
       </Dialog>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -1433,7 +1540,7 @@ function PaymentRow({
   const refundable = canOverride && payment.captured - payment.refundedTotal > 0;
   return (
     <tr data-testid={`payment-${payment.paymentId}`}>
-      <th scope="row" data-label="Team">
+      <th scope="row" data-label="" data-span="full" className="mn-team">
         {payment.teamName}
       </th>
       <td data-label="Recorded" className="money-when">
@@ -1441,9 +1548,9 @@ function PaymentRow({
       </td>
       <td data-label="Method">{methodLabel}</td>
       <td data-label="State">
-        <Badge tone={PAYMENT_TONE[payment.status] ?? "neutral"}>
+        <Pill tone={PAYMENT_TONE[payment.status] ?? "neutral"}>
           {PAYMENT_STATE[payment.status] ?? payment.status}
-        </Badge>
+        </Pill>
         {/* The action promises the money is "recorded against your name". The
             name was fetched and thrown away; here it is. */}
         {payment.attested ? (
@@ -1453,16 +1560,16 @@ function PaymentRow({
           </span>
         ) : null}
       </td>
-      <td data-label="Amount" className="num">
+      <td data-label="Amount" className="st-num">
         <Amount value={payment.amount} />
       </td>
-      <td data-label="Collected" className="num">
+      <td data-label="Collected" className="st-num">
         <Amount value={payment.captured} />
         {payment.refundedTotal > 0 ? (
           <span className="section-note"> less {inr(payment.refundedTotal)} refunded</span>
         ) : null}
       </td>
-      <td data-label="" className="num">
+      <td data-label="" className="st-num" data-span="full">
         <div className="money-row-actions">
           {canCollect && payment.status === "created" ? (
             <Button
@@ -1530,14 +1637,14 @@ function Overrides({
   }
 
   return (
-    <Card>
-      <div className="override-well">
-        <h3>Controller actions</h3>
-        <p className="override-hint">
-          These undo settled money. Every one is recorded against your name with the reason you
-          give, and shows on the case for ever.
-        </p>
-        <div className="money-row-actions" style={{ justifyContent: "flex-start" }}>
+    <SectionCard
+      icon={<IconAlert />}
+      tone="red"
+      title="Controller actions"
+      description="These undo settled money. Every one is recorded against your name with the reason you give, and shows on the case for ever."
+    >
+      <div>
+        <div className="mn-step-actions">
           {canReopen ? (
             <Button
               // The trigger opens the reason form; red is for the confirm there.
@@ -1626,6 +1733,6 @@ function Overrides({
           data-testid="override-reason"
         />
       </Dialog>
-    </Card>
+    </SectionCard>
   );
 }

@@ -1,4 +1,4 @@
-import { Badge, Card, EmptyState } from "@desiauction/ui";
+import { EmptyState, IconFileCheck, IconLock, IconSend, Pill, SectionCard } from "@desiauction/ui";
 
 import { maskContact } from "../../../server/admin/format";
 import type { MessagingOverview } from "../../../server/admin/views";
@@ -25,199 +25,209 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
     <>
       <ReadOnlyNotice />
 
-      <section aria-labelledby="admin-templates">
-        <h2 className="admin-section-title" id="admin-templates">
-          Registered templates
-        </h2>
-        <Card>
-          <div className="admin-health-row">
-            <span>DLT registration</span>
-            <Badge
-              tone={allConfigured ? "success" : "danger"}
-              data-testid="admin-templates-verdict"
-            >
-              {allConfigured
-                ? `All ${String(overview.total)} configured`
-                : `${String(overview.configured)} of ${String(overview.total)} configured`}
-            </Badge>
-          </div>
-          {allConfigured ? null : (
-            <p className="admin-meta" data-testid="admin-templates-warning">
-              A shape with no registered id refuses to send and names the missing variable in the
-              audit log. Those messages are not queued and not retried — they do not go out at all.
-            </p>
-          )}
-          <div className="table-scroll">
-            <table className="reg-table msg-template-table" data-testid="admin-template-table">
-              <thead>
-                <tr>
-                  <th scope="col">Message</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Environment variable</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.templates.map((row) => (
-                  <tr key={row.key} className="reg-row" data-testid={`admin-template-${row.key}`}>
-                    <td data-label="Message">
-                      <span className="registration-name">{row.key}</span>
+      <SectionCard
+        icon={<IconFileCheck />}
+        tone={allConfigured ? "green" : "red"}
+        title="Registered templates"
+        description="DLT registration for every message shape, and the sentence each one sends."
+        action={
+          <Pill tone={allConfigured ? "green" : "red"} dot testId="admin-templates-verdict">
+            {allConfigured
+              ? `All ${String(overview.total)} configured`
+              : `${String(overview.configured)} of ${String(overview.total)} configured`}
+          </Pill>
+        }
+        flush
+      >
+        {allConfigured ? null : (
+          <p className="admin-card-empty admin-warning" data-testid="admin-templates-warning">
+            A shape with no registered id refuses to send and names the missing variable in the
+            audit log. Those messages are not queued and not retried — they do not go out at all.
+          </p>
+        )}
+        <div className="admin-table-wrap">
+          <table className="admin-table" data-testid="admin-template-table">
+            <thead>
+              <tr>
+                <th scope="col">Message</th>
+                <th scope="col">Status</th>
+                <th scope="col">Environment variable</th>
+              </tr>
+            </thead>
+            <tbody>
+              {overview.templates.map((row) => (
+                <tr key={row.key} data-testid={`admin-template-${row.key}`}>
+                  <td data-label="Message">
+                    <span className="admin-cell-main">
+                      <span className="admin-name">{row.key}</span>
                       <span className="admin-meta">
                         {row.channel} · {row.category} · {row.locale}
                       </span>
                       {/* The registered sentence, verbatim. The gateway matches
-                          it character for character — a template whose text has
-                          drifted from its registration is rejected at the
+                          it character for character — a template whose text
+                          has drifted from its registration is rejected at the
                           provider, not here. */}
                       <span className="admin-meta">{row.body}</span>
+                    </span>
+                  </td>
+                  <td data-label="Status">
+                    <Pill tone={row.configured ? "green" : "red"} dot>
+                      {row.configured ? "Registered" : "Missing"}
+                    </Pill>
+                  </td>
+                  <td data-label="Environment variable" className="is-wide">
+                    <code className="admin-meta">{row.variable}</code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        icon={<IconSend />}
+        tone="blue"
+        title="Delivery by message"
+        description={`The last ${String(overview.deliveryWindowDays)} days, counted from the audit rows the sender writes — not from a separate counter that could drift from them.`}
+        flush
+      >
+        {overview.delivery.length === 0 ? (
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="Nothing sent yet"
+              description="Decision notices appear here once an organizer approves, waitlists or declines somebody."
+            />
+          </div>
+        ) : (
+          <div className="admin-table-wrap">
+            <table className="admin-table" data-stack="3" data-testid="admin-delivery-table">
+              <thead>
+                <tr>
+                  <th scope="col">Message</th>
+                  <th scope="col" className="admin-num">
+                    Sent
+                  </th>
+                  <th scope="col" className="admin-num">
+                    Failed
+                  </th>
+                  <th scope="col" className="admin-num">
+                    Suppressed
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {overview.delivery.map((row) => (
+                  <tr key={row.template}>
+                    <td data-label="Message">
+                      <span className="admin-name">{row.template}</span>
                     </td>
-                    <td data-label="Status">
-                      <Badge tone={row.configured ? "success" : "danger"}>
-                        {row.configured ? "Registered" : "Missing"}
-                      </Badge>
+                    <td data-label="Sent" className="admin-count admin-num">
+                      {String(row.sent)}
                     </td>
-                    <td data-label="Environment variable">
-                      <code className="admin-meta">{row.variable}</code>
+                    {/* Failed is a delivery problem. Suppressed is the gate
+                        working — somebody said stop, or a club switched the
+                        topic off. Folding them together would send an operator
+                        chasing an outage that is not happening. */}
+                    <td data-label="Failed" className="admin-count admin-num">
+                      {row.failed === 0 ? "0" : <strong>{String(row.failed)}</strong>}
+                    </td>
+                    <td data-label="Suppressed" className="admin-count admin-num">
+                      {String(row.suppressed)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </Card>
-      </section>
+        )}
+      </SectionCard>
 
-      <section aria-labelledby="admin-delivery">
-        <h2 className="admin-section-title" id="admin-delivery">
-          Delivery by message
-        </h2>
-        <Card>
-          <p className="admin-meta">
-            The last {String(overview.deliveryWindowDays)} days, counted from the audit rows the
-            sender writes — not from a separate counter that could drift from them.
-          </p>
-          {overview.delivery.length === 0 ? (
-            <EmptyState
-              title="Nothing sent yet"
-              description="Decision notices appear here once an organizer approves, waitlists or declines somebody."
-            />
-          ) : (
-            <div className="table-scroll">
-              <table className="reg-table msg-delivery-table" data-testid="admin-delivery-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Message</th>
-                    <th scope="col" className="admin-num">
-                      Sent
-                    </th>
-                    <th scope="col" className="admin-num">
-                      Failed
-                    </th>
-                    <th scope="col" className="admin-num">
-                      Suppressed
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.delivery.map((row) => (
-                    <tr key={row.template} className="reg-row">
-                      <td data-label="Message">
-                        <span className="registration-name">{row.template}</span>
-                      </td>
-                      <td data-label="Sent" className="admin-count admin-num">
-                        {String(row.sent)}
-                      </td>
-                      {/* Failed is a delivery problem. Suppressed is the gate
-                          working — somebody said stop, or a club switched the
-                          topic off. Folding them together would send an
-                          operator chasing an outage that is not happening. */}
-                      <td data-label="Failed" className="admin-count admin-num">
-                        {row.failed === 0 ? "0" : <strong>{String(row.failed)}</strong>}
-                      </td>
-                      <td data-label="Suppressed" className="admin-count admin-num">
-                        {String(row.suppressed)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </section>
-
-      <section aria-labelledby="admin-suppressions">
-        <h2 className="admin-section-title" id="admin-suppressions">
-          Suppression list
-        </h2>
-        <Card>
-          {/* No lift button, deliberately. Somebody who texts START lifts their
-              own; the day support genuinely needs to lift somebody else's is a
-              conversation at review, not an import into a read-only surface. */}
-          <div className="admin-health-row">
-            <span>Contacts we must not send to</span>
-            <Badge tone="neutral" data-testid="admin-suppression-count">
-              {String(overview.liveSuppressions)}
-            </Badge>
-          </div>
-          {/* Bounces and complaints carry consequences beyond the one person:
-              continuing to send to a hard bounce is how a sending domain dies,
-              and a complaint is somebody telling their provider we are spam. A
-              STOP is simply somebody's choice, and is toned as such. */}
-          <div className="admin-chips" data-testid="admin-suppression-reasons">
+      {/* No lift button, deliberately. Somebody who texts START lifts their
+          own; the day support genuinely needs to lift somebody else's is a
+          conversation at review, not an import into a read-only surface. */}
+      <SectionCard
+        icon={<IconLock />}
+        tone="neutral"
+        title="Suppression list"
+        description="Contacts we must not send to."
+        action={
+          <Pill tone="neutral" testId="admin-suppression-count">
+            {String(overview.liveSuppressions)}
+          </Pill>
+        }
+        flush
+      >
+        {/* Bounces and complaints carry consequences beyond the one person:
+            continuing to send to a hard bounce is how a sending domain dies,
+            and a complaint is somebody telling their provider we are spam. A
+            STOP is simply somebody's choice, and is toned as such. */}
+        {overview.byReason.length > 0 ? (
+          <div className="admin-chips admin-card-empty" data-testid="admin-suppression-reasons">
             {overview.byReason.map((row) => (
-              <Badge
+              <Pill
                 key={`${row.channel}:${row.reason}`}
-                tone={row.reason === "bounce" || row.reason === "complaint" ? "danger" : "neutral"}
+                tone={row.reason === "bounce" || row.reason === "complaint" ? "red" : "neutral"}
               >
                 {row.channel} {row.reason} <span className="admin-count">{String(row.count)}</span>
-              </Badge>
+              </Pill>
             ))}
           </div>
-          {overview.recent.length === 0 ? (
+        ) : null}
+        {overview.recent.length === 0 ? (
+          <div className="admin-card-empty">
             <EmptyState
+              headingLevel={3}
               title="Nobody is suppressed"
               description="Numbers that text STOP, and addresses that bounce or complain, appear here."
             />
-          ) : (
-            <div className="table-scroll">
-              <table
-                className="reg-table msg-suppression-table"
-                data-testid="admin-suppression-table"
-              >
-                <thead>
-                  <tr>
-                    <th scope="col">Contact</th>
-                    <th scope="col">Reason</th>
-                    <th scope="col">Topic</th>
-                    <th scope="col">Since</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.recent.map((row) => (
-                    <tr
-                      key={`${row.channel}:${row.contact}:${row.createdAt.toISOString()}`}
-                      className="reg-row"
-                    >
-                      {/* Masked, like every other contact on this surface.
-                          Administration needs to see THAT a contact is
-                          suppressed and why; it does not need the contact. */}
-                      <td data-label="Contact">
-                        <span className="registration-name">{maskContact(row.contact)}</span>
+          </div>
+        ) : (
+          <div className="admin-table-wrap">
+            <table className="admin-table" data-testid="admin-suppression-table">
+              <thead>
+                <tr>
+                  <th scope="col">Contact</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Topic</th>
+                  <th scope="col">Since</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overview.recent.map((row) => (
+                  <tr key={`${row.channel}:${row.contact}:${row.createdAt.toISOString()}`}>
+                    {/* Masked, like every other contact on this surface.
+                        Administration needs to see THAT a contact is
+                        suppressed and why; it does not need the contact. */}
+                    <td data-label="Contact">
+                      <span className="admin-cell-main">
+                        <span className="admin-name" data-private>
+                          {maskContact(row.contact)}
+                        </span>
                         <span className="admin-meta">{row.channel}</span>
-                      </td>
-                      <td data-label="Reason">{row.reason}</td>
-                      <td data-label="Topic">{row.scope}</td>
-                      <td data-label="Since">
-                        <RelativeTime at={row.createdAt} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </section>
+                      </span>
+                    </td>
+                    <td data-label="Reason">
+                      <Pill
+                        tone={
+                          row.reason === "bounce" || row.reason === "complaint" ? "red" : "neutral"
+                        }
+                      >
+                        {row.reason}
+                      </Pill>
+                    </td>
+                    <td data-label="Topic">{row.scope}</td>
+                    <td data-label="Since">
+                      <RelativeTime at={row.createdAt} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
     </>
   );
 }

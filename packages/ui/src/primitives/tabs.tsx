@@ -8,6 +8,13 @@ export interface TabItem {
   id: string;
   label: string;
   content: ReactNode;
+  /**
+   * A short count or flag beside the label ("8", "2 left"). Read as part of
+   * the tab's name, so keep it words a screen reader can say.
+   */
+  badge?: string | number;
+  /** Draws the badge in the accent — something on this tab wants attention. */
+  attention?: boolean;
 }
 
 export interface TabsProps {
@@ -91,6 +98,14 @@ export function Tabs({ tabs, selectedId, defaultTabId, onSelect, label }: TabsPr
             }}
           >
             {tab.label}
+            {tab.badge !== undefined ? (
+              <span
+                className={styles["badge"]}
+                data-attention={tab.attention === true ? "true" : undefined}
+              >
+                {tab.badge}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

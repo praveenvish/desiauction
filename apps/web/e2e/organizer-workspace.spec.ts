@@ -158,7 +158,7 @@ test("founder demo: org → competition → approve → team roster → venue �
     // account is nameless, so the profile step comes first).
     await playerPage.getByLabel("Your name").fill("Player Two");
     await playerPage.getByRole("button", { name: "Continue" }).click();
-    await playerPage.getByLabel("Playing role").selectOption("batter");
+    await playerPage.getByRole("radio", { name: "Batter", exact: true }).check();
     await playerPage.getByTestId("register-continue").click();
     // The publication-consent checkbox is an affirmative act the register
     // flow requires before Submit does anything — see register-flow.tsx.
@@ -179,7 +179,11 @@ test("founder demo: org → competition → approve → team roster → venue �
   await expect(page).toHaveURL(/status=approved/);
   // The player sheet opens on Squad for an approved player; the team select
   // saves itself — no Assign button.
-  await page.getByRole("button", { name: "Details" }).first().click();
+  await page
+    .getByTestId("reg-table")
+    .getByTestId(/^open-/)
+    .first()
+    .click();
   await expect(page.getByTestId("assign-team-row")).toBeVisible();
   await page.getByTestId("sheet-team").selectOption({ label: "Malad Mavericks" });
   await expect(page.getByTestId("reg-table")).toContainText("Malad Mavericks");
@@ -189,7 +193,7 @@ test("founder demo: org → competition → approve → team roster → venue �
   await page.goto(`${competitionUrl}/teams`);
   await page
     .locator(".team-card", { hasText: "Malad Mavericks" })
-    .getByRole("link", { name: "Prepare roster" })
+    .getByRole("link", { name: "View team" })
     .click();
   // PX-5: registration captures names — the roster shows the person, not a number.
   await expect(page.getByTestId("roster-list")).toContainText("Player Two");
@@ -203,7 +207,9 @@ test("founder demo: org → competition → approve → team roster → venue �
     timeout: 30_000,
   });
   await page.getByLabel("Start date").fill("2026-08-01");
-  await page.getByLabel("Kickoff times").fill("18:00,20:00");
+  // Fixed kickoffs, so the schedule below is the one the assertions expect.
+  await page.getByRole("radio", { name: "My own kickoff times" }).check();
+  await page.getByLabel("Kickoff times", { exact: true }).fill("18:00,20:00");
   await page.getByRole("checkbox", { name: /Main Oval/ }).check();
   await page.getByTestId("generate-fixtures").click();
   // Generation previews before it writes; confirm it.

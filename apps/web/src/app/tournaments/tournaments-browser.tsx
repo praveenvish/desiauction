@@ -89,17 +89,18 @@ function byEdition(a: SeasonRow, b: SeasonRow, oldestFirst: boolean): number {
 export function TournamentsBrowser({
   groups,
   initialMode,
-  bandGrouped,
-  bandSeasons,
+  summary,
+  featured,
   actionGrouped,
   actionSeasons,
 }: {
   groups: BrowsableGroup[];
   initialMode: ViewMode;
-  /** The two summary bands, built on the server. The band follows the active
-      view: a union of both would describe neither. */
-  bandGrouped: ReactNode;
-  bandSeasons: ReactNode;
+  /** The summary cards, built on the server. One set for both views: every
+      figure on it is about seasons, which both views list. */
+  summary: ReactNode;
+  /** The featured season (banner + journey), built on the server. */
+  featured?: ReactNode;
   /** The header's one primary action per view — absent for someone who holds
       `competition.create` nowhere. */
   actionGrouped?: ReactNode;
@@ -197,132 +198,137 @@ export function TournamentsBrowser({
         <PageAction>{flat ? actionSeasons : actionGrouped}</PageAction>
       ) : null}
 
-      {/* Two indexes over one dataset used to be two URLs with two vocabularies.
-          They are one destination now, and this is the switch between them —
-          above the band, because the band follows it. */}
-      <div className="tg-modes" role="group" aria-label="Index view" data-testid="tg-modes">
-        <button
-          type="button"
-          className="tg-mode-btn"
-          aria-pressed={!flat}
-          onClick={() => {
-            chooseMode("grouped");
-          }}
-          data-testid="tg-mode-grouped"
-        >
-          By tournament
-        </button>
-        <button
-          type="button"
-          className="tg-mode-btn"
-          aria-pressed={flat}
-          onClick={() => {
-            chooseMode("seasons");
-          }}
-          data-testid="tg-mode-seasons"
-        >
-          All seasons
-        </button>
-      </div>
-
-      {flat ? bandSeasons : bandGrouped}
-
-      <div className="tg-toolbar">
-        <div className="tg-search">
-          <span className="tg-search-icon" aria-hidden>
-            <IconSearch width={18} height={18} />
-          </span>
-          <input
-            type="search"
-            className="tg-search-input"
-            placeholder={flat ? "Search seasons…" : "Search tournaments…"}
-            aria-label="Search tournaments and seasons"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
+      {/* The view switch and the filters share one row (founder mockup): the
+          switch on the left, search / status / sort on the right. */}
+      <div className="tg-topbar">
+        {/* Two indexes over one dataset used to be two URLs with two vocabularies.
+          They are one destination now, and this is the switch between them. */}
+        <div className="tg-modes" role="group" aria-label="Index view" data-testid="tg-modes">
+          <button
+            type="button"
+            className="tg-mode-btn"
+            aria-pressed={!flat}
+            onClick={() => {
+              chooseMode("grouped");
             }}
-            data-testid="tg-search"
-          />
+            data-testid="tg-mode-grouped"
+          >
+            By tournament
+          </button>
+          <button
+            type="button"
+            className="tg-mode-btn"
+            aria-pressed={flat}
+            onClick={() => {
+              chooseMode("seasons");
+            }}
+            data-testid="tg-mode-seasons"
+          >
+            All seasons
+          </button>
         </div>
 
-        <label className="tg-pill">
-          <span className="tg-pill-label">Status:</span>
-          <select
-            className="tg-pill-select"
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as StatusFilter);
-            }}
-            data-testid="tg-status"
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="tg-toolbar">
+          <div className="tg-search">
+            <span className="tg-search-icon" aria-hidden>
+              <IconSearch width={18} height={18} />
+            </span>
+            <input
+              type="search"
+              className="tg-search-input"
+              placeholder="Search tournaments or seasons…"
+              aria-label="Search tournaments and seasons"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+              }}
+              data-testid="tg-search"
+            />
+          </div>
 
-        <label className="tg-pill">
-          <span className="tg-pill-label">Sort:</span>
-          <select
-            className="tg-pill-select"
-            // "Most seasons" cannot be *selected* in the flat view, but it can
-            // be *carried in* from the grouped one; the control shows what the
-            // list is actually doing rather than a value with no option.
-            value={flat && sort === "seasons" ? "newest" : sort}
-            onChange={(event) => {
-              setSort(event.target.value as Sort);
-            }}
-            data-testid="tg-sort"
-          >
-            {(flat ? SEASON_SORT_OPTIONS : SORT_OPTIONS).map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="tg-pill">
+            <span className="tg-pill-label">Status:</span>
+            <select
+              className="tg-pill-select"
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value as StatusFilter);
+              }}
+              data-testid="tg-status"
+            >
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        {/* Two states of one setting, so `aria-pressed` on a pair beats a pair
+          <label className="tg-pill">
+            <span className="tg-pill-label">Sort:</span>
+            <select
+              className="tg-pill-select"
+              // "Most seasons" cannot be *selected* in the flat view, but it can
+              // be *carried in* from the grouped one; the control shows what the
+              // list is actually doing rather than a value with no option.
+              value={flat && sort === "seasons" ? "newest" : sort}
+              onChange={(event) => {
+                setSort(event.target.value as Sort);
+              }}
+              data-testid="tg-sort"
+            >
+              {(flat ? SEASON_SORT_OPTIONS : SORT_OPTIONS).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* Two states of one setting, so `aria-pressed` on a pair beats a pair
             of unrelated buttons — a screen reader announces which is current.
             Grouped view only: "All seasons" IS the card grid, so a List/Grid
             pair beside the view switch would be a control with one state. */}
-        {flat ? null : (
-          <div className="tg-view" role="group" aria-label="Season layout">
-            <button
-              type="button"
-              className="tg-view-btn"
-              aria-pressed={layout === "list"}
-              onClick={() => {
-                setLayout("list");
-              }}
-              data-testid="tg-view-list"
-            >
-              <IconList width={18} height={18} />
-              <VisuallyHidden>List</VisuallyHidden>
-            </button>
-            <button
-              type="button"
-              className="tg-view-btn"
-              aria-pressed={layout === "grid"}
-              onClick={() => {
-                setLayout("grid");
-              }}
-              data-testid="tg-view-grid"
-            >
-              <IconGrid width={18} height={18} />
-              <VisuallyHidden>Grid</VisuallyHidden>
-            </button>
-          </div>
-        )}
+          {flat ? null : (
+            <div className="tg-view" role="group" aria-label="Season layout">
+              <button
+                type="button"
+                className="tg-view-btn"
+                aria-pressed={layout === "list"}
+                onClick={() => {
+                  setLayout("list");
+                }}
+                data-testid="tg-view-list"
+              >
+                <IconList width={18} height={18} />
+                <VisuallyHidden>List</VisuallyHidden>
+              </button>
+              <button
+                type="button"
+                className="tg-view-btn"
+                aria-pressed={layout === "grid"}
+                onClick={() => {
+                  setLayout("grid");
+                }}
+                data-testid="tg-view-grid"
+              >
+                <IconGrid width={18} height={18} />
+                <VisuallyHidden>Grid</VisuallyHidden>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {summary}
+
+      {featured}
 
       {/* Two jobs in one line. It announces the result of a filter that runs
           entirely in the browser (nothing else would tell a screen reader the
-          list had changed), and it says out loud that the summary band above is
-          NOT filtered — the band kept reading "1 Tournaments / 7 Seasons" with
-          one season left on screen, and nothing on the page admitted it. */}
+          list had changed), and it says out loud that the summary cards above
+          are NOT filtered — the band once kept reading "7 Seasons" with one
+          season left on screen, and nothing on the page admitted it. */}
       <p className="tg-results" role="status" aria-live="polite" data-testid="tg-results">
         {flat
           ? filtering

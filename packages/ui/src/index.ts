@@ -18,6 +18,28 @@ export { Stat, StatRow } from "./primitives/stat";
 export type { StatProps, StatRowProps } from "./primitives/stat";
 export { Field, Select } from "./primitives/field";
 export type { FieldProps, SelectProps } from "./primitives/field";
+export {
+  CardGrid,
+  HeroBanner,
+  IconTile,
+  JourneyStepper,
+  Notice,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  TeamChip,
+} from "./primitives/console-kit";
+export type {
+  HeroBannerProps,
+  IconTileProps,
+  JourneyStep,
+  KitTone,
+  NoticeProps,
+  PillProps,
+  SectionCardProps,
+  StatCardProps,
+} from "./primitives/console-kit";
 export { Tabs } from "./primitives/tabs";
 export type { TabsProps, TabItem } from "./primitives/tabs";
 export { Dialog } from "./primitives/dialog";
@@ -62,7 +84,7 @@ export { placeholderIdentity, initialsFor } from "./identity/placeholder";
 export type { PlaceholderIdentity, PlaceholderPattern } from "./identity/placeholder";
 export { PlayerImage } from "./identity/player-image";
 export type { PlayerImageProps, PlayerImageSize } from "./identity/player-image";
-export { ImageUploader } from "./identity/image-uploader";
+export { ImageUploader, IMAGE_UPLOAD_ACCEPT, imageFileProblem } from "./identity/image-uploader";
 export type { ImageUploaderProps, UploadOutcome } from "./identity/image-uploader";
 export { PlayerCard } from "./identity/player-card";
 export type { PlayerCardProps, PlayerRole, PlayerStatus } from "./identity/player-card";
@@ -100,3 +122,5 @@ export type { ErrorStateProps } from "./primitives/error-state";
 export { BrandGlyph } from "./shell/icons";
 // The one icon set. Every glyph the product draws — shell, marketing, content.
 export * from "./icons/icons";
+// The sport glyphs live in their own module (see the note at its head).
+export * from "./icons/sports";

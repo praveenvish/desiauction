@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@desiauction/ui";
+import { Button, IconGavel, SectionCard } from "@desiauction/ui";
 import { useState, useTransition } from "react";
 
 import {
@@ -29,70 +29,74 @@ export function AuctioneerPanel({ slug, view }: { slug: string; view: Auctioneer
   }
 
   return (
-    <section className="auctioneers" aria-labelledby="auctioneers-title" data-testid="auctioneers">
-      <header className="auctioneers-head">
-        <h2 id="auctioneers-title">Auctioneer</h2>
-        <p>
-          Someone who runs this season&apos;s auction room without owning the club. They can open
-          lots and bring the hammer down; undoing a sale stays with the club&apos;s owners.
-        </p>
-      </header>
-      {view.auctioneers.length > 0 ? (
-        <ul className="auctioneers-list">
-          {view.auctioneers.map((row) => (
-            <li key={row.personId}>
-              <span>{row.name}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => {
-                  run(() => removeAuctioneerAction(slug, row.personId));
-                }}
-              >
-                Remove
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="auctioneers-none">No auctioneer yet — the club&apos;s owners run the room.</p>
-      )}
-      {view.candidates.length > 0 ? (
-        <div className="auctioneers-assign">
-          <label htmlFor="auctioneer-pick">Club member</label>
-          <select
-            id="auctioneer-pick"
-            value={choice}
-            onChange={(event) => {
-              setChoice(event.target.value);
-            }}
-          >
-            <option value="">Choose a member…</option>
-            {view.candidates.map((candidate) => (
-              <option key={candidate.personId} value={candidate.personId}>
-                {candidate.name}
-              </option>
+    <SectionCard
+      icon={<IconGavel />}
+      tone="purple"
+      title="Auctioneer"
+      description="Someone who runs this season's auction room without owning the club. They can open lots and bring the hammer down; undoing a sale stays with the club's owners."
+      className="auctioneers"
+      data-testid="auctioneers"
+    >
+      <div className="auctioneers-body">
+        {view.auctioneers.length > 0 ? (
+          <ul className="auctioneers-list">
+            {view.auctioneers.map((row) => (
+              <li key={row.personId}>
+                <span>{row.name}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() => {
+                    run(() => removeAuctioneerAction(slug, row.personId));
+                  }}
+                >
+                  Remove
+                </Button>
+              </li>
             ))}
-          </select>
-          <Button
-            size="sm"
-            disabled={choice === "" || pending}
-            loading={pending}
-            data-testid="assign-auctioneer"
-            onClick={() => {
-              run(() => assignAuctioneerAction(slug, choice));
-            }}
-          >
-            Make auctioneer
-          </Button>
-        </div>
-      ) : null}
-      {error !== null ? (
-        <p className="auctioneers-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </section>
+          </ul>
+        ) : (
+          <p className="auctioneers-none">
+            No auctioneer yet — the club&apos;s owners run the room.
+          </p>
+        )}
+        {view.candidates.length > 0 ? (
+          <div className="auctioneers-assign">
+            <label htmlFor="auctioneer-pick">Club member</label>
+            <select
+              id="auctioneer-pick"
+              value={choice}
+              onChange={(event) => {
+                setChoice(event.target.value);
+              }}
+            >
+              <option value="">Choose a member…</option>
+              {view.candidates.map((candidate) => (
+                <option key={candidate.personId} value={candidate.personId}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              disabled={choice === "" || pending}
+              loading={pending}
+              data-testid="assign-auctioneer"
+              onClick={() => {
+                run(() => assignAuctioneerAction(slug, choice));
+              }}
+            >
+              Make auctioneer
+            </Button>
+          </div>
+        ) : null}
+        {error !== null ? (
+          <p className="auctioneers-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </SectionCard>
   );
 }

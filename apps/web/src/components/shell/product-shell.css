@@ -200,6 +200,18 @@
 }
 
 /* ---- sidebar footer: the signed-in user (on navy chrome) ---- */
+/* The rail's footer card: the signed-in account, and Log out one tap away. */
+.shell-railcard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2);
+  border: 1px solid var(--identity-line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
 .shell-railuser {
   display: flex;
   align-items: center;
@@ -207,7 +219,109 @@
   padding: var(--space-2);
   border-radius: var(--radius-md);
   text-decoration: none;
+}
+
+.shell-raillogout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border: 0;
   border-top: 1px solid var(--identity-line-soft);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+}
+
+.shell-raillogout:hover {
+  color: var(--danger-strong);
+}
+
+.shell-raillogout:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.shell-raillogout svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---- The top bar's left inside a season: crest, name, year · place ---- */
+.shell-season {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell-season:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.shell-season-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.shell-season-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.shell-season-text strong {
+  overflow: hidden;
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shell-season-text span {
+  overflow: hidden;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shell-season-status {
+  flex: none;
+  margin-inline-start: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .shell-season-text span,
+  .shell-season-status {
+    display: none;
+  }
+
+  .shell-season-crest {
+    width: 32px;
+    height: 32px;
+    font-size: var(--text-xs-size);
+  }
 }
 
 .shell-railuser:hover {
@@ -248,30 +362,7 @@
   color: color-mix(in srgb, var(--identity-glyph) 55%, transparent);
 }
 
-/* Public identity: the vector carries the monogram, the text remains readable. */
-.public-brand-name {
-  display: block;
-  white-space: nowrap;
-  line-height: 1.15;
-}
-.public-brand-name > span {
-  color: var(--text-accent);
-}
-.public-brand-name > small {
-  display: block;
-  margin-top: 6px;
-  font-family: var(--font-text);
-  font-size: 8px;
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: 0.13em;
-  color: var(--text-secondary);
-}
 @media (max-width: 359px) {
-  .public-brand-name > small {
-    font-size: 7px;
-    letter-spacing: 0.1em;
-  }
   .shell-header-link {
     padding-inline: 6px;
     font-size: 12px;

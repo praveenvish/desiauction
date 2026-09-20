@@ -41,10 +41,26 @@ export interface ShellNavItem {
    * the only way to reach them.
    */
   children?: ShellNavItem[];
+  /**
+   * `false`: desktop rail only (premium-flow's ruling, 2026-09-19, kept).
+   * Organizations and Reports are desk surfaces, and the phone's bar has five
+   * columns to spend. The app decides WHICH items this covers — see
+   * `phoneBar()` — and passes the result as `bottomNav`.
+   */
+  mobile?: false;
 }
 
 export interface AppShellProps {
   nav: ShellNavItem[];
+  /**
+   * What the phone's bottom bar carries, when it is not simply `nav`.
+   *
+   * A vertical rail has room and a five-column bar does not, so the app hands
+   * the already-decided five here rather than this component re-deriving them.
+   * LAW 4 still holds: it is the same menu, minus the desk surfaces a phone
+   * cannot usefully show, and every one of those is still in the drawer.
+   */
+  bottomNav?: ShellNavItem[];
   /** Extra groups rendered under the primary rail, each divided from the last. */
   navGroups?: { key: string; label?: string; items: ShellNavItem[] }[];
   /** Injected link renderer (e.g. next/link). Defaults to <a>. */
@@ -88,6 +104,7 @@ export interface AppShellProps {
 
 export function AppShell({
   nav,
+  bottomNav,
   navGroups,
   linkComponent: Link = "a",
   wordmark,
@@ -222,7 +239,7 @@ export function AppShell({
           "Sections" was also simply wrong — the section tabs are a separate
           strip (the `tabs` prop, rendered above). */}
       <nav className={styles["bottom-tabs"]} aria-label="Primary">
-        {nav.map((item) => (
+        {(bottomNav ?? nav).map((item) => (
           <Link
             key={item.key}
             href={item.href}

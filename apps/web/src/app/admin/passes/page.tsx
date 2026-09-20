@@ -1,4 +1,4 @@
-import { EmptyState, Card, ToastProvider } from "@desiauction/ui";
+import { EmptyState, IconWallet, SectionCard, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
@@ -37,22 +37,22 @@ export default async function AdminPassesPage() {
   return (
     <ToastProvider>
       <main className="registrations-dash">
-        <div className="dash-stack">
+        <div className="dash-stack admin-stack">
           <header className="dash-head">
-            <p className="competitions-hint">
+            <p className="dash-hint">
               Season pass requests. Granting moves the season&apos;s tier and lifts its ceilings;
               declining answers the organizer without changing anything. Both land on the audit log
               against your name.
             </p>
           </header>
           {queue.open.length === 0 && queue.recent.length === 0 ? (
-            <Card>
+            <SectionCard icon={<IconWallet />} tone="neutral" title="Pass requests">
               <EmptyState
-                headingLevel={2}
+                headingLevel={3}
                 title="No pass requests"
                 description="When an organizer runs out of room on their pass and asks for more, it appears here."
               />
-            </Card>
+            </SectionCard>
           ) : (
             <PassQueuePanel queue={queue} />
           )}

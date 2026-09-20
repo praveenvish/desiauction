@@ -14,6 +14,7 @@ import {
   isValidKickoff,
   kickoffToMinutes,
   planRoundRobin,
+  dailyKickoffs,
   roundRobinPairings,
   type FixtureForConflicts,
   type FixtureStatus,
@@ -512,5 +513,85 @@ describe("fixture CSV parsing", () => {
     expect(parseFixtureCsv("foo,bar\n1,2").errors[0]?.message).toContain(
       "Missing required column(s)",
     );
+  });
+});
+
+describe("packed days (planRoundRobin pack: true)", () => {
+  const teams4 = ["A", "B", "C", "D"];
+  const base = {
+    teamIds: teams4,
+    rounds: 1 as const,
+    startDate: "2026-09-19",
+    groundIds: ["G1"],
+    durationMinutes: 150,
+    pack: true,
+  };
+
+  it("dailyKickoffs fits matches back to back with a break, ending by the cut-off", () => {
+    expect(dailyKickoffs("09:00", "21:00", 150, 15)).toEqual(["09:00", "11:45", "14:30", "17:15"]);
+    expect(dailyKickoffs("09:00", "10:00", 150, 15)).toEqual([]);
+    expect(dailyKickoffs("9:00", "21:00", 150, 15)).toEqual([]);
+  });
+
+  it("one match per team per day: 4 teams, 2 matches a day, 3 days", () => {
+    const plan = planRoundRobin({
+      ...base,
+      kickoffTimes: dailyKickoffs("09:00", "21:00", 150, 15),
+      maxPerTeamPerDay: 1,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const days = new Set(plan.fixtures.map((f) => f.kickoffAt.slice(0, 10)));
+    expect(plan.fixtures).toHaveLength(6);
+    expect([...days]).toEqual(["2026-09-19", "2026-09-20", "2026-09-21"]);
+  });
+
+  it("two per team per day packs rounds into the same day — 2 days instead of 3", () => {
+    const plan = planRoundRobin({
+      ...base,
+      kickoffTimes: dailyKickoffs("09:00", "21:00", 150, 15),
+      maxPerTeamPerDay: 2,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const byDay = new Map<string, number>();
+    for (const f of plan.fixtures) {
+      const day = f.kickoffAt.slice(0, 10);
+      byDay.set(day, (byDay.get(day) ?? 0) + 1);
+    }
+    expect([...byDay.entries()]).toEqual([
+      ["2026-09-19", 4],
+      ["2026-09-20", 2],
+    ]);
+  });
+
+  it("never books a team twice at overlapping times, nor a ground twice", () => {
+    const plan = planRoundRobin({
+      ...base,
+      teamIds: ["A", "B", "C", "D", "E", "F"],
+      groundIds: ["G1", "G2"],
+      kickoffTimes: ["09:00", "10:00", "12:00"],
+      maxPerTeamPerDay: null,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const toMin = (k: string) => Number(k.slice(11, 13)) * 60 + Number(k.slice(14, 16));
+    for (const a of plan.fixtures) {
+      for (const b of plan.fixtures) {
+        if (a === b || a.kickoffAt.slice(0, 10) !== b.kickoffAt.slice(0, 10)) continue;
+        const overlap = Math.abs(toMin(a.kickoffAt) - toMin(b.kickoffAt)) < 150;
+        const shared = [a.homeTeamId, a.awayTeamId].some(
+          (t) => t === b.homeTeamId || t === b.awayTeamId,
+        );
+        expect(overlap && shared).toBe(false);
+        expect(a.kickoffAt === b.kickoffAt && a.groundId === b.groundId).toBe(false);
+      }
+    }
+    expect(plan.fixtures).toHaveLength(15);
+  });
+
+  it("is deterministic", () => {
+    const input = { ...base, kickoffTimes: ["10:00", "14:00"], maxPerTeamPerDay: 2 };
+    expect(planRoundRobin(input)).toEqual(planRoundRobin(input));
   });
 });

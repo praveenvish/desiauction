@@ -37,7 +37,7 @@ import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { canCompetition } from "../competition/authz";
 import { announceAuctionOutcomes } from "./auction-notify";
-import { lotMediaOf } from "./live-summary";
+import { lotMediaOf, registrationPhotosOf } from "./live-summary";
 import {
   advanceCompetition,
   createCompetition,
@@ -994,5 +994,13 @@ describe("AUCTION FOUNDATION — a minor's face never rides the live surfaces (P
     const media = await lotMediaOf(db, auction.id, (key) => `/media/${key}`);
     expect(media[minorLot.id]?.photoUrl, "minor photo must be withheld").toBeNull();
     expect(media[adultLot.id]?.photoUrl, "adult photo publishes with consent").not.toBeNull();
+    // The mark's seed rides with the face: the registration, not the lot.
+    expect(media[adultLot.id]?.registrationId).toBe(adultLot.registrationId);
+
+    // The registration-keyed read (the setup pool, before any lot) applies the
+    // SAME gate, so a player shows one face in the pool and on the block.
+    const pool = await registrationPhotosOf(db, auction.competitionId, (key) => `/media/${key}`);
+    expect(pool[minorLot.registrationId], "minor photo must be withheld").toBeUndefined();
+    expect(pool[adultLot.registrationId]).toBe(media[adultLot.id]?.photoUrl);
   });
 });

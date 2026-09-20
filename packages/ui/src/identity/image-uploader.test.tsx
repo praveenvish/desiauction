@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { ImageUploader, type UploadOutcome } from "./image-uploader";
+import { ImageUploader, imageFileProblem, type UploadOutcome } from "./image-uploader";
 
 function fileInput(): HTMLInputElement {
   // The visually-hidden input is the only file control in the component.
@@ -47,5 +47,14 @@ describe("ImageUploader", () => {
       expect(img).toHaveAttribute("src", "/_media/ok.jpg");
     });
     vi.unstubAllGlobals();
+  });
+
+  it("exposes the same file rule to surfaces that lay out their own picker", () => {
+    expect(imageFileProblem(new File(["x"], "p.png", { type: "image/png" }))).toBeNull();
+    expect(imageFileProblem(new File(["x"], "d.pdf", { type: "application/pdf" }))).toMatch(
+      /JPEG, PNG or WebP/,
+    );
+    const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], "big.jpg", { type: "image/jpeg" });
+    expect(imageFileProblem(big)).toMatch(/5 MB/);
   });
 });

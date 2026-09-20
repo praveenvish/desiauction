@@ -1,6 +1,21 @@
 "use client";
 
-import { Badge, Card, EmptyState, IconArrowRight } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconAlert,
+  IconArrowRight,
+  IconBolt,
+  IconBroadcast,
+  IconCheckCircle,
+  IconClock,
+  IconGavel,
+  IconUsers,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  type KitTone,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { useCallback } from "react";
 
@@ -15,13 +30,10 @@ const REFRESH_MS = 10_000;
 /** "Never closed" is a backlog, not a feed: the longest-silent tail folds away. */
 const STALE_SHOWN = 10;
 
-const STATE_BADGE: Record<
-  RoomState,
-  { tone: "success" | "info" | "warning" | "neutral"; label: string }
-> = {
-  active: { tone: "success", label: "Bidding" },
-  quiet: { tone: "info", label: "Quiet" },
-  paused: { tone: "warning", label: "Paused" },
+const STATE_BADGE: Record<RoomState, { tone: KitTone; label: string }> = {
+  active: { tone: "green", label: "Bidding" },
+  quiet: { tone: "blue", label: "Quiet" },
+  paused: { tone: "amber", label: "Paused" },
   stale: { tone: "neutral", label: "Silent" },
 };
 
@@ -53,27 +65,50 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         revoked={revoked}
       />
 
-      <div className="stat-row" data-testid="live-summary">
-        <SummaryTile label="Auctions running" value={String(data.running.length)} />
-        <SummaryTile label="Bids · last 5 min" value={String(pulse)} />
-        <SummaryTile label="People connected" value={String(connected)} />
-        <SummaryTile
-          label="Rooms with engine trouble"
-          value={String(troubled.length)}
-          tone={troubled.length > 0 ? "danger" : undefined}
+      <StatGrid testId="live-summary">
+        <StatCard
+          icon={<IconGavel />}
+          tone="gold"
+          value={String(data.running.length)}
+          label="Auctions running"
         />
-      </div>
+        <StatCard icon={<IconBolt />} tone="blue" value={String(pulse)} label="Bids · last 5 min" />
+        <StatCard
+          icon={<IconUsers />}
+          tone="green"
+          value={String(connected)}
+          label="People connected"
+        />
+        <StatCard
+          icon={<IconAlert />}
+          tone={troubled.length > 0 ? "red" : "neutral"}
+          value={String(troubled.length)}
+          label="Rooms with engine trouble"
+        />
+      </StatGrid>
 
-      <Card data-testid="live-running">
-        <h2 className="admin-section-title">Running now</h2>
+      <SectionCard
+        icon={<IconBroadcast />}
+        tone="red"
+        title="Running now"
+        description={
+          data.running.length === 0
+            ? "Busiest first"
+            : `${String(data.running.length)} room${data.running.length === 1 ? "" : "s"}, busiest first`
+        }
+        flush
+        data-testid="live-running"
+      >
         {data.running.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="No auction is running"
-            description={`When an organizer opens one, it appears here within ${String(REFRESH_MS / 1000)} seconds.`}
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No auction is running"
+              description={`When an organizer opens one, it appears here within ${String(REFRESH_MS / 1000)} seconds.`}
+            />
+          </div>
         ) : (
-          <ul className="admin-live-list">
+          <ul className="admin-rows is-stacked">
             {data.running.map((row) => (
               <RoomRow
                 key={row.auctionId}
@@ -84,18 +119,22 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
             ))}
           </ul>
         )}
-      </Card>
+      </SectionCard>
 
       {data.stale.length > 0 ? (
-        <Card data-testid="live-stale">
-          <h2 className="admin-section-title">
-            Never closed <span className="admin-count">· {String(data.stale.length)}</span>
-          </h2>
-          <p className="admin-meta">
-            Marked live, but nothing has happened in over twelve hours — an auction night that ended
-            without anyone closing it. Only the organizer can close it, from their cockpit.
-          </p>
-          <ul className="admin-live-list is-compact">
+        <SectionCard
+          icon={<IconClock />}
+          tone="amber"
+          title={
+            <>
+              Never closed <span className="admin-count">· {String(data.stale.length)}</span>
+            </>
+          }
+          description="Marked live, but nothing has happened in over twelve hours — an auction night that ended without anyone closing it. Only the organizer can close it, from their cockpit."
+          flush
+          data-testid="live-stale"
+        >
+          <ul className="admin-rows">
             {data.stale.slice(0, STALE_SHOWN).map((row) => (
               <StaleRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
             ))}
@@ -103,24 +142,29 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
           {data.stale.length > STALE_SHOWN ? (
             <details className="admin-more">
               <summary>Show all {String(data.stale.length)}</summary>
-              <ul className="admin-live-list is-compact">
+              <ul className="admin-rows">
                 {data.stale.slice(STALE_SHOWN).map((row) => (
                   <StaleRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
                 ))}
               </ul>
             </details>
           ) : null}
-        </Card>
+        </SectionCard>
       ) : null}
 
-      <Card data-testid="live-ended">
-        <h2 className="admin-section-title">Ended in the last 24 hours</h2>
+      <SectionCard
+        icon={<IconCheckCircle />}
+        tone="neutral"
+        title="Ended in the last 24 hours"
+        flush
+        data-testid="live-ended"
+      >
         {data.ended.length === 0 ? (
-          <p className="admin-meta">No auction has closed in the last day.</p>
+          <p className="admin-card-empty">No auction has closed in the last day.</p>
         ) : (
-          <ul className="admin-live-list is-compact">
+          <ul className="admin-rows">
             {data.ended.map((row) => (
-              <li key={row.auctionId} className="admin-live-row">
+              <li key={row.auctionId}>
                 <span className="admin-live-name">
                   <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
                   <span className="admin-meta">
@@ -135,14 +179,14 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
             ))}
           </ul>
         )}
-      </Card>
+      </SectionCard>
     </>
   );
 }
 
 function StaleRow({ row, nowMs }: { row: LiveAuctionRow; nowMs: number }) {
   return (
-    <li className="admin-live-row">
+    <li>
       <span className="admin-live-name">
         <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
         <span className="admin-meta">
@@ -156,23 +200,6 @@ function StaleRow({ row, nowMs }: { row: LiveAuctionRow; nowMs: number }) {
         {row.lots.sold} of {row.lots.total} sold
       </span>
     </li>
-  );
-}
-
-function SummaryTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "danger" | undefined;
-}) {
-  return (
-    <div className={tone === "danger" ? "stat-tile admin-tile-danger" : "stat-tile"}>
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}</span>
-    </div>
   );
 }
 
@@ -229,7 +256,7 @@ function RoomRow({
   const trouble = engineTrouble(engine);
   const pct = (n: number) => (row.lots.total > 0 ? (n / row.lots.total) * 100 : 0);
   return (
-    <li className="admin-live-room" data-testid={`live-room-${row.auctionId}`}>
+    <li data-testid={`live-room-${row.auctionId}`}>
       <div className="admin-live-head">
         <span className="admin-live-name">
           <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
@@ -238,7 +265,9 @@ function RoomRow({
             {row.openedAtMs === null ? "" : ` · opened ${istWhen(row.openedAtMs, nowMs)}`}
           </span>
         </span>
-        <Badge tone={badge.tone}>{badge.label}</Badge>
+        <Pill tone={badge.tone} dot>
+          {badge.label}
+        </Pill>
       </div>
 
       <span className="auc-progress" aria-hidden>
@@ -285,7 +314,7 @@ function RoomRow({
         </p>
       ) : null}
 
-      <Link href={`/admin/auctions/${row.auctionId}`} className="admin-meta">
+      <Link href={`/admin/auctions/${row.auctionId}`} className="admin-card-link">
         Watch this auction
         <IconArrowRight size={16} className="icon-trail" />
       </Link>

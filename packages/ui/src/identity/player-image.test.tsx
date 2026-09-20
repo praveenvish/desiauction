@@ -65,4 +65,30 @@ describe("PlayerImage", () => {
       ?.getAttribute("data-pattern");
     expect(first).toBe(second);
   });
+
+  it("treats a null src as no photo — the consent-gated view model passes straight through", () => {
+    render(<PlayerImage name="Rohit Sharma" seed="p6" src={null} />);
+    const frame = screen.getByTestId("player-image");
+    expect(frame).toHaveAttribute("data-state", "mark");
+    expect(frame.querySelector("img")).toBeNull();
+  });
+
+  it("decorative: hides from assistive tech so a name printed beside it is read once", () => {
+    const { unmount } = render(<PlayerImage name="Rohit Sharma" seed="p7" decorative />);
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.getByTestId("player-image").querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    unmount();
+    render(<PlayerImage name="Rohit Sharma" seed="p7" src="/photo.jpg" decorative />);
+    expect(screen.getByTestId("player-image").querySelector("img")).toHaveAttribute("alt", "");
+  });
+
+  it("fluid: leaves the box to the caller but keeps the intrinsic resolution", () => {
+    render(<PlayerImage name="Rohit Sharma" seed="p8" size="hero" src="/photo.jpg" fluid />);
+    const frame = screen.getByTestId("player-image");
+    expect(frame.getAttribute("style")).toBeNull();
+    expect(frame.querySelector("img")).toHaveAttribute("width", "160");
+  });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
-import { Badge, Button, Card, Select, useToast, Dialog, Field } from "@desiauction/ui";
+import { Badge, Button, Card, Select, useToast, Dialog, Field, PlayerImage } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -10,15 +10,15 @@ import {
   resolveKeyDown,
   resolveKeyUp,
 } from "../../../../../components/auction/cockpit-keys";
+import { HashTabs } from "../../../../../components/hash-tabs/hash-tabs";
 import { formatDateTime } from "../../../../../lib/format-date";
+import { lotSeed } from "../../../../../lib/player-seed";
 import { personContact } from "../../../../../lib/person-label";
 import { GavelButton, type GavelHandle } from "./gavel-button";
 import type { CockpitView } from "../../../../../server/auction/conduct-actions";
-// From its OWN module, not re-exported through the "use server" file beside it:
-// `export type { X }` in a "use server" module is erased before Turbopack reads
-// the directive's export list, so dev builds fail with "Export X doesn't exist
-// in target module" while `tsc` stays perfectly happy. Dev-only, and it takes
-// the whole server down rather than one page.
+// Straight from its own module: a "use server" file may export only async
+// functions, and Turbopack compiled its `export type` re-export into a real
+// export that does not exist — the cockpit 500'd on every load.
 import type { OwnerAcceptance } from "../../../../../server/auction/owner-acceptances";
 import {
   grantPaddleAction,
@@ -32,7 +32,7 @@ import { BroadcastLinks } from "../broadcast-links";
 import { CeremonyStage } from "../ceremony-stage";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
-import { AuctionProgress, useLiveFeed } from "../live-experience";
+import { AuctionProgress, BidFeedList, useLiveFeed } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
@@ -415,6 +415,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
           remainingMs={remainingMs}
           variant="shell"
           offline={offline}
+          lotMedia={view.lotMedia}
         />
       </PageStatus>
 
@@ -442,6 +443,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               snapshot={snapshot}
               ceremony={ceremony}
               remainingMs={remainingMs}
+              lotMedia={view.lotMedia}
+              resolved={feed.resolved}
+              teams={view.teams}
             />
 
             {/* THE CONDUCT CARD, in three tiers.
@@ -633,15 +637,11 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                   : "Awaiting the first paddle…"}
               </p>
             ) : (
-              <ol className="timeline">
-                {[...lot.bidHistory].reverse().map((entry) => (
-                  <li key={entry.bidId}>
-                    <Badge tone="neutral">{entry.paddleNumber}</Badge>
-                    <span>{entry.teamName}</span>
-                    <span className="timeline-at">{formatPaiseINR(paise(entry.amount))}</span>
-                  </li>
-                ))}
-              </ol>
+              <BidFeedList
+                bids={lot.bidHistory}
+                playerName={lot.playerName}
+                teamColors={new Map(view.teams.map((team) => [team.name, team.primaryColor]))}
+              />
             )}
           </Card>
 
@@ -659,6 +659,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                 {queue.map((entry) => (
                   <li key={entry.lotId} data-testid={`queue-${entry.lotNumber}`}>
                     <Badge tone="info">{entry.lotNumber}</Badge>
+                    <PlayerImage
+                      name={entry.playerName ?? "Unnamed"}
+                      seed={lotSeed(entry.lotId, view.lotMedia)}
+                      src={view.lotMedia[entry.lotId]?.photoUrl}
+                      size="sm"
+                      shape="round"
+                      decorative
+                    />
                     <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
                     <span className="competitions-hint">
                       base {formatPaiseINR(paise(entry.basePrice))}
@@ -736,6 +744,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     .map((entry) => (
                       <li key={entry.id} data-testid={`resolve-${entry.lotNumber}`}>
                         <Badge tone="warning">{entry.lotNumber}</Badge>
+                        <PlayerImage
+                          name={entry.playerName ?? "Unnamed"}
+                          seed={lotSeed(entry.id, view.lotMedia)}
+                          src={view.lotMedia[entry.id]?.photoUrl}
+                          size="sm"
+                          shape="round"
+                          decorative
+                        />
                         <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
                         <span className="competitions-hint">{entry.status}</span>
                         <span className="queue-actions">
@@ -794,230 +810,273 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         </div>
 
         <div className="cockpit-col">
-          {/* DA-20: the cockpit rendered no outbound links at ALL, so the two
-              surfaces the room and the stream actually watch — the venue board
-              and the OBS overlay — had no door anywhere in the product. */}
-          <BroadcastLinks slug={slug} />
-
-          <Card data-testid="owners-card">
-            <h2>Owners &amp; paddles</h2>
-            <p className="competitions-hint">
-              Invitation → acceptance → grant → claim. No active paddle without an explicit grant.
-            </p>
-            {/* P0-2 CLOSED. This card used to carry an apology — "an owner link
-                cannot be withdrawn once you send it" — because `revoked_at` was
-                read in six places and written in none. The command, the event
-                and the control now exist, so the honest sentence is the one
-                about what revoking can and cannot reach. */}
-            <p className="competitions-hint" data-testid="owner-invite-revocable">
-              A pending link can be withdrawn below, and stops working the moment you do. Once
-              somebody has <strong>accepted</strong> it they are in the club and hold a paddle grant
-              — withdrawing the link no longer reaches them, and you remove the grant instead.
-            </p>
-            {/* Accepting a link makes the person a club member, so minting and
-                withdrawing links is the club owners' act. An appointed
-                auctioneer sees the board and grants paddles to people who
-                have already accepted. */}
-            {view.viewer.canManage ? (
-              <div className="date-row">
-                <Select
-                  label="Team"
-                  name="inviteTeam"
-                  value={inviteTeam}
-                  onChange={(event) => {
-                    setInviteTeam(event.target.value);
-                  }}
-                >
-                  <option value="">Choose…</option>
-                  {view.teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))}
-                </Select>
-                <Button
-                  onClick={() => void invite()}
-                  loading={pending === "invite"}
-                  /* `finished` joins the derived blocked states. The control was
-                   offered on a completed auction and failed on click with
-                   "This auction has ended." — the panel already derived
-                   !auctionExists and !canConduct, and simply never asked the
-                   auction what state it was in. */
-                  disabled={inviteTeam === "" || finished}
-                  data-testid="invite-owner"
-                >
-                  Invite owner
-                </Button>
-              </div>
-            ) : null}
-            {finished ? (
-              <p className="competitions-hint" data-testid="invite-owner-blocked">
-                This auction has ended — there is no owner left to invite.
-              </p>
-            ) : null}
-            {inviteUrl !== null ? (
-              <div className="owner-invite-result" data-testid="owner-invite-result">
-                {/* `owner-url` sets `font-variant-ligatures: none`: base64url
-                    tokens contain `-`, and the mono face was ligating `--` into
-                    one long dash. Roughly one token in 125 displayed wrongly,
-                    and this string is copied by hand. */}
-                <span className="owner-url" data-testid="owner-invite-url">
-                  {inviteUrl}
-                </span>
-                <div className="owner-invite-actions">
-                  <Button
-                    size="touch"
-                    variant="secondary"
-                    onClick={() => void copyInvite()}
-                    data-testid="copy-owner-invite"
-                  >
-                    {inviteCopied ? "Copied" : "Copy link"}
-                  </Button>
-                  <span className="competitions-hint">
-                    Send it yourself — the platform sends nothing. It works once and cannot be
-                    withdrawn.
-                  </span>
-                </div>
-              </div>
-            ) : null}
-
-            {view.owners.invites.length > 0 ? (
-              <div data-testid="owner-invites">
-                {view.owners.invites.map((entry) => {
-                  const who = acceptanceOf(entry.id);
-                  return (
-                    <div
-                      key={entry.id}
-                      className="owner-row"
-                      data-testid={`invite-row-${entry.id}`}
-                    >
-                      <Badge
-                        tone={
-                          entry.acceptedBy !== null ? "success" : entry.expired ? "danger" : "info"
-                        }
-                      >
-                        {entry.acceptedBy !== null
-                          ? "accepted"
-                          : entry.expired
-                            ? "expired"
-                            : "pending"}
-                      </Badge>
-                      <span className="registration-name">{entry.teamName}</span>
-                      {who === undefined ? null : (
-                        <span className="competitions-hint">{describeAcceptor(who)}</span>
-                      )}
-                      {/* Only while it is still a link. An accepted invitation
-                          has already minted a membership and a paddle grant;
-                          offering Withdraw there would promise to undo two
-                          things it cannot touch. */}
-                      {view.viewer.canManage && entry.acceptedBy === null && !entry.expired ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void revokeInvite(entry.id)}
-                          loading={pending === `revoke-${entry.id}`}
-                          data-testid={`revoke-invite-${entry.id}`}
-                        >
-                          Withdraw link
-                        </Button>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {grantable.length > 0 ? (
-              <>
-                <h2>Ready to grant</h2>
-                {/* THE MOMENT MONEY AUTHORITY CHANGES HANDS. This list used to
-                    read "Owner" — the literal fallback string — for any account
-                    without a name, with no phone anywhere, so two rows for the
-                    same team (a legitimate owner and a stranger who opened a
-                    forwarded link) were indistinguishable. */}
-                {grantable.map((entry) => {
-                  const who = acceptanceOf(entry.id);
-                  return (
-                    <div key={entry.id} className="owner-row" data-testid={`grantable-${entry.id}`}>
-                      <span className="registration-name">
-                        {who?.name ?? "Unnamed account"}
-                        {who === undefined ? null : (
-                          <span
-                            className="registration-phone"
-                            data-testid={`grantable-phone-${entry.id}`}
-                          >
-                            {personContact(who)}
-                          </span>
-                        )}
-                      </span>
-                      <span className="competitions-hint">
-                        {entry.teamName}
-                        {who?.acceptedAt == null
-                          ? ""
-                          : ` · accepted ${formatDateTime(who.acceptedAt)}`}
-                        {who !== undefined && !who.stillMember
-                          ? " · REMOVED from this organization"
-                          : ""}
-                      </span>
-                      <Button
-                        size="sm"
-                        onClick={() => void grant(entry.teamId, entry.acceptedBy ?? "")}
-                        loading={pending === `grant-${entry.teamId}`}
-                        /* Offboarded. `removeMember` cannot withdraw an auction
-                           acceptance (no command exists), so the row survives —
-                           but handing a paddle and a purse to somebody who has
-                           been removed from the club is not a click to leave
-                           enabled. */
-                        disabled={who !== undefined && !who.stillMember}
-                        data-testid={`grant-${entry.teamId}`}
-                      >
-                        Grant paddle
-                      </Button>
-                    </div>
-                  );
-                })}
-              </>
-            ) : null}
-
-            {view.owners.grants.length > 0 ? (
-              <div data-testid="grant-list">
-                {view.owners.grants.map((entry) => (
-                  <div key={entry.id} className="owner-row">
-                    <Badge tone={entry.claimed ? "success" : "neutral"}>
-                      {entry.claimed ? "claimed" : "granted"}
-                    </Badge>
-                    <span className="registration-name">{entry.personName ?? "Owner"}</span>
-                    <span className="competitions-hint">{entry.teamName}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </Card>
-
           {/* Same reason as the live room: the component renders its own
               connecting state, and guarding it here reintroduces the re-flow. */}
           <AuctionProgress snapshot={snapshot} />
 
-          {/* The one purse treatment, shared with the owner room and the
-              spectator board. */}
-          {/* The auctioneer's board carries every purse — and now the split
-              the engine will enforce on the next bid, which is the question
-              they are asked between lots ("can they still afford him?") and
-              had to answer by doing the reserve arithmetic in their head. */}
-          <PurseBoard
-            snapshot={snapshot}
-            teams={view.teams}
-            rules={view.rules}
-            squadSizes={squadSizesOf(view.teams, view.preSigned, feed.resolved)}
-          />
+          {/* One panel at a time on the right: purses while the room is live,
+              owners while it is being set up, and the two broadcast screens
+              (DA-20 — their only door) a tab away instead of above both. */}
+          <HashTabs
+            label="Room panels"
+            defaultId={status === "scheduled" ? "owners" : "purses"}
+            tabs={[
+              {
+                id: "purses",
+                label: "Purses",
+                content: (
+                  <div className="cockpit-tab">
+                    {/* The auctioneer's board carries every purse — and the
+                        split the engine will enforce on the next bid, the
+                        question they are asked between lots. */}
+                    <PurseBoard
+                      snapshot={snapshot}
+                      teams={view.teams}
+                      rules={view.rules}
+                      squadSizes={squadSizesOf(view.teams, view.preSigned, feed.resolved)}
+                    />
+                    <PoolSummary
+                      snapshot={snapshot}
+                      resolved={feed.resolved}
+                      preSigned={view.preSigned}
+                    />
+                  </div>
+                ),
+              },
+              {
+                id: "owners",
+                label: "Owners",
+                content: (
+                  <div className="cockpit-tab">
+                    <Card data-testid="owners-card">
+                      <h2>Owners &amp; paddles</h2>
+                      <p className="competitions-hint">
+                        Invitation → acceptance → grant → claim. No active paddle without an
+                        explicit grant.
+                      </p>
+                      {/* P0-2 CLOSED. This card used to carry an apology — "an owner link
+                cannot be withdrawn once you send it" — because `revoked_at` was
+                read in six places and written in none. The command, the event
+                and the control now exist, so the honest sentence is the one
+                about what revoking can and cannot reach. */}
+                      <p className="competitions-hint" data-testid="owner-invite-revocable">
+                        A pending link can be withdrawn below, and stops working the moment you do.
+                        Once somebody has <strong>accepted</strong> it they are in the club and hold
+                        a paddle grant — withdrawing the link no longer reaches them, and you remove
+                        the grant instead.
+                      </p>
+                      {/* Accepting a link makes the person a club member, so minting and
+                withdrawing links is the club owners' act. An appointed
+                auctioneer sees the board and grants paddles to people who
+                have already accepted. */}
+                      {view.viewer.canManage ? (
+                        <div className="date-row">
+                          <Select
+                            label="Team"
+                            name="inviteTeam"
+                            value={inviteTeam}
+                            onChange={(event) => {
+                              setInviteTeam(event.target.value);
+                            }}
+                          >
+                            <option value="">Choose…</option>
+                            {view.teams.map((team) => (
+                              <option key={team.id} value={team.id}>
+                                {team.name}
+                              </option>
+                            ))}
+                          </Select>
+                          <Button
+                            onClick={() => void invite()}
+                            loading={pending === "invite"}
+                            /* `finished` joins the derived blocked states. The control was
+                   offered on a completed auction and failed on click with
+                   "This auction has ended." — the panel already derived
+                   !auctionExists and !canConduct, and simply never asked the
+                   auction what state it was in. */
+                            disabled={inviteTeam === "" || finished}
+                            data-testid="invite-owner"
+                          >
+                            Invite owner
+                          </Button>
+                        </div>
+                      ) : null}
+                      {finished ? (
+                        <p className="competitions-hint" data-testid="invite-owner-blocked">
+                          This auction has ended — there is no owner left to invite.
+                        </p>
+                      ) : null}
+                      {inviteUrl !== null ? (
+                        <div className="owner-invite-result" data-testid="owner-invite-result">
+                          {/* `owner-url` sets `font-variant-ligatures: none`: base64url
+                    tokens contain `-`, and the mono face was ligating `--` into
+                    one long dash. Roughly one token in 125 displayed wrongly,
+                    and this string is copied by hand. */}
+                          <span className="owner-url" data-testid="owner-invite-url">
+                            {inviteUrl}
+                          </span>
+                          <div className="owner-invite-actions">
+                            <Button
+                              size="touch"
+                              variant="secondary"
+                              onClick={() => void copyInvite()}
+                              data-testid="copy-owner-invite"
+                            >
+                              {inviteCopied ? "Copied" : "Copy link"}
+                            </Button>
+                            <span className="competitions-hint">
+                              Send it yourself — the platform sends nothing. It works once and
+                              cannot be withdrawn.
+                            </span>
+                          </div>
+                        </div>
+                      ) : null}
 
-          <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={view.preSigned} />
+                      {view.owners.invites.length > 0 ? (
+                        <div data-testid="owner-invites">
+                          {view.owners.invites.map((entry) => {
+                            const who = acceptanceOf(entry.id);
+                            return (
+                              <div
+                                key={entry.id}
+                                className="owner-row"
+                                data-testid={`invite-row-${entry.id}`}
+                              >
+                                <Badge
+                                  tone={
+                                    entry.acceptedBy !== null
+                                      ? "success"
+                                      : entry.expired
+                                        ? "danger"
+                                        : "info"
+                                  }
+                                >
+                                  {entry.acceptedBy !== null
+                                    ? "accepted"
+                                    : entry.expired
+                                      ? "expired"
+                                      : "pending"}
+                                </Badge>
+                                <span className="registration-name">{entry.teamName}</span>
+                                {who === undefined ? null : (
+                                  <span className="competitions-hint">{describeAcceptor(who)}</span>
+                                )}
+                                {/* Only while it is still a link. An accepted invitation
+                          has already minted a membership and a paddle grant;
+                          offering Withdraw there would promise to undo two
+                          things it cannot touch. */}
+                                {view.viewer.canManage &&
+                                entry.acceptedBy === null &&
+                                !entry.expired ? (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => void revokeInvite(entry.id)}
+                                    loading={pending === `revoke-${entry.id}`}
+                                    data-testid={`revoke-invite-${entry.id}`}
+                                  >
+                                    Withdraw link
+                                  </Button>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
+                      {grantable.length > 0 ? (
+                        <>
+                          <h2>Ready to grant</h2>
+                          {/* THE MOMENT MONEY AUTHORITY CHANGES HANDS. This list used to
+                    read "Owner" — the literal fallback string — for any account
+                    without a name, with no phone anywhere, so two rows for the
+                    same team (a legitimate owner and a stranger who opened a
+                    forwarded link) were indistinguishable. */}
+                          {grantable.map((entry) => {
+                            const who = acceptanceOf(entry.id);
+                            return (
+                              <div
+                                key={entry.id}
+                                className="owner-row"
+                                data-testid={`grantable-${entry.id}`}
+                              >
+                                <span className="registration-name">
+                                  {who?.name ?? "Unnamed account"}
+                                  {who === undefined ? null : (
+                                    <span
+                                      className="registration-phone"
+                                      data-testid={`grantable-phone-${entry.id}`}
+                                    >
+                                      {personContact(who)}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="competitions-hint">
+                                  {entry.teamName}
+                                  {who?.acceptedAt == null
+                                    ? ""
+                                    : ` · accepted ${formatDateTime(who.acceptedAt)}`}
+                                  {who !== undefined && !who.stillMember
+                                    ? " · REMOVED from this organization"
+                                    : ""}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  onClick={() => void grant(entry.teamId, entry.acceptedBy ?? "")}
+                                  loading={pending === `grant-${entry.teamId}`}
+                                  /* Offboarded. `removeMember` cannot withdraw an auction
+                           acceptance (no command exists), so the row survives —
+                           but handing a paddle and a purse to somebody who has
+                           been removed from the club is not a click to leave
+                           enabled. */
+                                  disabled={who !== undefined && !who.stillMember}
+                                  data-testid={`grant-${entry.teamId}`}
+                                >
+                                  Grant paddle
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </>
+                      ) : null}
+
+                      {view.owners.grants.length > 0 ? (
+                        <div data-testid="grant-list">
+                          {view.owners.grants.map((entry) => (
+                            <div key={entry.id} className="owner-row">
+                              <Badge tone={entry.claimed ? "success" : "neutral"}>
+                                {entry.claimed ? "claimed" : "granted"}
+                              </Badge>
+                              <span className="registration-name">
+                                {entry.personName ?? "Owner"}
+                              </span>
+                              <span className="competitions-hint">{entry.teamName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </Card>
+                  </div>
+                ),
+              },
+              {
+                id: "screens",
+                label: "Screens",
+                content: (
+                  <div className="cockpit-tab">
+                    <BroadcastLinks slug={slug} />
+                  </div>
+                ),
+              },
+            ]}
+          />
         </div>
       </div>
 
       <SquadBoard
         roles={view.roles}
         teams={view.teams}
+        lotMedia={view.lotMedia}
         preSigned={view.preSigned}
         resolved={feed.resolved}
         snapshot={snapshot}

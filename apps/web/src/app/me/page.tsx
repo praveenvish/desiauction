@@ -1,11 +1,38 @@
 import { SPORTS, sportPackFor } from "@desiauction/core";
+import {
+  HeroBanner,
+  IconArrowRight,
+  IconCalendar,
+  IconChart,
+  IconGavel,
+  IconMatch,
+  IconPin,
+  IconShieldCheck,
+  IconTrophy,
+  IconUsers,
+  Notice,
+  Pill,
+  PlayerImage,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  TeamChip,
+  type KitTone,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { HeroChip, HeroStatus } from "../../components/season-hero/season-hero";
 import { compactINR } from "../../lib/inr";
 import { currentSession } from "../../server/auth/actions";
-import { playerCareer, playerMatches, type CareerMatch } from "../../server/player/career";
-import { playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
+import {
+  playerCareer,
+  playerMatches,
+  playerUpcomingMatches,
+  type CareerMatch,
+} from "../../server/player/career";
+import { ownPhotoUrl, playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
+import { RegistrationCard } from "./registration-card";
 import "./me.css";
 
 export const metadata = { title: "My sports · DesiAuction" };
@@ -28,13 +55,11 @@ const RESULT_LABEL: Record<NonNullable<CareerMatch["result"]>, string> = {
   no_result: "No result",
 };
 
-const ENTRY_LABEL: Record<string, string> = {
-  submitted: "Waiting for approval",
-  approved: "In the pool",
-  waitlisted: "Waitlisted",
-  rejected: "Not accepted",
-  withdrawn: "Withdrawn",
-  draft: "Not submitted",
+const RESULT_TONE: Record<NonNullable<CareerMatch["result"]>, KitTone> = {
+  won: "green",
+  lost: "red",
+  tied: "amber",
+  no_result: "neutral",
 };
 
 const PLAYED_LABEL: Record<CareerMatch["played"], string> = {
@@ -49,6 +74,17 @@ function matchDate(kickoffAt: string | null): string {
   return Number.isNaN(d.getTime())
     ? kickoffAt.slice(0, 10)
     : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** "Sat 27 Sept · 4:30 pm" from the fixture's local wall-clock text. */
+function kickoffLabel(kickoffAt: string | null): string {
+  if (kickoffAt === null) return "Time to be announced";
+  const d = new Date(kickoffAt.length > 10 ? kickoffAt : `${kickoffAt}T00:00`);
+  if (Number.isNaN(d.getTime())) return kickoffAt;
+  const day = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  return kickoffAt.length > 10
+    ? `${day} · ${d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })}`
+    : day;
 }
 
 function seasonYear(startsOn: string | null): string {
@@ -67,13 +103,18 @@ export default async function MySportsPage({
   if (session.name === null || session.name.trim() === "") {
     redirect("/onboarding");
   }
-  const [query, career, matches, profile, completeness] = await Promise.all([
-    searchParams,
-    playerCareer(session.personId),
-    playerMatches(session.personId),
-    playerProfileFor(session.personId),
-    profileCompletenessFor(session.personId),
-  ]);
+  // Today in IST — fixture kickoffs are local wall-clock text.
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const [query, career, matches, upcomingMatches, profile, completeness, photoUrl] =
+    await Promise.all([
+      searchParams,
+      playerCareer(session.personId),
+      playerMatches(session.personId),
+      playerUpcomingMatches(session.personId, today),
+      playerProfileFor(session.personId),
+      profileCompletenessFor(session.personId),
+      ownPhotoUrl(session.personId),
+    ]);
 
   // Sports this person actually played, in the platform's own order.
   const played = new Set(career.seasons.map((season) => season.sport));
@@ -84,7 +125,14 @@ export default async function MySportsPage({
     .slice()
     .reverse();
   const shownMatches = matches.filter((match) => filter === undefined || match.sport === filter);
+  const shownUpcoming = upcomingMatches.filter(
+    (match) => filter === undefined || match.sport === filter,
+  );
   const matchesPlayed = matches.filter((match) => match.played === "played").length;
+  const wins = matches.filter(
+    (match) => match.played === "played" && match.result === "won",
+  ).length;
+  const auctioned = career.seasons.filter((season) => season.auction !== null).length;
 
   const bySport = sports.map((pack) => ({
     key: pack.key,
@@ -102,66 +150,106 @@ export default async function MySportsPage({
   );
   const upcoming = waiting ?? inPool;
 
-  const initials = session.name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-
   return (
     <main className="me">
-      <section className="me-profile" aria-label="Profile">
-        <span className="me-avatar" aria-hidden>
-          {initials}
-        </span>
-        <div className="me-who">
-          <h2 className="me-name">{session.name}</h2>
-          <p className="me-meta">
-            {[profile.location, sports.map((pack) => pack.label).join(" · ")]
-              .filter((part) => part !== null && part !== "")
-              .join(" · ") || "Your record starts with your first tournament."}
-          </p>
-        </div>
-        {completeness.done < completeness.total ? (
-          <Link href="/account" className="me-complete">
-            Profile {completeness.done} of {completeness.total} — finish it
+      {/* Their own face when they have uploaded one; the branded initials mark
+          (C-25) until then — the same mark every season surface shows. */}
+      <HeroBanner
+        testId="me-hero"
+        crest={
+          <span className="me-crest-photo">
+            <PlayerImage
+              name={session.name}
+              seed={session.personId}
+              src={photoUrl}
+              size="lg"
+              fluid
+              decorative
+            />
+          </span>
+        }
+        eyebrow={<HeroStatus>Player</HeroStatus>}
+        title={session.name}
+        meta={[
+          ...(profile.location !== null && profile.location !== ""
+            ? [
+                <>
+                  <IconPin />
+                  {profile.location}
+                </>,
+              ]
+            : []),
+          ...(sports.length > 0
+            ? sports.map((pack) => <HeroChip key={pack.key}>{pack.label}</HeroChip>)
+            : [<>Your record starts with your first tournament.</>]),
+        ]}
+        actions={
+          <Link href="/account" className="sh-ghost">
+            {completeness.done < completeness.total
+              ? `Profile ${String(completeness.done)} of ${String(completeness.total)} — finish it`
+              : "Edit profile"}
+            <IconArrowRight size={14} />
           </Link>
-        ) : null}
-      </section>
+        }
+        sideAlign="start"
+      />
 
-      <dl className="me-figures" aria-label="Career totals">
-        {[
-          ["Tournaments", String(career.totals.seasons)],
-          ["Matches played", String(matchesPlayed)],
-          ["Teams", String(career.totals.teams)],
-          ["Times sold", String(career.totals.soldCount)],
-          [
-            "Highest price",
-            career.totals.highestPrice === null ? "—" : compactINR(career.totals.highestPrice),
-          ],
-        ].map(([label, value]) => (
-          <div key={label} className="me-figure">
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <StatGrid testId="me-figures">
+        <StatCard
+          icon={<IconTrophy />}
+          tone="gold"
+          value={career.totals.seasons.toLocaleString("en-IN")}
+          label={career.totals.seasons === 1 ? "Season" : "Seasons"}
+          hint={
+            sports.length > 0
+              ? `${String(sports.length)} ${sports.length === 1 ? "sport" : "sports"}`
+              : "None entered yet"
+          }
+        />
+        <StatCard
+          icon={<IconMatch />}
+          tone="green"
+          value={matchesPlayed.toLocaleString("en-IN")}
+          label="Matches played"
+          hint={matchesPlayed > 0 ? `${String(wins)} won` : "From recorded lineups"}
+        />
+        <StatCard
+          icon={<IconUsers />}
+          tone="blue"
+          value={career.totals.teams.toLocaleString("en-IN")}
+          label={career.totals.teams === 1 ? "Team" : "Teams"}
+          hint="Across every club"
+        />
+        <StatCard
+          icon={<IconGavel />}
+          tone="purple"
+          value={auctioned.toLocaleString("en-IN")}
+          label={auctioned === 1 ? "Auction" : "Auctions"}
+          hint={
+            career.totals.highestPrice === null
+              ? career.totals.soldCount > 0
+                ? `Sold ${String(career.totals.soldCount)}×`
+                : "No sale yet"
+              : `Sold ${String(career.totals.soldCount)}× · top ${compactINR(career.totals.highestPrice)}`
+          }
+        />
+      </StatGrid>
 
       {upcoming !== undefined ? (
-        <section className="me-next" aria-labelledby="me-next-title" data-testid="me-next">
-          <p className="me-next-eyebrow">Coming up · {upcoming.competitionName}</p>
-          <h2 id="me-next-title">
-            {upcoming.status === "submitted"
-              ? "Your registration is with the organizer"
-              : "You're in the auction pool"}
-          </h2>
-          <p>
-            {upcoming.status === "submitted"
-              ? "You'll get a message the moment they approve it."
-              : "We'll message you the moment a team buys you."}
-          </p>
-        </section>
+        <Notice
+          tone="info"
+          icon={<IconCalendar />}
+          testId="me-next"
+          title={
+            upcoming.status === "submitted"
+              ? `Your registration for ${upcoming.competitionName} is with the organizer`
+              : `You're in the auction pool for ${upcoming.competitionName}`
+          }
+        >
+          {upcoming.status === "submitted"
+            ? "You'll get a message the moment they approve it."
+            : "We'll message you the moment a team buys you."}
+        </Notice>
       ) : null}
 
       {sports.length > 1 ? (
@@ -183,105 +271,140 @@ export default async function MySportsPage({
 
       <div className="me-layout">
         <div className="me-main">
-          <section aria-labelledby="me-tournaments" data-testid="me-tournaments">
-            <header className="me-head">
-              <h2 id="me-tournaments">Tournaments</h2>
-              <span>{seasons.length}</span>
-            </header>
+          <SectionCard
+            icon={<IconTrophy />}
+            title="My registrations"
+            description={
+              seasons.length === 0
+                ? "Every season you enter shows up here, with where it stands."
+                : `${String(seasons.length)} ${seasons.length === 1 ? "season" : "seasons"} · newest first`
+            }
+            action={
+              <Link href="/c" className="me-link">
+                Find a tournament <IconArrowRight size={14} aria-hidden />
+              </Link>
+            }
+            data-testid="me-tournaments"
+          >
             {seasons.length === 0 ? (
               <p className="me-empty">
                 No tournaments yet. <Link href="/c">Find one to play</Link>.
               </p>
             ) : (
-              <ul className="me-rows">
+              <ul className="me-regs">
                 {seasons.map((season) => {
                   const pack = sportPackFor(season.sport);
-                  const verdict =
-                    season.auction === null
-                      ? season.teamName !== null
-                        ? "In the squad"
-                        : (ENTRY_LABEL[season.status] ?? season.status)
-                      : season.auction.kind === "sold"
-                        ? `Sold · ${compactINR(season.auction.soldPrice)}`
-                        : season.auction.kind === "unsold"
-                          ? "Unsold"
-                          : season.auction.kind === "icon"
-                            ? "Icon player"
-                            : "Retained";
                   return (
                     <li key={season.registrationId}>
-                      <Link href={`/seasons/${season.competitionSlug}/register`} className="me-row">
-                        <span className="me-year">{seasonYear(season.startsOn)}</span>
-                        <span className="me-row-main">
-                          <strong>{season.competitionName}</strong>
-                          <span>
-                            {[pack.label, season.orgName, season.teamName]
-                              .filter((part) => part !== null)
-                              .join(" · ")}
-                          </span>
-                        </span>
-                        <span className="me-verdict">{verdict}</span>
-                      </Link>
+                      <RegistrationCard
+                        season={season}
+                        eyebrow={`${pack.label} · ${seasonYear(season.startsOn)}`}
+                        subline={season.orgName}
+                        money={compactINR}
+                      />
                     </li>
                   );
                 })}
               </ul>
             )}
-          </section>
+          </SectionCard>
 
-          <section aria-labelledby="me-matches" data-testid="me-matches">
-            <header className="me-head">
-              <h2 id="me-matches">Matches</h2>
-              <span>{shownMatches.length}</span>
-            </header>
-            {shownMatches.length === 0 ? (
-              <p className="me-empty">
-                Matches appear here once your team plays and the organizer records the lineup.
-              </p>
-            ) : (
-              <table className="me-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Date</th>
-                    <th scope="col">Match</th>
-                    <th scope="col">Result</th>
-                    <th scope="col">You</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shownMatches.map((match) => (
-                    <tr key={match.fixtureId}>
-                      <td className="me-num">{matchDate(match.kickoffAt)}</td>
-                      <td>
-                        <strong>
-                          {match.teamName} vs {match.opponentName}
-                        </strong>
-                        <span>
-                          {sportPackFor(match.sport).label} · {match.competitionName}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`me-result me-result--${match.result ?? "live"}`}>
-                          {match.result === null ? "In progress" : RESULT_LABEL[match.result]}
-                        </span>
-                      </td>
-                      <td className={`me-played me-played--${match.played}`}>
-                        {PLAYED_LABEL[match.played]}
-                      </td>
+          <SectionCard
+            icon={<IconMatch />}
+            tone="green"
+            title="Matches"
+            description={
+              shownMatches.length === 0
+                ? "Matches appear here once your team plays and the organizer records the lineup."
+                : `${String(shownMatches.length)} played or in progress`
+            }
+            flush={shownMatches.length > 0}
+            data-testid="me-matches"
+          >
+            {shownMatches.length === 0 ? undefined : (
+              <div className="me-table-wrap">
+                <table className="me-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      <th scope="col">Match</th>
+                      <th scope="col">Result</th>
+                      <th scope="col">You</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {shownMatches.map((match) => (
+                      <tr key={match.fixtureId}>
+                        <td className="me-num" data-label="Date">
+                          {matchDate(match.kickoffAt)}
+                        </td>
+                        <td className="me-cell-match">
+                          <strong>
+                            {match.teamName} vs {match.opponentName}
+                          </strong>
+                          <span>
+                            {sportPackFor(match.sport).label} · {match.competitionName}
+                          </span>
+                        </td>
+                        <td data-label="Result">
+                          {match.result === null ? (
+                            <Pill tone="blue" dot>
+                              In progress
+                            </Pill>
+                          ) : (
+                            <Pill tone={RESULT_TONE[match.result]}>
+                              {RESULT_LABEL[match.result]}
+                            </Pill>
+                          )}
+                        </td>
+                        <td className={`me-played me-played--${match.played}`} data-label="You">
+                          {PLAYED_LABEL[match.played]}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </section>
+          </SectionCard>
         </div>
 
-        <aside className="me-side">
+        <aside className="me-side" aria-label="Coming up and career by sport">
+          <SectionCard
+            icon={<IconCalendar />}
+            tone="blue"
+            title="Upcoming matches"
+            description={
+              shownUpcoming.length === 0
+                ? "Your team's published fixtures appear here."
+                : "Your team's next published fixtures."
+            }
+            data-testid="me-upcoming"
+          >
+            {shownUpcoming.length === 0 ? undefined : (
+              <ul className="me-upcoming">
+                {shownUpcoming.map((match) => (
+                  <li key={match.fixtureId}>
+                    <span className="me-upcoming-when">{kickoffLabel(match.kickoffAt)}</span>
+                    <span className="me-upcoming-teams">
+                      <TeamChip color={match.teamColor}>{match.teamName}</TeamChip>
+                      <span className="me-vs">vs</span>
+                      <span className="me-upcoming-opp">{match.opponentName}</span>
+                    </span>
+                    <span className="me-upcoming-comp">{match.competitionName}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+
           {bySport.length > 0 ? (
-            <section aria-labelledby="me-by-sport">
-              <header className="me-head">
-                <h2 id="me-by-sport">By sport</h2>
-              </header>
+            <SectionCard
+              icon={<IconChart />}
+              tone="purple"
+              title="Career by sport"
+              description="Seasons and matches, per sport."
+            >
               <ul className="me-sports">
                 {bySport.map((row) => (
                   <li key={row.key}>
@@ -298,11 +421,15 @@ export default async function MySportsPage({
                   </li>
                 ))}
               </ul>
-            </section>
+            </SectionCard>
           ) : null}
+
           <p className="me-privacy">
-            <strong>Who sees this page?</strong> Only you. Clubs see what you enter for their
-            season; your share card shows only what you choose.
+            <IconShieldCheck size={16} aria-hidden />
+            <span>
+              <strong>Who sees this page?</strong> Only you. Clubs see what you enter for their
+              season; your share card shows only what you choose.
+            </span>
           </p>
         </aside>
       </div>

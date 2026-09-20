@@ -1,6 +1,14 @@
 "use client";
 
-import { Button, Card, Field, Select, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Field,
+  IconCalendar,
+  IconLock,
+  SectionCard,
+  Select,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -67,13 +75,11 @@ export function AvailabilityPanel({
 
   return (
     <>
-      <Card>
-        <h2>Weekly windows</h2>
-        <p className="competitions-hint">
-          All times are Indian Standard Time. A window repeats every week until you retire it;
-          retiring one never cancels a call already booked inside it.
-        </p>
-
+      <SectionCard
+        icon={<IconCalendar />}
+        title="Weekly windows"
+        description="All times are Indian Standard Time. A window repeats every week until you retire it; retiring one never cancels a call already booked inside it."
+      >
         <div className="demo-availability-form">
           <Select
             label="Day"
@@ -126,35 +132,36 @@ export function AvailabilityPanel({
           </Button>
         </div>
 
-        <ul className="demo-window-list">
-          {windows.map((window) => (
-            <li key={window.id}>
-              <span>
-                {DAYS[window.weekday] ?? "?"} · {clock(window.startMinute)} to{" "}
-                {clock(window.endMinute)} · {window.slotMinutes}-minute slots
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                loading={pending}
-                onClick={() => {
-                  run(() => removeAvailabilityAction(window.id));
-                }}
-              >
-                Retire
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </Card>
+        {windows.length === 0 ? null : (
+          <ul className="admin-rows is-inset demo-window-list">
+            {windows.map((window) => (
+              <li key={window.id}>
+                <span>
+                  {DAYS[window.weekday] ?? "?"} · {clock(window.startMinute)} to{" "}
+                  {clock(window.endMinute)} · {window.slotMinutes}-minute slots
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={pending}
+                  onClick={() => {
+                    run(() => removeAvailabilityAction(window.id));
+                  }}
+                >
+                  Retire
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
 
-      <Card>
-        <h2>Blocked days</h2>
-        <p className="competitions-hint">
-          A day nothing is offered on, whatever the weekly windows say. Travel, a wedding, an
-          auction of your own.
-        </p>
-
+      <SectionCard
+        icon={<IconLock />}
+        tone="neutral"
+        title="Blocked days"
+        description="A day nothing is offered on, whatever the weekly windows say. Travel, a wedding, an auction of your own."
+      >
         <div className="demo-availability-form">
           <Field
             label="Date"
@@ -183,27 +190,29 @@ export function AvailabilityPanel({
           </Button>
         </div>
 
-        <ul className="demo-window-list">
-          {blackouts.map((blackout) => (
-            <li key={blackout.id}>
-              <span>
-                {blackout.blackoutOn}
-                {blackout.reason === null ? "" : ` · ${blackout.reason}`}
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                loading={pending}
-                onClick={() => {
-                  run(() => removeBlackoutAction(blackout.id));
-                }}
-              >
-                Unblock
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </Card>
+        {blackouts.length === 0 ? null : (
+          <ul className="admin-rows is-inset demo-window-list">
+            {blackouts.map((blackout) => (
+              <li key={blackout.id}>
+                <span>
+                  {blackout.blackoutOn}
+                  {blackout.reason === null ? "" : ` · ${blackout.reason}`}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={pending}
+                  onClick={() => {
+                    run(() => removeBlackoutAction(blackout.id));
+                  }}
+                >
+                  Unblock
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
     </>
   );
 }

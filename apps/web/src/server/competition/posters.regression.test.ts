@@ -39,7 +39,14 @@ import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { createCompetition, createTeam } from "./competitions";
-import { playerPosterFor, posterGateFor, posterPickerFor, teamPosterFor } from "./posters";
+import {
+  playerPosterFor,
+  posterGateFor,
+  posterPickerFor,
+  seasonPosterFor,
+  teamPosterFor,
+  topBuysPosterFor,
+} from "./posters";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -462,5 +469,183 @@ describe("POSTER ACCESS — everyone else", () => {
     }
     await db.delete(registrationsTable).where(eq(registrationsTable.id, alsoHere));
     await db.delete(competitionsTable).where(eq(competitionsTable.id, second.id));
+  });
+});
+
+describe("POSTER PHOTO — consent AND age, decided before a byte is read", () => {
+  /** The `photo` fact on the newest poster row the organizer made for `sold`. */
+  async function lastPhotoFact(): Promise<string | undefined> {
+    const [row] = await db
+      .select({ meta: auditLog.meta })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.action, "registration.poster_generated"),
+          eq(auditLog.subject, sold.registrationId),
+          eq(auditLog.actor, organizer),
+        ),
+      )
+      .orderBy(desc(auditLog.at), desc(auditLog.id))
+      .limit(1);
+    return (row?.meta as { photo?: string } | undefined)?.photo;
+  }
+
+  it("withholds a MINOR's consented photo — a poster is public once forwarded", async () => {
+    const tenYearsAgo = new Date();
+    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+    await db
+      .update(people)
+      .set({ photoUrl: `players/${sold.personId}/poster-test.png`, photoConsentAt: new Date() })
+      .where(eq(people.id, sold.personId));
+    await db
+      .update(registrationsTable)
+      .set({ dateOfBirth: tenYearsAgo.toISOString().slice(0, 10) })
+      .where(eq(registrationsTable.id, sold.registrationId));
+
+    const minor = await playerPosterFor(organizer, slug, sold.registrationId, REQUEST);
+    expect(minor.ok).toBe(true);
+    if (minor.ok) {
+      expect(minor.input.photoUrl).toBeNull();
+    }
+    expect(await lastPhotoFact()).toBe("withheld");
+
+    // The same consented photo on an ADULT is included — proving the refusal
+    // above was the age gate and not the fixture.
+    await db
+      .update(registrationsTable)
+      .set({ dateOfBirth: "1990-01-01" })
+      .where(eq(registrationsTable.id, sold.registrationId));
+    expect((await playerPosterFor(organizer, slug, sold.registrationId, REQUEST)).ok).toBe(true);
+    expect(await lastPhotoFact()).toBe("included");
+
+    await db
+      .update(people)
+      .set({ photoUrl: null, photoConsentAt: null })
+      .where(eq(people.id, sold.personId));
+    await db
+      .update(registrationsTable)
+      .set({ dateOfBirth: null })
+      .where(eq(registrationsTable.id, sold.registrationId));
+  });
+});
+
+/*
+ * THE SEASON-WIDE POSTERS, WHICH ARE A NEW KIND OF GRANT.
+ *
+ * "Top buys" and "All squads" name every franchise's business and every price
+ * in it — precisely what DA-30 withholds from a rival owner everywhere else in
+ * the product. So the two RELATIONSHIP grants, which are enough for a player's
+ * own card and an owner's own squad, deliberately do not reach them. This is
+ * the file that says so out loud.
+ */
+describe("SEASON POSTERS — the whole auction is the organizer's to publish", () => {
+  it("ranks the night's buys for the organizer, and records the act on the season", async () => {
+    const top = await topBuysPosterFor(organizer, slug, { ...REQUEST, count: 5 });
+    expect(top.ok).toBe(true);
+    if (!top.ok) {
+      return;
+    }
+    expect(top.input.buys.map((buy) => buy.playerName)).toEqual(["Sold Player"]);
+    expect(top.input.buys[0]?.pricePaise).toBe(7_500_000);
+    expect(top.input.buys[0]?.teamName).toBe("Alpha XI");
+
+    const [row] = await db
+      .select({ meta: auditLog.meta, subject: auditLog.subject })
+      .from(auditLog)
+      .where(and(eq(auditLog.action, "season.poster_generated"), eq(auditLog.actor, organizer)))
+      .orderBy(desc(auditLog.at), desc(auditLog.id))
+      .limit(1);
+    // The subject is the SEASON, not a person: nobody's timeline carries a
+    // poster that was about the auction rather than about them.
+    expect(row?.subject).toBe(compId);
+    expect((row?.meta as { kind?: string; via?: string }).kind).toBe("top");
+    expect((row?.meta as { via?: string }).via).toBe("organizer");
+  });
+
+  it("draws every squad in the season for the organizer", async () => {
+    const season = await seasonPosterFor(organizer, slug, REQUEST);
+    expect(season.ok).toBe(true);
+    if (!season.ok) {
+      return;
+    }
+    expect(season.input.squads.map((squad) => squad.teamName)).toEqual(["Alpha XI", "Beta United"]);
+    expect(season.input.squads[0]?.members.map((member) => member.name)).toContain("Sold Player");
+    expect(season.input.squads[0]?.spentPaise).toBe(7_500_000);
+    // Beta bought nobody; an empty squad is a true fact about the night.
+    expect(season.input.squads[1]?.members).toEqual([]);
+  });
+
+  it("REFUSES an owner — their own squad is not the whole season's prices", async () => {
+    expect(await topBuysPosterFor(alpha.ownerId, slug, REQUEST)).toMatchObject({
+      ok: false,
+      status: 404,
+    });
+    expect(await seasonPosterFor(alpha.ownerId, slug, REQUEST)).toMatchObject({
+      ok: false,
+      status: 404,
+    });
+  });
+
+  it("REFUSES a player, and a stranger", async () => {
+    for (const person of [sold.personId, stranger]) {
+      expect(await topBuysPosterFor(person, slug, REQUEST)).toMatchObject({ ok: false });
+      expect(await seasonPosterFor(person, slug, REQUEST)).toMatchObject({ ok: false });
+    }
+    // And nothing was written for a poster nobody was allowed to draw.
+    const rows = await db
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(eq(auditLog.action, "season.poster_generated"), eq(auditLog.actor, sold.personId)),
+      );
+    expect(rows).toHaveLength(0);
+  });
+
+  it("offers the studio exactly the kinds each person may make", async () => {
+    const forOrganizer = await posterPickerFor(organizer, slug);
+    expect("ok" in forOrganizer).toBe(false);
+    if (!("ok" in forOrganizer)) {
+      expect(forOrganizer.kinds).toEqual(["player", "team", "reveal", "top", "season"]);
+    }
+    const forOwner = await posterPickerFor(alpha.ownerId, slug);
+    if (!("ok" in forOwner)) {
+      // A squad and its reveal, and not one season-wide sheet.
+      expect(forOwner.kinds).toEqual(["team", "reveal"]);
+    }
+    const forPlayer = await posterPickerFor(sold.personId, slug);
+    if (!("ok" in forPlayer)) {
+      expect(forPlayer.kinds).toEqual(["player"]);
+    }
+  });
+});
+
+describe("SQUAD FACES — the same two rules as the player card", () => {
+  it("puts consented adult faces on the sheet and withholds everyone else's", async () => {
+    await db
+      .update(people)
+      .set({ photoUrl: `org/${org.id}/player/${sold.personId}/x.jpg` })
+      .where(eq(people.id, sold.personId));
+
+    // No consent: initials, not a face.
+    const withheld = await teamPosterFor(alpha.ownerId, slug, alpha.teamId, REQUEST);
+    expect(withheld.ok).toBe(true);
+    if (withheld.ok) {
+      expect(withheld.input.members[0]?.photoUrl).toBeNull();
+    }
+
+    /*
+     * With consent the key reaches the media port — which cannot resolve this
+     * fixture's object, so the poster still draws initials. What is asserted
+     * here is the GATE, not the bytes: that consent is what lets a key through
+     * at all, and that a missing object is a monogram rather than a 500.
+     */
+    await db.update(people).set({ photoConsentAt: new Date() }).where(eq(people.id, sold.personId));
+    const consented = await teamPosterFor(alpha.ownerId, slug, alpha.teamId, REQUEST);
+    expect(consented.ok).toBe(true);
+
+    await db
+      .update(people)
+      .set({ photoUrl: null, photoConsentAt: null })
+      .where(eq(people.id, sold.personId));
   });
 });

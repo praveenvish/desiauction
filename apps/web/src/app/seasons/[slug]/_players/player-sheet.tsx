@@ -226,9 +226,10 @@ export function PlayerSheet({
         <header className="pd-sheet-head">
           <PlayerImage
             name={row.name ?? "Player"}
-            seed={row.personId}
+            seed={row.id}
             size="lg"
-            {...(row.photoUrl !== null ? { src: row.photoUrl } : {})}
+            src={row.photoUrl}
+            decorative
           />
           <div className="pd-sheet-id">
             <h2 id={titleId} ref={headingRef} tabIndex={-1} data-testid="details-subject">
@@ -236,7 +237,7 @@ export function PlayerSheet({
             </h2>
             <p className="pd-sheet-meta">
               <span className="pd-mono">{row.number}</span>
-              <span>{personContact(row)}</span>
+              <span data-private>{personContact(row)}</span>
               {row.age !== null ? <span>{row.age} yrs</span> : null}
             </p>
             <div className="pd-chips">
@@ -525,7 +526,9 @@ function DetailsTab({
             <div className="pd-setting-head">
               <span>Contact</span>
             </div>
-            <p className="pd-readonly">{personContact(row)}</p>
+            <p className="pd-readonly" data-private>
+              {personContact(row)}
+            </p>
             <p className="pd-setting-hint">A number is who the player is — it can’t be edited.</p>
           </div>
           <TextSetting

@@ -157,15 +157,37 @@ a.wordmark:hover .wordmark-glyph {
   min-height: 44px;
 }
 
-/* Breadcrumb over title, as one block: the pair moves together, so the title
-   sits in the same place whether or not the surface has ancestors. */
-.identity {
+/* ---- the top bar's left: where you are (club, season, status) ---- */
+.context {
   flex: 1;
   min-width: 0;
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---- THE PAGE HEAD: trail, title + status, lede — action on the right ---- */
+.page-head {
+  display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 0;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.page-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+}
+
+.identity {
+  flex: 1 1 22rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .identity-trail {
@@ -175,82 +197,110 @@ a.wordmark:hover .wordmark-glyph {
 
 .identity-lede {
   margin: 0;
-  line-height: 1.35;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 72ch;
   font-family: var(--font-text);
-  font-size: var(--text-sm-size);
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
   color: var(--text-secondary);
 }
 
 .identity-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2) var(--space-3);
   min-width: 0;
 }
 
 .page-title {
   margin: 0;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-family: var(--font-text);
-  font-size: var(--text-lg-size);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
   font-weight: var(--font-weight-semibold);
   letter-spacing: -0.02em;
-  line-height: 1.2;
   color: var(--text-heading);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
-/* The page's primary action, at the head of the utility cluster — so the tab
-   order runs title → action → search → account, and every page's main button
-   is in the same place. */
+/* The page's primary action sits at the right of the head, level with the
+   title's baseline row. */
 .page-action {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-2);
 }
 
-/* Under 720px the bar cannot hold brand + title + a labelled button + icons, so
-   the action wraps to a full-width row of its own instead of being dropped.
-   The same arithmetic fails again between 720px and 1000px for a different
-   reason — see the squeeze-band block below the desktop rules. */
+/* In the bar (no season context): one line of title, one of lede. */
+.topbar .identity {
+  flex: 1;
+  gap: 0;
+}
+
+.topbar .page-title {
+  font-size: var(--text-lg-size);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar .identity-lede {
+  font-size: var(--text-sm-size);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @media (max-width: 719px) {
-  .topbar {
-    height: auto;
-    padding-bottom: var(--space-2);
+  .page-head {
+    margin-bottom: var(--space-4);
   }
 
-  .topbar-inner {
-    height: auto;
-    min-height: var(--shell-topbar-h);
-    flex-wrap: wrap;
+  .page-title {
+    font-size: var(--text-xl-size);
+    line-height: var(--text-xl-line);
   }
 
+  /* The action gets its own full-width row — in the page head, and in the
+     top bar, where it goes LAST so the icons keep the first row. */
   .page-action {
     flex-basis: 100%;
   }
 
   .page-action > button,
   .page-action > a {
-    width: 100%;
+    flex: 1;
     justify-content: center;
+  }
+
+  .topbar:has(.page-action:not(:empty)) {
+    height: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  .topbar-inner {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--shell-topbar-h);
+  }
+
+  .topbar .page-action {
+    order: 10;
+  }
+
+  .topbar .identity-lede {
+    display: none;
   }
 }
 
-/* AN EMPTY SLOT MUST COST NOTHING.
-   The action arrives from a parallel route now, and a route slot is always a
-   node — `@action/default.tsx` renders nothing, but it is not `null`, so the
-   shell cannot tell "no action" from "an action that drew nothing" by looking
-   at the value. The wrapper is therefore always present on console routes, and
-   an empty flex item is not free: `.topbar-inner` has a `gap`, so a zero-width
-   child still pushes its neighbours by one gap step on every actionless page.
-   `:empty` is exact here — it matches only when the div has no child nodes at
-   all, which is precisely the render-nothing case. */
+/* AN EMPTY SLOT MUST COST NOTHING. The action arrives from a parallel route,
+   and `@action/default.tsx` renders nothing but is not `null` — so the wrapper
+   is always present; `:empty` is exact for the render-nothing case. */
 .page-action:empty {
   display: none;
 }
@@ -394,6 +444,21 @@ a.wordmark:hover .wordmark-glyph {
     align-items: center;
   }
 
+  /* The rail's mark at the public header's proportion (mark ≈ 1.8× the
+     wordmark's size), and with the header's bare corners: the app's mark
+     carries its own gold tile, so the chip's gradient and border only drew a
+     second, darker edge around it. */
+  .rail-brand .wordmark {
+    gap: 10px;
+  }
+
+  .rail-brand .wordmark-glyph {
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 28%;
+  }
+
   /* The wordmark and its tagline are one column beside the glyph, so the column
      is as wide as the longer of the two — and with the tagline set small enough
      to be the shorter, that is the wordmark. */
@@ -449,86 +514,12 @@ a.wordmark:hover .wordmark-glyph {
     display: none;
   }
 
-  .page-title {
-    font-size: var(--text-xl-size);
-  }
-
   .content {
     padding: var(--space-6) var(--space-6);
   }
 
   .bottom-tabs {
     display: none;
-  }
-}
-
-/* ---- the squeeze band (720–1000px): the title stops paying for everyone ----
-
-   Below 720px the bar is narrow and everyone can see it. Between 720 and 1000
-   it LOOKS roomy and is not: the rail takes 248px off the top before the bar
-   starts, so at 768px the whole identity bar is 472px wide — narrower than the
-   phone bar it replaced. Into that go a title, a labelled action and four
-   utility controls, and only the title can shrink (`.page-action` and
-   `.top-actions` are both `flex: none`, deliberately, since a truncated button
-   label is worse than a truncated sentence). So the title absorbed the entire
-   shortfall on its own: 114px of the 271px it asked for at 768px, which is
-   "Good evenin…" — and because this shell owns the one `<h1>` for every console
-   page, it was every page's name that was losing half its characters, not one
-   greeting's.
-
-   The arithmetic is what decides it, not taste: 271 (title) + 156 (action) +
-   178 (utilities) + 3 gaps = 629px asked of a 472px bar. No distribution of one
-   row satisfies that, so a row has to give — the same conclusion, and the same
-   remedy, as the sub-720 rule above. 1000px is where the title clears its ask
-   with the action still beside it, and it is also the point where the title
-   holds at least half the bar (52% at 1000, 44% at 900, 28% at 768).
-
-   Two axes again, and the second one is why this is gated on `:has()` rather
-   than applied to the band wholesale: a second row costs vertical space, and
-   this bar is sticky on every screen of every session. Only a page that
-   actually HAS an action pays — an actionless tablet page keeps its 64px bar to
-   the pixel, and its title still clears 278px at 768, which is the whole ask.
-   That matters beyond tidiness: `.tabbar` parks at `--shell-topbar-h`, so a
-   taller bar and a tab strip cannot both be true on one page without the strip
-   sliding under it. Today the two never meet — page actions live on the four
-   rail-root surfaces (/home, /orgs, /seasons, /tournaments) and tab strips live
-   on the section surfaces below them — and this gate is what keeps that from
-   being a coincidence: only the four grow, and none of them has tabs.
-
-   It is the TITLE that takes the whole first row, not the action that takes the
-   second. Wrapping the action alone (what the sub-720 rule does) reads as the
-   cheaper change and is not: `flex-basis: 100%` breaks the line at the action,
-   and everything after it in the DOM — the whole utility cluster — is carried
-   onto a THIRD row. That bar is 167px tall. Giving the identity the full first
-   row instead leaves the action and the cluster together on the second, costs
-   one row rather than two, and hands the title 472px at 768 instead of 271 —
-   room the longest console title will not exhaust. */
-@media (min-width: 720px) and (max-width: 999px) {
-  .topbar:has(.page-action) {
-    height: auto;
-    padding-bottom: var(--space-3);
-  }
-
-  .topbar-inner:has(.page-action) {
-    height: auto;
-    min-height: var(--shell-topbar-h);
-    flex-wrap: wrap;
-  }
-
-  .topbar-inner:has(.page-action) .identity {
-    flex-basis: 100%;
-  }
-
-  /* Row two, flush right, in the reading order the wide bar already has: the
-     action at the head of the utility cluster. The auto margin moves to the
-     action so the pair travels together instead of the free space splitting
-     between two auto margins and stranding the action mid-row. */
-  .topbar-inner:has(.page-action) .page-action {
-    margin-left: auto;
-  }
-
-  .topbar-inner:has(.page-action) .top-actions {
-    margin-left: 0;
   }
 }
 

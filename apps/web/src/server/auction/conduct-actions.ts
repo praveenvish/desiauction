@@ -11,7 +11,7 @@ import type {
 } from "@desiauction/core";
 import { roleOptions } from "@desiauction/core";
 import { auctionOf } from "@desiauction/auction";
-import { competitions, organizations, teams, withTenantDb, type Db } from "@desiauction/db";
+import { competitions, lots, organizations, teams, withTenantDb, type Db } from "@desiauction/db";
 import { asc, eq } from "drizzle-orm";
 
 import { dbHandle, systemDb } from "../db";
@@ -97,6 +97,12 @@ export interface CockpitView {
   /** Icons and retained players: on a squad, never in the pool. */
   preSigned: PreSignedPlayer[];
   resolved: ResolvedLot[];
+  /**
+   * Face, number and mark seed per lot — beside the snapshot, never on it (see
+   * `SpectatorView.lotMedia`). The cockpit is projected in the hall as often as
+   * it is read at a desk, so it takes the broadcast rule (consent and age).
+   */
+  lotMedia: Record<string, LotMedia>;
   rules: AuctionRules;
 }
 
@@ -106,7 +112,7 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
   if (gate === null || !gate.canConduct) {
     return null;
   }
-  const [view, owners, teamRows, preSigned, resolved, ownerAcceptances] = await inGateOrg(
+  const [view, owners, teamRows, preSigned, resolved, ownerAcceptances, lotMedia] = await inGateOrg(
     gate,
     (db) =>
       Promise.all([
@@ -117,9 +123,10 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
           .from(teams)
           .where(eq(teams.competitionId, gate.competition.id))
           .orderBy(asc(teams.name)),
-        preSignedPlayers(db, gate.competition.id),
+        preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
         resolvedLots(db, gate.auction.id),
         ownerAcceptancesOf(db, gate.auction.id, gate.competition.orgId),
+        lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
       ]),
   );
   return {
@@ -141,6 +148,7 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
     },
     preSigned,
     resolved,
+    lotMedia,
     rules: rulesOf(gate.auction.config),
   };
 }
@@ -233,7 +241,7 @@ export async function spectatorView(slug: string): Promise<SpectatorView | null>
         .from(teams)
         .where(eq(teams.competitionId, gate.competition.id))
         .orderBy(asc(teams.name)),
-      preSignedPlayers(db, gate.competition.id),
+      preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
       lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
       // Folded into the boundary the rest of this view already opened. It sat
       // one line outside it on the bypass pool for a name (audit PA-1 §10 P1-4);
@@ -303,7 +311,7 @@ export async function publicSpectatorView(slug: string): Promise<SpectatorView |
       .from(teams)
       .where(eq(teams.competitionId, competition.id))
       .orderBy(asc(teams.name)),
-    preSignedPlayers(systemDb, competition.id),
+    preSignedPlayers(systemDb, competition.id, (key) => storage.readUrl(key)),
     lotMediaOf(systemDb, auction.id, (key) => storage.readUrl(key)),
   ]);
   return {
@@ -333,6 +341,12 @@ export interface LedgerView {
   page: number;
   totalPages: number;
   generationMs: number;
+  /**
+   * Faces for the ledger's Lot column, keyed by LOT NUMBER — the one lot key a
+   * ledger row carries (core's `AuctionLedgerRow` is a certified fold and stays
+   * free of media). Same rule and seed as the live room's `lotMedia`.
+   */
+  faces: Record<string, { registrationId: string; photoUrl: string | null }>;
 }
 
 /**
@@ -350,7 +364,23 @@ export async function ledgerView(slug: string, page = 1): Promise<LedgerView | n
     return null;
   }
   const start = performance.now();
-  const all = await inGateOrg(gate, (db) => ledgerOf(db, gate.auction));
+  const [all, lotNumbers, media] = await inGateOrg(gate, (db) =>
+    Promise.all([
+      ledgerOf(db, gate.auction),
+      db
+        .select({ lotId: lots.id, lotNumber: lots.lotNumber })
+        .from(lots)
+        .where(eq(lots.auctionId, gate.auction.id)),
+      lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
+    ]),
+  );
+  const faces: LedgerView["faces"] = {};
+  for (const { lotId, lotNumber } of lotNumbers) {
+    const face = media[lotId];
+    if (face !== undefined) {
+      faces[lotNumber] = { registrationId: face.registrationId, photoUrl: face.photoUrl };
+    }
+  }
   // The fold stays whole — the ledger's guarantee is that it regenerates from
   // the event log — and only the RENDER is bounded. A 500-lot auction would
   // otherwise ship several megabytes to a browser that shows thirty rows.
@@ -365,6 +395,7 @@ export async function ledgerView(slug: string, page = 1): Promise<LedgerView | n
     page: current,
     totalPages,
     generationMs: performance.now() - start,
+    faces,
   };
 }
 
@@ -375,6 +406,8 @@ export interface ReplayViewerData {
   refs: SnapshotRefs;
   /** The engine's CURRENT canonical snapshot bytes (comparison target). */
   engineSerialized: string | null;
+  /** Faces keyed by lot id, beside the fold and never inside it (see `SpectatorView.lotMedia`). */
+  lotMedia: Record<string, LotMedia>;
 }
 
 /** The replay viewer's feed — pure inputs for a client-side visual fold. */
@@ -383,11 +416,12 @@ export async function replayViewerData(slug: string): Promise<ReplayViewerData |
   if (gate === null || !gate.canConduct) {
     return null;
   }
-  const [events, refs, engineSerialized] = await inGateOrg(gate, (db) =>
+  const [events, refs, engineSerialized, lotMedia] = await inGateOrg(gate, (db) =>
     Promise.all([
       loadEvents(db, gate.auction.id),
       snapshotRefs(db, gate.auction),
       fetchEngineSnapshot(gate.auction.id),
+      lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
     ]),
   );
   return {
@@ -396,6 +430,7 @@ export async function replayViewerData(slug: string): Promise<ReplayViewerData |
     events,
     refs,
     engineSerialized,
+    lotMedia,
   };
 }
 

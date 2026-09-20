@@ -9,7 +9,8 @@ import {
   type Db,
 } from "@desiauction/db";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
-import { shownName } from "./shown-name";
+import { storage } from "../media";
+import { consentedPhotoUrl, shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
  * WHO PLAYED EACH MATCH (launch polish, Phase 3) — the domain half.
@@ -23,11 +24,15 @@ import { shownName } from "./shown-name";
 export interface LineupSide {
   teamId: string;
   teamName: string;
+  /** The team's primary colour, for its chip; null when none was picked. */
+  teamColor: string | null;
   /** True once this team's lineup has been saved at least once. */
   recorded: boolean;
   players: {
     registrationId: string;
     name: string;
+    /** The shown photo, signed only with recorded consent (DPDP §5); null → initials mark. */
+    photoUrl: string | null;
     role: string | null;
     isCaptain: boolean;
     played: boolean;
@@ -40,8 +45,8 @@ export interface LineupFixture {
   round: number | null;
   kickoffAt: string | null;
   status: string;
-  home: { id: string; name: string };
-  away: { id: string; name: string };
+  home: { id: string; name: string; color: string | null };
+  away: { id: string; name: string; color: string | null };
   /** Players recorded per side, or null when that side is not recorded. */
   recorded: { home: number | null; away: number | null };
 }
@@ -63,7 +68,7 @@ export async function lineupFixtures(db: Db, competitionId: string): Promise<Lin
       .where(and(eq(fixtures.competitionId, competitionId), isNotNull(fixtures.homeTeamId)))
       .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq)),
     db
-      .select({ id: teams.id, name: teams.name })
+      .select({ id: teams.id, name: teams.name, color: teams.primaryColor })
       .from(teams)
       .where(eq(teams.competitionId, competitionId)),
     db
@@ -72,6 +77,7 @@ export async function lineupFixtures(db: Db, competitionId: string): Promise<Lin
       .where(eq(fixtureLineups.competitionId, competitionId)),
   ]);
   const teamName = new Map(teamRows.map((team) => [team.id, team.name]));
+  const teamColor = new Map(teamRows.map((team) => [team.id, team.color]));
   const tally = new Map<string, number>();
   for (const row of counts) {
     const key = `${row.fixtureId}:${row.teamId}`;
@@ -86,8 +92,16 @@ export async function lineupFixtures(db: Db, competitionId: string): Promise<Lin
         round: row.round,
         kickoffAt: row.kickoffAt,
         status: row.status,
-        home: { id: row.homeTeamId, name: teamName.get(row.homeTeamId) ?? "Home" },
-        away: { id: row.awayTeamId, name: teamName.get(row.awayTeamId) ?? "Away" },
+        home: {
+          id: row.homeTeamId,
+          name: teamName.get(row.homeTeamId) ?? "Home",
+          color: teamColor.get(row.homeTeamId) ?? null,
+        },
+        away: {
+          id: row.awayTeamId,
+          name: teamName.get(row.awayTeamId) ?? "Away",
+          color: teamColor.get(row.awayTeamId) ?? null,
+        },
         recorded: {
           home: tally.get(`${row.id}:${row.homeTeamId}`) ?? null,
           away: tally.get(`${row.id}:${row.awayTeamId}`) ?? null,
@@ -109,6 +123,8 @@ export async function lineupSides(
         registrationId: registrations.id,
         teamId: registrations.teamId,
         name: shownName,
+        photoKey: shownPhotoKey,
+        photoConsentAt: shownPhotoConsentAt,
         role: registrations.role,
         isCaptain: registrations.isCaptain,
       })
@@ -132,12 +148,14 @@ export async function lineupSides(
   return [fixture.home, fixture.away].map((side) => ({
     teamId: side.id,
     teamName: side.name,
+    teamColor: side.color,
     recorded: recordedTeams.has(side.id),
     players: squad
       .filter((row) => row.teamId === side.id)
       .map((row) => ({
         registrationId: row.registrationId,
         name: row.name ?? "Unnamed player",
+        photoUrl: consentedPhotoUrl(row, (key) => storage.readUrl(key)),
         role: row.role,
         isCaptain: row.isCaptain,
         played: playedIds.has(row.registrationId),

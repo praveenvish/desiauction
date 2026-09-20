@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IconArrowLeft } from "@desiauction/ui";
 
+import { PageBody, PageHero } from "../../../../components/public/public-kit";
 import { env } from "../../../../env";
 import { HELP_CATEGORIES, helpArticlesIn, helpCategory } from "../../../../content/help";
 import "../../../content.css";
@@ -38,28 +39,33 @@ export default async function HelpCategoryPage({ params }: { params: Promise<{ s
   const articles = helpArticlesIn(slug);
   return (
     <main className="content-page">
-      <p className="article-meta no-print">
-        <Link href="/help" className="prose-link">
-          <IconArrowLeft size={16} className="icon-lead" /> All help
-        </Link>
-      </p>
-      <h1>{category.title}</h1>
-      <p className="content-lead">{category.description}</p>
-      {/* h1 → h3 skip on all six category pages: the article cards are h3 with
+      <PageHero
+        size="compact"
+        eyebrow={
+          <Link href="/help" className="article-back no-print">
+            <IconArrowLeft size={16} className="icon-lead" /> All help
+          </Link>
+        }
+        title={category.title}
+        lede={category.description}
+      />
+      <PageBody>
+        {/* h1 → h3 skip on all six category pages: the article cards are h3 with
           no h2 between them and the title. One group of cards, so the group
           heading is the h2 the cards were missing. */}
-      <h2 id="articles">Articles in this guide</h2>
-      <ul className="content-grid" aria-labelledby="articles">
-        {articles.map((article) => (
-          <li key={article.slug}>
-            <Link href={`/help/${article.slug}`} className="content-card">
-              <h3>{article.title}</h3>
-              <p>{article.summary}</p>
-              <span className="content-card-meta">{article.readMinutes} min read</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+        <h2 id="articles">Articles in this guide</h2>
+        <ul className="content-grid" aria-labelledby="articles">
+          {articles.map((article) => (
+            <li key={article.slug}>
+              <Link href={`/help/${article.slug}`} className="content-card">
+                <h3>{article.title}</h3>
+                <p>{article.summary}</p>
+                <span className="content-card-meta">{article.readMinutes} min read</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </PageBody>
     </main>
   );
 }

@@ -3,18 +3,59 @@
 import { PlayerImage } from "@desiauction/ui";
 import { useMemo } from "react";
 
+import { TeamCard, TeamGrid } from "../../../components/public/team-card";
 import { groupSquads } from "../../../components/showcase/showcase-filter";
 import type { ShowcasePlayer } from "../../../server/competition/public";
 
 /**
- * Public Squads view (parity §3.3): final team rosters, grouped from the same
- * showcase data via the pure `groupSquads` core (unit-tested). Pre-auction (no
- * sold players) shows an honest empty state.
+ * Public Squads view (parity §3.3): the team sheets, grouped from the same
+ * showcase data via the pure `groupSquads` core (unit-tested).
+ *
+ * It now renders the shared `TeamCard`, and it is given the season's TEAMS as
+ * well as its players. That is the change that let the page drop its separate
+ * "Teams" section: a team's colour, crest and coach were listed three sections
+ * away from the players in it, and a team nobody had been sold to yet appeared
+ * only in that other list. One card per team, including the empty ones.
  */
-export function SquadsView({ players }: { players: ShowcasePlayer[] }) {
+export interface SquadTeam {
+  id: string;
+  name: string;
+  primaryColor: string | null;
+  logoUrl: string | null;
+  coachName: string | null;
+}
+
+export function SquadsView({
+  players,
+  teams,
+}: {
+  players: ShowcasePlayer[];
+  teams: readonly SquadTeam[];
+}) {
   const squads = useMemo(() => groupSquads(players), [players]);
 
-  if (squads.length === 0) {
+  const cards = useMemo(() => {
+    const byName = new Map(squads.map((squad) => [squad.teamName, squad.players]));
+    const named = teams.map((team) => ({ team, players: byName.get(team.name) ?? [] }));
+    // A team sheet the season does not list as a team (renamed mid-season, or
+    // a squad row that outlived its team) still has real players on it, so it
+    // is shown rather than silently dropped.
+    const orphans = squads
+      .filter((squad) => !teams.some((team) => team.name === squad.teamName))
+      .map((squad) => ({
+        team: {
+          id: squad.teamName,
+          name: squad.teamName,
+          primaryColor: null,
+          logoUrl: null,
+          coachName: null,
+        },
+        players: squad.players,
+      }));
+    return [...named, ...orphans].sort((a, b) => b.players.length - a.players.length);
+  }, [squads, teams]);
+
+  if (cards.length === 0) {
     return <p className="showcase-empty">Squads appear here as players are sold.</p>;
   }
 
@@ -23,34 +64,39 @@ export function SquadsView({ players }: { players: ShowcasePlayer[] }) {
   // showcase-grid.tsx. A public page shows rosters; it does not hand them over
   // as a file to an actor it cannot name.
   return (
-    <>
-      <div className="squads">
-        {squads.map((squad) => (
-          <section key={squad.teamName} className="squad" aria-label={squad.teamName}>
-            <header className="squad-head">
-              <h3 className="squad-name">{squad.teamName}</h3>
-              <span className="squad-count">
-                {squad.players.length} {squad.players.length === 1 ? "player" : "players"}
-              </span>
-            </header>
-            <ul className="squad-list">
-              {squad.players.map((p) => (
-                <li key={p.number} className="squad-player">
-                  <PlayerImage
-                    name={p.name}
-                    seed={p.number}
-                    size="sm"
-                    shape="round"
-                    {...(p.photoUrl !== null ? { src: p.photoUrl } : {})}
-                  />
-                  <span className="squad-player-name">{p.name}</span>
-                  <span className="squad-player-num">#{p.number}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </>
+    <TeamGrid>
+      {cards.map(({ team, players: squad }) => (
+        <TeamCard
+          key={team.id}
+          team={{
+            id: team.id,
+            name: team.name,
+            color: team.primaryColor,
+            coachName: team.coachName,
+            crest:
+              team.logoUrl === null ? undefined : (
+                // A signed storage URL, already sized by the card; next/image
+                // would add a proxy hop for a 40px crest.
+                <img src={team.logoUrl} alt="" width={40} height={40} loading="lazy" />
+              ),
+            players: squad.map((player) => ({
+              name: player.name,
+              number: player.number,
+              preSigned: player.status === "retained",
+              photo: (
+                <PlayerImage
+                  name={player.name}
+                  seed={player.registrationId}
+                  size="sm"
+                  shape="round"
+                  src={player.photoUrl}
+                  decorative
+                />
+              ),
+            })),
+          }}
+        />
+      ))}
+    </TeamGrid>
   );
 }

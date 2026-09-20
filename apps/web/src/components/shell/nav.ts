@@ -539,6 +539,9 @@ const RAIL_TITLES: Record<string, string> = {
   tournaments: "Tournaments",
   orgs: "Organizations",
   money: "Money",
+  players: "Players",
+  auctions: "Auctions",
+  reports: "Reports",
   help: "Help",
 };
 
@@ -574,6 +577,9 @@ const SURFACE_SUBTITLES: [string, string][] = [
   ["/money", "Receipts issued to your teams, across every season."],
   ["/inbox", "Approvals, auction results, receipts and account activity."],
   ["/account", "Your sign-in, profile and security."],
+  ["/players", "Every player across the seasons you run — search, filter, open their sheet."],
+  ["/auctions", "Every auction night you run, conduct, bid in or can watch."],
+  ["/reports", "Registrations, fees and auction spend for each season you run."],
   ["/me", "Every tournament, match and sport you've played — in one place."],
   ["/me/cricket", "Every season you've played, in one place."],
 ];
@@ -793,6 +799,9 @@ export type NavIcon =
   | "money"
   | "sports"
   | "find"
+  | "player"
+  | "gavel"
+  | "chart"
   | "help"
   | "bell"
   | "account"
@@ -829,6 +838,15 @@ export interface NavItem {
   active?: boolean;
   /** Present only when the person holds more than one of this thing. */
   choices?: NavChoice[];
+  /**
+   * Absent from the PHONE's bar (premium-flow's ruling, 2026-09-19, kept).
+   *
+   * Organizations and Reports are desk surfaces — a laptop job — and the bar
+   * has five columns to spend. LAW 4 wants the same menu everywhere and still
+   * gets it: nothing here is a destination the phone cannot reach (the drawer
+   * and Home both carry them), it is a question of which five earn the bar.
+   */
+  mobile?: false;
 }
 
 export interface NavModel {
@@ -888,8 +906,36 @@ export interface NavRoles {
   platform: readonly PlatformDoorCapability[];
 }
 
-/** LAW 1. Five is the cap, and §RN-1 3.1 explains why it can be hard. */
+/**
+ * FIVE COLUMNS — the PHONE's constraint, which is where the number came from.
+ *
+ * The desktop rail is vertical and has room, so it shows everything a person is
+ * offered; the bar has five columns and spends them on the five that earn it
+ * (`mobile: false` opts a desk surface out first). That is the synthesis of two
+ * rulings: RN-1's "a short primary list, built from what you do", and the
+ * founder's 2026-09-19 sidebar mockups, which asked for seven items on a laptop
+ * and five on a phone.
+ */
 export const RAIL_CAP = 5;
+
+/**
+ * What the phone's bottom bar carries, from the same one model (LAW 4).
+ *
+ * THE PAGE YOU ARE ON ALWAYS HAS A SEAT. The cap binds here now, so the rule
+ * that used to guard the rail belongs here: an organizer standing on /reports
+ * — the sixth item, and `mobile: false` besides — would otherwise get a bar
+ * that lights nothing, and a menu that cannot say where you are is worse than
+ * a short one. The claiming item displaces the last, and Home keeps slot one.
+ */
+export function phoneBar(rail: NavItem[]): NavItem[] {
+  const eligible = rail.filter((item) => item.mobile !== false);
+  const bar = eligible.slice(0, RAIL_CAP);
+  if (bar.some((item) => item.active === true)) {
+    return bar;
+  }
+  const claiming = rail.find((item) => item.active === true);
+  return claiming === undefined ? bar : [...bar.slice(0, RAIL_CAP - 1), claiming];
+}
 
 /**
  * Where an operator's one door leads.
@@ -1015,6 +1061,12 @@ function claims(item: NavItem, pathname: string): boolean {
       return pathname.startsWith("/orgs") || pathname.startsWith("/org/");
     case "money":
       return pathname.startsWith("/money");
+    case "players":
+      return pathname === "/players" || pathname.startsWith("/players/");
+    case "auctions":
+      return pathname === "/auctions" || pathname.startsWith("/auctions/");
+    case "reports":
+      return pathname === "/reports" || pathname.startsWith("/reports/");
     case "sports":
       return pathname === "/me" || pathname.startsWith("/me/");
     case "find":
@@ -1079,7 +1131,50 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
         }
       : null,
     roles.organizes
-      ? { key: "orgs", label: "Organizations", shortLabel: "Clubs", href: "/orgs", icon: "org" }
+      ? {
+          key: "orgs",
+          label: "Organizations",
+          shortLabel: "Clubs",
+          href: "/orgs",
+          icon: "org",
+          mobile: false,
+        }
+      : null,
+    /*
+     * THE THREE CROSS-SEASON INDEXES from the founder's sidebar mockups
+     * (2026-09-19, ui/premium-flow). They were a FIXED rail of seven there;
+     * here they are candidates like everything else, offered to the people who
+     * run seasons and absent for everyone else — a player has no cross-season
+     * player index, and /reports of seasons you do not run is an empty page.
+     * That is LAW 3 applied to three real surfaces, not a demotion of them.
+     */
+    roles.organizes
+      ? {
+          key: "players",
+          label: "Players",
+          shortLabel: "Players",
+          href: "/players",
+          icon: "player",
+        }
+      : null,
+    roles.organizes
+      ? {
+          key: "auctions",
+          label: "Auctions",
+          shortLabel: "Auctions",
+          href: "/auctions",
+          icon: "gavel",
+        }
+      : null,
+    roles.organizes
+      ? {
+          key: "reports",
+          label: "Reports",
+          shortLabel: "Reports",
+          href: "/reports",
+          icon: "chart",
+          mobile: false,
+        }
       : null,
     // DA-18 removed Money because it led to an apology. It comes back for the
     // people who have books — and stays absent for everyone else (LAW 3).
@@ -1113,24 +1208,19 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
       : { key: "find", label: "Find tournaments", shortLabel: "Find", href: "/c", icon: "find" },
   ];
 
-  const offered = candidates.filter((item): item is NavItem => item !== null);
+  const rail = candidates.filter((item): item is NavItem => item !== null);
 
   /*
-   * THE PAGE YOU ARE ON ALWAYS HAS A SEAT.
+   * NO CAP ON THE DESKTOP RAIL. The five was always the PHONE's number — five
+   * columns across a 320px bar — and a vertical rail has room, which is what
+   * the founder's 2026-09-19 mockups assumed when they asked for seven items.
+   * `phoneBar()` applies the five where it actually binds.
    *
-   * The cap is hard (LAW 1), so a busy organizer who also plays loses "My
-   * sports" to it. Without this, walking to /me — reachable from their home,
-   * which is the whole justification for a hard cap — lit NOTHING in the menu,
-   * and a menu that cannot say where you are is worse than a long one.
-   *
-   * So the item claiming the current path displaces the lowest-precedence one
-   * instead of vanishing. Home keeps slot 1 always; the cap still holds.
+   * The rail still cannot run away: every item here is gated on a role fact,
+   * so the longest possible list belongs to somebody who genuinely organizes,
+   * owns a team, conducts a night AND plays — and that person has earned every
+   * one of them.
    */
-  const claimant = offered.findIndex((item) => claims(item, pathname));
-  const rail =
-    claimant >= RAIL_CAP
-      ? [...offered.slice(0, RAIL_CAP - 1), offered[claimant] as NavItem]
-      : offered.slice(0, RAIL_CAP);
 
   const doorHref = operatorDoorHref(roles.platform);
   const utility: NavItem[] = [

@@ -1,6 +1,15 @@
 "use client";
 
-import { Badge, Button, Card, Dialog, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Dialog,
+  IconInfo,
+  IconPin,
+  Notice,
+  SectionCard,
+  TeamChip,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -10,24 +19,11 @@ import {
   type FixtureLifecycleAction,
   type MatchDayView,
 } from "../../../../../server/competition/fixture-actions";
+import { FixtureStatusPill } from "../../_tabs/fixture-status";
 
 // Match-day operations (M-IP3-3): one date, grouped by ground, with the single
 // legal next lifecycle step per fixture. No live match management — the machine
 // edges (start, complete, cancel) only.
-
-// The console's one colour grammar: grey not started, blue set and open,
-// red live, green done. "Published" was green and "completed" grey — the
-// schedule read as finished before a ball was bowled, and finished as idle.
-// A cancelled match is closed, not an alarm. (Same table in the fixtures
-// panel, the calendar and match day — change the three together.)
-const FIXTURE_TONE = {
-  draft: "neutral",
-  scheduled: "info",
-  published: "info",
-  in_progress: "live",
-  completed: "success",
-  cancelled: "neutral",
-} as const;
 
 const NEXT_ACTION: Partial<Record<string, { action: FixtureLifecycleAction; label: string }>> = {
   published: { action: "start", label: "Start match" },
@@ -84,11 +80,13 @@ export function MatchDayPanel({
 
   if (groundGroups.length === 0) {
     return (
-      <Card>
-        <p className="competitions-hint" data-testid="match-day-empty">
-          No fixtures on this date.
-        </p>
-      </Card>
+      <SectionCard
+        icon={<IconPin />}
+        tone="neutral"
+        title="No fixtures on this date"
+        description="Step to another day, or open the calendar to find the next match."
+        data-testid="match-day-empty"
+      />
     );
   }
 
@@ -98,68 +96,83 @@ export function MatchDayPanel({
           Start/Complete — the exact affordances of a live match console. It is
           not one, and saying so once is cheaper than letting an organizer find
           out at the ground. */}
-      <Card>
-        <p className="competitions-hint" data-testid="match-day-scope">
-          Results and scoring aren&apos;t part of DesiAuction yet — Complete just marks the match as
-          played.
-        </p>
-      </Card>
+      <Notice tone="info" icon={<IconInfo size={18} />} testId="match-day-scope">
+        Complete marks the match as played. Record the score afterwards on the Fixtures tab&apos;s
+        Results card.
+      </Notice>
       {groundGroups.map((group) => (
-        <Card key={group.groundId ?? "unassigned"} data-testid={`ground-group-${group.groundName}`}>
-          <div className="competition-head">
-            <h2>{group.groundName}</h2>
-            <span className="competitions-hint">{group.venueName}</span>
-          </div>
-          <ul className="calendar-day-list">
+        <SectionCard
+          key={group.groundId ?? "unassigned"}
+          icon={<IconPin />}
+          tone="purple"
+          title={group.groundName}
+          description={`${group.venueName} · ${String(group.fixtures.length)} match${group.fixtures.length === 1 ? "" : "es"}`}
+          flush
+          data-testid={`ground-group-${group.groundName}`}
+        >
+          <ul className="cal-lines">
             {group.fixtures.map((fixture) => {
               const next = NEXT_ACTION[fixture.status];
               return (
                 <li
-                  className="calendar-fixture"
+                  className="cal-line md-line"
                   key={fixture.id}
                   data-testid={`md-${fixture.number}`}
                 >
-                  <span className="reg-number">{fixture.number}</span>
-                  <span className="registration-name">
-                    {fixture.homeTeamName} vs {fixture.awayTeamName}
+                  <span className="cal-line-time">
+                    <strong>
+                      {fixture.kickoffAt !== null ? formatWallTime(fixture.kickoffAt) : "—"}
+                    </strong>
+                    <span className="st-mono">{fixture.number}</span>
                   </span>
-                  <span className="registration-phone">
-                    {fixture.kickoffAt !== null ? formatWallTime(fixture.kickoffAt) : "—"}
+                  <span className="cal-line-main">
+                    <span className="fx-teams">
+                      {fixture.homeTeamId === null ? (
+                        <TeamChip color={null}>{fixture.squadCount} squads</TeamChip>
+                      ) : (
+                        <>
+                          <TeamChip color={fixture.homeTeamColor}>{fixture.homeTeamName}</TeamChip>
+                          <span className="fx-vs">vs</span>
+                          <TeamChip color={fixture.awayTeamColor}>{fixture.awayTeamName}</TeamChip>
+                        </>
+                      )}
+                    </span>
                   </span>
-                  <Badge tone={FIXTURE_TONE[fixture.status]}>
-                    {fixture.status.replace(/_/g, " ")}
-                  </Badge>
-                  {canManage && next !== undefined ? (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        start(fixture, next.action);
-                      }}
-                      loading={busy}
-                      data-testid={`${next.action}-${fixture.number}`}
-                    >
-                      {next.label}
-                    </Button>
-                  ) : null}
-                  {/* An organizer standing at a rained-off ground had no way to
-                      call a match off from here at all. */}
-                  {canManage && cancellable(fixture.status) ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setConfirming({ fixture, action: "cancel" });
-                      }}
-                      data-testid={`cancel-${fixture.number}`}
-                    >
-                      Cancel
-                    </Button>
-                  ) : null}
+                  <span className="md-side">
+                    <FixtureStatusPill status={fixture.status} />
+                    {canManage && next !== undefined ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          start(fixture, next.action);
+                        }}
+                        loading={busy}
+                        data-testid={`${next.action}-${fixture.number}`}
+                      >
+                        {next.label}
+                      </Button>
+                    ) : null}
+                    {/* An organizer standing at a rained-off ground had no way to
+                        call a match off from here at all. */}
+                    {canManage && cancellable(fixture.status) ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setConfirming({ fixture, action: "cancel" });
+                        }}
+                        data-testid={`cancel-${fixture.number}`}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
+                  </span>
                 </li>
               );
             })}
           </ul>
-        </Card>
+        </SectionCard>
       ))}
 
       <Dialog
@@ -180,7 +193,7 @@ export function MatchDayPanel({
         }
       >
         {confirming !== null ? (
-          <div data-testid="match-day-confirm">
+          <div data-testid="match-day-confirm" className="fx-dialog-body">
             <p>
               <strong>{confirming.fixture.number}</strong> — {confirming.fixture.homeTeamName} vs{" "}
               {confirming.fixture.awayTeamName}

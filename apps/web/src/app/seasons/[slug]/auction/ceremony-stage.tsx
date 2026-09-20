@@ -8,10 +8,12 @@ import {
   type CeremonyState,
   type LotOutcomeKind,
 } from "@desiauction/core";
-import { GoldDrift, SoldStamp, type StampSize } from "@desiauction/ui";
+import { GoldDrift, PlayerImage, SoldStamp, type StampSize } from "@desiauction/ui";
 import { useEffect, useMemo, useState } from "react";
 
-import type { LotMedia } from "../../../../server/auction/live-summary";
+import { lotSeed } from "../../../../lib/player-seed";
+import type { TeamIdentity } from "./purse-board";
+import type { LotMedia, ResolvedLot } from "../../../../server/auction/live-summary";
 
 // The FLOODLIGHT ceremony stage (M-IP4-3). Presentation ONLY: renders the
 // deterministic ceremony phase derived from consecutive AuctionSnapshots.
@@ -81,6 +83,9 @@ export function outcomeMeta(outcome: NonNullable<AuctionSnapshot["lastOutcome"]>
 // the identical moment. Decoration is aria-hidden and gone under reduced
 // motion; the static gold frame is the non-motion marker.
 
+/** How many buys the results showcase puts on the stage when the night ends. */
+const SHOWCASE = 3;
+
 /** How long a blank stage stays hopeful before it admits it cannot get through. */
 const PATIENCE_MS = 8_000;
 
@@ -95,12 +100,21 @@ export function CeremonyStage({
    * block and, between lots, the one that just resolved. Both carry a `lotId`,
    * so the stage looks up whichever it is showing.
    *
-   * Defaulted to empty so the cockpit — whose own view does not carry media —
-   * keeps rendering exactly the stage it always has.
+   * Defaulted to empty so a surface without media still renders: the
+   * portrait then falls back to the player's branded mark.
    */
   lotMedia = {},
   /** `stage` when the ceremony fills a projector; `lg` in a page. */
   stampSize = "lg",
+  /**
+   * The night's settled lots and the franchises that bought them. Used by ONE
+   * phase: the finished stage, which used to be 552px of black with "3/3 LOTS
+   * RESOLVED" in the middle of it — the last frame of the evening, on the most
+   * shared screen in the product, showing nobody. It becomes the night's top
+   * buys, with faces. Optional: a surface that has no history still renders.
+   */
+  resolved = [],
+  teams = [],
 }: {
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
@@ -109,6 +123,8 @@ export function CeremonyStage({
   remainingMs: number | null;
   lotMedia?: Readonly<Record<string, LotMedia>>;
   stampSize?: StampSize;
+  resolved?: readonly ResolvedLot[];
+  teams?: readonly TeamIdentity[];
 }) {
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // "Waiting for the first snapshot…" told a guest, in the product's own
@@ -160,10 +176,41 @@ export function CeremonyStage({
    * finished state is about the auction rather than a person, so it takes no
    * face at all.
    */
+  const showcase = finished
+    ? [...resolved]
+        .filter((entry) => entry.status === "sold")
+        .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0))
+        .slice(0, SHOWCASE)
+    : [];
+  const colorOf = (teamName: string | null): string | undefined =>
+    teams.find((team) => team.name === teamName)?.primaryColor ?? undefined;
   const subject = finished ? null : (lot?.lotId ?? outcome?.lotId ?? null);
   const media = subject === null ? undefined : lotMedia[subject];
   const photo = media?.photoUrl ?? null;
   const number = media?.number ?? null;
+  /**
+   * THE PORTRAIT. The backdrop alone put a face on the stage only when a photo
+   * existed, and only as a wash behind the name — a player without a photo had
+   * no face at all, and one with a photo was never actually SHOWN. The portrait
+   * is the player's photo or their branded mark, in a box the stage reserves
+   * (`.ceremony-portrait`, counted into the stage's measured height), so the
+   * face never resizes the stage. Decorative: the name sits directly under it
+   * in display type.
+   */
+  const portrait =
+    subject === null ? null : (
+      <span className="ceremony-portrait" data-testid="ceremony-portrait">
+        <PlayerImage
+          name={lot?.playerName ?? outcome?.playerName ?? "Unnamed"}
+          seed={lotSeed(subject, lotMedia)}
+          src={photo}
+          size="hero"
+          shape="round"
+          fluid
+          decorative
+        />
+      </span>
+    );
 
   return (
     <section
@@ -210,6 +257,37 @@ export function CeremonyStage({
           <p className="ceremony-waiting-title" data-testid="ceremony-progress">
             {snapshot.lotsResolved}/{snapshot.lotsTotal} lots resolved
           </p>
+          {showcase.length > 0 ? (
+            /* THE NIGHT'S HEADLINES — the biggest buys, by face, each ringed in
+               the colours of the franchise that won them. */
+            <ol className="ceremony-showcase" data-testid="ceremony-showcase">
+              {showcase.map((entry, index) => (
+                <li key={entry.lotId} className="ceremony-showcase-item">
+                  <span className="ceremony-showcase-face">
+                    <PlayerImage
+                      name={entry.playerName ?? entry.lotNumber}
+                      seed={entry.registrationId ?? lotSeed(entry.lotId, lotMedia)}
+                      src={lotMedia[entry.lotId]?.photoUrl ?? null}
+                      size="hero"
+                      shape="round"
+                      fluid
+                      decorative
+                      teamColor={colorOf(entry.teamName)}
+                      ring
+                    />
+                  </span>
+                  <span className="ceremony-showcase-rank">
+                    {index === 0 ? "Top buy" : `#${String(index + 1)}`}
+                  </span>
+                  <b className="ceremony-showcase-name">{entry.playerName ?? entry.lotNumber}</b>
+                  <span className="ceremony-showcase-price">
+                    {formatPaiseINR(paise(entry.soldPrice ?? 0))}
+                  </span>
+                  <span className="ceremony-showcase-team">{entry.teamName ?? "—"}</span>
+                </li>
+              ))}
+            </ol>
+          ) : null}
           <p className="ceremony-waiting-hint">Every lot is settled. Final squads below.</p>
         </div>
       ) : lot !== null ? (
@@ -217,6 +295,7 @@ export function CeremonyStage({
            then money, then the clock — 60ms apart. The section is keyed on the
            moment, so the reveal plays once per lot and never on a bid. */
         <div className={`ceremony-lot${ceremony.phase === "opening" ? " ceremony-reveal" : ""}`}>
+          {portrait}
           <h2 className="ceremony-player" data-testid="ceremony-player">
             {lot.playerName ?? "Unnamed"}
           </h2>
@@ -270,6 +349,7 @@ export function CeremonyStage({
            only for `sold`. Every phase has a price worth showing (the money the
            lot had reached) and a reason worth naming. */
         <div className="ceremony-lot">
+          {portrait}
           <h2 className="ceremony-player" data-testid="ceremony-player">
             {outcome.playerName ?? outcome.lotNumber}
           </h2>

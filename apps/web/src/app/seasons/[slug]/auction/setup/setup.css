@@ -54,29 +54,60 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* --- The board: step list beside ONE open step ---------------------------- */
+
+.as-board {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: var(--space-8) var(--space-12);
+  align-items: start;
+}
+
 .as-steps {
+  position: sticky;
+  top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.as-step {
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .as-step-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-4) 0;
+  padding: var(--space-3);
   border: 0;
+  border-radius: var(--radius-md);
   background: none;
   color: inherit;
   font: inherit;
   text-align: start;
   cursor: pointer;
+  transition: background-color var(--duration-fast) ease;
+}
+
+.as-step-head:hover {
+  background: var(--surface-sunken);
+}
+
+.as-step[data-selected="true"] .as-step-head {
+  background: var(--surface-sunken);
+}
+
+/* Gold is selection: a bar on the open step, nothing else. */
+.as-step[data-selected="true"] .as-step-head::before {
+  content: "";
+  position: absolute;
+  inset-block: var(--space-2);
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
 }
 
 .as-step-head:focus-visible {
@@ -135,6 +166,8 @@
 
 .as-step-state {
   flex: none;
+  align-self: flex-start;
+  margin-top: 4px;
   font-size: var(--text-xs-size);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
@@ -142,12 +175,60 @@
   color: var(--text-muted);
 }
 
-.as-step[data-state="current"] .as-step-state {
+.as-step-state[data-state="current"] {
   color: var(--text-accent);
 }
 
+.as-step-state[data-state="done"] {
+  color: var(--success-strong);
+}
+
+.as-panel {
+  min-width: 0;
+}
+
 .as-step-body {
-  padding: 0 0 var(--space-5) calc(28px + var(--space-3));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.as-panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.as-panel-eyebrow {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.as-panel-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.as-panel-summary {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.as-panel-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .as-step-body[hidden] {
@@ -328,11 +409,56 @@
   color: var(--text-muted);
 }
 
-@media (max-width: 760px) {
-  .as-step-body {
-    padding-inline-start: 0;
+/* Phone and narrow tablet: the step list becomes a strip of numbered chips
+   above the open step — one row, scrolling within itself, never the page. */
+@media (max-width: 900px) {
+  .as-board {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
   }
 
+  .as-steps {
+    position: static;
+    flex-direction: row;
+    gap: var(--space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-4);
+  }
+
+  .as-step {
+    flex: none;
+    scroll-snap-align: start;
+  }
+
+  .as-step-head {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+  }
+
+  .as-step[data-selected="true"] .as-step-head {
+    border-color: var(--accent);
+  }
+
+  .as-step[data-selected="true"] .as-step-head::before {
+    content: none;
+  }
+
+  .as-step-mark {
+    width: 22px;
+    height: 22px;
+    font-size: var(--text-xs-size);
+  }
+
+  .as-step-title {
+    white-space: nowrap;
+    font-size: var(--text-sm-size);
+  }
+
+  .as-step-summary,
   .as-step-state {
     display: none;
   }

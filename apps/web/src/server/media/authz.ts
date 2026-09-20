@@ -98,6 +98,14 @@ export async function requireMediaWrite(
   await requireCompetitionCapability(db, personId, scope, "registration.review");
 }
 
+/**
+ * Which of a season's two pictures a `competition` media write is for: the
+ * square crest (`logo_url`) or the wide cover photo behind the hero (`cover_url`,
+ * 0082). Both are the same subject — same key prefix, same `competition.manage`
+ * gate — so the slot only chooses the column.
+ */
+export type CompetitionImageSlot = "logo" | "cover";
+
 /** Persist the attached key on the subject's row. For a player photo, consent
  * is captured with a `via` that records self-upload vs organizer attestation. */
 export async function persistMediaKey(
@@ -107,6 +115,7 @@ export async function persistMediaKey(
   key: string,
   now: Date,
   consentVia: string,
+  slot: CompetitionImageSlot = "logo",
 ): Promise<void> {
   if (subject === "team") {
     await db.update(teams).set({ logoUrl: key }).where(eq(teams.id, resolved.storageSubjectId));
@@ -115,7 +124,7 @@ export async function persistMediaKey(
   if (subject === "competition") {
     await db
       .update(competitions)
-      .set({ logoUrl: key })
+      .set(slot === "cover" ? { coverUrl: key } : { logoUrl: key })
       .where(eq(competitions.id, resolved.storageSubjectId));
     return;
   }
@@ -158,6 +167,32 @@ export async function currentPlayerPhotoKey(
     .where(eq(people.id, resolved.storageSubjectId))
     .limit(1);
   return row?.key ?? null;
+}
+
+/** The key a season picture slot holds now — read before clearing, for deletion. */
+export async function currentCompetitionImageKey(
+  db: Db,
+  competitionId: string,
+  slot: CompetitionImageSlot,
+): Promise<string | null> {
+  const [row] = await db
+    .select({ logo: competitions.logoUrl, cover: competitions.coverUrl })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  return (slot === "cover" ? row?.cover : row?.logo) ?? null;
+}
+
+/** Take a season picture down: the column goes back to null (gradient/initials). */
+export async function clearCompetitionImage(
+  db: Db,
+  competitionId: string,
+  slot: CompetitionImageSlot,
+): Promise<void> {
+  await db
+    .update(competitions)
+    .set(slot === "cover" ? { coverUrl: null } : { logoUrl: null })
+    .where(eq(competitions.id, competitionId));
 }
 
 /** Withdraw the club's photo from a typed-name entry (0077). */

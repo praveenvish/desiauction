@@ -4,12 +4,17 @@ import { useMemo } from "react";
 
 import { roleLabeller } from "../../../../lib/role-label";
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Card } from "@desiauction/ui";
+import { Card, IconPlus, PlayerImage } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
 import { TeamChip, type TeamIdentity } from "./purse-board";
 
-import type { PreSignedPlayer, ResolvedLot } from "../../../../server/auction/live-summary";
+import { lotSeed } from "../../../../lib/player-seed";
+import type {
+  LotMedia,
+  PreSignedPlayer,
+  ResolvedLot,
+} from "../../../../server/auction/live-summary";
 
 // THE SQUAD BOARD — every franchise and who is actually in it.
 //
@@ -22,6 +27,10 @@ import type { PreSignedPlayer, ResolvedLot } from "../../../../server/auction/li
 export interface SquadMember {
   key: string;
   name: string;
+  /** The mark's seed — the registration id (lib/player-seed). */
+  seed: string;
+  /** Consent- and age-gated; null draws the branded mark. */
+  photoUrl: string | null;
   role: string | null;
   /** Null for pre-signed players — they were never bid on. */
   price: number | null;
@@ -36,6 +45,8 @@ export function squadsOf(
   teams: TeamIdentity[],
   preSigned: PreSignedPlayer[],
   resolved: ResolvedLot[],
+  /** Faces for the bought players, keyed by lot id; the pre-signed carry their own. */
+  lotMedia: Readonly<Record<string, LotMedia>> = {},
 ): { team: TeamIdentity; members: SquadMember[] }[] {
   // A player who is BOTH pre-signed and auctioned must be counted once. That
   // combination is now impossible going forward — `auctionReady` excludes both
@@ -72,6 +83,8 @@ export function squadsOf(
         .map((player) => ({
           key: player.registrationId,
           name: player.playerName ?? "Unnamed",
+          seed: player.registrationId,
+          photoUrl: player.photoUrl,
           role: player.role,
           price: null,
           icon: player.isIcon,
@@ -91,6 +104,10 @@ export function squadsOf(
           return {
             key: lot.lotId,
             name: lot.playerName ?? "Unnamed",
+            // A row synthesised from the snapshot has no registration of its
+            // own; the media read beside it does.
+            seed: lot.registrationId ?? lotSeed(lot.lotId, lotMedia),
+            photoUrl: lotMedia[lot.lotId]?.photoUrl ?? null,
             role: lot.role,
             price: lot.soldPrice,
             // Icon and Retained stay false whatever the registration says: they
@@ -156,6 +173,7 @@ function MemberBadges({ member }: { member: SquadMember }) {
 export function SquadBoard({
   roles,
   teams,
+  lotMedia = {},
   preSigned,
   resolved,
   snapshot,
@@ -173,6 +191,8 @@ export function SquadBoard({
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
   teams: TeamIdentity[];
+  /** Faces for the players bought in the room, keyed by lot id. */
+  lotMedia?: Readonly<Record<string, LotMedia>>;
   preSigned: PreSignedPlayer[];
   resolved: ResolvedLot[];
   snapshot: AuctionSnapshot | null;
@@ -181,12 +201,12 @@ export function SquadBoard({
   note?: string | null;
 }) {
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
-  const squads = squadsOf(teams, preSigned, resolved);
+  const squads = squadsOf(teams, preSigned, resolved, lotMedia);
   const purseByTeam = new Map(
     (snapshot?.paddles ?? []).map((paddle) => [paddle.teamId, paddle.purseRemaining]),
   );
   return (
-    <Card data-testid="squad-board">
+    <Card data-testid="squad-board" className="live-card">
       <div className="competition-head">
         <h2>Squads</h2>
         {/* The shorthand was a note to ourselves: "pre-signed" is a schema word
@@ -231,6 +251,16 @@ export function SquadBoard({
                 <ul className="squad-list">
                   {members.map((member) => (
                     <li key={member.key} className="squad-row">
+                      <PlayerImage
+                        name={member.name}
+                        seed={member.seed}
+                        src={member.photoUrl}
+                        size="sm"
+                        shape="round"
+                        teamColor={team.primaryColor ?? undefined}
+                        ring
+                        decorative
+                      />
                       <span className="squad-name">{member.name}</span>
                       <MemberBadges member={member} />
                       <span className="squad-role">{labelOf(member.role)}</span>
@@ -243,6 +273,14 @@ export function SquadBoard({
                       </span>
                     </li>
                   ))}
+                  {members.length < squadMax ? (
+                    <li className="squad-row squad-row--open">
+                      <IconPlus size={14} />
+                      {squadMax - members.length === 1
+                        ? "1 spot open"
+                        : `${String(squadMax - members.length)} spots open`}
+                    </li>
+                  ) : null}
                 </ul>
               )}
             </section>

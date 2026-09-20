@@ -12,20 +12,25 @@ import {
   estimateTextWidth,
   fitCaps,
   fitHeadline,
+  faceType,
+  fitName,
   fitPrice,
-  fitSquadRows,
+  fitRankRows,
+  fitSeasonGrid,
+  fitTiles,
+  headerHeight,
   headerNameRoom,
   metricsFor,
+  sheetBody,
   stampWidth,
+  type TileFit,
 } from "./poster-layout";
 
 // The layout arithmetic, checked without a rasterizer. Satori clips silently, so
 // every one of these failures would otherwise ship as a poster with the bottom
 // of somebody's name missing.
 
-const SIZES: PosterSize[] = ["square", "story"];
-/** `DEFAULT_AUCTION_CONFIG.squadMax` — the biggest squad the platform allows. */
-const FULL_SQUAD = 15;
+const SIZES: PosterSize[] = ["square", "portrait", "story"];
 
 describe("poster metrics", () => {
   it("keeps the frame the exact size the model published", () => {
@@ -44,73 +49,13 @@ describe("poster metrics", () => {
     const square = metricsFor("square");
     const story = metricsFor("story");
     expect(story.photoHeight).toBeGreaterThan(square.photoHeight * 1.5);
-    expect(story.squadArea).toBeGreaterThan(square.squadArea * 1.5);
+    expect(sheetBody(story, [])).toBeGreaterThan(sheetBody(square, []) * 1.5);
+    const portrait = metricsFor("portrait");
+    expect(portrait.photoHeight).toBeGreaterThan(square.photoHeight);
+    expect(portrait.photoHeight).toBeLessThan(story.photoHeight);
     // And the frame inset does not grow faster than the canvas — that would be
     // exactly the letterboxing this is here to prevent.
     expect(story.pad / story.height).toBeLessThan(square.pad / square.width);
-  });
-});
-
-describe("fitSquadRows", () => {
-  it("never loses a player: shown plus overflow is always the squad", () => {
-    for (const size of SIZES) {
-      const metrics = metricsFor(size);
-      for (const count of [0, 1, 8, 15, 30, 120]) {
-        const fit = fitSquadRows(count, metrics);
-        expect(fit.shown + fit.overflow).toBe(count);
-      }
-    }
-  });
-
-  it("fits a full squad at both sizes with nothing left over", () => {
-    for (const size of SIZES) {
-      const fit = fitSquadRows(FULL_SQUAD, metricsFor(size));
-      expect(fit.overflow).toBe(0);
-      expect(fit.shown).toBe(FULL_SQUAD);
-    }
-  });
-
-  it("never draws more rows than the band can hold", () => {
-    for (const size of SIZES) {
-      const metrics = metricsFor(size);
-      for (const count of [1, 5, 15, 40, 200]) {
-        const fit = fitSquadRows(count, metrics);
-        expect(fit.shown * fit.rowHeight).toBeLessThanOrEqual(metrics.squadArea);
-      }
-    }
-  });
-
-  /*
-   * The point of the whole function. `buildTeamPoster` refuses to truncate, so
-   * when a squad genuinely cannot fit, the renderer has to keep a row free to
-   * SAY so — a list that just stops looks complete, and that is how a squad
-   * poster ends up quietly missing somebody.
-   */
-  it("reserves a row for the overflow line rather than ending the list early", () => {
-    for (const size of SIZES) {
-      const metrics = metricsFor(size);
-      const fit = fitSquadRows(500, metrics);
-      expect(fit.overflow).toBeGreaterThan(0);
-      expect((fit.shown + 1) * fit.rowHeight).toBeLessThanOrEqual(metrics.squadArea);
-    }
-  });
-
-  it("clamps the row height so rows neither balloon nor become unreadable", () => {
-    for (const size of SIZES) {
-      const metrics = metricsFor(size);
-      for (const count of [1, 3, 15, 60]) {
-        const fit = fitSquadRows(count, metrics);
-        expect(fit.rowHeight).toBeGreaterThanOrEqual(metrics.rowMin);
-        expect(fit.rowHeight).toBeLessThanOrEqual(metrics.rowMax);
-        expect(fit.fontSize).toBeGreaterThanOrEqual(20);
-      }
-    }
-  });
-
-  it("does not divide by an empty squad", () => {
-    const fit = fitSquadRows(0, metricsFor("square"));
-    expect(fit).toMatchObject({ shown: 0, overflow: 0 });
-    expect(Number.isFinite(fit.rowHeight)).toBe(true);
   });
 });
 
@@ -211,8 +156,15 @@ describe("fitPrice", () => {
 });
 
 describe("themes and sizes stay in step with the model", () => {
-  it("still has exactly the four themes the renderer paints", () => {
-    expect([...POSTER_THEMES]).toEqual(["floodlight", "gold", "arena", "ink"]);
+  it("still has exactly the six themes the renderer paints", () => {
+    expect([...POSTER_THEMES]).toEqual([
+      "floodlight",
+      "matchday",
+      "minimal",
+      "gold",
+      "arena",
+      "ink",
+    ]);
   });
 });
 
@@ -302,6 +254,159 @@ describe("the outcome caption", () => {
       );
       expect(estimateCapsWidth(LONGEST_CAPTION, fitted, OUTCOME_TRACKING)).toBeLessThanOrEqual(
         room,
+      );
+    }
+  });
+});
+
+/** A grid's footprint must sit inside the band it was fitted to. */
+function expectInside(fit: TileFit, width: number, height: number) {
+  expect(fit.gridWidth).toBeLessThanOrEqual(width);
+  expect(fit.gridHeight).toBeLessThanOrEqual(height);
+  expect(fit.cols * fit.rows).toBeGreaterThanOrEqual(fit.shown + (fit.overflow > 0 ? 1 : 0));
+}
+
+describe("the squad face grid", () => {
+  const faceOptions = (prices: boolean) => ({
+    gap: 14,
+    aspect: 1.15,
+    label: (cell: number) => faceType(cell, prices).labelHeight,
+    maxCell: 300,
+    minPhoto: 84,
+  });
+
+  it("fits every squad from 1 to 25 inside the band, at every size, priced or not", () => {
+    for (const size of SIZES) {
+      const metrics = metricsFor(size);
+      for (const prices of [true, false]) {
+        const band = sheetBody(metrics, [metrics.heroCrest, prices ? metrics.statHeight : 0]);
+        const width = contentWidth(metrics);
+        for (let count = 1; count <= 25; count += 1) {
+          const fit = fitTiles(count, width, band, faceOptions(prices));
+          expectInside(fit, width, band);
+          // Nobody is lost: a face or the "+N" tile accounts for every player.
+          expect(fit.shown + fit.overflow).toBe(count);
+          expect(fit.photoWidth).toBeGreaterThanOrEqual(84);
+        }
+      }
+    }
+  });
+
+  it("draws a whole 25-man squad on the portrait and the story without a '+N'", () => {
+    for (const size of ["portrait", "story"] as const) {
+      const metrics = metricsFor(size);
+      const band = sheetBody(metrics, [metrics.heroCrest, metrics.statHeight]);
+      expect(fitTiles(25, contentWidth(metrics), band, faceOptions(true)).overflow).toBe(0);
+    }
+  });
+
+  it("gives four players four big faces, not a 25-slot sheet with gaps", () => {
+    const metrics = metricsFor("portrait");
+    const fit = fitTiles(4, contentWidth(metrics), 800, faceOptions(true));
+    expect(fit.photoWidth).toBeGreaterThanOrEqual(200);
+  });
+
+  it("overflows into ONE '+N' tile instead of shrinking faces to smudges", () => {
+    const fit = fitTiles(60, 900, 400, faceOptions(true));
+    expect(fit.overflow).toBeGreaterThan(0);
+    expect(fit.shown + fit.overflow).toBe(60);
+    expect(fit.photoWidth).toBeGreaterThanOrEqual(84);
+    expectInside(fit, 900, 400);
+  });
+
+  it("does not divide by an empty squad or an empty band", () => {
+    expect(fitTiles(0, 900, 400, faceOptions(true))).toMatchObject({ shown: 0, overflow: 0 });
+    expect(fitTiles(5, 900, 0, faceOptions(true))).toMatchObject({ shown: 0 });
+  });
+});
+
+describe("names in small tiles", () => {
+  it("shrinks a little, and shortens rather than shrink to half the tile's type", () => {
+    expect(fitName("Mlaram", "Mlaram", 200, 30, 16)).toEqual({ text: "Mlaram", size: 30 });
+    // A whisker under: the full name keeps its place.
+    const nearly = fitName("Prakash Bishnoi", "Prakash B.", 270, 30, 16);
+    expect(nearly.text).toBe("Prakash Bishnoi");
+    expect(estimateTextWidth(nearly.text, nearly.size)).toBeLessThanOrEqual(270);
+    /*
+     * A long name that only fits at half the tile's own type size reads as a
+     * mistake beside the name next to it; "Vikram S." does not. Found by
+     * looking at a rendered squad, not at this function.
+     */
+    const squeezed = fitName("Vikram Singh Rathore", "Vikram S.", 160, 30, 14);
+    expect(squeezed.text).toBe("Vikram S.");
+    expect(estimateTextWidth(squeezed.text, squeezed.size)).toBeLessThanOrEqual(160);
+    expect(fitName("Venkataraghavan Subramaniam", "Venkataraghavan S.", 150, 30, 16).text).toBe(
+      "Venkataraghavan S.",
+    );
+  });
+});
+
+describe("the top-N list", () => {
+  it("fits 3, 5 and 10 rows inside the band at every size", () => {
+    for (const size of SIZES) {
+      const metrics = metricsFor(size);
+      const band = sheetBody(metrics, [metrics.titleMax + metrics.subSize * 1.4]);
+      for (const count of [1, 3, 5, 10]) {
+        const fit = fitRankRows(count, band, metrics);
+        expect(fit.listHeight).toBeLessThanOrEqual(band);
+        expect(fit.photo).toBeGreaterThan(0);
+        expect(fit.nameSize).toBeGreaterThanOrEqual(20);
+      }
+    }
+  });
+
+  it("caps a top three so it does not become three billboards", () => {
+    const metrics = metricsFor("story");
+    expect(fitRankRows(3, 1400, metrics).rowHeight).toBeLessThanOrEqual(metrics.width * 0.24);
+  });
+});
+
+describe("the season sheet", () => {
+  it("fits 2 to 12 squads of up to 16 inside the band on the tall shapes", () => {
+    for (const size of ["portrait", "story"] as const) {
+      const metrics = metricsFor(size);
+      const band = sheetBody(metrics, [metrics.titleMax + metrics.subSize * 1.4]);
+      const width = contentWidth(metrics);
+      for (const teams of [2, 4, 6, 8, 12]) {
+        for (const largest of [4, 11, 16]) {
+          const fit = fitSeasonGrid(teams, largest, width, band, metrics.gap);
+          expect(fit).not.toBeNull();
+          if (fit === null) {
+            continue;
+          }
+          const used = fit.panelRows * fit.panelHeight + (fit.panelRows - 1) * metrics.gap;
+          expect(used).toBeLessThanOrEqual(band);
+          expect(fit.panelCols * fit.panelRows).toBeGreaterThanOrEqual(teams);
+          expectInside(
+            fit.faces,
+            fit.panelWidth - 2 * fit.inset,
+            fit.panelHeight - fit.panelHeader - 2 * fit.inset,
+          );
+          expect(fit.faces.shown + fit.faces.overflow).toBe(largest);
+        }
+      }
+    }
+  });
+
+  it("shows every player of an 8-team, 15-man season on the story", () => {
+    const metrics = metricsFor("story");
+    const band = sheetBody(metrics, [metrics.titleMax + metrics.subSize * 1.4]);
+    const fit = fitSeasonGrid(8, 15, contentWidth(metrics), band, metrics.gap);
+    expect(fit?.faces.overflow).toBe(0);
+  });
+
+  it("has nothing to lay out for a season with no teams", () => {
+    expect(fitSeasonGrid(0, 0, 900, 900, 20)).toBeNull();
+  });
+});
+
+describe("the sheet frame", () => {
+  it("leaves the flexible band a real share of every canvas", () => {
+    for (const size of SIZES) {
+      const metrics = metricsFor(size);
+      expect(headerHeight(metrics)).toBeGreaterThanOrEqual(metrics.headerTile);
+      expect(sheetBody(metrics, [metrics.heroCrest, metrics.statHeight])).toBeGreaterThan(
+        metrics.height * 0.4,
       );
     }
   });

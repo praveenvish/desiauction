@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { completeAuction } from "./complete-auction";
 import { withRunnerHeld } from "./finops-runner";
 import { latestOtp } from "./otp";
+import { issuePaddleTo, showAuctionTab } from "./auction-tabs";
 
 // PX-8 COMPLETION · FOUNDER DEMONSTRATION — a FRESH organization, no demo seed,
 // no SQL, no engineering assistance:
@@ -180,12 +181,11 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   await page.getByTestId("create-auction").click();
   await expect(page.getByTestId("auction-status")).toHaveText("scheduled", { timeout: 20_000 });
   for (const team of ["Risers", "Royals"]) {
-    await page.getByLabel("Team", { exact: true }).selectOption({ label: team });
-    await page.getByTestId("issue-paddle").click();
-    await expect(page.getByTestId("paddles-panel")).toContainText(team, { timeout: 20_000 });
+    await issuePaddleTo(page, team);
   }
+  await showAuctionTab(page, "Setup");
   await page.getByTestId("queue-all").click();
-  await expect(page.getByTestId("lots-table")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("lot-L001")).toContainText("queued", { timeout: 20_000 });
   await page.getByTestId("accept-short-open").check();
   await page.getByTestId("auction-open").click();
   await expect(page.getByTestId("auction-status")).toHaveText("live", { timeout: 20_000 });

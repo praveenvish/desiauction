@@ -1,0 +1,548 @@
+/* THE SEASON OVERVIEW (founder mockup 1). Page-local: the console kit draws
+   the cards; this file lays them out and styles what the kit does not own —
+   the hero's buttons on the dark banner, the team and role rows, the public
+   page address, the two picture cards. Tokens only. */
+
+/* The hero carries this page's one <h1>, so the shell's page head (trail +
+   title) stands down here. `PageTitleHidden` (page.tsx) removes its h1 once
+   the page mounts; this rule keeps the head from painting before that, so the
+   hero does not jump down and back up on first load. AppShell marks the head
+   with `data-page-head`; only its title row hides — the trail up to the club
+   stays, so the overview keeps its way back. */
+#main-content:has(.ov-page) > [data-page-head] [data-page-head-row] {
+  display: none;
+}
+
+.ov-page {
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  padding-bottom: var(--space-10);
+}
+
+.ov-stack {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ---- Hero ----------------------------------------------------------------- */
+
+.ov-hero-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* The status reads in capitals on the banner, as in the mockup. The words stay
+   lower case in the DOM — suites and screen readers read "registration open".
+   The kit's tints are translucent, tuned to sit on a card; over the dark
+   banner they are laid on the card surface first, so each pill keeps the
+   strong-on-subtle pair its contrast was tuned for, in both themes. */
+.ov-hero-pills > span {
+  background: linear-gradient(var(--kit-bg), var(--kit-bg)), var(--surface-raised);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ov-hero-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: inherit;
+}
+
+.ov-hero-fact svg {
+  flex: none;
+}
+
+a.ov-hero-club {
+  min-height: 24px;
+  text-decoration: none;
+}
+
+a.ov-hero-club:hover {
+  color: var(--hero-ink);
+  text-decoration: underline;
+}
+
+a.ov-hero-club:focus-visible {
+  outline: 2px solid var(--hero-ink);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Buttons on the banner. The banner is always dark (both themes), so the
+   console's buttons, tuned for a light card, are restated for it: a glass
+   outline for "Season details", a solid light one for the way onward. The
+   extra `.ov-hero` ancestor out-ranks the button module's own variant. */
+.ov-hero .ov-hero-btn[data-tone="glass"] {
+  background: transparent;
+  border-color: var(--hero-crest-line);
+  color: var(--hero-ink);
+}
+
+.ov-hero .ov-hero-btn[data-tone="glass"]:hover {
+  background: var(--hero-crest-bed);
+  border-color: var(--hero-ink-soft);
+}
+
+.ov-hero .ov-hero-btn[data-tone="solid"] {
+  background: var(--hero-ink);
+  border-color: var(--hero-ink);
+  color: var(--hero-night);
+}
+
+.ov-hero .ov-hero-btn[data-tone="solid"]:hover {
+  background: var(--hero-ink-soft);
+  border-color: var(--hero-ink-soft);
+}
+
+.ov-hero .ov-hero-btn:focus-visible {
+  outline: 2px solid var(--hero-ink);
+  outline-offset: 2px;
+}
+
+/* A photo or not, the banner holds its shape: tall enough for the picture to
+   read, never so tall that the figures fall below the fold. */
+.ov-hero > section {
+  min-height: 188px;
+}
+
+/* ---- Journey + next step -------------------------------------------------- */
+
+.ov-journey {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Each step says its state in words through a visually-hidden span, which is
+   absolutely positioned. On a phone the stepper scrolls sideways, and an
+   absolute child whose containing block sits OUTSIDE that scroller escapes its
+   clipping — the off-screen steps' words widened the whole page to ~900px.
+   Anchoring them to their own step keeps them inside the scroller. */
+.ov-journey li {
+  position: relative;
+}
+
+/* ---- Figures -------------------------------------------------------------- */
+
+.ov-stat-of {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Cards side by side share a height, as in the mockup: a short card beside a
+   tall one otherwise leaves a ragged hole in the row. */
+.ov-grid > * {
+  align-items: stretch;
+}
+
+/* ---- Card links, empty states --------------------------------------------- */
+
+.ov-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ov-card-link svg {
+  transition: transform var(--duration-fast) ease;
+}
+
+.ov-card-link:hover svg {
+  transform: translateX(2px);
+}
+
+.ov-card-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.ov-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.ov-empty p,
+.ov-muted {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ---- Rows: teams and roles ------------------------------------------------ */
+
+.ov-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-bar {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.ov-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+/* A team: its letter on its own colour, the name, then squad · spend · share,
+   with the bar under the name in the team's colour. */
+.ov-team {
+  --team: var(--text-muted);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  align-items: center;
+}
+
+.ov-team-tile {
+  grid-row: 1 / span 2;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  /* The TeamChip formula: a wash of the team's colour with its name in a
+     deepened version of it — legible whatever colour a club picked. */
+  background: color-mix(in srgb, var(--team) 16%, var(--surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--team) 30%, transparent);
+  color: color-mix(in srgb, var(--team) 70%, var(--text-heading));
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ov-team-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ov-team-figs {
+  display: inline-flex;
+  gap: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ov-team-pct {
+  min-width: 4ch;
+  text-align: end;
+  color: var(--text-primary);
+}
+
+.ov-team-bar {
+  grid-column: 2 / span 2;
+}
+
+.ov-team-bar .ov-bar-fill {
+  background: var(--team);
+}
+
+/* A role: its mark, its name and count, and the bar under them. */
+.ov-role {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+  align-items: center;
+}
+
+.ov-role > :first-child {
+  grid-row: 1 / span 2;
+}
+
+.ov-role-name {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.ov-role-count {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.ov-role-bar {
+  grid-column: 2 / span 2;
+}
+
+.ov-role[data-tone="amber"] .ov-bar-fill {
+  background: var(--warning-base);
+}
+
+.ov-role[data-tone="red"] .ov-bar-fill {
+  background: var(--danger-base);
+}
+
+.ov-role[data-tone="purple"] .ov-bar-fill {
+  background: var(--violet-base);
+}
+
+.ov-role[data-tone="blue"] .ov-bar-fill {
+  background: var(--info-base);
+}
+
+.ov-role[data-tone="neutral"] .ov-bar-fill {
+  background: var(--accent);
+}
+
+/* ---- Public page ---------------------------------------------------------- */
+
+.ov-public {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ov-url-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.ov-url {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  box-sizing: border-box;
+  padding-inline: var(--space-3) var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.ov-url-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-size);
+  color: var(--text-heading);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ov-icon-btn {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ov-icon-btn:hover {
+  background: var(--surface-raised);
+  color: var(--text-heading);
+}
+
+.ov-icon-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ov-icon-btn-boxed {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+
+.ov-icon-btn-boxed:hover {
+  border-color: var(--border-strong);
+}
+
+.ov-public-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+}
+
+/* ---- Retrospective -------------------------------------------------------- */
+
+.ov-retro-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.ov-retro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.ov-retro-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-8);
+  margin: 0;
+}
+
+.ov-retro-figures dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.ov-retro-figures dd {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+/* ---- The two pictures ----------------------------------------------------- */
+
+.ov-image {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-5);
+}
+
+.ov-logo-frame {
+  flex: none;
+  display: inline-flex;
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.ov-cover-frame {
+  flex: none;
+  display: grid;
+  place-items: center;
+  /* The mockup's 1600 × 500: what the hero will show, at a glance. */
+  width: 208px;
+  aspect-ratio: 16 / 5;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 90% at 78% 110%, var(--hero-glow), transparent 60%),
+    linear-gradient(135deg, var(--hero-night) 0%, var(--hero-night-deep) 100%);
+  color: var(--hero-ink-soft);
+}
+
+.ov-cover-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ov-image-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.ov-image-text p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ov-image-text .ov-image-hint {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.ov-image-text .ov-image-error {
+  font-size: var(--text-xs-size);
+  color: var(--danger-strong);
+}
+
+.ov-image-remove {
+  margin-inline-start: calc(var(--space-3) * -1);
+}
+
+.ov-image-input {
+  display: none;
+}
+
+/* ---- Season pass ---------------------------------------------------------- */
+
+.season-pass-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ---- Phone ---------------------------------------------------------------- */
+
+@media (max-width: 719px) {
+  .ov-stack {
+    gap: var(--space-4);
+  }
+
+  .ov-hero > section {
+    min-height: 0;
+  }
+
+  .ov-image {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .ov-cover-frame {
+    width: 100%;
+  }
+
+  .ov-team-figs {
+    gap: var(--space-2);
+  }
+
+  .ov-public-actions > * {
+    flex: 1 1 auto;
+    white-space: nowrap;
+  }
+}

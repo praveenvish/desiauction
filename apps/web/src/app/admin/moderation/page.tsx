@@ -1,4 +1,4 @@
-import { Card, ToastProvider } from "@desiauction/ui";
+import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
@@ -35,40 +35,15 @@ export default async function AdminModerationPage({
   return (
     <ToastProvider>
       <main className="registrations-dash">
-        <div className="dash-stack">
+        <div className="dash-stack admin-stack">
           <header className="dash-head">
-            <p className="competitions-hint">
+            <p className="dash-hint">
               Every season on the open web, and every one DesiAuction has taken down. Taking a page
               down removes its public page, player pages, share cards and directory listing at once;
               the club keeps running its season. The organizer sees your reason, and it lands on the
               audit log against your name.
             </p>
           </header>
-          <Card>
-            <form
-              className="admin-filters"
-              method="get"
-              role="search"
-              data-testid="moderation-search"
-            >
-              <div className="admin-filter-grow">
-                <label className="stat-label" htmlFor="moderation-q">
-                  Find a public season
-                </label>
-                <input
-                  id="moderation-q"
-                  name="q"
-                  type="search"
-                  defaultValue={desk.query}
-                  placeholder="Season, slug or club"
-                  className="admin-search-input"
-                />
-              </div>
-              <button type="submit" className="admin-search-submit">
-                Search
-              </button>
-            </form>
-          </Card>
           <ModerationPanel desk={desk} />
         </div>
       </main>

@@ -1,29 +1,42 @@
 "use client";
 
 import {
-  Badge,
   Button,
-  Card,
-  Dialog,
   EmptyState,
   Field,
-  paintOnFill,
-  useToast,
-  initialsFor,
-  IconArrowRight,
   IconArrowLeft,
+  IconArrowRight,
+  IconChart,
+  IconCrown,
+  IconDownload,
+  IconFlag,
+  IconInfo,
+  IconLock,
+  IconRupee,
+  IconSearch,
+  IconTrophy,
+  IconUser,
+  IconUsers,
+  IconWallet,
+  initialsFor,
+  Notice,
+  paintOnFill,
+  Pill,
+  PlayerImage,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  useToast,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 
+import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { formatPhone } from "../../../../lib/format-phone";
-import {
-  createTeamAction,
-  setTeamCoachAction,
-  updateTeamAction,
-} from "../../../../server/competition/actions";
+import { setTeamCoachAction, updateTeamAction } from "../../../../server/competition/actions";
 import type { TeamsWorkspaceView } from "../../../../server/competition/actions";
 import type { TeamCard } from "../../../../server/competition/team-workspace";
 import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
@@ -62,47 +75,6 @@ function monogram(team: { name: string }): string {
   return initialsFor(team.name).initials ?? "?";
 }
 
-/** Distinguishable on a projector, and legible under the board's dark theme. */
-const TEAM_PALETTE = [
-  "#1f6f43",
-  "#1d4e89",
-  "#8e2420",
-  "#6b3fa0",
-  "#a8620f",
-  "#0f6d75",
-  "#8a1c53",
-  "#4a5a2b",
-];
-
-/**
- * DA-20/DA-37: the next shade nobody has taken, and — once all eight are taken —
- * the least-used one rather than always the first.
- *
- * DA-20 moved this bug one shade over instead of removing it: the colour was
- * computed in a `useState` INITIALISER, so it was fixed at mount and never
- * re-rolled as teams were added. Twelve teams created through this dialog took
- * the same shade. It is now recomputed every time the dialog opens.
- */
-function nextTeamColor(teams: readonly { color: string | null }[]): string {
-  const used = new Map<string, number>(TEAM_PALETTE.map((shade) => [shade, 0]));
-  for (const team of teams) {
-    const shade = team.color?.toLowerCase() ?? "";
-    if (used.has(shade)) {
-      used.set(shade, (used.get(shade) ?? 0) + 1);
-    }
-  }
-  let best = TEAM_PALETTE[0] ?? "#1f6f43";
-  let bestCount = Number.POSITIVE_INFINITY;
-  for (const shade of TEAM_PALETTE) {
-    const count = used.get(shade) ?? 0;
-    if (count < bestCount) {
-      best = shade;
-      bestCount = count;
-    }
-  }
-  return best;
-}
-
 export function TeamsPanel({
   view,
   slug,
@@ -121,25 +93,8 @@ export function TeamsPanel({
 /* --- The franchise grid ---------------------------------------------------- */
 
 function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
-  const router = useRouter();
-  const toast = useToast();
-  const [pending, startTransition] = useTransition();
-  const [addOpen, setAddOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [name, setName] = useState("");
-  const [shortName, setShortName] = useState("");
-  const [color, setColor] = useState(() => nextTeamColor(view.teams));
-  const [formError, setFormError] = useState<string | null>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
-
   const locked = view.rulesSource?.locked ?? false;
-  const canAdd = view.viewer.canManageTeams && !locked;
-
-  const openAdd = () => {
-    setFormError(null);
-    setColor(nextTeamColor(view.teams));
-    setAddOpen(true);
-  };
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -151,90 +106,73 @@ function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
     );
   }, [query, view.teams]);
 
-  const addTeam = () => {
-    setFormError(null);
-    startTransition(async () => {
-      const result = await createTeamAction(slug, name, shortName, color);
-      if (!result.ok) {
-        setFormError(result.error ?? "That team couldn't be created.");
-        // DA-38: a failed submit used to leave focus on <body>, so a keyboard or
-        // screen-reader user landed nowhere and never heard the error.
-        nameRef.current?.focus();
-        return;
-      }
-      toast({ tone: "success", title: "Team created" });
-      setName("");
-      setShortName("");
-      setAddOpen(false);
-      router.refresh();
-    });
-  };
-
   return (
     <>
-      <header className="teams-page-head">
-        <div>
-          <p className="teams-page-sub" data-testid="teams-count">
-            {view.teams.length} team{view.teams.length === 1 ? "" : "s"} · {view.approvedPlayers}{" "}
-            approved player{view.approvedPlayers === 1 ? "" : "s"}
+      {/* The page head's lede: the shell draws the trail and the one <h1>
+          ("Teams"), and the season's facts follow it here. */}
+      <div className="tm-lede">
+        <p className="tm-lede-count" data-testid="teams-count">
+          {view.teams.length} team{view.teams.length === 1 ? "" : "s"} · {view.approvedPlayers}{" "}
+          approved player{view.approvedPlayers === 1 ? "" : "s"}
+        </p>
+        {/* DA-39: the purse figure used to appear with no provenance — no link
+            to where it was set, no lock indicator — and vanished entirely while
+            the decision was still open. It is a default an organizer accepted
+            in "Rules of the night", so it says so and links there. */}
+        {view.purseTotal !== undefined ? (
+          <p className="tm-lede-rules" data-testid="purse-provenance">
+            {view.purseTotal > 0 ? (
+              <>
+                Purse {compactINR(view.purseTotal)} per team
+                {view.squadMax !== undefined && view.squadMax !== null
+                  ? `, squad of ${String(view.squadMax)}`
+                  : ""}{" "}
+                — {locked ? "locked when the auction started." : "set in the auction's rules."}{" "}
+                <Link className="tm-lede-link" href={`/seasons/${slug}/auction`}>
+                  Rules of the night
+                  <IconArrowRight size={14} className="icon-trail" aria-hidden />
+                </Link>
+              </>
+            ) : (
+              <>
+                No purse is set yet. It is chosen in{" "}
+                <Link className="tm-lede-link" href={`/seasons/${slug}/auction`}>
+                  Rules of the night
+                </Link>{" "}
+                when the auction is created.
+              </>
+            )}
           </p>
-          {/* DA-39: the purse figure used to appear with no provenance — no link
-              to where it was set, no lock indicator — and vanished entirely while
-              the decision was still open. It is a default an organizer accepted
-              in "Rules of the night", so it says so and links there. */}
-          {view.purseTotal !== undefined ? (
-            <p className="teams-provenance" data-testid="purse-provenance">
-              {view.purseTotal > 0 ? (
-                <>
-                  Purse {compactINR(view.purseTotal)} per team
-                  {view.squadMax !== undefined && view.squadMax !== null
-                    ? `, squad of ${String(view.squadMax)}`
-                    : ""}{" "}
-                  — {locked ? "locked when the auction started" : "set in"}{" "}
-                  <Link href={`/seasons/${slug}/auction`}>Rules of the night</Link>.
-                </>
-              ) : (
-                <>
-                  No purse is set yet. It is chosen in{" "}
-                  <Link href={`/seasons/${slug}/auction`}>Rules of the night</Link> when the auction
-                  is created.
-                </>
-              )}
-            </p>
-          ) : null}
-        </div>
-        {view.viewer.canManageTeams ? (
-          <Button data-testid="open-add-team" onClick={openAdd} disabled={locked}>
-            + Add team
-          </Button>
         ) : null}
-      </header>
+      </div>
 
       {/* DA-40: the auction lock is season state, not a validation failure on a
           text input. It is now stated before the form, not after the submit. */}
       {locked && view.viewer.canManageTeams ? (
-        <p className="teams-notice" role="status" data-testid="teams-locked-notice">
+        <Notice tone="warning" icon={<IconLock size={20} />} testId="teams-locked-notice">
           The auction has started, so the team list is locked for this season. Teams stay editable
           until you go live.
-        </p>
+        </Notice>
       ) : null}
 
       {/* DA-41: this screen says "add the teams that will bid" and had no concept
           of the person who bids — every link led to Registrations or back here.
           It now names the real order and links to the step that unblocks it. */}
       {view.viewer.canManageTeams && view.rulesSource === null && view.teams.length > 0 ? (
-        <p className="teams-notice" data-testid="teams-owner-hint">
+        <Notice tone="info" icon={<IconInfo size={20} />} testId="teams-owner-hint">
           Next: <Link href={`/seasons/${slug}/auction`}>create the auction</Link>, then invite an
-          owner for each team from its card here. You can keep adding teams until the auction goes
+          owner for each team from its page here. You can keep adding teams until the auction goes
           live.
-        </p>
+        </Notice>
       ) : null}
 
-      {view.teams.length > 0 ? (
-        <div className="teams-toolbar">
+      {/* A league of eight fits on a screen; past that, finding one needs a box. */}
+      {view.teams.length > 8 ? (
+        <div className="tm-toolbar">
+          <IconSearch size={16} className="tm-toolbar-icon" aria-hidden />
           <input
             type="search"
-            className="teams-search"
+            className="tm-search"
             placeholder="Search teams…"
             aria-label="Search teams"
             value={query}
@@ -246,198 +184,150 @@ function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
       ) : null}
 
       {view.teams.length === 0 ? (
-        <Card>
-          <EmptyState
-            headingLevel={2}
-            title="No teams yet"
-            description="The auction needs at least two teams. Add the first one to get going."
-            {...(canAdd
-              ? {
-                  action: (
-                    <Button data-testid="open-add-team-empty" onClick={openAdd}>
-                      + Add team
-                    </Button>
-                  ),
-                }
-              : {})}
-          />
-        </Card>
+        <SectionCard
+          icon={<IconUsers />}
+          title="No teams yet"
+          description={
+            view.viewer.canManageTeams
+              ? "The auction needs at least two teams. Add the first one with “Add team” above."
+              : "The organizer hasn't added any teams yet."
+          }
+          data-testid="teams-empty"
+        />
       ) : (
-        <ul className="team-grid" data-testid="teams-list">
+        <ul className="tm-grid" data-testid="teams-list">
           {shown.map((team) => (
             <li key={team.id}>
-              <TeamGridCard team={team} slug={slug} view={view} />
+              <TeamGridCard team={team} slug={slug} />
             </li>
           ))}
-          {shown.length === 0 ? <li className="teams-empty">No teams match “{query}”.</li> : null}
+          {shown.length === 0 ? <li className="tm-grid-empty">No teams match “{query}”.</li> : null}
         </ul>
       )}
-
-      <Dialog
-        open={addOpen}
-        onClose={() => {
-          setAddOpen(false);
-        }}
-        title="Add a team"
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setAddOpen(false);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={addTeam} loading={pending} data-testid="add-team-workspace">
-              Create team
-            </Button>
-          </>
-        }
-      >
-        <div className="teams-dialog-form">
-          <Field
-            ref={nameRef}
-            label="Team name"
-            name="team-name"
-            placeholder="Malad Mavericks"
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value);
-            }}
-            {...(formError !== null ? { error: formError } : {})}
-          />
-          <div className="teams-dialog-row">
-            <Field
-              label="Short name"
-              name="team-short"
-              placeholder="MAV"
-              value={shortName}
-              onChange={(event) => {
-                setShortName(event.target.value);
-              }}
-            />
-            <Field
-              label="Colour"
-              name="team-color"
-              type="color"
-              value={color}
-              onChange={(event) => {
-                setColor(event.target.value);
-              }}
-            />
-          </div>
-        </div>
-      </Dialog>
     </>
   );
 }
 
-function TeamGridCard({
-  team,
-  slug,
-  view,
-}: {
-  team: TeamCard;
-  slug: string;
-  view: TeamsWorkspaceView;
-}) {
+/** A team's mark: its crest, else its initials on its own colour. */
+function Crest({ team, size }: { team: TeamCard; size: "md" | "lg" }) {
+  const px = size === "lg" ? 64 : 44;
+  return team.logoUrl !== null ? (
+    <img className="tm-crest" data-size={size} src={team.logoUrl} alt="" width={px} height={px} />
+  ) : (
+    <span
+      className="tm-crest tm-crest-mono"
+      data-size={size}
+      style={paintOnFill(team.color)}
+      aria-hidden
+    >
+      {monogram(team)}
+    </span>
+  );
+}
+
+/** The team's colour as a custom property — every bar and wash on the card reads it. */
+function teamPaint(color: string | null): CSSProperties | undefined {
+  return color !== null ? ({ "--team": color } as CSSProperties) : undefined;
+}
+
+function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
   const remaining =
     team.purseTotal !== undefined && team.spent !== undefined
       ? Math.max(0, team.purseTotal - team.spent)
       : null;
+  const owner = team.ownerName !== null ? `Owner · ${team.ownerName}` : "No owner yet";
+  const full =
+    team.squadMax !== undefined && team.squadMax !== null && team.squadFilled >= team.squadMax;
   return (
-    <article className="team-card">
-      <div className="team-card-top">
-        {team.logoUrl !== null ? (
-          <img className="teams-crest" src={team.logoUrl} alt="" width={40} height={40} />
-        ) : (
-          <span className="team-card-mono" style={paintOnFill(team.color)} aria-hidden>
-            {monogram(team)}
-          </span>
-        )}
-        <div className="team-card-id">
-          <span className="team-card-name">
+    <article className="team-card tm-card" style={teamPaint(team.color)}>
+      <div className="tm-card-top">
+        <Crest team={team} size="md" />
+        <div className="tm-card-id">
+          <span className="tm-card-name">
             {team.name}
             {team.shortName !== null ? (
-              <span className="team-card-short">{team.shortName}</span>
+              <span className="tm-card-short">{team.shortName}</span>
             ) : null}
           </span>
-          {/* DA-42: the coach was saved, toasted and stored, and then rendered
-              on no screen in the product. */}
-          <span className="team-card-owner">
-            {team.ownerName !== null ? `Owner · ${team.ownerName}` : "No owner yet"}
-            {team.coachName !== null ? ` · Coach · ${team.coachName}` : ""}
+          <span className="tm-card-owner" title={owner}>
+            {owner}
           </span>
         </div>
-        {team.squadMax !== undefined && team.squadMax !== null ? (
-          <span className="team-card-squad">
-            {team.squadFilled}/{team.squadMax}
-          </span>
-        ) : (
-          <span className="team-card-squad">{team.squadFilled}</span>
-        )}
+        <span className="tm-card-squad" data-full={full ? "true" : undefined}>
+          {team.squadMax !== undefined && team.squadMax !== null ? (
+            <>
+              {team.squadFilled}/{team.squadMax}
+              <VisuallyHidden> players in the squad</VisuallyHidden>
+            </>
+          ) : (
+            <>
+              {team.squadFilled}
+              <VisuallyHidden> {team.squadFilled === 1 ? "player" : "players"}</VisuallyHidden>
+            </>
+          )}
+        </span>
       </div>
 
       {team.usedPct !== undefined && team.usedPct !== null ? (
-        <div className="team-card-purse">
-          <div className="team-card-purse-head">
+        <div className="tm-card-purse">
+          <div className="tm-card-purse-head">
             <span>Purse used</span>
-            <span>{team.usedPct}%</span>
+            <span className="tm-num">{team.usedPct}%</span>
           </div>
-          <span className="season-bar" aria-hidden>
+          <span className="tm-bar" aria-hidden>
             <span
-              className="season-bar-fill"
-              style={{
-                width: `${String(Math.min(100, team.usedPct))}%`,
-                ...(team.color !== null ? { background: team.color } : {}),
-              }}
+              className="tm-bar-fill"
+              style={{ transform: `scaleX(${String(Math.min(100, team.usedPct) / 100)})` }}
             />
           </span>
         </div>
       ) : null}
 
       {team.spent !== undefined ? (
-        <div className="team-card-money">
+        <dl className="tm-card-money">
           <div>
-            <span className="team-card-money-lbl">Spent</span>
-            <span className="team-card-money-val">{exactINR(team.spent)}</span>
+            <dt>Spent</dt>
+            <dd className="tm-num">{exactINR(team.spent)}</dd>
           </div>
           <div>
-            <span className="team-card-money-lbl">Remaining</span>
-            <span className="team-card-money-val is-positive">
+            <dt>Remaining</dt>
+            <dd className="tm-num" data-tone={remaining === 0 ? "out" : "left"}>
               {/* DA-24: no auction yet means no purse yet — "₹0" read as broke. */}
               {remaining !== null && (team.purseTotal ?? 0) > 0 ? exactINR(remaining) : "—"}
-            </span>
+            </dd>
           </div>
-        </div>
+        </dl>
       ) : null}
 
-      <div className="team-card-foot">
-        {team.topBuyName !== undefined ? (
-          team.topBuyName !== null ? (
-            <span className="team-card-topbuy">Top buy · {team.topBuyName}</span>
+      {team.topBuyName !== undefined ? (
+        <p className="tm-topbuy" data-empty={team.topBuyName === null ? "true" : undefined}>
+          <IconTrophy size={18} className="tm-topbuy-icon" aria-hidden />
+          {team.topBuyName !== null ? (
+            <>
+              <span className="tm-topbuy-name">
+                <VisuallyHidden>Top buy: </VisuallyHidden>
+                {team.topBuyName}
+              </span>
+              {team.topBuyPrice !== undefined && team.topBuyPrice !== null ? (
+                <span className="tm-num tm-topbuy-price">{exactINR(team.topBuyPrice)}</span>
+              ) : null}
+            </>
           ) : (
-            <span className="team-card-topbuy team-card-topbuy-empty">No buys yet</span>
-          )
-        ) : (
-          <span className="team-card-topbuy team-card-topbuy-empty">
-            {team.squadFilled} squad {team.squadFilled === 1 ? "member" : "members"}
-          </span>
-        )}
-        {/* DA-43: "Prepare roster →" was a 100×16 hit area on a card that was
-            2.3% clickable — below SC 2.5.8 AA. The link's ::after now covers the
-            whole card, so the target is the card and the accessible name is
-            still the link's own text. */}
-        <Link
-          href={`/seasons/${slug}/teams?team=${team.id}`}
-          className="team-card-link team-card-cover"
-          data-testid={`open-roster-${team.id}`}
-        >
-          {view.viewer.canSeeRoster ? "Prepare roster" : "Open team"}
-          <IconArrowRight size={16} className="icon-trail" />
-        </Link>
-      </div>
+            <span className="tm-topbuy-name">No buys yet</span>
+          )}
+        </p>
+      ) : null}
+
+      {/* DA-43: the card IS the target (SC 2.5.8). The link's ::after covers
+          the whole card, and its accessible name is still its own text. */}
+      <Link
+        href={`/seasons/${slug}/teams?team=${team.id}`}
+        className="tm-card-link team-card-cover"
+        data-testid={`open-roster-${team.id}`}
+      >
+        View team
+        <IconArrowRight size={16} className="icon-trail" aria-hidden />
+      </Link>
     </article>
   );
 }
@@ -502,102 +392,55 @@ function RosterDetail({
     );
   }, [roster, view.roles]);
 
-  return (
-    <>
-      <Link href={`/seasons/${slug}/teams`} className="teams-back">
-        <IconArrowLeft size={16} className="icon-lead" /> All teams
-      </Link>
-
-      <header className="team-detail-head">
-        {team.logoUrl !== null ? (
-          <img className="teams-crest lg" src={team.logoUrl} alt="" width={52} height={52} />
-        ) : (
-          <span className="team-card-mono lg" style={paintOnFill(team.color)} aria-hidden>
-            {monogram(team)}
-          </span>
-        )}
-        <div className="team-detail-id">
-          {/* Selecting a team is a URL state of the Teams surface, so the
-              shell's title follows it rather than the page growing a second. */}
-          <PageTitle title={team.name} />
-          <p className="team-detail-sub">
-            {team.shortName !== null ? `${team.shortName} · ` : ""}
-            {team.ownerName !== null ? `Owner · ${team.ownerName} · ` : "No owner yet · "}
-            {team.coachName !== null ? `Coach · ${team.coachName} · ` : ""}
-            {slotsOpen !== null && team.squadMax !== undefined && team.squadMax !== null
-              ? `${String(team.squadFilled)}/${String(team.squadMax)} squad · ${String(slotsOpen)} slot${slotsOpen === 1 ? "" : "s"} open`
-              : `${String(team.squadFilled)} player${team.squadFilled === 1 ? "" : "s"}`}
-          </p>
-        </div>
-        <div className="team-detail-actions">
-          {view.viewer.canSeeRoster ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              data-testid="export-squad"
-              onClick={() => {
-                setExportOpen(true);
-              }}
-            >
-              Export squad
-            </Button>
-          ) : null}
-        </div>
-      </header>
-
-      {team.spent !== undefined ? (
-        <div className="team-detail-tiles">
-          <div className="season-tile">
-            <span className="season-tile-value">{exactINR(team.spent)}</span>
-            <span className="season-tile-label">Purse spent</span>
-          </div>
-          <div className="season-tile">
-            <span className="season-tile-value season-tile-accent">
-              {remaining !== null && (team.purseTotal ?? 0) > 0 ? exactINR(remaining) : "—"}
-            </span>
-            <span className="season-tile-label">Remaining</span>
-          </div>
-          <div className="season-tile">
-            <span className="season-tile-value">
-              {team.usedPct !== undefined && team.usedPct !== null
-                ? `${String(team.usedPct)}%`
-                : "—"}
-            </span>
-            <span className="season-tile-label">Purse used</span>
-          </div>
-          <div className="season-tile">
-            <span className="season-tile-value team-tile-name">{team.topBuyName ?? "—"}</span>
-            <span className="season-tile-label">Top buy</span>
-          </div>
-        </div>
-      ) : null}
-
+  const squadSection = (
+    <div className="tm-squad-tab">
       {canManage && view.viewer.canSeeRoster ? (
-        <SquadPreSign
-          slug={slug}
-          teamId={team.id}
-          teamName={team.name}
-          roster={roster}
-          locked={view.rulesSource?.locked ?? false}
-          settlesAtOpen={view.rulesSource !== null && !view.rulesSource.locked}
-        />
-      ) : null}
-
-      {tally.length > 0 ? (
-        <div className="team-tally">
-          {tally.map(([role, count]) => (
-            <span key={role} className="team-tally-chip">
-              {labelOf(role)} <b>{count}</b>
-            </span>
-          ))}
-        </div>
+        <SectionCard
+          className="tm-presign-card"
+          icon={<IconCrown />}
+          tone="amber"
+          title="Captain, icons & retained"
+          description="Named before the auction — they join this squad without being bid for."
+        >
+          <SquadPreSign
+            slug={slug}
+            teamId={team.id}
+            teamName={team.name}
+            teamColor={team.color}
+            roster={roster}
+            locked={view.rulesSource?.locked ?? false}
+            settlesAtOpen={view.rulesSource !== null && !view.rulesSource.locked}
+          />
+        </SectionCard>
       ) : null}
 
       {view.viewer.canSeeRoster ? (
-        <Card>
+        <SectionCard
+          flush
+          icon={<IconUsers />}
+          title="Squad"
+          description={
+            roster.length === 0
+              ? undefined
+              : `${String(roster.length)} player${roster.length === 1 ? "" : "s"}${
+                  view.viewer.canSeeMoney ? " · dearest buy first" : ""
+                }`
+          }
+          action={
+            tally.length > 0 ? (
+              <span className="tm-tally">
+                {tally.map(([role, count]) => (
+                  <Pill key={role} tone="neutral">
+                    {labelOf(role)} <b>{count}</b>
+                  </Pill>
+                ))}
+              </span>
+            ) : undefined
+          }
+        >
           {roster.length === 0 ? (
             <EmptyState
-              headingLevel={2}
+              headingLevel={3}
               title="No players on this squad yet"
               description={
                 canManage
@@ -606,14 +449,16 @@ function RosterDetail({
               }
             />
           ) : (
-            <div className="table-scroll">
-              <table className="roster-table" data-testid="roster-list">
+            <div className="table-scroll tm-roster-scroll">
+              <table className="tm-roster" data-testid="roster-list">
                 <thead>
                   <tr>
-                    <th className="roster-num">#</th>
+                    <th className="tm-roster-num">#</th>
                     <th>Player</th>
                     <th>Role</th>
-                    {view.viewer.canSeeMoney ? <th className="roster-price">Buy price</th> : null}
+                    {view.viewer.canSeeMoney ? (
+                      <th className="tm-roster-price">Buy price</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -628,16 +473,22 @@ function RosterDetail({
                         }
                       }}
                     >
-                      <td className="roster-num">{String(index + 1).padStart(2, "0")}</td>
+                      <td className="tm-roster-num">{index + 1}</td>
                       <td>
-                        <span className="roster-player">
-                          <span className="roster-avatar" aria-hidden>
-                            {/* DA-23: the roster took the first TWO LETTERS of the first word,
-                                so Arjun Sharma read "AR" here and "AS" on Registrations. */}
-                            {initialsFor(row.name ?? row.phone ?? "?").initials ?? "?"}
-                          </span>
-                          <span className="roster-person">
-                            <span className="roster-name">
+                        <span className="tm-roster-player">
+                          {/* The player's photo (consent-gated upstream), else the same
+                              branded initials mark every other surface draws for them. */}
+                          <PlayerImage
+                            name={row.name ?? "Unnamed"}
+                            seed={row.registrationId}
+                            src={row.photoUrl}
+                            size="sm"
+                            shape="round"
+                            teamColor={team.color ?? undefined}
+                            decorative
+                          />
+                          <span className="tm-roster-person">
+                            <span className="tm-roster-name">
                               <button
                                 type="button"
                                 className="pd-player-name"
@@ -647,26 +498,28 @@ function RosterDetail({
                               >
                                 {row.name ?? "Unnamed"}
                               </button>
-                              {row.isCaptain ? <Badge tone="info">Captain</Badge> : null}
-                              {row.isIcon ? <Badge tone="success">Icon</Badge> : null}
-                              {row.isRetained ? <Badge tone="info">Retained</Badge> : null}
+                              {row.isCaptain ? <Pill tone="blue">Captain</Pill> : null}
+                              {row.isIcon ? <Pill tone="amber">Icon</Pill> : null}
+                              {row.isRetained ? <Pill tone="purple">Retained</Pill> : null}
                             </span>
                             {/* A player always has one — `submitRegistration` refuses an
                                 account with no number, because SMS is the only way a
                                 season reaches them. The fallback is for the rows that
                                 predate that rule, not a state the product creates. */}
-                            <span className="roster-phone">
+                            <span className="tm-roster-phone" data-private>
                               {row.phone !== null ? formatPhone(row.phone) : "—"}
                             </span>
                           </span>
                         </span>
                       </td>
-                      <td>{labelOf(row.role)}</td>
+                      <td data-label="Role">{labelOf(row.role) || "—"}</td>
                       {view.viewer.canSeeMoney ? (
-                        <td className="roster-price">
+                        <td className="tm-roster-price tm-num" data-label="Buy price">
                           {row.buyPrice !== undefined && row.buyPrice !== null
                             ? exactINR(row.buyPrice)
-                            : "—"}
+                            : row.isCaptain || row.isIcon || row.isRetained
+                              ? "Pre-signed"
+                              : "—"}
                         </td>
                       ) : null}
                     </tr>
@@ -675,46 +528,153 @@ function RosterDetail({
               </table>
             </div>
           )}
-        </Card>
+        </SectionCard>
       ) : (
-        <Card>
-          <EmptyState
-            headingLevel={2}
-            title="The squad is not yours to see"
-            description="Reviewing this season's players needs the registration-review permission. Ask an organizer of this season for it."
-          />
-        </Card>
+        <SectionCard
+          icon={<IconLock />}
+          tone="neutral"
+          title="The squad is not yours to see"
+          description="Reviewing this season's players needs the registration-review permission. Ask an organizer of this season for it."
+        />
       )}
+    </div>
+  );
 
-      {canManage ? (
-        <Card>
-          <h2 className="team-settings-title">Team settings</h2>
-          <div className="teams-manage">
-            <TeamLogoUploader
-              slug={slug}
-              teamId={team.id}
-              teamName={team.name}
-              {...(team.logoUrl !== null ? { currentUrl: team.logoUrl } : {})}
-            />
-            <div className="teams-settings-forms">
-              <TeamIdentityEditor
-                slug={slug}
-                team={team}
-                locked={view.rulesSource?.locked ?? false}
-              />
-              <CoachEditor slug={slug} teamId={team.id} initial={team.coachName ?? ""} />
-              <OwnerInvite
-                slug={slug}
-                teamId={team.id}
-                ownerName={team.ownerName}
-                canConduct={view.viewer.canConduct}
-                auctionExists={view.rulesSource !== null}
-                auctionFinished={view.rulesSource?.finished ?? false}
-              />
-            </div>
+  return (
+    <>
+      <Link href={`/seasons/${slug}/teams`} className="teams-back tm-back">
+        <IconArrowLeft size={16} className="icon-lead" /> All teams
+      </Link>
+
+      {/* Selecting a team is a URL state of the Teams surface, so the shell's
+          title follows it rather than the page growing a second <h1>. This
+          band carries everything about the team except its name. */}
+      <PageTitle title={team.name} />
+      <section className="tm-hero" style={teamPaint(team.color)} aria-label="About this team">
+        <Crest team={team} size="lg" />
+        <div className="tm-hero-id">
+          {team.shortName !== null ? (
+            <p className="tm-hero-eyebrow">
+              <span className="tm-card-short">{team.shortName}</span>
+            </p>
+          ) : null}
+          <ul className="tm-hero-meta">
+            <li>
+              <IconUser size={16} aria-hidden />
+              {team.ownerName !== null ? `Owner · ${team.ownerName}` : "No owner yet"}
+            </li>
+            {team.coachName !== null ? (
+              <li>
+                <IconFlag size={16} aria-hidden />
+                Coach · {team.coachName}
+              </li>
+            ) : null}
+            <li>
+              <IconUsers size={16} aria-hidden />
+              {slotsOpen !== null && team.squadMax !== undefined && team.squadMax !== null
+                ? `${String(team.squadFilled)}/${String(team.squadMax)} squad · ${String(slotsOpen)} slot${slotsOpen === 1 ? "" : "s"} open`
+                : `${String(team.squadFilled)} player${team.squadFilled === 1 ? "" : "s"}`}
+            </li>
+          </ul>
+        </div>
+        {view.viewer.canSeeRoster ? (
+          <div className="tm-hero-actions">
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="export-squad"
+              onClick={() => {
+                setExportOpen(true);
+              }}
+            >
+              <IconDownload size={16} className="icon-lead" aria-hidden />
+              Export squad
+            </Button>
           </div>
-        </Card>
+        ) : null}
+      </section>
+
+      {team.spent !== undefined ? (
+        <StatGrid>
+          <StatCard
+            icon={<IconWallet />}
+            tone="gold"
+            value={exactINR(team.spent)}
+            label="Purse spent"
+          />
+          <StatCard
+            icon={<IconRupee />}
+            tone="green"
+            value={remaining !== null && (team.purseTotal ?? 0) > 0 ? exactINR(remaining) : "—"}
+            label="Remaining"
+          />
+          <StatCard
+            icon={<IconChart />}
+            tone="blue"
+            value={
+              team.usedPct !== undefined && team.usedPct !== null ? `${String(team.usedPct)}%` : "—"
+            }
+            label="Purse used"
+            {...(team.usedPct !== undefined && team.usedPct !== null
+              ? { progress: team.usedPct }
+              : {})}
+          />
+          <StatCard
+            icon={<IconTrophy />}
+            tone="amber"
+            value={<span className="tm-stat-name">{team.topBuyName ?? "—"}</span>}
+            label="Top buy"
+            {...(team.topBuyPrice !== undefined && team.topBuyPrice !== null
+              ? { hint: exactINR(team.topBuyPrice) }
+              : {})}
+          />
+        </StatGrid>
       ) : null}
+
+      {/* Two tabs rather than one long page: the squad is what an organizer
+          comes here for; crest, name, coach and owner are set once. */}
+      {canManage ? (
+        <HashTabs
+          label="Team sections"
+          tabs={[
+            { id: "squad", label: "Squad", badge: roster.length, content: squadSection },
+            {
+              id: "settings",
+              label: "Team settings",
+              content: (
+                <div className="team-settings-tab">
+                  <div className="teams-manage">
+                    <TeamLogoUploader
+                      slug={slug}
+                      teamId={team.id}
+                      teamName={team.name}
+                      {...(team.logoUrl !== null ? { currentUrl: team.logoUrl } : {})}
+                    />
+                    <div className="teams-settings-forms">
+                      <TeamIdentityEditor
+                        slug={slug}
+                        team={team}
+                        locked={view.rulesSource?.locked ?? false}
+                      />
+                      <CoachEditor slug={slug} teamId={team.id} initial={team.coachName ?? ""} />
+                      <OwnerInvite
+                        slug={slug}
+                        teamId={team.id}
+                        ownerName={team.ownerName}
+                        canConduct={view.viewer.canConduct}
+                        auctionExists={view.rulesSource !== null}
+                        auctionFinished={view.rulesSource?.finished ?? false}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ),
+            },
+          ]}
+        />
+      ) : (
+        squadSection
+      )}
 
       <ExportDialog
         slug={slug}

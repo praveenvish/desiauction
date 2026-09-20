@@ -1,18 +1,21 @@
-import { Badge, Button, ButtonLink, Card, EmptyState, Field } from "@desiauction/ui";
-import { entryCategoryLabel } from "@desiauction/core";
+import { Button, ButtonLink, Card, EmptyState, Field } from "@desiauction/ui";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { env } from "../../../env";
 import {
   parseDirectoryFilter,
   parseDirectorySort,
   publicCompetitionsDirectory,
-  type DirectoryEntry,
   type DirectoryFilter,
   type DirectorySort,
 } from "../../../server/competition/public";
-import { IconArrowRight, IconCalendar, IconMapPin } from "../../../components/marketing/icons";
+import {
+  CountChips,
+  PageBody,
+  PageHero,
+  SportMontage,
+} from "../../../components/public/public-kit";
+import { TournamentCard, TournamentGrid } from "../../../components/public/tournament-card";
 import { formatDateRange } from "../format";
 import { DIRECTORY_DESCRIPTION, DIRECTORY_KICKER } from "./copy";
 import { SortSelect } from "./sort-select";
@@ -42,7 +45,16 @@ export async function generateMetadata({
   const sp = await searchParams;
   const term = sp.q?.trim() ?? "";
   const filter = parseDirectoryFilter(sp.filter);
-  const facet = filter === "open" ? "Registration open" : filter === "live" ? "Live now" : "";
+  const facet =
+    filter === "open"
+      ? "Registration open"
+      : filter === "live"
+        ? "Live now"
+        : filter === "upcoming"
+          ? "Upcoming"
+          : filter === "closed"
+            ? "Registration closed"
+            : "";
   const slice = [term === "" ? "" : `“${term}”`, facet].filter((part) => part !== "").join(" · ");
   const isSlice = slice !== "";
   return {
@@ -57,16 +69,6 @@ export async function generateMetadata({
       type: "website",
     },
   };
-}
-
-/** Monogram for the crest fallback: first letters of the first two words. */
-function monogram(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 /** Every directory link is one URL builder, so `q`, the facet, the sort and the
@@ -95,31 +97,6 @@ function directoryHref(params: {
   return query === "" ? "/c" : `/c?${query}`;
 }
 
-/**
- * What one click on this card does, said on the card. The whole card is a
- * single link — exactly one tab stop per result — so the destination and the
- * label are chosen together rather than nesting a second link inside the first
- * (invalid HTML, and a keyboard user paying twice per row).
- *
- * A live auction is the exception that earns the direct route: watching needs
- * no account, so the card goes straight to the spectate stage instead of via
- * the competition page that carries the same door one click further down.
- */
-function cardAction(entry: DirectoryEntry): { href: string; label: string; note: string | null } {
-  if (entry.live) {
-    return {
-      href: `/seasons/${entry.slug}/auction/spectate`,
-      label: "Watch live",
-      note: "No account needed",
-    };
-  }
-  return {
-    href: `/c/${entry.slug}`,
-    label: entry.open ? "Register" : "View tournament",
-    note: null,
-  };
-}
-
 // PX-5 public discovery: only tournaments their organizers PUBLISHED
 // (visibility='public') appear here. Search, facet, sort and pagination are all
 // URL-backed — every view a visitor can reach is a view they can send someone.
@@ -139,7 +116,16 @@ export default async function DirectoryPage({
     filter,
     sort,
   });
-  const facetLabel = filter === "open" ? "Registration open" : filter === "live" ? "Live now" : "";
+  const facetLabel =
+    filter === "open"
+      ? "Registration open"
+      : filter === "live"
+        ? "Live now"
+        : filter === "upcoming"
+          ? "Upcoming"
+          : filter === "closed"
+            ? "Registration closed"
+            : "";
   const noun = directory.total === 1 ? "tournament" : "tournaments";
   // The verb has to agree with the noun, or a one-result facet reads "There are
   // 1 tournament" — reachable today via /c?filter=live&page=5.
@@ -162,23 +148,43 @@ export default async function DirectoryPage({
   const searchEmpty = term !== "" && directory.counts.all === 0;
   const clearSearchHref = directoryHref({ filter, sort });
   const clearFilterHref = directoryHref({ q: term, sort });
-  const facets: { key: DirectoryFilter; label: string; count: number }[] = [
+  /**
+   * The five states a visitor actually sorts tournaments into. "Upcoming" and
+   * "Registration closed" were missing, so every season that was neither open
+   * nor live — most of them, most of the time — could only be found by
+   * scrolling All, and a visitor looking for a tournament to watch next month
+   * had no way to ask for one.
+   */
+  const facets: {
+    key: DirectoryFilter;
+    label: string;
+    count: number;
+    tone?: "live" | "open" | "closed" | "soon";
+  }[] = [
     { key: "all", label: "All", count: directory.counts.all },
-    { key: "open", label: "Registration open", count: directory.counts.open },
-    { key: "live", label: "Live now", count: directory.counts.live },
+    { key: "open", label: "Registration open", count: directory.counts.open, tone: "open" },
+    { key: "live", label: "Live now", count: directory.counts.live, tone: "live" },
+    { key: "upcoming", label: "Upcoming", count: directory.counts.upcoming, tone: "soon" },
+    {
+      key: "closed",
+      label: "Registration closed",
+      count: directory.counts.closed,
+      tone: "closed",
+    },
   ];
   return (
     <main className="public-page mk">
-      {/* The floodlight head. `/c` sat on the daylight surface between a dark
-          header and a dark footer — the one pale slab in an otherwise dark
-          public journey — and on that surface `--text-accent` resolves to a
-          muddy #865D12 instead of brand gold. Reusing the competition page's
-          own `.public-hero` fixes the seam and the accent in one move. */}
-      <header className="public-hero public-head" data-theme="floodlight">
-        <div className="mk-container public-hero-inner">
-          <p className="mk-kicker">{DIRECTORY_KICKER}</p>
-          <h1>Tournaments</h1>
-          <p className="public-sub">{DIRECTORY_DESCRIPTION}</p>
+      <PageHero
+        eyebrow={DIRECTORY_KICKER}
+        title={
+          <>
+            Tournam<em>ents</em>
+          </>
+        }
+        lede={DIRECTORY_DESCRIPTION}
+        art={<SportMontage />}
+        script="Different Sports One Platform"
+        actions={
           <form className="public-controls" action="/c" method="get">
             <div className="public-search">
               <Field
@@ -202,225 +208,167 @@ export default async function DirectoryPage({
                 facet keeps it, and the chips carry `q` so switching facet keeps
                 the search. Either one alone would silently drop the other. */}
             {filter === "all" ? null : <input type="hidden" name="filter" value={filter} />}
-            <div className="public-facets">
-              <div
-                className="showcase-filters public-filters"
-                role="group"
-                aria-label="Filter tournaments"
-                data-testid="directory-filters"
-              >
-                {facets.map((entry) => (
-                  <Link
-                    key={entry.key}
-                    className="showcase-filter"
-                    href={directoryHref({ q: term, filter: entry.key, sort })}
-                    data-active={entry.key === filter}
-                    aria-current={entry.key === filter ? "true" : undefined}
-                  >
-                    {entry.label}
-                    <span className="showcase-filter-count">{entry.count}</span>
-                  </Link>
-                ))}
-              </div>
+            <div className="public-facets" data-testid="directory-filters">
+              <CountChips
+                label="Filter tournaments"
+                chips={facets.map((entry) => ({
+                  label: entry.label,
+                  href: directoryHref({ q: term, filter: entry.key, sort }),
+                  count: entry.count,
+                  active: entry.key === filter,
+                  ...(entry.tone === undefined ? {} : { tone: entry.tone }),
+                }))}
+              />
               <SortSelect value={sort} />
             </div>
           </form>
-        </div>
-      </header>
-      <div className="public-body">
-        <div className="mk-container">
-          {directory.entries.length === 0 ? (
-            <Card>
-              {outOfRange ? (
-                <EmptyState
-                  aria-live="polite"
-                  headingLevel={2}
-                  title="That page doesn't exist"
-                  description={
-                    directory.totalPages === 1
-                      ? `There ${verb} ${String(directory.total)} ${noun}, all on page 1.`
-                      : `There ${verb} ${String(directory.total)} ${noun}, across ${String(directory.totalPages)} pages.`
-                  }
-                  action={
-                    <ButtonLink href={directoryHref({ q: term, filter, sort })}>
-                      Back to page 1
+        }
+      />
+
+      <PageBody>
+        {directory.entries.length === 0 ? (
+          <Card>
+            {outOfRange ? (
+              <EmptyState
+                aria-live="polite"
+                headingLevel={2}
+                title="That page doesn't exist"
+                description={
+                  directory.totalPages === 1
+                    ? `There ${verb} ${String(directory.total)} ${noun}, all on page 1.`
+                    : `There ${verb} ${String(directory.total)} ${noun}, across ${String(directory.totalPages)} pages.`
+                }
+                action={
+                  <ButtonLink href={directoryHref({ q: term, filter, sort })}>
+                    Back to page 1
+                  </ButtonLink>
+                }
+              />
+            ) : searchEmpty ? (
+              <EmptyState
+                aria-live="polite"
+                headingLevel={2}
+                title={`No tournaments match “${term}”`}
+                description={`Try a shorter search, or clear it to see all ${String(directory.catalogue)} tournaments. Organizers can also keep a tournament unlisted — if someone sent you a direct link, that link still works.`}
+                action={
+                  <span className="public-empty-actions">
+                    <ButtonLink variant="secondary" href={clearSearchHref}>
+                      Clear search
                     </ButtonLink>
-                  }
-                />
-              ) : searchEmpty ? (
-                <EmptyState
-                  aria-live="polite"
-                  headingLevel={2}
-                  title={`No tournaments match “${term}”`}
-                  description={`Try a shorter search, or clear it to see all ${String(directory.catalogue)} tournaments. Organizers can also keep a tournament unlisted — if someone sent you a direct link, that link still works.`}
-                  action={
-                    <span className="public-empty-actions">
-                      <ButtonLink variant="secondary" href={clearSearchHref}>
-                        Clear search
+                    <ButtonLink href="/c">Browse all tournaments</ButtonLink>
+                  </span>
+                }
+              />
+            ) : filter !== "all" ? (
+              <EmptyState
+                aria-live="polite"
+                headingLevel={2}
+                title={
+                  filter === "live"
+                    ? "No auction is live right now"
+                    : "No tournament is taking registrations right now"
+                }
+                description={
+                  term !== ""
+                    ? `“${term}” matches ${String(directory.counts.all)} ${directory.counts.all === 1 ? "tournament" : "tournaments"}, but ${directory.counts.all === 1 ? "it is not" : "none of them is"} ${filter === "live" ? "mid-auction" : "taking registrations"} right now.`
+                    : filter === "live"
+                      ? `An auction runs for a couple of hours on the day, so this changes fast. All ${String(directory.catalogue)} public tournaments are listed under All.`
+                      : `Organizers open registration when they are ready to take players. All ${String(directory.catalogue)} public tournaments are listed under All.`
+                }
+                action={
+                  <span className="public-empty-actions">
+                    {term === "" ? null : (
+                      <ButtonLink variant="secondary" href={clearFilterHref}>
+                        Show all matches
                       </ButtonLink>
-                      <ButtonLink href="/c">Browse all tournaments</ButtonLink>
-                    </span>
-                  }
-                />
-              ) : filter !== "all" ? (
-                <EmptyState
-                  aria-live="polite"
-                  headingLevel={2}
-                  title={
-                    filter === "live"
-                      ? "No auction is live right now"
-                      : "No tournament is taking registrations right now"
-                  }
-                  description={
-                    term !== ""
-                      ? `“${term}” matches ${String(directory.counts.all)} ${directory.counts.all === 1 ? "tournament" : "tournaments"}, but ${directory.counts.all === 1 ? "it is not" : "none of them is"} ${filter === "live" ? "mid-auction" : "taking registrations"} right now.`
-                      : filter === "live"
-                        ? `An auction runs for a couple of hours on the day, so this changes fast. All ${String(directory.catalogue)} public tournaments are listed under All.`
-                        : `Organizers open registration when they are ready to take players. All ${String(directory.catalogue)} public tournaments are listed under All.`
-                  }
-                  action={
-                    <span className="public-empty-actions">
-                      {term === "" ? null : (
-                        <ButtonLink variant="secondary" href={clearFilterHref}>
-                          Show all matches
-                        </ButtonLink>
-                      )}
-                      <ButtonLink href="/c">Browse all tournaments</ButtonLink>
-                    </span>
-                  }
-                />
-              ) : (
-                <EmptyState
-                  aria-live="polite"
-                  headingLevel={2}
-                  title="No public tournaments yet"
-                  description="Organizers choose whether to list a tournament publicly. If someone sent you a direct link, it still works — open it and register there."
-                  action={
-                    <span className="public-empty-actions">
-                      <ButtonLink variant="secondary" href="/help">
-                        How DesiAuction works
-                      </ButtonLink>
-                      <ButtonLink href="/">Back to home</ButtonLink>
-                    </span>
-                  }
-                />
-              )}
-            </Card>
-          ) : (
-            <section className="public-results" aria-labelledby="directory-results">
-              {/* The card names are the only per-result headings, so they need a
+                    )}
+                    <ButtonLink href="/c">Browse all tournaments</ButtonLink>
+                  </span>
+                }
+              />
+            ) : (
+              <EmptyState
+                aria-live="polite"
+                headingLevel={2}
+                title="No public tournaments yet"
+                description="Organizers choose whether to list a tournament publicly. If someone sent you a direct link, it still works — open it and register there."
+                action={
+                  <span className="public-empty-actions">
+                    <ButtonLink variant="secondary" href="/help">
+                      How DesiAuction works
+                    </ButtonLink>
+                    <ButtonLink href="/">Back to home</ButtonLink>
+                  </span>
+                }
+              />
+            )}
+          </Card>
+        ) : (
+          <section className="public-results" aria-labelledby="directory-results">
+            {/* The card names are the only per-result headings, so they need a
                   heading ABOVE them to hang off: without this the whole page had
                   exactly one heading and a screen-reader user could not move
                   result to result. */}
-              <h2 id="directory-results" className="visually-hidden">
-                Tournament results
-              </h2>
-              <div className="public-results-head">
-                <p className="public-count" aria-live="polite" data-testid="directory-count">
-                  {countLabel}
-                </p>
-                <p className="public-helper">
-                  Anyone can watch. Registering takes a mobile number, your name and playing role —
-                  about a minute.
-                </p>
-              </div>
-              <div className="public-grid" data-testid="directory-list">
-                {directory.entries.map((entry) => {
-                  const action = cardAction(entry);
-                  return (
-                    <Link
-                      key={entry.slug}
-                      href={action.href}
-                      className="public-card-link"
-                      data-live={entry.live ? "true" : undefined}
-                    >
-                      <article className="public-card">
-                        <div className="public-card-head">
-                          {entry.logoUrl !== null ? (
-                            <img
-                              className="public-card-crest"
-                              src={entry.logoUrl}
-                              alt=""
-                              width={48}
-                              height={48}
-                              loading="lazy"
-                            />
-                          ) : (
-                            <span className="public-card-crest public-card-mark" aria-hidden>
-                              {monogram(entry.name)}
-                            </span>
-                          )}
-                          <div className="public-card-titles">
-                            <h3 className="public-card-name">{entry.name}</h3>
-                            <span className="public-card-sub">{entry.orgName}</span>
-                          </div>
-                        </div>
-                        <div className="public-card-meta">
-                          {entry.location !== null ? (
-                            <span className="public-card-sub">
-                              <IconMapPin />
-                              {entry.location}
-                            </span>
-                          ) : null}
-                          <span className="public-card-sub">
-                            <IconCalendar />
-                            {formatDateRange(entry.startsOn, entry.endsOn)}
-                          </span>
-                        </div>
-                        <div className="public-card-foot">
-                          <span className="public-card-badges">
-                            {entry.live ? <Badge tone="live">Live now</Badge> : null}
-                            <Badge tone={entry.open ? "success" : "neutral"}>
-                              {entry.open ? "Registration open" : "Registration closed"}
-                            </Badge>
-                            {/* PI-1: category terminology; Open renders nothing
-                                — it is the unmarked case, not a badge. */}
-                            {entry.entryCategory !== "open" ? (
-                              <Badge tone="info">{entryCategoryLabel(entry.entryCategory)}</Badge>
-                            ) : null}
-                          </span>
-                          <span className="public-card-actions">
-                            {action.note !== null ? (
-                              <span className="public-card-note">{action.note}</span>
-                            ) : null}
-                            <span className="public-card-action">
-                              {action.label}
-                              <IconArrowRight />
-                            </span>
-                          </span>
-                        </div>
-                      </article>
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-          {directory.totalPages > 1 ? (
-            <nav className="public-pagination" aria-label="Pagination">
-              {directory.page > 1 ? (
-                <ButtonLink
-                  variant="ghost"
-                  href={directoryHref({ q: term, filter, sort, page: directory.page - 1 })}
-                >
-                  Previous
-                </ButtonLink>
-              ) : null}
-              <span>
-                Page {directory.page} of {directory.totalPages}
-              </span>
-              {directory.page < directory.totalPages ? (
-                <ButtonLink
-                  variant="ghost"
-                  href={directoryHref({ q: term, filter, sort, page: directory.page + 1 })}
-                >
-                  Next
-                </ButtonLink>
-              ) : null}
-            </nav>
-          ) : null}
-        </div>
-      </div>
+            <h2 id="directory-results" className="visually-hidden">
+              Tournament results
+            </h2>
+            <div className="public-results-head">
+              <p className="public-count" aria-live="polite" data-testid="directory-count">
+                {countLabel}
+              </p>
+              <p className="public-helper">
+                Anyone can watch. Registering takes a mobile number, your name and playing role —
+                about a minute.
+              </p>
+            </div>
+            <TournamentGrid testId="directory-list">
+              {directory.entries.map((entry) => (
+                <TournamentCard
+                  key={entry.slug}
+                  tournament={{
+                    name: entry.name,
+                    slug: entry.slug,
+                    orgName: entry.orgName,
+                    sport: entry.sport,
+                    location: entry.location,
+                    dates: formatDateRange(entry.startsOn, entry.endsOn),
+                    open: entry.open,
+                    live: entry.live,
+                    teamCount: entry.teamCount,
+                    playerCount: entry.playerCount,
+                    logoUrl: entry.logoUrl,
+                    coverUrl: entry.coverUrl,
+                    entryCategory: entry.entryCategory,
+                  }}
+                />
+              ))}
+            </TournamentGrid>
+          </section>
+        )}
+        {directory.totalPages > 1 ? (
+          <nav className="public-pagination" aria-label="Pagination">
+            {directory.page > 1 ? (
+              <ButtonLink
+                variant="ghost"
+                href={directoryHref({ q: term, filter, sort, page: directory.page - 1 })}
+              >
+                Previous
+              </ButtonLink>
+            ) : null}
+            <span>
+              Page {directory.page} of {directory.totalPages}
+            </span>
+            {directory.page < directory.totalPages ? (
+              <ButtonLink
+                variant="ghost"
+                href={directoryHref({ q: term, filter, sort, page: directory.page + 1 })}
+              >
+                Next
+              </ButtonLink>
+            ) : null}
+          </nav>
+        ) : null}
+      </PageBody>
     </main>
   );
 }

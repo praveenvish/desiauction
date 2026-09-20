@@ -95,7 +95,7 @@ test("the competition journey: create, open, team, register, approve", async ({
     // account is nameless, so the profile step comes first).
     await playerPage.getByLabel("Your name").fill("Player One");
     await playerPage.getByRole("button", { name: "Continue" }).click();
-    await playerPage.getByLabel("Playing role").selectOption("all_rounder");
+    await playerPage.getByRole("radio", { name: "All-rounder", exact: true }).check();
     await playerPage.getByTestId("register-continue").click();
     // The publication-consent checkbox is an affirmative act the register
     // flow requires before Submit does anything — see register-flow.tsx.
@@ -115,7 +115,12 @@ test("the competition journey: create, open, team, register, approve", async ({
   // phone is shown to a human; the shell spec asserts the same way.
   await expect(triage).toContainText(formatPhone(`+91${PHONE_PLAYER}`));
   await expect(triage).toContainText("submitted");
-  await triage.getByRole("button", { name: "Approve" }).first().click();
+  // Approve lives in the row's ⋯ menu.
+  await triage
+    .getByTestId(/^row-menu-/)
+    .first()
+    .click();
+  await page.getByRole("menuitem", { name: "Approve" }).click();
   await expect(triage).toContainText("approved");
 });
 

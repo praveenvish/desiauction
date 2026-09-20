@@ -1,4 +1,4 @@
-import { Card } from "@desiauction/ui";
+import { Card, PlayerImage } from "@desiauction/ui";
 
 import { compactINR, exactINR } from "../../../../lib/inr";
 import { roleLabeller } from "../../../../lib/role-label";
@@ -12,16 +12,6 @@ import type { AuctionOverview } from "../../../../server/auction/auction-overvie
  * timer and the bidding itself live on /live and /cockpit, which stream the
  * same auction — this page does not fake a countdown it cannot keep.
  */
-
-function initials(name: string | null): string {
-  if (name === null || name.trim() === "") return "—";
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join("");
-}
 
 export function AuctionOverviewPanel({
   overview,
@@ -96,9 +86,14 @@ export function AuctionOverviewPanel({
           ) : (
             <>
               <div className="auc-block-player">
-                <span className="roster-avatar" aria-hidden>
-                  {initials(onBlock.playerName)}
-                </span>
+                <PlayerImage
+                  name={onBlock.playerName ?? "Unnamed"}
+                  seed={onBlock.registrationId}
+                  src={onBlock.photoUrl}
+                  size="md"
+                  shape="round"
+                  decorative
+                />
                 <span className="roster-person">
                   <span className="roster-name">{onBlock.playerName ?? "Unnamed"}</span>
                   <span className="competitions-hint">

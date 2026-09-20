@@ -18,7 +18,7 @@ import { db as appDb } from "../db";
 import { enqueueMail, enqueueSms, kickDrain, type QueuedMail } from "../messaging/outbox";
 import { appointmentMail, smsRolePhrase, type AppointedRole } from "../messaging/player-mail";
 import { smsFit, smsSeasonName } from "../messaging/templates";
-import { shownName } from "./shown-name";
+import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
  * TELLING PEOPLE THEY WERE NAMED — captain, vice-captain, icon, retained.
@@ -46,6 +46,11 @@ export interface Appointment {
   readonly greetingName: string;
   readonly teamId: string;
   readonly teamName: string;
+  /** The team's colour, for the organizer's table. */
+  readonly teamColor: string | null;
+  /** The shown photo and its consent (see shown-name) — signed by the caller. */
+  readonly photoKey: string | null;
+  readonly photoConsentAt: Date | null;
   /** The roles held now (in the view: the roles not yet announced). */
   readonly roles: readonly AppointedRole[];
   /** A sale in this season's auction put them on the team (see appointmentMail). */
@@ -86,6 +91,9 @@ export async function appointmentsOf(db: Db, competitionId: string): Promise<App
       greetingName: people.name,
       teamId: registrations.teamId,
       teamName: teams.name,
+      teamColor: teams.primaryColor,
+      photoKey: shownPhotoKey,
+      photoConsentAt: shownPhotoConsentAt,
       isCaptain: registrations.isCaptain,
       isViceCaptain: registrations.isViceCaptain,
       isIcon: registrations.isIcon,
@@ -119,6 +127,9 @@ export async function appointmentsOf(db: Db, competitionId: string): Promise<App
     greetingName: row.greetingName?.trim() || "there",
     teamId: row.teamId ?? "",
     teamName: row.teamName,
+    teamColor: row.teamColor,
+    photoKey: row.photoKey,
+    photoConsentAt: row.photoConsentAt,
     roles: [
       ...(row.isCaptain ? (["captain"] as const) : []),
       ...(row.isViceCaptain ? (["vice_captain"] as const) : []),
@@ -156,19 +167,27 @@ export interface AppointmentsView {
   readonly pending: readonly Appointment[];
   /** People whose every current role has been announced. */
   readonly told: number;
+  /**
+   * Everyone named, told or not, with ALL their current roles — the
+   * organizer's table. `told` is true once nothing about them is left to say.
+   */
+  readonly named: readonly (Appointment & { readonly told: boolean })[];
 }
 
 /** Who is named but not yet told, and how many already were. */
 export async function appointmentsView(db: Db, competitionId: string): Promise<AppointmentsView> {
   const all = await appointmentsOf(db, competitionId);
   const told = await toldRoles(all);
-  const pending = all
-    .map((item) => {
-      const already = told.get(keyPrefix(item));
-      return { ...item, roles: item.roles.filter((role) => already?.has(role) !== true) };
-    })
-    .filter((item) => item.roles.length > 0);
-  return { pending, told: all.length - pending.length };
+  const unsaid = all.map((item) => {
+    const already = told.get(keyPrefix(item));
+    return { ...item, roles: item.roles.filter((role) => already?.has(role) !== true) };
+  });
+  const pending = unsaid.filter((item) => item.roles.length > 0);
+  return {
+    pending,
+    told: all.length - pending.length,
+    named: all.map((item, index) => ({ ...item, told: unsaid[index]?.roles.length === 0 })),
+  };
 }
 
 /**

@@ -1,4 +1,4 @@
-import { EmptyState, Card, ToastProvider } from "@desiauction/ui";
+import { EmptyState, IconCalendar, SectionCard, ToastProvider } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -40,9 +40,9 @@ export default async function AdminDemosPage() {
   return (
     <ToastProvider>
       <main className="registrations-dash">
-        <div className="dash-stack">
+        <div className="dash-stack admin-stack">
           <header className="dash-head">
-            <p className="competitions-hint">
+            <p className="dash-hint">
               People who asked for a demo. Answer them, then record what happened — an outcome is
               how &ldquo;nobody replied&rdquo; becomes something we can see rather than something we
               assume.{" "}
@@ -53,13 +53,13 @@ export default async function AdminDemosPage() {
             </p>
           </header>
           {queue.open.length === 0 && queue.answered.length === 0 ? (
-            <Card>
+            <SectionCard icon={<IconCalendar />} tone="neutral" title="Demo requests">
               <EmptyState
-                headingLevel={2}
+                headingLevel={3}
                 title="Nobody has asked yet"
                 description="When somebody fills in the form on /schedule-demo, they appear here with their tournament, their number and whatever they told us."
               />
-            </Card>
+            </SectionCard>
           ) : (
             <DemoQueuePanel queue={queue} />
           )}

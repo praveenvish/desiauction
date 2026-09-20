@@ -1,5 +1,6 @@
 "use server";
 
+import { outsideWindowMessage } from "../../lib/fixture-window";
 import {
   parseFixtureCsv,
   parseScoreField,
@@ -62,6 +63,7 @@ import {
   fixtureStats,
   fixtureTimeline,
   matchDay,
+  nextFixture,
   nowWallClock,
   organizerSchedule,
   queryFixtures,
@@ -75,6 +77,7 @@ import {
   type FixtureStats,
   type FixtureTimelineEntry,
   type MatchDayGround,
+  type NextFixture,
   type OrganizerFixture,
 } from "./fixtures";
 import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
@@ -332,6 +335,8 @@ export interface FixtureDashboard {
   orgSlug: string;
   stats: FixtureStats;
   page: FixturePage;
+  /** The match being played now, else the next to come, else one overdue. */
+  next: NextFixture | null;
   teams: TeamSummary[];
   /** Absent without fixture.manage — the org's ground inventory is not public. */
   grounds?: GroundOption[];
@@ -380,31 +385,38 @@ export async function fixtureDashboard(
     // The gate runs FIRST; every read below is shaped by its answer.
     const canManage = await canCompetition(db, session.personId, scope, "fixture.manage");
     const visible = canManage ? undefined : PUBLIC_FIXTURE_STATUSES;
-    const [orgSlug, stats, page, teamList, groundList, conflicts, resultMap] = await Promise.all([
-      orgSlugOf(db, competition.orgId),
-      fixtureStats(db, competition.id, visible),
-      queryFixtures(db, competition.id, {
-        ...(visible !== undefined ? { visible } : {}),
-        ...(params.status !== undefined && VALID_STATUS.has(params.status as FixtureStatus)
-          ? { status: params.status as FixtureStatus }
-          : {}),
-        ...(params.team !== undefined && params.team !== "" ? { teamId: params.team } : {}),
-        ...(params.ground !== undefined && params.ground !== "" ? { groundId: params.ground } : {}),
-        ...(params.q !== undefined && params.q !== "" ? { search: params.q } : {}),
-        sort: (VALID_SORT.has(params.sort as FixtureSort) ? params.sort : "kickoff") as FixtureSort,
-        page: Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1,
-        pageSize: PAGE_SIZE,
-      }),
-      teamsOf(db, competition.id),
-      canManage ? activeGroundsOf(db, competition.orgId) : Promise.resolve(undefined),
-      canManage ? competitionConflicts(db, competition) : Promise.resolve(undefined),
-      resultsOf(db, competition.id),
-    ]);
+    const [orgSlug, stats, page, teamList, groundList, conflicts, resultMap, next] =
+      await Promise.all([
+        orgSlugOf(db, competition.orgId),
+        fixtureStats(db, competition.id, visible),
+        queryFixtures(db, competition.id, {
+          ...(visible !== undefined ? { visible } : {}),
+          ...(params.status !== undefined && VALID_STATUS.has(params.status as FixtureStatus)
+            ? { status: params.status as FixtureStatus }
+            : {}),
+          ...(params.team !== undefined && params.team !== "" ? { teamId: params.team } : {}),
+          ...(params.ground !== undefined && params.ground !== ""
+            ? { groundId: params.ground }
+            : {}),
+          ...(params.q !== undefined && params.q !== "" ? { search: params.q } : {}),
+          sort: (VALID_SORT.has(params.sort as FixtureSort)
+            ? params.sort
+            : "kickoff") as FixtureSort,
+          page: Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1,
+          pageSize: PAGE_SIZE,
+        }),
+        teamsOf(db, competition.id),
+        canManage ? activeGroundsOf(db, competition.orgId) : Promise.resolve(undefined),
+        canManage ? competitionConflicts(db, competition) : Promise.resolve(undefined),
+        resultsOf(db, competition.id),
+        nextFixture(db, competition.id, nowWallClock(), visible),
+      ]);
     return {
       competition,
       orgSlug,
       stats,
       page,
+      next,
       teams: teamList,
       ...(groundList !== undefined ? { grounds: groundList } : {}),
       ...(conflicts !== undefined ? { conflicts } : {}),
@@ -464,6 +476,9 @@ export async function generateFixturesAction(
   if (!result.ok) {
     if (result.reason === "conflicts") {
       return { ok: false, error: conflictMessages(result.conflicts) };
+    }
+    if (result.reason === "outside_window") {
+      return { ok: false, error: outsideWindowMessage(result) };
     }
     return { ok: false, error: GENERATE_ERROR[result.reason] ?? "Could not generate." };
   }
@@ -638,9 +653,16 @@ export async function previewGenerationAction(
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     previewGeneration(db, gate.competition, input),
   );
-  return result.ok
-    ? { ok: true, preview: result.preview }
-    : { ok: false, error: GENERATE_ERROR[result.reason] ?? "Could not plan a schedule." };
+  if (result.ok) {
+    return { ok: true, preview: result.preview };
+  }
+  return {
+    ok: false,
+    error:
+      result.reason === "outside_window"
+        ? outsideWindowMessage(result)
+        : (GENERATE_ERROR[result.reason] ?? "Could not plan a schedule."),
+  };
 }
 
 export async function fixtureTimelineAction(
@@ -859,6 +881,8 @@ export async function exportFixturesAction(
 export interface StandingsPageView {
   readonly competition: CompetitionSummary;
   readonly standings: StandingsView;
+  /** Colour and crest per team, for the table's team tiles. */
+  readonly teams: readonly TeamSummary[];
   readonly viewer: { canManage: boolean };
 }
 
@@ -882,7 +906,9 @@ export async function standingsView(slug: string): Promise<StandingsPageView | n
       ),
       standingsOf(db, competition.id),
     ]);
-    return { competition, standings, viewer: { canManage } };
+    // The teams' colours and crests, for the table's team tiles.
+    const teams = await teamsOf(db, competition.id);
+    return { competition, standings, teams, viewer: { canManage } };
   });
 }
 

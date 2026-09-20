@@ -35,10 +35,22 @@ try {
 //
 // PLAYWRIGHT_PRECOMPILED=1 swaps `next dev` for a `next build` + `next start`
 // server. This is the actual fix for the memory-threshold restarts documented
-// below — a comment here used to say "CI keeps Playwright's default
-// (pre-compiled service containers)", which was never true: there is no e2e
-// step in CI at all, so nothing has ever run this suite against a compiled
-// server. That claim is retracted; this flag is what makes it possible to.
+// below.
+//
+// TWO RETRACTIONS, AND THE SECOND ONE IS THIS COMMENT'S OWN.
+//
+// It used to claim CI "keeps Playwright's default (pre-compiled service
+// containers)", which was never true. The correction then over-swung to "there
+// is no e2e step in CI at all, so nothing has ever run this suite against a
+// compiled server" — and that is no longer true either. `.github/workflows/
+// ci.yml` has an `e2e` job that migrates, seeds, builds and runs the whole
+// suite, with PLAYWRIGHT_PRECOMPILED=1 and NEXT_DIST_DIR=.next-e2e as
+// JOB-level env. It runs exactly the path described here, on every PR.
+//
+// The give-away was inside this same block: the paragraph below already says
+// "CI has never had either problem: its e2e job supplies …", which cannot be
+// true of a job that does not exist. A comment arguing with itself is how a
+// stale claim survives the rewrite that should have caught it.
 //
 // Run it with:
 //   cd apps/web

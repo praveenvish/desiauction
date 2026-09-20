@@ -568,6 +568,13 @@
       "when": 1790697600000,
       "tag": "0081_message_outbox_whatsapp",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1790784000000,
+      "tag": "0082_competition_cover",
+      "breakpoints": true
     }
   ]
 }

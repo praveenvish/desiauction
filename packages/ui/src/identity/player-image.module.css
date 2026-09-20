@@ -7,8 +7,29 @@
   flex-shrink: 0;
 }
 
+.fluid {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .round {
   border-radius: var(--radius-full);
+}
+
+/* The team ring (`ring`): drawn OVER the photo or the mark, inside the frame,
+   so it never changes the box (zero layout shift holds) and a photo cannot
+   paint over it. */
+.ringed::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 var(--pi-ring, 2px) var(--pi-team),
+    inset 0 0 0 calc(var(--pi-ring, 2px) + 1px)
+      color-mix(in srgb, var(--identity-field-deep) 45%, transparent);
+  pointer-events: none;
 }
 
 .photo {

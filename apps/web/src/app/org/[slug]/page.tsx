@@ -1,14 +1,24 @@
 import {
-  Badge,
+  AnnouncerProvider,
   ButtonLink,
   Card,
-  Stat,
-  StatRow,
-  AnnouncerProvider,
+  CardGrid,
+  IconArrowRight,
+  IconBolt,
+  IconBroadcast,
+  IconCalendar,
+  IconCheck,
+  IconChevronRight,
+  IconShieldCheck,
+  IconTile,
+  IconTrophy,
+  IconUsers,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
   ToastProvider,
   VisuallyHidden,
-  IconArrowRight,
-  IconCheck,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { enabledSports } from "../../../server/competition/sports";
@@ -17,6 +27,7 @@ import type { ReactNode } from "react";
 
 import { FormDialog } from "../../../components/form-dialog";
 import { PageTitle } from "../../../components/shell/page-title";
+import { activityLabel as feedLabel, activityStyle } from "../../home/home-activity";
 import { AboutBanner } from "./about-banner";
 import { OrgTabs } from "./org-tabs";
 import { financeAuthority } from "../../../server/financial-operations/actions";
@@ -81,37 +92,10 @@ const ACTIVITY_PHRASE: Record<string, string> = {
   "finops.document": "Document issued",
 };
 
-/** Internal domain words the organizer never calls by that name. */
-const ACTIVITY_DOMAIN: Record<string, string> = {
-  finops: "Finance",
-  competition: "Season",
-  grant: "Access",
-};
-
+/** The org's own words first; everything else reads as /home's feed does. */
 function activityLabel(action: string): string {
-  const phrase = ACTIVITY_PHRASE[action];
-  if (phrase !== undefined) return phrase;
-  const [domain, ...rest] = action.split(".");
-  const tail = rest
-    .join(" ")
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_.-]/g, " ")
-    .toLowerCase();
-  const named =
-    ACTIVITY_DOMAIN[domain ?? ""] ??
-    (domain ?? action).charAt(0).toUpperCase() + (domain ?? action).slice(1);
-  return tail === "" ? named : `${named} ${tail}`;
+  return ACTIVITY_PHRASE[action] ?? feedLabel(action);
 }
-
-const ACTIVITY_TONE: Record<string, string> = {
-  competition: "green",
-  tournament: "accent",
-  grant: "info",
-  org: "info",
-  settlement: "violet",
-  payment: "violet",
-  auction: "accent",
-};
 
 function ago(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -132,18 +116,19 @@ function ago(iso: string): string {
  * directory (orgOverview gates them); everyone else still gets the event.
  */
 function ActivityRow({ row }: { row: OrgActivityRow }) {
-  const tone = ACTIVITY_TONE[row.action.split(".")[0] ?? ""] ?? "muted";
+  const style = activityStyle(row.action);
   const who = [
     row.subjectName === null ? null : row.subjectName,
     row.actorName === null ? null : `by ${row.actorName}`,
   ].filter((part): part is string => part !== null);
   return (
     <li className="od-activity-row">
-      <span className={`od-dot od-dot--${tone}`} aria-hidden />
+      <IconTile icon={style.icon} tone={style.tone} size="sm" />
       <span className="od-activity-text">
         <strong>{activityLabel(row.action)}</strong>
-        <span>{[...who, ago(row.at)].join(" · ")}</span>
+        {who.length > 0 ? <span>{who.join(" · ")}</span> : null}
       </span>
+      <span className="od-activity-time">{ago(row.at)}</span>
     </li>
   );
 }
@@ -426,6 +411,26 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   // the same reason: rungs complete out of order.
   const laddering = canManageOrg && currentRung !== -1 && !(rungs[rungs.length - 1]?.done ?? false);
 
+  const tournamentsCard = (hint?: string) => (
+    <StatCard
+      icon={<IconTrophy />}
+      tone="gold"
+      value={stats.tournaments}
+      label={plural(stats.tournaments, "Tournament")}
+      {...(hint !== undefined ? { hint } : {})}
+      href="#tournaments"
+    />
+  );
+  const seasonsCard = (
+    <StatCard
+      icon={<IconCalendar />}
+      tone="blue"
+      value={stats.seasons}
+      label={plural(stats.seasons, "Season")}
+      href="#tournaments"
+    />
+  );
+
   const overviewTab: ReactNode = (
     <div className="od-overview">
       {overview !== null ? (
@@ -446,60 +451,74 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       {/* Seasons lead when every season is a one-off: "0 Tournaments" as the
           first tile above a live season read as an empty club — the same
           confusion /tournaments defuses with its "one-off" hint. */}
-      <StatRow label="Organization at a glance">
+      <StatGrid testId="org-stats">
         {stats.tournaments === 0 && stats.seasons > 0 ? (
           <>
-            <Stat label={plural(stats.seasons, "Season")} value={stats.seasons} />
-            <Stat
-              label={plural(stats.tournaments, "Tournament")}
-              value={stats.tournaments}
-              hint="Your seasons are one-offs"
-            />
+            {seasonsCard}
+            {tournamentsCard("Your seasons are one-offs")}
           </>
         ) : (
           <>
-            <Stat label={plural(stats.tournaments, "Tournament")} value={stats.tournaments} />
-            <Stat label={plural(stats.seasons, "Season")} value={stats.seasons} />
+            {tournamentsCard()}
+            {seasonsCard}
           </>
         )}
-        <Stat label={plural(stats.members, "Member")} value={stats.members} />
-        <Stat label={`Active ${plural(stats.teams, "team")}`} value={stats.teams} />
-      </StatRow>
+        <StatCard
+          icon={<IconUsers />}
+          tone="green"
+          value={stats.members}
+          label={plural(stats.members, "Member")}
+          href="#members"
+        />
+        <StatCard
+          icon={<IconShieldCheck />}
+          tone="purple"
+          value={stats.teams}
+          label={`Active ${plural(stats.teams, "team")}`}
+          hint="Across every season"
+        />
+      </StatGrid>
 
-      <div className="od-grid">
-        <Card className="od-panel">
-          <div className="od-panel-head">
-            <h2>Live &amp; open now</h2>
-            <Link href={`/org/${slug}#tournaments`}>
+      <CardGrid>
+        <SectionCard
+          icon={<IconBroadcast />}
+          tone="red"
+          title="Live & open now"
+          action={
+            <Link href={`/org/${slug}#tournaments`} className="od-more">
               All tournaments
-              <IconArrowRight size={16} className="icon-trail" />
+              <IconArrowRight size={14} />
             </Link>
-          </div>
+          }
+        >
           {liveOpen.length === 0 ? (
-            <p className="competitions-hint">Nothing live or taking entries right now.</p>
+            <p className="od-empty">Nothing live or taking entries right now.</p>
           ) : (
             <ul className="od-live-list">
               {liveOpen.map((row) => (
                 <li key={row.key}>
                   <Link href={`/seasons/${row.slug}`} className="od-live-row">
                     <span className="od-live-name">{row.name}</span>
-                    <Badge tone={row.tone === "live" ? "success" : "success"}>
-                      {row.tone === "live" ? "Live" : "Open"}
-                    </Badge>
+                    {row.tone === "live" ? (
+                      <Pill tone="red" dot>
+                        Live
+                      </Pill>
+                    ) : (
+                      <Pill tone="blue">Registration open</Pill>
+                    )}
                     <span className="od-live-go" aria-hidden>
-                      <IconArrowRight size={16} aria-hidden />
+                      <IconChevronRight size={18} />
                     </span>
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </SectionCard>
 
-        <Card className="od-panel">
-          <h2>Recent activity</h2>
+        <SectionCard icon={<IconBolt />} tone="purple" title="Recent activity">
           {overview === null || overview.activity.length === 0 ? (
-            <p className="competitions-hint">No activity recorded yet.</p>
+            <p className="od-empty">No activity recorded yet.</p>
           ) : (
             <ul className="od-activity-list">
               {overview.activity.map((row) => (
@@ -507,8 +526,8 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
               ))}
             </ul>
           )}
-        </Card>
-      </div>
+        </SectionCard>
+      </CardGrid>
     </div>
   );
 
@@ -662,7 +681,11 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
               </span>
               <div className="od-hero-id">
                 <div className="od-hero-title">
-                  {overview !== null ? <Badge tone="info">{overview.role}</Badge> : null}
+                  {overview !== null ? (
+                    <Pill tone={overview.role === "Owner" ? "gold" : "neutral"}>
+                      {overview.role}
+                    </Pill>
+                  ) : null}
                 </div>
                 <p className="od-hero-meta">
                   {established === null ? null : <span>Est. {established}</span>}

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { env } from "../../env";
 import { RELEASES } from "../../content/releases";
 import { slugify } from "../../lib/slug";
+import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -14,19 +15,27 @@ export const metadata: Metadata = {
 /** PX-10 §5 — release notes and version. Factual history, public, no auth. */
 export default function ReleasesPage() {
   return (
-    <main className="content-page content-narrow">
-      <h1>Release notes</h1>
-      <p className="content-lead">
-        {/* Same guard as /support: APP_VERSION defaults to "dev", which is a
+    <ContentPage
+      eyebrow="What's new"
+      title={
+        <>
+          Release <em>notes</em>
+        </>
+      }
+      lede={
+        <>
+          {/* Same guard as /support: APP_VERSION defaults to "dev", which is a
             developer string, not a version a reader should ever meet. */}
-        What each update delivered.
-        {env.APP_VERSION !== "dev" ? (
-          <>
-            {" "}
-            Running version <code>{env.APP_VERSION}</code>.
-          </>
-        ) : null}
-      </p>
+          What each update delivered.
+          {env.APP_VERSION !== "dev" ? (
+            <>
+              {" "}
+              Running version <code>{env.APP_VERSION}</code>.
+            </>
+          ) : null}
+        </>
+      }
+    >
       {RELEASES.map((release) => {
         const releaseId = `release-${slugify(release.version)}`;
         return (
@@ -43,6 +52,6 @@ export default function ReleasesPage() {
           </section>
         );
       })}
-    </main>
+    </ContentPage>
   );
 }

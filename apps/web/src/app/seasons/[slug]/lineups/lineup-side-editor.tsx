@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Dialog } from "@desiauction/ui";
+import { Button, Dialog, Pill, PlayerImage, TeamChip } from "@desiauction/ui";
 import { useState, useTransition } from "react";
 
 import {
@@ -85,78 +85,100 @@ export function LineupSideEditor({
 
   const headingId = `lineup-${side.teamId}`;
   return (
-    <section className="lineups-side" aria-labelledby={headingId} data-testid="lineup-side">
-      <header className="lineups-side-head">
-        <h3 id={headingId}>{side.teamName}</h3>
-        <span className="lineups-count">
-          {picked.size} of {side.players.length} picked
+    <section className="lu-side" aria-labelledby={headingId} data-testid="lineup-side">
+      <header className="lu-side-head">
+        <h3 id={headingId} className="lu-side-title">
+          <TeamChip color={side.teamColor}>{side.teamName}</TeamChip>
+        </h3>
+        <span className="lu-count">
+          <strong>{picked.size}</strong> of {side.players.length} played
         </span>
       </header>
       {side.players.length === 0 ? (
-        <p className="lineups-side-empty">
+        <p className="st-note lu-side-empty">
           No approved players on this team yet — the squad fills on auction night.
         </p>
       ) : (
-        <ul className="lineups-players">
+        <ul className="lu-players">
           {side.players.map((player) => {
             const id = `pick-${side.teamId}-${player.registrationId}`;
+            const on = picked.has(player.registrationId);
             return (
-              <li key={player.registrationId}>
+              <li key={player.registrationId} data-played={on ? "true" : "false"}>
                 <input
                   id={id}
                   type="checkbox"
-                  checked={picked.has(player.registrationId)}
+                  checked={on}
                   onChange={() => {
                     toggle(player.registrationId);
                   }}
                 />
                 <label htmlFor={id}>
-                  <span className="lineups-player-name">{player.name}</span>
-                  {player.isCaptain ? <span className="lineups-captain">Captain</span> : null}
-                  {player.role !== null ? (
-                    <span className="lineups-player-role">{player.role}</span>
-                  ) : null}
+                  <PlayerImage
+                    name={player.name}
+                    seed={player.registrationId}
+                    src={player.photoUrl}
+                    size="sm"
+                    shape="round"
+                    decorative
+                    {...(side.teamColor !== null ? { teamColor: side.teamColor } : {})}
+                  />
+                  <span className="lu-player-text">
+                    <span className="lu-player-name">
+                      {player.name}
+                      {player.isCaptain ? (
+                        <span className="lu-captain" title="Captain">
+                          C
+                        </span>
+                      ) : null}
+                    </span>
+                    {player.role !== null ? <span className="st-sub">{player.role}</span> : null}
+                  </span>
+                  <Pill tone={on ? "green" : "neutral"}>{on ? "Played" : "Bench"}</Pill>
                 </label>
               </li>
             );
           })}
         </ul>
       )}
-      <footer className="lineups-side-foot">
+      <footer className="lu-side-foot">
         <span
-          className={`lineups-status${status?.tone === "error" ? " lineups-status--error" : ""}`}
+          className="lu-status-text"
+          data-tone={status?.tone === "error" ? "error" : undefined}
           role="status"
         >
           {status?.text ?? (side.recorded ? "" : "Not recorded yet")}
         </span>
-        {/* Secondary: two sides means two of these on one screen, and one ink
-            button per screen is the console's rule. */}
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={save}
-          loading={pending}
-          disabled={side.players.length === 0}
-          data-testid="lineup-save"
-        >
-          Save {side.teamName} lineup
-        </Button>
-        {/* Only before the match, only once something is saved, and only for
-            players not told yet. A lineup recorded afterwards tells nobody. */}
-        {announce?.upcoming === true && announce.pending > 0 ? (
+        <span className="lu-side-actions">
+          {/* Secondary: two sides means two of these on one screen, and one gold
+              button per screen is the console's rule. */}
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => {
-              setConfirming(true);
-            }}
-            disabled={unsaved || pending}
-            title={unsaved ? "Save the lineup first" : undefined}
-            data-testid="lineup-announce"
+            onClick={save}
+            loading={pending}
+            disabled={side.players.length === 0}
+            data-testid="lineup-save"
           >
-            Announce to {players(announce.pending)}
+            Save {side.teamName} lineup
           </Button>
-        ) : null}
+          {/* Only before the match, only once something is saved, and only for
+              players not told yet. A lineup recorded afterwards tells nobody. */}
+          {announce?.upcoming === true && announce.pending > 0 ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setConfirming(true);
+              }}
+              disabled={unsaved || pending}
+              title={unsaved ? "Save the lineup first" : undefined}
+              data-testid="lineup-announce"
+            >
+              Announce to {players(announce.pending)}
+            </Button>
+          ) : null}
+        </span>
       </footer>
       {announce !== undefined ? (
         <Dialog
@@ -185,7 +207,7 @@ export function LineupSideEditor({
             </>
           }
         >
-          <p className="lineups-note">
+          <p className="st-note">
             {players(announce.pending)} in the saved lineup will be told they are playing — in their
             inbox, by email and by text. Anyone you take out later is not messaged.
           </p>

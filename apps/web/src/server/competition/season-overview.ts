@@ -43,6 +43,12 @@ export interface SeasonTeamSpend {
   squad: number;
   /** Squad max; money-adjacent auction configuration, gated with the spend. */
   squadMax?: number | null;
+  /**
+   * The purse each team was given for the auction, in paise — the scale the
+   * spend bar reads against ("100%" is a team that spent it all). Money-gated
+   * with the spend; absent before an auction exists.
+   */
+  purse?: number;
 }
 
 export interface SeasonRoleCount {
@@ -79,6 +85,11 @@ export interface SeasonOverview {
    * both shows the mark and offers to change it.
    */
   logoUrl: string | null;
+  /**
+   * The season's wide cover photo (0082), resolved the same way — the hero
+   * banner's picture. Null → the designed floodlight gradient.
+   */
+  coverUrl: string | null;
   approvedPlayers: number;
   /**
    * Applications waiting on a human. The overview used to report only the
@@ -94,6 +105,13 @@ export interface SeasonOverview {
   purseCommitted?: number;
   /** 0–100, or null when no auction (and so no purse) is configured. Money-gated. */
   pursePct?: number | null;
+  /**
+   * The auction's purse per team and squad cap — the figures a season's hero
+   * card states. Null before an auction exists. Money-gated with the spend: the
+   * squad cap is auction configuration and travels with it (see `squadMax`).
+   */
+  pursePerTeam?: number | null;
+  squadCap?: number | null;
   lotsSold: number;
   lotsTotal: number;
   auctionLive: boolean;
@@ -131,6 +149,7 @@ export async function seasonOverview(
         orgName: organizations.name,
         orgSlug: organizations.slug,
         logoKey: competitions.logoUrl,
+        coverKey: competitions.coverUrl,
       })
       .from(competitions)
       .innerJoin(organizations, eq(organizations.id, competitions.orgId))
@@ -158,11 +177,13 @@ export async function seasonOverview(
   ]);
 
   const logoKey = head[0]?.logoKey ?? null;
+  const coverKey = head[0]?.coverKey ?? null;
   const base = {
     competition,
     orgName: head[0]?.orgName ?? "",
     orgSlug: head[0]?.orgSlug ?? "",
     logoUrl: logoKey === null ? null : storage.readUrl(logoKey),
+    coverUrl: coverKey === null ? null : storage.readUrl(coverKey),
     approvedPlayers: stats.approved,
     pendingPlayers: stats.submitted,
     teamCount: teams.length,
@@ -178,7 +199,9 @@ export async function seasonOverview(
     // No auction yet — the tiles that describe one stay honestly empty.
     return {
       ...base,
-      ...(options.money ? { purseCommitted: 0, pursePct: null } : {}),
+      ...(options.money
+        ? { purseCommitted: 0, pursePct: null, pursePerTeam: null, squadCap: null }
+        : {}),
       lotsSold: 0,
       lotsTotal: 0,
       auctionLive: false,
@@ -196,7 +219,7 @@ export async function seasonOverview(
   const rules = rulesOf(auction.config);
   const [lots, preSigned] = await Promise.all([
     resolvedLots(db, auction.id),
-    preSignedPlayers(db, competition.id),
+    preSignedPlayers(db, competition.id, (key) => storage.readUrl(key)),
   ]);
 
   // Fold the sold lots into per-team spend and squad counts. Icons and retained
@@ -232,6 +255,8 @@ export async function seasonOverview(
       ? {
           purseCommitted,
           pursePct: purseTotal > 0 ? Math.round((purseCommitted / purseTotal) * 100) : null,
+          pursePerTeam: rules.pursePerTeam,
+          squadCap: rules.squadMax,
         }
       : {}),
     lotsSold: lots.filter((lot) => lot.status === "sold").length,
@@ -246,7 +271,9 @@ export async function seasonOverview(
           name: team.name,
           color: team.primaryColor,
           squad: entry?.squad ?? 0,
-          ...(options.money ? { spend: entry?.spend ?? 0, squadMax: rules.squadMax } : {}),
+          ...(options.money
+            ? { spend: entry?.spend ?? 0, squadMax: rules.squadMax, purse: rules.pursePerTeam }
+            : {}),
         };
       })
       // Without money sight there is no spend to rank by, so the list is

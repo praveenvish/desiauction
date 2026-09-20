@@ -43,7 +43,14 @@ import {
   type AuctionSetupInput,
   type SquadFeasibility,
 } from "./auction-setup";
-import { rulesOf, type AuctionRules } from "./live-summary";
+import {
+  lotMediaOf,
+  registrationPhotosOf,
+  rulesOf,
+  type AuctionRules,
+  type LotMedia,
+} from "./live-summary";
+import { storage } from "../media";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
 import { auctionOverview, type AuctionOverview } from "./auction-overview";
 
@@ -235,6 +242,20 @@ export interface AuctionDashboard {
   /** The operational dashboard: progress, block, burndown, queue, log. */
   overview: AuctionOverview | null;
   /**
+   * Every lot's face, keyed by LOT id — the live room's `lotMedia`, same shape
+   * and same rule (consent AND age): `photoUrl` (null → draw the mark),
+   * `registrationId` (the mark's seed — lib/player-seed `lotSeed`) and the
+   * registration `number`. Empty before the auction exists.
+   */
+  lotMedia: Record<string, LotMedia>;
+  /**
+   * The approved pool's faces, keyed by REGISTRATION id, for the setup screens
+   * that list players before any lot exists (`ready.pool`). Only players with a
+   * showable photo are present; an absent key means the branded mark, seeded
+   * by that same registration id.
+   */
+  poolPhotos: Record<string, string>;
+  /**
    * The owner road per team — invites, who accepted, grants, claims — for the
    * setup checklist. The cockpit's own read, served here too so the organizer
    * sets the night up on one page. Conductors only (it carries owner phones);
@@ -308,21 +329,26 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     overview,
     feasibility,
     owners,
+    lotMedia,
+    poolPhotos,
   } = await inCompetitionOrg(session.personId, competition, async (db) => {
-    const [readyProjection, auction, conduct, manage, review, ownTeams] = await Promise.all([
-      auctionReady(db, competition),
-      requireAuction(db, competition.id),
-      canCompetition(db, session.personId, scope, "auction.conduct"),
-      canCompetition(db, session.personId, scope, "competition.manage"),
-      // The organizer half of the poster gate. Evaluated rather than inferred
-      // from `conduct || manage`, because the studio was shipped with no link
-      // from anywhere in the product and the first link to it must not lead
-      // some of its holders to a 403 — nor hide the door from `org:staff`,
-      // who hold `registration.review` without holding either of the other
-      // two. The owner half is below.
-      canCompetition(db, session.personId, scope, "registration.review"),
-      ownedTeamIdsOn(db, session.personId, competition.id),
-    ]);
+    const [readyProjection, auction, conduct, manage, review, ownTeams, photos] = await Promise.all(
+      [
+        auctionReady(db, competition),
+        requireAuction(db, competition.id),
+        canCompetition(db, session.personId, scope, "auction.conduct"),
+        canCompetition(db, session.personId, scope, "competition.manage"),
+        // The organizer half of the poster gate. Evaluated rather than inferred
+        // from `conduct || manage`, because the studio was shipped with no link
+        // from anywhere in the product and the first link to it must not lead
+        // some of its holders to a 403 — nor hide the door from `org:staff`,
+        // who hold `registration.review` without holding either of the other
+        // two. The owner half is below.
+        canCompetition(db, session.personId, scope, "registration.review"),
+        ownedTeamIdsOn(db, session.personId, competition.id),
+        registrationPhotosOf(db, competition.id, (key) => storage.readUrl(key)),
+      ],
+    );
     // DA-30: running the night, or running the season. Nothing else sees a
     // rival's remaining purse — least of all a team owner, whom
     // `acceptOwnerJoin` made a member of this very org.
@@ -359,7 +385,13 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
       overview:
         auction === null
           ? null
-          : await auctionOverview(db, auction.id, auction.config, competition.sport, { money }),
+          : await auctionOverview(db, auction.id, auction.config, competition.sport, {
+              money,
+              readUrl: (key) => storage.readUrl(key),
+            }),
+      lotMedia:
+        auction === null ? {} : await lotMediaOf(db, auction.id, (key) => storage.readUrl(key)),
+      poolPhotos: photos,
       owners:
         auction === null || !conduct
           ? null
@@ -381,6 +413,8 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     feasibility,
     wsUrl,
     overview,
+    lotMedia,
+    poolPhotos,
     ...(owners === null ? {} : { owners }),
   };
 }

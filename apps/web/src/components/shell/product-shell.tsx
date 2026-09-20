@@ -8,6 +8,7 @@ import {
   IconArrowRight,
   IconBolt,
   IconCalendar,
+  IconChart,
   IconGavel,
   IconGrid,
   IconGlobe,
@@ -18,7 +19,9 @@ import {
   IconHome,
   IconMenu,
   IconRupee,
+  IconSearch,
   IconTrophy,
+  IconUser,
   IconUsers,
   InlineSearch,
   LiveShell,
@@ -40,7 +43,7 @@ import { inboxSeenKey } from "../../lib/inbox-events";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
-import { BrandMark } from "./brand";
+import { BrandMark, BrandWordmark } from "./brand";
 import {
   adminSectionsFor,
   PUBLIC_DESTINATIONS,
@@ -50,6 +53,7 @@ import {
   seasonTabs,
   liveExit,
   navigationFor,
+  phoneBar,
   orgMoneyTabs,
   pageIdentity,
   shellKind,
@@ -212,6 +216,11 @@ const NAV_ICONS: Record<NavIcon, ReactNode> = {
   org: <IconGrid />,
   money: <IconRupee />,
   sports: <IconStar />,
+  // The founder's mockup icons for the three cross-season indexes
+  // (ui/premium-flow, 2026-09-19): a person, a gavel, a chart.
+  player: <IconUser />,
+  gavel: <IconGavel />,
+  chart: <IconChart />,
   find: <IconGlobe />,
   help: <IconHelp />,
   bell: <IconBell />,
@@ -723,7 +732,8 @@ export function ProductShell({
           exitHref={exit.href}
           exitLabel={exit.label}
           linkComponent={Link}
-          brand={<BrandMark size={26} />}
+          brand={<BrandMark size={32} />}
+          wordmark={<BrandWordmark tone="live" />}
           // A spectator arrives with no account and the mark was dead text on
           // the one screen the product is most often shared from.
           brandHref="/"
@@ -753,12 +763,11 @@ export function ProductShell({
     const atLoginGate = pathname === "/login";
     return (
       <PublicShell
-        wordmark={
-          <span className="public-brand-name">
-            Desi<span>Auction</span>
-            <small aria-hidden="true">THE GAME STARTS HERE</small>
-          </span>
-        }
+        // The brand lockup is ONE component with a tone (brand.tsx), not markup
+        // repeated per shell — which is how the header came to render the
+        // wordmark and the tagline jammed on a single line: the inline copy
+        // kept a <small> the stacking CSS no longer had a rule for.
+        wordmark={<BrandWordmark tone="header" />}
         wordmarkHref="/"
         glyph={<BrandMark size={42} />}
         nav={publicNav(pathname)}
@@ -771,20 +780,50 @@ export function ProductShell({
             }
           : {})}
         headerAction={
-          session !== null ? (
-            <Link className="shell-header-cta" href="/home">
-              Open console
-            </Link>
-          ) : atGate ? null : (
-            <>
-              <Link className="shell-header-link" href="/login">
-                Sign in
+          <>
+            {/* Search and the theme switch are the two controls a visitor
+                looks for in a header and had to go to the footer to find.
+                They are hidden at the gates, where the page holds a single
+                decision and every other control is a way to not make it.
+                The search label is "Search", not "Search the site" — the
+                footer already owns that name, and two links with one name
+                break the strict-mode locators that name it. */}
+            {atGate ? null : (
+              <>
+                {/* Desktop only, for now: at 320px the header action row was
+                    4 controls wide and pushed the page 4px past the viewport
+                    (responsive.spec). The phone reaches search through the
+                    footer's "Search the site"; giving the mobile menu both
+                    controls is a change to the shared shell, not to this
+                    header, and belongs in its own pass. */}
+                <Link
+                  className="shell-icon-button shell-desktop-only"
+                  href="/search"
+                  aria-label="Search"
+                  title="Search"
+                >
+                  <IconSearch width={18} height={18} />
+                </Link>
+                <span className="shell-desktop-only">
+                  <ThemeToggle />
+                </span>
+              </>
+            )}
+            {session !== null ? (
+              <Link className="shell-header-cta" href="/home">
+                Open console
               </Link>
-              <Link className="shell-header-cta shell-desktop-only" href="/login">
-                Start free <IconArrowRight width={16} height={16} />
-              </Link>
-            </>
-          )
+            ) : atGate ? null : (
+              <>
+                <Link className="shell-header-link" href="/login">
+                  Sign in
+                </Link>
+                <Link className="shell-header-cta shell-desktop-only" href="/login">
+                  Start free <IconArrowRight width={16} height={16} />
+                </Link>
+              </>
+            )}
+          </>
         }
         footerCompact={atGate}
         contentFill={atLoginGate}
@@ -888,6 +927,13 @@ export function ProductShell({
   }
 
   const nav: ShellNavItem[] = menu.rail.map(toShellItem);
+  /*
+   * The phone's bar is the same menu minus the desk surfaces (`mobile: false`)
+   * and capped at the five columns it has. The rail above is vertical and keeps
+   * everything, which is what the founder's 2026-09-19 mockups assumed when
+   * they asked for seven items on a laptop.
+   */
+  const bottomNav: ShellNavItem[] = phoneBar(menu.rail).map(toShellItem);
 
   // Identity: one derivation for every console route (nav.ts), overridden only
   // where the name is page data the shell cannot hold.
@@ -988,6 +1034,7 @@ export function ProductShell({
       <ShellActionContext.Provider value={actionChannel}>
         <AppShell
           nav={nav}
+          bottomNav={bottomNav}
           navGroups={[
             {
               key: "utility",
@@ -1002,16 +1049,9 @@ export function ProductShell({
             },
           ]}
           linkComponent={Link}
-          // ONE tagline in the sidebar (founder, 2026-09-19): the brand line
-          // "Bid · Build · Win" below; the wordmark carries just the name.
-          wordmark={
-            <span className="public-brand-name">
-              Desi<span>Auction</span>
-            </span>
-          }
+          wordmark={<BrandWordmark tone="rail" />}
           wordmarkHref="/home"
           glyph={<BrandMark size={32} />}
-          tagline="Bid · Build · Win"
           {...(title !== null ? { pageTitle: title } : {})}
           {...(titleTestId !== undefined ? { pageTitleAttrs: { "data-testid": titleTestId } } : {})}
           {...(identity.crumbs.length > 0

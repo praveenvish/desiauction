@@ -295,15 +295,86 @@ export interface GenerateInput {
   kickoffTimes: readonly string[];
   groundIds: readonly string[];
   durationMinutes: number;
+  /** Fill each day's slots across rounds (see core `GeneratePlanInput.pack`). */
+  pack?: boolean;
+  /** With `pack`: most matches one team plays in a day; null = no limit. */
+  maxPerTeamPerDay?: number | null;
+}
+
+/** The planner's input from the organizer's, forwarding the packing options only when set. */
+function planInputOf(teamIds: string[], input: GenerateInput): GeneratePlanInput {
+  return {
+    teamIds,
+    rounds: input.rounds,
+    startDate: input.startDate,
+    kickoffTimes: input.kickoffTimes,
+    groundIds: input.groundIds,
+    durationMinutes: input.durationMinutes,
+    ...(input.pack === true ? { pack: true } : {}),
+    ...(input.maxPerTeamPerDay !== undefined ? { maxPerTeamPerDay: input.maxPerTeamPerDay } : {}),
+  };
+}
+
+/**
+ * The plan runs past the season's own dates. Refused BEFORE the conflict pass,
+ * which would otherwise report every candidate as "(Unknown fixture) — date is
+ * outside the competition window": true, unreadable, and no hint what to change.
+ */
+export interface OutsideWindow {
+  ok: false;
+  reason: "outside_window";
+  startsOn: string | null;
+  endsOn: string | null;
+  firstDate: string;
+  lastDate: string;
+  /** Match days the plan needs at the chosen kickoffs × grounds. */
+  daysNeeded: number;
+  /** Fixtures one match day can hold (kickoff times × grounds). */
+  perDay: number;
 }
 
 export type GenerateResult =
   | { ok: true; created: number }
   | ConflictRefusal
+  | OutsideWindow
   | {
       ok: false;
       reason: "fixtures_exist" | "unknown_ground" | GeneratePlanResultError;
     };
+
+/** The first plan date before the season starts, or the last after it ends. */
+function outsideWindow(
+  competition: CompetitionSummary,
+  planned: readonly { kickoffAt: string }[],
+): OutsideWindow | null {
+  const dates = planned.map((f) => f.kickoffAt.slice(0, 10)).sort();
+  const firstDate = dates[0];
+  const lastDate = dates[dates.length - 1];
+  if (firstDate === undefined || lastDate === undefined) {
+    return null;
+  }
+  const early = competition.startsOn !== null && firstDate < competition.startsOn;
+  const late = competition.endsOn !== null && lastDate > competition.endsOn;
+  if (!early && !late) {
+    return null;
+  }
+  return {
+    ok: false,
+    reason: "outside_window",
+    startsOn: competition.startsOn,
+    endsOn: competition.endsOn,
+    firstDate,
+    lastDate,
+    daysNeeded: new Set(dates).size,
+    // The busiest day the plan actually has — the per-team cap and the
+    // round-per-day rule can hold a day below kickoffs × grounds.
+    perDay: Math.max(
+      ...[
+        ...dates.reduce((acc, d) => acc.set(d, (acc.get(d) ?? 0) + 1), new Map<string, number>()),
+      ].map(([, n]) => n),
+    ),
+  };
+}
 
 type GeneratePlanResultError =
   | "too_few_teams"
@@ -353,17 +424,18 @@ export async function generateFixtures(
       return { ok: false, reason: "unknown_ground" };
     }
   }
-  const planInput: GeneratePlanInput = {
-    teamIds: teamRows.map((t) => t.id),
-    rounds: input.rounds,
-    startDate: input.startDate,
-    kickoffTimes: input.kickoffTimes,
-    groundIds: input.groundIds,
-    durationMinutes: input.durationMinutes,
-  };
-  const plan = planRoundRobin(planInput);
+  const plan = planRoundRobin(
+    planInputOf(
+      teamRows.map((t) => t.id),
+      input,
+    ),
+  );
   if (!plan.ok) {
     return { ok: false, reason: plan.reason };
+  }
+  const miss = outsideWindow(competition, plan.fixtures);
+  if (miss !== null) {
+    return miss;
   }
 
   const baseSeq = await nextSeq(db, competition.id);
@@ -434,6 +506,7 @@ export interface GeneratePreview {
 
 export type GeneratePreviewResult =
   | { ok: true; preview: GeneratePreview }
+  | OutsideWindow
   | { ok: false; reason: "fixtures_exist" | GeneratePlanResultError };
 
 /**
@@ -460,16 +533,20 @@ export async function previewGeneration(
     .from(teams)
     .where(eq(teams.competitionId, competition.id))
     .orderBy(asc(teams.name), asc(teams.id));
-  const plan = planRoundRobin({
-    teamIds: teamRows.map((t) => t.id),
-    rounds: input.rounds,
-    startDate: input.startDate,
-    kickoffTimes: input.kickoffTimes,
-    groundIds: input.groundIds,
-    durationMinutes: input.durationMinutes,
-  });
+  const plan = planRoundRobin(
+    planInputOf(
+      teamRows.map((t) => t.id),
+      input,
+    ),
+  );
   if (!plan.ok) {
     return { ok: false, reason: plan.reason };
+  }
+  // The preview says what the confirm would refuse, so the organizer fixes it
+  // here rather than after pressing "Generate".
+  const miss = outsideWindow(competition, plan.fixtures);
+  if (miss !== null) {
+    return miss;
   }
   const dates = plan.fixtures.map((f) => f.kickoffAt.slice(0, 10)).sort();
   return {

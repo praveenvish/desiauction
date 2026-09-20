@@ -167,6 +167,12 @@ export interface FixtureStats {
    * schedule, so they are counted where the schedule is.
    */
   rounds: number;
+  /**
+   * How many distinct venues, and grounds, the schedule plays at — cancelled
+   * matches aside, since a match that is off books nowhere.
+   */
+  venues: number;
+  grounds: number;
 }
 
 export async function fixtureStats(
@@ -178,7 +184,7 @@ export async function fixtureStats(
     eq(fixtures.competitionId, competitionId),
     ...(visible === undefined ? [] : [inArray(fixtures.status, [...visible])]),
   );
-  const [rows, [roundRow]] = await Promise.all([
+  const [rows, [roundRow], [placeRow]] = await Promise.all([
     db
       .select({ status: fixtures.status, count: sql<number>`count(*)::int` })
       .from(fixtures)
@@ -188,6 +194,14 @@ export async function fixtureStats(
       .select({ max: sql<number>`coalesce(max(${fixtures.round}), 0)::int` })
       .from(fixtures)
       .where(scope),
+    db
+      .select({
+        venues: sql<number>`count(distinct ${grounds.venueId})::int`,
+        grounds: sql<number>`count(distinct ${fixtures.groundId})::int`,
+      })
+      .from(fixtures)
+      .innerJoin(grounds, eq(grounds.id, fixtures.groundId))
+      .where(and(scope, sql`${fixtures.status} <> 'cancelled'`)),
   ]);
   const stats: FixtureStats = {
     total: 0,
@@ -198,8 +212,10 @@ export async function fixtureStats(
     completed: 0,
     cancelled: 0,
     rounds: roundRow?.max ?? 0,
+    venues: placeRow?.venues ?? 0,
+    grounds: placeRow?.grounds ?? 0,
   };
-  const keys: Record<FixtureStatus, keyof FixtureStats> = {
+  const keys: Record<FixtureStatus, Exclude<keyof FixtureStats, "venues" | "grounds">> = {
     draft: "draft",
     scheduled: "scheduled",
     published: "published",
@@ -403,6 +419,51 @@ export async function upcomingFixtures(
     .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
     .limit(limit);
   return rows.map(toSnapshot);
+}
+
+/**
+ * The match to look at next, and why: one being played right now; else the
+ * first one still to come; else the earliest one whose kickoff has passed
+ * without it being played — the match an organizer has forgotten to close.
+ * Cancelled and completed matches are never "next".
+ */
+export interface NextFixture {
+  readonly fixture: FixtureSnapshot;
+  readonly state: "live" | "upcoming" | "overdue";
+}
+
+export async function nextFixture(
+  db: Db,
+  competitionId: string,
+  fromKickoff: string,
+  visible?: readonly FixtureStatus[],
+): Promise<NextFixture | null> {
+  const scope = [
+    eq(fixtures.competitionId, competitionId),
+    ...(visible === undefined ? [] : [inArray(fixtures.status, [...visible])]),
+  ];
+  const [live] = await snapshotQuery(db)
+    .where(and(...scope, eq(fixtures.status, "in_progress")))
+    .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
+    .limit(1);
+  if (live !== undefined) {
+    return { fixture: toSnapshot(live), state: "live" };
+  }
+  const [upcoming] = await upcomingFixtures(db, competitionId, fromKickoff, visible, 1);
+  if (upcoming !== undefined) {
+    return { fixture: upcoming, state: "upcoming" };
+  }
+  const [overdue] = await snapshotQuery(db)
+    .where(
+      and(
+        ...scope,
+        inArray(fixtures.status, ["scheduled", "published"]),
+        lte(fixtures.kickoffAt, fromKickoff),
+      ),
+    )
+    .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
+    .limit(1);
+  return overdue === undefined ? null : { fixture: toSnapshot(overdue), state: "overdue" };
 }
 
 export interface MatchDayGround {

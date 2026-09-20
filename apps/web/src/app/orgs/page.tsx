@@ -1,4 +1,12 @@
-import { Badge, Card, IconArrowRight } from "@desiauction/ui";
+import {
+  Card,
+  IconCalendar,
+  IconChevronRight,
+  IconPlus,
+  IconShieldCheck,
+  IconUsers,
+  Pill,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -115,72 +123,67 @@ export default async function OrgsPage({
           </p>
         ) : null}
 
-        {/* One card holding rows, with the create affordance as the last row —
-            the same shape the tournaments list uses, so the two rail
-            destinations read as one product rather than two. */}
-        <Card padding="none">
-          <div className="org-rows" data-testid="orgs-list">
-            {orgs.map((org) => (
-              <Link
-                key={org.id}
-                href={`/org/${org.slug}`}
-                className="org-row"
-                // The whole row was one link, so its accessible name was the
-                // entire row swallowed into a sentence: "DC Demo Cricket Club
-                // /demo-club 0 tourn 6 teams Owner →". The link is named for
-                // where it GOES; the figures beside it are decoration for
-                // assistive technology, which reads them from nothing.
-                aria-label={`${org.name} — you are ${org.role === "Owner" ? "an owner" : `a ${org.role.toLowerCase()}`}`}
-              >
-                <span className="org-monogram" aria-hidden>
-                  {monogram(org.name)}
-                </span>
-                <span className="org-row-id" aria-hidden>
+        {/* One card per club (founder mockups): the crest, the name and the
+            reader's standing, then the three figures that say how big it is.
+            The create affordance is the last card of the same grid. */}
+        <div className="org-cards" data-testid="orgs-list">
+          {orgs.map((org) => (
+            <Link
+              key={org.id}
+              href={`/org/${org.slug}`}
+              className="org-card"
+              // Named for where it GOES; the figures inside are decoration for
+              // assistive technology (the old row read as one long sentence).
+              aria-label={`${org.name} — you are ${org.role === "Owner" ? "an owner" : `a ${org.role.toLowerCase()}`}`}
+            >
+              <span className="org-card-top" aria-hidden>
+                <span className="org-monogram">{monogram(org.name)}</span>
+                <span className="org-card-id">
                   <strong>{org.name}</strong>
                   <span className="org-slug">/{org.slug}</span>
                 </span>
-                {/* One container so the phone tier can move the whole figure
-                    set below the name — loose flex items can't be forced onto
-                    a second line without crushing the name they sit beside. */}
-                <span className="org-row-meta" aria-hidden>
-                  <span className="org-stat">
-                    <b>{org.seasons}</b> {count(org.seasons, "season")}
-                  </span>
-                  <span className="org-stat">
-                    <b>{org.teams}</b> {count(org.teams, "team")}
-                  </span>
-                  <span className="org-stat">
-                    <b>{org.members}</b> {count(org.members, "member")}
-                  </span>
-                  <span className="org-role">
-                    <Badge tone="neutral">{org.role}</Badge>
-                  </span>
+                <Pill tone={org.role === "Owner" ? "gold" : "neutral"}>{org.role}</Pill>
+              </span>
+              <span className="org-card-figures" aria-hidden>
+                <span className="org-card-figure">
+                  <IconCalendar size={16} />
+                  <b>{org.seasons}</b> {count(org.seasons, "season")}
                 </span>
-                <span className="org-row-go" aria-hidden>
-                  <IconArrowRight size={16} aria-hidden />
+                <span className="org-card-figure">
+                  <IconShieldCheck size={16} />
+                  <b>{org.teams}</b> {count(org.teams, "team")}
                 </span>
-              </Link>
-            ))}
-            {/* The create affordance is the last row of the same list — one
-                click opens the modal rather than scrolling to a pinned card. */}
-            <FormDialog
-              title="New organization"
-              triggerLabel={
-                <>
-                  <span className="org-add-plus" aria-hidden>
-                    +
-                  </span>
-                  Create an organization
-                </>
-              }
-              triggerAsLink
-              triggerClassName="org-row org-row--add"
-              triggerTestId="create-org-row"
-            >
-              <CreateOrgForm />
-            </FormDialog>
-          </div>
-        </Card>
+                <span className="org-card-figure">
+                  <IconUsers size={16} />
+                  <b>{org.members}</b> {count(org.members, "member")}
+                </span>
+                <span className="org-card-go">
+                  <IconChevronRight size={18} />
+                </span>
+              </span>
+            </Link>
+          ))}
+          {/* One click opens the modal rather than scrolling to a pinned card. */}
+          <FormDialog
+            title="New organization"
+            triggerLabel={
+              <>
+                <span className="org-add-plus" aria-hidden>
+                  <IconPlus size={20} />
+                </span>
+                <span className="org-add-text">
+                  <strong>Create an organization</strong>
+                  <span>A club or academy of your own.</span>
+                </span>
+              </>
+            }
+            triggerAsLink
+            triggerClassName="org-card org-card--add"
+            triggerTestId="create-org-row"
+          >
+            <CreateOrgForm />
+          </FormDialog>
+        </div>
       </div>
     </main>
   );

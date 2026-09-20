@@ -1,8 +1,27 @@
+import {
+  IconGavel,
+  IconHelp,
+  IconMessageCircle,
+  IconReceipt,
+  IconSpark,
+  IconTrophy,
+  IconUsers,
+} from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { env } from "../../env";
 import { HELP_ARTICLES, HELP_CATEGORIES, helpArticlesIn } from "../../content/help";
+import {
+  CountChips,
+  PageBody,
+  PageHero,
+  PageSection,
+  SportMontage,
+  TopicCard,
+  TopicGrid,
+} from "../../components/public/public-kit";
 import "../content.css";
 import "../marketing.css";
 
@@ -13,73 +32,134 @@ export const metadata: Metadata = {
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/help` },
 };
 
+type Tone = "gold" | "green" | "blue" | "amber" | "purple" | "neutral";
+
 /**
- * PX-10 P-03 — the Help Centre index (PX-1 05 §8). Card list of the guide
- * categories and every article, plus a search box that submits to the public
- * search. Static, public, no authentication.
+ * A face per category, so a reader scanning six sections has something other
+ * than the heading to recognise. Keyed by the category's own slug — a new
+ * category without an entry gets the neutral question mark rather than
+ * nothing, which is the one thing a card grid cannot survive.
  */
+const CATEGORY_FACE: Record<string, { icon: ReactNode; tone: Tone }> = {
+  "getting-started": { icon: <IconSpark width={20} height={20} />, tone: "gold" },
+  organizer: { icon: <IconTrophy width={20} height={20} />, tone: "blue" },
+  player: { icon: <IconUsers width={20} height={20} />, tone: "green" },
+  auction: { icon: <IconGavel width={20} height={20} />, tone: "purple" },
+  money: { icon: <IconReceipt width={20} height={20} />, tone: "amber" },
+};
+
+/**
+ * WHAT PEOPLE ACTUALLY ARRIVE LOOKING FOR.
+ *
+ * Each chip is a real query against the real index — not a decorative tag —
+ * and each one is phrased the way a visitor would type it rather than the way
+ * the product names it. The mockup's version of this row sat above a grid of
+ * cards claiming "6 articles", "8 articles" and so on; there are sixteen
+ * articles in total, and a count nobody can verify is exactly what the content
+ * ruling forbids. The real reading time rides on each card instead.
+ */
+const POPULAR = [
+  "Create a tournament",
+  "Player registration",
+  "Live auction",
+  "Receipts",
+  "Teams and squads",
+];
+
 export default function HelpIndexPage() {
   return (
-    <main className="content-page mk">
-      <p className="mk-kicker">Guides &amp; answers</p>
-      <h1>Help centre</h1>
-      <p className="content-lead">
-        Everything you need to run a tournament on DesiAuction — described exactly as the platform
-        works.
-      </p>
+    <main className="content-page">
+      <PageHero
+        eyebrow="Support"
+        title={
+          <>
+            Help <em>centre</em>
+          </>
+        }
+        lede="Everything you need to run a tournament on DesiAuction — described exactly as the platform works."
+        art={<SportMontage />}
+        actions={
+          <>
+            <form
+              className="content-searchbar no-print"
+              action="/search"
+              method="get"
+              role="search"
+            >
+              <label className="visually-hidden-heading" htmlFor="help-q">
+                Search help
+              </label>
+              <input id="help-q" name="q" type="search" placeholder="Search help and more…" />
+              <button type="submit">Search</button>
+            </form>
+            <CountChips
+              label="Popular searches"
+              chips={POPULAR.map((term) => ({
+                label: term,
+                href: `/search?q=${encodeURIComponent(term)}`,
+              }))}
+            />
+          </>
+        }
+      />
 
-      <form className="content-searchbar no-print" action="/search" method="get" role="search">
-        <label className="visually-hidden-heading" htmlFor="help-q">
-          Search help
-        </label>
-        <input id="help-q" name="q" type="search" placeholder="Search help and more…" />
-        <button type="submit">Search</button>
-      </form>
-
-      {HELP_CATEGORIES.map((category) => (
-        <section key={category.slug} className="content-section" aria-labelledby={category.slug}>
-          <h2 id={category.slug}>
-            <Link href={`/help/category/${category.slug}`} className="prose-link">
-              {category.title}
-            </Link>
-          </h2>
-          <p className="content-lead" style={{ marginBottom: "var(--space-3)" }}>
-            {category.description}
-          </p>
-          <ul className="content-grid">
-            {helpArticlesIn(category.slug).map((article) => (
-              <li key={article.slug}>
-                <Link href={`/help/${article.slug}`} className="content-card">
-                  <h3>{article.title}</h3>
-                  <p>{article.summary}</p>
-                  <span className="content-card-meta">{article.readMinutes} min read</span>
+      <PageBody>
+        {HELP_CATEGORIES.map((category) => {
+          const face = CATEGORY_FACE[category.slug] ?? {
+            icon: <IconHelp width={20} height={20} />,
+            tone: "neutral" as Tone,
+          };
+          return (
+            <PageSection
+              key={category.slug}
+              headingId={category.slug}
+              title={category.title}
+              lede={category.description}
+              action={
+                <Link className="content-view-all" href={`/help/category/${category.slug}`}>
+                  View all
                 </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+              }
+              flush
+            >
+              <TopicGrid>
+                {helpArticlesIn(category.slug).map((article) => (
+                  <TopicCard
+                    key={article.slug}
+                    href={`/help/${article.slug}`}
+                    icon={face.icon}
+                    tone={face.tone}
+                    title={article.title}
+                    description={article.summary}
+                    foot={`${String(article.readMinutes)} min read`}
+                  />
+                ))}
+              </TopicGrid>
+            </PageSection>
+          );
+        })}
 
-      <section className="content-section" aria-labelledby="more">
-        <h2 id="more">More</h2>
-        <ul className="content-grid">
-          <li>
-            <Link href="/help/faq" className="content-card">
-              <h3>Frequently asked questions</h3>
-              <p>Quick answers to the things people ask most.</p>
-            </Link>
-          </li>
-          <li>
-            <Link href="/support" className="content-card">
-              <h3>Support</h3>
-              <p>Reach a human, report a bug, or check what changed.</p>
-            </Link>
-          </li>
-        </ul>
-        <p className="article-meta">
-          {HELP_ARTICLES.length} articles · always free to read, no sign-in needed.
-        </p>
-      </section>
+        <PageSection headingId="more" title="More" flush>
+          <TopicGrid>
+            <TopicCard
+              href="/help/faq"
+              icon={<IconHelp width={20} height={20} />}
+              title="Frequently asked questions"
+              description="Quick answers to the things people ask most."
+            />
+            <TopicCard
+              href="/support"
+              tone="neutral"
+              icon={<IconMessageCircle width={20} height={20} />}
+              title="Support"
+              description="Reach a human, report a bug, or check what changed."
+            />
+          </TopicGrid>
+          <p className="article-meta">
+            {HELP_ARTICLES.length} articles · always free to read, no sign-in needed.
+          </p>
+        </PageSection>
+      </PageBody>
     </main>
   );
 }

@@ -136,9 +136,13 @@ test("a gendered category refuses a declared mismatch, and the profile fix opens
   // profile — the PI-1 write-back and prefill meeting in one control.
   await page.goto(season.registerPath);
   await expect(page.getByTestId("register-card")).toBeVisible();
-  // The register form's own control — still "Playing role". Only /account
+  // The register form's own control — the "Playing role" chips. Only /account
   // names the sport, because only /account shows one panel per sport.
-  await expect(page.getByLabel("Playing role")).toHaveValue("all_rounder");
+  await expect(
+    page
+      .getByRole("group", { name: "Playing role" })
+      .getByRole("radio", { name: "All-rounder", exact: true }),
+  ).toBeChecked();
   await page.getByTestId("register-continue").click();
   await page.getByTestId("register-consent").check();
   await page.getByTestId("register-submit").click();

@@ -1,0 +1,187 @@
+/* /auctions — one card per auction night. Tokens only; both themes. */
+
+.ax-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: var(--space-5);
+}
+
+.ax-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+/* A night in progress is the one thing on this page that is happening now. */
+.ax-card[data-status="live"],
+.ax-card[data-status="paused"] {
+  border-color: var(--accent);
+  box-shadow:
+    var(--shadow-2),
+    inset 0 3px 0 var(--accent);
+}
+
+.ax-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.ax-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.ax-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.ax-title a {
+  color: var(--text-heading);
+  text-decoration: none;
+}
+
+.ax-title a:hover {
+  text-decoration: underline;
+}
+
+.ax-title a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.ax-org {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.ax-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.ax-meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ax-meta svg {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.ax-note {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.ax-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ax-progress-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.ax-progress-row strong {
+  color: var(--text-heading);
+}
+
+.ax-muted {
+  color: var(--text-muted);
+}
+
+.ax-money {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ax-bar {
+  position: relative;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.ax-bar-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--success-base);
+  transform-origin: left center;
+}
+
+.ax-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ax-role {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ax-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .ax-card {
+    padding: var(--space-4);
+  }
+
+  .ax-links {
+    width: 100%;
+  }
+
+  .ax-links a {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+}

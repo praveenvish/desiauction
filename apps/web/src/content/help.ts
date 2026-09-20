@@ -113,6 +113,15 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       },
       {
         kind: "paragraph",
+        text: "If you run seasons you also get three cross-season desks: {0} is everyone across every season you run, {1} is every auction night with the right door for your role, and {2} is registrations, fees and spend per season.",
+        links: [
+          { text: "Players", href: "/players" },
+          { text: "Auctions", href: "/auctions" },
+          { text: "Reports", href: "/reports" },
+        ],
+      },
+      {
+        kind: "paragraph",
         text: "{0} is always the first item, and it is the one page that shows everything you have at once — so anything your menu is too short to list is one tap away there. Notifications, your account and this help centre sit together underneath, on every screen.",
         links: [{ text: "Home", href: "/home" }],
       },

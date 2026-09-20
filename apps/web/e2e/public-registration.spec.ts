@@ -185,7 +185,9 @@ test("player journey: discover → multi-step register with draft recovery → t
     // DA-35: the share link is no longer a login wall that never names the
     // tournament. A public season shows what it is and what will be asked;
     // the OTP moves to the point of submission.
-    await expect(player.getByTestId("register-preview")).toContainText(`Monsoon Cup ${STAMP}`);
+    // The name heads the page (the frame's h1); the card below says what is asked.
+    await expect(player.getByRole("heading", { level: 1 })).toHaveText(`Monsoon Cup ${STAMP}`);
+    await expect(player.getByTestId("register-preview")).toBeVisible();
     await player.getByTestId("register-verify-cta").click();
     await expect(player).toHaveURL(/\/login\?next=/);
     await otpLogin(player, PLAYER);
@@ -195,8 +197,8 @@ test("player journey: discover → multi-step register with draft recovery → t
     await player.getByLabel("Your name").fill("Kiran Player");
     await player.getByRole("button", { name: "Continue" }).click();
 
-    // Step 2: role — autosaved as a device-local draft.
-    await player.getByLabel("Playing role").selectOption("bowler");
+    // Step 2: role — a choice chip, autosaved as a device-local draft.
+    await player.getByRole("radio", { name: "Bowler", exact: true }).check();
 
     // Draft recovery: a refresh resumes at review with the saved role.
     await player.reload();
@@ -270,7 +272,7 @@ test("attacks: tampered drafts are refused by the server; duplicates show status
 
     // Recover: pick a real role and submit.
     await player.getByRole("button", { name: "Back" }).click();
-    await player.getByLabel("Playing role").selectOption("wicket_keeper");
+    await player.getByRole("radio", { name: "Wicket-keeper", exact: true }).check();
     await player.getByTestId("register-continue").click();
     await player.getByTestId("register-consent").check();
     await player.getByTestId("register-submit").click();
@@ -280,6 +282,63 @@ test("attacks: tampered drafts are refused by the server; duplicates show status
     await player.goto(registerUrl);
     await expect(player.getByTestId("registration-status")).toBeVisible();
     await expect(player.getByTestId("register-card")).not.toBeVisible();
+  });
+});
+
+test("an email-only account adds its mobile in place and finishes — the share ref intact", async ({
+  browser,
+}) => {
+  /*
+   * THE DEAD END THIS REPLACES. Production opens /login on the EMAIL door until
+   * SMS is live, so a new player arrives with no number — and the register page
+   * used to stop them with "Add a mobile number" and a link to /account, which
+   * ignored where they came from. They added the number and were stranded on a
+   * settings page. The number is now added inside the wizard, and the page
+   * carries on from there with the `?ref` still on the URL.
+   */
+  test.setTimeout(120_000);
+  const address = `regmail${STAMP}@example.test`;
+  const LATE_PHONE = `64${STAMP}`;
+  const shared = `${registerUrl}?ref=whatsapp`;
+  await inSecondBrowser(browser, async (player) => {
+    await player.goto(shared);
+    const href = (await player.getByTestId("register-verify-cta").getAttribute("href")) ?? "";
+    expect(decodeURIComponent(href)).toContain("ref=whatsapp");
+    // The harness pins the phone door; the email door is production's default.
+    await player.goto(`${href}&method=email`);
+    await player.getByTestId("email-login-address").fill(address);
+    await player.getByTestId("email-login-send").click();
+    await expect(player.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
+    await player.getByTestId("email-login-code").fill(await latestOtp(address));
+    await player.getByTestId("email-login-verify").click();
+
+    // Back on the register page, not /onboarding or /account — ref and all.
+    await expect(player).toHaveURL(/\/register\?ref=whatsapp/, { timeout: 30_000 });
+    await expect(player.getByTestId("register-step-mobile")).toBeVisible();
+    await expect(player.getByRole("list", { name: "Registration progress" })).toContainText(
+      "Mobile",
+    );
+    await player.getByLabel("Mobile number").fill(LATE_PHONE);
+    await player.getByTestId("register-phone-send").click();
+    await player.getByLabel("Six-digit code").fill(await latestOtp(LATE_PHONE));
+    await player.getByTestId("register-phone-confirm").click();
+
+    // The page re-reads the session and the wizard simply carries on.
+    await expect(player.getByTestId("register-step-profile")).toBeVisible({ timeout: 20_000 });
+    await expect(player).toHaveURL(/\?ref=whatsapp/);
+    await player.getByLabel("Your name").fill("Mail Player");
+    await player.getByRole("button", { name: "Continue" }).click();
+    await player.getByRole("radio", { name: "Batter", exact: true }).check();
+    await player.getByTestId("register-continue").click();
+    await player.getByTestId("register-consent").check();
+    await player.getByTestId("register-submit").click();
+    await expect(player.getByTestId("registration-submitted")).toBeVisible();
+    await expect(player.getByTestId("registration-submitted")).toBeFocused();
+
+    // A reload shows the same panel, now with the registration number.
+    await player.reload();
+    await expect(player.getByTestId("my-registration-status")).toHaveText("submitted");
+    await expect(player.getByTestId("registration-status")).toContainText("Registration ");
   });
 });
 

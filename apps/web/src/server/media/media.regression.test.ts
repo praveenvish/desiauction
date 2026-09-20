@@ -34,7 +34,13 @@ import {
 import { ForbiddenError } from "../orgs/authz";
 import { createOrg } from "../orgs/orgs";
 import { env } from "../../env";
-import { persistMediaKey, requireMediaWrite, resolveMediaSubject } from "./authz";
+import {
+  clearCompetitionImage,
+  currentCompetitionImageKey,
+  persistMediaKey,
+  requireMediaWrite,
+  resolveMediaSubject,
+} from "./authz";
 import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
@@ -215,6 +221,32 @@ describe("MEDIA REGRESSION — write authorization contract", () => {
     expect(row?.photoUrl).toBe("k/photo");
     expect(row?.consentAt).not.toBeNull();
     expect(row?.via).toBe("self_upload");
+  });
+
+  it("writes the season's cover photo to its own column, apart from the crest (0082)", async () => {
+    const competitionSubject = { storageSubjectId: comp.id, ownerPersonId: null };
+    const now = new Date();
+    await persistMediaKey(db, "competition", competitionSubject, "k/logo", now, "x");
+    await persistMediaKey(db, "competition", competitionSubject, "k/cover", now, "x", "cover");
+    const read = async () => {
+      const [row] = await db
+        .select({ logo: competitionsTable.logoUrl, cover: competitionsTable.coverUrl })
+        .from(competitionsTable)
+        .where(eq(competitionsTable.id, comp.id))
+        .limit(1);
+      return row;
+    };
+    expect(await read()).toEqual({ logo: "k/logo", cover: "k/cover" });
+    expect(await currentCompetitionImageKey(db, comp.id, "cover")).toBe("k/cover");
+
+    // Taking the cover down leaves the crest where it was.
+    await clearCompetitionImage(db, comp.id, "cover");
+    expect(await read()).toEqual({ logo: "k/logo", cover: null });
+    expect(await currentCompetitionImageKey(db, comp.id, "cover")).toBeNull();
+    // Only a season manager may write either picture.
+    await expect(
+      requireMediaWrite(db, outsider, comp, "competition", competitionSubject),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("keeps the club's photo for a typed-name entry on the ENTRY, never the account (0077)", async () => {

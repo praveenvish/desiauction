@@ -159,8 +159,39 @@ export function renderShareCard(model: CompetitionShareCard, monogram: string) {
   );
 }
 
-/** The shareable single-player card (`/c/[slug]/p/[number]`). */
-export function renderPlayerShareCard(model: PlayerShareCard, monogram: string) {
+/**
+ * The player's face, when the public gate let one through: a data URI (PNG or
+ * JPEG) inlined by the route. Square, cropped to fill, on the same radius
+ * family as the monogram tile it replaces — larger, because on a player card
+ * the face IS the subject.
+ */
+function PhotoTile({ src }: { src: string }) {
+  return (
+    <img
+      src={src}
+      width={176}
+      height={176}
+      alt=""
+      style={{
+        width: 176,
+        height: 176,
+        borderRadius: 32,
+        objectFit: "cover",
+        border: `2px solid ${C.borderSubtle}`,
+      }}
+    />
+  );
+}
+
+/**
+ * The shareable single-player card (`/c/[slug]/p/[number]`). `photo` is the
+ * inlined, already-gated image or null; null draws the initials tile.
+ */
+export function renderPlayerShareCard(
+  model: PlayerShareCard,
+  monogram: string,
+  photo: string | null = null,
+) {
   return (
     <div
       style={{
@@ -176,8 +207,14 @@ export function renderPlayerShareCard(model: PlayerShareCard, monogram: string) 
         fontFamily: "sans-serif",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <MonogramTile text={monogram} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: photo === null ? "center" : "flex-start",
+          justifyContent: "space-between",
+        }}
+      >
+        {photo === null ? <MonogramTile text={monogram} /> : <PhotoTile src={photo} />}
         <StatusChip label={model.statusLabel} tone={model.statusTone} />
       </div>
 

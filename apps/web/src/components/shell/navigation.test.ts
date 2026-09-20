@@ -7,6 +7,7 @@ import {
   seasonRoleFor,
   activeSeasonTab,
   adminSectionsFor,
+  phoneBar,
   seasonTabs,
   shellKind,
   RAIL_CAP,
@@ -87,24 +88,33 @@ describe("the rail is the union of what is yours (RN-1 §3.2)", () => {
     expect(navigationFor({ roles: both, pathname: "/home" }).rail[1]?.key).toBe("cockpit");
   });
 
-  it("an organizer gets the indexes and no 'find' — they have three doors already", () => {
-    expect(keys({ ...NOBODY, organizes: true })).toEqual(["home", "tournaments", "orgs"]);
-  });
-
-  it("Money returns only for the people who have books (DA-18 reversed, narrowly)", () => {
-    expect(keys({ ...NOBODY, organizes: true, hasBooks: true })).toEqual([
+  it("an organizer gets the indexes and the three desks, and no 'find'", () => {
+    /*
+     * Players, Auctions and Reports are the founder's 2026-09-19 sidebar
+     * mockups (ui/premium-flow), which asked for a FIXED rail of seven. Here
+     * they are candidates like everything else — offered to people who run
+     * seasons, absent for everyone else, because a cross-season player index of
+     * seasons you do not run is an empty page (LAW 3).
+     */
+    expect(keys({ ...NOBODY, organizes: true })).toEqual([
       "home",
       "tournaments",
       "orgs",
-      "money",
+      "players",
+      "auctions",
+      "reports",
     ]);
+  });
+
+  it("Money returns only for the people who have books (DA-18 reversed, narrowly)", () => {
+    expect(keys({ ...NOBODY, organizes: true, hasBooks: true })).toContain("money");
     expect(keys({ ...NOBODY, organizes: true, hasBooks: false })).not.toContain("money");
   });
 
   it("an organizer who owns a team is offered both — the union, not a mode", () => {
     expect(
       keys({ ...NOBODY, organizes: true, teams: [scope("Demo Panthers", "demo-pl")] }),
-    ).toEqual(["home", "team", "tournaments", "orgs"]);
+    ).toEqual(["home", "team", "tournaments", "orgs", "players", "auctions", "reports"]);
   });
 
   it("membership is not a role: there is no field for it and no door from it", () => {
@@ -121,7 +131,7 @@ describe("the rail is the union of what is yours (RN-1 §3.2)", () => {
   });
 });
 
-describe("LAW 1: one list, never more than five", () => {
+describe("LAW 1: one list — and five is the PHONE's number", () => {
   it("holds under every role combination", () => {
     const flags = [true, false];
     for (const organizes of flags) {
@@ -143,8 +153,15 @@ describe("LAW 1: one list, never more than five", () => {
                   ),
                 };
                 const model = navigationFor({ roles, pathname: "/home" });
-                expect(model.rail.length).toBeLessThanOrEqual(RAIL_CAP);
+                /*
+                 * The five was always the BAR's constraint — five columns
+                 * across 320px. A vertical rail has room, which is what the
+                 * founder's mockups assumed in asking for seven on a laptop.
+                 * Both lists still come from one model (LAW 4).
+                 */
+                expect(phoneBar(model.rail).length).toBeLessThanOrEqual(RAIL_CAP);
                 expect(model.rail[0]?.key).toBe("home");
+                expect(phoneBar(model.rail)[0]?.key).toBe("home");
                 // LAW 1 again: no duplicate destinations inside the one list.
                 expect(new Set(model.rail.map((i) => i.key)).size).toBe(model.rail.length);
               }
@@ -215,21 +232,27 @@ describe("exactly one item is ever active", () => {
     });
   }
 
-  it("a dropped item takes the last seat back when you are standing on it", () => {
-    // `busy` overflows the cap, so "My sports" is not offered on /home...
-    expect(keys(busy)).toEqual(["home", "team", "tournaments", "orgs", "money"]);
-    // ...but the menu must still be able to say where you are (LAW 1's cap is
-    // only affordable because nothing it drops can become unreachable).
-    const model = navigationFor({ roles: busy, pathname: "/me/cricket" });
-    expect(model.rail.map((item) => item.key)).toEqual([
-      "home",
-      "team",
-      "tournaments",
-      "orgs",
-      "sports",
-    ]);
-    expect(model.rail).toHaveLength(RAIL_CAP);
-    expect(model.rail.find((item) => item.active)?.key).toBe("sports");
+  it("the BAR gives the page you are on a seat, even past its five", () => {
+    /*
+     * The rail keeps everything this person is offered; the bar has five
+     * columns. So the seat rule moved to where the cap actually binds — an
+     * organizer standing on /reports (sixth, and a desk surface besides) would
+     * otherwise get a bar lighting nothing, and a menu that cannot say where
+     * you are is worse than a short one.
+     */
+    const onReports = navigationFor({ roles: busy, pathname: "/reports" });
+    expect(onReports.rail.find((item) => item.active)?.key).toBe("reports");
+    const bar = phoneBar(onReports.rail);
+    expect(bar).toHaveLength(RAIL_CAP);
+    expect(bar[0]?.key).toBe("home");
+    expect(bar.find((item) => item.active)?.key).toBe("reports");
+  });
+
+  it("desk surfaces ride the drawer, not the bar", () => {
+    // premium-flow's ruling, kept: Organizations and Reports are laptop jobs.
+    const bar = phoneBar(navigationFor({ roles: busy, pathname: "/home" }).rail);
+    expect(bar.map((item) => item.key)).not.toContain("orgs");
+    expect(bar.map((item) => item.key)).not.toContain("reports");
   });
 
   it("an unknown path lights nothing rather than guessing", () => {

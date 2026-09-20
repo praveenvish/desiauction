@@ -1,19 +1,17 @@
-import { POSTER_SIZES, buildTeamPoster } from "@desiauction/core";
-import { ImageResponse } from "next/og";
+import { buildTeamPoster } from "@desiauction/core";
 
-import { posterBrandMark, teamPosterSource } from "../../../../../../server/competition/posters";
+import { teamPosterSource } from "../../../../../../server/competition/posters";
 import { renderTeamPoster } from "../../poster-card";
-import { posterFonts } from "../../poster-fonts";
-import { parsePosterQuery, posterHeaders, posterRefusal } from "../../poster-request";
+import { posterResponse } from "../../poster-response";
 
 /**
- * The squad poster — one image covering fifteen players, and the more forwarded
- * of the two, because an owner posts it the same night.
+ * The squad sheet — one image covering fifteen faces, and the more forwarded of
+ * the two, because an owner posts it the same night.
  *
  * Same console gate as the player poster next door, and for a stronger reason:
- * this one carries fifteen civilians' names and what each of them was bought
- * for. See `server/competition/posters.ts` for the gate, the consent rule and
- * the audit row.
+ * this one carries fifteen civilians' faces and what each of them was bought
+ * for. See `server/competition/posters.ts` for the gate, the consent rule, the
+ * age rule and the audit row.
  */
 
 export const runtime = "nodejs";
@@ -24,23 +22,17 @@ export async function GET(
   { params }: { params: Promise<{ slug: string; teamId: string }> },
 ): Promise<Response> {
   const { slug, teamId } = await params;
-  const query = parsePosterQuery(new URL(request.url).searchParams);
-  const source = await teamPosterSource(slug, teamId, { theme: query.theme, size: query.size });
-  if (!source.ok) {
-    return posterRefusal(source.status, source.message);
-  }
-  return new ImageResponse(
-    renderTeamPoster(buildTeamPoster(source.input), {
-      theme: query.theme,
-      size: query.size,
-      showBranding: source.showBranding,
-      brandMarkSrc: source.showBranding ? await posterBrandMark() : null,
-    }),
-    {
-      ...POSTER_SIZES[query.size],
-      // Without these the rupee sign rasterizes as an empty box — see poster-fonts.
-      fonts: await posterFonts(),
-      headers: posterHeaders(source.filename, query.download),
-    },
-  );
+  return posterResponse({
+    request,
+    kind: "team",
+    source: (query) =>
+      teamPosterSource(slug, teamId, {
+        theme: query.theme,
+        size: query.size,
+        prices: query.prices,
+        kind: "team",
+      }),
+    build: buildTeamPoster,
+    draw: renderTeamPoster,
+  });
 }

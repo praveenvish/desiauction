@@ -43,6 +43,7 @@ import {
   createLobbyFixture,
   editFixture,
   generateFixtures,
+  previewGeneration,
   publishAllScheduled,
   publishFixture,
   rescheduleFixture,
@@ -358,6 +359,44 @@ describe("FIXTURE OPS REGRESSION — deterministic generation", () => {
     const first = await mk(`Det One ${RUN}`);
     const second = await mk(`Det Two ${RUN}`);
     expect(second).toEqual(first);
+  });
+
+  it("a plan that runs past the season's dates is refused by the preview AND the generate, with the numbers to fix it", async () => {
+    // 4 teams → 6 matches; one kickoff on one ground is one match a day, so a
+    // 3-day season cannot hold it. This used to preview happily and then fail
+    // at confirm with "(Unknown fixture) — date is outside the competition window".
+    const short = await createCompetition(db, org.id, owner, {
+      sport: "cricket",
+      name: "Short Window Cup",
+      startsOn: "2026-09-19",
+      endsOn: "2026-09-21",
+    });
+    for (const teamName of ["S Alpha", "S Bravo", "S Charlie", "S Delta"]) {
+      await createTeam(db, org.id, short.id, owner, teamName);
+    }
+    const input = {
+      ...GEN,
+      startDate: "2026-09-19",
+      kickoffTimes: ["18:00"],
+      groundIds: [groundA],
+    };
+    const preview = await previewGeneration(db, short, input);
+    expect(preview).toMatchObject({
+      ok: false,
+      reason: "outside_window",
+      startsOn: "2026-09-19",
+      endsOn: "2026-09-21",
+      perDay: 1,
+      daysNeeded: 6,
+    });
+    expect(await generateFixtures(db, short, owner, input)).toMatchObject({
+      ok: false,
+      reason: "outside_window",
+    });
+    // Three kickoffs a day fit it inside the window.
+    expect(
+      await previewGeneration(db, short, { ...input, kickoffTimes: ["10:00", "14:00", "18:00"] }),
+    ).toMatchObject({ ok: true });
   });
 
   it("generation is refused while live fixtures exist (stable numbers forever)", async () => {

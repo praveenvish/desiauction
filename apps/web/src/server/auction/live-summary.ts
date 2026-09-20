@@ -1,6 +1,5 @@
 import {
   DEFAULT_AUCTION_CONFIG,
-  isMinor,
   minPossiblePrice,
   type AuctionConfig,
   type IncrementSlab,
@@ -8,7 +7,12 @@ import {
 import { lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { preSignedSql } from "../competition/pre-signed";
-import { shownName, shownPhotoConsentAt, shownPhotoKey } from "../competition/shown-name";
+import {
+  publicPhotoUrl,
+  shownName,
+  shownPhotoConsentAt,
+  shownPhotoKey,
+} from "../competition/shown-name";
 
 // PX-6 live-experience reads (thin, additive, spectator-safe). The snapshot
 // stream carries live state but only the LAST lot outcome — late joiners need
@@ -89,6 +93,14 @@ export async function resolvedLots(db: Db, auctionId: string): Promise<ResolvedL
 }
 
 export interface LotMedia {
+  /**
+   * The registration behind the lot — the SEED for the player's branded mark.
+   * The snapshot names a lot by lot id only, and a mark seeded by lot id gave
+   * the same player one monogram on the block and another on every roster.
+   * One rule everywhere: a season surface seeds by registration id. Already
+   * spectator-safe: `ResolvedLot.registrationId` carries the same value.
+   */
+  registrationId: string;
   /** Consent-gated (DPDP §5): null unless the player set `photo_consent_at`. */
   photoUrl: string | null;
   /** The REGISTRATION number — the identity the player already sees on their
@@ -122,6 +134,7 @@ export async function lotMediaOf(
   const rows = await db
     .select({
       lotId: lots.id,
+      registrationId: lots.registrationId,
       number: registrations.registrationNumber,
       photoKey: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
@@ -141,14 +154,51 @@ export async function lotMediaOf(
     // appear on the auction block. The number and name still show.
     // Consent first, then signing: an unconsented photo is never signed, so a
     // URL for it cannot exist to leak.
-    const consented = row.photoConsentAt !== null && row.photoKey !== null;
-    const showPhoto = consented && row.photoKey !== null && !isMinor(row.dateOfBirth, now);
     media[row.lotId] = {
-      photoUrl: showPhoto ? readUrl(row.photoKey as string) : null,
+      registrationId: row.registrationId,
+      photoUrl: publicPhotoUrl(row, now, readUrl),
       number: row.number,
     };
   }
   return media;
+}
+
+/**
+ * The face of every APPROVED player in a season, keyed by REGISTRATION id —
+ * for the surfaces that name a player before (or without) a lot: the auction
+ * setup's pool, which exists before a single lot does.
+ *
+ * Same rule as `lotMediaOf` (consent AND age, `publicPhotoUrl`), so a player
+ * shows the same face in the pool as on the block. Only players with a
+ * showable photo are present; an absent key means "draw the branded mark",
+ * which keeps a 400-player pool from shipping 400 nulls.
+ */
+export async function registrationPhotosOf(
+  db: Db,
+  competitionId: string,
+  readUrl: (key: string) => string,
+): Promise<Record<string, string>> {
+  const rows = await db
+    .select({
+      registrationId: registrations.id,
+      photoKey: shownPhotoKey,
+      photoConsentAt: shownPhotoConsentAt,
+      dateOfBirth: registrations.dateOfBirth,
+    })
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(
+      and(eq(registrations.competitionId, competitionId), eq(registrations.status, "approved")),
+    );
+  const now = new Date();
+  const photos: Record<string, string> = {};
+  for (const row of rows) {
+    const url = publicPhotoUrl(row, now, readUrl);
+    if (url !== null) {
+      photos[row.registrationId] = url;
+    }
+  }
+  return photos;
 }
 
 /**
@@ -164,6 +214,12 @@ export async function lotMediaOf(
 export interface PreSignedPlayer {
   registrationId: string;
   playerName: string | null;
+  /**
+   * A pre-signed player has no lot once the auction opens (or never had one),
+   * so `lotMedia` cannot carry their face; it rides here instead, under the
+   * same consent-and-age rule (`publicPhotoUrl`) — these rows reach /spectate.
+   */
+  photoUrl: string | null;
   /** Null in a sport whose pack declares no playing roles (Phase 2). */
   role: string | null;
   teamId: string;
@@ -173,11 +229,18 @@ export interface PreSignedPlayer {
   isViceCaptain: boolean;
 }
 
-export async function preSignedPlayers(db: Db, competitionId: string): Promise<PreSignedPlayer[]> {
+export async function preSignedPlayers(
+  db: Db,
+  competitionId: string,
+  readUrl: (key: string) => string,
+): Promise<PreSignedPlayer[]> {
   const rows = await db
     .select({
       registrationId: registrations.id,
       playerName: shownName,
+      photoKey: shownPhotoKey,
+      photoConsentAt: shownPhotoConsentAt,
+      dateOfBirth: registrations.dateOfBirth,
       role: registrations.role,
       teamId: registrations.teamId,
       isIcon: registrations.isIcon,
@@ -200,10 +263,19 @@ export async function preSignedPlayers(db: Db, competitionId: string): Promise<P
       ),
     )
     .orderBy(asc(shownName));
-  return rows.flatMap((row) =>
+  const now = new Date();
+  return rows.flatMap(({ photoKey, photoConsentAt, dateOfBirth, ...row }) =>
     // A pre-signed marker without a team is an organizer mid-edit, not a squad
     // member: drop it rather than invent a franchise for them.
-    row.teamId === null ? [] : [{ ...row, teamId: row.teamId }],
+    row.teamId === null
+      ? []
+      : [
+          {
+            ...row,
+            teamId: row.teamId,
+            photoUrl: publicPhotoUrl({ photoKey, photoConsentAt, dateOfBirth }, now, readUrl),
+          },
+        ],
   );
 }
 

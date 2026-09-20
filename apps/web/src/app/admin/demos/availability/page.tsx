@@ -1,4 +1,4 @@
-import { Card, ToastProvider } from "@desiauction/ui";
+import { IconInfo, Notice, ToastProvider } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -37,9 +37,9 @@ export default async function AdminDemoAvailabilityPage() {
   return (
     <ToastProvider>
       <main className="registrations-dash">
-        <div className="dash-stack">
+        <div className="dash-stack admin-stack">
           <header className="dash-head">
-            <p className="competitions-hint">
+            <p className="dash-hint">
               Times published here are offered on{" "}
               <Link href="/schedule-demo" className="prose-link">
                 the public demo page
@@ -50,15 +50,16 @@ export default async function AdminDemoAvailabilityPage() {
           </header>
 
           {windows.length === 0 ? (
-            <Card>
-              <p className="demo-empty-warning">
-                <strong>No times published — and that is a working state.</strong> The demo page is
-                currently promising that a person will come back within a working day, and the
-                request form behind it works exactly as it should. Publish windows below only if you
-                will keep them: a calendar offering a slot nobody attends is worse than no calendar
-                at all.
-              </p>
-            </Card>
+            <Notice
+              tone="warning"
+              icon={<IconInfo size={20} />}
+              title="No times published — and that is a working state."
+            >
+              The demo page is currently promising that a person will come back within a working
+              day, and the request form behind it works exactly as it should. Publish windows below
+              only if you will keep them: a calendar offering a slot nobody attends is worse than no
+              calendar at all.
+            </Notice>
           ) : null}
 
           <AvailabilityPanel windows={windows} blackouts={blackouts} />

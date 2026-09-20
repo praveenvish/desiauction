@@ -260,6 +260,7 @@ export function SpectatePanel({
           variant="shell"
           audience="public"
           offline={offline}
+          lotMedia={lotMedia}
         />
       </PageStatus>
       <SaleAnnouncer snapshot={snapshot} />
@@ -316,6 +317,8 @@ export function SpectatePanel({
           remainingMs={remainingMs}
           lotMedia={lotMedia}
           stampSize={stage ? "stage" : "lg"}
+          resolved={feed.resolved}
+          teams={teams}
         />
       ) : (
         <div className="stage-hide">
@@ -327,6 +330,8 @@ export function SpectatePanel({
             leadColor={leadColor}
             clock={clock}
             media={lotMedia[lot.lotId]}
+            /* The guest's stage: the person on the block, large. */
+            face="lg"
             testId="spectate-lot"
           />
         </div>
@@ -349,6 +354,7 @@ export function SpectatePanel({
             canConduct={false}
             viewerTeamName={null}
             canReplay={false}
+            teamColors={Object.fromEntries(teams.map((team) => [team.id, team.primaryColor]))}
           />
         </div>
       ) : null}
@@ -404,7 +410,11 @@ export function SpectatePanel({
             </div>
           </Card>
 
-          <AuctionTimeline feed={feed} />
+          <AuctionTimeline
+            feed={feed}
+            lotMedia={lotMedia}
+            teamColors={new Map(teams.map((team) => [team.name, team.primaryColor]))}
+          />
         </div>
 
         <div className="live-col">
@@ -420,7 +430,7 @@ export function SpectatePanel({
               squadSizes={squadSizesOf(teams, preSigned, feed.resolved)}
             />
           </div>
-          <UpNext snapshot={snapshot} />
+          <UpNext snapshot={snapshot} lotMedia={lotMedia} />
           <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={preSigned} />
           {/* Same reason as the live room and the cockpit: the component renders
               its own connecting state, so guarding it here would move everything
@@ -438,6 +448,7 @@ export function SpectatePanel({
         <SquadBoard
           roles={roles}
           teams={teams}
+          lotMedia={lotMedia}
           preSigned={preSigned}
           resolved={feed.resolved}
           snapshot={snapshot}

@@ -50,6 +50,9 @@ const ALLOW = [
   ".mk-stat-value",
   ".mk-tier-amount",
   ".ceremony-bid",
+  // The results showcase's prices — the money figures on the night's last
+  // frame. Numerals set for figure impact, the same case as `.ceremony-bid`.
+  ".ceremony-showcase-price",
   // The raise button's amount: a money figure on the owner's one live control,
   // set in the display face so it reads as a number to hit, not a label.
   ".paddle-raise-amount",

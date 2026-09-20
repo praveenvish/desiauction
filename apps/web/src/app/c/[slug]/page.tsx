@@ -1,5 +1,12 @@
-import { Badge, ButtonLink, EmptyState } from "@desiauction/ui";
-import { entryCategoryLabel, sportPackFor } from "@desiauction/core";
+import {
+  Badge,
+  ButtonLink,
+  EmptyState,
+  IconGavel,
+  IconTrophy,
+  IconUsers as IconUsersUi,
+} from "@desiauction/ui";
+import { entryCategoryLabel, formatPaiseINR, sportPackFor } from "@desiauction/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,6 +15,14 @@ import { env } from "../../../env";
 import { publicCompetitionView, publicShowcase } from "../../../server/competition/public";
 import { serializeJsonLd } from "../../../server/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
+import {
+  HeroFact,
+  PageBody,
+  PageHero,
+  PageSection,
+  StatStrip,
+  type Stat,
+} from "../../../components/public/public-kit";
 import { formatDateRange } from "../format";
 import { PublicSeasonReviews } from "../../../components/reviews/season-reviews";
 import { ShowcaseGrid } from "./showcase-grid";
@@ -45,6 +60,24 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * The season's name with everything after its first word in gold — the way the
+ * mockups set a title, without the page having to guess where to break a name
+ * it has never seen. A one-word name stays plain rather than being coloured
+ * whole, which would read as a link.
+ */
+function goldenName(name: string) {
+  const [first, ...rest] = name.trim().split(/\s+/);
+  if (rest.length === 0) {
+    return name;
+  }
+  return (
+    <>
+      {first} <em>{rest.join(" ")}</em>
+    </>
+  );
+}
+
 export default async function PublicCompetitionPage({
   params,
   searchParams,
@@ -68,6 +101,57 @@ export default async function PublicCompetitionPage({
   // (`isLive` in server/competition/public.ts): paused is mid-lot, not over, and
   // still watchable.
   const live = view.auctionStatus === "live" || view.auctionStatus === "paused";
+  /**
+   * THE COUNTS, SAID ONCE.
+   *
+   * The hero above says who, where and when; this strip says how big. The two
+   * do not overlap — the mockup had the team and player counts in both, and a
+   * page that states the same number twice invites the reader to check whether
+   * they agree.
+   *
+   * Purse and squad size are the season's published RULES (founder,
+   * 2026-09-19). No amount that belongs to a person appears here: not a sold
+   * price, not a bid, not what an owner has left.
+   */
+  const stats: Stat[] = [
+    ...(view.teams.length > 0
+      ? [
+          {
+            value: String(view.teams.length),
+            label: view.teams.length === 1 ? "Team" : "Teams",
+            icon: <IconUsersUi width={18} height={18} />,
+          },
+        ]
+      : []),
+    ...(pool !== null && pool.total > 0
+      ? [
+          {
+            value: String(pool.total),
+            label: "Approved players",
+            icon: <IconUsers />,
+          },
+        ]
+      : []),
+    ...(view.pursePerTeam !== null
+      ? [
+          {
+            value: formatPaiseINR(view.pursePerTeam),
+            label: "Purse per team",
+            icon: <IconTrophy width={18} height={18} />,
+          },
+        ]
+      : []),
+    ...(view.squadSize !== null
+      ? [
+          {
+            value: String(view.squadSize),
+            label: "Squad size",
+            icon: <IconGavel width={18} height={18} />,
+          },
+        ]
+      : []),
+  ];
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
@@ -88,39 +172,43 @@ export default async function PublicCompetitionPage({
         // a stored-XSS breakout.
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
-      <header className="public-hero" data-theme="floodlight">
-        <div className="mk-container public-hero-inner">
-          <span className="public-hero-badges">
+      <PageHero
+        cover={view.coverUrl === null ? null : { src: view.coverUrl }}
+        sport={view.sport}
+        status={
+          <>
             {live ? <Badge tone="live">Live now</Badge> : null}
             <Badge tone={view.open ? "success" : "neutral"} data-testid="public-reg-status">
               {view.open ? "Registration open" : "Registration closed"}
             </Badge>
-          </span>
-          <h1>{view.name}</h1>
-          <div className="public-hero-meta">
-            <span data-testid="public-org">
-              <IconUsers />
-              Organized by {view.orgName}
-            </span>
+          </>
+        }
+        title={goldenName(view.name)}
+        /* The organizer is SAID here and counted nowhere else. It used to be a
+           chip in the hero and a cell in no stat strip; now the hero is where
+           a visitor learns whose event this is, in a sentence. */
+        lede={<span data-testid="public-org">A community event by {view.orgName}</span>}
+        meta={
+          <>
+            {view.location !== null ? (
+              <HeroFact icon={<IconMapPin />}>{view.location}</HeroFact>
+            ) : null}
+            <HeroFact icon={<IconCalendar />}>
+              {formatDateRange(view.startsOn, view.endsOn)}
+            </HeroFact>
             {/* PI-1: the category, in words ("Women's tournament"); an Open
                 season says nothing rather than announcing the default. */}
             {view.entryCategory !== "open" ? (
-              <span data-testid="public-category">
-                {entryCategoryLabel(view.entryCategory)} tournament
-              </span>
+              <HeroFact icon={<IconUsers />}>
+                <span data-testid="public-category">
+                  {entryCategoryLabel(view.entryCategory)} tournament
+                </span>
+              </HeroFact>
             ) : null}
-            {view.location !== null ? (
-              <span>
-                <IconMapPin />
-                {view.location}
-              </span>
-            ) : null}
-            <span>
-              <IconCalendar />
-              {formatDateRange(view.startsOn, view.endsOn)}
-            </span>
-          </div>
-          <div className="public-cta-row">
+          </>
+        }
+        actions={
+          <>
             {live ? (
               <ButtonLink
                 href={`/seasons/${view.slug}/auction/spectate`}
@@ -143,48 +231,50 @@ export default async function PublicCompetitionPage({
                 Live gets "Watch"; open gets "Register". Neither is true for a
                 closed tournament or a finished one — which is most of the
                 lifecycle, and includes every link people keep forwarding after
-                the night is over. The only control left was the ghost below,
-                which navigates AWAY. The squads and the pool are on this very
-                page, a scroll down, and nothing pointed at them. */}
+                the night is over. */}
             {!live && !view.open && pool !== null && pool.total > 0 ? (
               <ButtonLink href="#players-heading" size="lg" data-testid="public-squads-cta">
                 See the squads
               </ButtonLink>
             ) : null}
-            {/* "All seasons" pointed at a page headed <h1>Tournaments</h1>,
-                titled "Tournaments · DesiAuction", and called "Browse
-                tournaments" and "All tournaments" by the public header and
-                footer. One destination, four labels, and this was the only one
-                using the OTHER domain noun the product deliberately keeps
-                apart: a tournament recurs, a season is the edition that runs. */}
             <ButtonLink href="/c" variant="ghost" size="lg">
               All tournaments
             </ButtonLink>
-          </div>
-          {live ? (
-            <p className="public-live-note" data-testid="public-watch-note">
-              No account needed — watching is open to anyone.
-            </p>
-          ) : null}
-        </div>
-      </header>
+            {live ? (
+              <p className="public-live-note" data-testid="public-watch-note">
+                No account needed — watching is open to anyone.
+              </p>
+            ) : null}
+          </>
+        }
+        script={
+          <>
+            Play
+            <br />
+            Bid
+            <br />
+            Belong
+          </>
+        }
+      />
 
-      <div className="mk-container public-sections">
+      <PageBody>
+        {stats.length > 0 ? <StatStrip label={`${view.name} at a glance`} stats={stats} /> : null}
+
         {/* Instructions for a door that is shut are not instructions, they are a
             trap: this block was unconditional, so a guest on a closed
             tournament was walked through signing in and submitting a
             registration that the page has no way to accept. It renders only
             while registration is actually open. */}
         {view.open ? (
-          <section className="public-section" aria-labelledby="how-it-works">
-            <h2 id="how-it-works">How registration works</h2>
+          <PageSection headingId="how-it-works" title="How registration works">
             <p className="public-hint">
               Sign in with your mobile number, tell us your name and playing role, and submit. The
               organizer reviews every registration — you can check your status here any time.
               Approved players enter the player pool for the auction, where team owners bid to build
               their squads.
             </p>
-          </section>
+          </PageSection>
         ) : null}
 
         {/* An empty pool is the DEFAULT state of every tournament on its first
@@ -193,8 +283,16 @@ export default async function PublicCompetitionPage({
             than one nobody has been approved into yet. The section stays; the
             emptiness gets explained. */}
         {pool === null ? null : (
-          <section className="public-section" aria-labelledby="players-heading">
-            <h2 id="players-heading">Players</h2>
+          <PageSection
+            headingId="players-heading"
+            title="Teams &amp; players"
+            lede={
+              view.teams.length > 0
+                ? "Every approved player, and the squad each one ended up in."
+                : "Every player the organizer has approved into the pool."
+            }
+            flush
+          >
             {pool.total === 0 ? (
               <EmptyState
                 data-testid="public-players-empty"
@@ -226,43 +324,25 @@ export default async function PublicCompetitionPage({
                   key: value.key,
                   label: value.label,
                 }))}
+                /* THE SEPARATE "TEAMS" SECTION IS GONE, and this is where it
+                   went. It listed each team's colour and crest three sections
+                   below the players in it, so the page answered "which teams
+                   are in this?" and "who is in this team?" in two places that
+                   never referred to each other. The squad cards answer both. */
+                teams={view.teams.map((team) => ({
+                  id: team.id,
+                  name: team.name,
+                  primaryColor: team.primaryColor,
+                  logoUrl: team.logoUrl,
+                  coachName: team.coachName,
+                }))}
               />
             )}
-          </section>
+          </PageSection>
         )}
 
-        {view.teams.length > 0 ? (
-          <section className="public-section" aria-labelledby="teams-heading">
-            <h2 id="teams-heading">Teams</h2>
-            <ul className="public-team-list" data-testid="public-teams">
-              {view.teams.map((team) => (
-                <li key={team.id} className="public-team">
-                  {team.logoUrl !== null ? (
-                    <img
-                      className="public-team-crest"
-                      src={team.logoUrl}
-                      alt=""
-                      width={28}
-                      height={28}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span
-                      className="public-team-swatch"
-                      style={{ background: team.primaryColor ?? "var(--accent)" }}
-                      aria-hidden
-                    />
-                  )}
-                  {team.name}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
         {view.fixtures.length > 0 ? (
-          <section className="public-section" aria-labelledby="schedule-heading">
-            <h2 id="schedule-heading">Published schedule</h2>
+          <PageSection headingId="schedule-heading" title="Published schedule">
             <ul className="public-fixture-list" data-testid="public-schedule">
               {view.fixtures.map((fixture) => (
                 <li key={fixture.number} className="public-fixture">
@@ -292,21 +372,20 @@ export default async function PublicCompetitionPage({
                 {view.orgName} for the full schedule.
               </p>
             ) : null}
-          </section>
+          </PageSection>
         ) : null}
 
         {/* FR-1: absent until a public season has three published reviews. */}
         <PublicSeasonReviews slug={view.slug} orgName={view.orgName} />
 
-        <section className="public-section" aria-labelledby="contact-heading">
-          <h2 id="contact-heading">Questions?</h2>
+        <PageSection headingId="contact-heading" title="Questions?">
           <p className="public-hint">
             This competition is run by {view.orgName} — reach them through whoever shared this page
             with you. For anything about the DesiAuction platform itself, see{" "}
             <Link href="/help">Help</Link>.
           </p>
-        </section>
-      </div>
+        </PageSection>
+      </PageBody>
     </main>
   );
 }

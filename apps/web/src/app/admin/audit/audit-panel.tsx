@@ -1,4 +1,10 @@
-import { Card, EmptyState, IconArrowRight } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconArrowRight,
+  IconFileCheck,
+  IconSearch,
+  SectionCard,
+} from "@desiauction/ui";
 import Link from "next/link";
 
 import { actorLabel, formatCount, isSystemActor } from "../../../server/admin/format";
@@ -19,12 +25,23 @@ export function AuditPanel({ page }: { page: AuditPage }) {
   return (
     <>
       <ReadOnlyNotice />
-      <Card>
+      {/* A hundred audit entries under zero headings: the page had one h1 and
+          nothing else, so nothing named what the list was. */}
+      <SectionCard
+        icon={<IconFileCheck />}
+        title="Events"
+        description={
+          <span data-testid="admin-audit-count">
+            {formatCount(rows.length)} shown · {formatCount(total)} matching event
+            {total === 1 ? "" : "s"} · times are IST
+          </span>
+        }
+        flush
+      >
         <form className="admin-filters" method="get" role="search" data-testid="admin-audit-search">
-          <div className="admin-filter-grow">
-            <label className="stat-label" htmlFor="admin-audit-q">
-              Search
-            </label>
+          <label className="admin-search" htmlFor="admin-audit-q">
+            <span className="admin-sr-only">Search</span>
+            <IconSearch size={18} aria-hidden />
             <input
               id="admin-audit-q"
               name="q"
@@ -33,9 +50,9 @@ export function AuditPanel({ page }: { page: AuditPage }) {
               placeholder="Actor, scope, subject or action"
               className="admin-search-input"
             />
-          </div>
-          <div>
-            <label className="stat-label" htmlFor="admin-audit-action">
+          </label>
+          <span className="admin-field">
+            <label className="admin-field-label" htmlFor="admin-audit-action">
               Action
             </label>
             <select
@@ -51,9 +68,9 @@ export function AuditPanel({ page }: { page: AuditPage }) {
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="stat-label" htmlFor="admin-audit-from">
+          </span>
+          <span className="admin-field">
+            <label className="admin-field-label" htmlFor="admin-audit-from">
               From
             </label>
             <input
@@ -63,9 +80,9 @@ export function AuditPanel({ page }: { page: AuditPage }) {
               defaultValue={filters.from ?? ""}
               className="admin-search-input"
             />
-          </div>
-          <div>
-            <label className="stat-label" htmlFor="admin-audit-to">
+          </span>
+          <span className="admin-field">
+            <label className="admin-field-label" htmlFor="admin-audit-to">
               To
             </label>
             <input
@@ -75,7 +92,7 @@ export function AuditPanel({ page }: { page: AuditPage }) {
               defaultValue={filters.to ?? ""}
               className="admin-search-input"
             />
-          </div>
+          </span>
           {/* Deep links carry actor/scope; keep them across a filter submit. */}
           {filters.actor !== undefined ? (
             <input type="hidden" name="actor" value={filters.actor} />
@@ -87,25 +104,17 @@ export function AuditPanel({ page }: { page: AuditPage }) {
             Filter
           </button>
         </form>
-      </Card>
-
-      <Card>
-        {/* A hundred audit entries under zero headings: the page had one h1 and
-            nothing else, so nothing named what the list was. */}
-        <h2 className="admin-section-title">Events</h2>
-        <p className="admin-meta" data-testid="admin-audit-count">
-          {formatCount(rows.length)} shown · {formatCount(total)} matching event
-          {total === 1 ? "" : "s"} · times are IST
-        </p>
         {rows.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="No matching events"
-            description="Nothing in the audit log matches these filters."
-          />
+          <div className="admin-card-empty">
+            <EmptyState
+              headingLevel={3}
+              title="No matching events"
+              description="Nothing in the audit log matches these filters."
+            />
+          </div>
         ) : (
           <>
-            <ul className="admin-timeline" data-testid="admin-audit-list">
+            <ul className="admin-rows" data-testid="admin-audit-list">
               {rows.map((row) => (
                 <AuditRow key={row.id} row={row} />
               ))}
@@ -124,7 +133,7 @@ export function AuditPanel({ page }: { page: AuditPage }) {
             </nav>
           </>
         )}
-      </Card>
+      </SectionCard>
     </>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { env } from "../../env";
 import { LANDING } from "../../content/marketing";
+import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -14,9 +15,7 @@ export const metadata: Metadata = {
  * page "foundation" section and /features. Public, no auth. */
 export default function SecurityPage() {
   return (
-    <main className="content-page content-narrow">
-      <h1>Security</h1>
-      <p className="content-lead">{LANDING.foundation.h2}</p>
+    <ContentPage eyebrow="Trust" title="Security" lede={LANDING.foundation.h2}>
       <div className="prose">
         {LANDING.foundation.cards.map((card) => (
           <div key={card.title} className="content-section">
@@ -33,6 +32,6 @@ export default function SecurityPage() {
           </p>
         </div>
       </div>
-    </main>
+    </ContentPage>
   );
 }

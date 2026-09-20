@@ -22,3 +22,39 @@
   line-height: var(--text-sm-line);
   color: var(--text-secondary);
 }
+
+/* THE COVER PHOTO (0082). The organizer's wide picture fills the hero behind a
+   shade — the same dark ramp the console's hero banner lays over a photo — so
+   the floodlight text above it keeps its contrast whatever the picture is. */
+.public-hero[data-has-cover] {
+  isolation: isolate;
+}
+
+.public-hero-cover {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.public-hero[data-has-cover]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    90deg,
+    var(--hero-shade) 0%,
+    var(--hero-shade-mid) 60%,
+    var(--hero-shade-soft) 100%
+  );
+}
+
+/* On a phone the text runs the full width of the picture, so the shade does too. */
+@media (max-width: 719px) {
+  .public-hero[data-has-cover]::before {
+    background: var(--hero-shade);
+  }
+}

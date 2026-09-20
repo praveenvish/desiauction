@@ -1,7 +1,20 @@
-import { AnnouncerProvider, Card, PageIntro, ToastProvider } from "@desiauction/ui";
+import {
+  AnnouncerProvider,
+  IconBall,
+  IconBell,
+  IconDevice,
+  IconFile,
+  IconKey,
+  IconLock,
+  IconShieldCheck,
+  IconUser,
+  SectionCard,
+  ToastProvider,
+} from "@desiauction/ui";
 import { SPORTS } from "@desiauction/core";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
 import {
   accountEmail,
@@ -11,16 +24,17 @@ import {
 } from "../../server/auth/actions";
 import { notificationSettings } from "../../server/messaging/actions";
 import {
+  ownPhotoUrl,
   playerProfileFor,
   sportProfilesFor,
   sportsPlayedBy,
   profileCompletenessFor,
 } from "../../server/player/profile";
 import { WHATSAPP_CONSENT_LABEL } from "../../lib/whatsapp-consent";
+import { AccountHero } from "./account-hero";
 import { NotificationSwitches, WhatsAppSwitch } from "./notification-switches";
 import { PersonProfilePanel } from "./person-profile-panel";
 import { SportProfiles } from "./sport-profiles";
-import { EmailVerify } from "./email-verify";
 import { ErasurePanel } from "./erasure-panel";
 import { myErasureRequest } from "../../server/privacy/actions";
 import { ProfilePanel } from "./profile-panel";
@@ -30,14 +44,14 @@ import "./account.css";
 
 export const metadata = { title: "Account · DesiAuction" };
 
-const ACCOUNT_SECTIONS: [string, string][] = [
-  ["profile", "Profile"],
-  ["player", "Player profile"],
-  ["sports", "Sports"],
-  ["email", "Email"],
-  ["security", "Sign-in & security"],
-  ["notifications", "Notifications"],
-  ["data", "Your data"],
+/** The jump row under the hero — one chip per card, in reading order. */
+const ACCOUNT_SECTIONS: { id: string; label: string; icon: ReactNode }[] = [
+  { id: "profile", label: "Name & contact", icon: <IconUser /> },
+  { id: "player", label: "Player profile", icon: <IconFile /> },
+  { id: "sports", label: "How you play", icon: <IconBall /> },
+  { id: "security", label: "Sign-in & security", icon: <IconLock /> },
+  { id: "notifications", label: "Notifications", icon: <IconBell /> },
+  { id: "data", label: "Privacy & data", icon: <IconShieldCheck /> },
 ];
 
 export default async function AccountPage() {
@@ -49,7 +63,7 @@ export default async function AccountPage() {
   // Independent reads, together: they were eight awaits in a row, so the page
   // cost the SUM of eight round trips. Completeness needs the passkey count,
   // so it follows.
-  const [security, settings, email, erasure, cricketProfile, sportProfiles, played] =
+  const [security, settings, email, erasure, cricketProfile, sportProfiles, played, photoUrl] =
     await Promise.all([
       accountSecurity(),
       notificationSettings(),
@@ -66,6 +80,8 @@ export default async function AccountPage() {
       // a season they entered. Every pack is still built; `SportProfiles`
       // decides which to show and offers the rest one at a time.
       sportsPlayedBy(session.personId),
+      // Their own photo, signed here rather than in the client panel.
+      ownPhotoUrl(session.personId),
     ]);
   const sportForms = SPORTS.map((pack) => {
     const held = sportProfiles.find((profile) => profile.sport === pack.key);
@@ -97,161 +113,137 @@ export default async function AccountPage() {
    * happens when the component actually renders in a browser — the e2e suite
    * caught it, which is the whole argument for having one.
    */
+  const sportsPlayed = sportForms.filter((form) => form.played).map((form) => form.spec.label);
   return (
     <AnnouncerProvider>
       <ToastProvider>
-        <main className="account">
-          {/* Settings read like settings: a section index on the left, the
-              sections beside it — not one narrow column floating mid-page. */}
-          <nav className="account-nav" aria-label="Account sections">
+        <main className="acct">
+          <AccountHero
+            personId={session.personId}
+            name={session.name}
+            phone={session.phone}
+            email={email.email ?? session.email}
+            emailVerified={email.verified}
+            photoUrl={photoUrl}
+            sports={sportsPlayed}
+            completeness={completeness}
+            facts={[
+              {
+                key: "sports",
+                icon: <IconBall />,
+                value: String(sportsPlayed.length),
+                label: sportsPlayed.length === 1 ? "Sport played" : "Sports played",
+              },
+              {
+                key: "passkeys",
+                icon: <IconKey />,
+                value: String(security?.passkeys.length ?? 0),
+                label: security?.passkeys.length === 1 ? "Passkey" : "Passkeys",
+              },
+              {
+                key: "devices",
+                icon: <IconDevice />,
+                value: String(security?.sessions.length ?? 1),
+                label: security?.sessions.length === 1 ? "Device signed in" : "Devices signed in",
+              },
+            ]}
+            signOut={<SignOutButton logout={logoutAction} />}
+          />
+
+          {/* Settings read like settings: an index of the cards, then the cards —
+              two columns on a laptop so the page is two screens, not seven. */}
+          <nav className="acct-nav" aria-label="Account sections">
             <ul>
-              {ACCOUNT_SECTIONS.map(([id, label]) => (
-                <li key={id}>
-                  <a href={`#${id}`}>{label}</a>
+              {ACCOUNT_SECTIONS.map((section) => (
+                <li key={section.id}>
+                  <a href={`#${section.id}`}>
+                    <span aria-hidden>{section.icon}</span>
+                    {section.label}
+                  </a>
                 </li>
               ))}
             </ul>
           </nav>
-          <div className="account-stack">
-            {/*
-            The "Active session" badge that used to sit here consulted nothing:
-            it was a constant, rendered beside a page you cannot reach without a
-            session. The sessions panel below states the same fact from the
-            database, per device. A badge that is always true is not a status.
 
-            The bare <dl> that followed it (Phone / Name, no heading) said the
-            same two things the Profile card says 150px lower — the first of the
-            two with no heading at all, so a screen-reader user met a definition
-            list between the h1 and "Profile". One identity card now.
-          */}
-            <PageIntro />
-            <section id="profile" className="account-section" aria-label="Profile">
-              <ProfilePanel
-                personId={session.personId}
-                phone={session.phone}
-                email={session.email}
-                name={session.name}
-                completeness={completeness}
-                signOut={<SignOutButton logout={logoutAction} />}
-              />
-            </section>
-            {/* PI-1: the durable identity, right under the account identity it
-              extends. Prefills every future registration. */}
-            <section id="player" className="account-section" aria-label="Player profile">
+          <div className="acct-columns">
+            <div className="acct-column">
+              <ProfilePanel phone={session.phone} name={session.name} email={email} />
+              {/* PI-1: the durable identity. Prefills every future registration. */}
               <PersonProfilePanel profile={cricketProfile} />
-            </section>
-            {/* SP-1 Phase 3: "how you play" has a different answer in each
-              sport. This used to render one panel per sport the PLATFORM runs,
-              which was four and became eight; it now renders the ones this
-              person plays, and offers the rest one at a time. */}
-            <section id="sports" className="account-section" aria-label="Sports">
+              {/* SP-1 Phase 3: "how you play" has a different answer in each
+                  sport — the ones this person plays, and the rest one at a time. */}
               <SportProfiles forms={sportForms} />
-            </section>
-            {/* Beside the identity it belongs to, and above Security: this is a
-              contact route the product will actually use, not a credential. */}
-            <section id="email" className="account-section" aria-labelledby="account-email-title">
-              <h2 id="account-email-title">Email</h2>
-              <EmailVerify current={email.email} verified={email.verified} />
-            </section>
-            {security !== null ? (
-              <section
-                id="security"
-                className="account-section"
-                aria-labelledby="account-security-title"
+            </div>
+
+            <div className="acct-column">
+              {security !== null ? <SecurityPanels security={security} /> : null}
+
+              {/*
+                NOTIFICATIONS — disclosure AND real switches. The column exists
+                (notification_preferences, migration 0023) and `maySend` reads it
+                before every send, so these switches stop messages rather than
+                recording an opinion. The disclosure stays beside them: knowing
+                what we send is not the same as being able to stop it.
+              */}
+              <SectionCard
+                id="notifications"
+                icon={<IconBell />}
+                tone="blue"
+                title="Notifications"
+                description="Switch any of these off and we stop sending it, by text and by email."
+                className="acct-card"
+                data-testid="notifications-panel"
               >
-                <h2 id="account-security-title">Sign-in &amp; security</h2>
-                <SecurityPanels security={security} />
-              </section>
-            ) : null}
-
-            {/*
-            NOTIFICATIONS — disclosure AND, now, real switches.
-
-            This card used to say, honestly, that stopping registration SMS was
-            handled "by a person, not a switch — we would rather tell you that
-            than show you a toggle that does nothing", because storing a
-            preference needed a column nobody had written.
-
-            The column exists now (notification_preferences, migration 0023) and
-            `maySend` reads it before every send, so these switches stop
-            messages rather than recording an opinion. The disclosure stays
-            beside them: knowing what we send is not the same as being able to
-            stop it, and a person deserves both.
-          */}
-            <section id="notifications" className="account-section" aria-label="Notifications">
-              <Card className="account-card" data-testid="notifications-panel">
-                <h2>Notifications</h2>
-                <p className="account-prose">
-                  We use your mobile number for sign-in codes and for the updates you choose below,
-                  and nothing else. We never sell it, and we never use it for marketing.
-                </p>
-                <dl className="account-facts">
-                  <dt>Sign-in codes</dt>
-                  <dd>
-                    By SMS, only when you ask for one. These cannot be turned off — they are how you
-                    get into your account.
-                  </dd>
-                  <dt>Your season</dt>
-                  <dd>
-                    The big moments — a team buys you, you are named captain, you are in a lineup —
-                    by text (or WhatsApp, if you choose), by email if you have added one, and always
-                    in <Link href="/inbox">your notifications</Link> here in the app.
-                  </dd>
-                </dl>
-                <h3 className="account-subhead">What we may send you</h3>
-                <p className="account-prose">
-                  Switch any of these off and we stop sending it, by text and by email. Sign-in
-                  codes are not on the list because turning them off would lock you out of your own
-                  account.
-                </p>
+                <div className="acct-always">
+                  <span className="acct-always-text">
+                    <span className="acct-always-label">Sign-in codes</span>
+                    <span className="acct-always-detail">
+                      By SMS or email, only when you ask for one. They can&rsquo;t be turned off —
+                      they are how you get into your account.
+                    </span>
+                  </span>
+                  <span className="acct-always-tag">Always on</span>
+                </div>
                 {settings === null ? null : <NotificationSwitches settings={settings} />}
                 {settings === null ? null : (
                   <WhatsAppSwitch optedIn={settings.whatsapp} label={WHATSAPP_CONSENT_LABEL} />
                 )}
-                <p className="account-prose">
-                  You can also reply <strong>STOP</strong> to any text to stop all of them at once,
-                  and <strong>START</strong> to turn them back on.
+                <p className="acct-fineprint">
+                  The big moments — a team buys you, you are named captain, you are in a lineup —
+                  always land in <Link href="/inbox">your notifications</Link> too. We never sell
+                  your number or use it for marketing. Reply <strong>STOP</strong> to any text to
+                  stop them all, <strong>START</strong> to turn them back on.
                 </p>
-              </Card>
-            </section>
+              </SectionCard>
 
-            {/*
-            YOUR DATA — the deletion path the product did not have.
-
-            Zero hits for `deleteAccount|delete my account|erasure` across the
-            whole source tree. The Data Retention policy is genuinely good and
-            genuinely reasoned, and NOTHING implemented it or linked to it; the
-            operative instruction ("email privacy@desiauction.in") sat in a legal
-            page nobody opens. A manual, staffed process is defensible at beta
-            scale. An undiscoverable one is not. This is the discoverable one.
-          */}
-            <section id="data" className="account-section" aria-label="Your data">
-              <Card className="account-card" data-testid="your-data-panel">
-                <h2>Your data</h2>
-                <p className="account-prose">
-                  You can ask us to delete your account. Where your data appears only in your own
-                  profile, we delete it. Where it appears in a shared, permanent record — an auction
-                  you bid in, a receipt issued to you — we anonymize your name and number instead of
-                  destroying the record, so the tournament&rsquo;s history stays intact for everyone
-                  else in it.
-                </p>
+              {/*
+                YOUR DATA — the deletion path the product did not have. A manual,
+                staffed process is defensible at beta scale. An undiscoverable one
+                is not. This is the discoverable one.
+              */}
+              <SectionCard
+                id="data"
+                icon={<IconShieldCheck />}
+                tone="red"
+                title="Privacy & data"
+                description="Ask us to delete your account. Your own profile is deleted; shared records — an auction you bid in, a receipt issued to you — keep the history but lose your name and number."
+                className="acct-card"
+                data-testid="your-data-panel"
+              >
                 <ErasurePanel request={erasure} />
-                <p className="account-prose">
-                  You can also email{" "}
+                <p className="acct-fineprint">
+                  Or email{" "}
                   <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
                     privacy@desiauction.in
                   </a>{" "}
-                  from the number on this account, or{" "}
-                  <Link href="/support">raise it through support</Link>. We reply within seven days
-                  either way.
-                </p>
-                <p className="account-prose account-links">
+                  from this account, or <Link href="/support">raise it through support</Link>. We
+                  reply within seven days either way.{" "}
                   <Link href="/legal/data-retention">Data Retention policy</Link>
                   {" · "}
                   <Link href="/legal/privacy">Privacy Policy</Link>
                 </p>
-              </Card>
-            </section>
+              </SectionCard>
+            </div>
           </div>
         </main>
       </ToastProvider>

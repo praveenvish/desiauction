@@ -2,13 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildPlayerPoster,
+  buildSeasonPoster,
   buildTeamPoster,
+  buildTopBuysPoster,
+  firstNameOf,
+  isPosterKind,
   isPosterSize,
   isPosterTheme,
+  isTopBuyCount,
   monogramOf,
+  normalizeHexColor,
+  POSTER_KIND_SIZES,
+  POSTER_KINDS,
   POSTER_SIZES,
+  shortNameOf,
   type PlayerPosterInput,
   type TeamPosterInput,
+  type TeamPosterMember,
+  type TopBuyInput,
 } from "./poster";
 
 const PLAYER: PlayerPosterInput = {
@@ -89,9 +100,15 @@ const TEAM: TeamPosterInput = {
   competitionName: "BSCB-5",
   competitionLogoUrl: null,
   members: [
-    { name: "Mlaram", role: "all_rounder", pricePaise: 400_000, marker: null },
-    { name: "Prakash Bishnoi", role: "bowler", pricePaise: 2_100_000, marker: "captain" },
-    { name: "Bhaira Ram", role: "batsman", pricePaise: null, marker: "icon" },
+    { name: "Mlaram", role: "all_rounder", pricePaise: 400_000, marks: [], photoUrl: null },
+    {
+      name: "Prakash Bishnoi",
+      role: "bowler",
+      pricePaise: 2_100_000,
+      marks: ["captain"],
+      photoUrl: "data:image/jpeg;base64,AA",
+    },
+    { name: "Bhaira Ram", role: "batsman", pricePaise: null, marks: ["icon"], photoUrl: null },
   ],
   spentPaise: 2_500_000,
   pursePaise: 9_700_000,
@@ -104,7 +121,66 @@ describe("team poster", () => {
     expect(t.squadLabel).toBe("3 players");
     expect(t.spentLabel).toBe("₹25,000");
     expect(t.remainingLabel).toBe("₹72,000");
-    expect(t.rows[1]?.markerLabel).toBe("C");
+    // The captain leads the sheet, and carries the face the source sent.
+    expect(t.rows[0]?.markerLabel).toBe("C");
+    expect(t.rows[0]?.isCaptain).toBe(true);
+    expect(t.rows[0]?.photoUrl).toBe("data:image/jpeg;base64,AA");
+    expect(t.captainName).toBe("Prakash Bishnoi");
+  });
+
+  it("orders captain, icon, retained, then the room's buys in the source's order", () => {
+    const member = (name: string, marks: TeamPosterMember["marks"]): TeamPosterMember => ({
+      name,
+      role: "batter",
+      pricePaise: marks.length === 0 ? 100_000 : null,
+      marks,
+      photoUrl: null,
+    });
+    const t = buildTeamPoster({
+      ...TEAM,
+      members: [
+        member("Bought One", []),
+        member("Kept", ["retained"]),
+        member("Bought Two", []),
+        member("Star", ["icon"]),
+        member("Skipper", ["captain"]),
+      ],
+    });
+    expect(t.rows.map((row) => row.name)).toEqual([
+      "Skipper",
+      "Star",
+      "Kept",
+      "Bought One",
+      "Bought Two",
+    ]);
+  });
+
+  it("badges an icon who is also the captain with BOTH marks", () => {
+    const t = buildTeamPoster({
+      ...TEAM,
+      members: [
+        {
+          name: "Bhaira Ram",
+          role: "batsman",
+          marks: ["icon", "captain"],
+          pricePaise: null,
+          photoUrl: null,
+        },
+      ],
+    });
+    expect(t.rows[0]?.badges).toEqual(["C", "ICON"]);
+    // A table row has room for one word, and ICON is the one people look for.
+    expect(t.rows[0]?.markerLabel).toBe("ICON");
+  });
+
+  it("names the coach, refuses a colour that is not a hex, and keeps one that is", () => {
+    const t = buildTeamPoster({ ...TEAM, coachName: "  Ramesh Godara ", teamColor: "#1f6f43" });
+    expect(t.coachName).toBe("Ramesh Godara");
+    expect(t.teamColor).toBe("#1F6F43");
+    expect(buildTeamPoster({ ...TEAM, coachName: "  ", teamColor: "red" })).toMatchObject({
+      coachName: null,
+      teamColor: null,
+    });
   });
 
   /*
@@ -113,8 +189,9 @@ describe("team poster", () => {
    */
   it("prices no pre-signed player", () => {
     const t = buildTeamPoster(TEAM);
-    expect(t.rows[2]?.priceLabel).toBeNull();
-    expect(t.rows[2]?.markerLabel).toBe("ICON");
+    const icon = t.rows.find((row) => row.name === "Bhaira Ram");
+    expect(icon?.priceLabel).toBeNull();
+    expect(icon?.markerLabel).toBe("ICON");
   });
 
   it("never reports negative money left, however the purse was configured", () => {
@@ -133,7 +210,8 @@ describe("team poster", () => {
       name: `Player ${String(i)}`,
       role: "batsman",
       pricePaise: 100_000,
-      marker: null,
+      marks: [],
+      photoUrl: null,
     }));
     expect(buildTeamPoster({ ...TEAM, members }).rows).toHaveLength(18);
   });
@@ -151,15 +229,30 @@ describe("poster shapes and themes", () => {
    * NOT 1200x630 — the link-preview shape, which is wrong for the two places a
    * poster is actually posted.
    */
-  it("offers a feed square and a full-bleed story, both 1080 wide", () => {
+  it("offers a feed square, a 4:5 feed portrait and a full-bleed story, all 1080 wide", () => {
     expect(POSTER_SIZES.square).toEqual({ width: 1080, height: 1080 });
+    expect(POSTER_SIZES.portrait).toEqual({ width: 1080, height: 1350 });
     expect(POSTER_SIZES.story).toEqual({ width: 1080, height: 1920 });
+  });
+
+  it("draws every kind in at least one size, and the whole season only tall", () => {
+    for (const kind of POSTER_KINDS) {
+      expect(POSTER_KIND_SIZES[kind].length).toBeGreaterThan(0);
+      expect(isPosterKind(kind)).toBe(true);
+    }
+    expect(POSTER_KIND_SIZES.season).not.toContain("square");
+    expect(isPosterKind("constructor")).toBe(false);
+    expect(isTopBuyCount(5)).toBe(true);
+    expect(isTopBuyCount(7)).toBe(false);
   });
 
   it("validates theme and size from untrusted query strings", () => {
     expect(isPosterTheme("gold")).toBe(true);
     expect(isPosterTheme("../../etc/passwd")).toBe(false);
     expect(isPosterSize("story")).toBe(true);
+    expect(isPosterSize("portrait")).toBe(true);
+    expect(isPosterTheme("matchday")).toBe(true);
+    expect(isPosterTheme("minimal")).toBe(true);
     expect(isPosterSize("banner")).toBe(false);
   });
 
@@ -181,5 +274,102 @@ describe("poster shapes and themes", () => {
     expect(monogramOf("Bishnoi Sports Club (Bangalore)")).toBe("BB");
     expect(monogramOf("'Quoted' Name")).toBe("QN");
     expect(monogramOf("!!! ???")).toBe("?");
+  });
+});
+
+describe("names and colours for small tiles", () => {
+  it("shortens to a first name and an initial, and never below one word", () => {
+    expect(shortNameOf("Prakash Bishnoi")).toBe("Prakash B.");
+    expect(shortNameOf("Mlaram")).toBe("Mlaram");
+    expect(shortNameOf("  Dev  Kumar  Nair ")).toBe("Dev N.");
+    expect(firstNameOf("Venkataraghavan Subramaniam")).toBe("Venkatara…");
+  });
+
+  it("normalizes a team colour, and refuses anything that could escape a CSS string", () => {
+    expect(normalizeHexColor("#abc")).toBe("#AABBCC");
+    expect(normalizeHexColor(" #1d4e89 ")).toBe("#1D4E89");
+    for (const bad of ["red", "#12345", "url(x)", "#123456;background:red", "", null, undefined]) {
+      expect(normalizeHexColor(bad)).toBeNull();
+    }
+  });
+});
+
+const BUY = (name: string, price: number, team = "Alpha XI"): TopBuyInput => ({
+  playerName: name,
+  role: "batter",
+  photoUrl: null,
+  pricePaise: price,
+  teamName: team,
+  teamColor: "#1d4e89",
+  teamCrestUrl: null,
+});
+
+describe("top buys poster", () => {
+  it("ranks by price, highest first, and keeps the source's order on a tie", () => {
+    const p = buildTopBuysPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      count: 3,
+      buys: [
+        BUY("Cheap", 100_000),
+        BUY("Tie A", 500_000),
+        BUY("Top", 900_000),
+        BUY("Tie B", 500_000),
+      ],
+    });
+    expect(p.rows.map((row) => row.name)).toEqual(["Top", "Tie A", "Tie B"]);
+    expect(p.rows.map((row) => row.rankLabel)).toEqual(["01", "02", "03"]);
+    expect(p.rows[0]?.priceLabel).toBe("₹9,000");
+    expect(p.rows[0]?.teamColor).toBe("#1D4E89");
+    expect(p.title).toBe("TOP 3 BUYS");
+  });
+
+  it("titles what is ON the poster, not what was asked for", () => {
+    const two = buildTopBuysPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      count: 10,
+      buys: [BUY("One", 100_000), BUY("Two", 200_000)],
+    });
+    expect(two.title).toBe("TOP 2 BUYS");
+    expect(two.chip).toBe("Top 2");
+    const one = buildTopBuysPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      count: 5,
+      buys: [BUY("One", 100_000)],
+    });
+    expect(one.title).toBe("TOP BUY");
+  });
+});
+
+describe("season poster", () => {
+  it("counts every player and every rupee, and orders each squad like its own poster", () => {
+    const p = buildSeasonPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      squads: [
+        {
+          teamName: "Alpha XI",
+          teamColor: "#1f6f43",
+          teamCrestUrl: null,
+          members: TEAM.members,
+          spentPaise: 2_500_000,
+        },
+        {
+          teamName: "Beta United",
+          teamCrestUrl: null,
+          members: TEAM.members.slice(0, 1),
+          spentPaise: 400_000,
+        },
+      ],
+    });
+    expect(p.countLine).toBe("4 players · 2 teams");
+    expect(p.chip).toBe("2 teams");
+    expect(p.spentLabel).toBe("₹29,000");
+    expect(p.largestSquad).toBe(3);
+    expect(p.squads[0]?.rows[0]?.isCaptain).toBe(true);
+    expect(p.squads[0]?.teamColor).toBe("#1F6F43");
+    expect(p.squads[1]?.countLabel).toBe("1 player");
   });
 });

@@ -72,8 +72,16 @@ export const GavelButton = forwardRef<
         style={{ transform: `scaleX(${String(gate.progress)})` }}
         aria-hidden="true"
       />
+      {/* BOTH labels are always laid out, one hidden: the button keeps the
+          width of the longer one. Swapping the text shrank a content-sized
+          button under the pointer the instant it was pressed, the browser
+          fired pointerleave 2ms later, and the gate stopped — the gavel on
+          /live could not be held with a mouse at all. */}
       <span className="cockpit-gavel-label">
-        {gate.holding ? "Hold…" : "Gavel — hold to close"}
+        <span className="cockpit-gavel-texts">
+          <span data-shown={gate.holding ? "false" : "true"}>Gavel — hold to close</span>
+          <span data-shown={gate.holding ? "true" : "false"}>Hold…</span>
+        </span>
         <kbd>Space</kbd>
       </span>
     </button>

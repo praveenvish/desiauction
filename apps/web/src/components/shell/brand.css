@@ -1,0 +1,131 @@
+/* ==========================================================================
+   THE ONE LOCKUP (brand.tsx). The public header's lockup is the reference:
+   Geist semibold, tight tracking, "Auction" in the accent, and the tagline
+   set small, medium-weight and widely tracked beneath it. Tones change the
+   SCALE and the ink only — never the words or the proportions.
+   ========================================================================== */
+
+.da-wordmark {
+  display: block;
+  white-space: nowrap;
+  line-height: 1.15;
+  font-family: var(--font-text);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.da-wordmark-accent {
+  color: var(--text-accent);
+}
+
+.da-wordmark-tagline {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-text);
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.13em;
+  color: var(--text-secondary);
+}
+
+/* ---- header: the public site header owns the size (23 / 20 / 18px) ---- */
+@media (max-width: 359px) {
+  .da-wordmark--header .da-wordmark-tagline {
+    font-size: 7px;
+    letter-spacing: 0.1em;
+  }
+}
+
+/* ---- rail: the console sidebar. The rail's own ink (identity glyph on navy,
+   heading ink on the warm daylight rail) is inherited; the tagline is that ink
+   softened, so it follows the rail through both themes. ---- */
+.da-wordmark--rail {
+  font-size: 20px;
+}
+.da-wordmark--rail .da-wordmark-tagline {
+  margin-top: 5px;
+  font-size: 7.5px;
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, currentColor 64%, transparent);
+}
+
+/* ---- live: the dark strip over the live room, cockpit and spectate ---- */
+.da-wordmark--live {
+  font-size: 18px;
+  color: var(--text-heading);
+}
+.da-wordmark--live .da-wordmark-tagline {
+  margin-top: 4px;
+  font-size: 7px;
+  letter-spacing: 0.12em;
+}
+
+/* ---- page: a shell-less page (onboarding) — the header's own scale ---- */
+.da-wordmark--page {
+  font-size: 20px;
+  color: var(--text-heading);
+}
+
+/* ---- board: a projector. Scales with the frame so it reads from the back of
+   a hall without ever out-shouting the lot. ---- */
+.da-wordmark--board {
+  font-size: clamp(18px, 1.35vw, 30px);
+  color: var(--text-heading);
+}
+.da-wordmark--board .da-wordmark-tagline {
+  margin-top: 0.3em;
+  font-size: max(8px, 0.36em);
+  letter-spacing: 0.16em;
+}
+
+/* ---- bug: the overlay's "powered by" corner, on top of somebody's video ---- */
+.da-wordmark--bug {
+  font-size: 16px;
+  color: var(--text-heading);
+}
+.da-wordmark--bug .da-wordmark-tagline {
+  margin-top: 3px;
+  font-size: 6.5px;
+  letter-spacing: 0.12em;
+}
+
+/* ---- the mark beside the words (BrandLockup) ---- */
+.da-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.da-lockup-mark {
+  flex: none;
+  display: block;
+  width: 42px;
+  height: 42px;
+  /* The mark carries its own gold tile and corners; this only clips the
+     raster edge to them. */
+  border-radius: 28%;
+  overflow: hidden;
+}
+
+.da-lockup--page .da-lockup-mark {
+  width: 36px;
+  height: 36px;
+}
+
+.da-lockup--board {
+  gap: clamp(10px, 0.8vw, 16px);
+}
+.da-lockup--board .da-lockup-mark {
+  width: clamp(34px, 2.6vw, 56px);
+  height: clamp(34px, 2.6vw, 56px);
+}
+
+.da-lockup--bug {
+  gap: 8px;
+}
+.da-lockup--bug .da-lockup-mark {
+  width: 30px;
+  height: 30px;
+}

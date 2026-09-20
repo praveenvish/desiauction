@@ -192,6 +192,9 @@ export default async function RootLayout({
   const competitions = (competitionsView_?.competitions ?? []).map((competition) => ({
     slug: competition.slug,
     name: competition.name,
+    status: competition.status,
+    location: competition.location,
+    startsOn: competition.startsOn,
     orgName: competition.orgName,
     orgSlug: orgSlugById.get(competition.orgId) ?? "",
     canSettle: settlementOrgs.has(competition.orgId),

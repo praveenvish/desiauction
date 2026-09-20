@@ -143,6 +143,21 @@
   gap: var(--space-2);
 }
 
+/* At 320px the shell ribbon was 20px wider than the screen: the version and
+   the name refused to give way. The status row may wrap, and the version —
+   an operator's figure, repeated in the room's diagnostics — steps aside. */
+@media (max-width: 400px) {
+  .status-ribbon--shell {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .status-ribbon--shell .ribbon-version {
+    display: none;
+  }
+}
+
 /* The Live shell's header carries the status now, so it has to behave like a
    status bar: it stays put while the page scrolls, and it wraps to a second
    row rather than shoving the ribbon off a 320px screen. Scoped to the Live
@@ -229,7 +244,14 @@
    *
    * 420px clears every phase at 400px and up, with ~24px of headroom for a
    * longer name than the demo's; 460px clears the two-line name a narrow screen
-   * forces. Nothing is lost by the extra space: the phases that gain it —
+   * forces.
+   *
+   * THE PORTRAIT is then added on top, counted rather than measured: a lot on
+   * the block and an outcome splash both carry the player's face in a box of
+   * fixed size (`.ceremony-portrait` — 120px plus its 12px margin at 400px and
+   * up, 88px plus 12px below), so 420 + 132 = 552 and 460 + 100 = 560. The
+   * phases without a subject (connecting, between lots, complete) simply gain
+   * the space. Nothing is lost by the extra space: the phases that gain it —
    * connecting, between lots, complete — are exactly the phases with NO bid
    * control on screen, so the button a bidder reaches for is never pushed down
    * by this. When a lot is live the stage is at its natural height anyway.
@@ -239,7 +261,7 @@
    * TOP of the number above, and the stage renders 466px where the comment
    * promises 400. Measured that way round the first time. */
   box-sizing: border-box;
-  min-height: 420px;
+  min-height: 552px;
   padding: 32px 24px;
   text-align: center;
   background: var(--surface-sunken);
@@ -254,7 +276,7 @@
    at 390px. */
 @media (max-width: 399px) {
   .ceremony {
-    min-height: 460px;
+    min-height: 560px;
   }
 }
 
@@ -309,6 +331,33 @@
     color-mix(in srgb, var(--surface-sunken) 74%, transparent) 66%,
     color-mix(in srgb, var(--surface-sunken) 32%, transparent) 100%
   );
+}
+
+/* --- the portrait ----------------------------------------------------------- */
+/* The player's face — photo or branded mark — in a box of FIXED size, so it is
+   part of the stage's measured height (see `.ceremony`) rather than a row that
+   appears and disappears. The image fills the box (`PlayerImage fluid`). */
+.ceremony-portrait {
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 12px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+}
+
+@media (max-width: 399px) {
+  .ceremony-portrait {
+    width: 88px;
+    height: 88px;
+  }
+}
+
+/* SOLD: the frame turns gold with the stage, and the face settles in with the
+   name — transform only, like every fact on this stage. */
+.ceremony-sold .ceremony-portrait {
+  box-shadow: 0 0 0 2px var(--ceremony-gold);
+  animation: ceremony-fact var(--duration-emphatic) var(--ease-out) both;
 }
 
 /* The registration number, inline inside a line the stage already had. */
@@ -383,6 +432,64 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-heading);
+}
+
+/* --- the results showcase (the finished stage) -----------------------------
+   The last frame of the night used to be 552px of black with "3/3 LOTS
+   RESOLVED" floating in the middle of it — on the screen the product is most
+   often shared from. The height was already paid for (see `.ceremony`): the
+   finished phase simply never spent it. It spends it on the people. */
+.ceremony-showcase {
+  display: grid;
+  /* Always one ROW: a podium that wraps to 2 + 1 reads as an accident. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-5);
+  width: min(100%, 640px);
+  margin: var(--space-2) auto 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ceremony-showcase-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ceremony-showcase-face {
+  display: block;
+  width: clamp(72px, 16vw, 112px);
+  height: clamp(72px, 16vw, 112px);
+  margin-bottom: var(--space-2);
+}
+
+.ceremony-showcase-rank {
+  font-size: var(--text-xs-size);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ceremony-showcase-name {
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.ceremony-showcase-price {
+  font-family: var(--font-display);
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-accent);
+}
+
+.ceremony-showcase-team {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
 }
 
 .ceremony-waiting-hint {
@@ -477,7 +584,7 @@
 
 /* Beat 3's atmosphere: gold climbs the height of the stage. */
 .ceremony-drift {
-  --drift-height: 420px;
+  --drift-height: 552px;
 }
 
 /* Beat 2 — the stamp takes the title's place. */
@@ -610,6 +717,7 @@
 
   .ceremony-sold,
   .ceremony-sold .ceremony-backdrop img,
+  .ceremony-sold .ceremony-portrait,
   .ceremony-sold .ceremony-player,
   .ceremony-sold .ceremony-bid,
   .ceremony-leader--sold {
@@ -829,6 +937,14 @@
   position: relative;
   flex: none;
   display: flex;
+}
+
+/* THE SPECTATOR'S STAGE. A guest came to watch a PERSON be sold; 96px is the
+   thumbnail an owner's console wants. The box is definite at every width (the
+   primitive fills it), so the zero-layout-shift contract is unchanged. */
+.lot-hero-figure--lg {
+  width: clamp(104px, 13vw, 168px);
+  height: clamp(104px, 13vw, 168px);
 }
 
 /* THE PLAYER'S OWN NUMBER — the one on the shirt and on their public page, not
@@ -1376,7 +1492,9 @@
    whose whole job is naming players must never eat a name to fit a badge. */
 .squad-row {
   display: flex;
-  align-items: baseline;
+  /* Centre, not baseline: the row now opens with the player's face, and a
+     baseline row sits a 24px image on the text's baseline, not beside it. */
+  align-items: center;
   flex-wrap: wrap;
   gap: 2px var(--space-2);
   padding: var(--space-2) 0;
@@ -2094,6 +2212,13 @@
   letter-spacing: 0.24em;
 }
 
+/* The hall's portrait: bounded by the short edge like everything else here,
+   so a 16:9 wall still has room for the name, the price and the clock. */
+.stage-mode .ceremony-portrait {
+  width: clamp(7rem, min(18vw, 20vh), 13rem);
+  height: clamp(7rem, min(18vw, 20vh), 13rem);
+}
+
 .stage-mode .ceremony-player {
   font-size: clamp(2.5rem, min(11vw, 12vh), 8.5rem);
   line-height: 1.02;
@@ -2106,6 +2231,31 @@
 
 .stage-mode .ceremony-timer {
   font-size: clamp(1.5rem, min(4vw, 5vh), 3rem);
+}
+
+/* On the wall the showcase grows with everything else — bounded by the short
+   edge, like every other figure on the projected stage. */
+.stage-mode .ceremony-showcase {
+  width: min(100%, 72vw);
+  gap: clamp(var(--space-3), 2vh, var(--space-8));
+}
+
+.stage-mode .ceremony-showcase-face {
+  width: clamp(5rem, min(13vw, 16vh), 11rem);
+  height: clamp(5rem, min(13vw, 16vh), 11rem);
+}
+
+.stage-mode .ceremony-showcase-name {
+  font-size: clamp(1rem, min(2.4vw, 2.8vh), 2rem);
+}
+
+.stage-mode .ceremony-showcase-price {
+  font-size: clamp(1.25rem, min(3.4vw, 4vh), 3rem);
+}
+
+.stage-mode .ceremony-showcase-rank,
+.stage-mode .ceremony-showcase-team {
+  font-size: clamp(0.8rem, min(1.4vw, 1.8vh), 1.25rem);
 }
 
 .stage-mode .ceremony-waiting-title {
@@ -2308,12 +2458,21 @@
 
 .up-next-list li {
   display: flex;
-  align-items: baseline;
+  /* Centre: each line opens with the player's face (see `.squad-row`). */
+  align-items: center;
   flex-wrap: wrap;
   gap: 2px var(--space-2);
   padding: var(--space-2) 0;
   border-top: 1px solid var(--border-subtle);
   font-size: var(--text-sm-size);
+}
+
+/* The live timeline and the owner's squad list open lines with a face; a
+   baseline (or top) row would hang the text off the image's edge. Scoped by
+   modifier because `.timeline` and `.conflict-list` are shared app-wide. */
+.timeline--faces li,
+.my-squad-list li {
+  align-items: center;
 }
 
 .up-next-list li:first-child {
@@ -2419,6 +2578,19 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* Two labels in one cell: the box is as wide as the longer, whichever shows. */
+.cockpit-gavel-texts {
+  display: inline-grid;
+}
+
+.cockpit-gavel-texts > * {
+  grid-area: 1 / 1;
+}
+
+.cockpit-gavel-texts > [data-shown="false"] {
+  visibility: hidden;
 }
 
 /* Shortcut legend */
@@ -2639,13 +2811,11 @@
   min-width: 32px;
 }
 
-/* Auctioneer appointment (launch polish, Phase 3) — flat section. */
-.auctioneers {
+/* Auctioneer appointment (launch polish, Phase 3) — a console-kit card. */
+.auctioneers-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--border-subtle);
 }
 
 .auctioneers-head h2 {
@@ -2824,4 +2994,31 @@
   padding: 0;
   background: transparent;
   color: var(--text-muted);
+}
+
+/* --- faces on the record surfaces (ledger, replay) ------------------------- */
+/* The ledger's Lot cell and the replay's subject line open with the player's
+   face; the text keeps its own node, so the evidence reads exactly as before. */
+.ledger-lot,
+.replay-subject {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.replay-subject {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.replay-subject > p {
+  margin: 0;
+}
+
+/* The cockpit's right-hand tabs (Purses · Owners · Screens). */
+.cockpit-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
 }

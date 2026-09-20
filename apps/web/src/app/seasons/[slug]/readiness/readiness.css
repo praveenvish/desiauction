@@ -1,0 +1,109 @@
+/* READINESS (page.tsx): the auction's gates as a checklist, then each area of
+   preparation with where it stands and where to change it. Tokens only. */
+
+.rd-checks,
+.rd-areas {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rd-checks > li,
+.rd-areas > li {
+  display: grid;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.rd-checks > li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.rd-areas > li {
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(9rem, auto);
+}
+
+.rd-checks > li:first-child,
+.rd-areas > li:first-child {
+  padding-top: 0;
+}
+
+.rd-checks > li:last-child,
+.rd-areas > li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.rd-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--success-base);
+  color: var(--text-on-dark);
+}
+
+.rd-checks > li[data-pass="false"] .rd-mark {
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+}
+
+.rd-checks > li[data-pass="false"][data-soft="true"] .rd-mark {
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+}
+
+.rd-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rd-text strong {
+  font-size: var(--text-sm-size);
+  color: var(--text-heading);
+}
+
+.rd-state {
+  display: inline-flex;
+}
+
+.rd-areas .st-link {
+  justify-self: end;
+}
+
+.rd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .rd-checks > li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .rd-checks > li > :last-child {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .rd-areas > li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .rd-areas .st-link {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+
+  .rd-actions > * {
+    flex: 1 1 100%;
+  }
+}

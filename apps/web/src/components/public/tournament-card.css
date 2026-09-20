@@ -1,0 +1,309 @@
+/* THE TOURNAMENT CARD — see `tournament-card.tsx`. Tokens only. */
+
+.tc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: var(--space-5);
+}
+
+.tc {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+/* ---- banner ---- */
+
+.tc-banner {
+  position: relative;
+  aspect-ratio: 5 / 2;
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+
+.tc-banner .pk-sport-art,
+.tc-cover {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  border-radius: 0;
+  border: 0;
+  object-fit: cover;
+}
+
+.tc-banner .pk-sport-glyph {
+  width: 42%;
+  max-width: 150px;
+}
+
+.tc-status {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-start: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-1);
+}
+
+/* THE STATE IS THE DOT, NOT THE WORDS.
+   The label used to take the state's own colour, and on the white pill that
+   made "Live now" 3.43:1 — under AA for small text, caught by the two-theme
+   sweep. The mockup draws it the right way round anyway: a coloured dot and
+   dark text. The dot is non-text, so 3:1 is its bar and every tone clears it. */
+.tc-status::before {
+  content: "";
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: var(--radius-full);
+  background: var(--tc-dot, var(--text-muted));
+}
+
+.tc-status[data-tone="live"] {
+  --tc-dot: var(--live);
+}
+
+.tc-status[data-tone="open"] {
+  --tc-dot: var(--success-base);
+}
+
+.tc-status[data-tone="closed"] {
+  --tc-dot: var(--text-muted);
+}
+
+/* ---- body ---- */
+
+.tc-body {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding: var(--space-5);
+}
+
+.tc-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: start;
+  min-width: 0;
+}
+
+.tc-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.tc-crest img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tc-title-block {
+  min-width: 0;
+}
+
+.tc-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--text-heading);
+  text-wrap: balance;
+}
+
+.tc-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The card's hit area, without nesting the action inside the title's anchor. */
+.tc-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.tc-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.tc-org {
+  margin: var(--space-05) 0 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* ---- facts ---- */
+
+.tc-facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.tc-fact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tc-fact dt {
+  display: flex;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.tc-fact dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Visually hidden, but the label stays in the accessibility tree: a screen
+   reader hearing three values in a row needs to know which is which. */
+.tc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- foot ---- */
+
+.tc-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tc-tag {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.tc-action {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tc-action[data-primary] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.tc-action:hover {
+  border-color: var(--border-interactive);
+}
+
+.tc-action[data-primary]:hover {
+  background: var(--accent-hover);
+}
+
+.tc-action:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- the featured card (landing) ---- */
+
+@media (min-width: 760px) {
+  .tc[data-feature] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
+  .tc[data-feature] .tc-banner {
+    height: 100%;
+    aspect-ratio: auto;
+  }
+
+  .tc[data-feature] .tc-title {
+    font-size: 1.375rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tc {
+    transition:
+      transform 180ms ease,
+      box-shadow 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .tc:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-3);
+    border-color: var(--border-interactive);
+  }
+
+  .tc:hover .tc-cover,
+  .tc:hover .pk-sport-glyph {
+    transform: scale(1.03);
+  }
+
+  .tc-cover,
+  .pk-sport-glyph {
+    /* `base`, not a raw 240ms: a card hover is the same beat as every other
+       hover in the product, and the scale is not encoding a relationship that
+       a rung would break. */
+    transition: transform var(--duration-base) ease;
+  }
+}

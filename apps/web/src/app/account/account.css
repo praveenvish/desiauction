@@ -1,418 +1,825 @@
-.account {
-  /* Settings layout (launch polish, Phase 4): a sticky section index beside
-     the sections, aligned to the page gutter — it used to be one 520px column
-     centred in the viewport with the rest of the page left empty. */
+/* /account — the identity card, a jump row, then the settings cards in two
+   columns on a laptop and one on a phone. Tokens only; daylight + floodlight.
+   The cards themselves are the console kit's SectionCard; this file lays them
+   out and styles what goes inside them. */
+
+.acct {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.acct a:focus-visible,
+.acct button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A card jumped to from the row below the hero stops clear of the top bar. */
+.acct-card,
+.acct [id] {
+  scroll-margin-top: var(--space-20, 88px);
+}
+
+/* The kit's card body is a plain block; the settings inside it stack with one
+   rhythm. (The body is the card's last child — its header is the first.) */
+.acct-card > :last-child:not(header) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---- top: identity card + profile strength -------------------------------- */
+
+.acct-top {
   display: grid;
-  grid-template-columns: 200px minmax(0, 720px);
-  gap: var(--space-10);
-  align-items: start;
-  color: var(--text-primary);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+@media (min-width: 1024px) {
+  .acct-top {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: stretch;
+  }
+}
+
+.acct-id {
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  padding: var(--space-6);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+/* A soft wash of the accent behind the photo — the card's one flourish. */
+.acct-id-glow {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 96px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-subtle) 90%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.acct-id-main {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.acct-id-photo {
+  flex: none;
+  padding: 4px;
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.acct-id-photo-box {
+  display: block;
+  width: 96px;
+  height: 96px;
+}
+
+.acct-id-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.acct-id-name {
+  margin: 0;
   font-family: var(--font-text);
-  padding: var(--space-2) 0 var(--space-12);
+  letter-spacing: -0.01em;
+  font-size: var(--text-2xl-size, 1.5rem);
+  line-height: 1.2;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
 }
 
-.account-nav {
-  position: sticky;
-  top: calc(var(--shell-topbar-h, 64px) + var(--space-5));
-}
-
-.account-nav ul {
+.acct-id-contacts,
+.acct-id-sports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.acct-id-contacts {
+  flex-direction: column;
+}
+
+.acct-id-contacts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.acct-id-contacts li > svg {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.acct-id-contacts [data-testid="account-phone"],
+.acct-id-email {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.acct-id-sports {
+  gap: var(--space-2);
+}
+
+.acct-id-facts {
+  position: relative;
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.acct-id-facts li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.acct-id-fact-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.acct-id-fact-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.acct-id-fact-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.acct-id-fact-value {
+  color: var(--text-heading);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.acct-id-fact-label {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.acct-id-foot {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.acct-id-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.acct-id-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.acct-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.acct-link:hover {
+  text-decoration: underline;
+}
+
+.acct-strength {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.acct-checklist {
+  box-sizing: border-box;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 0 var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  list-style: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+.acct-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+}
+
+a.acct-check-row:hover {
+  background: var(--surface-sunken);
+}
+
+.acct-check-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.acct-checklist li[data-done="true"] .acct-check-row {
+  color: var(--text-secondary);
+}
+
+.acct-checklist li[data-done="true"] .acct-check-icon {
+  color: var(--success-base);
+}
+
+.acct-check-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.acct-check-hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+/* ---- jump row ---------------------------------------------------------------- */
+
+.acct-nav ul {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.acct-nav ul::-webkit-scrollbar {
+  display: none;
+}
+
+.acct-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  white-space: nowrap;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.acct-nav a:hover {
+  border-color: var(--border-strong);
+  color: var(--text-heading);
+}
+
+.acct-nav a svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-accent);
+}
+
+/* ---- the two columns --------------------------------------------------------- */
+
+.acct-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.acct-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+@media (min-width: 1100px) {
+  .acct-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.acct-fineprint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-sm-line);
+}
+
+.acct-fineprint a {
+  color: var(--text-accent);
+}
+
+.acct-form-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---- name & contact ---------------------------------------------------------- */
+
+.acct-name-form,
+.enroll-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+/* The button lines up with the input, not with the label above it. */
+.acct-name-form > button {
+  margin-top: calc(var(--text-sm-line) + var(--space-2));
+}
+
+.acct-contacts {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.acct-contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.acct-contact:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.acct-contact-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.acct-contact-text {
+  flex: 1 1 12rem;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.account-nav a {
-  display: flex;
-  align-items: center;
-  min-height: 36px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-md);
+.acct-contact-label {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.acct-contact-value {
+  color: var(--text-primary);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.acct-contact-empty {
   color: var(--text-secondary);
-  text-decoration: none;
+  font-weight: var(--font-weight-regular);
 }
 
-.account-nav a:hover {
-  background: var(--surface-sunken);
-  color: var(--text-heading);
-}
-
-.account-stack {
-  width: 100%;
+.acct-contact-flow {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-lg);
 }
 
-.account-section,
-.account-card[id] {
-  scroll-margin-top: calc(var(--shell-topbar-h, 64px) + var(--space-5));
+.acct-flow-title {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
 }
 
-@media (max-width: 899px) {
-  .account {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-5);
-  }
-
-  .account-nav {
-    position: static;
-    overflow-x: auto;
-  }
-
-  .account-nav ul {
-    flex-direction: row;
-    gap: var(--space-2);
-  }
-
-  .account-nav a {
-    white-space: nowrap;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-full);
-    min-height: 36px;
-  }
+.acct-flow-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
 }
 
-.account-card {
+.acct-flow-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
   width: 100%;
 }
 
-.account-card h2 {
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
+.acct-flow-form > :not(button) {
+  width: 100%;
+}
+
+/* ---- player profile + sports ------------------------------------------------- */
+
+.cricket-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cricket-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+
+@media (max-width: 599px) {
+  .cricket-profile-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.acct-sport {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.acct-sport-title {
+  margin: 0;
+  font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
-  margin: 0 0 var(--space-3);
+}
+
+.acct-add-sport {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ---- sign-in & security ------------------------------------------------------- */
+
+.acct-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.acct-block + .acct-block {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.acct-block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.acct-block-title {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.acct-block-empty,
+.security-intro,
+.security-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
 }
 
 .security-list {
-  list-style: none;
-  margin: 0 0 var(--space-4);
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* Two lines, not one squeezed row: name (and badge) beside the action on the
-   first line, the dates on their own line under it. In a 520px column the old
-   single-file flex row wrapped "last active" mid-phrase and folded dates into
-   fragments beside four identical device names. */
 .security-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  column-gap: var(--space-3);
-  row-gap: 2px;
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
-  min-height: 32px;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.security-list li:last-child {
+  border-bottom: 0;
+}
+
+.security-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .security-name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--text-primary);
+  font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
   overflow-wrap: anywhere;
 }
 
 .security-meta {
   color: var(--text-muted);
-  grid-column: 1 / -1;
-  grid-row: 2;
-}
-
-/* Event rows are label + one timestamp — they stay single-line, time on the
-   right, rather than paying the sessions' two-line layout for one date. */
-.events .security-meta {
-  grid-column: 2;
-  grid-row: 1;
-  text-align: right;
+  font-size: var(--text-xs-size);
 }
 
 .security-actions {
-  grid-column: 2;
-  grid-row: 1;
-  display: inline-flex;
-  gap: var(--space-1);
-  flex-shrink: 0;
-}
-
-.enroll-row {
+  flex: none;
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-3);
+  gap: var(--space-1);
 }
 
-.enroll-row > :first-child {
-  flex: 1;
-}
-
-/* Security activity is PROSE now (shared with /inbox), so it is set in the text
-   face like every other sentence in the product. The monospace treatment only
-   survives for an action key this build has no name for — where the raw string
-   IS the content and reads as a token on purpose. */
 .events .security-name {
+  flex: 1;
   font-weight: var(--font-weight-regular);
 }
 
 .events .security-name[data-raw="true"] {
   font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
 }
 
-.security-intro {
-  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
+.events li {
+  min-height: 0;
+  padding: var(--space-3) 0;
+}
+
+.events .security-meta {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.security-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+}
+
+.events li:first-child .security-dot {
+  background: var(--accent);
+}
+
+.enroll-row > button {
+  margin-top: calc(var(--text-sm-line) + var(--space-2));
 }
 
 .security-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-}
-
-.security-note {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
+  gap: var(--space-3);
 }
 
 .security-error {
   margin: var(--space-3) 0 0;
   color: var(--danger-strong);
   font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
 }
 
-.account-prose {
-  margin: 0 0 var(--space-3);
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-md-line);
-}
+/* ---- notifications ------------------------------------------------------------ */
 
-.account-prose:last-child {
-  margin-bottom: 0;
-}
-
-.account-links {
-  color: var(--text-muted);
-}
-
-.account-facts {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-05) 0;
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-md-line);
-}
-
-.account-facts dt {
-  color: var(--text-heading);
-  font-weight: var(--font-weight-semibold);
-}
-
-.account-facts dd {
-  margin: 0 0 var(--space-2);
-  color: var(--text-secondary);
-}
-
-.account-facts dd:last-child {
-  margin-bottom: 0;
-}
-
-.account-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
-.account-head h1 {
-  font-family: var(--font-text);
-  letter-spacing: -0.01em;
-  font-weight: 600;
-  font-size: var(--text-2xl-size);
-  line-height: var(--text-2xl-line);
-  color: var(--text-heading);
-  margin: 0;
-}
-
-.account dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-1) var(--space-4);
-  margin: 0 0 var(--space-5);
-  font-size: var(--text-md-size);
-  line-height: var(--text-md-line);
-}
-
-.account dt {
-  color: var(--text-muted);
-}
-
-.account dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.profile-head {
+.acct-always {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
-  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-lg);
 }
 
-.profile-id {
+.acct-always-text {
+  flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.profile-id h2 {
+.acct-always-label {
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.acct-always-detail {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.acct-always-tag {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The shared switch rows (base.css), drawn here as real switches: a hairline
+   list, the label on the left, the track on the right. Still a checkbox to
+   every assistive technology — only its paint changes. */
+.acct .notify-switches {
+  gap: 0;
   margin: 0;
 }
 
-.profile-name {
-  margin: var(--space-05) 0 0;
-  color: var(--text-primary);
-  font-weight: var(--font-weight-medium);
-  overflow-wrap: anywhere;
-}
-
-.profile-signout {
-  margin-left: auto;
-}
-
-.profile-phone {
-  margin: var(--space-05) 0 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  display: inline-flex;
+.acct .notify-switch {
+  flex-direction: row-reverse;
+  justify-content: space-between;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
 }
 
-.profile-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
+.acct .notify-switch:hover {
+  background: transparent;
 }
 
-/* "Save name" used to stretch full-bleed at 478px — a 460px-wide secondary
-   button for a two-word action, reading as the page's primary commitment. */
-.profile-save {
-  display: flex;
+.acct [data-testid="whatsapp-switch"] .notify-switch {
+  border-bottom: 0;
 }
 
-.profile-completion {
-  border-top: 1px solid var(--border-subtle);
-  padding-top: var(--space-3);
+.acct .notify-switch-label {
   font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
 }
 
-.profile-completion-label {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
+.acct .notify-switch-detail {
+  font-size: var(--text-xs-size);
 }
 
-.profile-completion ul {
-  list-style: none;
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  color: var(--text-secondary);
+.acct .notify-switch input {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-.profile-completion li[data-done="true"] {
-  color: var(--success-strong);
+.acct .notify-switch input::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
-.profile-hint {
-  color: var(--text-muted);
+.acct .notify-switch input:checked {
+  background: var(--accent);
 }
 
-/*
- * The notification switches. This card used to carry a paragraph explaining
- * that stopping registration SMS was handled by a person rather than a toggle,
- * because there was no column to persist one. There is now, and `maySend`
- * reads it before every send.
- */
-.account-subhead {
-  margin: var(--space-4) 0 var(--space-1);
-  font-size: var(--text-sm-size);
-  color: var(--text-heading);
+.acct .notify-switch input:checked::before {
+  transform: translateX(16px);
 }
 
-/*
- * CHANGE MOBILE NUMBER — a disclosure, not an open field.
- *
- * Separated from the profile form above it by a rule, because the two forms do
- * very different things: one edits a display name, the other moves the
- * credential this product signs people in with.
- */
-.phone-change {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
+.acct .notify-switch input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
-/*
- * CRICKET PROFILE (PI-1) — the person-level defaults grid. Two columns where
- * they fit, one where they don't; the save row keeps the profile form's
- * right-aligned convention.
- */
-.cricket-profile-form {
-  margin-top: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+.acct .notify-switch input:disabled {
+  cursor: progress;
+  opacity: 0.7;
 }
 
-.cricket-profile-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
+/* ---- privacy & data ------------------------------------------------------------ */
 
-@media (max-width: 719px) {
-  .cricket-profile-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* Account deletion: the request, and its pending / declined states. */
 .account-erasure {
   display: grid;
   gap: var(--space-3);
   justify-items: start;
 }
+
+.account-erasure .account-prose {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
 .account-erasure-form {
   display: grid;
   gap: var(--space-4);
 }
+
 .account-erasure-check {
   display: flex;
   gap: var(--space-2);
   align-items: flex-start;
   min-height: 44px;
 }
+
 .account-erasure-actions {
   display: flex;
   flex-wrap: wrap;
@@ -420,222 +827,84 @@
   justify-content: flex-end;
 }
 
-/* ==========================================================================
-   ONE SETTINGS GRAMMAR (launch polish, Phase 4). The founder's read of this
-   page was "bad UI", and the screenshot agreed: three heading sizes, a boxed
-   section beside an unboxed one, a hairline under some sections and not
-   others, 20px gold checkboxes and a checklist parked under the form. Every
-   section now has the same shape — a hairline, a heading, its content — and
-   sub-panels inside one (passkeys, sessions, activity) are spaced, not ruled.
-   ========================================================================== */
-.account-stack {
-  gap: 0;
-}
-
-.account-stack > .account-section {
-  padding-block: var(--space-8);
-}
-
-.account-stack > .account-section:first-of-type {
-  padding-top: var(--space-2);
-}
-
-.account-stack > .account-section + .account-section {
-  border-top: 1px solid var(--border-subtle);
-}
-
-/* Cards inside a section are the section's content, not boxes: the console
-   card rule gives each one padding and a hairline after any sibling, and the
-   :not()s here only lift this rule over that one. */
-.account .account-stack .account-section > :not(h2):not(.account-intro) {
-  padding: 0;
-  border-top: 0;
-}
-
-.account .account-section > * + * {
-  margin-top: var(--space-6);
-}
-
-.account .account-section > h2 + * {
-  margin-top: var(--space-4);
-}
-
-.account-stack h2 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.005em;
-  color: var(--text-heading);
-}
-
-.account-h3 {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-md-size);
-  line-height: var(--text-md-line);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.account-stack .dash-hint,
-.account-stack .account-card > p:first-of-type {
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-md-line);
-}
-
-/* The identity header: avatar, name as the heading, contact under it. */
-.profile-head {
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-}
-
-.account-stack .profile-name {
+.acct .register-error {
   margin: 0;
-  font-size: var(--text-xl-size);
-  line-height: var(--text-xl-line);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.01em;
-  color: var(--text-heading);
-}
-
-.profile-phone {
-  margin-top: var(--space-1);
+  color: var(--danger-strong);
   font-size: var(--text-sm-size);
 }
 
-.profile-phone > [data-testid="account-phone"] {
-  font-variant-numeric: tabular-nums;
-}
+/* ---- phone ---------------------------------------------------------------------- */
 
-/* The checklist is a meter and two quiet columns, above the form. */
-.profile-completion {
-  border-top: 0;
-  padding: 0;
-  margin-bottom: var(--space-6);
-}
-
-.profile-completion-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.profile-completion-label {
-  flex: none;
-}
-
-.profile-meter {
-  position: relative;
-  flex: 1;
-  max-width: 240px;
-  height: 4px;
-  border-radius: var(--radius-full);
-  background: var(--border-subtle);
-  overflow: hidden;
-}
-
-.profile-meter > i {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
-  background: var(--accent);
-}
-
-.profile-completion ul {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2) var(--space-6);
-  margin-top: var(--space-4);
-}
-
-.profile-completion li {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  line-height: var(--text-sm-line);
-}
-
-.profile-completion li > svg {
-  flex: none;
-  margin-top: 2px;
-  color: var(--text-muted);
-}
-
-.profile-completion li[data-done="true"] {
-  color: var(--text-primary);
-}
-
-.profile-completion li[data-done="true"] > svg {
-  color: var(--success-base);
-}
-
-@media (max-width: 599px) {
-  .profile-completion ul {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.profile-form {
-  max-width: 480px;
-}
-
-/* Notifications: facts as a two-column list at body size, and switches at
-   the size of every other checkbox in the product. */
-.account .account-facts {
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: var(--space-2) var(--space-4);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
-}
-
-.account .account-facts dd {
-  margin: 0;
-  font-variant-numeric: normal;
-}
-
-.account-stack .notify-switch {
-  padding-inline: 0;
-}
-
-.account-stack .notify-switch:hover {
-  background: transparent;
-}
-
-.account-stack .notify-switch input {
-  width: 16px;
-  height: 16px;
-  margin-top: 3px;
-}
-
-.account-stack .notify-switch-label {
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-}
-
-.account-subhead {
-  font-size: var(--text-md-size);
-  font-weight: var(--font-weight-semibold);
-}
-
-.email-verify {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: flex-start;
-}
-
-.email-verify .profile-form {
-  width: 100%;
-}
-
-@media (max-width: 599px) {
-  .account .account-facts {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-1);
+@media (max-width: 719px) {
+  .acct {
+    gap: var(--space-4);
   }
 
-  .account .account-facts dd {
-    margin-bottom: var(--space-2);
+  .acct-id {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .acct-id-main {
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .acct-id-name {
+    font-size: var(--text-xl-size);
+  }
+
+  .acct-id-photo-box {
+    width: 64px;
+    height: 64px;
+  }
+
+  /* On a phone the meter already says how many are done; the list keeps only
+     what is left to do. */
+  .acct-checklist {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .acct-checklist li[data-done="true"],
+  .acct-checklist:not(:has(li[data-done="false"])) {
+    display: none;
+  }
+
+  .acct-id-facts {
+    gap: var(--space-2);
+  }
+
+  .acct-id-facts li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .acct-columns,
+  .acct-column {
+    gap: var(--space-4);
+  }
+
+  .security-list li {
+    flex-wrap: wrap;
+  }
+
+  .acct-name-form,
+  .enroll-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .acct-name-form > button,
+  .enroll-row > button {
+    margin-top: 0;
+    justify-self: start;
+  }
+
+  .security-actions {
+    margin-left: calc(32px + var(--space-3));
+  }
+
+  .events .security-meta {
+    text-align: start;
   }
 }

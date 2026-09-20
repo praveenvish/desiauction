@@ -46,6 +46,8 @@ describe("the live feed fold", () => {
     feed = foldSnapshot(feed, snap({ version: 2, lastOutcome: sold }));
     expect(feed.resolved.map((row) => row.lotId)).toEqual(["lot-7"]);
     expect(feed.events.map((event) => event.key)).toEqual(["outcome-7"]);
+    // The timeline line carries its subject, so it can wear the player's face.
+    expect(feed.events[0]?.subject).toEqual({ lotId: "lot-7", playerName: "Asha" });
   });
 
   it("does not mutate the feed it was given", () => {

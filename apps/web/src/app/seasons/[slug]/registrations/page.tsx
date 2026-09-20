@@ -6,6 +6,7 @@ import { RegistrationDashboardPanel } from "./dashboard-panel";
 import { ShareRegistration } from "./share-registration";
 import { SiblingLink } from "../sibling-link";
 import "../../seasons.css";
+import "./registrations.css";
 
 export const metadata = { title: "Registrations · DesiAuction" };
 
@@ -23,6 +24,7 @@ export default async function RegistrationsPage({
     ...(sp["status"] !== undefined ? { status: sp["status"] } : {}),
     ...(sp["fee"] !== undefined ? { fee: sp["fee"] } : {}),
     ...(sp["team"] !== undefined ? { teamId: sp["team"] } : {}),
+    ...(sp["role"] !== undefined ? { role: sp["role"] } : {}),
     ...(sp["sort"] !== undefined ? { sort: sp["sort"] } : {}),
     ...(sp["page"] !== undefined ? { page: sp["page"] } : {}),
   });
@@ -53,13 +55,18 @@ export default async function RegistrationsPage({
   }
   return (
     <ToastProvider>
-      <main className="registrations-dash">
-        <div className="dash-stack">
+      <main className="registrations-dash rd-page">
+        <div className="dash-stack rd-stack">
           {/* Lineups shares this tab (RN-1 "Players"): who applied, and who
               actually took the field, are one question with two answers. */}
           <PageIntro actions={<SiblingLink href={`/seasons/${slug}/lineups`} label="Lineups" />} />
-          <ShareRegistration slug={slug} open={dashboard.registrationOpen} />
           <RegistrationDashboardPanel
+            share={<ShareRegistration slug={slug} open={dashboard.registrationOpen} />}
+            canReopen={
+              dashboard.viewer.canManage === true &&
+              dashboard.competition.status === "registration_closed" &&
+              !dashboard.desk.rosterLocked
+            }
             slug={slug}
             stats={dashboard.stats}
             page={dashboard.page}
@@ -76,6 +83,7 @@ export default async function RegistrationsPage({
               status: sp["status"] ?? "",
               fee: sp["fee"] ?? "",
               team: sp["team"] ?? "",
+              role: sp["role"] ?? "",
               sort: sp["sort"] ?? "recent",
             }}
           />

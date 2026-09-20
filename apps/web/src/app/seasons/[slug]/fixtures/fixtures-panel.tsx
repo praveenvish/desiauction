@@ -1,14 +1,36 @@
 "use client";
 
-import { FIXTURE_CSV_HEADER } from "@desiauction/core";
+import { FIXTURE_CSV_HEADER, dailyKickoffs, planRoundRobin } from "@desiauction/core";
 import { useSportTerms } from "../../../../components/sport-terms";
 import {
-  Badge,
   Button,
-  Card,
+  ButtonLink,
+  CardGrid,
   Dialog,
   Field,
+  IconAlert,
+  IconArrowRight,
+  IconBolt,
+  IconCalendar,
+  IconCheckCircle,
+  IconClock,
+  IconDownload,
+  IconKebab,
+  IconLayers,
+  IconMatch,
+  IconPin,
+  IconPlus,
+  IconSearch,
+  IconSpark,
+  IconTrophy,
+  IconUpload,
+  Pill,
+  PopoverMenu,
+  SectionCard,
   Select,
+  StatCard,
+  StatGrid,
+  TeamChip,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -35,7 +57,14 @@ import {
   type FixtureImportPreview,
   type FixtureLifecycleAction,
 } from "../../../../server/competition/fixture-actions";
-import { formatDateTime, formatKickoff, formatWallDate } from "../../../../lib/format-date";
+import {
+  formatDateTime,
+  formatKickoff,
+  formatWallDate,
+  formatWallTime,
+} from "../../../../lib/format-date";
+import { FixtureStatusPill } from "../_tabs/fixture-status";
+import { TeamCrest } from "../_tabs/team-crest";
 import { ResultsCard } from "./results-card";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
 import { useHydrated } from "../../../../lib/use-hydrated";
@@ -43,30 +72,34 @@ import { useHydrated } from "../../../../lib/use-hydrated";
 type Snapshot = FixtureDashboard["page"]["rows"][number];
 type GeneratePreview = Awaited<ReturnType<typeof previewGenerationAction>>;
 
-// The console's one colour grammar: grey not started, blue set and open,
-// red live, green done. "Published" was green and "completed" grey — the
-// schedule read as finished before a ball was bowled, and finished as idle.
-// A cancelled match is closed, not an alarm. (Same table in the fixtures
-// panel, the calendar and match day — change the three together.)
-const FIXTURE_TONE = {
-  draft: "neutral",
-  scheduled: "info",
-  published: "info",
-  in_progress: "live",
-  completed: "success",
-  cancelled: "neutral",
-} as const;
-
-const STATUS_FILTERS = [
-  "",
-  "draft",
-  "scheduled",
-  "published",
-  "in_progress",
-  "completed",
-  "cancelled",
+/** Status chips over the schedule — each a count, each a filter. */
+const STATUS_CHIPS: {
+  status: Snapshot["status"];
+  label: string;
+  key: keyof FixtureDashboard["stats"];
+  testId?: string;
+  managerOnly?: boolean;
+}[] = [
+  { status: "draft", label: "Draft", key: "draft", testId: "stat-draft", managerOnly: true },
+  {
+    status: "scheduled",
+    label: "Scheduled",
+    key: "scheduled",
+    testId: "stat-scheduled",
+    managerOnly: true,
+  },
+  { status: "published", label: "Published", key: "published", testId: "stat-published" },
+  { status: "in_progress", label: "Live", key: "inProgress" },
+  { status: "completed", label: "Completed", key: "completed" },
+  { status: "cancelled", label: "Cancelled", key: "cancelled", testId: "stat-cancelled" },
 ];
-const SORTS = ["kickoff", "kickoff_desc", "number", "round"];
+
+const SORTS: { value: string; label: string }[] = [
+  { value: "kickoff", label: "Kickoff, soonest" },
+  { value: "kickoff_desc", label: "Kickoff, latest" },
+  { value: "number", label: "Fixture number" },
+  { value: "round", label: "Round" },
+];
 
 // At 240 fixtures the conflict panel ran 3565px of a 6431px page. Bound it.
 const CONFLICTS_SHOWN = 20;
@@ -95,7 +128,14 @@ export function FixturesPanel({
   filters,
   scoreFields,
   fixtureShape,
+  next,
+  seasonStartsOn = null,
+  seasonEndsOn = null,
 }: {
+  next: FixtureDashboard["next"];
+  /** The season's own dates — the generator's default start and its limits. */
+  seasonStartsOn?: string | null;
+  seasonEndsOn?: string | null;
   slug: string;
   orgSlug: string;
   isPublic: boolean;
@@ -140,10 +180,24 @@ export function FixturesPanel({
   // Generate wizard state. `plan` holds the dry run awaiting confirmation.
   const [plan, setPlan] = useState<Extract<GeneratePreview, { ok: true }> | null>(null);
   const [genRounds, setGenRounds] = useState("1");
-  const [genStart, setGenStart] = useState("");
+  // Starts on the season's first day: an empty date disabled "Generate" with
+  // nothing on screen saying why.
+  const [genStart, setGenStart] = useState(seasonStartsOn ?? "");
   const [genTimes, setGenTimes] = useState("18:00");
   const [genDuration, setGenDuration] = useState("180");
-  const [genGrounds, setGenGrounds] = useState<Set<string>>(new Set());
+  // HOW MANY MATCHES A DAY. "fit" works the kickoffs out from the playing day
+  // (first match, last finish, match length + break); "custom" takes typed
+  // times. Either way the planner packs each day — a round no longer forces a
+  // new day, so a 4-team league is not three days by construction.
+  const [genMode, setGenMode] = useState<"fit" | "custom">("fit");
+  const [genFirst, setGenFirst] = useState("09:00");
+  const [genLastEnd, setGenLastEnd] = useState("21:00");
+  const [genBreak, setGenBreak] = useState("15");
+  const [genPerTeam, setGenPerTeam] = useState("1");
+  // One ground is the only answer, so it starts ticked.
+  const [genGrounds, setGenGrounds] = useState<Set<string>>(
+    () => new Set(grounds.length === 1 && grounds[0] !== undefined ? [grounds[0].id] : []),
+  );
 
   // Manual fixture state.
   const [manHome, setManHome] = useState("");
@@ -154,6 +208,7 @@ export function FixturesPanel({
   const [manSquads, setManSquads] = useState<ReadonlySet<string>>(new Set<string>());
   const [importOpen, setImportOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(page.total / page.pageSize));
 
@@ -235,16 +290,76 @@ export function FixturesPanel({
     return result;
   };
 
+  const durationMinutes = Number.parseInt(genDuration, 10);
+  const kickoffTimes =
+    genMode === "fit"
+      ? dailyKickoffs(genFirst, genLastEnd, durationMinutes, Number.parseInt(genBreak, 10) || 0)
+      : genTimes
+          .split(",")
+          .map((t) => t.trim())
+          .filter((t) => t !== "");
+  const maxPerTeamPerDay = genPerTeam === "any" ? null : Number.parseInt(genPerTeam, 10);
   const generateInput = () => ({
     rounds: genRounds === "2" ? (2 as const) : (1 as const),
     startDate: genStart,
-    kickoffTimes: genTimes
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t !== ""),
+    kickoffTimes,
     groundIds: [...genGrounds],
-    durationMinutes: Number.parseInt(genDuration, 10),
+    durationMinutes,
+    pack: true,
+    maxPerTeamPerDay,
   });
+
+  /*
+   * THE LIVE ANSWER to "how many a day, and how many days?" — the same planner
+   * the server runs, over the same team order (name, then id), so what this
+   * says is what "Generate" will do.
+   */
+  const capacity = useMemo(() => {
+    if (isLobby || genStart === "" || genGrounds.size === 0 || kickoffTimes.length === 0) {
+      return null;
+    }
+    const teamIds = [...teams]
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+      .map((team) => team.id);
+    const planned = planRoundRobin({
+      teamIds,
+      rounds: genRounds === "2" ? 2 : 1,
+      startDate: genStart,
+      kickoffTimes,
+      groundIds: [...genGrounds],
+      durationMinutes,
+      pack: true,
+      maxPerTeamPerDay,
+    });
+    if (!planned.ok) {
+      return null;
+    }
+    const dates = [...new Set(planned.fixtures.map((f) => f.kickoffAt.slice(0, 10)))].sort();
+    const last = dates[dates.length - 1] ?? genStart;
+    return {
+      matches: planned.fixtures.length,
+      days: dates.length,
+      first: dates[0] ?? genStart,
+      last,
+      pastSeason: seasonEndsOn !== null && last > seasonEndsOn,
+    };
+    // `kickoffTimes` is derived each render; its inputs are the dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isLobby,
+    teams,
+    genRounds,
+    genStart,
+    genGrounds,
+    genMode,
+    genTimes,
+    genFirst,
+    genLastEnd,
+    genBreak,
+    genDuration,
+    genPerTeam,
+    seasonEndsOn,
+  ]);
 
   const askToGenerate = async () => {
     setBusy(true);
@@ -400,43 +515,562 @@ export function FixturesPanel({
       return result;
     }, "Fixtures imported");
 
+  const teamById = new Map(teams.map((team) => [team.id, team]));
+  // With nothing to come, the card shows the last match played on this page.
+  const latest = [...page.rows]
+    .filter((row) => row.status === "completed" && row.kickoffAt !== null)
+    .sort((a, b) => (b.kickoffAt ?? "").localeCompare(a.kickoffAt ?? ""))[0];
+  const live = stats.total - stats.cancelled;
+  const upcoming = stats.scheduled + stats.published;
+  const filtered =
+    filters.status !== "" || filters.team !== "" || filters.ground !== "" || filters.q !== "";
+  /*
+   * ONE primary action on the page: the next bulk step the schedule is waiting
+   * for. Generate while there is nothing; schedule while drafts sit; publish
+   * while scheduled matches are still private. Everything else is secondary.
+   */
+  const primary: "generate" | "schedule" | "publish" | "add" | null = !canManage
+    ? null
+    : live === 0 && !isLobby
+      ? "generate"
+      : stats.draft > 0
+        ? "schedule"
+        : stats.scheduled > 0
+          ? "publish"
+          : "add";
+  const noun = isLobby ? "lobby" : "fixture";
+
+  /* ---- The generate form: inline while the schedule is empty, else a dialog -- */
+  const generateBlocked =
+    !isLobby && (teams.length < 2 || grounds.length === 0) ? (
+      <div className="fx-blocked" data-testid="generate-blocked">
+        <IconAlert size={18} aria-hidden />
+        <p className="st-note">
+          {teams.length < 2
+            ? `This season has ${teams.length === 0 ? "no" : "one"} team. A round robin needs at least two.`
+            : "This organization has no active grounds yet, so there is nowhere to play."}{" "}
+          {teams.length < 2 ? (
+            <Link href={`/seasons/${slug}/teams`}>Add teams</Link>
+          ) : (
+            <Link href={`/org/${orgSlug}/venues`} data-testid="add-venues-link">
+              Add a venue and its grounds
+            </Link>
+          )}
+        </p>
+      </div>
+    ) : null;
+
+  const generateForm = isLobby ? null : (
+    <div className="fx-generate">
+      {generateBlocked}
+      <div className="fx-form-grid">
+        <Select
+          label="Rounds"
+          name="rounds"
+          value={genRounds}
+          onChange={(event) => {
+            setGenRounds(event.target.value);
+          }}
+        >
+          <option value="1">Single round robin</option>
+          <option value="2">Double round robin</option>
+        </Select>
+        <Field
+          label="Start date"
+          name="startDate"
+          type="date"
+          value={genStart}
+          {...(seasonStartsOn !== null ? { min: seasonStartsOn } : {})}
+          {...(seasonEndsOn !== null ? { max: seasonEndsOn } : {})}
+          onChange={(event) => {
+            setGenStart(event.target.value);
+          }}
+        />
+        <Field
+          label="Match length (min)"
+          name="duration"
+          inputMode="numeric"
+          value={genDuration}
+          onChange={(event) => {
+            setGenDuration(event.target.value);
+          }}
+        />
+        <Select
+          label="Matches per team per day"
+          name="perTeam"
+          value={genPerTeam}
+          onChange={(event) => {
+            setGenPerTeam(event.target.value);
+          }}
+        >
+          <option value="1">1 match</option>
+          <option value="2">Up to 2</option>
+          <option value="3">Up to 3</option>
+          <option value="any">No limit</option>
+        </Select>
+      </div>
+      <fieldset className="fx-times">
+        <legend>Match times</legend>
+        <div className="fx-mode" role="radiogroup" aria-label="How to set match times">
+          <label className="fx-mode-option" data-checked={genMode === "fit" ? "true" : undefined}>
+            <input
+              type="radio"
+              name="genMode"
+              checked={genMode === "fit"}
+              onChange={() => {
+                setGenMode("fit");
+              }}
+            />
+            Fit matches into the day
+          </label>
+          <label
+            className="fx-mode-option"
+            data-checked={genMode === "custom" ? "true" : undefined}
+          >
+            <input
+              type="radio"
+              name="genMode"
+              checked={genMode === "custom"}
+              onChange={() => {
+                setGenMode("custom");
+              }}
+            />
+            My own kickoff times
+          </label>
+        </div>
+        {genMode === "fit" ? (
+          <div className="fx-form-grid">
+            <Field
+              label="First match at"
+              name="firstKickoff"
+              type="time"
+              value={genFirst}
+              onChange={(event) => {
+                setGenFirst(event.target.value);
+              }}
+            />
+            <Field
+              label="Last match ends by"
+              name="lastEnd"
+              type="time"
+              value={genLastEnd}
+              onChange={(event) => {
+                setGenLastEnd(event.target.value);
+              }}
+            />
+            <Field
+              label="Break between matches (min)"
+              name="breakMinutes"
+              inputMode="numeric"
+              value={genBreak}
+              onChange={(event) => {
+                setGenBreak(event.target.value);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="fx-form-grid">
+            <Field
+              label="Kickoff times"
+              name="kickoffTimes"
+              value={genTimes}
+              onChange={(event) => {
+                setGenTimes(event.target.value);
+              }}
+              placeholder="10:00, 14:00, 18:00"
+            />
+          </div>
+        )}
+        <p className="fx-capacity" data-testid="generate-capacity" aria-live="polite">
+          {kickoffTimes.length === 0
+            ? genMode === "fit"
+              ? "Not even one match fits between those times — start earlier, finish later or shorten the match."
+              : "Enter at least one kickoff time (HH:MM)."
+            : `${String(kickoffTimes.length)} match${kickoffTimes.length === 1 ? "" : "es"} a day on each ${terms.ground.toLowerCase()}: ${kickoffTimes.join(", ")}.`}
+          {capacity !== null ? (
+            <>
+              {" "}
+              <strong data-past-season={capacity.pastSeason ? "true" : undefined}>
+                {capacity.matches} matches → {capacity.days} day{capacity.days === 1 ? "" : "s"}
+                {capacity.days > 1
+                  ? ` (${formatWallDate(capacity.first)} – ${formatWallDate(capacity.last)})`
+                  : ` (${formatWallDate(capacity.first)})`}
+                .
+              </strong>
+              {capacity.pastSeason && seasonEndsOn !== null
+                ? ` That runs past the season's last day (${formatWallDate(seasonEndsOn)}) — allow more matches per team per day, add a ${terms.ground.toLowerCase()}, lengthen the day, or extend the season.`
+                : null}
+            </>
+          ) : null}
+        </p>
+      </fieldset>
+      <fieldset className="fx-grounds">
+        <legend>{terms.ground}s</legend>
+        {grounds.length === 0 ? (
+          <p className="st-note">
+            No active grounds yet — <Link href={`/org/${orgSlug}/venues`}>add a venue</Link> and its
+            grounds first.
+          </p>
+        ) : (
+          <div className="fx-ground-list">
+            {grounds.map((ground) => (
+              <label key={ground.id} className="fx-ground">
+                <input
+                  type="checkbox"
+                  checked={genGrounds.has(ground.id)}
+                  onChange={() => {
+                    setGenGrounds((prev) => {
+                      const nextSet = new Set(prev);
+                      if (nextSet.has(ground.id)) {
+                        nextSet.delete(ground.id);
+                      } else {
+                        nextSet.add(ground.id);
+                      }
+                      return nextSet;
+                    });
+                  }}
+                />
+                <span>
+                  {ground.venueName} · {ground.name}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </fieldset>
+      <div className="fx-generate-go">
+        <Button
+          variant={primary === "generate" ? "primary" : "secondary"}
+          onClick={() => void askToGenerate()}
+          loading={busy}
+          disabled={genStart === "" || genGrounds.size === 0 || kickoffTimes.length === 0}
+          aria-describedby="generate-why"
+          data-testid="generate-fixtures"
+        >
+          <IconSpark size={16} aria-hidden />
+          Generate
+        </Button>
+        {/* A disabled button always says why — this one used to sit greyed
+            out with nothing on screen explaining it. */}
+        <p className="st-note" id="generate-why" data-testid="generate-why">
+          {genStart === "" && genGrounds.size === 0
+            ? `Pick a start date and tick at least one ${terms.ground.toLowerCase()} to generate.`
+            : genStart === ""
+              ? "Pick a start date to generate."
+              : genGrounds.size === 0
+                ? `Tick at least one ${terms.ground.toLowerCase()} to generate.`
+                : seasonStartsOn !== null && seasonEndsOn !== null
+                  ? `The season runs ${formatWallDate(seasonStartsOn)} – ${formatWallDate(seasonEndsOn)}. Fixtures land as drafts, so nothing is public until you publish.`
+                  : "Generated fixtures land as drafts, so nothing is public until you publish."}
+        </p>
+      </div>
+    </div>
+  );
+  /* ---- Bulk steps -------------------------------------------------------- */
+  const bulkSteps = (
+    <div className="fx-steps">
+      <Button
+        variant={primary === "schedule" ? "primary" : "secondary"}
+        size="sm"
+        onClick={() =>
+          void act(
+            () => scheduleAllAction(slug),
+            bulkOutcome("scheduled", "drafts", "There are no drafts to schedule."),
+          )
+        }
+        loading={busy}
+        data-testid="schedule-all"
+      >
+        Schedule all drafts
+      </Button>
+      <Button
+        variant={primary === "publish" ? "primary" : "secondary"}
+        size="sm"
+        onClick={() =>
+          void act(
+            () => publishAllAction(slug),
+            bulkOutcome(
+              "published",
+              "fixtures",
+              "There is nothing to publish — no fixture is scheduled yet.",
+            ),
+          )
+        }
+        loading={busy}
+        data-testid="publish-all"
+      >
+        Publish schedule
+      </Button>
+      {stats.draft > 0 ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setDiscardOpen(true);
+          }}
+          loading={busy}
+          data-testid="discard-drafts"
+        >
+          Discard {stats.draft} draft{stats.draft === 1 ? "" : "s"}
+        </Button>
+      ) : null}
+    </div>
+  );
+
+  const privateNote = isPublic ? null : (
+    <p className="st-note" data-testid="private-season-note">
+      This season is private, so a published schedule is still visible only to members. Make it
+      public from the season settings to give it a public page.
+    </p>
+  );
+
+  /* ---- Next match ---------------------------------------------------------- */
+  const NEXT_TITLE = {
+    live: "Being played now",
+    upcoming: "Next match",
+    overdue: "Waiting to be played",
+  } as const;
+  const nextCard =
+    next !== null ? (
+      <SectionCard
+        icon={
+          next.state === "live" ? (
+            <IconBolt />
+          ) : next.state === "overdue" ? (
+            <IconAlert />
+          ) : (
+            <IconClock />
+          )
+        }
+        tone={next.state === "live" ? "red" : next.state === "overdue" ? "amber" : "gold"}
+        title={NEXT_TITLE[next.state]}
+        description={
+          next.state === "overdue"
+            ? "Its kickoff has passed. Start or complete it on Match day, or move it."
+            : next.fixture.round !== null
+              ? `Round ${String(next.fixture.round)} · ${next.fixture.number}`
+              : next.fixture.number
+        }
+        action={<FixtureStatusPill status={next.fixture.status} />}
+        data-testid="next-match"
+      >
+        <NextMatch fixture={next.fixture} teamById={teamById} ground={terms.ground} />
+      </SectionCard>
+    ) : latest !== undefined ? (
+      <SectionCard
+        icon={<IconTrophy />}
+        tone="green"
+        title="Latest result"
+        description={
+          latest.round !== null ? `Round ${String(latest.round)} · ${latest.number}` : latest.number
+        }
+        action={<FixtureStatusPill status={latest.status} />}
+        data-testid="next-match"
+      >
+        <NextMatch
+          fixture={latest}
+          teamById={teamById}
+          ground={terms.ground}
+          result={results[latest.id]}
+        />
+      </SectionCard>
+    ) : (
+      <SectionCard
+        icon={<IconClock />}
+        title="Next match"
+        description={
+          live === 0
+            ? "Nothing is on the schedule yet."
+            : "No match is coming up — everything scheduled has been played."
+        }
+        data-testid="next-match"
+      />
+    );
+
+  /* ---- Tools for the organizer --------------------------------------------- */
+  const toolsCard =
+    canManage && (live > 0 || isLobby) ? (
+      <SectionCard
+        icon={<IconLayers />}
+        tone="blue"
+        title={isLobby ? "Schedule lobbies" : "Schedule tools"}
+        description={
+          isLobby
+            ? "Every match is one lobby of many squads — add each lobby, then schedule and publish the lot."
+            : "Move drafts to scheduled, then publish the schedule to your players and owners."
+        }
+        data-testid="generate-panel"
+      >
+        <div className="fx-tools">
+          <dl className="fx-pipeline">
+            <div>
+              <dt>Draft</dt>
+              <dd>{stats.draft}</dd>
+            </div>
+            <div>
+              <dt>Scheduled</dt>
+              <dd>{stats.scheduled}</dd>
+            </div>
+            <div>
+              <dt>Published</dt>
+              <dd>{stats.published + stats.inProgress + stats.completed}</dd>
+            </div>
+          </dl>
+          {bulkSteps}
+          {!isLobby ? (
+            <button
+              type="button"
+              className="st-link fx-regen"
+              onClick={() => {
+                setGenerateOpen(true);
+              }}
+            >
+              Generate a round robin
+              <IconArrowRight size={16} aria-hidden />
+            </button>
+          ) : null}
+          {privateNote}
+        </div>
+      </SectionCard>
+    ) : null;
+
   return (
     <>
-      <div className="stat-row" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
-        <StatTile label="Total" value={stats.total} testId="stat-total" />
-        <StatTile label="Draft" value={stats.draft} testId="stat-draft" />
-        <StatTile label="Scheduled" value={stats.scheduled} testId="stat-scheduled" />
-        <StatTile label="Published" value={stats.published} testId="stat-published" />
-        <StatTile label="Completed" value={stats.completed} testId="stat-completed" />
-        <StatTile label="Cancelled" value={stats.cancelled} testId="stat-cancelled" />
+      {/* The page's actions: the other views of the schedule, and a match by
+          hand. The shell's page head carries the title above this row. */}
+      <div className="st-head">
+        <p className="st-head-lede">
+          {stats.total > 0 ? (
+            <>
+              <strong>
+                {stats.total} {isLobby ? "lobb" : "fixture"}
+                {isLobby ? (stats.total === 1 ? "y" : "ies") : stats.total === 1 ? "" : "s"}
+              </strong>
+              {stats.rounds > 0
+                ? ` across ${String(stats.rounds)} round${stats.rounds === 1 ? "" : "s"}`
+                : ""}
+            </>
+          ) : canManage ? (
+            "No fixtures yet — generate a round robin or add a match by hand."
+          ) : (
+            "The organizer hasn't published any matches yet."
+          )}
+        </p>
+        <div className="st-actions">
+          <ButtonLink
+            href={`/seasons/${slug}/fixtures/calendar`}
+            variant="secondary"
+            size="sm"
+            data-testid="open-calendar"
+          >
+            <IconCalendar size={16} aria-hidden />
+            Calendar
+          </ButtonLink>
+          <ButtonLink
+            href={`/seasons/${slug}/fixtures/match-day`}
+            variant="secondary"
+            size="sm"
+            data-testid="open-match-day"
+          >
+            <IconMatch size={16} aria-hidden />
+            Match day
+          </ButtonLink>
+          {canManage ? (
+            <Button
+              size="sm"
+              variant={primary === "add" ? "primary" : "secondary"}
+              data-testid="open-add-fixture"
+              onClick={() => {
+                setManualOpen(true);
+              }}
+            >
+              <IconPlus size={16} aria-hidden />
+              Add {noun}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <div data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
+        <StatGrid>
+          <StatCard
+            icon={<IconCalendar />}
+            tone="gold"
+            value={stats.total}
+            label={isLobby ? "Lobbies" : "Matches"}
+            hint={
+              stats.rounds > 0
+                ? `${String(stats.rounds)} round${stats.rounds === 1 ? "" : "s"}`
+                : stats.total === 0
+                  ? "None scheduled yet"
+                  : "No rounds"
+            }
+            testId="stat-total"
+          />
+          <StatCard
+            icon={<IconCheckCircle />}
+            tone="green"
+            value={stats.completed}
+            label="Played"
+            hint={live > 0 ? `of ${String(live)} on the schedule` : "None yet"}
+            {...(live > 0 ? { progress: (stats.completed / live) * 100 } : {})}
+            testId="stat-completed"
+          />
+          <StatCard
+            icon={<IconClock />}
+            tone="blue"
+            value={upcoming}
+            label="To play"
+            hint={
+              next !== null && next.state === "upcoming" && next.fixture.kickoffAt !== null
+                ? `Next ${formatWallDate(next.fixture.kickoffAt.slice(0, 10))}`
+                : next !== null && next.state === "overdue"
+                  ? "Kickoffs have passed"
+                  : upcoming > 0
+                    ? "Nothing dated ahead"
+                    : "Nothing to play"
+            }
+            testId="stat-upcoming"
+          />
+          <StatCard
+            icon={<IconPin />}
+            tone="purple"
+            value={stats.venues}
+            label={stats.venues === 1 ? "Venue" : "Venues"}
+            hint={`${String(stats.grounds)} ${terms.ground.toLowerCase()}${stats.grounds === 1 ? "" : "s"} in use`}
+            testId="stat-venues"
+          />
+        </StatGrid>
       </div>
 
       {conflicts.length > 0 ? (
-        <Card data-testid="conflict-panel">
-          <h2>Conflicts</h2>
-          <p className="competitions-hint">
-            {conflicts.length} clash{conflicts.length === 1 ? "" : "es"} in this season&apos;s
-            schedule.
-            {conflicts.length > CONFLICTS_SHOWN
+        <SectionCard
+          icon={<IconAlert />}
+          tone="red"
+          title="Conflicts"
+          description={`${String(conflicts.length)} clash${conflicts.length === 1 ? "" : "es"} in this season's schedule.${
+            conflicts.length > CONFLICTS_SHOWN
               ? ` Showing the first ${String(CONFLICTS_SHOWN)}.`
-              : ""}
-          </p>
+              : ""
+          }`}
+          data-testid="conflict-panel"
+        >
           {/* Unbounded, this panel ran 3565px of a 6431px page at 240 fixtures. */}
-          <ul className="conflict-list">
+          <ul className="st-rows fx-conflicts">
             {conflicts.slice(0, CONFLICTS_SHOWN).map((entry, index) => (
               <li key={index} data-testid="conflict-item">
-                <Badge tone={entry.severity === "blocking" ? "danger" : "warning"}>
+                <Pill tone={entry.severity === "blocking" ? "red" : "amber"}>
                   {entry.type.replace(/_/g, " ")}
-                </Badge>
+                </Pill>
                 {/* The fixture numbers were always in the payload; now they are
                     on the screen, so "which two?" has an answer. */}
-                <span>
+                <span className="fx-conflict-text">
                   <strong className="conflict-fixtures">
                     {entry.fixtures.map((f) => f.number).join(" · ")}
                   </strong>{" "}
                   {entry.detail}
                   {entry.fixtures.map((f) => (
-                    <span className="conflict-fixture-line" key={f.id}>
+                    <span className="fx-conflict-line" key={f.id}>
                       {f.number} — {f.teams}
                       {f.kickoffAt !== null ? `, ${formatKickoff(f.kickoffAt)}` : ""}
                     </span>
@@ -445,189 +1079,60 @@ export function FixturesPanel({
               </li>
             ))}
           </ul>
-        </Card>
+        </SectionCard>
       ) : null}
 
-      {canManage ? (
-        <Card data-testid="generate-panel">
-          <div className="teams-head">
-            <div className="teams-head-title">
-              <h2>{isLobby ? "Schedule lobbies" : "Generate fixtures"}</h2>
-            </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              data-testid="open-add-fixture"
-              onClick={() => {
-                setManualOpen(true);
-              }}
-            >
-              + Add one {isLobby ? "lobby" : "fixture"}
-            </Button>
-          </div>
-          <p className="competitions-hint">
-            {isLobby
-              ? "Every match here is one lobby of many squads, so there is nothing to pair up and no round robin to generate. Add each lobby, choose the squads dropping into it, then schedule and publish the lot."
-              : "Deterministic round robin over this season's teams — same inputs, same schedule, every time. Generated fixtures land as drafts, and home and away are shared out evenly."}
-          </p>
-          {/* The blocked activation path, stated BEFORE the form rather than as
-              one unlinked sentence buried inside it. An org with no venues can
-              never generate, and "your organization page" was not a link. */}
-          {!isLobby && (teams.length < 2 || grounds.length === 0) ? (
-            <div className="dash-hint" data-testid="generate-blocked">
-              <p>
-                {teams.length < 2
-                  ? `This season has ${teams.length === 0 ? "no" : "one"} team. A round robin needs at least two.`
-                  : "This organization has no active grounds yet, so there is nowhere to play."}
-              </p>
-              {teams.length < 2 ? (
-                <Link href={`/seasons/${slug}/teams`}>Add teams</Link>
-              ) : (
-                <Link href={`/org/${orgSlug}/venues`} data-testid="add-venues-link">
-                  Add a venue and its grounds
-                </Link>
-              )}
-            </div>
-          ) : null}
-          {isLobby ? null : (
-            <>
-              <div className="date-row">
-                <Select
-                  label="Rounds"
-                  name="rounds"
-                  value={genRounds}
-                  onChange={(event) => {
-                    setGenRounds(event.target.value);
-                  }}
-                >
-                  <option value="1">Single round robin</option>
-                  <option value="2">Double round robin</option>
-                </Select>
-                <Field
-                  label="Start date"
-                  name="startDate"
-                  type="date"
-                  value={genStart}
-                  onChange={(event) => {
-                    setGenStart(event.target.value);
-                  }}
-                />
-                <Field
-                  label="Kickoff times"
-                  name="kickoffTimes"
-                  value={genTimes}
-                  onChange={(event) => {
-                    setGenTimes(event.target.value);
-                  }}
-                  placeholder="18:00,20:00"
-                />
-                <Field
-                  label="Duration (min)"
-                  name="duration"
-                  value={genDuration}
-                  onChange={(event) => {
-                    setGenDuration(event.target.value);
-                  }}
-                />
-              </div>
-              <fieldset className="ground-picker">
-                <legend>{terms.ground}s</legend>
-                {grounds.length === 0 ? (
-                  <p className="competitions-hint">
-                    No active grounds yet — <Link href={`/org/${orgSlug}/venues`}>add a venue</Link>{" "}
-                    and its grounds first.
-                  </p>
-                ) : (
-                  grounds.map((ground) => (
-                    <label key={ground.id} className="check-row">
-                      <input
-                        type="checkbox"
-                        checked={genGrounds.has(ground.id)}
-                        onChange={() => {
-                          setGenGrounds((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(ground.id)) {
-                              next.delete(ground.id);
-                            } else {
-                              next.add(ground.id);
-                            }
-                            return next;
-                          });
-                        }}
-                      />
-                      {ground.venueName} · {ground.name}
-                    </label>
-                  ))
-                )}
-              </fieldset>
-            </>
-          )}
-          <div className="date-row">
-            {isLobby ? null : (
-              <Button
-                onClick={() => void askToGenerate()}
-                loading={busy}
-                disabled={genStart === "" || genGrounds.size === 0}
-                data-testid="generate-fixtures"
-              >
-                Generate
-              </Button>
-            )}
-            <Button
-              variant="secondary"
-              onClick={() =>
-                void act(
-                  () => scheduleAllAction(slug),
-                  bulkOutcome("scheduled", "drafts", "There are no drafts to schedule."),
-                )
-              }
-              loading={busy}
-              data-testid="schedule-all"
-            >
-              Schedule all drafts
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                void act(
-                  () => publishAllAction(slug),
-                  bulkOutcome(
-                    "published",
-                    "fixtures",
-                    "There is nothing to publish — no fixture is scheduled yet.",
-                  ),
-                )
-              }
-              loading={busy}
-              data-testid="publish-all"
-            >
-              Publish schedule
-            </Button>
-            {stats.draft > 0 ? (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setDiscardOpen(true);
-                }}
-                loading={busy}
-                data-testid="discard-drafts"
-              >
-                Discard {stats.draft} draft{stats.draft === 1 ? "" : "s"}
-              </Button>
-            ) : null}
-          </div>
-          {isPublic ? null : (
-            <p className="competitions-hint" data-testid="private-season-note">
-              This season is private, so a published schedule is still visible only to members. Make
-              it public from the season settings to give it a public page.
-            </p>
-          )}
-        </Card>
+      {primary === "generate" ? (
+        <SectionCard
+          icon={<IconSpark />}
+          title="Generate fixtures"
+          description="Deterministic round robin over this season's teams — same inputs, same schedule, every time. Home and away are shared out evenly."
+          data-testid="generate-panel"
+        >
+          {generateForm}
+          {privateNote}
+        </SectionCard>
+      ) : toolsCard !== null ? (
+        <div className="st-grid">
+          <CardGrid weight="wide-left">
+            {nextCard}
+            {toolsCard}
+          </CardGrid>
+        </div>
+      ) : live > 0 || next !== null ? (
+        nextCard
       ) : null}
 
       {/* 240 fixtures used to be written blind — no count, no date range, no
           confirmation. A league asked to start 1 March silently ended 28 June,
           discoverable only on page 10. */}
+      {canManage && !isLobby && primary !== "generate" ? (
+        <Dialog
+          open={generateOpen}
+          onClose={() => {
+            setGenerateOpen(false);
+          }}
+          title="Generate a round robin"
+          size="wide"
+          footer={
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setGenerateOpen(false);
+              }}
+            >
+              Close
+            </Button>
+          }
+        >
+          <p className="st-note fx-dialog-lede">
+            A round robin is generated over an empty schedule. Discard the drafts, or cancel the
+            matches already set, before generating again.
+          </p>
+          {generateForm}
+        </Dialog>
+      ) : null}
+
       {canManage ? (
         <Dialog
           open={plan !== null}
@@ -647,7 +1152,7 @@ export function FixturesPanel({
           }
         >
           {plan !== null ? (
-            <div data-testid="generate-preview">
+            <div data-testid="generate-preview" className="fx-dialog-body">
               <p>
                 <strong>{plan.preview.count}</strong> fixtures across{" "}
                 <strong>{plan.preview.rounds}</strong> round
@@ -657,11 +1162,18 @@ export function FixturesPanel({
                 First match {formatWallDate(plan.preview.firstDate)}; last match{" "}
                 {formatWallDate(plan.preview.lastDate)}.
               </p>
-              <p className="competitions-hint">
+              <p className="st-note">
                 They land as drafts, so nothing is public yet — and you can discard them all in one
                 click if the dates are wrong.
               </p>
-              <Button onClick={() => void generate()} loading={busy} data-testid="confirm-generate">
+              <Button
+                onClick={() => {
+                  setGenerateOpen(false);
+                  void generate();
+                }}
+                loading={busy}
+                data-testid="confirm-generate"
+              >
                 Generate {plan.preview.count} fixtures
               </Button>
             </div>
@@ -687,28 +1199,30 @@ export function FixturesPanel({
             </Button>
           }
         >
-          <p>
-            Every draft fixture is cancelled and its slot released. Scheduled, published and played
-            fixtures are untouched. This is how you start a generation over.
-          </p>
-          <Button
-            onClick={() =>
-              void act(
-                async () => {
-                  const result = await discardDraftsAction(slug);
-                  if (result.ok) {
-                    setDiscardOpen(false);
-                  }
-                  return result;
-                },
-                bulkOutcome("discarded", "drafts", "There are no drafts to discard."),
-              )
-            }
-            loading={busy}
-            data-testid="confirm-discard-drafts"
-          >
-            Discard the drafts
-          </Button>
+          <div className="fx-dialog-body">
+            <p>
+              Every draft fixture is cancelled and its slot released. Scheduled, published and
+              played fixtures are untouched. This is how you start a generation over.
+            </p>
+            <Button
+              onClick={() =>
+                void act(
+                  async () => {
+                    const result = await discardDraftsAction(slug);
+                    if (result.ok) {
+                      setDiscardOpen(false);
+                    }
+                    return result;
+                  },
+                  bulkOutcome("discarded", "drafts", "There are no drafts to discard."),
+                )
+              }
+              loading={busy}
+              data-testid="confirm-discard-drafts"
+            >
+              Discard the drafts
+            </Button>
+          </div>
         </Dialog>
       ) : null}
 
@@ -847,41 +1361,107 @@ export function FixturesPanel({
         canManage={canManage}
       />
 
-      <Card>
+      <SectionCard
+        icon={<IconCalendar />}
+        title="Schedule"
+        description={
+          page.total === 0
+            ? filtered
+              ? "No match fits these filters."
+              : "Nothing on the schedule yet."
+            : `${String(page.total)} match${page.total === 1 ? "" : "es"}${filtered ? " match these filters" : ""} · grouped by round`
+        }
+        flush
+        action={
+          canManage ? (
+            <>
+              <Button
+                size="sm"
+                variant="secondary"
+                data-testid="export-csv"
+                onClick={() => void doExport()}
+              >
+                <IconDownload size={16} aria-hidden />
+                Export CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                data-testid="open-import"
+                onClick={() => {
+                  setImportOpen(true);
+                }}
+              >
+                <IconUpload size={16} aria-hidden />
+                Import
+              </Button>
+            </>
+          ) : undefined
+        }
+        data-testid="schedule-card"
+      >
+        <ul className="st-chips" aria-label="Filter by status">
+          <li>
+            <button
+              type="button"
+              className="st-chip"
+              aria-pressed={filters.status === ""}
+              onClick={() => {
+                pushQuery({ status: "", page: "1" });
+              }}
+            >
+              All <span className="st-chip-count">{stats.total}</span>
+            </button>
+          </li>
+          {STATUS_CHIPS.filter((chip) => canManage || chip.managerOnly !== true).map((chip) => (
+            <li key={chip.status}>
+              <button
+                type="button"
+                className="st-chip"
+                aria-pressed={filters.status === chip.status}
+                onClick={() => {
+                  pushQuery({
+                    status: filters.status === chip.status ? "" : chip.status,
+                    page: "1",
+                  });
+                }}
+                data-testid={chip.testId}
+              >
+                {chip.label} <span className="st-chip-count">{stats[chip.key]}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
         <form
-          className="filter-bar"
+          className="st-toolbar"
+          role="search"
           onSubmit={(event) => {
             event.preventDefault();
             pushQuery({ q: search, page: "1" });
           }}
         >
-          <Field
-            label="Search"
-            name="q"
-            placeholder="fixture number"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-            }}
-          />
-          <Select
-            label="Status"
-            name="status"
-            value={filters.status}
-            onChange={(event) => {
-              pushQuery({ status: event.target.value, page: "1" });
-            }}
-          >
-            {STATUS_FILTERS.map((status) => (
-              <option key={status} value={status}>
-                {status === "" ? "All statuses" : status.replace(/_/g, " ")}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Team"
+          <label className="st-search">
+            <IconSearch size={18} aria-hidden />
+            <span className="st-sr">Search by fixture number</span>
+            <input
+              name="q"
+              type="search"
+              placeholder="Fixture number"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+              }}
+            />
+            <button type="submit" data-testid="search-submit">
+              Search
+            </button>
+          </label>
+          <select
+            className="st-select"
+            aria-label="Team"
             name="team"
             value={filters.team}
+            data-active={filters.team !== "" ? "true" : undefined}
             onChange={(event) => {
               pushQuery({ team: event.target.value, page: "1" });
             }}
@@ -892,24 +1472,29 @@ export function FixturesPanel({
                 {team.name}
               </option>
             ))}
-          </Select>
-          <Select
-            label={terms.ground}
-            name="ground"
-            value={filters.ground}
-            onChange={(event) => {
-              pushQuery({ ground: event.target.value, page: "1" });
-            }}
-          >
-            <option value="">All grounds</option>
-            {grounds.map((ground) => (
-              <option key={ground.id} value={ground.id}>
-                {ground.venueName} · {ground.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Sort"
+          </select>
+          {grounds.length > 0 ? (
+            <select
+              className="st-select"
+              aria-label={terms.ground}
+              name="ground"
+              value={filters.ground}
+              data-active={filters.ground !== "" ? "true" : undefined}
+              onChange={(event) => {
+                pushQuery({ ground: event.target.value, page: "1" });
+              }}
+            >
+              <option value="">All {terms.ground.toLowerCase()}s</option>
+              {grounds.map((ground) => (
+                <option key={ground.id} value={ground.id}>
+                  {ground.venueName} · {ground.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <select
+            className="st-select"
+            aria-label="Sort"
             name="sort"
             value={filters.sort}
             onChange={(event) => {
@@ -917,47 +1502,15 @@ export function FixturesPanel({
             }}
           >
             {SORTS.map((sort) => (
-              <option key={sort} value={sort}>
-                {sort.replace(/_/g, " ")}
+              <option key={sort.value} value={sort.value}>
+                {sort.label}
               </option>
             ))}
-          </Select>
-          <Button type="submit" variant="secondary" data-testid="search-submit">
-            Search
-          </Button>
+          </select>
         </form>
-      </Card>
-
-      <Card>
-        <div className="teams-head">
-          <div className="teams-head-title">
-            <h2>Schedule</h2>
-          </div>
-          {canManage ? (
-            <div className="teams-head-tools">
-              <Button
-                size="sm"
-                variant="secondary"
-                data-testid="export-csv"
-                onClick={() => void doExport()}
-              >
-                Export CSV
-              </Button>
-              <Button
-                size="sm"
-                data-testid="open-import"
-                onClick={() => {
-                  setImportOpen(true);
-                }}
-              >
-                + Import fixtures
-              </Button>
-            </div>
-          ) : null}
-        </div>
-        <div className="table-scroll">
-          <table className="reg-table fixtures-table" data-testid="fixtures-table">
-            <caption className="table-caption">
+        <div className="st-table-wrap">
+          <table className="st-table fx-table" data-stack="" data-testid="fixtures-table">
+            <caption>
               This season&apos;s fixtures, grouped by round — {page.total} match
               {page.total === 1 ? "" : "es"} matching the current filters.
             </caption>
@@ -968,6 +1521,7 @@ export function FixturesPanel({
                 <th scope="col">Kickoff</th>
                 <th scope="col">{terms.ground}</th>
                 <th scope="col">Status</th>
+                <th scope="col">Result</th>
                 {canManage ? (
                   <th scope="col">
                     <VisuallyHidden>Actions</VisuallyHidden>
@@ -978,18 +1532,17 @@ export function FixturesPanel({
             <tbody>
               {rounds.map(({ round, rows, when }) => (
                 <Fragment key={String(round)}>
-                  <tr className="round-head">
-                    <th scope="rowgroup" colSpan={canManage ? 6 : 5}>
-                      <span className="round-head-label">
-                        {round !== null ? `Round ${String(round)}` : "Unscheduled"}
-                      </span>
-                      {when !== null ? <span className="round-head-week">{when}</span> : null}
+                  <tr data-group="">
+                    <th scope="rowgroup" colSpan={canManage ? 7 : 6}>
+                      {round !== null ? `Round ${String(round)}` : "Unscheduled"}
+                      {when !== null ? <span className="st-group-when">{when}</span> : null}
                     </th>
                   </tr>
                   {rows.map((fixture) => (
                     <FixtureRow
                       key={fixture.id}
                       fixture={fixture}
+                      result={results[fixture.id]}
                       canManage={canManage}
                       busy={busy}
                       moving={moving === fixture.id}
@@ -1012,17 +1565,16 @@ export function FixturesPanel({
               ))}
               {page.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 6 : 5} className="dash-hint">
+                  <td colSpan={canManage ? 7 : 6} data-span="full" className="fx-none">
                     {/* Same DA-35 rule the registration desk follows: blaming
                         filters nobody applied is a dead end — a season with no
                         fixtures yet gets its actual next step instead. */}
-                    {filters.status !== "" ||
-                    filters.team !== "" ||
-                    filters.ground !== "" ||
-                    filters.q !== ""
+                    {filtered
                       ? "No fixtures match these filters."
                       : canManage
-                        ? "No fixtures yet — generate a round robin above, or add one match at a time."
+                        ? isLobby
+                          ? "No lobbies yet — add the first one with “Add lobby”."
+                          : "No fixtures yet — generate a round robin above, or add one match at a time."
                         : "No fixtures yet. The organizer hasn't scheduled any matches."}
                   </td>
                 </tr>
@@ -1031,52 +1583,59 @@ export function FixturesPanel({
           </table>
         </div>
 
-        <div className="pager">
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={page.page <= 1}
-            onClick={() => {
-              pushQuery({ page: String(page.page - 1) });
-            }}
-            data-testid="page-prev"
-          >
-            Previous
-          </Button>
+        <div className="st-pager">
           <span data-testid="page-indicator">
             Page {page.page} of {totalPages} · {page.total} total
           </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={page.page >= totalPages}
-            onClick={() => {
-              pushQuery({ page: String(page.page + 1) });
-            }}
-            data-testid="page-next"
-          >
-            Next
-          </Button>
+          <span className="st-actions fx-pager-actions">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={page.page <= 1}
+              onClick={() => {
+                pushQuery({ page: String(page.page - 1) });
+              }}
+              data-testid="page-prev"
+            >
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={page.page >= totalPages}
+              onClick={() => {
+                pushQuery({ page: String(page.page + 1) });
+              }}
+              data-testid="page-next"
+            >
+              Next
+            </Button>
+          </span>
         </div>
-      </Card>
+      </SectionCard>
 
       {expanded !== null ? (
-        <Card data-testid="fixture-timeline">
-          <h2>Fixture timeline</h2>
-          <ol className="timeline">
+        <SectionCard
+          icon={<IconClock />}
+          tone="neutral"
+          title="Fixture timeline"
+          description="Every change to this match, oldest first."
+          data-testid="fixture-timeline"
+        >
+          <ol className="st-rows fx-timeline">
             {timeline.map((entry, index) => (
               <li key={index}>
-                <Badge tone="neutral">{entry.action.replace("fixture.", "")}</Badge>
-                <span className="timeline-at">{formatDateTime(entry.at)}</span>
+                <Pill tone="neutral">{entry.action.replace("fixture.", "")}</Pill>
+                <span className="st-note">{formatDateTime(entry.at)}</span>
                 {isMove(entry.meta) ? (
-                  <span className="timeline-note">
+                  <span className="st-note">
                     {entry.meta.fromKickoff} → {entry.meta.toKickoff}
                   </span>
                 ) : null}
               </li>
             ))}
           </ol>
-        </Card>
+        </SectionCard>
       ) : null}
 
       {canManage ? (
@@ -1153,13 +1712,129 @@ export function FixturesPanel({
   );
 }
 
-function StatTile({ label, value, testId }: { label: string; value: number; testId: string }) {
+/** One side of the next match: its crest and its name. */
+function Side({
+  id,
+  name,
+  short,
+  color,
+  teamById,
+}: {
+  id: string | null;
+  name: string | null;
+  short: string | null;
+  color: string | null;
+  teamById: ReadonlyMap<string, FixtureDashboard["teams"][number]>;
+}) {
+  const team = id !== null ? teamById.get(id) : undefined;
+  const label = name ?? "To be decided";
   return (
-    <div className="stat-tile" data-testid={testId}>
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}</span>
+    <span className="fx-side">
+      <TeamCrest
+        name={label}
+        short={short}
+        color={color}
+        logoUrl={team?.logoUrl ?? null}
+        size="xl"
+      />
+      <span className="fx-side-name">{label}</span>
+    </span>
+  );
+}
+
+function NextMatch({
+  fixture,
+  teamById,
+  ground,
+  result,
+}: {
+  fixture: Snapshot;
+  teamById: ReadonlyMap<string, FixtureDashboard["teams"][number]>;
+  ground: string;
+  /** A played match shows its score where the "vs" would be. */
+  result?: FixtureDashboard["results"][string] | undefined;
+}) {
+  const lobby = fixture.homeTeamId === null;
+  return (
+    <div className="fx-next">
+      {lobby ? (
+        <div className="fx-faceoff" data-lobby="true">
+          <span className="fx-lobby-count">
+            <strong>{fixture.squadCount}</strong> squads in this lobby
+          </span>
+        </div>
+      ) : (
+        <div className="fx-faceoff">
+          <Side
+            id={fixture.homeTeamId}
+            name={fixture.homeTeamName}
+            short={fixture.homeTeamShort}
+            color={fixture.homeTeamColor}
+            teamById={teamById}
+          />
+          {result !== undefined ? (
+            <span className="fx-final">
+              <strong>
+                {scoreOf(result.score?.home)} – {scoreOf(result.score?.away)}
+              </strong>
+              <span>{sentence(result.outcome)}</span>
+            </span>
+          ) : (
+            <>
+              <span className="fx-vs-big" aria-hidden>
+                vs
+              </span>
+              <span className="st-sr"> versus </span>
+            </>
+          )}
+          <Side
+            id={fixture.awayTeamId}
+            name={fixture.awayTeamName}
+            short={fixture.awayTeamShort}
+            color={fixture.awayTeamColor}
+            teamById={teamById}
+          />
+        </div>
+      )}
+      <ul className="fx-next-facts">
+        <li>
+          <IconCalendar size={16} aria-hidden />
+          {fixture.kickoffAt !== null
+            ? formatWallDate(fixture.kickoffAt.slice(0, 10))
+            : "Date to be set"}
+        </li>
+        {fixture.kickoffAt !== null ? (
+          <li>
+            <IconClock size={16} aria-hidden />
+            {formatWallTime(fixture.kickoffAt)}
+          </li>
+        ) : null}
+        <li>
+          <IconPin size={16} aria-hidden />
+          <span className="st-sr">{ground}: </span>
+          {fixture.groundName !== null
+            ? `${fixture.groundName}${fixture.venueName !== null ? ` · ${fixture.venueName}` : ""}`
+            : `${ground} to be set`}
+        </li>
+      </ul>
     </div>
   );
+}
+
+/**
+ * The scoreline in one line — the PRIMARY component only (runs, goals), the
+ * way a result reads when somebody asks who won. An em dash for a component
+ * that was never recorded, because zero is a real score.
+ */
+function scoreOf(side: Record<string, number> | undefined): string {
+  const first = side === undefined ? undefined : Object.values(side)[0];
+  return first === undefined ? "—" : String(first);
+}
+
+/** "home_win" → "Home win". */
+function sentence(outcome: string): string {
+  const words = outcome.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function isMove(meta: unknown): meta is { fromKickoff: string; toKickoff: string } {
@@ -1173,6 +1848,7 @@ function isMove(meta: unknown): meta is { fromKickoff: string; toKickoff: string
 
 function FixtureRow({
   fixture,
+  result,
   canManage,
   busy,
   moving,
@@ -1187,6 +1863,7 @@ function FixtureRow({
   onDetails,
 }: {
   fixture: Snapshot;
+  result: FixtureDashboard["results"][string] | undefined;
   canManage: boolean;
   busy: boolean;
   moving: boolean;
@@ -1204,117 +1881,128 @@ function FixtureRow({
   const next = NEXT_ACTION[fixture.status];
   const movable = fixture.status === "scheduled" || fixture.status === "published";
   const cancellable = fixture.status !== "completed" && fixture.status !== "cancelled";
+  const lobby = fixture.homeTeamId === null;
   return (
     <>
-      {/* `.reg-table` hides its `thead` below 1100px and restores the headings
-          from `data-label` (seasons.css). The `<caption>` and `scope="col"`
-          landed here earlier; the labels did not, so on a phone at the ground
-          this read as a number, two team names, a time, a place and a word,
-          with nothing saying which was the kickoff and which the ground. */}
-      <tr data-testid={`fixture-${fixture.number}`}>
-        <td data-label="#" className="reg-number">
+      {/* On a phone the table stacks and every cell names itself from its
+          `data-label` — without them this read as a number, two team names, a
+          time, a place and a word, with nothing saying which was which. */}
+      <tr data-testid={`fixture-${fixture.number}`} data-status={fixture.status}>
+        <td data-label="" className="st-mono fx-num">
           {fixture.number}
         </td>
-        <td data-label="Fixture">
+        <td data-label="" data-span="full">
           {/* A LOBBY has no home and no away, so it cannot be read as "A vs B".
               It is named by its size — the thing an organizer actually checks
               on a battle royale schedule is whether the right number of squads
               is in it — and by how far the scoring has got, because a lobby
               writes no result row and this is the only place that shows. */}
-          {fixture.homeTeamId === null ? (
-            <span className="registration-name" data-testid={`lobby-${fixture.number}`}>
-              <span className="fx-team">
-                <span className="fx-dot" style={{ background: "var(--accent)" }} aria-hidden />
-                {fixture.squadCount} squads
-              </span>
-              {fixture.placedCount > 0 ? (
-                <span className="registration-phone">
-                  {fixture.placedCount === fixture.squadCount
-                    ? "all placed"
-                    : `${String(fixture.placedCount)} of ${String(fixture.squadCount)} placed`}
-                </span>
-              ) : null}
+          {lobby ? (
+            <span className="fx-teams" data-testid={`lobby-${fixture.number}`}>
+              <TeamChip color={null}>{fixture.squadCount} squads</TeamChip>
             </span>
           ) : (
-            <span className="registration-name">
-              <span className="fx-team">
-                <span
-                  className="fx-dot"
-                  style={{ background: fixture.homeTeamColor ?? "var(--accent)" }}
-                  aria-hidden
-                />
+            <span className="fx-teams">
+              <TeamChip color={fixture.homeTeamColor}>
                 {fixture.homeTeamShort ?? fixture.homeTeamName}
-              </span>
+              </TeamChip>
               <span className="fx-vs">vs</span>
-              <span className="fx-team">
-                <span
-                  className="fx-dot"
-                  style={{ background: fixture.awayTeamColor ?? "var(--accent)" }}
-                  aria-hidden
-                />
+              <TeamChip color={fixture.awayTeamColor}>
                 {fixture.awayTeamShort ?? fixture.awayTeamName}
-              </span>
+              </TeamChip>
             </span>
           )}
         </td>
-        <td data-label="Kickoff">
+        <td data-label="Kickoff" className="fx-when">
           {fixture.kickoffAt !== null ? formatKickoff(fixture.kickoffAt) : "—"}
         </td>
         <td data-label={terms.ground}>
-          {fixture.groundName ?? "—"}
-          {fixture.venueName !== null ? (
-            <span className="registration-phone">{fixture.venueName}</span>
-          ) : null}
+          <span className="fx-place">
+            {fixture.groundName ?? "—"}
+            {fixture.venueName !== null ? (
+              <span className="st-sub">{fixture.venueName}</span>
+            ) : null}
+          </span>
         </td>
         <td data-label="Status">
-          <Badge tone={FIXTURE_TONE[fixture.status]}>{fixture.status.replace(/_/g, " ")}</Badge>
+          <FixtureStatusPill status={fixture.status} />
+        </td>
+        <td data-label="Result" className="fx-result">
+          {lobby ? (
+            fixture.placedCount > 0 ? (
+              <span className="st-note">
+                {fixture.placedCount === fixture.squadCount
+                  ? "all placed"
+                  : `${String(fixture.placedCount)} of ${String(fixture.squadCount)} placed`}
+              </span>
+            ) : (
+              <span className="st-muted">—</span>
+            )
+          ) : result !== undefined ? (
+            <span className="fx-score">
+              <strong>
+                {scoreOf(result.score?.home)} – {scoreOf(result.score?.away)}
+              </strong>
+              <span className="st-sub">{sentence(result.outcome)}</span>
+            </span>
+          ) : (
+            <span className="st-muted">—</span>
+          )}
         </td>
         {canManage ? (
-          <td data-label="" className="reg-actions">
-            {next !== undefined ? (
-              <Button
-                size="sm"
-                onClick={() => {
-                  onLifecycle(next.action);
-                }}
-                loading={busy}
-                data-testid={`${next.action}-${fixture.number}`}
-              >
-                {next.label}
-              </Button>
-            ) : null}
-            {movable ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={onOpenMove}
-                data-testid={`move-${fixture.number}`}
-              >
-                Move
-              </Button>
-            ) : null}
-            {cancellable ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  onLifecycle("cancel");
-                }}
-                loading={busy}
-              >
-                Cancel
-              </Button>
-            ) : null}
-            <Button size="sm" variant="ghost" onClick={onDetails}>
-              Details
-            </Button>
+          <td data-label="" data-span="full">
+            <div className="st-row-actions">
+              {next !== undefined ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    onLifecycle(next.action);
+                  }}
+                  loading={busy}
+                  data-testid={`${next.action}-${fixture.number}`}
+                >
+                  {next.label}
+                </Button>
+              ) : null}
+              {movable ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onOpenMove}
+                  data-testid={`move-${fixture.number}`}
+                >
+                  Move
+                </Button>
+              ) : null}
+              <PopoverMenu
+                label={`More for ${fixture.number}`}
+                trigger={<IconKebab width={18} height={18} />}
+                triggerClassName="st-kebab"
+                items={[
+                  { key: "details", label: "History", onSelect: onDetails },
+                  ...(cancellable
+                    ? [
+                        {
+                          key: "cancel",
+                          label: "Cancel match",
+                          danger: true,
+                          onSelect: () => {
+                            if (!busy) onLifecycle("cancel");
+                          },
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </div>
           </td>
         ) : null}
       </tr>
       {moving ? (
-        <tr data-testid={`move-row-${fixture.number}`}>
-          <td colSpan={canManage ? 6 : 5}>
-            <div className="date-row">
+        <tr data-testid={`move-row-${fixture.number}`} className="fx-move-row">
+          <td colSpan={canManage ? 7 : 6} data-span="full">
+            <div className="fx-move">
               <Field
                 label="New kickoff"
                 name="moveKickoff"

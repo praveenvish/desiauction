@@ -42,6 +42,11 @@ export interface InlineSearchProps {
   placeholder?: string;
   /** Accessible name for the collapsed trigger. */
   label?: string;
+  /**
+   * "bar" draws the collapsed trigger as a search field (icon, "Search…", ⌘K)
+   * — the console top bar. "icon" is the compact glyph.
+   */
+  variant?: "icon" | "bar";
 }
 
 export function InlineSearch({
@@ -50,6 +55,7 @@ export function InlineSearch({
   handleRef,
   placeholder = "Search seasons, teams, players…",
   label = "Search (⌘K)",
+  variant = "icon",
 }: InlineSearchProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -144,7 +150,7 @@ export function InlineSearch({
   };
 
   return (
-    <div className={styles["root"]} ref={rootRef} data-open={open}>
+    <div className={styles["root"]} ref={rootRef} data-open={open} data-variant={variant}>
       {open ? (
         <div className={styles["field"]}>
           <span className={styles["field-icon"]} aria-hidden>
@@ -176,16 +182,27 @@ export function InlineSearch({
         <button
           ref={triggerRef}
           type="button"
-          className={styles["trigger"]}
+          className={variant === "bar" ? styles["trigger-bar"] : styles["trigger"]}
           aria-label={label}
           aria-expanded={false}
           title="Search"
           data-testid="shell-search"
+          data-variant={variant}
           onClick={() => {
             setOpen(true);
           }}
         >
           <IconSearch />
+          {variant === "bar" ? (
+            <>
+              <span className={styles["trigger-text"]} aria-hidden>
+                Search…
+              </span>
+              <kbd className={styles["trigger-kbd"]} aria-hidden>
+                ⌘K
+              </kbd>
+            </>
+          ) : null}
         </button>
       )}
       {open ? (

@@ -1,7 +1,8 @@
+import { IconGavel, IconReceipt, IconTile, IconUser } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { BrandMark } from "../../components/shell/brand";
+import { BrandMark, BrandWordmark } from "../../components/shell/brand";
 import { currentSession } from "../../server/auth/actions";
 import { safeNext } from "../../server/auth/redirect";
 import { OnboardingPanel } from "./onboarding-steps";
@@ -39,17 +40,29 @@ export default async function OnboardingPage({
     redirect(destination);
   }
   return (
-    // The first signed-in screen: it takes the console's quiet primitives
-    // (an ink primary, not the marketing gold) — see data-surface in AppShell.
-    <main className="onboarding" data-surface="console">
+    /*
+     * NOT a console surface, deliberately.
+     *
+     * This panel re-points the accent ramp at the marketing gold so the last
+     * click of the entry journey matches login's "Send code" (see
+     * --entry-accent-pressed in onboarding.css). The console primary pairs
+     * --accent-pressed with a WHITE label, and against the re-pointed ramp that
+     * is white on #CE9A2E — 2.53:1. The marketing primary reads the same ramp
+     * with the ink label the gold was measured against: 7.8:1.
+     *
+     * Two sessions found this independently and fixed it the same way. Worth
+     * keeping the reason it survived a green axe scan: the Continue button is
+     * DISABLED until a name is typed, and axe skips disabled controls.
+     */
+    <main className="onboarding">
       <Link className="onboarding-mark" href="/">
         {/* The DA mark every other screen carries — this was the one place
             still drawing the old bar-chart glyph, on a new person's first
             signed-in screen. */}
         <span className="onboarding-mark-glyph" aria-hidden="true">
-          <BrandMark size={34} />
+          <BrandMark size={36} />
         </span>
-        DesiAuction
+        <BrandWordmark tone="page" />
       </Link>
       <div className="onboarding-grid">
         {/* Desktop-only orientation column. The first mark is the ANSWER to the
@@ -60,9 +73,18 @@ export default async function OnboardingPage({
             You&rsquo;re one question away from your first auction.
           </p>
           <ul className="onboarding-aside-marks">
-            <li>Your name goes on team sheets and the stage</li>
-            <li aria-hidden="true">Run server-verified live auctions</li>
-            <li aria-hidden="true">Settle every rupee with numbered receipts</li>
+            <li>
+              <IconTile icon={<IconUser />} tone="gold" />
+              Your name goes on team sheets and the stage
+            </li>
+            <li aria-hidden="true">
+              <IconTile icon={<IconGavel />} tone="purple" />
+              Run server-verified live auctions
+            </li>
+            <li aria-hidden="true">
+              <IconTile icon={<IconReceipt />} tone="green" />
+              Settle every rupee with numbered receipts
+            </li>
           </ul>
         </aside>
         <div className="onboarding-panel">
