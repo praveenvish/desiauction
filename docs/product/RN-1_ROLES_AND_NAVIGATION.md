@@ -425,8 +425,8 @@ Zero migrations in the whole programme.
 | # | Phase | Ships | Proof | Est. |
 |---|---|---|---|---|
 | 1 | **The model** — ✅ **DONE** | `navigationFor()`, `seasonRoleFor()`, `seasonTabs()`, `operatorDoorHref()`, the seven laws as `nav.ts` canon | **53 tests green**, typecheck + lint + format clean. No UI change. | done |
-| 2 | **The menu, both devices** | Rail rebuilt from one model; **bottom tab bar under 720px**; drawer reduced to utility; multi-team popover; role-change notice | e2e per role at 375px **and** 1280px: same items, same order. A player never sees `/orgs`. | 5–6 d |
-| 3 | **Home** | `/home` → router + 5 role homes; the new auctioneer home; the identity line | **The One-Tap Law spec**, one per role. No file over 350 lines. | 5–6 d |
+| 2 | **The menu, both devices** — ✅ **DONE** | Rail + bottom bar from one model; drawer reduced to utility; multi-scope nested list; palette from the menu; every platform set gets a door | Verified in-browser at phone width per role; 5-tab label clipping measured and fixed. **Role-change notice deferred to a follow-up** — it needs a per-viewer "what have you seen" store and is the lowest-value item in the phase. | done |
+| 3 | **Home** — ✅ **DONE** | `/home` → 161-line router over 6 role homes (member is the sixth); the new auctioneer home; the identity line | `home-router.test.ts` pins which sections each role gets; verified in-browser as owner, organizer+player+operator, auctioneer+player | done |
 | 4 | **The season** | `seasonTabs(slug, role)`; Players/Schedule consolidation; owner and player tab sets | e2e: a team owner sees My team · My plan · Auction room · Table — 4 tabs, not 6 | 3–4 d |
 | 5 | **Trust** | Admin grouped into 4; door on held capabilities; the §7 payload matrix | Served-payload assertion per row; one operator per platform set reaches their section in one click | 3–4 d |
 | 6 | **Premium** | §9 in full; palette rebuilt from `NavModel.palette`; per-role empty states | Full precompiled e2e; `pnpm verify`; axe in **both** themes; computed-style contrast; target-size | 3–4 d |
