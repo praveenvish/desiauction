@@ -52,7 +52,7 @@
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
   background: var(--surface-overlay);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   letter-spacing: 0.08em;
@@ -60,24 +60,29 @@
   box-shadow: var(--shadow-1);
 }
 
+/* THE STATE IS THE DOT, NOT THE WORDS.
+   The label used to take the state's own colour, and on the white pill that
+   made "Live now" 3.43:1 — under AA for small text, caught by the two-theme
+   sweep. The mockup draws it the right way round anyway: a coloured dot and
+   dark text. The dot is non-text, so 3:1 is its bar and every tone clears it. */
 .tc-status::before {
   content: "";
   inline-size: 7px;
   block-size: 7px;
   border-radius: var(--radius-full);
-  background: currentColor;
+  background: var(--tc-dot, var(--text-muted));
 }
 
 .tc-status[data-tone="live"] {
-  color: var(--live);
+  --tc-dot: var(--live);
 }
 
 .tc-status[data-tone="open"] {
-  color: var(--success-strong);
+  --tc-dot: var(--success-base);
 }
 
 .tc-status[data-tone="closed"] {
-  color: var(--text-muted);
+  --tc-dot: var(--text-muted);
 }
 
 /* ---- body ---- */
