@@ -153,15 +153,18 @@ test("search navigates; the identity bar names every surface consistently", asyn
 
   // A section below it: the section becomes the title, the season joins the trail.
   const tabs = page.getByRole("navigation", { name: "Season sections" });
-  await tabs.getByRole("link", { name: "Registrations" }).click();
+  /*
+   * "Players", not "Registrations": RN-1 Phase 4 took the organizer's strip
+   * from nine tabs to seven by joining the surfaces that answer one question —
+   * Players is Registrations AND Lineups — and the page announces the same
+   * name the tab does, rather than contradicting it one line apart.
+   */
+  await tabs.getByRole("link", { name: "Players" }).click();
   await expect(page).toHaveURL(/\/registrations$/);
-  await expect(heading).toHaveText("Registrations");
+  await expect(heading).toHaveText("Players");
   await expect(breadcrumb).toContainText(`Shell Cup ${STAMP}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
-  await expect(tabs.getByRole("link", { name: "Registrations" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(tabs.getByRole("link", { name: "Players" })).toHaveAttribute("aria-current", "page");
 
   // /home now shows the competition and pins work (device-local).
   await page.goto("/home");

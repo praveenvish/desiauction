@@ -149,6 +149,15 @@ export interface CompetitionTab {
   href: string;
   /** Test hook, for when the tab IS the navigation affordance a suite drives. */
   testId?: string;
+  /**
+   * Extra path suffixes this tab owns, beyond its own href.
+   *
+   * A consolidated tab needs them: "Players" is Registrations AND Lineups, so
+   * standing on /lineups must still light Players rather than leaving the strip
+   * blank or falling through to Overview — a strip that cannot say where you
+   * are is worse than a longer one (LAW 2).
+   */
+  claims?: string[];
 }
 
 /**
@@ -309,57 +318,6 @@ export function activeAdminTab(pathname: string): string {
 }
 
 /**
- * PX-7: Money appears only for holders of `settlement.view` (PX-1 01 §3). The
- * tab is not disabled for anyone else — it is ABSENT, matching the surface
- * itself, which 404s rather than admit the books exist.
- */
-export function competitionTabs(
-  slug: string,
-  canSettle = false,
-  /**
-   * Manages the season's club (org:owner / org:staff). Registrations and
-   * Lineups are rosters: a plain member or a team owner used to be offered
-   * Registrations and shown a one-line refusal behind it. Defaults to true so
-   * callers that predate the flag keep their tabs.
-   */
-  canManage = true,
-): CompetitionTab[] {
-  const base = `/seasons/${slug}`;
-  // These tabs ARE the season workspace's navigation, so they carry the
-  // navigation test hooks. They used to hang off buttons on the overview, which
-  // is now a read-only dashboard.
-  return [
-    { key: "overview", label: "Overview", href: base },
-    { key: "teams", label: "Teams", href: `${base}/teams`, testId: "open-teams" },
-    ...(canManage
-      ? [
-          {
-            key: "registrations",
-            label: "Registrations",
-            href: `${base}/registrations`,
-            testId: "open-dashboard",
-          },
-        ]
-      : []),
-    { key: "fixtures", label: "Fixtures", href: `${base}/fixtures`, testId: "open-fixtures" },
-    // Who played each match — what a player's career counts as a match played.
-    ...(canManage
-      ? [{ key: "lineups", label: "Lineups", href: `${base}/lineups`, testId: "open-lineups" }]
-      : []),
-    // The table sits beside the fixtures it is derived from. It reads for
-    // everyone who can see the season, not just officers — a league table only
-    // officers can open is not a league table.
-    { key: "standings", label: "Table", href: `${base}/standings`, testId: "open-standings" },
-    { key: "auction", label: "Auction", href: `${base}/auction`, testId: "open-auction" },
-    // FR-1: what players and owners said. For everyone who can see the season,
-    // like the Table — published reviews are public anyway; only the club's
-    // owners get the reply and ask controls, and nobody here sees an unread one.
-    { key: "reviews", label: "Reviews", href: `${base}/reviews`, testId: "open-reviews" },
-    ...(canSettle ? [{ key: "money", label: "Money", href: `${base}/money` }] : []),
-  ];
-}
-
-/**
  * The org's money desks read as one workspace with four sections, so they
  * navigate like every other sectioned surface — through the shell's tab strip,
  * not a bar each page draws for itself.
@@ -389,40 +347,6 @@ export function activeOrgMoneyTab(pathname: string, slug: string): string | null
     return "finance";
   }
   return null;
-}
-
-export function activeCompetitionTab(pathname: string, slug: string): string {
-  const base = `/seasons/${slug}`;
-  if (pathname.startsWith(`${base}/money`)) {
-    return "money";
-  }
-  if (pathname.startsWith(`${base}/teams`)) {
-    return "teams";
-  }
-  if (pathname.startsWith(`${base}/registrations`)) {
-    return "registrations";
-  }
-  if (pathname.startsWith(`${base}/fixtures`)) {
-    return "fixtures";
-  }
-  if (pathname.startsWith(`${base}/lineups`)) {
-    return "lineups";
-  }
-  if (pathname.startsWith(`${base}/standings`)) {
-    return "standings";
-  }
-  if (pathname.startsWith(`${base}/reviews`)) {
-    return "reviews";
-  }
-  if (pathname.startsWith(`${base}/auction`) || pathname.startsWith(`${base}/readiness`)) {
-    return "auction";
-  }
-  // Posters is reached from /home and the auction page but is not a tab; the
-  // fall-through underlined "Overview" over a page that wasn't the overview.
-  if (pathname.startsWith(`${base}/posters`) || pathname.startsWith(`${base}/register`)) {
-    return "";
-  }
-  return "overview";
 }
 
 const SECTION_LABELS: [RegExp, string][] = [
@@ -460,10 +384,17 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/settlement$/, "Settlement"],
   [/\/teams$/, "Teams"],
   [/\/readiness$/, "Readiness"],
-  [/\/registrations$/, "Registrations"],
+  /*
+   * "Players", not "Registrations" — the tab that leads here is called Players
+   * (RN-1 Phase 4 consolidated Registrations + Lineups under it), and a tab
+   * whose page announces a different name is the shell contradicting itself
+   * one line apart. The CHILD keeps its own name: Lineups is Lineups, under a
+   * Players tab that stays lit. Same reasoning for Schedule below.
+   */
+  [/\/registrations$/, "Players"],
   [/\/fixtures\/calendar$/, "Calendar"],
   [/\/fixtures\/match-day$/, "Match day"],
-  [/\/fixtures$/, "Fixtures"],
+  [/\/fixtures$/, "Schedule"],
   [/\/lineups$/, "Lineups"],
   [/\/reviews$/, "Reviews"],
   [/\/standings$/, "Table"],
@@ -1180,6 +1111,8 @@ export function seasonTabs(
     label: "Auction",
     href: `${base}/auction`,
     testId: "open-auction",
+    // Readiness is reached from the auction page and is not a tab of its own.
+    claims: ["/readiness"],
   };
   const teams: CompetitionTab = {
     key: "teams",
@@ -1198,9 +1131,20 @@ export function seasonTabs(
           label: "Players",
           href: `${base}/registrations`,
           testId: "open-dashboard",
+          // Who is IN this season: who applied and was approved, and who
+          // actually took the field. Lineups is reached from Registrations.
+          claims: ["/lineups"],
         },
         teams,
-        { key: "schedule", label: "Schedule", href: `${base}/fixtures`, testId: "open-fixtures" },
+        {
+          key: "schedule",
+          label: "Schedule",
+          href: `${base}/fixtures`,
+          testId: "open-fixtures",
+          // When it is played, and how it went — the table is derived from the
+          // fixtures beside it, so the two are one question.
+          claims: ["/standings"],
+        },
         auction,
         // Absent without `settlement.view`, never disabled — the surface itself
         // 404s rather than admit the books exist, and the tab must agree.
@@ -1231,4 +1175,42 @@ export function seasonTabs(
     case "public":
       return [overview, table, auction];
   }
+}
+
+/**
+ * Which tab owns the current path — by the TAB LIST, not by a fixed table.
+ *
+ * `activeCompetitionTab` hard-coded one mapping of path to key, which cannot be
+ * right for two roles at once: an organizer's /standings belongs to "Schedule"
+ * and a team owner's belongs to their own "Table" tab. Matching against the
+ * list this person was actually given answers both, and consolidations
+ * (`claims`) come along for free.
+ *
+ * Longest href wins, so `/auction/plan` beats `/auction` for an owner. Overview
+ * is the fallback because its href is the bare season and would otherwise
+ * prefix-match everything.
+ */
+export function activeSeasonTab(pathname: string, slug: string, tabs: CompetitionTab[]): string {
+  const base = `/seasons/${slug}`;
+  const owns = (href: string): boolean => pathname === href || pathname.startsWith(`${href}/`);
+  let best: { key: string; length: number } | null = null;
+  for (const tab of tabs) {
+    if (tab.key === "overview") continue;
+    const paths = [tab.href, ...(tab.claims ?? []).map((suffix) => `${base}${suffix}`)];
+    for (const href of paths) {
+      if (owns(href) && (best === null || href.length > best.length)) {
+        best = { key: tab.key, length: href.length };
+      }
+    }
+  }
+  if (best !== null) return best.key;
+  /*
+   * Posters and the registration form are reached from elsewhere and are not
+   * tabs, so nothing is lit rather than underlining a page you are not on.
+   * `my-entry` IS /register for a player, and is caught by the loop above.
+   */
+  if (pathname.startsWith(`${base}/posters`) || pathname.startsWith(`${base}/register`)) {
+    return "";
+  }
+  return "overview";
 }

@@ -21,7 +21,8 @@ import { latestSecurityEventAt } from "../server/auth/security-events";
 import { competitionsView } from "../server/competition/actions";
 import { myOrgs } from "../server/orgs/actions";
 import { rolesOf } from "../server/roles/roles";
-import type { NavRoles } from "../components/shell/nav";
+import { seasonRoleFor, type NavRoles, type SeasonRole } from "../components/shell/nav";
+import { myRegistrations } from "../server/competition/public";
 import { finopsOrgIds } from "../server/financial-operations/actions";
 import { settlementOrgIds } from "../server/settlement/actions";
 
@@ -165,14 +166,42 @@ export default async function RootLayout({
         };
 
   const orgSlugById = new Map(orgs.map((org) => [org.id, org.slug]));
-  const managedOrgIds = new Set((roles?.organizes ?? []).map((club) => club.orgId));
+
+  /*
+   * WHO THIS PERSON IS IN EACH SEASON (RN-1 Phase 4).
+   *
+   * Not globally — somebody organizes club A, owns a team in season B and plays
+   * in season C, and the season workspace is the one place where that genuinely
+   * differs per object. The tab strip used to ask one and a half booleans
+   * (`canManage`, `canSettle`), so a team owner was handed six tabs and neither
+   * "My plan" nor "My squad" was among them.
+   *
+   * The registrations read is skipped entirely for somebody who does not play,
+   * and it is `cache`d with /home's, so a player pays for one query, not two.
+   */
+  const managedLevel = new Map((roles?.organizes ?? []).map((club) => [club.orgId, club.level]));
+  const memberOrgIds = new Set((roles?.memberOf ?? []).map((club) => club.orgId));
+  const conductedSlugs = new Set((roles?.conducts ?? []).map((season) => season.competitionSlug));
+  const ownedSlugs = new Set((roles?.owns ?? []).map((team) => team.competitionSlug));
+  const registeredSlugs = new Set(
+    roles?.plays === true
+      ? (await myRegistrations(session?.personId ?? "")).map((row) => row.competitionSlug)
+      : [],
+  );
+
   const competitions = (competitionsView_?.competitions ?? []).map((competition) => ({
     slug: competition.slug,
     name: competition.name,
     orgName: competition.orgName,
     orgSlug: orgSlugById.get(competition.orgId) ?? "",
     canSettle: settlementOrgs.has(competition.orgId),
-    canManage: managedOrgIds.has(competition.orgId),
+    seasonRole: seasonRoleFor({
+      manages: managedLevel.get(competition.orgId) ?? null,
+      conducts: conductedSlugs.has(competition.slug),
+      ownsTeam: ownedSlugs.has(competition.slug),
+      registered: registeredSlugs.has(competition.slug),
+      member: memberOrgIds.has(competition.orgId),
+    }) satisfies SeasonRole,
   }));
   return (
     // `suppressHydrationWarning`: the bootstrap below rewrites `data-theme`

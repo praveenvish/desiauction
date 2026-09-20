@@ -5,6 +5,7 @@ import {
   navigationFor,
   operatorDoorHref,
   seasonRoleFor,
+  activeSeasonTab,
   seasonTabs,
   shellKind,
   RAIL_CAP,
@@ -463,5 +464,75 @@ describe("the directory stays public, and the rail item that leads there stays",
     expect(
       navigationFor({ roles: player, pathname: "/home" }).rail.map((item) => item.key),
     ).toContain("find");
+  });
+});
+
+describe("the strip always says where you are, whatever role you hold", () => {
+  const at = (pathname: string, role: SeasonRole, canSettle = false): string =>
+    activeSeasonTab(pathname, "demo-pl", seasonTabs("demo-pl", role, { canSettle }));
+
+  it("a consolidated tab owns its children", () => {
+    // Nine tabs became seven by joining surfaces that answer one question. The
+    // children are still routes, and standing on one must light its parent —
+    // before `claims`, /lineups fell through and underlined Overview, a page
+    // the reader was demonstrably not on.
+    expect(at("/seasons/demo-pl/registrations", "organizer")).toBe("players");
+    expect(at("/seasons/demo-pl/lineups", "organizer")).toBe("players");
+    expect(at("/seasons/demo-pl/fixtures", "organizer")).toBe("schedule");
+    expect(at("/seasons/demo-pl/standings", "organizer")).toBe("schedule");
+    expect(at("/seasons/demo-pl/fixtures/match-day", "organizer")).toBe("schedule");
+  });
+
+  it("the SAME path belongs to different tabs for different people", () => {
+    // Which is exactly what a fixed path→key table could not express.
+    expect(at("/seasons/demo-pl/standings", "organizer")).toBe("schedule");
+    expect(at("/seasons/demo-pl/standings", "owner")).toBe("standings");
+    expect(at("/seasons/demo-pl/standings", "player")).toBe("standings");
+  });
+
+  it("longest match wins, so an owner's plan is not swallowed by the auction", () => {
+    expect(at("/seasons/demo-pl/auction/plan", "owner")).toBe("my-plan");
+    expect(at("/seasons/demo-pl/auction/live", "owner")).toBe("room");
+    expect(at("/seasons/demo-pl/teams", "owner")).toBe("my-team");
+  });
+
+  it("readiness belongs to the auction that sends you there", () => {
+    expect(at("/seasons/demo-pl/readiness", "organizer")).toBe("auction");
+    expect(at("/seasons/demo-pl/auction", "auctioneer")).toBe("auction");
+  });
+
+  it("Money lights only for somebody who was given the tab", () => {
+    expect(at("/seasons/demo-pl/money", "organizer", true)).toBe("money");
+    // Without the books there is no Money tab, so the page 404s under a strip
+    // that is not claiming to hold it.
+    expect(at("/seasons/demo-pl/money", "organizer", false)).toBe("overview");
+  });
+
+  it("a page that is not a tab lights nothing rather than the wrong thing", () => {
+    expect(at("/seasons/demo-pl/posters", "organizer")).toBe("");
+    expect(at("/seasons/demo-pl", "organizer")).toBe("overview");
+  });
+
+  it("a player's own entry is a tab, so /register lights it", () => {
+    expect(at("/seasons/demo-pl/register", "player")).toBe("my-entry");
+    // …but for an organizer the same path is not a tab at all.
+    expect(at("/seasons/demo-pl/register", "organizer")).toBe("");
+  });
+
+  it("every tab every role is given can light itself", () => {
+    const roles: SeasonRole[] = [
+      "organizer",
+      "staff",
+      "auctioneer",
+      "owner",
+      "player",
+      "member",
+      "public",
+    ];
+    for (const role of roles) {
+      for (const tab of seasonTabs("demo-pl", role, { canSettle: true })) {
+        expect(at(tab.href, role, true)).toBe(tab.key);
+      }
+    }
   });
 });

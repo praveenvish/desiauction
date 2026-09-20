@@ -45,9 +45,9 @@ import {
   ADMIN_TABS,
   PUBLIC_DESTINATIONS,
   activeAdminTab,
-  activeCompetitionTab,
   activeOrgMoneyTab,
-  competitionTabs,
+  activeSeasonTab,
+  seasonTabs,
   liveExit,
   navigationFor,
   orgMoneyTabs,
@@ -56,6 +56,7 @@ import {
   type NavIcon,
   type NavItem,
   type NavRoles,
+  type SeasonRole,
 } from "./nav";
 import { useReportProblem } from "../report-problem/report-problem";
 import { ShellActionContext } from "./page-action";
@@ -96,8 +97,12 @@ export interface ShellCompetition {
   orgSlug: string;
   /** PX-7: holder of `settlement.view` on this competition's org — gates Money. */
   canSettle: boolean;
-  /** Manages this competition's club (org:owner/staff) — gates the roster tabs. */
-  canManage?: boolean;
+  /**
+   * Who this person is IN THIS SEASON (RN-1 Phase 4), resolved by
+   * `seasonRoleFor` in the server layout. Replaces `canManage`, which was one
+   * boolean standing in for seven roles.
+   */
+  seasonRole: SeasonRole;
 }
 
 export interface ProductShellProps {
@@ -495,11 +500,9 @@ export function ProductShell({
       groups.push({
         label: `In ${currentCompetition.name}`,
         items: [
-          ...competitionTabs(
-            currentCompetition.slug,
-            currentCompetition.canSettle,
-            currentCompetition.canManage ?? true,
-          ).map((tab) => ({
+          ...seasonTabs(currentCompetition.slug, currentCompetition.seasonRole, {
+            canSettle: currentCompetition.canSettle,
+          }).map((tab) => ({
             key: `section-${tab.key}`,
             label: tab.label,
             hint: currentCompetition.name,
@@ -912,17 +915,15 @@ export function ProductShell({
     const competition = competitions.find((entry) => entry.slug === slug);
     if (competition !== undefined) {
       seasonSwitcherFor = slug;
-      const activeTab = activeCompetitionTab(pathname, slug);
+      const tabs = seasonTabs(slug, competition.seasonRole, {
+        canSettle: competition.canSettle,
+      });
+      const activeTab = activeSeasonTab(pathname, slug, tabs);
       tabsNode = (
         <SubNavTabs
           label="Season sections"
           linkComponent={Link}
-          tabs={competitionTabs(slug, competition.canSettle, competition.canManage ?? true).map(
-            (tab) => ({
-              ...tab,
-              active: tab.key === activeTab,
-            }),
-          )}
+          tabs={tabs.map((tab) => ({ ...tab, active: tab.key === activeTab }))}
         />
       );
     }

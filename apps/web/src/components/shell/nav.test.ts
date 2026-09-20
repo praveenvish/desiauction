@@ -5,10 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   ADMIN_TABS,
   activeAdminTab,
-  activeCompetitionTab,
   activeOrgMoneyTab,
   activeRailKey,
-  competitionTabs,
   liveExit,
   orgMoneyTabs,
   pageIdentity,
@@ -66,93 +64,6 @@ describe("path ownership, for the identity bar's title", () => {
     expect(activeRailKey("/help")).toBe("help");
     expect(activeRailKey("/account")).toBeNull();
     expect(activeRailKey("/inbox")).toBeNull();
-  });
-});
-
-describe("competition tabs", () => {
-  it("builds the eight organizer tabs and resolves the active one", () => {
-    const tabs = competitionTabs("mpl");
-    expect(tabs.map((tab) => tab.key)).toEqual([
-      "overview",
-      "teams",
-      "registrations",
-      "fixtures",
-      // Who played each match, beside the matches.
-      "lineups",
-      // The table sits beside the fixtures it is derived from.
-      "standings",
-      "auction",
-      // FR-1: what players and owners said, at the end of the season's story.
-      "reviews",
-    ]);
-    expect(activeCompetitionTab("/seasons/mpl", "mpl")).toBe("overview");
-    expect(activeCompetitionTab("/seasons/mpl/teams", "mpl")).toBe("teams");
-    expect(activeCompetitionTab("/seasons/mpl/registrations", "mpl")).toBe("registrations");
-    expect(activeCompetitionTab("/seasons/mpl/fixtures/calendar", "mpl")).toBe("fixtures");
-    expect(activeCompetitionTab("/seasons/mpl/lineups", "mpl")).toBe("lineups");
-    expect(activeCompetitionTab("/seasons/mpl/standings", "mpl")).toBe("standings");
-    expect(activeCompetitionTab("/seasons/mpl/reviews", "mpl")).toBe("reviews");
-    expect(activeCompetitionTab("/seasons/mpl/auction/ledger", "mpl")).toBe("auction");
-    // Readiness lives with the auction preparation context.
-    expect(activeCompetitionTab("/seasons/mpl/readiness", "mpl")).toBe("auction");
-    // Posters and the public register form are reached from elsewhere and are
-    // not tabs. They used to fall through to "overview", so the strip
-    // underlined Overview over a page that was not the overview.
-    expect(activeCompetitionTab("/seasons/mpl/posters", "mpl")).toBe("");
-    expect(activeCompetitionTab("/seasons/mpl/register", "mpl")).toBe("");
-  });
-
-  it("a member who does not manage the club is not offered the roster tabs", () => {
-    const keys = competitionTabs("mpl", false, false).map((tab) => tab.key);
-    expect(keys).not.toContain("registrations");
-    expect(keys).not.toContain("lineups");
-    expect(keys).toContain("fixtures");
-    expect(keys).toContain("standings");
-  });
-
-  // PX-7: Money is absent without settlement.view — never rendered-then-disabled.
-  it("hides Money from anyone without a settlement grant", () => {
-    expect(competitionTabs("mpl").map((tab) => tab.key)).not.toContain("money");
-    expect(competitionTabs("mpl", false).map((tab) => tab.key)).not.toContain("money");
-  });
-
-  it("appends Money last for a settlement grant holder", () => {
-    const tabs = competitionTabs("mpl", true);
-    expect(tabs.map((tab) => tab.key)).toEqual([
-      "overview",
-      "teams",
-      "registrations",
-      "fixtures",
-      "lineups",
-      "standings",
-      "auction",
-      "reviews",
-      "money",
-    ]);
-    expect(tabs.at(-1)?.href).toBe("/seasons/mpl/money");
-  });
-
-  it("keeps the money surfaces on the Money tab", () => {
-    expect(activeCompetitionTab("/seasons/mpl/money", "mpl")).toBe("money");
-    expect(activeCompetitionTab("/seasons/mpl/money/case/01ABC", "mpl")).toBe("money");
-  });
-
-  it("labels deep sections for the breadcrumb", () => {
-    expect(sectionLabel("/seasons/mpl")).toBeNull();
-    expect(sectionLabel("/seasons/mpl/teams")).toBe("Teams");
-    expect(sectionLabel("/seasons/mpl/readiness")).toBe("Readiness");
-    expect(sectionLabel("/seasons/mpl/registrations")).toBe("Registrations");
-    expect(sectionLabel("/seasons/mpl/fixtures/match-day")).toBe("Match day");
-    expect(sectionLabel("/seasons/mpl/auction/ledger")).toBe("Ledger");
-    // PX-7: the case review is its own place, never just "Money".
-    expect(sectionLabel("/seasons/mpl/money")).toBe("Money");
-    expect(sectionLabel("/seasons/mpl/money/case/01ABC")).toBe("Case review");
-    expect(sectionLabel("/org/demo-club/settlement")).toBe("Settlement");
-    // PX-8: the finance segments are their own places, never just "Money".
-    expect(sectionLabel("/org/demo-club/money")).toBe("Money");
-    expect(sectionLabel("/org/demo-club/money/deliveries")).toBe("Deliveries");
-    expect(sectionLabel("/org/demo-club/money/reconciliation")).toBe("Reconciliation");
-    expect(sectionLabel("/org/demo-club/money/documents/01ABC")).toBe("Document");
   });
 });
 
