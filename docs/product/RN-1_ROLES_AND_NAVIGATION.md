@@ -365,8 +365,22 @@ Answering "for whom do we show the player list":
 | Public | Published pool and results, per `visibility` |
 
 The team-owner row is **competitive integrity**, not only privacy: a rival's
-remaining purse leaking mid-auction decides the auction. Each row is pinned by
-a served-payload assertion (`response.text()`, never the DOM).
+remaining purse leaking mid-auction decides the auction.
+
+**Pinned, with a control.** `live-auction.spec.ts` already builds the expensive
+state — three accepted owners, each a viewer-level member of the host club, on
+a settled season — so the assertion lives there: each owner's own
+`response.text()` for `/seasons/{slug}/teams` carries none of `TeamCard`'s
+money keys, and the organizer's carries all of them from the same route.
+
+The control is the load-bearing half. Two earlier drafts guessed key names that
+are never emitted for anybody, and both passed the owner side while failing the
+control. **A negative assertion against a string the page never emits proves
+nothing**, and only an inverted check can tell the two apart. The remaining
+rows (auctioneer, player, member) are gated by the same
+`money`/`roster` options on the same read model and are covered by unit-level
+capability resolution; extending the served-payload proof to each is a
+follow-up, not a gap in the gate.
 
 ---
 
