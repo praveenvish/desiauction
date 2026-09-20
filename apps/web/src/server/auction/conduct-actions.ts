@@ -64,8 +64,9 @@ function signCrests<T extends { logoKey: string | null }>(
   }));
 }
 
+// NOT re-exported: a `export type { X }` here breaks the Turbopack dev build
+// (see cockpit-panel.tsx). Consumers import it from ./owner-acceptances.
 import type { OwnerAcceptance } from "./owner-acceptances";
-export type { OwnerAcceptance };
 
 export interface CockpitView {
   competition: { name: string; slug: string };
