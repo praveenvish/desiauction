@@ -23,7 +23,6 @@ export const metadata: Metadata = {
 export default function SupportPage() {
   return (
     <ContentPage eyebrow="Support" title="Support" lede={SUPPORT.intro}>
-
       <section className="content-section" aria-labelledby="channels">
         <h2 id="channels">Contact channels</h2>
         <div className="support-channels">

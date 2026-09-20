@@ -24,15 +24,15 @@ export default function ReleasesPage() {
       }
       lede={
         <>
-        {/* Same guard as /support: APP_VERSION defaults to "dev", which is a
+          {/* Same guard as /support: APP_VERSION defaults to "dev", which is a
             developer string, not a version a reader should ever meet. */}
-        What each update delivered.
-        {env.APP_VERSION !== "dev" ? (
-          <>
-            {" "}
-            Running version <code>{env.APP_VERSION}</code>.
-          </>
-        ) : null}
+          What each update delivered.
+          {env.APP_VERSION !== "dev" ? (
+            <>
+              {" "}
+              Running version <code>{env.APP_VERSION}</code>.
+            </>
+          ) : null}
         </>
       }
     >

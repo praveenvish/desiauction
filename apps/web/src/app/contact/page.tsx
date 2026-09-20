@@ -19,7 +19,6 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   return (
     <ContentPage eyebrow="Talk to us" title="Contact us" lede={SUPPORT.intro}>
-
       <div className="support-channels">
         {SUPPORT.channels.map((channel) => (
           <div key={channel.title} className="support-card">

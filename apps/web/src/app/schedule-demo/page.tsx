@@ -58,7 +58,6 @@ export default async function ScheduleDemoPage({
       }
       lede="Twenty minutes, on a call, watching a real auction run: teams and purses, players going under the hammer, the gavel, and the receipts that come out the other side. Not slides."
     >
-
       <ol className="demo-steps">
         <li>
           <strong>Tell us about your tournament.</strong> How many teams, and when your auction is —

@@ -128,8 +128,7 @@ function publicAuctionRules(config: unknown): {
   return {
     pursePerTeam:
       typeof purse === "number" && Number.isFinite(purse) && purse > 0 ? paise(purse) : null,
-    squadSize:
-      typeof squad === "number" && Number.isInteger(squad) && squad > 0 ? squad : null,
+    squadSize: typeof squad === "number" && Number.isInteger(squad) && squad > 0 ? squad : null,
   };
 }
 
@@ -599,9 +598,7 @@ export type DirectoryFilter = "all" | "open" | "live" | "upcoming" | "closed";
 export type DirectorySort = "opportunity" | "soon" | "name";
 
 export function parseDirectoryFilter(raw: string | undefined): DirectoryFilter {
-  return raw === "open" || raw === "live" || raw === "upcoming" || raw === "closed"
-    ? raw
-    : "all";
+  return raw === "open" || raw === "live" || raw === "upcoming" || raw === "closed" ? raw : "all";
 }
 
 export function parseDirectorySort(raw: string | undefined): DirectorySort {

@@ -80,7 +80,12 @@ export default function HelpIndexPage() {
         art={<SportMontage />}
         actions={
           <>
-            <form className="content-searchbar no-print" action="/search" method="get" role="search">
+            <form
+              className="content-searchbar no-print"
+              action="/search"
+              method="get"
+              role="search"
+            >
               <label className="visually-hidden-heading" htmlFor="help-q">
                 Search help
               </label>

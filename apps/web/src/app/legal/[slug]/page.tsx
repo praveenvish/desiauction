@@ -55,21 +55,21 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
       <PageBody>
         <Prose blocks={doc.blocks} />
 
-      <section className="content-section" aria-labelledby="version-history">
-        <h2 id="version-history" className="prose-h2">
-          Version history
-        </h2>
-        <dl className="prose-dl">
-          {doc.versions.map((version) => (
-            <div key={version.version} className="prose-dl-row">
-              <dt>
-                {version.version} — {version.date}
-              </dt>
-              <dd>{version.note}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+        <section className="content-section" aria-labelledby="version-history">
+          <h2 id="version-history" className="prose-h2">
+            Version history
+          </h2>
+          <dl className="prose-dl">
+            {doc.versions.map((version) => (
+              <div key={version.version} className="prose-dl-row">
+                <dt>
+                  {version.version} — {version.date}
+                </dt>
+                <dd>{version.note}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
       </PageBody>
     </main>
   );

@@ -66,11 +66,8 @@ export function ShowcaseGrid({
   // night press a toggle to reach it. Before that, there are no squads to show.
   const hasSquads = pool.players.some((player) => player.status !== "available");
   const urlView = searchParams.get("view");
-  const openOn: ShowcaseView = urlView === "players" || urlView === "squads"
-    ? initial.view
-    : hasSquads
-      ? "squads"
-      : "players";
+  const openOn: ShowcaseView =
+    urlView === "players" || urlView === "squads" ? initial.view : hasSquads ? "squads" : "players";
 
   const [query, setQuery] = useState(initial.query);
   const [filter, setFilter] = useState<ShowcaseFilter>(initial.filter);

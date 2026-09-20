@@ -1,4 +1,11 @@
-import { Badge, ButtonLink, EmptyState, IconGavel, IconTrophy, IconUsers as IconUsersUi } from "@desiauction/ui";
+import {
+  Badge,
+  ButtonLink,
+  EmptyState,
+  IconGavel,
+  IconTrophy,
+  IconUsers as IconUsersUi,
+} from "@desiauction/ui";
 import { entryCategoryLabel, formatPaiseINR, sportPackFor } from "@desiauction/core";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -8,7 +15,14 @@ import { env } from "../../../env";
 import { publicCompetitionView, publicShowcase } from "../../../server/competition/public";
 import { serializeJsonLd } from "../../../server/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
-import { HeroFact, PageBody, PageHero, PageSection, StatStrip, type Stat } from "../../../components/public/public-kit";
+import {
+  HeroFact,
+  PageBody,
+  PageHero,
+  PageSection,
+  StatStrip,
+  type Stat,
+} from "../../../components/public/public-kit";
 import { formatDateRange } from "../format";
 import { PublicSeasonReviews } from "../../../components/reviews/season-reviews";
 import { ShowcaseGrid } from "./showcase-grid";
@@ -45,7 +59,6 @@ export async function generateMetadata({
     twitter: { card: "summary_large_image", title: view.name, description },
   };
 }
-
 
 /**
  * The season's name with everything after its first word in gold — the way the

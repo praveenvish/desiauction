@@ -1,6 +1,13 @@
 "use client";
 
-import { IconGavel, IconHelp, IconLedger, IconReceipt, IconTrophy, IconUsers } from "@desiauction/ui";
+import {
+  IconGavel,
+  IconHelp,
+  IconLedger,
+  IconReceipt,
+  IconTrophy,
+  IconUsers,
+} from "@desiauction/ui";
 
 import {
   CountChips,
@@ -58,7 +65,11 @@ export function PublicKitDemo() {
           </>
         }
         lede="Every tournament on DesiAuction that's open to the public."
-        status={<span className="pk-chip" data-tone="open">Registration open</span>}
+        status={
+          <span className="pk-chip" data-tone="open">
+            Registration open
+          </span>
+        }
         meta={
           <>
             <HeroFact icon={<IconTrophy width={16} height={16} />}>Example Club</HeroFact>
@@ -93,7 +104,11 @@ export function PublicKitDemo() {
         stats={[
           { value: "4", label: "Teams", icon: <IconUsers width={18} height={18} /> },
           { value: "16", label: "Approved players", icon: <IconUsers width={18} height={18} /> },
-          { value: "₹1,00,000", label: "Purse per team", icon: <IconTrophy width={18} height={18} /> },
+          {
+            value: "₹1,00,000",
+            label: "Purse per team",
+            icon: <IconTrophy width={18} height={18} />,
+          },
           { value: "4", label: "Squad size", icon: <IconGavel width={18} height={18} /> },
           { value: "Example Club", label: "Organized by", aside: true },
         ]}
@@ -226,7 +241,11 @@ export function PublicKitDemo() {
       </TopicGrid>
 
       <h3>Sport art — every pack</h3>
-      <PageSection headingId="kit-sport-art" title="Fallback art" lede="Drawn when no photograph exists for the sport, and for every season without a cover.">
+      <PageSection
+        headingId="kit-sport-art"
+        title="Fallback art"
+        lede="Drawn when no photograph exists for the sport, and for every season without a cover."
+      >
         <div className="gallery-sport-grid">
           {SPORTS.map((sport) => (
             <figure className="gallery-sport" key={sport}>

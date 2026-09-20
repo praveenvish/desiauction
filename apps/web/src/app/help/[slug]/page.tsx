@@ -59,11 +59,11 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
         />
         <PageBody>
           <div className="content-section">
-          {FAQS.map((faq) => (
-            <details key={faq.question} className="faq-item">
-              <summary>{faq.question}</summary>
-              <p>{faq.answer}</p>
-            </details>
+            {FAQS.map((faq) => (
+              <details key={faq.question} className="faq-item">
+                <summary>{faq.question}</summary>
+                <p>{faq.answer}</p>
+              </details>
             ))}
           </div>
         </PageBody>

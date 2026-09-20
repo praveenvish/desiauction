@@ -112,13 +112,7 @@ export function HeroFact({ icon, children }: { icon?: ReactNode; children: React
  * it is the brand's handwriting, never information, so it is `aria-hidden` and
  * a page that needs the words read out loud must say them in real copy.
  */
-export function ScriptTag({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function ScriptTag({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span className={className === undefined ? "pk-script" : `pk-script ${className}`} aria-hidden>
       {children}
@@ -251,14 +245,7 @@ export interface TopicCardProps {
 }
 
 /** A link card with an icon tile — help topics, legal documents, support routes. */
-export function TopicCard({
-  href,
-  title,
-  description,
-  icon,
-  foot,
-  tone = "gold",
-}: TopicCardProps) {
+export function TopicCard({ href, title, description, icon, foot, tone = "gold" }: TopicCardProps) {
   return (
     <Link className="pk-topic" href={href} data-tone={tone}>
       {icon === undefined ? null : (
@@ -343,7 +330,11 @@ export function PageSection({
   flush?: boolean;
 }) {
   return (
-    <section className="pk-section" aria-labelledby={headingId} data-flush={flush === true ? "" : undefined}>
+    <section
+      className="pk-section"
+      aria-labelledby={headingId}
+      data-flush={flush === true ? "" : undefined}
+    >
       <div className="pk-section-head">
         <div>
           <h2 className="pk-section-title" id={headingId}>

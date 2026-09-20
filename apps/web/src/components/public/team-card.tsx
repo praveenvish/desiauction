@@ -60,7 +60,9 @@ export function TeamCard({
   return (
     <article
       className="team-card"
-      style={color == null || color === "" ? undefined : ({ "--team-color": color } as CSSProperties)}
+      style={
+        color == null || color === "" ? undefined : ({ "--team-color": color } as CSSProperties)
+      }
     >
       <header className="team-card-head">
         <span className="team-card-crest" aria-hidden>

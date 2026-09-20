@@ -39,20 +39,20 @@ export function ArticleView({
       />
       <PageBody>
         <div className="article-layout">
-        <article>
-          <Prose blocks={blocks} />
-        </article>
-        {toc.length > 1 ? (
-          <nav className="article-toc no-print" aria-label="In this article">
-            <h2>In this article</h2>
-            <ul>
-              {toc.map((heading) => (
-                <li key={heading.id} className={heading.level === 3 ? "toc-3" : undefined}>
-                  <a href={`#${heading.id}`}>{heading.text}</a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <article>
+            <Prose blocks={blocks} />
+          </article>
+          {toc.length > 1 ? (
+            <nav className="article-toc no-print" aria-label="In this article">
+              <h2>In this article</h2>
+              <ul>
+                {toc.map((heading) => (
+                  <li key={heading.id} className={heading.level === 3 ? "toc-3" : undefined}>
+                    <a href={`#${heading.id}`}>{heading.text}</a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
           ) : null}
         </div>
       </PageBody>

@@ -54,5 +54,5 @@ export function sportGradientAngle(sport: string, seed = ""): number {
   }
   // Snap to 15° steps: neighbouring cards differ visibly, and no card lands on
   // an angle so shallow that the gradient reads as a flat fill.
-  return 100 + (Math.round(hash / 15) * 15) % 140;
+  return 100 + ((Math.round(hash / 15) * 15) % 140);
 }

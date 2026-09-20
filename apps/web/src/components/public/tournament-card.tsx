@@ -192,7 +192,11 @@ export function TournamentCard({
             <span className="tc-tag">{sportLabel(sport)}</span>
             {category === undefined ? null : <span className="tc-tag">{category}</span>}
           </span>
-          <Link className="tc-action" href={action.href} data-primary={live || open ? "" : undefined}>
+          <Link
+            className="tc-action"
+            href={action.href}
+            data-primary={live || open ? "" : undefined}
+          >
             {action.label}
           </Link>
         </div>
@@ -202,13 +206,7 @@ export function TournamentCard({
 }
 
 /** The grid tournament cards sit in. */
-export function TournamentGrid({
-  children,
-  testId,
-}: {
-  children: ReactNode;
-  testId?: string;
-}) {
+export function TournamentGrid({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
     <div className="tc-grid" data-testid={testId}>
       {children}

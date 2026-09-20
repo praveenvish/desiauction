@@ -48,19 +48,19 @@ export default async function SearchPage({
         art={<SportMontage />}
         actions={
           <form className="content-searchbar no-print" action="/search" method="get" role="search">
-        <label className="visually-hidden-heading" htmlFor="search-q">
-          Search
-        </label>
-        {/* No autoFocus: it steals the caret from a reader who arrived with
+            <label className="visually-hidden-heading" htmlFor="search-q">
+              Search
+            </label>
+            {/* No autoFocus: it steals the caret from a reader who arrived with
             results already on screen, and jumps a screen reader past the count
             it was about to announce. */}
-        <input
-          id="search-q"
-          name="q"
-          type="search"
-          defaultValue={query}
-          placeholder="Search the site…"
-        />
+            <input
+              id="search-q"
+              name="q"
+              type="search"
+              defaultValue={query}
+              placeholder="Search the site…"
+            />
             <button type="submit">Search</button>
           </form>
         }
@@ -68,46 +68,48 @@ export default async function SearchPage({
 
       <PageBody>
         {query.length < 2 ? (
-        <p className="article-meta">Type at least two characters to search.</p>
-      ) : matches.length === 0 ? (
-        <p className="article-meta" data-testid="search-empty">
-          Nothing matches “{query}”. Try a different word, or browse{" "}
-          <Link href="/help" className="prose-link">
-            the help centre
-          </Link>
-          .
-        </p>
-      ) : (
-        <>
-          <p className="article-meta" data-testid="search-count">
-            {matches.length} result{matches.length === 1 ? "" : "s"} for “{query}”
-            {results.length < matches.length ? `, showing the first ${String(results.length)}` : ""}
+          <p className="article-meta">Type at least two characters to search.</p>
+        ) : matches.length === 0 ? (
+          <p className="article-meta" data-testid="search-empty">
+            Nothing matches “{query}”. Try a different word, or browse{" "}
+            <Link href="/help" className="prose-link">
+              the help centre
+            </Link>
+            .
           </p>
-          <ul className="search-results" data-testid="search-results">
-            {results.map((result) => (
-              <li key={result.href}>
-                <Link href={result.href} className="search-result">
-                  <span>
-                    <strong>{result.title}</strong>
-                    <span className="content-card-meta">{result.hint}</span>
-                  </span>
-                  <span className="search-result-section">{result.section}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {results.length < matches.length ? (
-            <p className="article-meta no-print">
-              <Link
-                href={`/search?q=${encodeURIComponent(query)}&all=1`}
-                className="prose-link"
-                data-testid="search-show-all"
-              >
-                Show all {matches.length} results
-              </Link>
+        ) : (
+          <>
+            <p className="article-meta" data-testid="search-count">
+              {matches.length} result{matches.length === 1 ? "" : "s"} for “{query}”
+              {results.length < matches.length
+                ? `, showing the first ${String(results.length)}`
+                : ""}
             </p>
-          ) : null}
-        </>
+            <ul className="search-results" data-testid="search-results">
+              {results.map((result) => (
+                <li key={result.href}>
+                  <Link href={result.href} className="search-result">
+                    <span>
+                      <strong>{result.title}</strong>
+                      <span className="content-card-meta">{result.hint}</span>
+                    </span>
+                    <span className="search-result-section">{result.section}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {results.length < matches.length ? (
+              <p className="article-meta no-print">
+                <Link
+                  href={`/search?q=${encodeURIComponent(query)}&all=1`}
+                  className="prose-link"
+                  data-testid="search-show-all"
+                >
+                  Show all {matches.length} results
+                </Link>
+              </p>
+            ) : null}
+          </>
         )}
       </PageBody>
     </main>

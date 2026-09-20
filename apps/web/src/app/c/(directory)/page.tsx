@@ -226,146 +226,146 @@ export default async function DirectoryPage({
       />
 
       <PageBody>
-          {directory.entries.length === 0 ? (
-            <Card>
-              {outOfRange ? (
-                <EmptyState
-                  aria-live="polite"
-                  headingLevel={2}
-                  title="That page doesn't exist"
-                  description={
-                    directory.totalPages === 1
-                      ? `There ${verb} ${String(directory.total)} ${noun}, all on page 1.`
-                      : `There ${verb} ${String(directory.total)} ${noun}, across ${String(directory.totalPages)} pages.`
-                  }
-                  action={
-                    <ButtonLink href={directoryHref({ q: term, filter, sort })}>
-                      Back to page 1
+        {directory.entries.length === 0 ? (
+          <Card>
+            {outOfRange ? (
+              <EmptyState
+                aria-live="polite"
+                headingLevel={2}
+                title="That page doesn't exist"
+                description={
+                  directory.totalPages === 1
+                    ? `There ${verb} ${String(directory.total)} ${noun}, all on page 1.`
+                    : `There ${verb} ${String(directory.total)} ${noun}, across ${String(directory.totalPages)} pages.`
+                }
+                action={
+                  <ButtonLink href={directoryHref({ q: term, filter, sort })}>
+                    Back to page 1
+                  </ButtonLink>
+                }
+              />
+            ) : searchEmpty ? (
+              <EmptyState
+                aria-live="polite"
+                headingLevel={2}
+                title={`No tournaments match “${term}”`}
+                description={`Try a shorter search, or clear it to see all ${String(directory.catalogue)} tournaments. Organizers can also keep a tournament unlisted — if someone sent you a direct link, that link still works.`}
+                action={
+                  <span className="public-empty-actions">
+                    <ButtonLink variant="secondary" href={clearSearchHref}>
+                      Clear search
                     </ButtonLink>
-                  }
-                />
-              ) : searchEmpty ? (
-                <EmptyState
-                  aria-live="polite"
-                  headingLevel={2}
-                  title={`No tournaments match “${term}”`}
-                  description={`Try a shorter search, or clear it to see all ${String(directory.catalogue)} tournaments. Organizers can also keep a tournament unlisted — if someone sent you a direct link, that link still works.`}
-                  action={
-                    <span className="public-empty-actions">
-                      <ButtonLink variant="secondary" href={clearSearchHref}>
-                        Clear search
+                    <ButtonLink href="/c">Browse all tournaments</ButtonLink>
+                  </span>
+                }
+              />
+            ) : filter !== "all" ? (
+              <EmptyState
+                aria-live="polite"
+                headingLevel={2}
+                title={
+                  filter === "live"
+                    ? "No auction is live right now"
+                    : "No tournament is taking registrations right now"
+                }
+                description={
+                  term !== ""
+                    ? `“${term}” matches ${String(directory.counts.all)} ${directory.counts.all === 1 ? "tournament" : "tournaments"}, but ${directory.counts.all === 1 ? "it is not" : "none of them is"} ${filter === "live" ? "mid-auction" : "taking registrations"} right now.`
+                    : filter === "live"
+                      ? `An auction runs for a couple of hours on the day, so this changes fast. All ${String(directory.catalogue)} public tournaments are listed under All.`
+                      : `Organizers open registration when they are ready to take players. All ${String(directory.catalogue)} public tournaments are listed under All.`
+                }
+                action={
+                  <span className="public-empty-actions">
+                    {term === "" ? null : (
+                      <ButtonLink variant="secondary" href={clearFilterHref}>
+                        Show all matches
                       </ButtonLink>
-                      <ButtonLink href="/c">Browse all tournaments</ButtonLink>
-                    </span>
-                  }
-                />
-              ) : filter !== "all" ? (
-                <EmptyState
-                  aria-live="polite"
-                  headingLevel={2}
-                  title={
-                    filter === "live"
-                      ? "No auction is live right now"
-                      : "No tournament is taking registrations right now"
-                  }
-                  description={
-                    term !== ""
-                      ? `“${term}” matches ${String(directory.counts.all)} ${directory.counts.all === 1 ? "tournament" : "tournaments"}, but ${directory.counts.all === 1 ? "it is not" : "none of them is"} ${filter === "live" ? "mid-auction" : "taking registrations"} right now.`
-                      : filter === "live"
-                        ? `An auction runs for a couple of hours on the day, so this changes fast. All ${String(directory.catalogue)} public tournaments are listed under All.`
-                        : `Organizers open registration when they are ready to take players. All ${String(directory.catalogue)} public tournaments are listed under All.`
-                  }
-                  action={
-                    <span className="public-empty-actions">
-                      {term === "" ? null : (
-                        <ButtonLink variant="secondary" href={clearFilterHref}>
-                          Show all matches
-                        </ButtonLink>
-                      )}
-                      <ButtonLink href="/c">Browse all tournaments</ButtonLink>
-                    </span>
-                  }
-                />
-              ) : (
-                <EmptyState
-                  aria-live="polite"
-                  headingLevel={2}
-                  title="No public tournaments yet"
-                  description="Organizers choose whether to list a tournament publicly. If someone sent you a direct link, it still works — open it and register there."
-                  action={
-                    <span className="public-empty-actions">
-                      <ButtonLink variant="secondary" href="/help">
-                        How DesiAuction works
-                      </ButtonLink>
-                      <ButtonLink href="/">Back to home</ButtonLink>
-                    </span>
-                  }
-                />
-              )}
-            </Card>
-          ) : (
-            <section className="public-results" aria-labelledby="directory-results">
-              {/* The card names are the only per-result headings, so they need a
+                    )}
+                    <ButtonLink href="/c">Browse all tournaments</ButtonLink>
+                  </span>
+                }
+              />
+            ) : (
+              <EmptyState
+                aria-live="polite"
+                headingLevel={2}
+                title="No public tournaments yet"
+                description="Organizers choose whether to list a tournament publicly. If someone sent you a direct link, it still works — open it and register there."
+                action={
+                  <span className="public-empty-actions">
+                    <ButtonLink variant="secondary" href="/help">
+                      How DesiAuction works
+                    </ButtonLink>
+                    <ButtonLink href="/">Back to home</ButtonLink>
+                  </span>
+                }
+              />
+            )}
+          </Card>
+        ) : (
+          <section className="public-results" aria-labelledby="directory-results">
+            {/* The card names are the only per-result headings, so they need a
                   heading ABOVE them to hang off: without this the whole page had
                   exactly one heading and a screen-reader user could not move
                   result to result. */}
-              <h2 id="directory-results" className="visually-hidden">
-                Tournament results
-              </h2>
-              <div className="public-results-head">
-                <p className="public-count" aria-live="polite" data-testid="directory-count">
-                  {countLabel}
-                </p>
-                <p className="public-helper">
-                  Anyone can watch. Registering takes a mobile number, your name and playing role —
-                  about a minute.
-                </p>
-              </div>
-              <TournamentGrid testId="directory-list">
-                {directory.entries.map((entry) => (
-                  <TournamentCard
-                    key={entry.slug}
-                    tournament={{
-                      name: entry.name,
-                      slug: entry.slug,
-                      orgName: entry.orgName,
-                      sport: entry.sport,
-                      location: entry.location,
-                      dates: formatDateRange(entry.startsOn, entry.endsOn),
-                      open: entry.open,
-                      live: entry.live,
-                      teamCount: entry.teamCount,
-                      playerCount: entry.playerCount,
-                      logoUrl: entry.logoUrl,
-                      coverUrl: entry.coverUrl,
-                      entryCategory: entry.entryCategory,
-                    }}
-                  />
-                ))}
-              </TournamentGrid>
-            </section>
-          )}
-          {directory.totalPages > 1 ? (
-            <nav className="public-pagination" aria-label="Pagination">
-              {directory.page > 1 ? (
-                <ButtonLink
-                  variant="ghost"
-                  href={directoryHref({ q: term, filter, sort, page: directory.page - 1 })}
-                >
-                  Previous
-                </ButtonLink>
-              ) : null}
-              <span>
-                Page {directory.page} of {directory.totalPages}
-              </span>
-              {directory.page < directory.totalPages ? (
-                <ButtonLink
-                  variant="ghost"
-                  href={directoryHref({ q: term, filter, sort, page: directory.page + 1 })}
-                >
-                  Next
-                </ButtonLink>
-              ) : null}
+            <h2 id="directory-results" className="visually-hidden">
+              Tournament results
+            </h2>
+            <div className="public-results-head">
+              <p className="public-count" aria-live="polite" data-testid="directory-count">
+                {countLabel}
+              </p>
+              <p className="public-helper">
+                Anyone can watch. Registering takes a mobile number, your name and playing role —
+                about a minute.
+              </p>
+            </div>
+            <TournamentGrid testId="directory-list">
+              {directory.entries.map((entry) => (
+                <TournamentCard
+                  key={entry.slug}
+                  tournament={{
+                    name: entry.name,
+                    slug: entry.slug,
+                    orgName: entry.orgName,
+                    sport: entry.sport,
+                    location: entry.location,
+                    dates: formatDateRange(entry.startsOn, entry.endsOn),
+                    open: entry.open,
+                    live: entry.live,
+                    teamCount: entry.teamCount,
+                    playerCount: entry.playerCount,
+                    logoUrl: entry.logoUrl,
+                    coverUrl: entry.coverUrl,
+                    entryCategory: entry.entryCategory,
+                  }}
+                />
+              ))}
+            </TournamentGrid>
+          </section>
+        )}
+        {directory.totalPages > 1 ? (
+          <nav className="public-pagination" aria-label="Pagination">
+            {directory.page > 1 ? (
+              <ButtonLink
+                variant="ghost"
+                href={directoryHref({ q: term, filter, sort, page: directory.page - 1 })}
+              >
+                Previous
+              </ButtonLink>
+            ) : null}
+            <span>
+              Page {directory.page} of {directory.totalPages}
+            </span>
+            {directory.page < directory.totalPages ? (
+              <ButtonLink
+                variant="ghost"
+                href={directoryHref({ q: term, filter, sort, page: directory.page + 1 })}
+              >
+                Next
+              </ButtonLink>
+            ) : null}
           </nav>
         ) : null}
       </PageBody>
