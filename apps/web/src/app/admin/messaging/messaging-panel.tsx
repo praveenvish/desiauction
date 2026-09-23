@@ -2,6 +2,7 @@ import { EmptyState, IconFileCheck, IconLock, IconSend, Pill, SectionCard } from
 
 import { maskContact } from "../../../server/admin/format";
 import type { MessagingOverview } from "../../../server/admin/views";
+import { NavButton } from "../../players/nav-button";
 import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
 
 /**
@@ -170,18 +171,24 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
         </div>
       </SectionCard>
 
-      {/* No lift button, deliberately. Somebody who texts START lifts their
-          own; the day support genuinely needs to lift somebody else's is a
-          conversation at review, not an import into a read-only surface. */}
+      {/* No lift button here, still. This surface is read-only; lifting and
+          adding by hand live on the suppression desk (Notification Control
+          Center, Phase 4), one contact at a time, audited — the link below. */}
       <SectionCard
         icon={<IconLock />}
         tone="neutral"
         title="Suppression list"
         description="Contacts we must not send to."
         action={
-          <Pill tone="neutral" testId="admin-suppression-count">
-            {String(overview.liveSuppressions)}
-          </Pill>
+          <span className="admin-chips">
+            <Pill tone="neutral" testId="admin-suppression-count">
+              {String(overview.liveSuppressions)}
+            </Pill>
+            <NavButton href="/admin/notifications/suppressions" variant="ghost">
+              Manage
+              <span className="admin-sr-only"> suppressions</span>
+            </NavButton>
+          </span>
         }
         flush
       >

@@ -13,7 +13,7 @@ import {
   type KitTone,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition } from "react";
 
 import {
   addSuppression,
@@ -256,15 +256,14 @@ export function SuppressionSearchPanel() {
       setResult(await findSuppressions(contact));
     });
   };
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    search(query);
-  };
   return (
     <div className="spr-body">
       <form
         className="spr-search"
-        onSubmit={onSubmit}
+        onSubmit={(event) => {
+          event.preventDefault();
+          search(query);
+        }}
         role="search"
         data-testid="suppression-search"
       >

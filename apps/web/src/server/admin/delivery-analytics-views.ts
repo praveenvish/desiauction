@@ -1,7 +1,9 @@
 import { messageOutbox, type Db } from "@desiauction/db";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
+import { systemDb } from "../db";
 import { isNotificationKind, notificationOf } from "../messaging/catalogue";
+import { platformAdminGate } from "./authz";
 import {
   normalizeDeliveryError,
   normalizeFailureReason,
@@ -280,4 +282,16 @@ export async function deliveryAnalytics(
     reasons: groupReasons(reasonRows, deliveryRows),
     daily: fillDays(dayRows, windowDays, now),
   };
+}
+
+/**
+ * The page's read: `platform.admin`, or nothing. On the SYSTEM pool, because
+ * the counts are across every club and the outbox is org-scoped for everyone
+ * else.
+ */
+export async function adminDeliveryAnalytics(
+  windowDays: AnalyticsWindow,
+): Promise<DeliveryAnalytics | null> {
+  if ((await platformAdminGate()) === null) return null;
+  return deliveryAnalytics(systemDb, windowDays);
 }

@@ -59,7 +59,7 @@ async function run(
 /** Is this contact suppressed? Exact match on what was typed, normalized. */
 export async function findSuppressions(contact: string): Promise<SuppressionSearch> {
   if ((await platformAdminGate()) === null) return REFUSED;
-  return searchSuppressions(systemDb, String(contact).slice(0, 320));
+  return searchSuppressions(systemDb, contact.slice(0, 320));
 }
 
 export async function addSuppression(
@@ -68,7 +68,7 @@ export async function addSuppression(
   reason: string,
 ): Promise<SuppressionActionResult> {
   return run((handles, actorId) =>
-    addManualSuppression(handles, actorId, { contact: String(contact), scope, reason }),
+    addManualSuppression(handles, actorId, { contact, scope, reason }),
   );
 }
 
@@ -80,13 +80,13 @@ export async function liftSuppressionAction(
 ): Promise<SuppressionActionResult> {
   return run((handles, actorId) =>
     liftSuppressionByAdmin(handles, actorId, {
-      suppressionId: String(suppressionId),
+      suppressionId,
       reason,
-      confirmed: confirmed === true,
+      confirmed,
     }),
   );
 }
 
 export async function revertSuppression(auditId: string): Promise<SuppressionActionResult> {
-  return run((handles, actorId) => revertSuppressionChange(handles, actorId, String(auditId)));
+  return run((handles, actorId) => revertSuppressionChange(handles, actorId, auditId));
 }

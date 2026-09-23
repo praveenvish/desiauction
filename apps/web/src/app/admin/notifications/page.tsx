@@ -1,8 +1,9 @@
-import { ToastProvider } from "@desiauction/ui";
+import { IconChart, IconLock, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { platformAdminPageGate } from "../../../server/admin/authz";
 import { adminNotificationCenter } from "../../../server/admin/notification-views";
+import { NavButton } from "../../players/nav-button";
 import { NotificationsPanel } from "./notifications-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
@@ -28,13 +29,23 @@ export default async function AdminNotificationsPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head">
+          <header className="dash-head ntc-page-head">
             <p className="dash-hint">
               What DesiAuction sends, on which channel, and who may stop it. A switch here stops a
               message for everyone at once; people and clubs keep their own switches only where you
               leave them. Sign-in codes are never stopped. Every change is on the audit log with
               your name, and can be reverted below.
             </p>
+            <nav aria-label="More about notifications" className="ntc-links">
+              <NavButton href="/admin/notifications/suppressions">
+                <IconLock size={18} aria-hidden />
+                Suppressions
+              </NavButton>
+              <NavButton href="/admin/notifications/analytics">
+                <IconChart size={18} aria-hidden />
+                Delivery analytics
+              </NavButton>
+            </nav>
           </header>
           {/* No Suspense here, unlike the read-only desks: this page is
               changed by its own actions, and a refresh that re-renders a

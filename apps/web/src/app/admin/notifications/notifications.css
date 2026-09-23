@@ -167,6 +167,10 @@
   background: var(--surface);
 }
 
+.dla-channel h3 {
+  margin: 0;
+}
+
 .dla-channel dl {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -226,6 +230,19 @@
   margin-inline-end: var(--space-1);
   border-radius: 2px;
   vertical-align: -0.1em;
+}
+
+/* The legend's swatches are spans, which take a background, not a fill. */
+.dla-swatch.dla-bar-sent {
+  background: var(--success-strong);
+}
+
+.dla-swatch.dla-bar-failed {
+  background: var(--danger-strong);
+}
+
+.dla-swatch.dla-bar-suppressed {
+  background: var(--warning-strong);
 }
 
 .dla-trend details {

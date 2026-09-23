@@ -14,6 +14,7 @@ export function NavButton({
   variant = "secondary",
   size = "touch",
   className,
+  current = false,
   children,
 }: {
   href: string;
@@ -21,10 +22,16 @@ export function NavButton({
   size?: ButtonSize;
   /** Extra classes for layout; the button look stays the kit's. */
   className?: string;
+  /** This link is the page being shown (a window switch, a tab): aria-current. */
+  current?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Link href={href} className={buttonClassName({ variant, size }, className)}>
+    <Link
+      href={href}
+      className={buttonClassName({ variant, size }, className)}
+      {...(current ? { "aria-current": "page" as const } : {})}
+    >
       {children}
     </Link>
   );
