@@ -259,10 +259,9 @@ describe("a manual suppression reaches the outbox", () => {
     if (!added.ok || added.auditId === null) throw new Error("expected an audit id");
     // The person texts START: the row is lifted without the desk.
     await liftSuppression(db, { contact: PLAYER_PHONE, channel: "sms" });
-    expect(await revertSuppression(added.auditId)).toMatchObject({
-      ok: false,
-      error: expect.stringContaining("changed since"),
-    });
+    const refused = await revertSuppression(added.auditId);
+    expect(refused.ok).toBe(false);
+    expect(refused.ok ? "" : refused.error).toContain("changed since");
     const recent = await recentSuppressionChanges(db);
     const entry = recent.find((change) => change.id === added.auditId);
     expect(entry).toMatchObject({ revertable: false });
