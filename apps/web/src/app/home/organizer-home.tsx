@@ -28,7 +28,7 @@ import {
   type JourneyStep,
 } from "@desiauction/ui";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { FormDialog } from "../../components/form-dialog";
 import { monogram } from "../../components/season-hero/season-hero";
@@ -55,6 +55,29 @@ import { HomeShortcuts } from "./home-shortcuts";
 import type { NextStep } from "./next-step";
 import { NextStepBanner } from "./next-step-banner";
 import "./home.css";
+
+/**
+ * A season's facts on one line — "1 Aug – 31 Oct 2026 · Mumbai · ₹2L
+ * collected" — where a narrow column may wrap BETWEEN facts but never inside
+ * one, so a date range never breaks across three lines.
+ */
+function Facts({ parts, className }: { parts: string[]; className?: string }) {
+  return (
+    <span className={className}>
+      {parts.map((part, index) => (
+        <Fragment key={part}>
+          {/* The dot rides with the fact BEFORE it, so a wrapped line never
+              starts with one. */}
+          <span className="home-fact">
+            {part}
+            {index < parts.length - 1 ? " ·" : null}
+          </span>
+          {index < parts.length - 1 ? " " : null}
+        </Fragment>
+      ))}
+    </span>
+  );
+}
 
 interface AttentionRow {
   key: string;
@@ -390,13 +413,15 @@ export async function OrganizerHome({
   const allSold = liveDone && liveRow.lotsSold === liveRow.lotsTotal;
 
   const bySlug = new Map(view.competitions.map((competition) => [competition.slug, competition]));
-  const seasonMeta = (slug: string): string | null => {
+  const seasonFacts = (slug: string): string[] => {
     const competition = bySlug.get(slug);
-    if (competition === undefined) return null;
-    const parts = [
-      dateRange(competition.startsOn, competition.endsOn),
-      competition.location,
-    ].filter((part): part is string => part !== null);
+    if (competition === undefined) return [];
+    return [dateRange(competition.startsOn, competition.endsOn), competition.location].filter(
+      (part): part is string => part !== null,
+    );
+  };
+  const seasonMeta = (slug: string): string | null => {
+    const parts = seasonFacts(slug);
     return parts.length === 0 ? null : parts.join(" · ");
   };
 
@@ -761,8 +786,11 @@ export async function OrganizerHome({
               }
             >
               {/* Two renderings, one visible at a time (see home.css): a
-                    table on a laptop, one card per season on a phone — a fixed
-                    table left the name 0px wide at 390. */}
+                    table where the COLUMN is wide enough for one, one row per
+                    season where it is not. It used to switch on the viewport,
+                    and this card sits in the narrow half of a two-column grid —
+                    so a 1280 laptop squeezed the name to 164px and a 1024 one
+                    pushed the table out of its card. */}
               <div className="home-table-wrap" data-testid="home-competitions">
                 <table className="home-table">
                   <thead>
@@ -779,7 +807,10 @@ export async function OrganizerHome({
                   <tbody>
                     {dash.top.map((row) => {
                       const badge = seasonBadge(row);
-                      const meta = seasonMeta(row.slug);
+                      const facts = [
+                        ...seasonFacts(row.slug),
+                        ...(row.canSeeMoney ? [`${compactINR(row.collectedPaise)} collected`] : []),
+                      ];
                       return (
                         <tr key={row.slug}>
                           <td>
@@ -789,18 +820,7 @@ export async function OrganizerHome({
                               </span>
                               <span className="home-tcell-text">
                                 <Link href={`/seasons/${row.slug}`}>{row.name}</Link>
-                                {meta !== null || row.canSeeMoney ? (
-                                  <span>
-                                    {[
-                                      meta,
-                                      row.canSeeMoney
-                                        ? `${compactINR(row.collectedPaise)} collected`
-                                        : null,
-                                    ]
-                                      .filter((part) => part !== null)
-                                      .join(" · ")}
-                                  </span>
-                                ) : null}
+                                {facts.length > 0 ? <Facts parts={facts} /> : null}
                               </span>
                             </span>
                           </td>
@@ -827,7 +847,6 @@ export async function OrganizerHome({
                 <ul className="home-season-cards">
                   {dash.top.map((row) => {
                     const badge = seasonBadge(row);
-                    const meta = seasonMeta(row.slug);
                     return (
                       <li key={row.slug}>
                         <Link href={`/seasons/${row.slug}`} className="home-season-card">
@@ -836,15 +855,21 @@ export async function OrganizerHome({
                           </span>
                           <span className="home-season-main">
                             <strong className="home-season-name">{row.name}</strong>
-                            <span className="home-season-meta">
-                              {[
+                            <Facts
+                              className="home-season-meta"
+                              parts={[
                                 `${String(row.teams)} team${row.teams === 1 ? "" : "s"}`,
                                 `${String(row.registrations)} player${row.registrations === 1 ? "" : "s"}`,
-                                meta,
-                              ]
-                                .filter((part) => part !== null)
-                                .join(" · ")}
-                            </span>
+                                ...seasonFacts(row.slug),
+                                // The table's money column, carried over: the
+                                // list is what a laptop shows now, so leaving it
+                                // out would hide the figure from the very
+                                // organizer it was for.
+                                ...(row.canSeeMoney
+                                  ? [`${compactINR(row.collectedPaise)} collected`]
+                                  : []),
+                              ]}
+                            />
                           </span>
                           <Pill tone={badge.tone}>{badge.label}</Pill>
                         </Link>
