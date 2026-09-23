@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { roleLabelIn, sportPackFor, styleLabel } from "@desiauction/core";
 import { Badge, ButtonLink, PlayerImage, IconArrowLeft } from "@desiauction/ui";
 import type { Metadata } from "next";
@@ -18,6 +19,15 @@ import {
 import { SharePlayer } from "./share-player";
 import "../../../../marketing.css";
 import "../../../directory.css";
+
+/**
+ * `generateMetadata` and the page both need this read, and Next runs them as
+ * two calls in one request — so it was fetched twice per render. React
+ * `cache` makes the second a memo hit for the rest of the request (wrapped
+ * here, not in the server module, because a "use server" file may only export
+ * async functions).
+ */
+const playerView = cache(publicPlayer);
 
 // Public single-player profile (parity §Phase 2). The routable, link-shareable
 // surface behind the player OG card — the client showcase dialog is not
@@ -60,7 +70,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string; number: string }>;
 }): Promise<Metadata> {
   const { slug, number } = await params;
-  const player = await publicPlayer(slug, number);
+  const player = await playerView(slug, number);
   if (player === null) {
     return { title: "Player · DesiAuction" };
   }
@@ -98,7 +108,7 @@ export default async function PlayerProfilePage({
   params: Promise<{ slug: string; number: string }>;
 }) {
   const { slug, number } = await params;
-  const player = await publicPlayer(slug, number);
+  const player = await playerView(slug, number);
   if (player === null) {
     notFound();
   }

@@ -2,7 +2,7 @@ import { Card, EmptyState, IconArrowLeft, PageIntro, SectionHeader } from "@desi
 import { enabledSports } from "../../../server/competition/sports";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense, type ReactNode } from "react";
+import { cache, Suspense, type ReactNode } from "react";
 
 import { FormDialog } from "../../../components/form-dialog";
 import { PageTitle } from "../../../components/shell/page-title";
@@ -17,6 +17,15 @@ import "../../seasons/seasons.css";
 import "../tournaments.css";
 
 /**
+ * `generateMetadata` and the page both need this read, and Next runs them as
+ * two calls in one request — so it was fetched twice per render. React
+ * `cache` makes the second a memo hit for the rest of the request (wrapped
+ * here, not in the server module, because a "use server" file may only export
+ * async functions).
+ */
+const headerOf = cache(tournamentHeader);
+
+/**
  * The tab and every shared link used to read the literal "Tournament ·
  * DesiAuction" for every tournament in the product, so a person with three of
  * these open could not tell them apart and a pasted link named nothing. The
@@ -24,7 +33,7 @@ import "../tournaments.css";
  */
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const header = await tournamentHeader(slug);
+  const header = await headerOf(slug);
   return header === null
     ? { title: "Tournament · DesiAuction" }
     : {
@@ -54,7 +63,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
   // more than one (SP-1 Phase 1).
   const sportOptions = await enabledSports();
   const { slug } = await params;
-  const header = await tournamentHeader(slug);
+  const header = await headerOf(slug);
   if (header === null) {
     notFound();
   }

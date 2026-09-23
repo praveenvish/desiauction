@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
@@ -12,11 +13,18 @@ import type { Metadata } from "next";
 // Spectator mode (M-IP4-3): read-only. Consumes the AuctionSnapshot stream and
 // NOTHING else — no commands, no diagnostics, no owner data, no audit.
 
-async function viewOf(slug: string) {
+/**
+ * `generateMetadata` and the page both need this read, and Next runs them as
+ * two calls in one request — so it was fetched twice per render. React
+ * `cache` makes the second a memo hit for the rest of the request (wrapped
+ * here, not in the server module, because a "use server" file may only export
+ * async functions).
+ */
+const viewOf = cache(async (slug: string) => {
   // PX-6: published competitions are publicly watchable (no sign-in); the
   // member-gated path remains for unpublished auctions.
   return (await publicSpectatorView(slug)) ?? (await spectatorView(slug));
-}
+});
 
 /**
  * The title used to be the constant "Live auction · DesiAuction" — the same
