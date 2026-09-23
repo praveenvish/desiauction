@@ -685,8 +685,10 @@
 }
 
 /* ---------- top seasons ---------- */
+/* The query container for the table/list switch at the bottom of this block. */
 .home-table-wrap {
   min-width: 0;
+  container-type: inline-size;
 }
 
 .home-table {
@@ -838,7 +840,18 @@
   color: var(--text-secondary);
 }
 
-@media (max-width: 639px) {
+/* One fact never breaks inside itself; the line breaks between them. */
+.home-fact {
+  white-space: nowrap;
+}
+
+/*
+   Switched on the CARD's width, not the viewport's. The table needs ~640px
+   before the season name gets a readable column (Teams, Players, Status and
+   View take ~410 between them); the card is narrower than that on every screen
+   below ~1440 because it shares the row with the side column.
+*/
+@container (max-width: 639px) {
   .home-table {
     display: none;
   }
