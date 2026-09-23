@@ -191,6 +191,7 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
     allowed: {
       "packages/messaging/src/finance-delivery.ts": "defines it; the email half asks the gate",
       "server/financial-operations/deps.ts": "the web tier's finops deps",
+      "apps/finops-runner/src/delivery.ts": "the runner's finops deps — the tier that sends",
     },
   },
   ...[
