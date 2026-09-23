@@ -9,10 +9,12 @@ import {
 import { and, eq } from "drizzle-orm";
 
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../admin/capabilities";
+import { db as appDb } from "../db";
 import { isNotificationKind, notificationOf } from "./catalogue";
 import {
   buildSubmitPayload,
   fetchTemplateStatuses,
+  metaConfigFromEnv,
   MetaTemplateError,
   submitRefusal,
   submitTemplate,
@@ -471,6 +473,11 @@ export async function syncWhatsAppTemplatesIfStale(
   } catch {
     return { ok: false, reason: "failed", error: "sync failed" };
   }
+}
+
+/** The scheduled job's call: the platform's account, on the app pool. */
+export function scheduledTemplateSync(): ReturnType<typeof syncWhatsAppTemplatesIfStale> {
+  return syncWhatsAppTemplatesIfStale(appDb, metaConfigFromEnv());
 }
 
 // ---------------------------------------------------------------------------

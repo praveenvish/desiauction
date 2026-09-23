@@ -245,7 +245,7 @@ export function buildTemplatesView(input: {
         list.add(name);
         submittedByKind.set(row.subject, list);
       }
-      const results = Array.isArray(meta.results) ? meta.results : [];
+      const results: SubmitAuditMeta["results"] = Array.isArray(meta.results) ? meta.results : [];
       const parts = results.map((r) =>
         "error" in r ? `${r.language}: refused (${r.error})` : `${r.language}: ${r.status}`,
       );

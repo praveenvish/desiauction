@@ -74,12 +74,12 @@ function LanguageChecks({
   onChange: (next: string[]) => void;
 }) {
   return (
-    <fieldset className="tpl-langs">
-      <legend className="tpl-langs-legend">Approved in</legend>
+    <fieldset className="ptpl-langs">
+      <legend className="ptpl-langs-legend">Approved in</legend>
       {LANGUAGES.map((language) => {
         const id = `${idPrefix}-${language.code}`;
         return (
-          <label key={language.code} className="notify-switch tpl-lang" htmlFor={id}>
+          <label key={language.code} className="notify-switch ptpl-lang" htmlFor={id}>
             <input
               id={id}
               type="checkbox"
@@ -436,12 +436,12 @@ export function SubmitTemplate({
           .map((p) => (
             <section
               key={p.language}
-              className="tpl-preview"
+              className="ptpl-preview"
               aria-label={`What Meta receives in ${p.languageLabel}`}
               data-testid={`${idPrefix}-preview-${p.language}`}
             >
-              <h3 className="tpl-preview-title">{p.languageLabel}</h3>
-              <p className="tpl-preview-body" lang={p.language}>
+              <h3 className="ptpl-preview-title">{p.languageLabel}</h3>
+              <p className="ptpl-preview-body" lang={p.language}>
                 {p.body}
               </p>
               <p className="admin-meta">
@@ -452,7 +452,7 @@ export function SubmitTemplate({
                 Samples:{" "}
                 {p.samples.map((sample, i) => `{{${String(i + 1)}}} ${sample}`).join(" · ")}
               </p>
-              <details className="tpl-json">
+              <details className="ptpl-json">
                 <summary>The exact request</summary>
                 <pre>{p.json.replace(/"name": "[^"]*"/, `"name": "${name.trim()}"`)}</pre>
               </details>

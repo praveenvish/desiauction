@@ -273,6 +273,10 @@
     "apps/web/src/server/messaging/notification-email.ts": {
       "class": "by-design",
       "reason": "The one email renderer (Notification Control Center, Phase 2) reads the PUBLISHED wording from notification_templates (0087): platform-level, no org_id, no RLS \u2014 the same words go to every club's players. The app pool is only the default handle for that read (cached 30s, and a failed read falls back to the code default); it never reads or writes tenant data."
+    },
+    "apps/web/src/server/messaging/provider-template-writer.ts": {
+      "class": "by-design",
+      "reason": "Notification Control Center (Phase 3): the scheduled refresh of Meta's WhatsApp template status (/api/jobs/feedback behind FEEDBACK_JOB_SECRET) writes provider_template_status and provider_template_syncs (0088) on the app pool \u2014 platform tables with no org_id and no RLS, holding Meta's verdict on DesiAuction's own templates. There is no tenant to scope to; every other write in this module takes its handles from the caller."
     }
   }
 }

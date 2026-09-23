@@ -230,5 +230,5 @@ export function resolverFor(snapshot: MappingSnapshot, envRecord: EnvRecord): Te
 
 /** The platform's resolver: this process's cached mappings over `env`. */
 export async function templateResolver(db: Db): Promise<TemplateResolver> {
-  return resolverFor(await providerTemplateMappings(db), env as unknown as EnvRecord);
+  return resolverFor(await providerTemplateMappings(db), env);
 }
