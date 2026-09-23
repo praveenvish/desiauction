@@ -6,7 +6,12 @@ import { env } from "../../env";
 import { clientIp } from "../../lib/client-ip";
 import { db } from "../db";
 import { sendDemoRequestMail } from "./demo-mail";
-import { isSubscribeThrottled, subscribe, unsubscribe } from "./newsletter";
+import {
+  isSubscribeThrottled,
+  subscribe,
+  unsubscribe,
+  unsubscribeTokenMatches,
+} from "./newsletter";
 import { pickHandleFor } from "./demo-booking";
 import {
   acknowledgementsSpent,
@@ -59,6 +64,24 @@ export async function unsubscribeNewsletterAction(
   const email = formData.get("email");
   if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
     return { error: "Enter a valid email address." };
+  }
+  await unsubscribe(db, email);
+  return { done: true };
+}
+
+/**
+ * The same removal, from the link a newsletter mail carries (`unsubscribeUrl`).
+ * The token proves the link was ours for this address; a POST from the page's
+ * one button rather than the GET itself, so a mail scanner prefetching links
+ * cannot unsubscribe anybody.
+ */
+export async function unsubscribeByLinkAction(
+  _previous: { error?: string; done?: boolean },
+  formData: FormData,
+): Promise<{ error?: string; done?: boolean }> {
+  const email = formData.get("address");
+  if (!unsubscribeTokenMatches(email, formData.get("token")) || typeof email !== "string") {
+    return { error: "That link isn't valid any more. Enter your address below instead." };
   }
   await unsubscribe(db, email);
   return { done: true };

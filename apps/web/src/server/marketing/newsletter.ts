@@ -1,5 +1,9 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { newId, newsletterSubscribers, type Db } from "@desiauction/db";
 import { and, count, desc, eq, gt, isNotNull, lt } from "drizzle-orm";
+
+import { env } from "../../env";
 
 /**
  * THE NEWSLETTER LIST — collected honestly, kept for a stated time, removable.
@@ -55,6 +59,49 @@ export async function subscribe(db: Db, email: string, requestIp: string | null)
     .insert(newsletterSubscribers)
     .values({ id: newId(), email: email.trim().toLowerCase(), requestIp })
     .onConflictDoNothing({ target: newsletterSubscribers.email });
+}
+
+/**
+ * THE LINK EVERY NEWSLETTER MUST CARRY (gate P3).
+ *
+ * Nothing sends to this list yet. When something does, each mail carries a
+ * link that removes exactly its own recipient and nobody else: the address
+ * plus an HMAC of it, under the marketing key in its own namespace (the demo
+ * pick handle's shape, demo-booking.ts), so no other token of ours can stand in
+ * for it and it cannot be forged for an address you do not receive mail at.
+ * Derived, not stored, for the demo key's reason — a leaked backup holds no
+ * working links.
+ *
+ * The page also still takes a TYPED address, and that is deliberate. The list
+ * is single opt-in: anybody can type anybody's address into the footer to JOIN
+ * it, so demanding proof of the mailbox to LEAVE would make leaving harder
+ * than joining — backwards for consent, and the DPDP Act asks withdrawal to be
+ * as easy as giving it. The worst a typed removal can do is take somebody off
+ * a list that has never sent them anything, which they can undo in one step.
+ * The token is for the mail, where one click has to be enough.
+ */
+export function unsubscribeToken(email: string): string {
+  return createHmac("sha256", env.DEMO_TOKEN_SECRET)
+    .update(`newsletter-unsubscribe:${email.trim().toLowerCase()}`)
+    .digest("base64url")
+    .slice(0, 22);
+}
+
+/** Does this token belong to this address? Constant-time; anything malformed is no. */
+export function unsubscribeTokenMatches(email: unknown, token: unknown): boolean {
+  if (typeof email !== "string" || typeof token !== "string" || email.trim() === "") {
+    return false;
+  }
+  const expected = Buffer.from(unsubscribeToken(email));
+  const given = Buffer.from(token);
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
+/** The one-click removal link for a newsletter mail's footer (and its List-Unsubscribe header). */
+export function unsubscribeUrl(email: string): string {
+  const address = email.trim().toLowerCase();
+  const query = new URLSearchParams({ address, token: unsubscribeToken(address) });
+  return `${env.PUBLIC_BASE_URL}/newsletter/unsubscribe?${query.toString()}`;
 }
 
 /** Remove an address. Says nothing about whether it was there. */
