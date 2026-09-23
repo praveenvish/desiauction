@@ -16,6 +16,7 @@ import {
   whatsappOptedIn,
   whatsappParams,
   whatsappTemplateName,
+  WhatsAppSendError,
   WHATSAPP_TEMPLATES,
   type PersonalWhatsAppSender,
 } from "./whatsapp";
@@ -155,21 +156,138 @@ export function kickDrain(): void {
 }
 
 const MAX_ATTEMPTS = 5;
-/** A claimed row is invisible to other drains for this long. */
+/**
+ * A claimed row is invisible to other drains for this long — and every provider
+ * call is cut off at PROVIDER_TIMEOUT_MS (ten seconds), so one send can never
+ * outlive the lease it was made under. That ratio is the at-most-once rule.
+ */
 const LEASE_MS = 5 * 60 * 1000;
+/** Retries back off 2, 4, 8, 16 minutes — and never further than this. */
+const MAX_BACKOFF_MS = 30 * 60 * 1000;
+/**
+ * How soon a row the breaker turned away is looked at again. Roughly the
+ * breakers' own cooldown (a minute): sooner is pointless, later just delays
+ * the backlog once the provider recovers.
+ */
+const BREAKER_RETRY_MS = 2 * 60 * 1000;
+
+function backoffMs(attempts: number): number {
+  return Math.min(2 ** attempts * 60 * 1000, MAX_BACKOFF_MS);
+}
 
 export interface DrainResult {
   readonly sent: number;
   readonly suppressed: number;
   readonly failed: number;
   readonly retrying: number;
+  /** Rows this drain claimed but another drain took over before it got to them. */
+  readonly skipped: number;
+}
+
+/** What the claim hands back: the row, and the lease it was taken under. */
+type ClaimedRow = {
+  id: string;
+  person_id: string;
+  org_id: string | null;
+  channel: "email" | "sms";
+  subject: string;
+  body_text: string;
+  body_html: string;
+  template_key: string | null;
+  slots: Record<string, string> | null;
+  media_url: string | null;
+  attempts: number;
+  /** `next_attempt_at` as epoch microseconds, as text — the claim token. */
+  lease: string;
+};
+
+/** `next_attempt_at` to the microsecond: exact, so it can be compared for equality. */
+const LEASE_TOKEN = sql`(extract(epoch from next_attempt_at) * 1000000)::bigint::text`;
+
+/**
+ * Is this row still OURS? Asked immediately before each send, and it renews
+ * the lease while it asks.
+ *
+ * `FOR UPDATE SKIP LOCKED` stops two drains claiming a row AT THE SAME TIME. It
+ * says nothing about a drain that claimed fifty rows and is still working
+ * through them when their five minutes run out: the next drain claims the
+ * stragglers, and without this both would send them. The claim moved
+ * `next_attempt_at` and `attempts`; a re-claim moves them again. So "the row
+ * still carries the lease I took" is a compare-and-set that exactly one drain
+ * can win — the loser skips the row, the winner sends it.
+ */
+async function stillOurs(db: Db, row: ClaimedRow): Promise<boolean> {
+  const renewed = await db.execute<{ lease: string }>(sql`
+    update ${messageOutbox}
+    set next_attempt_at = now() + ${`${String(LEASE_MS)} milliseconds`}::interval
+    where ${messageOutbox.id} = ${row.id}
+      and status = 'pending'
+      and attempts = ${row.attempts}
+      and ${LEASE_TOKEN} = ${row.lease}
+    returning ${LEASE_TOKEN} as lease
+  `);
+  const [fresh] = renewed;
+  if (fresh === undefined) {
+    return false;
+  }
+  row.lease = fresh.lease;
+  return true;
+}
+
+/**
+ * The send gate, asked INSIDE the club's own boundary.
+ *
+ * `maySend` reads `org_messaging_settings` — a club's "don't send" switch —
+ * and that table is FORCE ROW LEVEL SECURITY, visible only where `app.org_id`
+ * names its club. The drain works across every org on the bare app pool, so in
+ * production the read saw no row, and "no row" means "enabled": a club that
+ * switched auction mail off kept sending it. Locally the database owner
+ * bypasses RLS and the switch worked, which is why no test noticed.
+ *
+ * So a row that belongs to a club has its consent read in a short transaction
+ * scoped to that club, exactly as `withTenantDb` would set it up — and only the
+ * reads: the provider call stays outside, so no connection is held across it.
+ */
+function mayDeliver(
+  db: Db,
+  row: ClaimedRow,
+  input: Omit<Parameters<typeof maySend>[1], "orgId" | "personId">,
+): ReturnType<typeof maySend> {
+  const gate = { ...input, personId: row.person_id };
+  const orgId = row.org_id;
+  if (orgId === null) {
+    return maySend(db, gate);
+  }
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.person_id', ${row.person_id}, true)`);
+    await tx.execute(sql`select set_config('app.org_id', ${orgId}, true)`);
+    return maySend(tx, { ...gate, orgId });
+  });
+}
+
+/**
+ * A provider's breaker turned the send away without trying it. That is not an
+ * attempt — nothing reached the provider — so the claim's increment goes back
+ * and the row waits out the cooldown. Counting it was how an outage longer
+ * than the back-off ladder (half an hour) failed every queued message for good.
+ */
+async function waitOutBreaker(db: Db, row: ClaimedRow, now: Date, reason: string): Promise<void> {
+  await db
+    .update(messageOutbox)
+    .set({
+      lastError: reason,
+      nextAttemptAt: new Date(now.getTime() + BREAKER_RETRY_MS),
+      attempts: sql`greatest(${messageOutbox.attempts} - 1, 0)`,
+    })
+    .where(eq(messageOutbox.id, row.id));
 }
 
 /**
  * Claim due rows, then send each. The claim pushes `next_attempt_at` a lease
  * ahead inside one statement (`FOR UPDATE SKIP LOCKED`), so two drains running
- * at once never pick the same row — the at-most-once rule holds under
- * concurrency, not just under good timing.
+ * at once never pick the same row; `stillOurs` re-checks the claim before each
+ * send, so a drain that outlived its lease never sends a row another drain has
+ * since taken — the at-most-once rule holds under concurrency AND slowness.
  */
 export async function drainOutbox(
   options: {
@@ -196,19 +314,7 @@ export async function drainOutbox(
         )})`;
   const mailer = options.mailer ?? transactionalMailer();
   const limit = options.limit ?? 50;
-  const claimed = await db.execute<{
-    id: string;
-    person_id: string;
-    org_id: string | null;
-    channel: "email" | "sms";
-    subject: string;
-    body_text: string;
-    body_html: string;
-    template_key: string | null;
-    slots: Record<string, string> | null;
-    media_url: string | null;
-    attempts: number;
-  }>(sql`
+  const claimed = await db.execute<ClaimedRow>(sql`
     update ${messageOutbox}
     set next_attempt_at = now() + ${`${String(LEASE_MS)} milliseconds`}::interval,
         attempts = ${messageOutbox.attempts} + 1
@@ -220,19 +326,24 @@ export async function drainOutbox(
       for update skip locked
     )
     returning id, person_id, org_id, channel, subject, body_text, body_html,
-              template_key, slots, media_url, attempts
+              template_key, slots, media_url, attempts, ${LEASE_TOKEN} as lease
   `);
 
   let sent = 0;
   let suppressed = 0;
   let failed = 0;
   let retrying = 0;
+  let skipped = 0;
   let sms: PlayerSmsSender | null = null;
   const whatsapp: TextChannels["whatsapp"] = {
     sender: options.whatsapp === undefined ? createWhatsAppSender() : options.whatsapp,
     templateName: options.whatsappTemplate ?? whatsappTemplateName,
   };
   for (const row of claimed) {
+    if (!(await stillOurs(db, row))) {
+      skipped += 1;
+      continue;
+    }
     if (row.channel === "sms") {
       sms ??= options.sms ?? createPlayerSmsSender(db);
       const result = await sendText(db, row, { sms, whatsapp }, options.now ?? new Date());
@@ -248,13 +359,11 @@ export async function drainOutbox(
       suppressed += 1;
       continue;
     }
-    const decision = await maySend(db, {
+    const decision = await mayDeliver(db, row, {
       contact: email,
       channel: "email",
       category: "transactional",
       scope: "auction",
-      personId: row.person_id,
-      ...(row.org_id === null ? {} : { orgId: row.org_id }),
     });
     if (!decision.send) {
       await settle(db, row.id, "suppressed", decision.reason);
@@ -277,22 +386,27 @@ export async function drainOutbox(
       // No provider yet: nothing will ever send it, so it is not "failing".
       await settle(db, row.id, "suppressed", "email provider not configured");
       suppressed += 1;
+    } else if (outcome === "breaker-open") {
+      await waitOutBreaker(db, row, new Date(), outcome);
+      retrying += 1;
     } else if (row.attempts >= MAX_ATTEMPTS) {
       await settle(db, row.id, "failed", outcome);
       failed += 1;
     } else {
-      // Back off: 2, 4, 8, 16 minutes.
+      // A timed-out send lands here too and is retried: an email provider that
+      // did not answer in ten seconds almost never went on to deliver, and a
+      // lost sale notice is the worse error than a rare duplicate one.
       await db
         .update(messageOutbox)
         .set({
           lastError: outcome,
-          nextAttemptAt: new Date(Date.now() + 2 ** row.attempts * 60 * 1000),
+          nextAttemptAt: new Date(Date.now() + backoffMs(row.attempts)),
         })
         .where(eq(messageOutbox.id, row.id));
       retrying += 1;
     }
   }
-  return { sent, suppressed, failed, retrying };
+  return { sent, suppressed, failed, retrying, skipped };
 }
 
 type TextResult = "sent" | "suppressed" | "failed" | "retrying" | "deferred";
@@ -333,16 +447,7 @@ interface TextChannels {
 
 async function sendText(
   db: Db,
-  row: {
-    id: string;
-    person_id: string;
-    org_id: string | null;
-    body_text: string;
-    template_key: string | null;
-    slots: Record<string, string> | null;
-    media_url: string | null;
-    attempts: number;
-  },
+  row: ClaimedRow,
   channels: TextChannels,
   now: Date,
 ): Promise<TextResult> {
@@ -372,13 +477,11 @@ async function sendText(
     await settle(db, row.id, "suppressed", "no phone number");
     return "suppressed";
   }
-  const decision = await maySend(db, {
+  const decision = await mayDeliver(db, row, {
     contact: person.phone,
     channel: "sms",
     category: template.category,
     scope: "auction",
-    personId: row.person_id,
-    ...(row.org_id === null ? {} : { orgId: row.org_id }),
   });
   if (!decision.send) {
     await settle(db, row.id, "suppressed", decision.reason);
@@ -395,6 +498,13 @@ async function sendText(
    * A WhatsApp failure is not the end of the moment: it falls straight back to
    * SMS in this same pass (C-19, "SMS when WhatsApp is undeliverable"), and the
    * row keeps the WhatsApp error so the fallback is visible.
+   *
+   * EXCEPT a timeout. A refusal or a dead connection means Meta never had the
+   * message; a call that died on our deadline may well have been accepted and
+   * be on the phone already. That is not "undeliverable", it is UNKNOWN — and
+   * an SMS on top, or a retry, is the same moment twice. The queue's promise is
+   * at most once, so the row stops here, failed with the reason spelled out;
+   * the in-app inbox line the caller wrote still carries the moment.
    */
   let whatsappError: string | null = null;
   const waTemplate = WHATSAPP_TEMPLATES[template.key];
@@ -418,6 +528,15 @@ async function sendText(
         .where(eq(messageOutbox.id, row.id));
       return "sent";
     } catch (error) {
+      if (error instanceof WhatsAppSendError && error.outcomeUnknown) {
+        await settle(
+          db,
+          row.id,
+          "failed",
+          `WhatsApp: ${error.message} — delivery unknown, not retried or sent by SMS`,
+        );
+        return "failed";
+      }
       whatsappError = `WhatsApp: ${error instanceof Error ? error.message : "send failed"}`;
     }
   }
@@ -425,6 +544,10 @@ async function sendText(
     await channels.sms.send(person.phone, { template, slots: row.slots, body: row.body_text });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "send failed";
+    if (error instanceof SmsSendError && error.breakerOpen) {
+      await waitOutBreaker(db, row, now, reason);
+      return "retrying";
+    }
     // A template with no registered DLT id will never deliver: fail it once,
     // naming the variable, instead of retrying five times into the same wall.
     if ((error instanceof SmsSendError && error.permanent) || row.attempts >= MAX_ATTEMPTS) {
@@ -435,7 +558,7 @@ async function sendText(
       .update(messageOutbox)
       .set({
         lastError: reason,
-        nextAttemptAt: new Date(now.getTime() + 2 ** row.attempts * 60 * 1000),
+        nextAttemptAt: new Date(now.getTime() + backoffMs(row.attempts)),
       })
       .where(eq(messageOutbox.id, row.id));
     return "retrying";

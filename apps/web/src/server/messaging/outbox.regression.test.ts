@@ -10,7 +10,7 @@ import {
   people,
   type DbHandle,
 } from "@desiauction/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { env } from "../../env";
@@ -437,5 +437,162 @@ describe("WHATSAPP — instead of SMS, for a player who opted in", () => {
     });
     expect(result.suppressed).toBe(1);
     expect(wa.sent).toHaveLength(0);
+  });
+});
+
+describe("AT MOST ONCE, under slowness — a drain that outlives its lease", () => {
+  /**
+   * The double send (gate P1-7): a drain claims a batch for five minutes and
+   * works through it one send at a time. A provider that stalls holds the
+   * whole batch; the next drain re-claims whatever is still waiting, and both
+   * used to deliver it. The fix is two-sided — a ten-second deadline on every
+   * provider call (provider-fetch.ts), and a compare-and-set on the claim
+   * before each send — and this proves the second side with real Postgres.
+   *
+   * The lease expiry is simulated by moving `next_attempt_at` back, which is
+   * exactly the state a real expiry leaves.
+   */
+  it("the slow drain skips the row a second drain took over; it is sent once", async () => {
+    const person = newId();
+    await db.insert(people).values({
+      id: person,
+      phone: `+9195${RUN}1`,
+      name: "Leased",
+      email: `leased-${RUN}@example.test`,
+      emailVerifiedAt: new Date(),
+    });
+    try {
+      await enqueueMail([mail(person, "lease-a"), mail(person, "lease-b")], db);
+      await db
+        .update(messageOutbox)
+        .set({ subject: sql`${messageOutbox.dedupeKey}` })
+        .where(eq(messageOutbox.personId, person));
+
+      // Drain A's provider stalls on its FIRST send until released.
+      let release: () => void = () => undefined;
+      const stalled = new Promise<void>((done) => {
+        release = done;
+      });
+      let reachedProvider: (subject: string) => void = () => undefined;
+      const firstSend = new Promise<string>((done) => {
+        reachedProvider = done;
+      });
+      const slowSubjects: string[] = [];
+      const slow: TransactionalMailer = {
+        send: async (message) => {
+          slowSubjects.push(message.subject);
+          if (slowSubjects.length === 1) {
+            reachedProvider(message.subject);
+            await stalled;
+          }
+          return "sent";
+        },
+      };
+      const drainA = drainOutbox({ db, mailer: slow, personIds: [person] });
+      const inFlight = await firstSend;
+      const waiting = inFlight === `test:${RUN}:lease-a` ? "lease-b" : "lease-a";
+
+      // The waiting row's lease runs out while A is stuck; drain B takes it.
+      await db
+        .update(messageOutbox)
+        .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+        .where(eq(messageOutbox.dedupeKey, `test:${RUN}:${waiting}`));
+      const fast = mailer("sent");
+      const drainB = await drainOutbox({ db, mailer: fast, personIds: [person] });
+      expect(drainB.sent).toBe(1);
+      expect(fast.sent.map((m) => m.subject)).toEqual([`test:${RUN}:${waiting}`]);
+
+      release();
+      const resultA = await drainA;
+      expect(resultA).toMatchObject({ sent: 1, skipped: 1 });
+      // A delivered only the row it was holding — never the one B took.
+      expect(slowSubjects).toEqual([inFlight]);
+      const rows = await db
+        .select({ status: messageOutbox.status })
+        .from(messageOutbox)
+        .where(eq(messageOutbox.personId, person));
+      expect(rows.map((r) => r.status)).toEqual(["sent", "sent"]);
+    } finally {
+      await db.delete(messageOutbox).where(eq(messageOutbox.personId, person));
+      await db.delete(people).where(eq(people.id, person));
+    }
+  });
+});
+
+describe("OUTAGES — a breaker that turns sends away is not an attempt", () => {
+  it("puts the attempt back and looks again in minutes, so a long outage fails nothing", async () => {
+    const person = newId();
+    await db.insert(people).values({
+      id: person,
+      phone: `+9195${RUN}2`,
+      name: "Outage",
+      email: `outage-${RUN}@example.test`,
+      emailVerifiedAt: new Date(),
+    });
+    try {
+      await enqueueMail([mail(person, "outage")], db);
+      const down = mailer("breaker-open");
+      // Far more drains than MAX_ATTEMPTS: an outage of any length.
+      for (let pass = 0; pass < 8; pass += 1) {
+        await db
+          .update(messageOutbox)
+          .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+          .where(eq(messageOutbox.personId, person));
+        expect((await drainOutbox({ db, mailer: down, personIds: [person] })).retrying).toBe(1);
+      }
+      const [row] = await db.select().from(messageOutbox).where(eq(messageOutbox.personId, person));
+      expect(row?.status).toBe("pending");
+      expect(row?.attempts).toBe(0);
+      expect(row?.lastError).toBe("breaker-open");
+      // Once the provider is back, it goes.
+      await db
+        .update(messageOutbox)
+        .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+        .where(eq(messageOutbox.personId, person));
+      expect((await drainOutbox({ db, mailer: mailer("sent"), personIds: [person] })).sent).toBe(1);
+    } finally {
+      await db.delete(messageOutbox).where(eq(messageOutbox.personId, person));
+      await db.delete(people).where(eq(people.id, person));
+    }
+  });
+
+  it("does the same for an SMS breaker", async () => {
+    await enqueueSms([text(noEmail, "sms-outage")], db);
+    const sender = phone(new SmsSendError("SMS provider unavailable (breaker open)", true));
+    const result = await drainOutbox({ db, sms: sender, now: NOON_IST, personIds: [noEmail] });
+    expect(result.retrying).toBe(1);
+    const [row] = await db
+      .select()
+      .from(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:sms-outage`));
+    expect(row?.status).toBe("pending");
+    expect(row?.attempts).toBe(0);
+    await db.delete(messageOutbox).where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:sms-outage`));
+  });
+});
+
+describe("WHATSAPP TIMEOUT — unknown is not undeliverable", () => {
+  it("does not cover a timed-out WhatsApp send with an SMS, and does not retry it", async () => {
+    await enqueueSms([text(waFan, "wa-timeout")], db);
+    const sms = phone();
+    const stalled: PersonalWhatsAppSender = {
+      send: () => Promise.reject(new WhatsAppSendError("WhatsApp did not answer in time", true)),
+    };
+    const result = await drainOutbox({
+      db,
+      sms,
+      whatsapp: stalled,
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [waFan],
+    });
+    expect(result.failed).toBe(1);
+    expect(sms.sent).toHaveLength(0);
+    const [row] = await db
+      .select()
+      .from(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:wa-timeout`));
+    expect(row?.status).toBe("failed");
+    expect(row?.lastError).toContain("delivery unknown");
   });
 });

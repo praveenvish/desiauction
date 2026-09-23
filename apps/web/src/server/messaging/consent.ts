@@ -121,6 +121,13 @@ export async function maySend(
    * Absence means enabled, so this layer is inert until a club opens the screen.
    * The read is tenant-scoped by RLS; `notifyDecision` runs inside the
    * competition's org, which is what puts these rows in view.
+   *
+   * WHICH MAKES `db` PART OF THE CONTRACT: a caller passing `orgId` must hand
+   * in a handle scoped to that org. On the bare app pool the policy hides every
+   * row, "absence means enabled" answers, and the club's switch silently does
+   * nothing in production while working perfectly under the RLS-exempt owner
+   * every local run uses. The outbox drain did exactly that (`mayDeliver` in
+   * outbox.ts is the fix and the pattern).
    */
   if (input.orgId !== undefined) {
     const [setting] = await db
