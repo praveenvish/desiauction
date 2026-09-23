@@ -59,9 +59,23 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   CPU oversubscription, which shows up as jitter and is the wrong failure mode
   for a gavel. Watch steal during a rehearsal auction before trusting it.
 - ☐F **Contabo Auto Backup ON** (~EUR 1.15/mo): daily, stored OFF the server,
-  10 days retained. The pgBackRest repo lives on the same disk it backs up, so
-  it recovers a bad migration and NOT a dead machine — this add-on is the only
-  thing that covers the disk, and it is the cheapest line item on this page.
+  10 days retained — a whole-machine image, the coarse last resort under the
+  two off-box copies below.
+- ☐F **An off-box S3 bucket for pgBackRest** (different account/provider —
+  B2, R2, S3), keys in `pgbackrest.env` (ops/deploy/README "Backups"). ☑ The
+  sidecar is automated: WAL archive, nightly full/diff, `BACKUP_OK`/`FAILED`
+  lines, and it **refuses** an on-box repo unless `PGBACKREST_ALLOW_ONBOX_REPO=1`
+  records the interim in writing.
+- ☐F **An off-box S3 bucket for object storage**, keys in `mirror.env`. ☑ The
+  `minio-mirror` sidecar copies the media and finops buckets hourly and refuses
+  to run unconfigured.
+- ☐F **`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY`** in the `production`
+  GitHub environment. `backup-production.yml` FAILS nightly until they exist
+  (it used to report green with no backup taken), and `deploy-host.yml` cannot
+  run without them.
+- ☐F **Branch protection on `main`** with the required checks listed in
+  [DEPLOYMENT](DEPLOYMENT.md) "Required status checks". Needs a repository admin;
+  nothing in the repo can set it.
 - ☐F Domain + three DNS records at the host: `PUBLIC_DOMAIN`, `ENGINE_DOMAIN`,
   `S3_DOMAIN` (`RP_ID`/`RP_ORIGINS` must match the public domain — passkeys
   break otherwise)
@@ -74,7 +88,8 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   - `PUBLIC_BASE_URL`, which the web tier refuses to boot without in production.
   Needs MX **plus SPF/DKIM/DMARC** — mail that arrives without them lands in
   spam, which for a grievance address is the same as not arriving.
-- ☐F Managed Postgres 17 (Mumbai, PITR + daily dumps to a separate credential/account)
+- ~~☐F Managed Postgres 17~~ — superseded 2026-09-10 by the self-hosted `db`
+  service; PITR is pgBackRest to the off-box bucket above.
 - ☐E **TCP keepalives on the production database** (`tcp_keepalives_idle=30`,
   `tcp_keepalives_interval=10`, `tcp_keepalives_count=3`). Not tuning — the engine's
   single-writer lease is a session lock, and a connection severed without a close (host
@@ -149,10 +164,16 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   size-capped, so they can no longer fill the disk; Loki holds 30 days.
   ☐E ship them off-box — on-box logs are least available exactly when the
   machine is gone, which is the same limitation the backups carry.
-- ☐E Dashboards + alerts on: engine `/healthz`, bid-ack p95, WS fan-out,
-  runner tick age, finops supervisor status, settlement meters, DB
-  connections/replication, backup success (docs/56 SLOs). Alert on SILENCE
-  (missed backup, stale runner cursor), not just errors (C-2).
+- ☑ Alert rules provisioned from `ops/deploy/observability/grafana-alerting.yml`
+  (2026-09-23): service/engine unhealthy (via `autoheal`), error rate, fatal,
+  runner crash loop, webhook 5xx/4xx, backup + mirror failure AND silence,
+  scheduled jobs failing or silent — [ALERTS](ALERTS.md) has the map and the gaps.
+  ☐F `ALERT_WEBHOOK_URL` in `.env` (compose refuses to start without it).
+  ☐F External uptime check on `/readyz` + engine `/healthz` + TLS expiry
+  ([ALERTS](ALERTS.md) "Outside the box"). ☐F Sentry alert rules on the DSNs.
+- ☐E Metrics-backed alerts still absent: bid-ack p95, WS fan-out, runner tick
+  age / queue age, settlement meters, DB connections (docs/56 SLOs) — nothing
+  measures them yet.
 - ☐E Alert-validation drill: kill the staging runner, verify the page fires.
 
 ## 5 · Operational automation (PRP-1 §5)
@@ -161,9 +182,14 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
 - ⚠ Snapshot-consistent restore-verify (`pnpm db:restore-verify`) — drilled under concurrent writes, 43/43 exact **on 2026-07-16**. That measurement predates migrations 0015–0026, so the table count has moved and it must be re-drilled. Note also what it proves: `pg_dump` → `pg_restore` into a scratch database is row-count-lossless. It never reads a stored backup, replays no audit chain, and pages nobody — backup *restorability* remains unproven (audit P2-8, docs/62).
 - ☑ Secret rotation runbook + drilled ENGINE_SECRET cutover (1.29 s downtime, stale credentials refused)
 - ☑ Deployment + disaster-recovery runbooks
-- ☐E Settlement sweep scheduling (freeze §8.3) hosted beside settlement's writer once staging exists
+- ☑ Settlement sweep scheduling (freeze §8.3): the compose `scheduler` calls
+  `/api/jobs/settlement-coordination` every 5 min, beside the outbox drain,
+  demo reminders and the feedback/retention sweep (2026-09-23). ☐F the three job
+  secrets in `web.env`.
 - ☐E finops writer-role credential + `finops_events` grant narrowing (freeze §8.2)
-- ☐E Quarterly PITR human drill #1 on staging, timed against RTO
+- ☐E PITR drill against the OFF-BOX repo on the production stanza, timed and
+  recorded ([RESTORE_RUNBOOK](RESTORE_RUNBOOK.md) "Point-in-time restore"), then
+  quarterly on staging
 - ☑ TLS/certificates: Caddy provisions and renews Let's Encrypt automatically
   for all three hostnames — ☐E confirm renewal once in production
 
@@ -391,8 +417,10 @@ GO on their own, since several of them were measured before migrations
    exists, and the upgrade path is a request a human grants out-of-band. Launching
    Free-only is a legitimate answer; launching with an undecided price is not.
 3. **No rollback exists.** Migrations are forward-only, `0019_tournaments.sql`
-   already dropped a column, and there is no provisioned PITR or restored
-   backup (§5). A bad release cannot be undone today.
+   already dropped a column, and there is no restored backup (§5). The PITR
+   machinery is in the stack as of 2026-09-23, but its off-box repo is
+   founder-held (§2) and no restore from it has been drilled. A bad release
+   cannot be undone until both are.
 
 > **Read the ☑ marks against the branch you are deploying**, and note that
 > §1–§9 above still contain their own open items. Code readiness is not

@@ -25,7 +25,13 @@ import { SPORTS } from ".";
  *      never a use;
  *   B. a role LABEL in quotes — the prose spelling belongs to the pack alone,
  *      and this is the offence that actually shipped;
- *   C. any batting/bowling style token — the style enums have exactly one home.
+ *   C. a batting/bowling style token — the style enums have exactly one home.
+ *      A COMPOUND token (`right_arm_fast`, `left_hand`) is unmistakable, so one
+ *      in quotes is an offence. A BARE one (`right`, `left`, `both`) is also
+ *      ordinary English — `textAlign = "right"`, a "left" tone for a purse
+ *      with money remaining — so alone it proves nothing; it counts only when
+ *      two or more options of the SAME attribute sit in one file, which is the
+ *      shape of a copied list or map (rule A, applied per attribute).
  *
  * READ WITH readFileSync, NEVER grep. `player-profile.ts` holds a deliberate
  * control-character class (`no-control-regex`, in `validateProfileLocation`),
@@ -86,6 +92,17 @@ const ROLE_LABELS = SPORTS.flatMap((pack) => pack.roles.values.map((role) => rol
 const STYLE_TOKENS = SPORTS.flatMap((pack) =>
   pack.attributes.flatMap((attribute) => attribute.options.map((option) => option.key)),
 );
+/*
+ * The split rule C draws. Derived from the packs rather than listed, so a new
+ * attribute is guarded the day it lands: a key with an underscore is a coined
+ * term nobody writes by accident; a key without one is a word first.
+ */
+const COMPOUND_STYLE_TOKENS = [...new Set(STYLE_TOKENS.filter((token) => token.includes("_")))];
+const BARE_STYLE_SETS = SPORTS.flatMap((pack) =>
+  pack.attributes.map((attribute) =>
+    attribute.options.map((option) => option.key).filter((token) => !token.includes("_")),
+  ),
+).filter((tokens) => tokens.length > 1);
 
 /** A token or label sitting in quotes, which is how a copied list is written. */
 function quoted(values: readonly string[]): RegExp {
@@ -97,6 +114,8 @@ const QUOTED_ROLE = quoted(ROLE_TOKENS);
 /* Both spellings of the role that drifted, so the losing one cannot come back. */
 const QUOTED_LABEL = quoted([...ROLE_LABELS, "All rounder", "Wicket keeper"]);
 const QUOTED_STYLE = quoted(STYLE_TOKENS);
+const QUOTED_COMPOUND_STYLE = quoted(COMPOUND_STYLE_TOKENS);
+const QUOTED_BARE_STYLE_SETS = BARE_STYLE_SETS.map(quoted);
 
 function walk(dir: string, out: string[]): void {
   for (const entry of readdirSync(dir)) {
@@ -140,6 +159,18 @@ function matches(source: string, pattern: RegExp): string[] {
   return inCode(code(source), pattern);
 }
 
+/** Rule C over already-stripped code: every compound hit, and bare hits only as a set. */
+function styleOffences(stripped: string): string[] {
+  const hits = new Set(inCode(stripped, QUOTED_COMPOUND_STYLE));
+  for (const pattern of QUOTED_BARE_STYLE_SETS) {
+    const found = new Set(inCode(stripped, pattern));
+    if (found.size > 1) {
+      found.forEach((hit) => hits.add(hit));
+    }
+  }
+  return [...hits];
+}
+
 describe("a sport's words live in its pack and nowhere else", () => {
   /*
    * Read and strip the tree ONCE. Each check used to walk and read every file
@@ -181,11 +212,33 @@ describe("a sport's words live in its pack and nowhere else", () => {
   it("finds no batting or bowling style token outside the pack", () => {
     const offenders: string[] = [];
     for (const file of scanned) {
-      for (const hit of new Set(inCode(file.code, QUOTED_STYLE))) {
+      for (const hit of styleOffences(file.code)) {
         offenders.push(`${file.path} — ${hit}`);
       }
     }
     expect(offenders, "read styles from the sport pack").toEqual([]);
+  });
+
+  /*
+   * Rule C was once a bare-word match, and `textAlign = "right"` in the poster
+   * renderer turned main red for a football attribute it has never heard of.
+   * Narrowing a scan is only safe with proof it still bites, so both halves are
+   * pinned: the words in ordinary use pass, and each real leak shape fails.
+   */
+  it("tells an alignment word from a copied style list", () => {
+    expect(styleOffences(code('target.textAlign = "right";'))).toEqual([]);
+    expect(styleOffences(code('<dd data-tone={n === 0 ? "out" : "left"} />'))).toEqual([]);
+
+    expect(styleOffences(code('const STYLE = "right_arm_fast";'))).toEqual(['"right_arm_fast"']);
+    expect(
+      styleOffences(code("const HAND = { left_hand: 1 } as const; use('left_hand');")),
+    ).toEqual(["'left_hand'"]);
+    expect(styleOffences(code('const FEET = ["right", "left", "both"];')).sort()).toEqual([
+      '"both"',
+      '"left"',
+      '"right"',
+    ]);
+    expect(styleOffences(code("const GRIPS = ['shakehand', 'penhold'];")).length).toBe(2);
   });
 
   /* A rename of the pack must not quietly turn this whole test into a no-op. */
@@ -199,6 +252,14 @@ describe("a sport's words live in its pack and nowhere else", () => {
     expect(matches(pack, QUOTED_ROLE).length).toBeGreaterThan(1);
     expect(matches(pack, QUOTED_LABEL).length).toBeGreaterThan(0);
     expect(matches(pack, QUOTED_STYLE).length).toBeGreaterThan(0);
+    expect(
+      styleOffences(code(pack)).length,
+      "cricket's styles still read as styles",
+    ).toBeGreaterThan(0);
+    expect(
+      styleOffences(code(second)).length,
+      "football's bare foot list still reads as a list",
+    ).toBeGreaterThan(1);
   });
 
   /* The scan is worthless if the walk silently covers nothing. */

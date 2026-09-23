@@ -1,3 +1,28 @@
+# CADDY'S OWN LOG, FILTERED THE SAME WAY AS THE WEBHOOK ACCESS LOG BELOW.
+#
+# Caddy writes an `http.log.error` line for every failed upstream request —
+# a 502 while web restarts, say — and that line carries the FULL request:
+# every header and the query string. Measured before this block existed: a
+# webhook arriving during a restart put its `X-Razorpay-Signature` into the
+# container log verbatim, and Alloy ships container logs to Loki for thirty
+# days. The default logger is filtered here so no Caddy line, access or error,
+# can carry a header, a client address or a query string.
+{
+	log default {
+		output stderr
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>uri regexp "\?.*$" "?[redacted]"
+			}
+		}
+	}
+}
+
 # TLS is automatic: Caddy provisions and renews Let's Encrypt certificates and
 # redirects http→https. Nothing here needs a cron job or a renewal reminder.
 {$PUBLIC_DOMAIN} {
@@ -9,6 +34,37 @@
 	request_body {
 		max_size 10MB
 	}
+
+	# AN ACCESS LOG FOR THE WEBHOOK ROUTES, AND ONLY THOSE (ALERTS.md 5).
+	#
+	# Those routes fail closed and quietly by design — an unconfigured secret
+	# 404s, an unverifiable payload is refused — and they log nothing of their
+	# own, so a rotated provider secret was invisible until money stopped
+	# arriving. This line is the signal the webhook alerts count.
+	#
+	# Everything else is skipped on purpose: a log of every page view is a log
+	# of every visitor's IP and every token-bearing URL, kept for thirty days,
+	# for no alert anybody asked for. And from what IS logged, the parts that
+	# identify a person or carry a credential are removed before the line is
+	# written: headers (the provider signatures and callback secrets ride
+	# there), the client addresses, and the query string.
+	@not_webhook not path /api/webhooks/*
+	log_skip @not_webhook
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>uri regexp "\?.*$" "?[redacted]"
+				resp_headers delete
+			}
+		}
+	}
+
 	reverse_proxy web:3000
 }
 

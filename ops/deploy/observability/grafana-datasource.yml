@@ -1,9 +1,18 @@
 # Provisioned, not clicked. A datasource configured by hand in the UI lives in
 # grafana_data and is gone the moment that volume is recreated — which is
 # exactly when somebody is trying to read logs in a hurry.
+#
+# A FIXED uid, because the provisioned alert rules (grafana-alerting.yml) name
+# their datasource by uid. The first version let Grafana generate one, so the
+# delete below migrates an existing volume: the old auto-uid copy is removed and
+# this one takes its place on the same boot.
 apiVersion: 1
+deleteDatasources:
+  - name: Loki
+    orgId: 1
 datasources:
   - name: Loki
+    uid: loki
     type: loki
     access: proxy
     url: http://loki:3100

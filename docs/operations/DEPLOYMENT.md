@@ -25,29 +25,68 @@ advisory lock, and the runner is a persistent worker.
 | finops-runner | same host | `apps/finops-runner/Dockerfile` (distroless, non-root) | same |
 | caddy | same host | `caddy:2-alpine` | TLS is automatic |
 | Postgres 17 | same host, built from `ops/deploy/db/Dockerfile` | `packages/db/migrations` + `apps/engine/drizzle` | migrate on release |
-| **PITR** | **pgBackRest → MinIO on this box** | `ops/deploy/` | destroy-and-restore, verified 2026-09-11 |
-| Object storage | MinIO, same host | `ops/deploy/` | media + finops + WAL buckets |
+| **PITR** | **pgBackRest → an OFF-BOX S3 repo** (`pgbackrest.env`) | `ops/deploy/` | destroy-and-restore, verified 2026-09-11 (on-box repo) |
+| Object storage | MinIO, same host; `minio-mirror` copies it off-box hourly | `ops/deploy/` | media + finops buckets |
+| Scheduled jobs | `scheduler` (web image) | `ops/deploy/jobs/scheduler.mjs` | `/api/jobs/*` on a clock |
+| Deploy-time DB work | `migrator` (profile `ops`) | `ops/deploy/migrator/` | freeze, migrate, grants, preflight — on the host |
+| Watchdog + alerts | `autoheal`; Grafana-provisioned rules | `ops/deploy/observability/` | webhook to `ALERT_WEBHOOK_URL` |
 
 Postgres is BUILT rather than pulled: `archive_command` runs inside the database
 container and `postgres:17-alpine` has no pgbackrest, so every WAL segment failed
 and the disk would have filled until writes stopped. See `ops/deploy/README.md`.
 
-The backup repo is on the same disk it backs up. That protects a bad migration —
-the failure most likely to happen — and NOT the loss of the machine. Moving
-`repo1` off-box is a credentials change in `pgbackrest.env` and nothing else.
+The backup repo belongs OFF the box: a repo on the disk it backs up protects a
+bad migration and NOT the loss of the machine. The `pgbackrest` sidecar refuses
+an on-box repo unless `PGBACKREST_ALLOW_ONBOX_REPO=1` is set as a written
+interim — ops/deploy/README "Backups" has both configurations and the table of
+what is automated versus founder-held.
 
 The stack is described in `ops/deploy/` — see its README for the env-file split
 and why images are built in CI rather than on the host.
 
-`deploy-host.yml` is `workflow_dispatch` only, builds all three images in CI
-(never on the production host), refuses to run while an auction is live, and
-swaps the engine first so its single-writer lease is handed over cleanly.
+`deploy-host.yml` is `workflow_dispatch` only. It refuses a commit that has no
+successful `ci` run, builds every image in CI (never on the production host),
+and then does ALL of its database work **on the host** over SSH, in the
+`migrator` image on the compose network: the production database publishes no
+port, so the old runner-side freeze check, migrations and grant gate could not
+reach it at all. On the host it runs preflight → live-window freeze → migrate →
+grants, swaps the engine first so its single-writer lease is handed over
+cleanly, and fails the job unless `/readyz` answers on the new engine and web
+within 180 s. ops/deploy/README "How a deploy runs" has the step list.
+
+**The first deploy onto an empty database** passes the freeze on its own: an
+unmigrated database has no `auctions` table, which the check reads as "nothing
+can be live" (any other error is still a refusal). Create the four roles
+(below) after that first migrate, then re-run the deploy so `grants` passes.
+
+### Required status checks (branch protection — set by hand)
+
+Nothing in this repository can switch branch protection on; it needs a token
+with admin rights and is a GitHub settings change. Protect `main` and require
+these checks, by the names GitHub shows for them:
+
+- `quality`
+- `integration`
+- `e2e`
+- `image (web)`, `image (engine)`, `image (finops-runner)`, `image (migrator)`,
+  `image (db)`
+- `secrets-scan`
+- `pr-title`
+
+Also: require branches to be up to date before merging, and disallow force
+pushes to `main`. `deploy-host.yml` independently refuses any commit without a
+successful `ci` run, so the gate holds even for a dispatch from a branch — but
+protection is what keeps a red commit off `main` in the first place.
 
 ## Database bootstrap (fresh environment)
 
-1. Create the instance (Postgres 17, `bom`/Mumbai). Enable PITR + daily dumps.
-2. Run migrations as the owner role:
-   `pnpm --filter @desiauction/db db:migrate && pnpm --filter @desiauction/engine db:migrate`
+1. The `db` service in the compose stack IS the instance (Postgres 17 with
+   pgBackRest; PITR once `pgbackrest.env` points at the off-box repo).
+2. Run migrations as the owner role. The first `deploy-host.yml` run does this
+   on the host (`migrator migrate`); by hand on the host:
+   `docker compose --profile ops run --rm migrator migrate`
+   (from a checkout with a reachable owner URL:
+   `pnpm --filter @desiauction/db db:migrate && pnpm --filter @desiauction/engine db:migrate`)
    (journal pitfall: any NEW migration needs its `when` bumped past the
    hand-spaced future dates or drizzle silently skips it).
 3. Create runtime roles — **all four passwords, or the script aborts**:
@@ -127,16 +166,22 @@ header.
 
 ## Pre-deploy checklist
 
-Run in order; any failure stops the deploy.
+The workflow now automates items 1, 4 and 5 on the host and fails the deploy on
+them; the rest are decisions only a person can make. Run in order; any failure
+stops the deploy.
 
-1. `pnpm preflight:production` with the production env — a FAIL means do not deploy.
+1. Preflight — `deploy-host.yml` runs it on the host over the real split env
+   files (`migrator preflight`). By hand:
+   `node scripts/preflight-production.mjs --env=web.env --engine-env=engine.env --runner-env=runner.env`.
+   A FAIL means do not deploy.
 2. **Does this release ship a migration?** `git diff --name-only <deployed-sha>..HEAD -- packages/db/migrations apps/engine/drizzle`. The answer decides the whole rollback plan below, so establish it *before* deploying, not during the incident.
 3. **Record the restore point.** Write down the PITR timestamp (or take the labelled dump) taken immediately before the migration step, and put it in the deploy note alongside the currently-deployed image id. Migrations are forward-only; this timestamp is the only thing that can undo one. A deploy with a migration and no recorded restore point has no rollback path at all.
 4. `pnpm --filter @desiauction/web grants:verify` against the target database if the release adds a table or a write path.
-5. Confirm no auction is LIVE (C-22) — `DATABASE_URL=<target> node scripts/check-live-window.mjs`.
-   Both deploy workflows run this and refuse on a live or paused auction; running
-   it by hand first means finding out before the pipeline does. An unreachable
+5. Confirm no auction is LIVE (C-22). The deploy runs this on the host and
+   refuses on a live or paused auction; by hand on the host:
+   `docker compose --profile ops run --rm migrator live-window`. An unreachable
    database is also a refusal: it is not evidence the room is empty.
+   `deploy_anyway` is the only override and is recorded in the run summary.
 6. **When the roles or grants changed in this release** — a new table, a new
    write path, a `create-app-role.sql` edit — run the rehearsal against a
    database with the target's roles:
@@ -148,13 +193,14 @@ Run in order; any failure stops the deploy.
 
 ## Release order
 
-1. engine (staging auto → smoke `/healthz` → production dispatch)
-2. finops-runner (same shape; smoke = machines `started`)
-3. web (platform promote; instant rollback to previous immutable build)
+One workflow, one order, on the host: migrate → engine (then its `/readyz`) →
+web, runner, scheduler and the rest (then web's `/readyz`, and runner and
+scheduler running). Dispatch `staging` first, then `production` with the SAME
+commit — both are gated on that commit's `ci` run.
 
 Never deploy the engine during a live auction window: the engine recovers all
 state from the event log (measured 29 ms replay at 2,500 lots), but spectator
-sockets drop and reconnect. The C-22 live-window check lands with IP-7.
+sockets drop and reconnect. The C-22 live-window check enforces this.
 
 ### The engine is ONE process, and the database now enforces it
 
@@ -168,8 +214,8 @@ exiting non-zero with `the single-writer lease is held elsewhere`.
 
 Operationally this means:
 
-- **`fly scale count 2` on the engine will not give you two engines.** The
-  second machine crash-loops on purpose. Scale the WEB tier for capacity; the
+- **`docker compose up --scale engine=2` will not give you two engines.** The
+  second container crash-loops on purpose. Scale the WEB tier for capacity; the
   engine is deliberately not horizontally scalable.
 - **Rolling deploys still work.** The lock is released when the old process's
   SESSION ends. On graceful SIGTERM it is handed back explicitly and a
@@ -241,7 +287,8 @@ this release ship a migration?"** (pre-deploy checklist item 2).
    - All three: set `TAG=` to the previous image tag in `/opt/desiauction/.env`
      on the host and `docker compose up -d`. Images are immutable and every
      build is tagged with its commit, so the previous release is still in the
-     registry. State lives in Postgres, not the container.
+     registry. State lives in Postgres, not the container. A failed deploy
+     prints this exact command with the previous tag filled in.
    - Leave `DB_TAG` alone — it tracks the database Dockerfile, not the release,
      and rolling it back would restart Postgres for no reason.
    - This is the safe, boring case, and most releases are it.
@@ -268,9 +315,11 @@ this release ship a migration?"** (pre-deploy checklist item 2).
 
 ### The honest state of option 3
 
-The restore point that option 3 depends on is **founder-held and not yet
-provisioned**: there is no managed Postgres, no PITR window and no off-site dump
-in existence at the time of writing ([PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md)
+The restore point that option 3 depends on is pgBackRest PITR
+(RESTORE_RUNBOOK "Point-in-time restore"). The machinery is in the stack; the
+OFF-BOX repo it should write to is **founder-held and not yet provisioned**, and
+until it is, the sidecar refuses to run unless the on-box interim is accepted in
+writing ([PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md)
 §2). `pnpm --filter @desiauction/web db:restore-verify` proves that
 `pg_dump` → `pg_restore` is row-count-lossless on a locally dumped database; it
 has never restored a stored backup, and no drill has been run against a real
