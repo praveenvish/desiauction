@@ -67,7 +67,7 @@ describe("notConfiguredReason — the grid's Not configured chip", () => {
   it("WhatsApp needs the account AND this kind's approved template", () => {
     const account = { WHATSAPP_PHONE_NUMBER_ID: "1", WHATSAPP_ACCESS_TOKEN: "t" };
     expect(notConfiguredReason(sold, "whatsapp", {})).toBe("WhatsApp not set up");
-    expect(notConfiguredReason(sold, "whatsapp", account)).toBe("Template not approved");
+    expect(notConfiguredReason(sold, "whatsapp", account)).toBe("No approved template mapped");
     expect(
       notConfiguredReason(sold, "whatsapp", {
         ...account,

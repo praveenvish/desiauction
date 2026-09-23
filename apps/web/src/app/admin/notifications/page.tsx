@@ -37,6 +37,9 @@ export default async function AdminNotificationsPage() {
               your name, and can be reverted below.
             </p>
             <nav aria-label="More about notifications" className="ntc-links">
+              <NavButton href="/admin/notifications/templates">
+                WhatsApp and SMS templates
+              </NavButton>
               <NavButton href="/admin/notifications/suppressions">
                 <IconLock size={18} aria-hidden />
                 Suppressions

@@ -1,6 +1,21 @@
 import type { NotificationChannel, ResolvedNotification } from "./catalogue";
+import {
+  NO_MAPPINGS,
+  resolveSmsTemplate,
+  resolveWhatsAppTemplate,
+  type MappingSnapshot,
+} from "./provider-templates";
+import { approvalOf, EMPTY_STATUS, type StatusSnapshot } from "./template-status";
 import { SMS_TEMPLATES } from "./templates";
 import { WHATSAPP_TEMPLATES } from "./whatsapp";
+
+function hasWhatsAppTemplate(key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(WHATSAPP_TEMPLATES, key);
+}
+
+function hasSmsTemplate(key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(SMS_TEMPLATES, key);
+}
 
 /**
  * CAN THIS CELL ACTUALLY SEND? — for the admin grid's "Not configured" chip.
@@ -15,13 +30,51 @@ import { WHATSAPP_TEMPLATES } from "./whatsapp";
  * constructs a sender: the guard test allows those factories only in the
  * modules that ask the gate first.
  *
+ * THE TEMPLATE NAME is resolved by the senders' own resolver
+ * (provider-templates.ts: admin mapping, else env), and judged against Meta's
+ * last status sync (template-status.ts) — so the chip says WHY: nothing mapped,
+ * or mapped to a name Meta has not approved.
+ *
  * Returns null when the cell can send, else a short reason.
  */
 export function notConfiguredReason(
   entry: ResolvedNotification,
   channel: NotificationChannel,
   env: Readonly<Record<string, string | undefined>>,
+  templates?: TemplateReadiness,
 ): string | null {
+  return notConfiguredCause(entry, channel, env, templates)?.reason ?? null;
+}
+
+/** What the grid needs to judge a template: the mappings and Meta's last word. */
+export interface TemplateReadiness {
+  readonly mappings: MappingSnapshot;
+  readonly status: StatusSnapshot;
+}
+
+export interface NotConfigured {
+  readonly reason: string;
+  /** The fix is on /admin/notifications/templates (a mapping or an approval). */
+  readonly templates: boolean;
+}
+
+export function notConfiguredCause(
+  entry: ResolvedNotification,
+  channel: NotificationChannel,
+  env: Readonly<Record<string, string | undefined>>,
+  templates: TemplateReadiness = { mappings: NO_MAPPINGS, status: EMPTY_STATUS },
+): NotConfigured | null {
+  const reason = cause(entry, channel, env, templates);
+  if (reason === null) return null;
+  return typeof reason === "string" ? { reason, templates: false } : reason;
+}
+
+function cause(
+  entry: ResolvedNotification,
+  channel: NotificationChannel,
+  env: Readonly<Record<string, string | undefined>>,
+  templates: TemplateReadiness,
+): string | NotConfigured | null {
   const set = (name: string): boolean => (env[name] ?? "") !== "";
   switch (channel) {
     case "in_app":
@@ -43,11 +96,16 @@ export function notConfiguredReason(
           ? null
           : "Codes not on WhatsApp";
       }
-      const template = (WHATSAPP_TEMPLATES as Readonly<Record<string, { nameEnv: string }>>)[
-        entry.key
-      ];
-      if (template === undefined) return "No WhatsApp template";
-      return set(template.nameEnv) ? null : "Template not approved";
+      const resolved = resolveWhatsAppTemplate(entry.key, templates.mappings, env);
+      if (resolved.name === undefined) {
+        return !hasWhatsAppTemplate(entry.key)
+          ? "No WhatsApp template"
+          : { reason: "No approved template mapped", templates: true };
+      }
+      const approval = approvalOf(resolved.name, resolved.languages, templates.status);
+      return approval.verdict === "not_approved"
+        ? { reason: `Template not approved — ${approval.why}`, templates: true }
+        : null;
     }
     case "sms": {
       if (env["OTP_PROVIDER"] === "dev") return null;
@@ -57,11 +115,10 @@ export function notConfiguredReason(
           : "Codes not on SMS";
       }
       if (!set("MSG91_AUTH_KEY")) return "SMS gateway not set up";
-      const template = (SMS_TEMPLATES as Readonly<Record<string, { providerTemplateEnv: string }>>)[
-        entry.key
-      ];
-      if (template === undefined) return "No SMS template";
-      return set(template.providerTemplateEnv) ? null : "DLT template not registered";
+      if (!hasSmsTemplate(entry.key)) return "No SMS template";
+      return resolveSmsTemplate(entry.key, templates.mappings, env).id === undefined
+        ? { reason: "DLT template not registered", templates: true }
+        : null;
     }
   }
 }
