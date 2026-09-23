@@ -72,15 +72,17 @@ dependency. Track closure in [PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md).
   own Firefox calls itself — so it could not tell the revoked row from the one
   it was sitting on).
 
-  **BUT NEITHER RUNS IN THE NIGHTLY, and that is deliberate.** Across two full
-  405-test three-engine runs of the same code they produced DIFFERENT failures
-  each time, all in the live-auction path (engine service + WebSockets);
-  Chromium had zero failures across all four full runs. An intermittently red
-  nightly teaches everyone to ignore it. Both stay opt-in (`E2E_WEBKIT=1`,
-  `E2E_FIREFOX=1`) for deliberate use and go back into the nightly when that
-  flakiness is understood. **Chromium remains the certified engine.**
+  ~~**BUT NEITHER RUNS IN THE NIGHTLY**~~ — **BOTH ARE BACK IN THE NIGHTLY**
+  (2026-09-24). They were pulled on 2026-09-10 because two full three-engine
+  runs failed differently each time, all in the live-auction path. Traced one
+  by one it was five races with causes, not flakiness: three product defects
+  (the engine's restart load race, the cockpit's "Needs resolution" list lagging
+  the socket, the money consoles' filters waiting on a navigation the server
+  ignored) and two harness ones (a whole-engine `/admin/reset` hitting another
+  worker's auction, and a `goto` out of the cockpit racing its own refresh).
+  `nightly-verify.yml` records each and the repeat-run evidence.
 
-  Still open: that live-auction flakiness on non-Chromium engines, **Edge**, and
+  Still open: **Edge**, and
   **real Safari/Edge WebAuthn**, which needs the founder's devices at staging
   because `passkeys.spec.ts` drives a Chrome DevTools Protocol virtual
   authenticator that has no cross-engine equivalent.

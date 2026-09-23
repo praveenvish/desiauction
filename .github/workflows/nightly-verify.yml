@@ -12,7 +12,9 @@ on:
 jobs:
   nightly:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Three browser engines now (see the e2e step): the suite alone is ~16 min
+    # on two workers locally, on top of integration, restore-verify and a build.
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:17-alpine
@@ -103,37 +105,57 @@ jobs:
       # "Could not find a production build", two steps from its cause.
       - name: Build the server the suite will run against
         run: pnpm --filter @desiauction/web exec next build
-      # WebKit as well as Chromium — the nightly is where cross-browser lives.
-      # `KNOWN_LIMITATIONS.md` listed real cross-browser as an open verification
-      # gap and it was: with no `projects` block declared, 135 tests had only
-      # ever run on Chromium. Per-commit CI stays Chromium-only because WebKit
-      # doubles a ~5-minute run and the defects it catches (timing, layout) do
-      # not appear per commit.
-      - run: npx playwright install --with-deps chromium
+      # Chromium, Firefox AND WebKit — the nightly is where cross-browser lives.
+      # With no `projects` block, 135 tests had once only ever run on Chromium.
+      # Per-commit CI stays Chromium-only: three engines roughly triple a run,
+      # and what the other two catch (timing, layout) does not appear per commit.
+      - run: npx playwright install --with-deps chromium firefox webkit
         working-directory: apps/web
       # ~29 specs SKIP here by design: `next start` forces NODE_ENV=production
       # and the /gallery family is dev-only, so those pages correctly 404. They
       # report as skipped, not failed.
-      - name: End-to-end journeys
+      - name: End-to-end journeys (Chromium + Firefox + WebKit)
         run: npx playwright test
         working-directory: apps/web
         env:
           CI: "true"
-          # WEBKIT AND FIREFOX ARE NOT RUN HERE, and that is a retraction of a
-          # change made earlier the same day.
+          # Adds the `firefox` and `webkit` projects — see playwright.config.ts.
+          E2E_FIREFOX: "1"
+          E2E_WEBKIT: "1"
+          # BACK IN, AND THIS TIME BECAUSE THE FLAKES ARE UNDERSTOOD (2026-09-24).
           #
-          # Both engines are green when a spec is run deliberately, and both
-          # earned their keep: between them they exposed nine tests that were
-          # passing on timing luck rather than correctness. But across two full
-          # 405-test runs of the same code they produced DIFFERENT failures
-          # each time — conduct-ceremony on Firefox, financial-issuance on
-          # WebKit — all in the live-auction path, which is the one place the
-          # suite depends on a long-lived engine service and real WebSockets.
-          # Chromium had ZERO failures across all four full runs.
+          # They were pulled on 2026-09-10 after two full runs of the same code
+          # failed differently each time, all in the live-auction path. Traced
+          # one by one, with Firefox and WebKit on CI's two workers, it was five
+          # separate defects — three in the product, two in the harness — that
+          # Chromium's speed had been hiding:
           #
-          # An intermittently red nightly is worse than no nightly: this file's
-          # own header says a nightly that fails for its own harness teaches
-          # everyone to ignore it, and that is exactly what shipping this would
-          # have done. They stay available (`E2E_WEBKIT=1`, `E2E_FIREFOX=1`)
-          # for deliberate use, and go back in here when the live-auction
-          # flakiness is understood rather than tolerated.
+          #  * PRODUCT, engine: concurrent first touches after a restart each
+          #    built their own state and the last to finish won, so a socket
+          #    join could reinstall the pre-command snapshot. One shared load
+          #    per auction now (live-engine integration "RESTART RACE").
+          #  * PRODUCT, cockpit: "Needs resolution" read server props while the
+          #    queue read the socket, so a requeued lot sat in both until a
+          #    refresh, then the section vanished and shifted Open out from
+          #    under the click (conduct-ceremony on Firefox).
+          #  * PRODUCT, money consoles: a client-side filter waited on a router
+          #    navigation the server ignores, which Firefox/WebKit sometimes
+          #    never committed. Now written in place (`serverReads: false`).
+          #  * HARNESS: `/admin/reset` with an empty body restarted EVERY
+          #    auction on the shared engine — another worker's live night
+          #    included. Specs now reset only their own auction.
+          #  * HARNESS: a `goto` out of the cockpit aborted its in-flight
+          #    refresh, and Next "fell back" to a hard navigation back to the
+          #    cockpit (financial-issuance / settlement on WebKit). Specs leave
+          #    by the header link now.
+          #
+          # Evidence before re-enabling: the eight specs that run an auction
+          # (settlement and issuance included) 160/160 on Firefox + WebKit across five consecutive repeats
+          # (--repeat-each=5, --retries=0, two workers), then the full suite on
+          # all three engines with --retries=0: 444 passed, 0 failed, 90 skipped
+          # (Chromium 149, Firefox 148, WebKit 147).
+          #
+          # If a Firefox/WebKit-only failure shows up here again, trace it
+          # (`--trace retain-on-failure`) before reaching for a retry or a
+          # timeout: every one of the five above looked like flakiness and was
+          # a race with a cause.
