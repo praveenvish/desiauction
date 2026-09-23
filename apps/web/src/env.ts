@@ -106,14 +106,14 @@ const envSchema = z.object({
   MSG91_TEMPLATE_AUCTION_SOLD: z.string().min(1).optional(),
   MSG91_TEMPLATE_TEAM_APPOINTED: z.string().min(1).optional(),
   MSG91_TEMPLATE_LINEUP_ANNOUNCED: z.string().min(1).optional(),
-  // Phase 3: the names Meta approved the personal WhatsApp templates under
-  // (docs/messaging/WHATSAPP_TEMPLATES.md). Unset = that moment goes by SMS,
-  // even for a player who opted in to WhatsApp.
+  // The names Meta approved the personal WhatsApp templates under, one name per
+  // template for both languages (docs/messaging/WHATSAPP_TEMPLATES.md). Unset =
+  // that moment has no WhatsApp: it goes by SMS when a gateway is configured,
+  // and otherwise the email carries it alone.
   WHATSAPP_TEMPLATE_AUCTION_SOLD: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_TEAM_APPOINTED: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED: z.string().min(1).optional(),
-  // WhatsApp first (2026-09-23): every text moment has a template. Unset = that
-  // moment has no WhatsApp; with no SMS gateway either, the email carries it.
+  // WhatsApp first (2026-09-23): every text moment has a template.
   WHATSAPP_TEMPLATE_REGISTRATION_APPROVED: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_REGISTRATION_WAITLISTED: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_REGISTRATION_REJECTED: z.string().min(1).optional(),

@@ -252,6 +252,28 @@ if (otpProvider === "whatsapp") {
     "phone-first login with no SMS fallback",
     "LOGIN_DEFAULT_METHOD=phone and no MSG91: a WhatsApp outage closes the default door — keep LOGIN_DEFAULT_METHOD=email until SMS/DLT is live, or set MSG91_AUTH_KEY + MSG91_TEMPLATE_ID",
   );
+  // Every personal text moment rides WhatsApp now; a template Meta has not
+  // approved (name unset) means that moment reaches opted-in players by email
+  // only. A warning, not a refusal: approvals land one by one after launch.
+  const personalTemplates = [
+    "AUCTION_SOLD",
+    "TEAM_APPOINTED",
+    "LINEUP_ANNOUNCED",
+    "REGISTRATION_APPROVED",
+    "REGISTRATION_WAITLISTED",
+    "REGISTRATION_REJECTED",
+    "REGISTRATION_WITHDRAWN",
+    "REGISTRATION_RESTORED",
+    "SECURITY_PHONE_CHANGED",
+    "SECURITY_EMAIL_CHANGED",
+  ].map((key) => `WHATSAPP_TEMPLATE_${key}`);
+  const unapproved = personalTemplates.filter((name) => !nonEmpty(env[name]));
+  warn(
+    "WhatsApp-templates",
+    unapproved.length === 0,
+    `${String(personalTemplates.length - unapproved.length)}/${String(personalTemplates.length)} personal templates named`,
+    `unset: ${unapproved.join(", ")} — those moments go by email only (docs/messaging/WHATSAPP_TEMPLATES.md)`,
+  );
 } else {
   check(
     "MSG91-credentials",
