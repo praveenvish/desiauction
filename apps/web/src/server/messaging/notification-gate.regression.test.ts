@@ -26,7 +26,7 @@ import {
   listSecurityEvents,
 } from "../auth/security-events";
 import { resolveOwnerEmail } from "../financial-operations/deps";
-import { setPreference } from "./consent";
+import { orgSwitchesFor, setOrgMessagingSetting, setPreference } from "./consent";
 import { createHttpEmailAdapter, type EmailTransport } from "./email-adapter";
 import { notificationGate } from "./gate";
 import { FINANCE_DOCUMENT_ISSUED, createPersonInAppAdapter } from "./in-app-adapter";
@@ -266,5 +266,88 @@ describe("gap 2 — the in-app switch hides the inbox row, and keeps the evidenc
       back.map((event) => event.action),
       "and it comes back",
     ).toContain(FINANCE_DOCUMENT_ISSUED);
+  });
+});
+
+describe("gap 3 — the club's switch shows what it stops, and stops what it shows", () => {
+  it("shows a topic OFF when its email row is off, even with the SMS row on", async () => {
+    // The state the old view hid: it read the SMS row only.
+    await inOrg((tx) =>
+      setOrgMessagingSetting(tx, {
+        orgId,
+        topic: "registration",
+        channel: "email",
+        enabled: false,
+        actorId: ownerA,
+      }),
+    );
+    const shown = await inOrg((tx) => orgSwitchesFor(tx, orgId));
+    expect(shown["registration"], "something is withheld, so it reads off").toBe(false);
+    expect(shown["auction"]).toBe(true);
+    expect(Object.keys(shown), "only switches some send obeys").toEqual([
+      "registration",
+      "auction",
+      "money",
+    ]);
+  });
+
+  it("and the gate honours that email row for mail sent on the club's behalf", async () => {
+    const byMail = await inOrg((tx) =>
+      notificationGate(tx, {
+        kind: "registration.approved",
+        channel: "email",
+        recipient: { personId: ownerB, contact: EMAIL_B },
+        orgId,
+      }),
+    );
+    expect(byMail).toEqual({ send: false, reason: "org_disabled" });
+    const byWhatsApp = await inOrg((tx) =>
+      notificationGate(tx, {
+        kind: "registration.approved",
+        channel: "whatsapp",
+        recipient: { personId: ownerB, contact: PHONE_B },
+        orgId,
+      }),
+    );
+    expect(byWhatsApp.send, "the text row is still on").toBe(true);
+  });
+
+  it("stops WhatsApp with the text switch — one row for both apps", async () => {
+    await inOrg((tx) =>
+      setOrgMessagingSetting(tx, {
+        orgId,
+        topic: "auction",
+        channel: "sms",
+        enabled: false,
+        actorId: ownerA,
+      }),
+    );
+    const decision = await inOrg((tx) =>
+      notificationGate(tx, {
+        kind: "auction.sold",
+        channel: "whatsapp",
+        recipient: { personId: ownerB, contact: PHONE_B },
+        orgId,
+      }),
+    );
+    expect(decision).toEqual({ send: false, reason: "org_disabled" });
+  });
+
+  it("lets a club stop receipt emails — a withheld dispatch, not a delivery", async () => {
+    await inOrg((tx) =>
+      setOrgMessagingSetting(tx, {
+        orgId,
+        topic: "money",
+        channel: "email",
+        enabled: false,
+        actorId: ownerA,
+      }),
+    );
+    const mail = recording();
+    const result = await inOrg((tx) =>
+      receiptAdapter(tx, mail.transport).send(receipt(`owner:${teamPair}`)),
+    );
+    expect(mail.sentTo).toEqual([]);
+    expect(result).toEqual({ ok: false, code: "withheld:org_disabled", retryable: false });
   });
 });

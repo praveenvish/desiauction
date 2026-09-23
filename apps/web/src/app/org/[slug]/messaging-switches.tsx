@@ -19,7 +19,10 @@ import {
  *
  * Texts and emails both: since the personal messages (auction results,
  * appointments, squad sheets) a club reaches its players by email as well, and
- * a switch that stopped only the text would promise more than it does. The
+ * a switch that stopped only the text would promise more than it does. A text
+ * is SMS or WhatsApp — one row, one switch. The state shown is every row the
+ * switch writes (`orgSwitchesFor`), not the SMS row alone, and the topics are
+ * the catalogue's club-controllable ones — only switches some send obeys. The
  * in-app ledger is the person's own and is not the club's to switch off.
  */
 export function MessagingSwitches({
