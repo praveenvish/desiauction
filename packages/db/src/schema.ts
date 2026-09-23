@@ -348,6 +348,51 @@ export const whatsappInbound = pgTable(
   (table) => [index("whatsapp_inbound_received_idx").on(table.receivedAt)],
 );
 
+/**
+ * THE PLATFORM'S SWITCH FOR ONE KIND ON ONE CHANNEL (0086, Notification
+ * Control Center Phase 1). Written only from /admin/notifications; read by the
+ * one send gate (apps/web/src/server/messaging/platform-switches.ts).
+ *
+ * No row means the catalogue's answer: on, with the catalogue's own
+ * controllability. The controllability columns may only RESTRICT — NULL is the
+ * catalogue, FALSE takes the switch away from people or clubs, TRUE is refused
+ * by a CHECK. Login kinds (`auth.*`) cannot be switched off, and a security
+ * kind (`security.*`) only with a written reason — both also CHECKs.
+ * Platform-level, no org, no RLS.
+ */
+export const notificationSwitches = pgTable(
+  "notification_switches",
+  {
+    kind: text("kind").notNull(),
+    channel: text("channel", { enum: ["email", "whatsapp", "sms", "in_app"] }).notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    personControllable: boolean("person_controllable"),
+    orgControllable: boolean("org_controllable"),
+    reason: text("reason"),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ name: "notification_switches_pk", columns: [table.kind, table.channel] }),
+  ],
+);
+
+/**
+ * A WHOLE CHANNEL, EVERYWHERE (0086) — "WhatsApp off during a Meta incident".
+ * Login codes still go: the gate decides them before it reads this.
+ */
+export const notificationChannels = pgTable("notification_channels", {
+  channel: text("channel", { enum: ["email", "whatsapp", "sms", "in_app"] }).primaryKey(),
+  enabled: boolean("enabled").notNull().default(true),
+  reason: text("reason"),
+  updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+    onDelete: "restrict",
+  }),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
 export const otpCodes = pgTable(
   "otp_codes",
   {
