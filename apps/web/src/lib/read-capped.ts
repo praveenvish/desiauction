@@ -9,12 +9,24 @@
  * any other malformed request.
  */
 export async function readCapped(request: Request, maxBytes: number): Promise<string | null> {
+  const bytes = await readCappedBytes(request, maxBytes);
+  return bytes === null ? null : new TextDecoder().decode(bytes);
+}
+
+/**
+ * The same read, returning the bytes exactly as they arrived.
+ *
+ * For a caller that verifies a signature over the body: an HMAC is over BYTES,
+ * and decoding to text first quietly replaces anything that is not valid UTF-8
+ * — the digest then no longer describes what the sender signed.
+ */
+export async function readCappedBytes(request: Request, maxBytes: number): Promise<Buffer | null> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (declared > maxBytes) {
     return null;
   }
   if (request.body === null) {
-    return "";
+    return Buffer.alloc(0);
   }
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -31,5 +43,5 @@ export async function readCapped(request: Request, maxBytes: number): Promise<st
     }
     chunks.push(value);
   }
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  return Buffer.concat(chunks);
 }
