@@ -1120,11 +1120,24 @@ export async function withdrawMyRegistrationAction(
   return { ok: true };
 }
 
+/**
+ * What a registration submit answers. `code` is the part a client may BRANCH
+ * on: the sentence is copy and will be reworded, and the register form used to
+ * reload the page when the text happened to contain "already registered" — a
+ * copy edit away from silently breaking.
+ */
+export interface SubmitRegistrationResult {
+  error?: string;
+  done?: boolean;
+  /** The player already has a live registration here — another device got there first. */
+  code?: "already_registered";
+}
+
 export async function submitRegistrationAction(
   slug: string,
-  _previous: { error?: string; done?: boolean },
+  _previous: SubmitRegistrationResult,
   formData: FormData,
-): Promise<{ error?: string; done?: boolean }> {
+): Promise<SubmitRegistrationResult> {
   const session = await requireSession();
   const competition = await publicCompetitionBySlug(slug);
   if (competition === null) {
@@ -1272,18 +1285,22 @@ export async function submitRegistrationAction(
     return { error: "We couldn't save your registration just now. Please try again." };
   }
   if (!result.ok) {
+    if (result.reason === "duplicate") {
+      return {
+        code: "already_registered",
+        error: "You've already registered for this competition — check your status.",
+      };
+    }
     return {
       error:
         result.reason === "not_open"
           ? "Registration for this competition is not open."
-          : result.reason === "duplicate"
-            ? "You've already registered for this competition — check your status."
-            : result.reason === "no_phone"
-              ? // The register page says this before the form is ever shown; this
-                // is the same rule held at the server, for the request that
-                // skipped the page.
-                "Add a mobile number to your account before registering as a player — organizers text you about your registration and on auction day."
-              : "Choose a valid playing role.",
+          : result.reason === "no_phone"
+            ? // The register page says this before the form is ever shown; this
+              // is the same rule held at the server, for the request that
+              // skipped the page.
+              "Add a mobile number to your account before registering as a player — organizers text you about your registration and on auction day."
+            : "Choose a valid playing role.",
     };
   }
   /*
