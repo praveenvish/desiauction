@@ -98,6 +98,9 @@ export function PublicKitDemo() {
         }
       />
 
+      {/* The hero above renders the page's h1 (a real hero owns it), so the
+          outline restarts here: an h3 straight after an h1 skips a level. */}
+      <h2>Page sections</h2>
       <h3 id="kit-stats">Stat strip</h3>
       <StatStrip
         label="Example season at a glance"
