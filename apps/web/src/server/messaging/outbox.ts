@@ -7,6 +7,7 @@ import { db as appDb } from "../db";
 import { isNotificationKind, type NotificationKind } from "./catalogue";
 import { notificationGate, type GateDecision, type GateInput } from "./gate";
 import { platformVerdict } from "./platform-switches";
+import { languageFor, templateResolver, type TemplateResolver } from "./provider-templates";
 import { applyWhatsAppNudge, hasWhatsAppNudge } from "./email-layout";
 import type { NotificationMail } from "./notification-email";
 import { createPlayerSmsSender, SmsSendError, type PlayerSmsSender } from "./sms";
@@ -16,7 +17,6 @@ import {
   createWhatsAppSender,
   whatsappOptedIn,
   whatsappParams,
-  whatsappTemplateName,
   WhatsAppSendError,
   META_MISSING_TRANSLATION,
   WHATSAPP_TEMPLATES,
@@ -345,7 +345,10 @@ export async function drainOutbox(
     sms?: PlayerSmsSender | null;
     /** Omitted: the platform's (null when WhatsApp is not set up). */
     whatsapp?: PersonalWhatsAppSender | null;
-    /** The approved template name for a key — injected by tests. */
+    /**
+     * The approved template name for a key — injected by tests. Omitted: the
+     * admin mapping, else the env var (provider-templates.ts).
+     */
     whatsappTemplate?: (key: string) => string | undefined;
     now?: Date;
     limit?: number;
@@ -400,9 +403,17 @@ export async function drainOutbox(
   // Built on the first text row, once: `undefined` is "not asked yet", null is
   // "asked, and there is no SMS".
   let sms: PlayerSmsSender | null | undefined = options.sms;
+  // Which approved template each kind goes out under — the admin's mapping,
+  // else the env var — read once per drain, and only when a text is due.
+  const resolver: TemplateResolver | null = claimed.some((row) => row.channel === "sms")
+    ? await templateResolver(db)
+    : null;
+  const injected = options.whatsappTemplate;
   const whatsapp: TextChannels["whatsapp"] = {
     sender: options.whatsapp === undefined ? createWhatsAppSender() : options.whatsapp,
-    templateName: options.whatsappTemplate ?? whatsappTemplateName,
+    templateName: injected ?? ((key) => resolver?.whatsappName(key)),
+    templateLanguages:
+      injected === undefined ? (key) => resolver?.whatsappLanguages(key) ?? null : () => null,
   };
   for (const row of claimed) {
     if (!(await stillOurs(db, row))) {
@@ -410,7 +421,7 @@ export async function drainOutbox(
       continue;
     }
     if (row.channel === "sms") {
-      if (sms === undefined) sms = createPlayerSmsSender(db);
+      if (sms === undefined) sms = createPlayerSmsSender(db, resolver?.smsId);
       const result = await sendText(db, row, { sms, whatsapp }, options.now ?? new Date());
       if (result === "sent") sent += 1;
       else if (result === "suppressed") suppressed += 1;
@@ -514,6 +525,8 @@ interface TextChannels {
   readonly whatsapp: {
     readonly sender: PersonalWhatsAppSender | null;
     readonly templateName: (key: string) => string | undefined;
+    /** The versions the mapped name is approved in; null when unknown. */
+    readonly templateLanguages: (key: string) => readonly ("en" | "hi")[] | null;
   };
 }
 
@@ -616,15 +629,21 @@ async function sendText(
             imageUrl: row.media_url,
             language,
           });
+        // Their language, unless the admin's mapping says the name is not
+        // approved in it — then the version it IS approved in, at once.
+        const first = languageFor(
+          consent.language,
+          channels.whatsapp.templateLanguages(template.key),
+        );
         let receipt;
         try {
-          receipt = await sendIn(consent.language);
+          receipt = await sendIn(first);
         } catch (error) {
           // A Hindi reader whose template Meta has approved in English but not
           // yet in Hindi: send the English version rather than nothing. Meta
           // refused outright, so nothing went — this is not a duplicate.
           if (
-            consent.language !== "en" &&
+            first !== "en" &&
             error instanceof WhatsAppSendError &&
             error.failure === "refused" &&
             error.metaCode === META_MISSING_TRANSLATION

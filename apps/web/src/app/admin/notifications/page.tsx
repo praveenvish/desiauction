@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { platformAdminPageGate } from "../../../server/admin/authz";
 import { adminNotificationCenter } from "../../../server/admin/notification-views";
+import { NavButton } from "../../players/nav-button";
 import { NotificationsPanel } from "./notifications-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
@@ -35,6 +36,10 @@ export default async function AdminNotificationsPage() {
               leave them. Sign-in codes are never stopped. Every change is on the audit log with
               your name, and can be reverted below.
             </p>
+            {/* NavButton, not buttonClassName(): a server component. */}
+            <NavButton href="/admin/notifications/templates" variant="secondary">
+              WhatsApp and SMS templates
+            </NavButton>
           </header>
           {/* No Suspense here, unlike the read-only desks: this page is
               changed by its own actions, and a refresh that re-renders a

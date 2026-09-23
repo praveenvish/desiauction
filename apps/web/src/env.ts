@@ -71,6 +71,16 @@ const envSchema = z.object({
   WHATSAPP_TEMPLATE_NAME: z.string().min(1).optional(),
   /** Locale exactly as registered with Meta ("en", "en_US", "hi"). */
   WHATSAPP_TEMPLATE_LANGUAGE: z.string().min(1).optional(),
+  /**
+   * The WhatsApp Business Account id (WhatsApp Manager → Account tools →
+   * Business account id). Optional: without it /admin/notifications/templates
+   * cannot read Meta's approval status or submit a template, and says so —
+   * sending never needs it.
+   */
+  WHATSAPP_BUSINESS_ACCOUNT_ID: z
+    .string()
+    .regex(/^\d{5,30}$/, "the numeric WhatsApp Business Account id")
+    .optional(),
   MSG91_AUTH_KEY: z.string().min(1).optional(),
   /**
    * The OTP flow's DLT template id, and ONLY the OTP flow's. Its registered

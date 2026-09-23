@@ -25,11 +25,13 @@ English only, named in `WHATSAPP_TEMPLATE_NAME` (see WHATSAPP_SETUP.md).
 1. **Meta Business account** verified, with a WhatsApp Business phone number on the
    Cloud API. The same `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_ACCESS_TOKEN` serve
    sign-in codes and these messages.
-2. Create each template below in **WhatsApp Manager → Message templates**: category
-   **Utility**, ONE template name with **two languages** — English (`en`) and Hindi
-   (`hi`). Use the suggested name or your own, then put the APPROVED name in the env
-   var listed for it. Both languages must be approved before a Hindi reader gets it;
-   until then their send is refused and handled like any other refusal.
+2. Submit each template below — from **/admin/notifications/templates → Submit to
+   Meta** (it sends exactly this text; needs `WHATSAPP_BUSINESS_ACCOUNT_ID`; the sale's picture template only by hand), or by hand
+   in **WhatsApp Manager → Message templates**: category **Utility**, ONE template name
+   with **two languages** — English (`en`) and Hindi (`hi`). Use the suggested name or
+   your own. Once APPROVED, **map** the name on the same admin page (the env var listed
+   for it is the fallback when nothing is mapped). A Hindi reader gets English until
+   the Hindi version is approved.
 3. The button is a **static URL** (no variable) — its label is per language. The
    sale's header is an **image**: the player card for a public, adult player, the
    DesiAuction card otherwise.
@@ -38,7 +40,7 @@ English only, named in `WHATSAPP_TEMPLATE_NAME` (see WHATSAPP_SETUP.md).
 
 ## Templates
 
-| Moment | Suggested name | Env var for the approved name |
+| Moment | Suggested name | Env fallback for the approved name |
 |---|---|---|
 | registration.approved | `da_registration_approved` | `WHATSAPP_TEMPLATE_REGISTRATION_APPROVED` |
 | registration.waitlisted | `da_registration_waitlisted` | `WHATSAPP_TEMPLATE_REGISTRATION_WAITLISTED` |
@@ -63,7 +65,7 @@ When an organizer approves a registration — to the player.
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/home |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_APPROVED` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_APPROVED` |
 
 #### English (`en`)
 
@@ -119,7 +121,7 @@ When an organizer puts a registration on the waitlist — to the player.
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/home |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_WAITLISTED` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_WAITLISTED` |
 
 #### English (`en`)
 
@@ -175,7 +177,7 @@ When an organizer declines a registration — to the player, with the reason fro
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/home |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_REJECTED` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_REJECTED` |
 
 #### English (`en`)
 
@@ -233,7 +235,7 @@ When a registration is withdrawn — to the player.
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/home |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_WITHDRAWN` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_WITHDRAWN` |
 
 #### English (`en`)
 
@@ -289,7 +291,7 @@ When a withdrawn or declined registration is put back under review.
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/home |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_RESTORED` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_REGISTRATION_RESTORED` |
 
 #### English (`en`)
 
@@ -345,7 +347,7 @@ When the mobile number on an account is changed — to the number being GIVEN UP
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/support |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_SECURITY_PHONE_CHANGED` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_SECURITY_PHONE_CHANGED` |
 
 #### English (`en`)
 
@@ -401,7 +403,7 @@ When the sign-in email on an account is changed — to the account's phone, sent
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/support |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_SECURITY_EMAIL_CHANGED` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_SECURITY_EMAIL_CHANGED` |
 
 #### English (`en`)
 
@@ -457,7 +459,7 @@ When the organizer announces the auction results — to each player a team bough
 | Header | Image (sample: any player card PNG) |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/home |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_AUCTION_SOLD` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_AUCTION_SOLD` |
 
 #### English (`en`)
 
@@ -517,7 +519,7 @@ When the organizer announces captains and icons — to each player named captain
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/home |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_TEAM_APPOINTED` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_TEAM_APPOINTED` |
 
 #### English (`en`)
 
@@ -577,7 +579,7 @@ When the organizer announces a side's lineup for a match still to come — to ea
 | Header | None |
 | Footer | DesiAuction |
 | Button | Visit website → https://desiauction.in/home |
-| Env var for the approved name | `WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED` |
+| Env fallback for the approved name | `WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED` |
 
 #### English (`en`)
 

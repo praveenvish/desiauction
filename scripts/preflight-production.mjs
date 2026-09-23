@@ -255,6 +255,11 @@ if (otpProvider === "whatsapp") {
   // Every personal text moment rides WhatsApp now; a template Meta has not
   // approved (name unset) means that moment reaches opted-in players by email
   // only. A warning, not a refusal: approvals land one by one after launch.
+  //
+  // ADVISORY since Phase 3 of the notification control center: an admin can
+  // map each approved name at /admin/notifications/templates, which wins over
+  // these env vars — and preflight reads the env file, never the database. An
+  // env var unset here may well be mapped there; the admin grid is the truth.
   const personalTemplates = [
     "AUCTION_SOLD",
     "TEAM_APPOINTED",
@@ -272,7 +277,7 @@ if (otpProvider === "whatsapp") {
     "WhatsApp-templates",
     unapproved.length === 0,
     `${String(personalTemplates.length - unapproved.length)}/${String(personalTemplates.length)} personal templates named`,
-    `unset: ${unapproved.join(", ")} — those moments go by email only (docs/messaging/WHATSAPP_TEMPLATES.md)`,
+    `unset in env: ${unapproved.join(", ")} — unless mapped at /admin/notifications/templates (the admin mapping wins; check the grid there), those moments go by email only (docs/messaging/WHATSAPP_TEMPLATES.md)`,
   );
 } else {
   check(
@@ -280,6 +285,18 @@ if (otpProvider === "whatsapp") {
     nonEmpty(env.MSG91_AUTH_KEY) && nonEmpty(env.MSG91_TEMPLATE_ID),
     "SMS provider credentials",
     "set MSG91_AUTH_KEY and MSG91_TEMPLATE_ID",
+  );
+}
+
+// --- WhatsApp template status (optional) ----------------------------------------
+// Without the WABA id the admin templates page cannot read Meta's approvals or
+// submit a template. Sending does not need it, so this is a warning only.
+if (nonEmpty(env.WHATSAPP_PHONE_NUMBER_ID) && nonEmpty(env.WHATSAPP_ACCESS_TOKEN)) {
+  warn(
+    "WhatsApp-status-sync",
+    /^\d{5,30}$/.test(env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? ""),
+    "WhatsApp Business Account id (Meta template status in admin)",
+    "set WHATSAPP_BUSINESS_ACCOUNT_ID (WhatsApp Manager → Account tools → Business account id) to see Meta's approval status at /admin/notifications/templates and submit templates from there",
   );
 }
 

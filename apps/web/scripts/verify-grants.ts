@@ -207,6 +207,11 @@ const APP_WRITES_UNPROTECTED = [
   // /admin/notifications/[kind]/email on the app pool, read by every email
   // send. DesiAuction's words, not a club's — no tenant, no RLS.
   "notification_templates",
+  // WhatsApp/SMS template mapping and Meta's status (0088): written from
+  // /admin/notifications/templates and by the status sync, on the app pool.
+  "provider_template_mappings",
+  "provider_template_status",
+  "provider_template_syncs",
 ];
 
 /**
@@ -409,6 +414,21 @@ function expectations(allTables: string[]): Expectation[] {
     allowed: false,
     why: "the auction engine sends no mail, so it has no use for email wording (0087)",
   });
+  for (const table of [
+    "provider_template_mappings",
+    "provider_template_status",
+    "provider_template_syncs",
+  ]) {
+    for (const role of ["desiauction_engine", "desiauction_runner"]) {
+      out.push({
+        role,
+        table,
+        verb: "SELECT",
+        allowed: false,
+        why: "only the web tier sends WhatsApp or SMS, so only it reads which template to use (0088)",
+      });
+    }
+  }
   for (const table of PERSONAL_CONTENT_TABLES) {
     for (const role of ["desiauction_engine", "desiauction_runner"]) {
       out.push({

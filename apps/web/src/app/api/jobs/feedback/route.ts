@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
 import { withRequestId } from "../../../../server/logger";
+import { scheduledTemplateSync } from "../../../../server/messaging/provider-template-writer";
 import { sweepReviewAsks } from "../../../../server/reviews/review-sweep";
 import {
   purgeExpiredProblemReports,
@@ -16,7 +17,8 @@ import {
  * `demo-reminders`, and for the same reasons: the web tier holds no scheduler,
  * and the certified finops runner is no home for this.
  *
- * Two jobs: the problem-report retention purge (Phase 1 — a retention promise
+ * Three jobs: Meta's WhatsApp template status (Phase 3 of the notification
+ * control center, refreshed every six hours), and the problem-report retention purge (Phase 1 — a retention promise
  * with no scheduled enforcement is a paragraph), and the review-ask sweep
  * (Phase 3 — see `server/reviews/review-sweep.ts` for who is asked and when).
  *
@@ -48,7 +50,22 @@ async function handle(request: Request): Promise<NextResponse> {
   const security = await purgeSpentSecurityRecords();
   const whatsappInbound = await purgeWhatsAppInbound();
   const reviewAsks = await sweepReviewAsks();
-  return NextResponse.json({ purged, security, whatsappInbound, reviewAsks });
+  // Meta's template status, refreshed when the snapshot is six hours old
+  // (Notification Control Center, Phase 3). Here rather than a door of its
+  // own: this job already runs every fifteen minutes, and the refresh never
+  // throws, so a Meta outage cannot fail the purge beside it.
+  const templates = await scheduledTemplateSync();
+  return NextResponse.json({
+    purged,
+    security,
+    whatsappInbound,
+    reviewAsks,
+    whatsappTemplates: templates.ok
+      ? "skipped" in templates
+        ? "fresh"
+        : `synced ${String(templates.count)}`
+      : templates.reason,
+  });
 }
 
 export function POST(request: Request): Promise<NextResponse> {

@@ -34,7 +34,8 @@ import { isProviderTimeout, providerFetch } from "./provider-fetch";
  *     opt-in for a business-initiated message, DPDP requires it be
  *     affirmative). Nobody gets WhatsApp without one, security alerts included;
  *   · the platform has the template — Meta approves each one by NAME, and the
- *     approved name is set in the env var the template declares;
+ *     approved name is mapped at /admin/notifications/templates, or else set
+ *     in the env var the template declares (provider-templates.ts);
  *   · the Cloud API account is set up (the sign-in sender's credentials).
  *
  * Otherwise the moment goes by SMS where an SMS gateway exists, and where none
@@ -100,7 +101,8 @@ export interface WhatsAppTemplate {
     readonly url: string;
   };
   /**
-   * The env var holding the name Meta approved this template under. ONE name
+   * The env var holding the name Meta approved this template under — the
+   * FALLBACK since Phase 3: an admin mapping wins (provider-templates.ts). ONE name
    * for both languages: Meta approves a template name with several language
    * versions, and the send picks the version by language code.
    */
@@ -300,16 +302,25 @@ export const WHATSAPP_TEMPLATES: Readonly<Record<WhatsAppKey, WhatsAppTemplate>>
   },
 };
 
+/**
+ * The name to submit each template under when nobody has chosen one — the
+ * generated sheet's suggestion and the admin submit dialog's default.
+ */
+export const WHATSAPP_SUGGESTED_NAMES: Readonly<Record<WhatsAppKey, string>> = {
+  "registration.approved": "da_registration_approved",
+  "registration.waitlisted": "da_registration_waitlisted",
+  "registration.rejected": "da_registration_rejected",
+  "registration.withdrawn": "da_registration_withdrawn",
+  "registration.restored": "da_registration_restored",
+  "security.phone_changed": "da_security_phone_changed",
+  "security.email_changed": "da_security_email_changed",
+  "auction.sold": "da_auction_sold",
+  "team.appointed": "da_team_appointed",
+  "lineup.announced": "da_lineup_announced",
+};
+
 export function isWhatsAppKey(key: string): key is WhatsAppKey {
   return Object.prototype.hasOwnProperty.call(WHATSAPP_TEMPLATES, key);
-}
-
-/** The name Meta approved this template under, when it is configured. */
-export function whatsappTemplateName(key: string): string | undefined {
-  if (!isWhatsAppKey(key)) return undefined;
-  const template = WHATSAPP_TEMPLATES[key];
-  const value: unknown = (env as Readonly<Record<string, unknown>>)[template.nameEnv];
-  return typeof value === "string" && value !== "" ? value : undefined;
 }
 
 /**

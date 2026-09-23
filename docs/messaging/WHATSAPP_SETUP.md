@@ -124,11 +124,43 @@ Everything we send first (not as a reply) must be an **approved template**.
    in `WHATSAPP_TEMPLATE_NAME`, and its language code in
    `WHATSAPP_TEMPLATE_LANGUAGE` if it is not `en`.
 2. **Utility templates — the personal messages.** The list, the exact text to
-   submit (English and Hindi), a suggested name and the env variable for each
-   approved name are in [WHATSAPP_TEMPLATES.md](WHATSAPP_TEMPLATES.md). That
-   sheet is generated from the code (`pnpm --filter @desiauction/web wa:sheet`);
-   submit what it says, character for character. A template whose name is not
-   set is simply not sent on WhatsApp.
+   submit (English and Hindi) and a suggested name for each are in
+   [WHATSAPP_TEMPLATES.md](WHATSAPP_TEMPLATES.md). That sheet is generated from
+   the code (`pnpm --filter @desiauction/web wa:sheet`). Submit them from the
+   admin page (6.3) — it sends exactly that text — or by hand in WhatsApp
+   Manager, character for character. A template with no approved name mapped
+   (or set in env) is simply not sent on WhatsApp.
+3. **Status and mapping — `/admin/notifications/templates`** (platform admins
+   only). Needs the **WhatsApp Business Account id**: WhatsApp Manager →
+   **Account tools → Business account id** (or the app dashboard's WhatsApp →
+   API Setup page, "WhatsApp Business Account ID").
+   → `WHATSAPP_BUSINESS_ACCOUNT_ID` (the System User token from step 4 already
+   carries `whatsapp_business_management`, which this uses).
+
+   On that page, per message:
+   - **Map / Change** — the approved name this message goes out under, and the
+     languages it is approved in. It takes effect from the next send (within
+     30 seconds on every server), wins over the `WHATSAPP_TEMPLATE_<KEY>` env
+     var, and warns when Meta's last status sync has not seen the name
+     APPROVED. **Clear mapping** falls back to the env var.
+   - **Meta status** per language — Approved / Pending / Rejected (with Meta's
+     reason) / Paused / Disabled, and the quality rating. Read with **Refresh
+     from Meta** (at most once a minute) and every six hours by the scheduled
+     feedback job (`FEEDBACK_JOB_SECRET`).
+   - **Submit to Meta…** — sends the code's own template (body, samples, footer,
+     button) for approval under a name you choose, in English, Hindi or both;
+     the dialog shows the exact request. The status shows **Pending** at once.
+     Nothing changes for players until you **map** the approved name — the
+     page offers "Use <name>" once Meta approves a name submitted from it. The
+     sale message has a picture header, whose sample image Meta needs uploaded
+     separately: submit that one in WhatsApp Manager, then map it here.
+   - The sign-in template (`WHATSAPP_TEMPLATE_NAME`) is shown read-only with its
+     status: whether anybody can sign in is never changed from a screen.
+   - Every map, clear and submit is on the audit log with your name; a mapping
+     change can be reverted from the page's "Recent changes".
+
+   Without the WABA id the page still maps names; it just cannot show Meta's
+   verdict or submit, and says so.
 
 Submit in **Utility**, not Marketing: these are consequences of the person's
 own registration (a sale, a named role, a lineup). Meta may re-categorise a
@@ -146,11 +178,14 @@ WHATSAPP_TEMPLATE_NAME=…              # step 6.1 — approved authentication t
 WHATSAPP_TEMPLATE_LANGUAGE=en
 WHATSAPP_APP_SECRET=…                 # step 2.4 — App settings → Basic
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=…       # step 5.1 — yours, 16+ chars
-WHATSAPP_TEMPLATE_…=…                 # one per approved utility template (WHATSAPP_TEMPLATES.md)
+WHATSAPP_BUSINESS_ACCOUNT_ID=…        # step 6.3 — optional: Meta status + submit in admin
+WHATSAPP_TEMPLATE_…=…                 # optional fallback per template; map names in admin instead (6.3)
 ```
 
 No `MSG91_*` variable is needed. `pnpm preflight:production --env=web.env`
-checks the WhatsApp credentials and both webhook secrets, and only warns about
+checks the WhatsApp credentials and both webhook secrets (its warning about
+unset `WHATSAPP_TEMPLATE_*` names is advisory: it reads the env file, not the
+names mapped in admin — the admin grid is the truth), and only warns about
 SMS if phone is the default login door: with no SMS fallback a Meta outage
 would close that door, so leave `LOGIN_DEFAULT_METHOD=email` until SMS is live
 (the phone tab stays one click away).
