@@ -1,4 +1,6 @@
 import type { DeliveryPort } from "@desiauction/financial-operations";
+
+import type { GateReason } from "./gate";
 import { providerFetch } from "./provider-fetch";
 
 /**
@@ -133,8 +135,18 @@ export class EmailBreaker {
  * the in-app adapter's original sin was reporting success for a delivery it had
  * not attempted, and repeating it here would be worse, because an email nobody
  * received looks identical to one that arrived.
+ *
+ * Or `{ withheld }`: there IS an address, and the notification gate said not
+ * to use it — the person switched "Receipts and money" off, the club did, or
+ * the address is on the suppression list (gate.ts). Distinct from null because
+ * the fix is different: nobody needs to add an address, somebody chose this.
  */
-export type EmailResolver = (recipientRef: string) => Promise<string | null>;
+export type EmailResolution = string | null | { readonly withheld: GateReason };
+
+export type EmailResolver = (
+  recipientRef: string,
+  context: { readonly orgId: string },
+) => Promise<EmailResolution>;
 
 /**
  * Which provider events mean what.
@@ -240,7 +252,22 @@ export function createHttpEmailAdapter(
         // Retryable: the provider is melted, not the message malformed.
         return { ok: false as const, code: "provider_unavailable", retryable: true };
       }
-      const to = await resolve(request.recipientRef);
+      const to = await resolve(request.recipientRef, { orgId: request.orgId });
+      if (typeof to === "object" && to !== null) {
+        /*
+         * WITHHELD, and reported as what it is: a terminal, non-retryable
+         * failure of THIS dispatch, with the gate's reason in the code.
+         *
+         * The certified finops machine has no "suppressed" outcome and is not
+         * ours to give one. Its honest neighbours are the two it has: `sent`,
+         * which would record a receipt as delivered that nobody received — the
+         * one lie this adapter exists not to tell — and `failed`, which is true.
+         * Non-retryable because retrying cannot change a person's choice; the
+         * desk's Retry (a new dispatch) is the path once they switch it back
+         * on. `no_email_on_file` below is the same shape for the same reason.
+         */
+        return { ok: false as const, code: `withheld:${to.withheld}`, retryable: false };
+      }
       if (to === null) {
         /*
          * NOT retryable, and this is the important case rather than an edge one.

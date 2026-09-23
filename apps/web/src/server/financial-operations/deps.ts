@@ -12,6 +12,7 @@ import { env } from "../../env";
 import { createHttpEmailAdapter, type EmailResolver } from "../messaging/email-adapter";
 import { createPersonInAppAdapter, ownersOfRecipient } from "../messaging/in-app-adapter";
 import { verifiedEmailOf } from "../auth/email-change";
+import { notificationGate, type GateReason } from "../messaging/gate";
 
 /**
  * The web tier's FinOps dependencies — built in exactly ONE place (PX-8).
@@ -49,17 +50,38 @@ export const FINOPS_STORAGE_DIR: string = resolve(process.cwd(), env.FINOPS_STOR
  * the paddle). The FIRST with a verified address is used: the document is
  * addressed to the team, one copy is what "delivered" means, and mailing every
  * owner would make one dispatch several deliveries the register cannot count.
+ *
+ * THROUGH THE GATE, on the money topic. This path never asked, so the
+ * "Receipts and money" switch on /account — the one switch whose own wording
+ * names receipts — stopped nothing. An owner who switched it off is skipped
+ * and the next owner with an address is tried; when every address is withheld
+ * the first reason is reported (email-adapter.ts turns it into a terminal
+ * `withheld:<reason>` failure, never a delivery).
+ *
+ * `db` is the tenant handle `webFinopsDeps` is built on, scoped to the org the
+ * dispatch belongs to — which is what lets the club's own switch be read at all.
  */
-function resolveOwnerEmail(db: Db): EmailResolver {
-  return async (recipientRef: string) => {
+export function resolveOwnerEmail(db: Db): EmailResolver {
+  return async (recipientRef, { orgId }) => {
     const owners = await ownersOfRecipient(db, recipientRef);
+    let withheld: GateReason | null = null;
     for (const personId of owners) {
       const email = await verifiedEmailOf(db, personId);
-      if (email !== null) {
+      if (email === null) {
+        continue;
+      }
+      const decision = await notificationGate(db, {
+        kind: "finance.document.issued",
+        channel: "email",
+        recipient: { personId, contact: email },
+        orgId,
+      });
+      if (decision.send) {
         return email;
       }
+      withheld ??= decision.reason;
     }
-    return null;
+    return withheld === null ? null : { withheld };
   };
 }
 
