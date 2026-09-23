@@ -10,14 +10,9 @@ import { parseWhatsAppLanguage, type WhatsAppLanguage } from "../../lib/whatsapp
 import { setWhatsappOptIn, whatsappOptedIn } from "./whatsapp";
 import { ForbiddenError, can, requireCapability } from "../orgs/authz";
 import { resolveTenant } from "../orgs/orgs";
-import { ORG_SWITCH_CHANNELS, PERSON_SWITCH_CHANNELS, orgTopics } from "./catalogue";
-import {
-  NOTIFICATION_TOPICS,
-  orgSwitchesFor,
-  preferencesFor,
-  setOrgMessagingSetting,
-  setPreference,
-} from "./consent";
+import { ORG_SWITCH_CHANNELS, PERSON_SWITCH_CHANNELS } from "./catalogue";
+import { orgSwitchesFor, preferencesFor, setOrgMessagingSetting, setPreference } from "./consent";
+import { orgSwitchTopics, personSwitchTopics, platformSwitches } from "./platform-switches";
 
 /** Membership-checked slug → org, under person-only tenant context. */
 async function resolveTenantScoped(personId: string, slug: string) {
@@ -45,14 +40,18 @@ export async function notificationSettings(): Promise<NotificationSettings | nul
   if (session === null) {
     return null;
   }
-  const [current, whatsapp] = await Promise.all([
+  const [current, whatsapp, platform] = await Promise.all([
     preferencesFor(systemDb, session.personId, "sms"),
     whatsappOptedIn(systemDb, session.personId),
+    platformSwitches(systemDb),
   ]);
   return {
     whatsapp: whatsapp.optedIn,
     whatsappLanguage: whatsapp.language,
-    topics: NOTIFICATION_TOPICS.map((entry) => ({
+    // Only the topics still the person's to switch: a platform admin can take
+    // a kind's switch away (/admin/notifications), and a topic none of whose
+    // kinds still listens to the person would be a switch that does nothing.
+    topics: personSwitchTopics(platform).map((entry) => ({
       topic: entry.topic,
       label: entry.label,
       detail: entry.detail,
@@ -71,7 +70,9 @@ export async function setNotificationPreferenceAction(
   }
   // Only the topics we publish. An arbitrary string here would write a row the
   // sender never reads, so the switch would appear to work and change nothing.
-  if (!NOTIFICATION_TOPICS.some((entry) => entry.topic === topic)) {
+  // Read on the app pool the write uses; the platform tables carry no RLS.
+  const platform = await platformSwitches(appDb);
+  if (!personSwitchTopics(platform).some((entry) => entry.topic === topic)) {
     return { ok: false, error: "That is not a notification you can change." };
   }
   // Both channels. This wrote SMS alone, so switching Auction updates off
@@ -157,10 +158,12 @@ export async function orgMessagingSettingsView(slug: string): Promise<OrgMessagi
     );
     // Every row the switch covers, not the SMS row alone (consent.ts).
     const current = await orgSwitchesFor(db, org.id);
+    const platform = await platformSwitches(db);
     return {
       canManage,
-      // Only the topics a club's sends actually consult (catalogue).
-      topics: orgTopics().map((entry) => ({
+      // Only the topics a club's sends actually consult (catalogue), less any
+      // a platform admin has taken out of clubs' hands.
+      topics: orgSwitchTopics(platform).map((entry) => ({
         topic: entry.topic,
         label: entry.label,
         detail: entry.detail,
@@ -179,7 +182,7 @@ export async function setOrgMessagingSettingAction(
   if (session === null) {
     return { ok: false, error: "Sign in to change this." };
   }
-  if (!orgTopics().some((entry) => entry.topic === topic)) {
+  if (!orgSwitchTopics(await platformSwitches(appDb)).some((entry) => entry.topic === topic)) {
     // An unpublished topic would write a row the gate never reads for it, so
     // the switch would look like it worked and change nothing.
     return { ok: false, error: "That is not a notification you can change." };
