@@ -29,8 +29,7 @@ import {
   VisuallyHidden,
   type KitTone,
 } from "@desiauction/ui";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
   attestCaptureAction,
@@ -49,6 +48,7 @@ import {
 } from "../../../../server/settlement/actions";
 import type { CaseView, ObligationView, PaymentView } from "../../../../server/settlement/views";
 import { formatDateTime } from "../../../../lib/format-date";
+import { useOutcomeFocus } from "../../../../lib/use-outcome-focus";
 import { ledgerINR } from "../../../../lib/inr";
 import { CASE_STATE, PAYMENT_STATE } from "./money-words";
 import "./money.css";
@@ -162,16 +162,12 @@ function CaseStepper({ status }: { status: string }) {
 }
 
 export function MoneyPanel({ slug, console: view }: { slug: string; console: ConsoleView }) {
-  const router = useRouter();
   const toast = useToast();
   const announce = useAnnouncer();
   const [busy, setBusy] = useState(false);
-  // Carries a sequence so two identical outcomes still move focus twice.
-  const [outcome, setOutcome] = useState<{ text: string; seq: number } | null>(null);
-  const announceOutcome = (text: string) => {
-    setOutcome((current) => ({ text, seq: (current?.seq ?? 0) + 1 }));
-  };
-  const outcomeRef = useRef<HTMLParagraphElement | null>(null);
+  // Focus lands on the outcome once the refresh has committed — see
+  // `use-outcome-focus`, shared with the org money desks.
+  const { outcome, report, ref: outcomeRef } = useOutcomeFocus();
   // A click before hydration is a no-op; the surface says when it is live.
   const hydrated = useHydrated();
 
@@ -192,45 +188,14 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
     setBusy(false);
     if (result.ok) {
       toast({ title: done, tone: "success" });
-      announceOutcome(done);
-      router.refresh();
+      report(done, true);
       return true;
     }
     toast({ title: result.error, tone: "danger" });
     announce(result.error, "assertive");
-    announceOutcome(result.error);
+    report(result.error, false);
     return false;
   };
-
-  /*
-   * Focus has to be re-asserted, not set once.
-   *
-   * Two things take it away after a money command. A native <dialog>'s
-   * `close()` restores focus to whatever was focused when it opened — for
-   * Settle and Close that is a button the refreshed tree has just unmounted,
-   * so focus falls to <body>. And `router.refresh()` lands a new server tree a
-   * few hundred milliseconds later, which can drop it again. So the claim is
-   * re-made across that window, and ONLY while focus is sitting on <body> —
-   * nothing is ever taken from a real target the reader has moved to.
-   */
-  useEffect(() => {
-    if (outcome === null) {
-      return;
-    }
-    const timers = [0, 60, 200, 600, 1200].map((delay) =>
-      setTimeout(() => {
-        const node = outcomeRef.current;
-        if (node !== null && document.activeElement === document.body) {
-          node.focus();
-        }
-      }, delay),
-    );
-    return () => {
-      for (const timer of timers) {
-        clearTimeout(timer);
-      }
-    };
-  }, [outcome]);
 
   const outcomeNote =
     outcome === null ? null : (

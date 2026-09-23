@@ -1,9 +1,9 @@
 "use client";
 
 import { useAnnouncer, useToast } from "@desiauction/ui";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
+import { useOutcomeFocus } from "../../../../lib/use-outcome-focus";
 import type { FinopsResult } from "../../../../server/financial-operations/actions";
 
 /**
@@ -25,13 +25,10 @@ export function useFinopsAct(): {
   act: (run: () => Promise<FinopsResult>, done: string) => Promise<boolean>;
   outcomeNote: React.ReactNode;
 } {
-  const router = useRouter();
   const toast = useToast();
   const announce = useAnnouncer();
   const [busy, setBusy] = useState(false);
-  // The sequence makes two identical outcomes move focus twice.
-  const [outcome, setOutcome] = useState<{ text: string; seq: number } | null>(null);
-  const outcomeRef = useRef<HTMLParagraphElement | null>(null);
+  const { outcome, report, ref: outcomeRef } = useOutcomeFocus();
 
   const act = async (run: () => Promise<FinopsResult>, done: string): Promise<boolean> => {
     setBusy(true);
@@ -42,40 +39,11 @@ export function useFinopsAct(): {
     if (!result.ok) {
       announce(result.error, "assertive");
     }
-    setOutcome((current) => ({ text, seq: (current?.seq ?? 0) + 1 }));
-    if (result.ok) {
-      router.refresh();
-    }
+    report(text, result.ok);
     return result.ok;
   };
 
-  /*
-   * Focus has to be re-asserted, not set once. A native <dialog>'s `close()`
-   * restores focus to the trigger, which the refreshed tree may have just
-   * unmounted; and `router.refresh()` lands a new server tree a few hundred
-   * milliseconds later and can drop it again. So the claim is re-made across
-   * that window — and ONLY while focus is sitting on <body>, so nothing is ever
-   * taken from a target the reader has deliberately moved to.
-   */
-  useEffect(() => {
-    if (outcome === null) {
-      return;
-    }
-    const timers = [0, 60, 200, 600, 1200].map((delay) =>
-      setTimeout(() => {
-        const node = outcomeRef.current;
-        if (node !== null && document.activeElement === document.body) {
-          node.focus();
-        }
-      }, delay),
-    );
-    return () => {
-      for (const timer of timers) {
-        clearTimeout(timer);
-      }
-    };
-  }, [outcome]);
-
+  // Focus lands on the outcome once the refresh has committed (use-outcome-focus).
   const outcomeNote =
     outcome === null ? null : (
       <p className="money-result" tabIndex={-1} ref={outcomeRef} data-testid="finops-result">
