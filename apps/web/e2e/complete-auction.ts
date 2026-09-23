@@ -39,3 +39,26 @@ export async function completeAuction(
   }
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 20_000 });
 }
+
+/**
+ * LEAVE THE COCKPIT AFTER CLOSING THE NIGHT — BY ITS OWN DOOR, NOT `page.goto`.
+ *
+ * Completing sends the command and then `router.refresh()`es the cockpit.
+ * `cockpit-finished` renders from the SOCKET, so it can be on screen while that
+ * refresh's RSC fetch is still in flight. A `page.goto` then starts a document
+ * navigation, WebKit aborts the fetch, and Next's refresh reducer treats the
+ * failed fetch as "fall back to a browser navigation" — to the COCKPIT, which
+ * cancels the goto ("interrupted by another navigation to …/cockpit"). Two
+ * earlier fixes (wait for `cockpit-finished`, then `waitUntil: "commit"`) only
+ * narrowed that window; WebKit still hit it twice in ten repeats under load.
+ *
+ * The header's "Leave auction" link is a client-side navigation, which the
+ * router runs INSTEAD of the pending refresh rather than tearing the page down
+ * under it — exactly what a conductor clicking out of the room does. The
+ * destination assertion is unchanged and is still what proves we arrived.
+ */
+export async function leaveCockpit(page: Page, seasonSlug: string): Promise<void> {
+  await expect(page.getByTestId("cockpit-finished")).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("link", { name: "Leave auction" }).click();
+  await expect(page).toHaveURL(new RegExp(`/seasons/${seasonSlug}/auction$`));
+}
