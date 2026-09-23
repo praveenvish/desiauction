@@ -39,7 +39,8 @@ export async function GET(
     uid: inviteUid(row.requestId),
     start: booking.slotStart,
     end: booking.slotEnd,
-    summary: `DesiAuction demo — ${booking.orgName}`,
+    // Same title as the mailed invite (same UID), or a download would rename it.
+    summary: "DesiAuction demo",
     description: `A live walkthrough of a real auction. Manage this booking: ${url}`,
     url,
     organizerEmail: "support@desiauction.in",
