@@ -13,7 +13,10 @@ RUN pnpm install --frozen-lockfile --filter @desiauction/engine...
 RUN pnpm --filter @desiauction/engine build
 # --legacy: workspace code is bundled into dist/index.mjs; the deployed
 # node_modules only carries npm runtime deps (pnpm v10 injection not needed).
-RUN pnpm --filter @desiauction/engine deploy --legacy --prod /deployed
+# The next@ patch belongs to apps/web, which this context never copies, so
+# pnpm deploy calls it unused and refuses (ERR_PNPM_UNUSED_PATCH). Allowed
+# here only: the workspace install still fails on a genuinely stale patch.
+RUN pnpm --config.allow-unused-patches=true --filter @desiauction/engine deploy --legacy --prod /deployed
 
 FROM gcr.io/distroless/nodejs24-debian12:nonroot
 WORKDIR /app
