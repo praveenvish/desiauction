@@ -265,15 +265,26 @@ async function applyTransition(
     return { ok: false, reason: decision.reason };
   }
   const stampField = LIFECYCLE_TIMESTAMPS[event.type];
-  await db.transaction(async (tx) => {
-    await tx
+  const applied = await db.transaction(async (tx) => {
+    /*
+     * COMPARE-AND-SET (audit F-D3). `row` was loaded before this transaction
+     * and the machine decided against its status; the write only lands if the
+     * fixture is still in it. Otherwise two scorers completing and cancelling
+     * one match at once both "succeeded", and the later one's decision — made
+     * about a state that no longer existed — silently won.
+     */
+    const written = await tx
       .update(fixtures)
       .set({
         status: decision.next,
         ...(stampField !== undefined ? { [stampField]: new Date() } : {}),
         ...extraFields,
       })
-      .where(eq(fixtures.id, row.id));
+      .where(and(eq(fixtures.id, row.id), eq(fixtures.status, row.status)))
+      .returning({ id: fixtures.id });
+    if (written.length === 0) {
+      return false;
+    }
     await tx.insert(auditLog).values({
       id: newId(),
       actor: actorId,
@@ -283,7 +294,11 @@ async function applyTransition(
       subject: row.id,
       meta: { from: row.status, to: decision.next, ...extraMeta },
     });
+    return true;
   });
+  if (!applied) {
+    return { ok: false, reason: "illegal_transition" };
+  }
   return { ok: true, status: decision.next };
 }
 

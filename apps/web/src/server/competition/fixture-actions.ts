@@ -673,7 +673,9 @@ export async function fixtureTimelineAction(
   if (!gate.ok) {
     return [];
   }
-  return inCompetitionOrg(gate.personId, gate.competition, (db) => fixtureTimeline(db, fixtureId));
+  return inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    fixtureTimeline(db, gate.competition.id, fixtureId),
+  );
 }
 
 // --- Calendar / timeline / match-day views -------------------------------------------
@@ -970,11 +972,9 @@ export async function recordResultAction(
   );
   if (unreadable) {
     // Named specifically, because "invalid input" on a multi-field form sends a
-    // scorer hunting. In cricket, overs are the field people get wrong.
-    return {
-      ok: false,
-      error: "Check the numbers — overs are written like 18.3, and .6 is not an over.",
-    };
+    // scorer hunting. The pack says which field has a written form worth
+    // repeating (cricket's overs); every sport names its own fields.
+    return { ok: false, error: `Check the ${scoreWords(pack)}.${entryHints(pack)}` };
   }
 
   return inCompetitionOrg(session.personId, competition, async (db) => {
@@ -1004,7 +1004,7 @@ export async function recordResultAction(
         unknown_fixture: "That fixture is not in this competition.",
         not_played:
           "That match has not been played. Publish it, start it and complete it before recording a result.",
-        impossible_score: "That score cannot be right — check runs and wickets.",
+        impossible_score: `That score cannot be right — check the ${scoreWords(pack)}.`,
         winner_without_score:
           "A result with a winner needs both scores. Use 'no result' if the match did not finish.",
       };
@@ -1014,6 +1014,36 @@ export async function recordResultAction(
     revalidatePath(`/seasons/${slug}/standings`);
     return { ok: true, amended: result.amended };
   });
+}
+
+/**
+ * A SPORT'S SCORE, IN ITS OWN WORDS (multi-sport copy).
+ *
+ * The refusals above said "runs and wickets" and "overs are written like 18.3"
+ * to every sport — a football scorer told to check wickets. The pack already
+ * names its fields for the form, in the words the scorer types (`entry.label`,
+ * so cricket says overs, not balls); the refusal reads the same list.
+ */
+function scoreWords(pack: ReturnType<typeof sportPackFor>): string {
+  const words = pack.result.scoreFields.map((field) =>
+    (field.entry?.label ?? field.label).toLowerCase(),
+  );
+  if (words.length === 0) {
+    return "score";
+  }
+  const last = words.at(-1) ?? "";
+  return words.length === 1 ? last : `${words.slice(0, -1).join(", ")} and ${last}`;
+}
+
+/** The pack's own hint for any field written differently from how it is stored. */
+function entryHints(pack: ReturnType<typeof sportPackFor>): string {
+  return pack.result.scoreFields
+    .filter((field) => field.entry?.help !== undefined)
+    .map(
+      (field) =>
+        ` ${field.entry?.label ?? field.label} are written like ${field.entry?.help ?? ""}.`,
+    )
+    .join("");
 }
 
 /**
@@ -1028,16 +1058,15 @@ export async function lobbyParticipantsAction(
   slug: string,
   fixtureId: string,
 ): Promise<readonly LobbyParticipantRow[]> {
-  const session = await currentSession();
-  if (session === null) {
+  // The one caller is the scorer's results card, which records the lobby it
+  // opens — so this reads under the capability that write needs (audit P3). A
+  // member without it used to be handed every squad and score in the lobby.
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
     return [];
   }
-  const competition = await resolveMemberCompetition(session.personId, slug);
-  if (competition === null) {
-    return [];
-  }
-  return inCompetitionOrg(session.personId, competition, (db) =>
-    lobbyParticipantsOf(db, competition.orgId, fixtureId),
+  return inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    lobbyParticipantsOf(db, gate.competition.orgId, gate.competition.id, fixtureId),
   );
 }
 
