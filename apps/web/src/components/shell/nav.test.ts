@@ -122,10 +122,12 @@ describe("pageIdentity", () => {
     expect(pageIdentity("/seasons/mpl/teams", ctx).subtitle).toBeUndefined();
   });
 
-  it("names the season itself on its overview and the section everywhere below", () => {
+  it("leaves the overview's name to its hero and names the section everywhere below", () => {
+    // The hero banner carries the overview's one <h1>; the shell keeps only the
+    // trail, decided server-side so the HTML never holds two.
     expect(pageIdentity("/seasons/mpl", ctx)).toEqual({
       crumbs: [{ label: "Malad CC", href: "/org/malad-cc" }],
-      title: "MPL 2026",
+      title: null,
     });
     expect(pageIdentity("/seasons/mpl/teams", ctx)).toEqual({
       crumbs: [

@@ -3,15 +3,9 @@
    the hero's buttons on the dark banner, the team and role rows, the public
    page address, the two picture cards. Tokens only. */
 
-/* The hero carries this page's one <h1>, so the shell's page head (trail +
-   title) stands down here. `PageTitleHidden` (page.tsx) removes its h1 once
-   the page mounts; this rule keeps the head from painting before that, so the
-   hero does not jump down and back up on first load. AppShell marks the head
-   with `data-page-head`; only its title row hides — the trail up to the club
-   stays, so the overview keeps its way back. */
-#main-content:has(.ov-page) > [data-page-head] [data-page-head-row] {
-  display: none;
-}
+/* The hero carries this page's one <h1>; the shell's page head keeps only its
+   trail up to the club here (`pageIdentity`, nav.ts, decides that on the
+   server — there is no second title to hide). */
 
 .ov-page {
   color: var(--text-primary);
