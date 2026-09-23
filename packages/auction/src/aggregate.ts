@@ -382,6 +382,10 @@ export async function auctionReadiness(db: Db, auctionId: string, auction?: Auct
   // DA-06: "squad 8–15" is printed on every auction screen. Counting it here
   // makes the floor real — the ceiling was already enforced by the bid gauntlet.
   // Every team counts, including one that never bid: no squad is the shortest.
+  //
+  // APPROVED players only (go-live gate P1-9). A withdrawn or rejected player
+  // whose registration still carries a stale teamId is not on anybody's squad,
+  // and counting them let a short team pass the floor.
   let below = 0;
   if (auction !== undefined) {
     const [row] = await db
@@ -390,7 +394,8 @@ export async function auctionReadiness(db: Db, auctionId: string, auction?: Auct
       .where(
         and(
           eq(teams.competitionId, auction.competitionId),
-          sql`(select count(*) from ${registrations} where ${registrations.teamId} = ${teams.id})
+          sql`(select count(*) from ${registrations}
+                where ${registrations.teamId} = ${teams.id} and ${registrations.status} = 'approved')
               < ${auction.config.squadMin}`,
         ),
       );
@@ -996,6 +1001,10 @@ export async function placeBid(
   // `purseRow.squad` and must not be counted a second time here. SOLD lots
   // only: a pre-signed player whose waiting lot was withdrawn when the auction
   // opened (`settlePool`) is in no purse count and has to be counted here.
+  //
+  // APPROVED only, as settlePool reads the pool (go-live gate P1-9 / P3): a
+  // withdrawn or rejected player with a stale teamId and a mark is on nobody's
+  // squad, and counting them spent a real squad slot on a ghost.
   const [preSignedRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(registrations)
@@ -1003,6 +1012,7 @@ export async function placeBid(
       and(
         eq(registrations.competitionId, auction.competitionId),
         eq(registrations.teamId, paddle.teamId),
+        eq(registrations.status, "approved"),
         preSignedSql,
         sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
       ),
@@ -2173,9 +2183,20 @@ export async function undoLastAction(
     // Undoing a sale must also undo the squad placement, or the roster keeps a
     // player the ledger says was never signed — the failure mode that looks
     // correct and so never gets reported.
+    //
+    // The armband goes with the placement. A bought player may be named
+    // captain once the auction is open (`captainChangeRefusal`, apps/web
+    // roster-lock.ts: `bought` is enough), so an undone sale could leave
+    // isCaptain=true on a player with no team. Resold to a team that already
+    // has a captain, that collides on `registrations_team_captain_uq` and the
+    // gavel can never close the lot — the _TimerClose retries forever. Nothing
+    // else pre-signs a player whose lot SOLD: settlePool withdrew every lot of
+    // an Icon or Retained player when the auction opened, and those marks
+    // freeze with the roster from then on — so the captain mark here can only
+    // have come from the sale, and it is undone with it.
     await tx
       .update(registrations)
-      .set({ teamId: null })
+      .set({ teamId: null, isCaptain: false })
       .where(eq(registrations.id, lot.registrationId));
     await appendEvent(
       tx,

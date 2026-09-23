@@ -1,5 +1,5 @@
 import { registrations, type Db } from "@desiauction/db";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { countNoun } from "../../lib/plural";
 import { isPreSigned } from "../../lib/pre-signed";
@@ -14,9 +14,14 @@ import { scheduleSnapshot } from "../competition/schedule-snapshot";
 // mutable Competition entity (the IP-3 freeze condition, GATES condition 2).
 // Deep-frozen and deterministic, like every read model downstream of a freeze.
 
+/**
+ * One pool player, as the setup screens see it. No person id: this projection
+ * rides to the client AuctionPanel whole, and nothing there reads one — an
+ * identity key for every player in the club was being shipped to every
+ * browser that opened the setup screen for no reader at all (go-live gate P3).
+ */
 export interface AuctionPoolEntry {
   readonly registrationId: string;
-  readonly personId: string;
   readonly playerName: string | null;
   readonly role: string | null;
   readonly basePriceBand: string | null;
@@ -99,7 +104,6 @@ export async function auctionReady(
         .filter((row) => !isPreSigned(row))
         .map((row) => ({
           registrationId: row.id,
-          personId: row.personId,
           playerName: row.name,
           role: row.role,
           basePriceBand: row.basePriceBand,
@@ -114,13 +118,16 @@ export async function auctionReady(
   }
 
   // Team sheets as they stand. Counted the way the engine's below-minimum
-  // guard counts them (every registration carrying the team id), so the
-  // feasibility arithmetic on the setup screen and the refusal at closing time
-  // are the same sum.
+  // guard counts them (every APPROVED registration carrying the team id), so
+  // the feasibility arithmetic on the setup screen and the refusal at closing
+  // time are the same sum. A withdrawn or rejected player with a stale team id
+  // is on nobody's sheet (go-live gate P1-9).
   const sizeRows = await db
     .select({ teamId: registrations.teamId, count: sql<number>`count(*)::int` })
     .from(registrations)
-    .where(eq(registrations.competitionId, competition.id))
+    .where(
+      and(eq(registrations.competitionId, competition.id), eq(registrations.status, "approved")),
+    )
     .groupBy(registrations.teamId);
   const sizeByTeam = new Map(
     sizeRows.flatMap((row) => (row.teamId === null ? [] : [[row.teamId, row.count] as const])),

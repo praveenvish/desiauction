@@ -258,6 +258,46 @@ describe("engine transport", () => {
     expect((await post("01KYQ8214G1J6KWB86ZGCG7M2A")).statusCode).toBe(200);
   });
 
+  // P0-5 (go-live gate): `manage` is what lets a non-holder bid (manual mode),
+  // so the transport carries it exactly like `conduct` — strictly `true`, and
+  // anything else (absent, "true", 1) is false.
+  it("carries the manage flag strictly — only a literal true reaches the engine", async () => {
+    const seen: AuctionCommandEnvelope[] = [];
+    const engine = stubEngine();
+    (engine as unknown as { submit: (e: AuctionCommandEnvelope) => Promise<unknown> }).submit = (
+      envelope,
+    ) => {
+      seen.push(envelope);
+      return Promise.resolve({ commandId: envelope.commandId, accepted: true, version: 1 });
+    };
+    built = buildServer({
+      logger: silentLogger,
+      version: "test",
+      checkDb: () => Promise.resolve(true),
+      engine,
+      engineSecret: "test-secret-123",
+      nodeEnv: "test",
+    });
+    const server = built.server;
+    for (const manage of [true, "true", 1, undefined]) {
+      await server.inject({
+        method: "POST",
+        url: "/command",
+        headers: { "x-engine-secret": "test-secret-123" },
+        payload: {
+          commandId: VALID_ID,
+          auctionId: "a",
+          type: "PlaceBid",
+          actor: "01KYQ8214G1J6KWB86ZGCG7M2A",
+          conduct: true,
+          ...(manage === undefined ? {} : { manage }),
+          payload: {},
+        },
+      });
+    }
+    expect(seen.map((envelope) => envelope.manage)).toEqual([true, false, false, false]);
+  });
+
   // THE SCOPE IS INSIDE THE HMAC (audit 2026-08-18, P1-6). A ticket authorises
   // an auction AND an audience; if the scope were merely a query parameter the
   // engine's redaction would be advisory, which is exactly what the client-side

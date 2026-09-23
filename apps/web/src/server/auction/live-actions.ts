@@ -25,7 +25,8 @@ import { resolveMemberCompetition } from "../competition/resolve";
 import { dbHandle } from "../db";
 import { featureEnabled } from "../feature-settings";
 import { storage } from "../media";
-import { announceAuctionOutcomes } from "./auction-notify";
+import { completeAuctionOnce } from "./auction-notify";
+import { isSeasonAuctioneer, lockSeasonAppointments } from "./auctioneers";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
 import {
   preSignedPlayers,
@@ -503,6 +504,7 @@ const CONDUCT_ONLY = new Set([
   "RequeueLot",
   "GrantPaddle",
   "UndoLastAction",
+  "RevokeOwnerInvite",
 ]);
 
 // Conduct commands an appointed auctioneer may NOT send (security review,
@@ -511,12 +513,81 @@ const CONDUCT_ONLY = new Set([
 // themselves an ownerless team's paddle and spend its purse. Both need the
 // season's manager. (GrantPaddle stays conduct: the engine only grants to a
 // person who accepted an owner invitation for that team.)
-const MANAGE_ONLY = new Set(["AbortAuction", "IssuePaddle"]);
+//
+// RevokeOwnerInvite joins them. Its dedicated action (revokeOwnerInviteAction)
+// already demanded the season's manager, but the command also travelled this
+// generic gateway on conduct alone — an auctioneer could withdraw a link they
+// could never have minted (go-live gate, P3).
+const MANAGE_ONLY = new Set(["AbortAuction", "IssuePaddle", "RevokeOwnerInvite"]);
+
+/**
+ * Does this person HOLD the paddle they are bidding with, right now?
+ *
+ * The engine answers the same question (holder, or manual mode = conduct AND
+ * manage) and is the authority. This is the near end of the fence, for the
+ * same reason the command-id shape is checked here too: an appointed
+ * auctioneer's bid with a team's paddle should never leave the web tier
+ * (go-live gate P0-5).
+ */
+async function holdsPaddle(gate: LiveGate, paddleId: unknown): Promise<boolean> {
+  if (typeof paddleId !== "string") {
+    return false;
+  }
+  const rows = await withTenantDb(
+    dbHandle,
+    { personId: gate.personId, orgId: gate.competition.orgId },
+    (db) =>
+      db
+        .select({ id: paddles.id })
+        .from(paddles)
+        .where(
+          and(
+            eq(paddles.id, paddleId),
+            eq(paddles.auctionId, gate.auction.id),
+            eq(paddles.personId, gate.personId),
+            isNull(paddles.releasedAt),
+          ),
+        )
+        .limit(1),
+  );
+  return rows.length > 0;
+}
 
 // Token-flow commands never travel the generic gateway: invitations mint
 // secrets (dedicated action returns the URL) and acceptance must present the
 // TOKEN, not an invite id (owner-actions.ts owns both).
 const GATEWAY_BLOCKED = new Set(["InviteOwner", "AcceptOwnerInvite"]);
+
+/**
+ * A paddle in hand makes a person a team owner, and the season's auctioneer
+ * may never be one — conducting shows every rival's purse (security review,
+ * launch Phase 5). Appointment already refuses a paddle holder
+ * (`teamOwnersOf`); this is the same rule from the other side, and it runs
+ * under the season's appointment lock so the two cannot pass each other
+ * (go-live gate P3).
+ */
+async function issueUnlessAuctioneer(
+  gate: LiveGate,
+  commandId: string,
+  payload: Record<string, unknown>,
+  send: () => Promise<CommandAck>,
+): Promise<CommandAck> {
+  const personId = payload["personId"];
+  return withTenantDb(
+    dbHandle,
+    { personId: gate.personId, orgId: gate.competition.orgId },
+    async (db) => {
+      await lockSeasonAppointments(db, gate.competition.id);
+      if (
+        typeof personId === "string" &&
+        (await isSeasonAuctioneer(db, gate.competition.id, personId))
+      ) {
+        return { commandId, accepted: false, reason: "auctioneer", version: 0 };
+      }
+      return send();
+    },
+  );
+}
 
 /**
  * The single command gateway. `commandId` comes from the CLIENT so retries
@@ -553,36 +624,38 @@ export async function submitAuctionCommand(
   if (type === "UndoLastAction" && !gate.canOverride) {
     return { commandId, accepted: false, reason: "not_authorized", version: 0 };
   }
-  const ack = await sendEngineCommand({
-    commandId,
-    auctionId: gate.auction.id,
-    type,
-    actor: gate.personId,
-    conduct: gate.canConduct,
-    override: gate.canOverride,
-    payload,
-  });
-  /*
-   * THE ONE MESSAGE THE PLAYER WAS NEVER SENT.
-   *
-   * Announced only on an ACCEPTED completion, and only from here: the engine
-   * owns the auction but cannot reach the messaging adapters (`apps/*` may not
-   * import `apps/*`), and this is the single path a completion takes. A refused
-   * command must announce nothing — a short-squad close that DA-06 rejects has
-   * not ended anybody's night.
-   *
-   * Awaited rather than fired and forgotten, so the conductor's screen does not
-   * refresh into a finished auction before the inbox rows exist; it is bounded
-   * by one query plus a row per player, and it swallows its own failures so a
-   * completed auction can never be undone by a notification.
-   */
-  if (type === "CompleteAuction" && ack.accepted) {
-    await announceAuctionOutcomes({
-      personId: gate.personId,
-      orgId: gate.competition.orgId,
-      auctionId: gate.auction.id,
-      competition: { id: gate.competition.id, name: gate.competition.name },
-    });
+  // A bid with a paddle you do not hold is manual mode (doc 41): the season's
+  // owners only. Conduct is not enough — see holdsPaddle.
+  const manualMode = gate.canConduct && gate.canManage;
+  if (type === "PlaceBid" && !manualMode && !(await holdsPaddle(gate, payload["paddleId"]))) {
+    return { commandId, accepted: false, reason: "not_authorized", version: 0 };
   }
+  const send = () =>
+    sendEngineCommand({
+      commandId,
+      auctionId: gate.auction.id,
+      type,
+      actor: gate.personId,
+      conduct: gate.canConduct,
+      override: gate.canOverride,
+      manage: gate.canManage,
+      payload,
+    });
+  if (type === "CompleteAuction") {
+    return completeAuctionOnce(
+      {
+        personId: gate.personId,
+        orgId: gate.competition.orgId,
+        auctionId: gate.auction.id,
+        competition: { id: gate.competition.id, name: gate.competition.name },
+      },
+      send,
+      (ack) => ack.accepted,
+    );
+  }
+  const ack =
+    type === "IssuePaddle"
+      ? await issueUnlessAuctioneer(gate, commandId, payload, send)
+      : await send();
   return ack;
 }
