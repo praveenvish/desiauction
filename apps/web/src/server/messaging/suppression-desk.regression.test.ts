@@ -326,6 +326,8 @@ describe("delivery analytics", () => {
       status,
       dedupeKey: `spr:${RUN}:an:${String((n += 1))}`,
       createdAt: at(daysAgo),
+      // A text row carries its template and slots (0081's CHECK).
+      ...(channel === "email" ? {} : { templateKey: "auction.sold", slots: {} }),
       ...extra,
     });
     await db.insert(messageOutbox).values([
