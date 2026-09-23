@@ -27,7 +27,6 @@ import {
   StatGrid,
   VisuallyHidden,
   type JourneyStep,
-  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -51,65 +50,11 @@ import { dateRange } from "../tournaments/season-card";
 import { seasonJourney } from "../tournaments/season-journey";
 import { ClubHero } from "./club-hero";
 import { activityLabel, activityStyle, ago } from "./home-activity";
+import { seasonBadge } from "./home-parts";
 import { HomeShortcuts } from "./home-shortcuts";
 import type { NextStep } from "./next-step";
 import { NextStepBanner } from "./next-step-banner";
 import "./home.css";
-
-type Tone = KitTone;
-
-function statusTone(status: string): Tone {
-  switch (status) {
-    // The console's one colour grammar — see STATUS_TONE in season-card.
-    case "registration_open":
-      return "blue";
-    case "registration_closed":
-      return "amber";
-    default:
-      return "neutral";
-  }
-}
-
-/**
- * Compact label so the status column never truncates in a narrow panel.
- *
- * "Open"/"Closed" were shorter still, and wrong twice over: "Closed" told a
- * reader the SEASON had ended when only registration had (auction night is
- * next), and a settled season carried the same word as one mid-lifecycle.
- * These abbreviate the vocabulary /tournaments uses rather than invent one.
- */
-function statusLabel(status: string): string {
-  switch (status) {
-    case "registration_open":
-      return "Reg open";
-    case "registration_closed":
-      return "Reg closed";
-    case "setup":
-      return "Setup";
-    case "draft":
-      return "Draft";
-    default:
-      return status.replace(/_/g, " ");
-  }
-}
-
-/**
- * The one badge a season row shows. Whether the books are settled is the
- * settlement CASE's answer and outranks the competition status — the same
- * precedence the lifecycle rail below already applies.
- */
-function seasonBadge(row: { status: string; settlement: "settling" | "settled" | null }): {
-  label: string;
-  tone: Tone;
-} {
-  if (row.settlement === "settled") {
-    return { label: "Settled", tone: "green" };
-  }
-  if (row.settlement === "settling") {
-    return { label: "Settling", tone: "amber" };
-  }
-  return { label: statusLabel(row.status), tone: statusTone(row.status) };
-}
 
 interface AttentionRow {
   key: string;

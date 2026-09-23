@@ -1,8 +1,8 @@
-import { Badge } from "@desiauction/ui";
+import { IconCalendar, IconUsers, Pill, SectionCard } from "@desiauction/ui";
 import Link from "next/link";
 
 import { competitionsView } from "../../server/competition/actions";
-import { statusLabel, statusTone } from "./home-parts";
+import { monogram, statusLabel, statusTone } from "./home-parts";
 
 /**
  * FOR SOMEBODY WHOSE ONLY TIE IS MEMBERSHIP.
@@ -31,38 +31,43 @@ export async function MemberHome({ clubCount }: { clubCount: number }) {
      * a blank screen makes somebody wonder whether the product is broken.
      */
     return (
-      <section className="home-aside" aria-labelledby="home-member-empty" data-testid="home-member">
-        <h2 id="home-member-empty" className="home-flat-title">
-          Nothing running yet
-        </h2>
-        <p>
+      <SectionCard
+        data-testid="home-member"
+        icon={<IconCalendar />}
+        tone="neutral"
+        title="Nothing running yet"
+      >
+        <p className="home-card-note">
           You&apos;re a member of {clubCount === 1 ? "a club" : `${String(clubCount)} clubs`} that
           hasn&apos;t started a season. When one opens, it will show up here — and you&apos;ll get a
           message if they ask you to register.
         </p>
-      </section>
+      </SectionCard>
     );
   }
   return (
-    <section className="home-member" aria-labelledby="home-member-title" data-testid="home-member">
-      <header className="home-flat-head">
-        <h2 id="home-member-title" className="home-flat-title">
-          Seasons in your {clubCount === 1 ? "club" : "clubs"}
-        </h2>
-      </header>
-      <ul className="home-rows">
+    <SectionCard
+      data-testid="home-member"
+      icon={<IconUsers />}
+      tone="blue"
+      title={`Seasons in your ${clubCount === 1 ? "club" : "clubs"}`}
+    >
+      <ul className="home-list">
         {view.competitions.map((competition) => (
           <li key={competition.id}>
-            <Link href={`/seasons/${competition.slug}`} className="home-row">
-              <span className="home-row-main">
+            <Link href={`/seasons/${competition.slug}`} className="home-row-link">
+              <span className="home-crest" aria-hidden>
+                {monogram(competition.name)}
+              </span>
+              <span className="home-row-text">
                 <strong>{competition.name}</strong>
                 <span>{competition.orgName}</span>
               </span>
-              <Badge tone={statusTone(competition.status)}>{statusLabel(competition.status)}</Badge>
+              <Pill tone={statusTone(competition.status)}>{statusLabel(competition.status)}</Pill>
             </Link>
           </li>
         ))}
       </ul>
-    </section>
+    </SectionCard>
   );
 }

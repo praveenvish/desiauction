@@ -1220,42 +1220,24 @@
 /* ===========================================================================
    THE ROLE HOMES (RN-1).
 
-   The redesign above is the ORGANIZER's home. These are the other five —
-   player, owner, auctioneer, member, newcomer — which the router renders
-   instead of, or beneath, it. They came from a branch that never saw the
-   redesign, so they still wear the console's plainer clothes; restyling them
-   with the kit above is the follow-up this merge did not take on.
+   The redesign above is the ORGANIZER's home. The other five — player, owner,
+   auctioneer, member, newcomer — are built from the same kit (section cards,
+   stat cards, pills, the crest row above), so they need almost nothing of
+   their own. What is left here is the little they do.
    ======================================================================== */
 
-.home-crest--sm {
-  width: 32px;
-  height: 32px;
-  font-size: var(--text-xs-size);
-}
-
-.home-attn,
-.home-auction,
-.home-event {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+/* The organizer's auction rows sit a little inset from the card edge. */
+.home-auction {
   padding: var(--space-2);
   border-radius: var(--radius-md);
-  text-decoration: none;
-  color: inherit;
-  min-width: 0;
   transition: background var(--duration-fast) var(--ease-out);
 }
 
-.home-attn:hover,
-.home-auction:hover,
-.home-event:hover {
+.home-auction:hover {
   background: var(--surface-sunken);
 }
 
-.home-attn:focus-visible,
 .home-auction:focus-visible,
-.home-event:focus-visible,
 .home-money-cell:focus-visible,
 .home-tcell:focus-visible,
 .home-card-link:focus-visible {
@@ -1263,87 +1245,22 @@
   outline-offset: 2px;
 }
 
-.home-attn-text,
-.home-event-text,
-.home-feed-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  flex: 1;
-}
-
-.home-attn-text strong,
-.home-event-text strong,
-.home-feed-text strong {
-  font-family: var(--font-text);
+/* A sentence of explanation inside a section card: an offer or an empty
+   state, never a task — so secondary ink, and a measure a reader can hold. */
+.home-card-note {
+  margin: 0;
+  max-width: 62ch;
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-attn-text span,
-.home-event-text span,
-.home-feed-text span {
-  font-family: var(--font-text);
-  font-size: var(--text-xs-size);
   color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* ==========================================================================
-   FLAT SECTIONS (launch polish): a heading, hairline rows, whitespace — no box.
-   ========================================================================== */
-.home-flat-head {
+/* The newcomer's two doors, side by side until the phone stacks them. */
+.home-choose-doors {
   display: flex;
-  align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
-  padding-bottom: var(--space-3);
-}
-
-.home-flat-title {
-  margin: 0;
-  font-size: var(--text-md-size);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.01em;
-  color: var(--text-heading);
-}
-
-/* Hairline rows: the list IS the structure. */
-.home-rows {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.home-rows > li {
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.home-row-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.home-row-main strong {
-  font-size: var(--text-base-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.home-row-main span {
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-4);
 }
 
 /* The one-time "your menu changed" sentence (RN-1 §3.6). Quiet on purpose:
@@ -1355,38 +1272,4 @@
 
 .home-role-change p {
   margin: 0;
-}
-
-/*
-   `home-choose` (the newcomer's two doors) and `home-aside` (the player's
-   quiet "want to run your own?") shipped with RN-1 carrying no rules at all —
-   they leaned on the console's defaults and rendered as bare blocks. A section
-   with no styling is not neutral; it reads as unfinished.
-*/
-.home-choose,
-.home-aside {
-  padding: var(--space-6);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-}
-
-.home-aside {
-  /* Last on the page and quieter than everything above it: an offer, not a task. */
-  background: transparent;
-  border-style: dashed;
-}
-
-.home-choose p,
-.home-aside p {
-  margin: var(--space-2) 0 var(--space-4);
-  color: var(--text-secondary);
-  max-width: 62ch;
-}
-
-.home-choose-doors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: center;
 }
