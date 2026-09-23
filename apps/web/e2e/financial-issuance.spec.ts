@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { completeAuction } from "./complete-auction";
 import { withRunnerHeld } from "./finops-runner";
 import { latestOtp } from "./otp";
-import { issuePaddleTo, showAuctionTab } from "./auction-tabs";
+import { issuePaddleTo, queueAllFromSetup } from "./auction-tabs";
 
 // PX-8 COMPLETION · FOUNDER DEMONSTRATION — a FRESH organization, no demo seed,
 // no SQL, no engineering assistance:
@@ -183,8 +183,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   for (const team of ["Risers", "Royals"]) {
     await issuePaddleTo(page, team);
   }
-  await showAuctionTab(page, "Setup");
-  await page.getByTestId("queue-all").click();
+  await queueAllFromSetup(page);
   await expect(page.getByTestId("lot-L001")).toContainText("queued", { timeout: 20_000 });
   await page.getByTestId("accept-short-open").check();
   await page.getByTestId("auction-open").click();

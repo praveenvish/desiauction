@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { completeAuction } from "./complete-auction";
 import { latestOtp } from "./otp";
-import { issuePaddleTo, showAuctionTab } from "./auction-tabs";
+import { issuePaddleTo, queueAllFromSetup } from "./auction-tabs";
 
 // PX-7 FOUNDER DEMONSTRATION: complete an auction → open the Settlement
 // Workspace → review the case → verify → record a manual payment → waive one
@@ -163,8 +163,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   for (const team of ["Kings", "Chargers"]) {
     await issuePaddleTo(page, team);
   }
-  await showAuctionTab(page, "Setup");
-  await page.getByTestId("queue-all").click();
+  await queueAllFromSetup(page);
   await expect(page.getByTestId("lot-L001")).toContainText("queued", { timeout: 20_000 });
   await page.getByTestId("accept-short-open").check();
   await page.getByTestId("auction-open").click();
