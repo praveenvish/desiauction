@@ -42,6 +42,7 @@ services:
     <<: *logs
     restart: unless-stopped
     env_file: [./web.env]
+    labels: [autoheal=true]
     depends_on:
       db: { condition: service_healthy }
     healthcheck:
@@ -63,6 +64,7 @@ services:
     <<: *logs
     restart: unless-stopped
     env_file: [./engine.env]
+    labels: [autoheal=true]
     depends_on:
       db: { condition: service_healthy }
     # EXACTLY ONE. The engine is the single mutation authority and claims a
@@ -349,6 +351,33 @@ services:
           sleep "$${MIRROR_INTERVAL_SECONDS:-3600}"
         done
 
+  # RESTARTS WHAT DOCKER ONLY LABELS.
+  #
+  # `restart: unless-stopped` acts on a container that EXITS. A container whose
+  # healthcheck fails but whose process lives — a web tier that cannot reach
+  # the database, an engine whose watchdog stopped ticking — is marked
+  # `unhealthy` and then left exactly as it is, for ever. This restarts the
+  # containers labelled `autoheal=true` (web, engine) when that happens, and
+  # its log line is what Grafana's service-health alert fires on.
+  #
+  # NOT the database: a Postgres in long crash recovery fails pg_isready, and
+  # restarting it mid-recovery is how recovery never finishes.
+  #
+  # The Docker socket again — the same trust decision as Alloy's, and the same
+  # containment: pinned by digest, no ports, nothing reaches it from outside.
+  autoheal:
+    image: willfarrell/autoheal@sha256:31f580ef0279eaced5b38d631b08c474d70d8403c1c2fdd6ddcf2e879d5f3f7c # 1.2.0
+    <<: *logs
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: "10"
+      # The healthchecks' own start_period already covers boot; this is the
+      # extra grace before autoheal will act on a freshly started container.
+      AUTOHEAL_START_PERIOD: "60"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
   # ONE TIMELINE ACROSS EVERY SERVICE.
   #
   # `docker compose logs` was the whole story, and it answers "what did this one
@@ -407,8 +436,15 @@ services:
       GF_SECURITY_ALLOW_EMBEDDING: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      # Where alerts go (observability/grafana-alerting.yml). REQUIRED: an alert
+      # rule with nowhere to send it is a dashboard nobody is looking at, so a
+      # missing value stops `docker compose` here rather than at the incident.
+      # Any URL that accepts Grafana's webhook JSON — a Slack/Discord bridge,
+      # ntfy.sh, a PagerDuty/Opsgenie integration URL.
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:?set ALERT_WEBHOOK_URL in .env — see ops/deploy/README.md "Alerts"}
     volumes:
       - ./observability/grafana-datasource.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+      - ./observability/grafana-alerting.yml:/etc/grafana/provisioning/alerting/desiauction.yml:ro
       - grafana_data:/var/lib/grafana
     depends_on: [loki]
 
