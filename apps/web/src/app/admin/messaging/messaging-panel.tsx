@@ -144,6 +144,32 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
         )}
       </SectionCard>
 
+      <SectionCard
+        icon={<IconSend />}
+        tone={overview.whatsapp.failed > 0 ? "red" : "blue"}
+        title="WhatsApp delivery"
+        description={`The last ${String(overview.deliveryWindowDays)} days, from Meta's own callbacks: what reached a phone, what was opened, what Meta gave up on. A pile of "awaiting" with nothing delivered means the callback URL is not subscribed.`}
+      >
+        <div className="admin-chips" data-testid="admin-whatsapp-delivery">
+          <Pill tone="neutral">
+            awaiting <span className="admin-count">{String(overview.whatsapp.awaiting)}</span>
+          </Pill>
+          <Pill tone="green">
+            delivered <span className="admin-count">{String(overview.whatsapp.delivered)}</span>
+          </Pill>
+          <Pill tone="green">
+            read <span className="admin-count">{String(overview.whatsapp.read)}</span>
+          </Pill>
+          <Pill tone={overview.whatsapp.failed > 0 ? "red" : "neutral"}>
+            failed <span className="admin-count">{String(overview.whatsapp.failed)}</span>
+          </Pill>
+          {/* A STOP is somebody's choice, not a fault, and is toned as such. */}
+          <Pill tone="neutral">
+            STOP replies <span className="admin-count">{String(overview.whatsapp.stops)}</span>
+          </Pill>
+        </div>
+      </SectionCard>
+
       {/* No lift button, deliberately. Somebody who texts START lifts their
           own; the day support genuinely needs to lift somebody else's is a
           conversation at review, not an import into a read-only surface. */}
