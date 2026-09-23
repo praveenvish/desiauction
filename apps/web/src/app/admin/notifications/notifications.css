@@ -1,0 +1,86 @@
+/*
+ * The Notification Control Center (/admin/notifications). Tokens only; the
+ * switches reuse the product's `notify-switch` (base.css, 44px), so a toggle
+ * here reads like the one on /account.
+ */
+
+.ntc-kind-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+/* One cell per channel. They wrap rather than scroll: at 360px each cell takes
+   the full row, on a desktop up to four sit side by side. */
+.ntc-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ntc-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.ntc-cell[data-state="admin_off"] {
+  border-color: var(--danger-strong);
+}
+
+.ntc-cell[data-state="channel_off"] {
+  border-color: var(--warning-strong);
+}
+
+.ntc-cell-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+}
+
+/* The toggle keeps its 44px target but sits inline, not as a full-width row. */
+.ntc-toggle {
+  align-items: center;
+  padding-inline: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.ntc-toggle input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* A locked cell has no control: the label sits where the toggle would, at the
+   same height, so the row does not jump. */
+.ntc-locked-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.ntc-note {
+  color: var(--text-secondary);
+}
+
+.ntc-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-4);
+}

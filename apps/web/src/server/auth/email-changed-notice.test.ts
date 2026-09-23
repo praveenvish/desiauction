@@ -6,6 +6,20 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@desiauction/messaging/consent", () => ({
   maySend: vi.fn(() => Promise.resolve({ send: true })),
 }));
+// The platform's switches, as the catalogue leaves them: this db is a stub
+// with no tables to read (their own rules are platform-switches.test).
+vi.mock("@desiauction/messaging/platform-switches", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@desiauction/messaging/platform-switches")>();
+  return {
+    ...real,
+    platformSwitches: () => Promise.resolve(real.CATALOGUE_DEFAULTS),
+    withPlatformSwitches: (
+      _db: unknown,
+      entry: Parameters<typeof real.effectiveOn>[1],
+      channel: Parameters<typeof real.effectiveOn>[2],
+    ) => Promise.resolve(real.effectiveOn(real.CATALOGUE_DEFAULTS, entry, channel)),
+  };
+});
 
 import { maySend } from "../messaging/consent";
 import type { OutgoingMail, TransactionalMailer } from "../messaging/transactional-mail";

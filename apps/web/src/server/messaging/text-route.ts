@@ -40,6 +40,13 @@ export type WhatsAppBlock =
   | { readonly kind: "template_unset" }
   /** The person's latest answer is not yes. */
   | { readonly kind: "not_opted_in" }
+  /**
+   * A platform admin switched WhatsApp off — for this kind, or everywhere
+   * (/admin/notifications). SMS carries the text where a gateway exists, the
+   * same as any other WhatsApp that cannot be used; where none does, the row
+   * is suppressed with the admin's reason, so the grid's counts say why.
+   */
+  | { readonly kind: "platform_off"; readonly reason: "admin_disabled" | "channel_disabled" }
   | { readonly kind: "breaker_open"; readonly error: string }
   | { readonly kind: "unavailable"; readonly error: string }
   | { readonly kind: "refused"; readonly error: string };
@@ -80,6 +87,8 @@ export function textFallback(
       return { action: "suppress", reason: `${NO_TEXT_CHANNEL}: WhatsApp template not approved` };
     case "not_opted_in":
       return { action: "suppress", reason: `${NO_TEXT_CHANNEL}: not opted in to WhatsApp` };
+    case "platform_off":
+      return { action: "suppress", reason: block.reason };
     case "breaker_open":
       return { action: "wait_breaker", reason: `WhatsApp: ${block.error}` };
     case "unavailable":

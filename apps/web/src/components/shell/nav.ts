@@ -373,6 +373,15 @@ const ADMIN_SECTIONS: readonly Omit<AdminSection, "dividerBefore">[] = [
     capability: "platform.admin",
     group: "commercial",
   },
+  // Switches every message the platform sends — so its own door, beside the
+  // read-only messaging view rather than inside it.
+  {
+    key: "notifications",
+    label: "Notifications",
+    href: "/admin/notifications",
+    capability: "platform.admin",
+    group: "commercial",
+  },
 ];
 
 /** The sections this operator holds a key to, with group dividers marked. */
@@ -408,6 +417,9 @@ export function activeAdminTab(pathname: string): string {
   }
   if (pathname.startsWith("/admin/messaging")) {
     return "messaging";
+  }
+  if (pathname.startsWith("/admin/notifications")) {
+    return "notifications";
   }
   if (pathname.startsWith("/admin/passes")) {
     return "passes";
@@ -476,6 +488,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   // admin", since `pageIdentity` falls back to the surface name when a section
   // has no label.
   [/^\/admin\/messaging$/, "Messaging"],
+  [/^\/admin\/notifications$/, "Notifications"],
   [/^\/admin\/passes$/, "Passes"],
   // Longest-first: availability must not be labelled "Demos".
   [/^\/admin\/demos\/availability$/, "Demo availability"],

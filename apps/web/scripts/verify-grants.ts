@@ -192,6 +192,11 @@ const APP_WRITES_UNPROTECTED = [
   "newsletter_unsubscribes",
   // The WhatsApp webhook (0085): a callback from Meta, no session, no tenant.
   "whatsapp_inbound",
+  // The platform's notification switches (0086): written from
+  // /admin/notifications on the app pool, read by the send gate. A switch
+  // belongs to DesiAuction, not a club, so there is no tenant and no RLS.
+  "notification_switches",
+  "notification_channels",
 ];
 
 /**

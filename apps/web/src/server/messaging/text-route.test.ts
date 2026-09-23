@@ -12,6 +12,7 @@ const every: WhatsAppBlock[] = [
   { kind: "breaker_open", error: "WhatsApp provider unavailable (breaker open)" },
   { kind: "unavailable", error: "WhatsApp unavailable (status 503)" },
   { kind: "refused", error: "WhatsApp refused the send (status 400)" },
+  { kind: "platform_off", reason: "admin_disabled" },
 ];
 
 describe("WITH an SMS gateway — the fallback that existed before WhatsApp", () => {
@@ -91,6 +92,22 @@ describe("WITHOUT SMS — no channel is a decision, not a failure", () => {
       expect(textFallback(block, { smsAvailable: false, ...LAST }).action, block.kind).not.toBe(
         "sms",
       );
+    }
+  });
+});
+
+describe("WhatsApp switched off by a platform admin (/admin/notifications)", () => {
+  it("falls to SMS where there is one, and is suppressed with the admin's reason where not", () => {
+    for (const reason of ["admin_disabled", "channel_disabled"] as const) {
+      const block: WhatsAppBlock = { kind: "platform_off", reason };
+      expect(textFallback(block, { smsAvailable: true, ...FIRST })).toEqual({
+        action: "sms",
+        note: null,
+      });
+      expect(textFallback(block, { smsAvailable: false, ...FIRST })).toEqual({
+        action: "suppress",
+        reason,
+      });
     }
   });
 });

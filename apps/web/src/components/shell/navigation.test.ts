@@ -607,13 +607,13 @@ describe("administration shows an operator the desks they hold (RN-1 §6.3)", ()
       "platform.support",
     ]);
     // 4 platform (overview, live, health, audit), 4 trust (orgs, users,
-    // moderation, erasure), 4 commercial (reports, reviews from support;
-    // newsletter, messaging from admin — passes and demos need their own
-    // grants, which this operator does not hold).
+    // moderation, erasure), 5 commercial (reports, reviews from support;
+    // newsletter, messaging, notifications from admin — passes and demos need
+    // their own grants, which this operator does not hold).
     expect(sections.map((section) => section.group)).toEqual([
       ...Array<string>(4).fill("platform"),
       ...Array<string>(4).fill("trust"),
-      ...Array<string>(4).fill("commercial"),
+      ...Array<string>(5).fill("commercial"),
     ]);
     // Exactly two seams for three groups, and never one on the first item.
     expect(sections.filter((section) => section.dividerBefore === true)).toHaveLength(2);
