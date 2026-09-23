@@ -4,6 +4,8 @@ import { providerFetch } from "../messaging/provider-fetch";
 // The ED-1 port: RC-1's real SMS provider becomes a second implementation
 // of this interface — auth logic never changes (IP-2_DESIGN D3).
 export interface OtpSender {
+  /** Which app the code goes by — named for the notification gate. SMS if absent. */
+  readonly channel?: "sms" | "whatsapp";
   send(phone: string, code: string): Promise<void>;
 }
 
@@ -184,6 +186,7 @@ const DEFAULT_TEMPLATE_LANGUAGE = "en";
  * with a message nobody can act on.
  */
 export class WhatsAppCloudOtpSender implements OtpSender {
+  readonly channel = "whatsapp" as const;
   private readonly transport: SmsTransport;
   private readonly now: () => number;
   private readonly threshold: number;

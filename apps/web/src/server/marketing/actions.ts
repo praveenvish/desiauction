@@ -181,7 +181,7 @@ export async function requestDemoAction(
 
   const requestId = await recordDemoRequest(db, request);
 
-  const outcomes = await sendDemoRequestMail(request, requestId, {
+  const outcomes = await sendDemoRequestMail(db, request, requestId, {
     acknowledge: !(await acknowledgementsSpent(db)),
   });
   if (outcomes.founder === "failed" || outcomes.requester === "failed") {

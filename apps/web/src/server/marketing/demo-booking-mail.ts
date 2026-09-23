@@ -1,6 +1,8 @@
+import type { Db } from "@desiauction/db";
+
 import { env } from "../../env";
 import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
-import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
+import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
 import { buildInvite, inviteUid } from "./demo-ics";
 import { IST_OFFSET_MINUTES, dayLabel, istDayKey, timeLabel } from "./demo-slots";
 
@@ -149,25 +151,45 @@ function inviteFile(input: BookingMailInput, cancelled: boolean) {
   };
 }
 
-export async function sendBookingConfirmation(input: BookingMailInput): Promise<MailOutcome> {
-  return transactionalMailer().send({
-    to: input.to,
-    ...bookingConfirmationMail(input),
-    attachment: inviteFile(input, false),
-  });
+/*
+ * Every one through the gate (catalogue `demo.booking_*`): the person booking
+ * is a stranger with no switch, so what can stop these is a bounce or a
+ * complaint on their address — or, from Phase 1, a platform admin.
+ */
+export async function sendBookingConfirmation(
+  db: Db,
+  input: BookingMailInput,
+): Promise<GatedMailOutcome> {
+  const { outcome } = await sendNotificationMail(
+    db,
+    { kind: "demo.booking_confirmed", to: input.to },
+    { ...bookingConfirmationMail(input), attachment: inviteFile(input, false) },
+  );
+  return outcome;
 }
 
-export async function sendBookingCancellation(input: BookingMailInput): Promise<MailOutcome> {
-  return transactionalMailer().send({
-    to: input.to,
-    ...bookingCancellationMail(input),
-    attachment: inviteFile(input, true),
-  });
+export async function sendBookingCancellation(
+  db: Db,
+  input: BookingMailInput,
+): Promise<GatedMailOutcome> {
+  const { outcome } = await sendNotificationMail(
+    db,
+    { kind: "demo.booking_cancelled", to: input.to },
+    { ...bookingCancellationMail(input), attachment: inviteFile(input, true) },
+  );
+  return outcome;
 }
 
 export async function sendBookingReminder(
+  db: Db,
   input: BookingMailInput,
   hoursAhead: 24 | 1,
-): Promise<MailOutcome> {
-  return transactionalMailer().send({ to: input.to, ...bookingReminderMail(input, hoursAhead) });
+  now?: Date,
+): Promise<GatedMailOutcome> {
+  const { outcome } = await sendNotificationMail(
+    db,
+    { kind: "demo.booking_reminder", to: input.to, ...(now === undefined ? {} : { now }) },
+    bookingReminderMail(input, hoursAhead),
+  );
+  return outcome;
 }

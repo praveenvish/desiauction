@@ -2,7 +2,6 @@ import { demoBookings, demoRequests } from "@desiauction/db";
 import { and, eq, gte, isNotNull, isNull, lt } from "drizzle-orm";
 
 import { db } from "../db";
-import { maySend } from "../messaging/consent";
 import { tokenForRequest } from "./demo-booking";
 import { sendBookingReminder } from "./demo-booking-mail";
 
@@ -95,19 +94,10 @@ async function sweepWindow(kind: 24 | 1, now: Date): Promise<SweepResult> {
       continue;
     }
 
-    const decision = await maySend(db, {
-      contact: booking.email,
-      channel: "email",
-      category: "transactional",
-      scope: "demo",
-      now,
-    });
-    if (!decision.send) {
-      refused += 1;
-      continue;
-    }
-
+    // The gate is inside the send (catalogue `demo.booking_reminder`): a
+    // suppressed address comes back "suppressed" and counts as refused below.
     const outcome = await sendBookingReminder(
+      db,
       {
         to: booking.email,
         name: booking.name,
@@ -123,6 +113,7 @@ async function sweepWindow(kind: 24 | 1, now: Date): Promise<SweepResult> {
         sequence: 0,
       },
       kind,
+      now,
     );
     if (outcome === "sent") {
       sent += 1;

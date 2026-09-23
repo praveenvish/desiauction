@@ -26,10 +26,13 @@ import {
   listSecurityEvents,
 } from "../auth/security-events";
 import { resolveOwnerEmail } from "../financial-operations/deps";
-import { orgSwitchesFor, setOrgMessagingSetting, setPreference } from "./consent";
+import { sendDemoRequestMail } from "../marketing/demo-mail";
+import { orgSwitchesFor, setOrgMessagingSetting, setPreference, suppress } from "./consent";
 import { createHttpEmailAdapter, type EmailTransport } from "./email-adapter";
 import { notificationGate } from "./gate";
 import { FINANCE_DOCUMENT_ISSUED, createPersonInAppAdapter } from "./in-app-adapter";
+import { SUPPORT_EMAIL } from "./email-layout";
+import { setTransactionalMailerForTest, type OutgoingMail } from "./transactional-mail";
 
 /**
  * THE GATE'S FOUR GAPS, against a real database (Notification Control Center,
@@ -45,6 +48,7 @@ const PHONE_A = `+9195${RUN}1`;
 const PHONE_B = `+9195${RUN}2`;
 const EMAIL_A = `gate-a-${RUN}@example.com`;
 const EMAIL_B = `gate-b-${RUN}@example.com`;
+const EMAIL_LEAD = `gate-lead-${RUN}@example.com`;
 
 const ownerA = newId();
 const ownerB = newId();
@@ -171,7 +175,9 @@ afterAll(async () => {
   await withTenantDb(handle, { personId: ownerA, orgId }, (tx) =>
     tx.delete(orgMessagingSettings).where(eq(orgMessagingSettings.orgId, orgId)),
   );
-  await db.delete(suppressions).where(inArray(suppressions.contact, [EMAIL_A, EMAIL_B]));
+  await db
+    .delete(suppressions)
+    .where(inArray(suppressions.contact, [EMAIL_A, EMAIL_B, EMAIL_LEAD]));
   await db.delete(paddles).where(eq(paddles.orgId, orgId));
   await db.delete(auctions).where(eq(auctions.orgId, orgId));
   await db.delete(teams).where(eq(teams.orgId, orgId));
@@ -179,6 +185,7 @@ afterAll(async () => {
   await db.delete(organizations).where(eq(organizations.id, orgId));
   await db.delete(consentRecords).where(inArray(consentRecords.personId, [ownerA, ownerB]));
   await db.delete(people).where(inArray(people.id, [ownerA, ownerB]));
+  setTransactionalMailerForTest(null);
   await handle.sql.end({ timeout: 5 });
 });
 
@@ -349,5 +356,40 @@ describe("gap 3 — the club's switch shows what it stops, and stops what it sho
     );
     expect(mail.sentTo).toEqual([]);
     expect(result).toEqual({ ok: false, code: "withheld:org_disabled", retryable: false });
+  });
+});
+
+describe("gap 4 — the direct senders go through the gate too", () => {
+  it("stops mailing a demo requester whose address bounced, and still tells us", async () => {
+    const sent: OutgoingMail[] = [];
+    setTransactionalMailerForTest({
+      send: (mail) => {
+        sent.push(mail);
+        return Promise.resolve("sent");
+      },
+    });
+    const request = {
+      name: "Gate Lead",
+      phone: "+919820000000",
+      email: EMAIL_LEAD,
+      orgName: "Gate Lead Club",
+      sport: "cricket" as const,
+      tournamentSize: "8-16" as const,
+      auctionOn: null,
+      preferredWindow: "weekday-evening" as const,
+      note: null,
+      source: "schedule-demo" as const,
+      requestIp: null,
+    };
+    const first = await sendDemoRequestMail(db, request, newId());
+    expect(first).toEqual({ requester: "sent", founder: "sent" });
+
+    // The provider's bounce webhook suppresses the address (email-adapter.ts).
+    await suppress(db, { contact: EMAIL_LEAD, channel: "email", reason: "bounce" });
+    sent.length = 0;
+    const second = await sendDemoRequestMail(db, request, newId());
+    expect(second.requester, "never mailed again").toBe("suppressed");
+    expect(second.founder, "our own notice is not the stranger's to stop").toBe("sent");
+    expect(sent.map((mail) => mail.to)).toEqual([SUPPORT_EMAIL]);
   });
 });

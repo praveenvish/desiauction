@@ -1,6 +1,8 @@
+import type { Db } from "@desiauction/db";
+
 import { env } from "../../env";
 import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
-import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
+import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
 import type { ValidDemoRequest } from "./demo-requests";
 
 /**
@@ -109,6 +111,7 @@ export function founderNotification(
  * is the one printed on every public page.
  */
 export async function sendDemoRequestMail(
+  db: Db,
   request: ValidDemoRequest,
   requestId: string,
   options: {
@@ -119,20 +122,31 @@ export async function sendDemoRequestMail(
      */
     acknowledge?: boolean;
   } = {},
-): Promise<{ requester: MailOutcome | "no-address" | "capped"; founder: MailOutcome }> {
-  const mailer = transactionalMailer();
-
-  const requesterOutcome: MailOutcome | "no-address" | "capped" =
+): Promise<{
+  requester: GatedMailOutcome | "no-address" | "capped";
+  founder: GatedMailOutcome;
+}> {
+  // Through the gate: a requester whose address bounced or complained (the
+  // suppression list) is not mailed again, and there is no switch of theirs
+  // to read — they are a stranger with no account (catalogue `demo.*`).
+  const requesterOutcome: GatedMailOutcome | "no-address" | "capped" =
     request.email === null
       ? "no-address"
       : options.acknowledge === false
         ? "capped"
-        : await mailer.send({ to: request.email, ...requesterAcknowledgement(request) });
+        : (
+            await sendNotificationMail(
+              db,
+              { kind: "demo.request_received", to: request.email },
+              requesterAcknowledgement(request),
+            )
+          ).outcome;
 
-  const founderOutcome = await mailer.send({
-    to: SUPPORT_EMAIL,
-    ...founderNotification(request, requestId),
-  });
+  const { outcome: founderOutcome } = await sendNotificationMail(
+    db,
+    { kind: "staff.demo_request", to: SUPPORT_EMAIL },
+    founderNotification(request, requestId),
+  );
 
   return { requester: requesterOutcome, founder: founderOutcome };
 }

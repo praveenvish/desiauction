@@ -87,7 +87,7 @@ export async function submitReviewAction(
   if (result.firstTime) {
     const state = await reviewPageState(db, token);
     const name = state.kind === "open" ? state.personName : null;
-    const outcome = await sendReviewArrived(validated.value, name);
+    const outcome = await sendReviewArrived(db, validated.value, name);
     if (outcome === "failed") {
       logger().error({ reviewId: result.reviewId }, "reviews.arrived_mail_failed");
     }

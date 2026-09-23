@@ -2,8 +2,7 @@ import { newId, reviewReports, reviewRequests, reviews } from "@desiauction/db";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import { db, systemDb } from "../db";
-import { maySend } from "../messaging/consent";
-import { transactionalMailer } from "../messaging/transactional-mail";
+import { sendNotificationMail } from "../messaging/notify";
 import { seasonAskMail } from "./review-mail";
 import { ageOn, askForSeasonReview, isKnownMinor, markAskSent, type SeasonRole } from "./reviews";
 
@@ -195,7 +194,6 @@ export async function askSeason(
   const now = input.now ?? new Date();
   const budget = input.budget ?? Number.POSITIVE_INFINITY;
   const participants = await unaskedParticipants(season.id, input.roles);
-  const mailer = transactionalMailer();
   let asked = 0;
   let mailed = 0;
   let optedOut = 0;
@@ -223,28 +221,28 @@ export async function askSeason(
       continue;
     }
     asked += 1;
-    const decision = await maySend(db, {
-      contact: participant.email,
-      channel: "email",
-      category: "transactional",
-      scope: "feedback",
-      personId: participant.personId,
-      now,
-    });
-    if (!decision.send) {
-      optedOut += 1;
-      continue;
-    }
-    const outcome = await mailer.send({
-      to: participant.email,
-      ...seasonAskMail({
+    // No `orgId`: the catalogue keeps season asks off the club's switches
+    // (this reads on the bare pool, where a club's switch is invisible).
+    const { outcome } = await sendNotificationMail(
+      db,
+      {
+        kind: "review.season_ask",
+        to: participant.email,
+        personId: participant.personId,
+        now,
+      },
+      seasonAskMail({
         name: participant.name,
         seasonName: season.name,
         orgName: season.orgName,
         role: participant.role,
         link: ask.link,
       }),
-    });
+    );
+    if (outcome === "suppressed") {
+      optedOut += 1;
+      continue;
+    }
     if (outcome === "sent") {
       await markAskSent(db, ask.requestId, participant.email, now);
       mailed += 1;
