@@ -25,7 +25,7 @@ import { resolveMemberCompetition } from "../competition/resolve";
 import { dbHandle } from "../db";
 import { featureEnabled } from "../feature-settings";
 import { storage } from "../media";
-import { announceAuctionOutcomes } from "./auction-notify";
+import { completeAuctionOnce } from "./auction-notify";
 import { isSeasonAuctioneer, lockSeasonAppointments } from "./auctioneers";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
 import {
@@ -641,31 +641,21 @@ export async function submitAuctionCommand(
       manage: gate.canManage,
       payload,
     });
+  if (type === "CompleteAuction") {
+    return completeAuctionOnce(
+      {
+        personId: gate.personId,
+        orgId: gate.competition.orgId,
+        auctionId: gate.auction.id,
+        competition: { id: gate.competition.id, name: gate.competition.name },
+      },
+      send,
+      (ack) => ack.accepted,
+    );
+  }
   const ack =
     type === "IssuePaddle"
       ? await issueUnlessAuctioneer(gate, commandId, payload, send)
       : await send();
-  /*
-   * THE ONE MESSAGE THE PLAYER WAS NEVER SENT.
-   *
-   * Announced only on an ACCEPTED completion, and only from here: the engine
-   * owns the auction but cannot reach the messaging adapters (`apps/*` may not
-   * import `apps/*`), and this is the single path a completion takes. A refused
-   * command must announce nothing — a short-squad close that DA-06 rejects has
-   * not ended anybody's night.
-   *
-   * Awaited rather than fired and forgotten, so the conductor's screen does not
-   * refresh into a finished auction before the inbox rows exist; it is bounded
-   * by one query plus a row per player, and it swallows its own failures so a
-   * completed auction can never be undone by a notification.
-   */
-  if (type === "CompleteAuction" && ack.accepted) {
-    await announceAuctionOutcomes({
-      personId: gate.personId,
-      orgId: gate.competition.orgId,
-      auctionId: gate.auction.id,
-      competition: { id: gate.competition.id, name: gate.competition.name },
-    });
-  }
   return ack;
 }

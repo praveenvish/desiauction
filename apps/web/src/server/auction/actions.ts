@@ -51,6 +51,7 @@ import {
   type LotMedia,
 } from "./live-summary";
 import { storage } from "../media";
+import { completeAuctionOnce } from "./auction-notify";
 import { isSeasonAuctioneer } from "./auctioneers";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
 import { auctionOverview, type AuctionOverview } from "./auction-overview";
@@ -649,6 +650,38 @@ async function guardFailureDetail(slug: string, command: string): Promise<string
   return "The auction isn't ready for that yet.";
 }
 
+/**
+ * "Close auction" from the dashboard. It sent CompleteAuction and announced
+ * nothing, so a night closed from here — rather than from the live room —
+ * never told a single player what happened to them. Both paths now go through
+ * completeAuctionOnce, which also keeps a retry from announcing twice.
+ */
+async function completeFromDashboard(
+  slug: string,
+  payload: Record<string, unknown>,
+): Promise<Awaited<ReturnType<typeof conductCommand>>> {
+  const gate = await conductGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const auction = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    requireAuction(db, gate.competition.id),
+  );
+  if (auction === null) {
+    return { ok: false, error: "Create the auction first." };
+  }
+  return completeAuctionOnce(
+    {
+      personId: gate.personId,
+      orgId: gate.competition.orgId,
+      auctionId: auction.id,
+      competition: { id: gate.competition.id, name: gate.competition.name },
+    },
+    () => conductCommand(slug, "CompleteAuction", payload),
+    (result) => result.ok,
+  );
+}
+
 export async function auctionLifecycleAction(
   slug: string,
   command: string,
@@ -680,7 +713,11 @@ export async function auctionLifecycleAction(
       };
     }
   }
-  const result = await conductCommand(slug, type, reason === undefined ? {} : { reason });
+  const payload = reason === undefined ? {} : { reason };
+  const result =
+    type === "CompleteAuction"
+      ? await completeFromDashboard(slug, payload)
+      : await conductCommand(slug, type, payload);
   if (!result.ok) {
     // DA-25: "check paddles, the queue, and unresolved lots" named all three
     // possibilities and none of the actual cause. The readiness numbers are
