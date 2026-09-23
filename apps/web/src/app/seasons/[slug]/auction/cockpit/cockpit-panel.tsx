@@ -10,6 +10,7 @@ import {
   resolveKeyDown,
   resolveKeyUp,
 } from "../../../../../components/auction/cockpit-keys";
+import { lotsNeedingResolution } from "../../../../../components/auction/needs-resolution";
 import { HashTabs } from "../../../../../components/hash-tabs/hash-tabs";
 import { formatDateTime } from "../../../../../lib/format-date";
 import { lotSeed } from "../../../../../lib/player-seed";
@@ -316,6 +317,12 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
    */
   const claimedPaddles = (snapshot?.paddles ?? []).filter((paddle) => !paddle.released);
   const nextLot = queue[0] ?? null;
+  // Reconciled with the socket so it moves on the same frame as the queue —
+  // see needs-resolution.ts for the double listing this used to show.
+  const needsResolution = useMemo(
+    () => lotsNeedingResolution(view.view.lots, snapshot),
+    [view.view.lots, snapshot],
+  );
 
   /**
    * v1.1 G1 — page-level keyboard control. Every guard lives in the pure
@@ -710,7 +717,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                 ))}
               </ol>
             )}
-            {view.view.lotStats.frozen > 0 || view.view.lotStats.unsold > 0 ? (
+            {needsResolution.length > 0 ? (
               <>
                 <h2>Needs resolution</h2>
                 <p className="competitions-hint" data-testid="frozen-lot-hint">
@@ -739,35 +746,33 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                   </p>
                 ) : null}
                 <ol className="cockpit-queue">
-                  {view.view.lots
-                    .filter((entry) => entry.status === "frozen" || entry.status === "unsold")
-                    .map((entry) => (
-                      <li key={entry.id} data-testid={`resolve-${entry.lotNumber}`}>
-                        <Badge tone="warning">{entry.lotNumber}</Badge>
-                        <PlayerImage
-                          name={entry.playerName ?? "Unnamed"}
-                          seed={lotSeed(entry.id, view.lotMedia)}
-                          src={view.lotMedia[entry.id]?.photoUrl}
+                  {needsResolution.map((entry) => (
+                    <li key={entry.id} data-testid={`resolve-${entry.lotNumber}`}>
+                      <Badge tone="warning">{entry.lotNumber}</Badge>
+                      <PlayerImage
+                        name={entry.playerName ?? "Unnamed"}
+                        seed={lotSeed(entry.id, view.lotMedia)}
+                        src={view.lotMedia[entry.id]?.photoUrl}
+                        size="sm"
+                        shape="round"
+                        decorative
+                      />
+                      <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
+                      <span className="competitions-hint">{entry.status}</span>
+                      <span className="queue-actions">
+                        <Button
                           size="sm"
-                          shape="round"
-                          decorative
-                        />
-                        <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
-                        <span className="competitions-hint">{entry.status}</span>
-                        <span className="queue-actions">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() =>
-                              void send(
-                                `requeue-${entry.id}`,
-                                "RequeueLot",
-                                { lotId: entry.id },
-                                `${entry.lotNumber} requeued`,
-                              )
-                            }
-                            loading={pending === `requeue-${entry.id}`}
-                            /* `finished` for the same reason "Invite owner"
+                          variant="secondary"
+                          onClick={() =>
+                            void send(
+                              `requeue-${entry.id}`,
+                              "RequeueLot",
+                              { lotId: entry.id },
+                              `${entry.lotNumber} requeued`,
+                            )
+                          }
+                          loading={pending === `requeue-${entry.id}`}
+                          /* `finished` for the same reason "Invite owner"
                                carries it: the control was offered on a
                                completed auction, directly under a banner
                                saying nothing here can be opened or undone, and
@@ -776,33 +781,33 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                the refusal never reached the screen, so the
                                conductor's only evidence was a button that did
                                not respond. */
+                          disabled={stale || finished}
+                          data-testid={`requeue-${entry.lotNumber}`}
+                        >
+                          Requeue
+                        </Button>
+                        {entry.status === "frozen" ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              void send(
+                                `withdraw-${entry.id}`,
+                                "WithdrawLot",
+                                { lotId: entry.id },
+                                `${entry.lotNumber} withdrawn`,
+                              )
+                            }
+                            loading={pending === `withdraw-${entry.id}`}
                             disabled={stale || finished}
-                            data-testid={`requeue-${entry.lotNumber}`}
+                            data-testid={`withdraw-frozen-${entry.lotNumber}`}
                           >
-                            Requeue
+                            Withdraw
                           </Button>
-                          {entry.status === "frozen" ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                void send(
-                                  `withdraw-${entry.id}`,
-                                  "WithdrawLot",
-                                  { lotId: entry.id },
-                                  `${entry.lotNumber} withdrawn`,
-                                )
-                              }
-                              loading={pending === `withdraw-${entry.id}`}
-                              disabled={stale || finished}
-                              data-testid={`withdraw-frozen-${entry.lotNumber}`}
-                            >
-                              Withdraw
-                            </Button>
-                          ) : null}
-                        </span>
-                      </li>
-                    ))}
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
                 </ol>
               </>
             ) : null}
