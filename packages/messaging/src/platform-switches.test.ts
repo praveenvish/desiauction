@@ -2,7 +2,6 @@ import type { Db } from "@desiauction/db";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { NOTIFICATIONS, notificationOf } from "./catalogue";
-import { notConfiguredReason } from "./delivery-readiness";
 import {
   CATALOGUE_DEFAULTS,
   PLATFORM_SWITCH_TTL_MS,
@@ -15,13 +14,12 @@ import {
   type PlatformSwitches,
   type SwitchRow,
 } from "./platform-switches";
-import { nextKindStates, type KindState } from "./platform-switch-writer";
 
 /*
  * The admin layer's rules, without a database: the resolution over a snapshot,
  * the validation every change passes, the restrict-only overrides, and the
  * cache the gate reads through. The same rules against Postgres (the CHECKs,
- * the audit, the outbox) are notification-switches.regression.test.ts.
+ * the audit, the outbox) are apps/web notification-switches.regression.test.ts.
  */
 
 function row(kind: string, channel: SwitchRow["channel"], over: Partial<SwitchRow>): SwitchRow {
@@ -215,43 +213,6 @@ describe("refuseChange — what an admin may change", () => {
   });
 });
 
-describe("nextKindStates — TRUE gives the catalogue back, it never stores TRUE", () => {
-  const current: KindState[] = [
-    {
-      kind: "auction.sold",
-      channel: "email",
-      enabled: true,
-      personControllable: false,
-      orgControllable: null,
-      reason: null,
-    },
-  ];
-
-  it("restores NULL for true and stores FALSE for false", () => {
-    expect(
-      nextKindStates({ type: "control", kind: "auction.sold", person: true }, current)[0],
-    ).toMatchObject({ personControllable: null, orgControllable: null });
-    expect(
-      nextKindStates({ type: "control", kind: "auction.sold", org: false }, current)[0],
-    ).toMatchObject({ personControllable: false, orgControllable: false });
-  });
-
-  it("a switch change keeps controllability and records the trimmed reason", () => {
-    expect(
-      nextKindStates(
-        {
-          type: "switch",
-          kind: "auction.sold",
-          channel: "email",
-          enabled: false,
-          reason: "  paused  ",
-        },
-        current,
-      )[0],
-    ).toMatchObject({ enabled: false, reason: "paused", personControllable: false });
-  });
-});
-
 describe("the gate's cache", () => {
   /** A db whose two selects answer `rows`, counting how often it is read. */
   function countingDb(rows: () => SwitchRow[]): { db: Db; reads: () => number } {
@@ -297,49 +258,5 @@ describe("the gate's cache", () => {
 
     await platformSwitches(db, t0 + 2 + PLATFORM_SWITCH_TTL_MS);
     expect(reads()).toBe(3);
-  });
-});
-
-describe("notConfiguredReason — the grid's Not configured chip", () => {
-  const sold = notificationOf("auction.sold");
-  const code = notificationOf("auth.phone_code");
-
-  it("in-app always sends; email needs all three provider settings", () => {
-    expect(notConfiguredReason(sold, "in_app", {})).toBeNull();
-    expect(notConfiguredReason(sold, "email", {})).not.toBeNull();
-    expect(
-      notConfiguredReason(sold, "email", {
-        EMAIL_API_ENDPOINT: "https://x",
-        EMAIL_API_KEY: "k",
-        EMAIL_FROM: "a@b.c",
-      }),
-    ).toBeNull();
-  });
-
-  it("WhatsApp needs the account AND this kind's approved template", () => {
-    const account = { WHATSAPP_PHONE_NUMBER_ID: "1", WHATSAPP_ACCESS_TOKEN: "t" };
-    expect(notConfiguredReason(sold, "whatsapp", {})).toBe("WhatsApp not set up");
-    expect(notConfiguredReason(sold, "whatsapp", account)).toBe("Template not approved");
-    expect(
-      notConfiguredReason(sold, "whatsapp", {
-        ...account,
-        WHATSAPP_TEMPLATE_AUCTION_SOLD: "auction_sold_v1",
-      }),
-    ).toBeNull();
-    expect(
-      notConfiguredReason(code, "whatsapp", {
-        ...account,
-        OTP_PROVIDER: "whatsapp",
-        WHATSAPP_TEMPLATE_NAME: "otp",
-      }),
-    ).toBeNull();
-  });
-
-  it("SMS needs a gateway, or the dev inbox locally", () => {
-    expect(notConfiguredReason(sold, "sms", {})).toBe("SMS gateway not set up");
-    expect(notConfiguredReason(sold, "sms", { OTP_PROVIDER: "dev" })).toBeNull();
-    expect(notConfiguredReason(sold, "sms", { MSG91_AUTH_KEY: "k" })).toBe(
-      "DLT template not registered",
-    );
   });
 });

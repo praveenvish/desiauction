@@ -26,6 +26,16 @@ import { WHATSAPP_TEMPLATES } from "./whatsapp";
  */
 
 const SRC = join(__dirname, "..", "..");
+const REPO = join(SRC, "..", "..", "..");
+
+/**
+ * The gate, the finance delivery adapters and the catalogue moved to
+ * packages/messaging so the finops runner — the process that actually sends
+ * receipts — could use them. A guard that only read apps/web would stop
+ * seeing those senders the moment they moved, so both of the new homes are
+ * read too, keyed by their repo path (apps/web keeps its short keys).
+ */
+const EXTRA_ROOTS = ["packages/messaging/src", "apps/finops-runner/src"];
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -68,12 +78,18 @@ function stripComments(source: string): string {
   return out;
 }
 
-const FILES: ReadonlyMap<string, string> = new Map(
-  sources(SRC).map((file) => [
+const FILES: ReadonlyMap<string, string> = new Map([
+  ...sources(SRC).map((file) => [
     relative(SRC, file).split(sep).join("/"),
     stripComments(readFileSync(file, "utf8")),
   ]),
-);
+  ...EXTRA_ROOTS.flatMap((root) =>
+    sources(join(REPO, root)).map((file) => [
+      relative(REPO, file).split(sep).join("/"),
+      stripComments(readFileSync(file, "utf8")),
+    ]),
+  ),
+] as [string, string][]);
 
 /** Modules that ask the gate before they send — the only ones allowed a raw sender. */
 const GATES = [
@@ -81,7 +97,7 @@ const GATES = [
   "server/messaging/outbox.ts",
   "server/messaging/account-alert.ts",
   "server/auth/otp.ts",
-  "server/financial-operations/deps.ts",
+  "packages/messaging/src/finance-delivery.ts",
 ];
 
 /**
@@ -130,8 +146,8 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
   {
     token: "maySend(",
     allowed: {
-      "server/messaging/consent.ts": "defines the layers",
-      "server/messaging/gate.ts": "the gate",
+      "packages/messaging/src/consent.ts": "defines the layers",
+      "packages/messaging/src/gate.ts": "the gate",
     },
   },
   {
@@ -158,16 +174,24 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
   {
     token: "createHttpEmailAdapter(",
     allowed: {
-      "server/messaging/email-adapter.ts": "defines it",
-      "server/financial-operations/deps.ts": "gate-owning (resolveOwnerEmail)",
+      "packages/messaging/src/email-adapter.ts": "defines it",
+      "packages/messaging/src/finance-delivery.ts": "gate-owning (resolveOwnerEmail)",
     },
   },
   {
     token: "createPersonInAppAdapter(",
     allowed: {
-      "server/messaging/in-app-adapter.ts":
+      "packages/messaging/src/in-app-adapter.ts":
         "defines it; writes the ledger, gated where the inbox reads it (hiddenInboxActions)",
-      "server/financial-operations/deps.ts": "wires it for finops",
+      "packages/messaging/src/finance-delivery.ts": "wires it for finops",
+    },
+  },
+  {
+    token: "financeDeliveryAdapters(",
+    allowed: {
+      "packages/messaging/src/finance-delivery.ts": "defines it; the email half asks the gate",
+      "server/financial-operations/deps.ts": "the web tier's finops deps",
+      "apps/finops-runner/src/delivery.ts": "the runner's finops deps — the tier that sends",
     },
   },
   ...[
@@ -241,7 +265,7 @@ describe("every notification is in the catalogue, and every entry is sent", () =
 
   it("has no entry that no sender names", () => {
     const elsewhere = [...FILES]
-      .filter(([file]) => file !== "server/messaging/catalogue.ts")
+      .filter(([file]) => file !== "packages/messaging/src/catalogue.ts")
       .map(([, text]) => text)
       .join("\n");
     const unused = NOTIFICATIONS.map((entry) => entry.key).filter(

@@ -1,13 +1,15 @@
 import type { Db } from "@desiauction/db";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../messaging/consent", () => ({
+// The gate calls `maySend` inside packages/messaging, so the mock goes on the
+// module it actually imports; the web path below is a re-export of it.
+vi.mock("@desiauction/messaging/consent", () => ({
   maySend: vi.fn(() => Promise.resolve({ send: true })),
 }));
 // The platform's switches, as the catalogue leaves them: this db is a stub
 // with no tables to read (their own rules are platform-switches.test).
-vi.mock("../messaging/platform-switches", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../messaging/platform-switches")>();
+vi.mock("@desiauction/messaging/platform-switches", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@desiauction/messaging/platform-switches")>();
   return {
     ...real,
     platformSwitches: () => Promise.resolve(real.CATALOGUE_DEFAULTS),

@@ -184,6 +184,11 @@ function startFinopsRunner(): void {
       env: {
         ...process.env,
         RUNNER_TICK_MS: "1000",
+        // The runner EMAILS receipts now (it used to write every one to a
+        // file). Pinned to the file outbox exactly as the web server is pinned
+        // to the dev inbox, so a .env.local with live Resend keys does not mail
+        // test addresses on every run.
+        EMAIL_PROVIDER: "dev",
         DATABASE_URL:
           process.env["DATABASE_URL"] ??
           "postgres://desiauction:desiauction@localhost:5433/desiauction",
