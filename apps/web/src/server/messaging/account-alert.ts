@@ -2,13 +2,13 @@ import { people, type Db } from "@desiauction/db";
 import { eq } from "drizzle-orm";
 
 import { notificationGate } from "./gate";
+import { languageFor, templateResolver } from "./provider-templates";
 import { createPlayerSmsSender, type PlayerSmsSender } from "./sms";
 import { renderTemplate, SMS_TEMPLATES } from "./templates";
 import {
   createWhatsAppSender,
   whatsappOptedIn,
   whatsappParams,
-  whatsappTemplateName,
   WhatsAppSendError,
   WHATSAPP_TEMPLATES,
   type PersonalWhatsAppSender,
@@ -77,7 +77,11 @@ export async function sendAccountAlert(
     return "suppressed";
   }
   const whatsapp = channels.whatsapp === undefined ? createWhatsAppSender() : channels.whatsapp;
-  const name = (channels.whatsappTemplate ?? whatsappTemplateName)(input.key);
+  // The admin's mapping, else the env var (provider-templates.ts).
+  const resolver = await templateResolver(db);
+  const name = (channels.whatsappTemplate ?? resolver.whatsappName)(input.key);
+  const approvedIn =
+    channels.whatsappTemplate === undefined ? resolver.whatsappLanguages(input.key) : null;
   if (whatsapp !== null && name !== undefined) {
     const consent = await whatsappOptedIn(db, input.personId);
     if (consent.optedIn) {
@@ -87,18 +91,14 @@ export async function sendAccountAlert(
         .where(eq(people.id, input.personId))
         .limit(1);
       const template = WHATSAPP_TEMPLATES[input.key];
+      const language = languageFor(consent.language, approvedIn);
       try {
         await whatsapp.send(input.phone, {
           name,
           template,
-          params: whatsappParams(
-            template,
-            input.slots,
-            person?.name?.trim() || "there",
-            consent.language,
-          ),
+          params: whatsappParams(template, input.slots, person?.name?.trim() || "there", language),
           imageUrl: null,
-          language: consent.language,
+          language,
         });
         return "whatsapp";
       } catch (error) {
@@ -114,7 +114,7 @@ export async function sendAccountAlert(
   if (input.key !== "security.phone_changed") {
     return "no_text_channel";
   }
-  const sms = channels.sms === undefined ? createPlayerSmsSender(db) : channels.sms;
+  const sms = channels.sms === undefined ? createPlayerSmsSender(db, resolver.smsId) : channels.sms;
   if (sms === null) {
     return "no_text_channel";
   }

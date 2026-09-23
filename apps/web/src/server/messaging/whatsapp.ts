@@ -34,7 +34,8 @@ import { isProviderTimeout, providerFetch } from "./provider-fetch";
  *     opt-in for a business-initiated message, DPDP requires it be
  *     affirmative). Nobody gets WhatsApp without one, security alerts included;
  *   · the platform has the template — Meta approves each one by NAME, and the
- *     approved name is set in the env var the template declares;
+ *     approved name is mapped at /admin/notifications/templates, or else set
+ *     in the env var the template declares (provider-templates.ts);
  *   · the Cloud API account is set up (the sign-in sender's credentials).
  *
  * Otherwise the moment goes by SMS where an SMS gateway exists, and where none
@@ -100,7 +101,8 @@ export interface WhatsAppTemplate {
     readonly url: string;
   };
   /**
-   * The env var holding the name Meta approved this template under. ONE name
+   * The env var holding the name Meta approved this template under — the
+   * FALLBACK since Phase 3: an admin mapping wins (provider-templates.ts). ONE name
    * for both languages: Meta approves a template name with several language
    * versions, and the send picks the version by language code.
    */
@@ -302,14 +304,6 @@ export const WHATSAPP_TEMPLATES: Readonly<Record<WhatsAppKey, WhatsAppTemplate>>
 
 export function isWhatsAppKey(key: string): key is WhatsAppKey {
   return Object.prototype.hasOwnProperty.call(WHATSAPP_TEMPLATES, key);
-}
-
-/** The name Meta approved this template under, when it is configured. */
-export function whatsappTemplateName(key: string): string | undefined {
-  if (!isWhatsAppKey(key)) return undefined;
-  const template = WHATSAPP_TEMPLATES[key];
-  const value: unknown = (env as Readonly<Record<string, unknown>>)[template.nameEnv];
-  return typeof value === "string" && value !== "" ? value : undefined;
 }
 
 /**

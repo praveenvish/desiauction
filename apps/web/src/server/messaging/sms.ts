@@ -199,7 +199,14 @@ export function templateIdFromEnv(variable: string): string | undefined {
  * the day MSG91 is registered alongside WhatsApp sign-in it would never have
  * been used. Neither is true now: configure MSG91 and the fallback returns.
  */
-export function createPlayerSmsSender(db: Db): PlayerSmsSender | null {
+export function createPlayerSmsSender(
+  db: Db,
+  /**
+   * The DLT id for a template key — the admin mapping, else the env var
+   * (provider-templates.ts `templateResolver`). Omitted: the env var alone.
+   */
+  idFor?: (key: string) => string | undefined,
+): PlayerSmsSender | null {
   // Read through `env`, never `process.env` — the validated surface is the only
   // one allowed outside env.ts (IP-0_DESIGN §11). A variable a template names
   // but env.ts does not declare fails templates.test ("names an env var that
@@ -216,7 +223,7 @@ export function createPlayerSmsSender(db: Db): PlayerSmsSender | null {
   // with no id of its own raises a clear, non-retryable error naming the
   // variable, rather than sending against the wrong registration.
   const registered = (template: MessageTemplate): string | undefined =>
-    templateIdFromEnv(template.providerTemplateEnv);
+    idFor === undefined ? templateIdFromEnv(template.providerTemplateEnv) : idFor(template.key);
   const anyRegistered = Object.values(SMS_TEMPLATES).some(
     (template) => (registered(template) ?? "") !== "",
   );

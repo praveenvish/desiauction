@@ -450,7 +450,10 @@ export const providerTemplateMappings = pgTable(
     channel: text("channel", { enum: ["whatsapp", "sms"] }).notNull(),
     providerTemplateName: text("provider_template_name"),
     providerTemplateId: text("provider_template_id"),
-    languages: text("languages").array().notNull().default(sql`ARRAY['en', 'hi']::text[]`),
+    languages: text("languages")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['en', 'hi']::text[]`),
     note: text("note"),
     updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
       onDelete: "restrict",
