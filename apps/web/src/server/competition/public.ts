@@ -18,6 +18,7 @@ import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
+import { containsPattern } from "../../lib/like-pattern";
 
 // PX-5 public reads (PX-1 02 §I thin-wiring class): anonymous, system-pool
 // composites over EXISTING queries. Public exposure is governed by the
@@ -707,9 +708,9 @@ export async function publicCompetitionsDirectory(params: {
     term === undefined || term === ""
       ? undefined
       : or(
-          ilike(competitions.name, `%${term}%`),
-          ilike(competitions.location, `%${term}%`),
-          ilike(organizations.name, `%${term}%`),
+          ilike(competitions.name, containsPattern(term)),
+          ilike(competitions.location, containsPattern(term)),
+          ilike(organizations.name, containsPattern(term)),
         );
   // The search predicate WITHOUT the facet: the chip counts have to describe
   // the facets a visitor could switch TO, not the one already applied.

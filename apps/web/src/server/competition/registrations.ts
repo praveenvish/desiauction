@@ -33,6 +33,7 @@ import { resolveExportColumns, type ExportRows } from "../../lib/export-columns"
 import { preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
+import { containsPattern } from "../../lib/like-pattern";
 
 // Registration reads + creation (IP-3 §4, doc 42). TRIAGE TRANSITIONS live only
 // in registration-aggregate.ts; this module owns ENTRY into the competition —
@@ -793,7 +794,7 @@ function registrationFilters(
   }
   const term = query.search?.trim();
   if (term !== undefined && term !== "") {
-    const like = `%${term}%`;
+    const like = containsPattern(term);
     const clause = or(
       ilike(shownName, like),
       ilike(people.phone, like),
