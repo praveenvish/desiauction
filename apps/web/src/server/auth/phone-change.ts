@@ -1,7 +1,9 @@
 import { normalizePhone } from "@desiauction/core";
-import { people, type Db } from "@desiauction/db";
-import { eq } from "drizzle-orm";
+import { consentRecords, people, type Db } from "@desiauction/db";
+import { and, desc, eq } from "drizzle-orm";
 
+import { recordConsent } from "../messaging/consent";
+import { WHATSAPP_CONSENT_PURPOSE } from "../messaging/whatsapp";
 import { consumeCode, requestOtp } from "./otp";
 import type { OtpSender } from "./otp-sender";
 
@@ -173,6 +175,44 @@ export async function confirmPhoneChange(
     return { ok: false, reason: "taken" };
   }
 
-  await db.update(people).set({ phone }).where(eq(people.id, input.personId));
+  /*
+   * A NEW NUMBER STARTS WITH WHATSAPP OFF (founder decision, 2026-09-23).
+   *
+   * The WhatsApp opt-in was given for the number the person had then. Meta's
+   * policy ties opt-in to the number that receives the messages, and a new
+   * number may be a work phone, a family phone, a handset somebody else reads.
+   * So the change and the withdrawal land together, in one transaction: there
+   * is no moment in which the outbox could send a template to a number nobody
+   * opted in on. The person turns it back on from /account, on the new number.
+   * Written only when the latest answer was yes — a no stays a no without a
+   * second row.
+   */
+  await db.transaction(async (tx) => {
+    await tx.update(people).set({ phone }).where(eq(people.id, input.personId));
+    if (person.phone === phone) {
+      return;
+    }
+    const [latest] = await tx
+      .select({ granted: consentRecords.granted })
+      .from(consentRecords)
+      .where(
+        and(
+          eq(consentRecords.personId, input.personId),
+          eq(consentRecords.purpose, WHATSAPP_CONSENT_PURPOSE),
+        ),
+      )
+      .orderBy(desc(consentRecords.createdAt))
+      .limit(1);
+    if (latest?.granted === true) {
+      await recordConsent(tx, {
+        personId: input.personId,
+        purpose: WHATSAPP_CONSENT_PURPOSE,
+        granted: false,
+        source: "account",
+        // The reason, never the numbers: the evidence outlives both.
+        evidence: { reason: "phone_changed" },
+      });
+    }
+  });
   return { ok: true, previousPhone: person.phone, newPhone: phone };
 }

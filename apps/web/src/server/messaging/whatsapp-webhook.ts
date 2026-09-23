@@ -322,6 +322,25 @@ export const STOP_REPLY =
 export const START_REPLY = "WhatsApp updates from DesiAuction are back on. Reply STOP any time.";
 
 /**
+ * WHAT A WHATSAPP REPLY MEANS — narrower than an SMS reply, on purpose.
+ *
+ * STOP keeps every word the SMS side honours (inbound.ts): withdrawing has to
+ * be as easy as it can be. Turning updates back ON takes the word START and
+ * nothing else (founder decision, 2026-09-23). On WhatsApp people chat — "yes",
+ * "ok, subscribe me to the scores" — and the SMS list's "yes"/"subscribe"/
+ * "resume" would re-enable messages somebody had deliberately stopped, from a
+ * reply that was never meant as consent.
+ */
+export function classifyWhatsAppReply(body: string): InboundIntent {
+  const intent = classifyInbound(body);
+  if (intent !== "start") {
+    return intent;
+  }
+  const first = body.trim().toLowerCase().split(/\s+/)[0] ?? "";
+  return first.replace(/[^a-z]/g, "") === "start" ? "start" : "unknown";
+}
+
+/**
  * Record one inbound message, and act on it the FIRST time only.
  *
  * The `whatsapp_inbound` row is both the record and the lock: its primary key
@@ -335,7 +354,7 @@ export const START_REPLY = "WhatsApp updates from DesiAuction are back on. Reply
  */
 export async function recordInbound(db: Db, message: InboundMessage): Promise<InboundOutcome> {
   const phone = normaliseWhatsAppNumber(message.from);
-  const intent = classifyInbound(message.text);
+  const intent = classifyWhatsAppReply(message.text);
   if (phone === null) {
     return { first: false, intent, consentRecorded: false, reply: null };
   }
