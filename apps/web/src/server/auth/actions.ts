@@ -628,6 +628,12 @@ export async function removePasskeyAction(passkeyId: string): Promise<ActionResu
   if (session === null) {
     return { ok: false, error: SESSION_LAPSED };
   }
+  // Step-up, like enrolling one. Removing the owner's passkey is how a stolen
+  // session takes away the one credential it does not hold — the recovery
+  // step-up PA-1R 5.1 leans on — so it is a credential change like any other.
+  if (!signedInRecently(session)) {
+    return { ok: false, error: SIGN_IN_AGAIN };
+  }
   try {
     await removePasskey(db, session.personId, passkeyId);
   } catch {
