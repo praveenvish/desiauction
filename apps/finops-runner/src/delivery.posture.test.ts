@@ -6,6 +6,7 @@ import {
   createDb,
   newId,
   notificationPreferences,
+  notificationTemplates,
   orgMessagingSettings,
   organizations,
   paddles,
@@ -15,6 +16,7 @@ import {
 } from "@desiauction/db";
 import { finopsDeps, type FinopsDeps } from "@desiauction/financial-operations/server";
 import type { EmailTransport } from "@desiauction/messaging/email-adapter";
+import { invalidateTemplates } from "@desiauction/messaging/template-store";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -59,10 +61,14 @@ const orgId = newId();
 const competitionId = newId();
 const auctionId = newId();
 const teamId = newId();
+const templateId = newId();
 
 const sentTo: string[] = [];
+const subjects: string[] = [];
 const transport: EmailTransport = (_url, init) => {
-  sentTo.push(...(JSON.parse(init.body) as { to: string[] }).to);
+  const body = JSON.parse(init.body) as { to: string[]; subject: string };
+  sentTo.push(...body.to);
+  subjects.push(body.subject);
   return Promise.resolve({ status: 202, body: "{}" });
 };
 
@@ -130,6 +136,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const db = owner.db;
+  await db.delete(notificationTemplates).where(eq(notificationTemplates.id, templateId));
   await db.delete(auditLog).where(eq(auditLog.scopeId, personId));
   await db.delete(notificationPreferences).where(eq(notificationPreferences.personId, personId));
   // The owner handle is the superuser locally and in CI, so FORCE RLS does not
@@ -166,6 +173,72 @@ describe("the runner delivers a receipt to the person it is addressed to", () =>
     expect(rows.map((row) => (row.meta as { dispatchId?: string }).dispatchId)).toContain(
       request.dispatchId,
     );
+  });
+
+  it("writes the receipt in the owner's language, with the wording an admin published", async () => {
+    // Read as desiauction_runner in CI (0087 keeps its SELECT on the wording;
+    // the engine's is revoked): a receipt subject the runner could not read
+    // would be an edit that never reached anybody.
+    await owner.db.update(people).set({ language: "hi" }).where(eq(people.id, personId));
+    await owner.db.insert(notificationTemplates).values({
+      id: templateId,
+      kind: "finance.document.issued",
+      channel: "email",
+      language: "hi",
+      version: 1,
+      status: "published",
+      content: {
+        variants: {
+          receipt: {
+            subject: `रसीद ${RUN}`,
+            preheader: "",
+            heading: "",
+            paragraphs: [],
+            after: [],
+            actions: {},
+            footnote: "",
+          },
+          invoice: {
+            subject: "इनवॉइस",
+            preheader: "",
+            heading: "",
+            paragraphs: [],
+            after: [],
+            actions: {},
+            footnote: "",
+          },
+          correction: {
+            subject: "सुधार",
+            preheader: "",
+            heading: "",
+            paragraphs: [],
+            after: [],
+            actions: {},
+            footnote: "",
+          },
+          other: {
+            subject: "दस्तावेज़",
+            preheader: "",
+            heading: "",
+            paragraphs: [],
+            after: [],
+            actions: {},
+            footnote: "",
+          },
+        },
+      },
+      createdBy: personId,
+      publishedBy: personId,
+      publishedAt: new Date(),
+    });
+    invalidateTemplates();
+    subjects.length = 0;
+    const result = await deps.delivery("email")?.send(receipt("email"));
+    expect(result?.ok).toBe(true);
+    expect(subjects).toEqual([`रसीद ${RUN}`]);
+    await owner.db.delete(notificationTemplates).where(eq(notificationTemplates.id, templateId));
+    await owner.db.update(people).set({ language: null }).where(eq(people.id, personId));
+    invalidateTemplates();
   });
 
   it("honours the CLUB's money switch on the runner's service pool", async () => {

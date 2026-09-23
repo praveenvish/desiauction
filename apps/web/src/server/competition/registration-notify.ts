@@ -2,6 +2,8 @@ import type { RejectionReason } from "@desiauction/core";
 import { auditLog, newId, people, registrations, type Db } from "@desiauction/db";
 import { eq, inArray } from "drizzle-orm";
 
+import { messageLanguagesOf } from "@desiauction/messaging/language";
+
 import {
   drainOutbox,
   enqueueMail,
@@ -291,18 +293,29 @@ export async function notifyDecision(
       templateKey: kind,
       slots: body.slots,
     }));
-  const mails: QueuedMail[] = rows.map((row) => ({
-    personId: row.personId,
-    orgId: input.orgId,
-    kind,
-    dedupeKey: keyOf(row.id),
-    ...registrationDecisionMail({
-      name: row.name?.trim() || "there",
-      season: input.competitionName.trim(),
-      decision: input.event,
-      ...(input.event === "reject" ? { reason: REASON_TO_PLAYER[input.reason ?? "other"] } : {}),
-    }),
-  }));
+  const languages = await messageLanguagesOf(
+    db,
+    rows.map((row) => row.personId),
+  );
+  const mails: QueuedMail[] = await Promise.all(
+    rows.map(async (row) => ({
+      personId: row.personId,
+      orgId: input.orgId,
+      kind,
+      dedupeKey: keyOf(row.id),
+      ...(await registrationDecisionMail(
+        {
+          name: row.name?.trim() || "there",
+          season: input.competitionName.trim(),
+          decision: input.event,
+          ...(input.event === "reject"
+            ? { reason: REASON_TO_PLAYER[input.reason ?? "other"] }
+            : {}),
+        },
+        languages.get(row.personId) ?? "en",
+      )),
+    })),
+  );
   // Undefined falls through to the queue's own default, the app pool.
   const outboxDb = channels.outboxDb;
   await enqueueSms(texts, outboxDb);

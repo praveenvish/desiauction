@@ -23,6 +23,7 @@ import { env } from "../../../../env";
 import { currentSession } from "../../../../server/auth/actions";
 import { ownPhotoUrl, playerProfileFor, sportProfileFor } from "../../../../server/player/profile";
 import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
+import { notificationSettings } from "../../../../server/messaging/actions";
 import { publicCompetitionView } from "../../../../server/competition/public";
 import { SHARE_IMAGE_SIZE } from "../../../c/[slug]/share-image-card";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
@@ -296,9 +297,10 @@ export default async function RegisterPage({
   // PI-1: the person-level defaults that prefill "How you play" — from how
   // this person plays THIS season's sport, so a football season offers their
   // football answers and the cricket ones stay where they belong.
-  const [personProfile, sportProfile] = await Promise.all([
+  const [personProfile, sportProfile, settings] = await Promise.all([
     playerProfileFor(session.personId),
     sportProfileFor(session.personId, landing.sport),
+    notificationSettings(),
   ]);
   return (
     <RegisterFrame season={landing.competitionName} meta={meta}>
@@ -322,6 +324,7 @@ export default async function RegisterPage({
           dob: personProfile.dateOfBirth ?? "",
           attributes: sportProfile.attributes,
         }}
+        initialLanguage={settings?.language ?? "en"}
       />
     </RegisterFrame>
   );

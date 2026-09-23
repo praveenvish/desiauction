@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
-import { enqueueMail } from "../messaging/outbox";
+import { enqueueMail, type QueuedMail } from "../messaging/outbox";
 import { purgeSpentSecurityRecords } from "./report-retention";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
@@ -23,7 +23,7 @@ function moment(key: string) {
     subject: "Sold to Cup Kings",
     text: "Cup Kings bought you for Rs 75,000.",
     html: "<p>Cup Kings bought you for Rs 75,000.</p>",
-  };
+  } as QueuedMail;
 }
 
 async function age(key: string, days: number): Promise<void> {

@@ -14,6 +14,8 @@ import {
 } from "@desiauction/db";
 import { and, asc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
+import { messageLanguagesOf } from "@desiauction/messaging/language";
+
 import { env } from "../../env";
 import { shownName } from "../competition/shown-name";
 import type { QueuedMail, QueuedSms } from "../messaging/outbox";
@@ -165,7 +167,14 @@ export async function auctionOutcomeMessages(
 
   const mails: QueuedMail[] = [];
   const texts: QueuedSms[] = [];
+  // Each person's one language (packages/messaging language.ts) — their mail
+  // is written in it; the SMS line stays the registered English text.
+  const languages = await messageLanguagesOf(
+    db,
+    sales.map((sale) => sale.personId),
+  );
   for (const sale of sales) {
+    const language = languages.get(sale.personId) ?? "en";
     const name = sale.personName?.trim() || "there";
     if (sale.status === "sold" && sale.teamId !== null && sale.teamName !== null) {
       const soldPrice = sale.soldPrice ?? 0;
@@ -179,25 +188,28 @@ export async function auctionOutcomeMessages(
         orgId: context.orgId,
         kind: "auction.sold",
         dedupeKey: `auction.sold:${input.auctionId}:${sale.registrationId}`,
-        ...soldMail({
-          name,
-          season: context.season,
-          orgName: context.orgName,
-          teamName: sale.teamName,
-          price: formatPaiseINR(paise(soldPrice)),
-          basePrice: formatPaiseINR(paise(sale.basePrice)),
-          multiple: sale.basePrice > 0 ? soldPrice / sale.basePrice : null,
-          bidders: story.bidders.includes(sale.teamName)
-            ? story.bidders
-            : [...story.bidders, sale.teamName],
-          bidCount: Math.max(story.count, 1),
-          highlight:
-            topPrice !== null && soldPrice === topPrice && topCount === 1
-              ? "You were the most expensive buy of the night"
-              : null,
-          squad: squadOf(sale.teamId),
-          cardUrl: publicCard,
-        }),
+        ...(await soldMail(
+          {
+            name,
+            season: context.season,
+            orgName: context.orgName,
+            teamName: sale.teamName,
+            price: formatPaiseINR(paise(soldPrice)),
+            basePrice: formatPaiseINR(paise(sale.basePrice)),
+            multiple: sale.basePrice > 0 ? soldPrice / sale.basePrice : null,
+            bidders: story.bidders.includes(sale.teamName)
+              ? story.bidders
+              : [...story.bidders, sale.teamName],
+            bidCount: Math.max(story.count, 1),
+            highlight:
+              topPrice !== null && soldPrice === topPrice && topCount === 1
+                ? "You were the most expensive buy of the night"
+                : null,
+            squad: squadOf(sale.teamId),
+            cardUrl: publicCard,
+          },
+          language,
+        )),
       });
       texts.push({
         personId: sale.personId,
@@ -223,7 +235,7 @@ export async function auctionOutcomeMessages(
         orgId: context.orgId,
         kind: "auction.unsold",
         dedupeKey: `auction.unsold:${input.auctionId}:${sale.registrationId}`,
-        ...unsoldMail({ name, season: context.season, orgName: context.orgName }),
+        ...(await unsoldMail({ name, season: context.season, orgName: context.orgName }, language)),
       });
     }
   }
@@ -246,6 +258,10 @@ export async function auctionOutcomeMessages(
         isNull(auctionOwnerInvites.revokedAt),
       ),
     );
+  const ownerLanguages = await messageLanguagesOf(
+    db,
+    owners.flatMap((owner) => (owner.personId === null ? [] : [owner.personId])),
+  );
   for (const owner of owners) {
     if (owner.personId === null) continue;
     const spent = sales
@@ -258,18 +274,21 @@ export async function auctionOutcomeMessages(
       orgId: context.orgId,
       kind: "auction.owner_summary",
       dedupeKey: `auction.owner_summary:${input.auctionId}:${owner.teamId}:${owner.personId}`,
-      ...ownerSummaryMail({
-        name: owner.ownerName?.trim() || "there",
-        season: context.season,
-        teamName: owner.teamName,
-        squad,
-        spent: formatPaiseINR(paise(spent)),
-        purseLeft: formatPaiseINR(paise(Math.max(purse - spent, 0))),
-        squadSize: squad.length,
-        squadMin: config.squadMin ?? 0,
-        squadMax: config.squadMax ?? 0,
-        teamUrl: `${env.PUBLIC_BASE_URL}/seasons/${context.slug}/teams`,
-      }),
+      ...(await ownerSummaryMail(
+        {
+          name: owner.ownerName?.trim() || "there",
+          season: context.season,
+          teamName: owner.teamName,
+          squad,
+          spent: formatPaiseINR(paise(spent)),
+          purseLeft: formatPaiseINR(paise(Math.max(purse - spent, 0))),
+          squadSize: squad.length,
+          squadMin: config.squadMin ?? 0,
+          squadMax: config.squadMax ?? 0,
+          teamUrl: `${env.PUBLIC_BASE_URL}/seasons/${context.slug}/teams`,
+        },
+        ownerLanguages.get(owner.personId) ?? "en",
+      )),
     });
   }
   return { mails, texts };

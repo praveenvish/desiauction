@@ -2,7 +2,7 @@ import { newId, reviewReports, reviewRequests, reviews } from "@desiauction/db";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import { db, systemDb } from "../db";
-import { sendNotificationMail } from "../messaging/notify";
+import { languageForMail, sendNotificationMail } from "../messaging/notify";
 import { seasonAskMail } from "./review-mail";
 import { ageOn, askForSeasonReview, isKnownMinor, markAskSent, type SeasonRole } from "./reviews";
 
@@ -231,13 +231,16 @@ export async function askSeason(
         personId: participant.personId,
         now,
       },
-      seasonAskMail({
-        name: participant.name,
-        seasonName: season.name,
-        orgName: season.orgName,
-        role: participant.role,
-        link: ask.link,
-      }),
+      await seasonAskMail(
+        {
+          name: participant.name,
+          seasonName: season.name,
+          orgName: season.orgName,
+          role: participant.role,
+          link: ask.link,
+        },
+        await languageForMail(db, { personId: participant.personId }),
+      ),
     );
     if (outcome === "suppressed") {
       optedOut += 1;

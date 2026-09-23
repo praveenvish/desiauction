@@ -603,6 +603,13 @@
       "when": 1791129600000,
       "tag": "0086_notification_switches",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1791216000000,
+      "tag": "0087_notification_templates",
+      "breakpoints": true
     }
   ]
 }

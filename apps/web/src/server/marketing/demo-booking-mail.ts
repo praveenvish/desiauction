@@ -1,8 +1,9 @@
 import type { Db } from "@desiauction/db";
 
 import { env } from "../../env";
-import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
+import { SUPPORT_EMAIL } from "../messaging/email-layout";
 import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
+import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import { buildInvite, inviteUid } from "./demo-ics";
 import { IST_OFFSET_MINUTES, dayLabel, istDayKey, timeLabel } from "./demo-slots";
 
@@ -59,47 +60,37 @@ function bookingUrl(token: string): string {
 }
 
 /** A composed mail: what the preview gallery renders and the senders send. */
-export interface ComposedMail {
-  readonly subject: string;
-  readonly text: string;
-  readonly html: string;
-}
+export type ComposedMail = NotificationMail;
 
-export function bookingConfirmationMail(input: BookingMailInput): ComposedMail {
+/*
+ * The words are the template registry's (`demo.booking_*`); the booking table
+ * and the button's destination are ours. English: the person booking is a
+ * stranger with no account, so there is no language of theirs to read.
+ */
+export function bookingConfirmationMail(input: BookingMailInput): Promise<ComposedMail> {
   const when = whenWords(input.slotStart);
-  return {
-    subject: `Your DesiAuction demo — ${when}`,
-    ...renderEmail({
-      preheader: `You're booked in for ${when}. The calendar invite is attached.`,
-      heading: "Your demo is booked",
-      paragraphs: ["Hello,", `You're booked in for ${when}.`],
+  return renderNotificationEmail(
+    "demo.booking_confirmed",
+    "en",
+    { when },
+    {
       details: [
         ["When", when],
         ["How", "We call the number you gave us"],
         ["Length", "About twenty minutes"],
       ],
-      after: [
-        "We'll walk through a real auction end to end — squads and purses, the bidding, the gavel, and the settlement afterwards. The calendar invite is attached.",
-      ],
-      action: { label: "Move or cancel", url: bookingUrl(input.token) },
-      footnote: "You received this because you booked a DesiAuction demo.",
-    }),
-  };
+      action: { id: "manage", url: bookingUrl(input.token) },
+    },
+  );
 }
 
-export function bookingCancellationMail(input: BookingMailInput): ComposedMail {
-  const when = whenWords(input.slotStart);
-  return {
-    subject: `Cancelled: your DesiAuction demo — ${when}`,
-    ...renderEmail({
-      preheader: `The demo on ${when} is cancelled.`,
-      heading: "Your demo is cancelled",
-      paragraphs: ["Hello,", `The demo on ${when} is cancelled and nobody will call.`],
-      action: { label: "Pick another time", url: `${env.PUBLIC_BASE_URL}/schedule-demo` },
-      footnote:
-        "You received this because a DesiAuction demo booked with this address was cancelled.",
-    }),
-  };
+export function bookingCancellationMail(input: BookingMailInput): Promise<ComposedMail> {
+  return renderNotificationEmail(
+    "demo.booking_cancelled",
+    "en",
+    { when: whenWords(input.slotStart) },
+    { action: { id: "rebook", url: `${env.PUBLIC_BASE_URL}/schedule-demo` } },
+  );
 }
 
 /**
@@ -107,26 +98,19 @@ export function bookingCancellationMail(input: BookingMailInput): ComposedMail {
  * doing something else, and its only job is to put a time and a way out in
  * front of somebody.
  */
-export function bookingReminderMail(input: BookingMailInput, hoursAhead: 24 | 1): ComposedMail {
-  const when = whenWords(input.slotStart);
-  return {
-    subject:
-      hoursAhead === 24
-        ? `Tomorrow: your DesiAuction demo — ${when}`
-        : `In an hour: your DesiAuction demo`,
-    ...renderEmail({
-      preheader: hoursAhead === 24 ? `We're speaking ${when}.` : `We're calling in about an hour.`,
-      heading: hoursAhead === 24 ? "Your demo is tomorrow" : "Your demo is in an hour",
-      paragraphs: [
-        "Hello,",
-        hoursAhead === 24
-          ? `A reminder that we're speaking ${when}. We'll call the number you gave us.`
-          : `We're calling in about an hour, at ${when}.`,
-      ],
-      action: { label: "Can't make it? Move or cancel", url: bookingUrl(input.token) },
-      footnote: "You received this because you booked a DesiAuction demo.",
-    }),
-  };
+export function bookingReminderMail(
+  input: BookingMailInput,
+  hoursAhead: 24 | 1,
+): Promise<ComposedMail> {
+  return renderNotificationEmail(
+    "demo.booking_reminder",
+    "en",
+    { when: whenWords(input.slotStart) },
+    {
+      variant: hoursAhead === 24 ? "day_before" : "hour_before",
+      action: { id: "manage", url: bookingUrl(input.token) },
+    },
+  );
 }
 
 function inviteFile(input: BookingMailInput, cancelled: boolean) {
@@ -163,7 +147,7 @@ export async function sendBookingConfirmation(
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "demo.booking_confirmed", to: input.to },
-    { ...bookingConfirmationMail(input), attachment: inviteFile(input, false) },
+    { ...(await bookingConfirmationMail(input)), attachment: inviteFile(input, false) },
   );
   return outcome;
 }
@@ -175,7 +159,7 @@ export async function sendBookingCancellation(
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "demo.booking_cancelled", to: input.to },
-    { ...bookingCancellationMail(input), attachment: inviteFile(input, true) },
+    { ...(await bookingCancellationMail(input)), attachment: inviteFile(input, true) },
   );
   return outcome;
 }
@@ -189,7 +173,7 @@ export async function sendBookingReminder(
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "demo.booking_reminder", to: input.to, ...(now === undefined ? {} : { now }) },
-    bookingReminderMail(input, hoursAhead),
+    await bookingReminderMail(input, hoursAhead),
   );
   return outcome;
 }

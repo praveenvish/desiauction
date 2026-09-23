@@ -9,6 +9,7 @@ import {
   type WhatsAppLanguage,
 } from "../../lib/whatsapp-consent";
 import {
+  setMessageLanguageAction,
   setNotificationPreferenceAction,
   setWhatsappPreferenceAction,
   type NotificationSettings,
@@ -89,15 +90,15 @@ export function NotificationSwitches({ settings }: { settings: NotificationSetti
  * so it starts off, and turning it on is recorded with the words shown.
  * Stopping a topic above still stops it here too.
  *
- * The language rides with it, shown only once it is on: which version of each
- * message they get. A radio group, not a select — two options, both visible,
- * each named in its own script so a Hindi reader finds हिन्दी without reading
- * English first. Changing it is a new consent record naming the language.
+ * The language it comes in is no longer chosen here: it is the person's ONE
+ * language (`MessageLanguageChoice` below), which their email follows too. The
+ * consent record still names the language current when they said yes — what
+ * they agreed to receive, in the words they would receive it.
  */
 export function WhatsAppSwitch({
   optedIn,
   label,
-  language: initialLanguage,
+  language,
 }: {
   optedIn: boolean;
   label: string;
@@ -106,7 +107,6 @@ export function WhatsAppSwitch({
   const announce = useAnnouncer();
   const [pending, startTransition] = useTransition();
   const [on, setOn] = useState(optedIn);
-  const [language, setLanguage] = useState<WhatsAppLanguage>(initialLanguage);
   const [error, setError] = useState<string | null>(null);
 
   const toggle = (next: boolean) => {
@@ -119,21 +119,6 @@ export function WhatsAppSwitch({
         return;
       }
       setOn(!next);
-      setError(result.error ?? "That did not save. Try again.");
-    });
-  };
-
-  const choose = (next: WhatsAppLanguage) => {
-    const previous = language;
-    setLanguage(next);
-    setError(null);
-    startTransition(async () => {
-      const result = await setWhatsappPreferenceAction(true, next);
-      if (result.ok) {
-        announce(`WhatsApp messages in ${WHATSAPP_LANGUAGE_LABELS[next].label}`, "polite");
-        return;
-      }
-      setLanguage(previous);
       setError(result.error ?? "That did not save. Try again.");
     });
   };
@@ -158,29 +143,70 @@ export function WhatsAppSwitch({
           <span className="notify-switch-detail">{label}</span>
         </span>
       </label>
-      {on ? (
-        <fieldset className="notify-language" data-testid="whatsapp-language">
-          <legend className="notify-language-legend">Language for WhatsApp messages</legend>
-          <div className="notify-language-options">
-            {WHATSAPP_LANGUAGES.map((option) => (
-              <label key={option} className="notify-language-option" lang={option}>
-                <input
-                  type="radio"
-                  name="whatsapp-language"
-                  value={option}
-                  checked={language === option}
-                  disabled={pending}
-                  data-testid={`whatsapp-language-${option}`}
-                  onChange={() => {
-                    choose(option);
-                  }}
-                />
-                <span>{WHATSAPP_LANGUAGE_LABELS[option].label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+      {error !== null ? (
+        <p role="alert" className="notify-error">
+          {error}
+        </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * LANGUAGE FOR MESSAGES — one choice, for email and WhatsApp alike (founder
+ * decision, 2026-09-23). A radio group, not a select: two options, both
+ * visible, each named in its own script so a Hindi reader finds हिन्दी without
+ * reading English first. Always shown — it decides the email too, which
+ * everybody with an address gets, WhatsApp or not.
+ *
+ * The test ids are the ones the WhatsApp-only radio had, so anything that
+ * drove that one drives this.
+ */
+export function MessageLanguageChoice({ language: initial }: { language: WhatsAppLanguage }) {
+  const announce = useAnnouncer();
+  const [pending, startTransition] = useTransition();
+  const [language, setLanguage] = useState<WhatsAppLanguage>(initial);
+  const [error, setError] = useState<string | null>(null);
+
+  const choose = (next: WhatsAppLanguage) => {
+    const previous = language;
+    setLanguage(next);
+    setError(null);
+    startTransition(async () => {
+      const result = await setMessageLanguageAction(next);
+      if (result.ok) {
+        announce(`Messages in ${WHATSAPP_LANGUAGE_LABELS[next].label}`, "polite");
+        return;
+      }
+      setLanguage(previous);
+      setError(result.error ?? "That did not save. Try again.");
+    });
+  };
+
+  return (
+    <div className="notify-switches" id="message-language">
+      <fieldset className="notify-language" data-testid="whatsapp-language">
+        <legend className="notify-language-legend">Language for messages</legend>
+        <p className="notify-switch-detail">Emails and WhatsApp messages come in this language.</p>
+        <div className="notify-language-options">
+          {WHATSAPP_LANGUAGES.map((option) => (
+            <label key={option} className="notify-language-option" lang={option}>
+              <input
+                type="radio"
+                name="message-language"
+                value={option}
+                checked={language === option}
+                disabled={pending}
+                data-testid={`whatsapp-language-${option}`}
+                onChange={() => {
+                  choose(option);
+                }}
+              />
+              <span>{WHATSAPP_LANGUAGE_LABELS[option].label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       {error !== null ? (
         <p role="alert" className="notify-error">
           {error}

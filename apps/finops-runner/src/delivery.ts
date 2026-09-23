@@ -3,6 +3,7 @@ import type { EmailAdapterConfig, EmailTransport } from "@desiauction/messaging/
 import { financeDeliveryAdapters } from "@desiauction/messaging/finance-delivery";
 
 import { mailConfigured, type Env } from "./env";
+import { logger } from "./logger";
 
 /**
  * THE RUNNER'S DELIVERY ADAPTERS — the ones that actually reach a person.
@@ -24,7 +25,8 @@ import { mailConfigured, type Env } from "./env";
  * `db` is the runner's service pool. Its role (desiauction_runner) is BYPASSRLS
  * with SELECT on every table the gate and resolver read (paddles, people,
  * suppressions, notification_preferences, org_messaging_settings,
- * consent_records) and INSERT on audit_log — none of them among the personal
+ * consent_records, the platform switches and email wording of 0086–0087) and
+ * INSERT on audit_log — none of them among the personal
  * tables 0083–0085 revoked. Should any read be refused, the adapter throws,
  * the job retries and then dead-letters: an honest failure, never "delivered".
  */
@@ -51,5 +53,16 @@ export function runnerDelivery(
   return financeDeliveryAdapters(
     db,
     mail === null || transport === undefined ? mail : { ...mail, transport },
+    {
+      // A receipt's subject and opening lines are admin-editable wording
+      // (notification_templates, 0087 — this role keeps SELECT on it). One that
+      // no longer validates goes out in the default, and is said here.
+      onTemplateProblem: (problem) => {
+        logger.error(
+          { kind: problem.kind, language: problem.language, reason: problem.reason },
+          "notification_template.fallback",
+        );
+      },
+    },
   );
 }

@@ -15,6 +15,7 @@ import {
   smallint,
   text,
   timestamp,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -62,6 +63,12 @@ export const people = pgTable("people", {
    * legal only when erased, and an erased row may hold neither.
    */
   erasedAt: ts("erased_at"),
+  /**
+   * THE LANGUAGE WE WRITE TO THEM IN (0087) — email and WhatsApp alike.
+   * NULL = never chosen: the language given with a WhatsApp opt-in still
+   * decides, then English (packages/messaging language.ts).
+   */
+  language: text("language", { enum: ["en", "hi"] }),
 });
 
 /**
@@ -392,6 +399,44 @@ export const notificationChannels = pgTable("notification_channels", {
   }),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
+
+/**
+ * THE PLATFORM'S EMAIL WORDING (0087) — one kind, one language, one version.
+ * No row: the code default (packages/messaging email-template-defaults.ts). At
+ * most one `published` and one `draft` per kind, channel and language (partial
+ * unique indexes in the migration).
+ */
+export const notificationTemplates = pgTable(
+  "notification_templates",
+  {
+    id: id(),
+    kind: text("kind").notNull(),
+    channel: text("channel", { enum: ["email", "in_app"] })
+      .notNull()
+      .default("email"),
+    language: text("language", { enum: ["en", "hi"] }).notNull(),
+    version: integer("version").notNull(),
+    status: text("status", { enum: ["draft", "published", "archived"] }).notNull(),
+    content: jsonb("content").notNull(),
+    note: text("note"),
+    createdBy: char("created_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    publishedBy: char("published_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    publishedAt: ts("published_at"),
+  },
+  (table) => [
+    unique("notification_templates_version_unique").on(
+      table.kind,
+      table.channel,
+      table.language,
+      table.version,
+    ),
+  ],
+);
 
 export const otpCodes = pgTable(
   "otp_codes",

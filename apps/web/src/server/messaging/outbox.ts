@@ -8,6 +8,7 @@ import { isNotificationKind, type NotificationKind } from "./catalogue";
 import { notificationGate, type GateDecision, type GateInput } from "./gate";
 import { platformVerdict } from "./platform-switches";
 import { applyWhatsAppNudge, hasWhatsAppNudge } from "./email-layout";
+import type { NotificationMail } from "./notification-email";
 import { createPlayerSmsSender, SmsSendError, type PlayerSmsSender } from "./sms";
 import { renderTemplate, SMS_TEMPLATES, type TemplateKey } from "./templates";
 import { textFallback, type WhatsAppBlock } from "./text-route";
@@ -54,16 +55,19 @@ import { transactionalMailer, type TransactionalMailer } from "./transactional-m
  * (text-route.ts has every branch).
  */
 
-export interface QueuedMail {
+/**
+ * A mail to queue: the moment, and words that came from the template registry
+ * (`NotificationMail` — nothing else can construct one, so a queued subject
+ * cannot have been written anywhere but notification-email.ts). Rendered in the
+ * person's language when it is queued.
+ */
+export interface QueuedMail extends NotificationMail {
   readonly personId: string;
   readonly orgId: string | null;
   /** What happened — its catalogue entry (`auction.sold`, `team.appointed`, …). */
   readonly kind: NotificationKind;
   /** One per person per moment; a repeat is ignored. */
   readonly dedupeKey: string;
-  readonly subject: string;
-  readonly text: string;
-  readonly html: string;
 }
 
 /** One line of SMS on a registered template (templates.ts). */
@@ -138,7 +142,7 @@ export async function enqueueMail(mails: readonly QueuedMail[], db: Db = appDb):
         dedupeKey: mail.dedupeKey,
         subject: mail.subject,
         bodyText: mail.text,
-        bodyHtml: mail.html,
+        bodyHtml: mail.html ?? "",
       })),
     )
     .onConflictDoNothing({ target: messageOutbox.dedupeKey })

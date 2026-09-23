@@ -51,6 +51,7 @@ import { after } from "next/server";
 import { cache } from "react";
 
 import { auctionOf } from "@desiauction/auction";
+import { setMessageLanguage } from "@desiauction/messaging/language";
 import { recordConsent } from "../messaging/consent";
 import { logger } from "../logger";
 
@@ -1277,6 +1278,13 @@ export async function submitRegistrationAction(
               competition: slug,
               ...(whatsappLanguage === undefined ? {} : { language: whatsappLanguage }),
             });
+            // The language chosen here is the person's ONE language — their
+            // email follows it too (Notification Control Center, Phase 2).
+            // `people` has no RLS; this writes the session's own row, in the
+            // same transaction, so it commits with the registration or not at all.
+            if (whatsappLanguage !== undefined) {
+              await setMessageLanguage(db, session.personId, whatsappLanguage);
+            }
           }
         }
         return entered;

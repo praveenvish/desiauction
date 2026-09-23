@@ -377,6 +377,9 @@ export async function executeErasure(input: {
         photoUploadedAt: null,
         photoConsentAt: null,
         photoConsentVia: null,
+        // The language we wrote to them in (0087): a preference about a person
+        // who is no longer here, so it goes with the rest.
+        language: null,
         erasedAt: new Date(),
       })
       .where(eq(people.id, personId));

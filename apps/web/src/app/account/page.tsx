@@ -32,7 +32,11 @@ import {
 } from "../../server/player/profile";
 import { WHATSAPP_CONSENT_LABEL } from "../../lib/whatsapp-consent";
 import { AccountHero } from "./account-hero";
-import { NotificationSwitches, WhatsAppSwitch } from "./notification-switches";
+import {
+  MessageLanguageChoice,
+  NotificationSwitches,
+  WhatsAppSwitch,
+} from "./notification-switches";
 import { PersonProfilePanel } from "./person-profile-panel";
 import { SportProfiles } from "./sport-profiles";
 import { ErasurePanel } from "./erasure-panel";
@@ -209,9 +213,10 @@ export default async function AccountPage() {
                   <WhatsAppSwitch
                     optedIn={settings.whatsapp}
                     label={WHATSAPP_CONSENT_LABEL}
-                    language={settings.whatsappLanguage}
+                    language={settings.language}
                   />
                 )}
+                {settings === null ? null : <MessageLanguageChoice language={settings.language} />}
                 <p className="acct-fineprint">
                   The big moments — a team buys you, you are named captain, you are in a lineup —
                   always land in <Link href="/inbox">your notifications</Link> too. We never sell

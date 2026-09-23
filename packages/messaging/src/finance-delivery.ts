@@ -3,11 +3,16 @@ import type { DeliveryPort, DispatchChannel } from "@desiauction/financial-opera
 
 import {
   createHttpEmailAdapter,
+  financeDocumentMail,
+  financeVariantFor,
   type EmailAdapterConfig,
   type EmailResolver,
 } from "./email-adapter";
+import { ownHostsFor } from "./email-templates";
 import { notificationGate, type GateReason } from "./gate";
 import { createPersonInAppAdapter, ownersOfRecipient } from "./in-app-adapter";
+import { messageLanguageOf } from "./language";
+import { resolveTemplate, variantOf, type TemplateProblem } from "./template-store";
 import { verifiedEmailOf } from "./verified-email";
 
 /**
@@ -72,11 +77,48 @@ export function resolveOwnerEmail(db: Db): EmailResolver {
         orgId,
       });
       if (decision.send) {
-        return email;
+        // With the person, so the mail is written in their language.
+        return { to: email, personId };
       }
       withheld ??= decision.reason;
     }
     return withheld === null ? null : { withheld };
+  };
+}
+
+export interface FinanceMailOptions {
+  /** PUBLIC_BASE_URL, where the tier has one: a link to it is our own. */
+  readonly publicBaseUrl?: string;
+  /** Told when published wording could not be read or failed validation. */
+  readonly onTemplateProblem?: (problem: TemplateProblem) => void;
+}
+
+/**
+ * THE WORDING OF A DOCUMENT EMAIL (Notification Control Center, Phase 2): the
+ * owner's language, the published subject and opening paragraphs for this
+ * document type if an admin wrote any, the code default otherwise — and then
+ * the certified document text, whole, which no template can touch.
+ *
+ * Why the runner reads `notification_templates` at all (0087 keeps its
+ * SELECT): it is the process that sends receipts, so an edited receipt subject
+ * that only the web tier could see would be an edit that never reached anyone.
+ */
+export function composeFinanceMail(db: Db, options: FinanceMailOptions = {}) {
+  const ownHosts = ownHostsFor(options.publicBaseUrl);
+  return async (
+    request: { readonly templateId: string; readonly body: string },
+    recipient: { readonly personId: string | null },
+  ): Promise<{ subject: string; text: string }> => {
+    const language =
+      recipient.personId === null ? "en" : await messageLanguageOf(db, recipient.personId);
+    const resolved = await resolveTemplate(db, "finance.document.issued", language, {
+      ownHosts,
+      ...(options.onTemplateProblem === undefined ? {} : { onProblem: options.onTemplateProblem }),
+    });
+    return financeDocumentMail(
+      variantOf(resolved, financeVariantFor(request.templateId)),
+      request.body,
+    );
   };
 }
 
@@ -95,9 +137,17 @@ export function resolveOwnerEmail(db: Db): EmailResolver {
 export function financeDeliveryAdapters(
   db: Db,
   mail: EmailAdapterConfig | null,
+  options: FinanceMailOptions = {},
 ): Partial<Record<DispatchChannel, DeliveryPort>> {
   return {
     "in-app": createPersonInAppAdapter(db),
-    ...(mail === null ? {} : { email: createHttpEmailAdapter(mail, resolveOwnerEmail(db)) }),
+    ...(mail === null
+      ? {}
+      : {
+          email: createHttpEmailAdapter(
+            { compose: composeFinanceMail(db, options), ...mail },
+            resolveOwnerEmail(db),
+          ),
+        }),
   };
 }

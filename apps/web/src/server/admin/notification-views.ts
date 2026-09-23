@@ -27,6 +27,7 @@ import {
   type NotificationAuditMeta,
 } from "../messaging/platform-switch-writer";
 import { platformAdminGate } from "./authz";
+import { wordingSummaries, type WordingSummary } from "./template-views";
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "./capabilities";
 
 /**
@@ -124,6 +125,8 @@ export interface RecentChange {
 }
 
 export interface NotificationCenter {
+  /** Each email kind's wording: what goes out in each language, and the editor's link. */
+  readonly wording: Readonly<Record<string, WordingSummary>>;
   readonly channels: readonly ChannelSwitchView[];
   readonly groups: readonly GridGroup[];
   readonly recent: readonly RecentChange[];
@@ -360,6 +363,7 @@ export async function notificationControlCenter(
   });
 
   return {
+    wording: await wordingSummaries(db),
     channels: CHANNELS.map((channel) => {
       const row = snapshot.channels.get(channel);
       return {

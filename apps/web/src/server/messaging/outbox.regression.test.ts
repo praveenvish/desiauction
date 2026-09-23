@@ -52,7 +52,7 @@ function mail(personId: string, key: string): QueuedMail {
     subject: "Congratulations",
     text: "You were bought.",
     html: "<p>You were bought.</p>",
-  };
+  } as QueuedMail;
 }
 
 function mailer(outcome: MailOutcome): TransactionalMailer & { sent: OutgoingMail[] } {

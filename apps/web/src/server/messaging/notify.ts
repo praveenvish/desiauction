@@ -1,8 +1,13 @@
-import type { Db } from "@desiauction/db";
+import { people, type Db } from "@desiauction/db";
+import type { MessageLanguage } from "@desiauction/messaging/email-templates";
+import { messageLanguageOf } from "@desiauction/messaging/language";
+import { and, eq, isNotNull } from "drizzle-orm";
 
 import { createCodeMailer, type CodeMailPurpose } from "../auth/email-sender";
+import { logger } from "../logger";
 import type { NotificationKind } from "./catalogue";
 import { notificationGate, type GateDecision } from "./gate";
+import type { NotificationMail } from "./notification-email";
 import {
   transactionalMailer,
   type MailOutcome,
@@ -45,7 +50,11 @@ export interface MailTarget {
 export async function sendNotificationMail(
   db: Db,
   target: MailTarget,
-  mail: Omit<OutgoingMail, "to">,
+  /**
+   * Words from the template registry (`renderNotificationEmail`), and at most
+   * an attachment — never a subject written by the caller.
+   */
+  mail: NotificationMail & Pick<OutgoingMail, "attachment">,
   mailer: TransactionalMailer = transactionalMailer(),
 ): Promise<{ outcome: GatedMailOutcome; decision: GateDecision }> {
   const decision = await notificationGate(db, {
@@ -61,7 +70,42 @@ export async function sendNotificationMail(
   if (!decision.send) {
     return { outcome: "suppressed", decision };
   }
-  return { outcome: await mailer.send({ ...mail, to: target.to }), decision };
+  return {
+    outcome: await mailer.send({
+      to: target.to,
+      subject: mail.subject,
+      text: mail.text,
+      ...(mail.html === undefined ? {} : { html: mail.html }),
+      ...(mail.attachment === undefined ? {} : { attachment: mail.attachment }),
+    }),
+    decision,
+  };
+}
+
+/**
+ * The language to write to somebody in, when all we hold is who they are or
+ * which address they typed. Never throws: a lookup that fails writes in
+ * English rather than holding up a sign-in code or a warning.
+ */
+export async function languageForMail(
+  db: Db,
+  who: { readonly personId?: string | null; readonly email?: string | null },
+): Promise<MessageLanguage> {
+  try {
+    let personId = who.personId ?? null;
+    if (personId === null && who.email !== undefined && who.email !== null) {
+      const [row] = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(and(eq(people.email, who.email), isNotNull(people.emailVerifiedAt)))
+        .limit(1);
+      personId = row?.id ?? null;
+    }
+    return personId === null ? "en" : await messageLanguageOf(db, personId);
+  } catch (error) {
+    logger().warn({ err: error }, "notification_language.lookup_failed");
+    return "en";
+  }
 }
 
 /**
@@ -76,6 +120,8 @@ export async function sendSignInCodeMail(
   email: string,
   code: string,
   purpose: CodeMailPurpose,
+  /** Whose account it is, when known (a new address being confirmed). */
+  personId?: string,
 ): Promise<void> {
   const decision = await notificationGate(db, {
     kind: "auth.email_code",
@@ -87,5 +133,9 @@ export async function sendSignInCodeMail(
     // unlocked it, and a silent drop would leave a person waiting for a code.
     throw new Error(`sign-in code refused by the notification gate: ${decision.reason}`);
   }
-  await createCodeMailer(db).send(email, code, purpose);
+  // In the account's language: the person confirming a new address, or the
+  // account a sign-in address belongs to. A sign-up has no account yet.
+  const language =
+    purpose === "signup" ? "en" : await languageForMail(db, { personId: personId ?? null, email });
+  await createCodeMailer(db).send(email, code, purpose, language);
 }

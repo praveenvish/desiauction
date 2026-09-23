@@ -1,4 +1,9 @@
-import { consentRecords, type Db } from "@desiauction/db";
+import { consentRecords, people, type Db } from "@desiauction/db";
+import {
+  WHATSAPP_CONSENT_PURPOSE,
+  languageFromEvidence as consentLanguage,
+  resolveLanguage,
+} from "@desiauction/messaging/language";
 import { and, desc, eq } from "drizzle-orm";
 
 import { env } from "../../env";
@@ -41,7 +46,8 @@ import { isProviderTimeout, providerFetch } from "./provider-fetch";
  * (`pnpm --filter @desiauction/web wa:sheet`).
  */
 
-export const WHATSAPP_CONSENT_PURPOSE = "whatsapp.updates";
+// One constant, in the package the finops runner reads it from too.
+export { WHATSAPP_CONSENT_PURPOSE };
 
 export { WHATSAPP_CONSENT_LABEL, WHATSAPP_LANGUAGES, type WhatsAppLanguage };
 
@@ -349,48 +355,46 @@ export interface WhatsAppConsent {
   readonly language: WhatsAppLanguage;
 }
 
-function isLanguage(value: unknown): value is WhatsAppLanguage {
-  return typeof value === "string" && (WHATSAPP_LANGUAGES as readonly string[]).includes(value);
-}
-
 /**
  * The language from a person's consent history, newest first: the newest
- * record that NAMES one. Not simply the newest record — a STOP sent from the
- * phone (the webhook) and the START after it carry no language, and a Hindi
- * reader who paused their messages must not come back to English.
+ * record that NAMES one (packages/messaging language.ts has why), English when
+ * none does.
  */
 export function languageFromEvidence(
   newestFirst: readonly { readonly evidence: unknown }[],
 ): WhatsAppLanguage {
-  for (const record of newestFirst) {
-    const evidence = record.evidence;
-    if (typeof evidence === "object" && evidence !== null && "language" in evidence) {
-      if (isLanguage(evidence.language)) return evidence.language;
-    }
-  }
-  return "en";
+  return consentLanguage(newestFirst) ?? "en";
 }
 
 /**
  * The latest answer wins: consent_records is append-only. Twenty rows is far
  * more history than anybody makes, and bounds the read for somebody who
  * toggles the switch for fun.
+ *
+ * THE LANGUAGE is the person's ONE language (Notification Control Center,
+ * Phase 2): `people.language` when they chose one — under "Language for
+ * messages", which drives their email too — and only then the language named
+ * with the opt-in, then English. The Hindi→English fallback when Meta has not
+ * approved a Hindi version yet (132001) stays where it was, in the send.
  */
 export async function whatsappOptedIn(db: Db, personId: string): Promise<WhatsAppConsent> {
-  const history = await db
-    .select({ granted: consentRecords.granted, evidence: consentRecords.evidence })
-    .from(consentRecords)
-    .where(
-      and(
-        eq(consentRecords.personId, personId),
-        eq(consentRecords.purpose, WHATSAPP_CONSENT_PURPOSE),
-      ),
-    )
-    .orderBy(desc(consentRecords.createdAt))
-    .limit(20);
+  const [history, [person]] = await Promise.all([
+    db
+      .select({ granted: consentRecords.granted, evidence: consentRecords.evidence })
+      .from(consentRecords)
+      .where(
+        and(
+          eq(consentRecords.personId, personId),
+          eq(consentRecords.purpose, WHATSAPP_CONSENT_PURPOSE),
+        ),
+      )
+      .orderBy(desc(consentRecords.createdAt))
+      .limit(20),
+    db.select({ language: people.language }).from(people).where(eq(people.id, personId)).limit(1),
+  ]);
   return {
     optedIn: history[0]?.granted === true,
-    language: languageFromEvidence(history),
+    language: resolveLanguage(person?.language, consentLanguage(history)),
   };
 }
 

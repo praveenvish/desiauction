@@ -1,5 +1,5 @@
 import { db, systemDb } from "../db";
-import { sendNotificationMail } from "../messaging/notify";
+import { languageForMail, sendNotificationMail } from "../messaging/notify";
 import type { MailOutcome } from "../messaging/transactional-mail";
 import { resolveReports } from "./season";
 import { reviewAskMail } from "./review-mail";
@@ -86,7 +86,12 @@ export async function askByContact(
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "review.platform_ask", to: person.email, personId: person.id, now },
-    reviewAskMail(person.name, ask.link),
+    await reviewAskMail(
+      person.name,
+      ask.link,
+      "general",
+      await languageForMail(db, { personId: person.id }),
+    ),
   );
   if (outcome === "suppressed") {
     return { ...base, delivery: "opted-out" };

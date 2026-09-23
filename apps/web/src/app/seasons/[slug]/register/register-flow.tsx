@@ -176,6 +176,7 @@ export function RegisterFlow({
   roles,
   attributes,
   profileDefaults,
+  initialLanguage = "en",
 }: {
   slug: string;
   competitionName: string;
@@ -211,6 +212,12 @@ export function RegisterFlow({
    * and records that they live in their own columns.
    */
   attributes: readonly AttributeOption[];
+  /**
+   * The person's one language for messages as it stands (/account's "Language
+   * for messages"), so ticking WhatsApp here starts from their choice rather
+   * than quietly putting a Hindi reader back on English at submit.
+   */
+  initialLanguage?: WhatsAppLanguage;
   /** PI-1: the person-level profile for THIS sport, prefilling "How you play".
    *  A device-local draft still wins over it — the draft is this season's
    *  newer intent. */
@@ -245,8 +252,9 @@ export function RegisterFlow({
   // WhatsApp opt-in: unticked, and like consent never restored from a draft —
   // Meta and DPDP both need it to be a choice made now (Phase 3).
   const [whatsapp, setWhatsapp] = useState(false);
-  // Which version of the messages, asked only once they tick the box.
-  const [whatsappLanguage, setWhatsappLanguage] = useState<WhatsAppLanguage>("en");
+  // Which language their messages come in — asked once they tick the box, and
+  // saved as their ONE language (email follows it too) when they submit.
+  const [whatsappLanguage, setWhatsappLanguage] = useState<WhatsAppLanguage>(initialLanguage);
   const [pending, startTransition] = useTransition();
   const [restored, setRestored] = useState(false);
 
@@ -864,7 +872,7 @@ export function RegisterFlow({
             </label>
             {whatsapp ? (
               <fieldset className="reg-wa-language" data-testid="register-whatsapp-language">
-                <legend className="reg-wa-language-legend">Language for WhatsApp messages</legend>
+                <legend className="reg-wa-language-legend">Language for your messages</legend>
                 <div className="reg-wa-language-options">
                   {WHATSAPP_LANGUAGES.map((option) => (
                     <label key={option} className="reg-wa-language-option" lang={option}>

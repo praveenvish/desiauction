@@ -11,31 +11,31 @@ import { HttpMailer, codeMailCopy, type MailTransport } from "./email-sender";
  * login code a ready-made cover story for the message their victim receives.
  */
 describe("codeMailCopy", () => {
-  it("names SIGNING IN, and never calls it a confirmation", () => {
-    const copy = codeMailCopy("123456", "login");
+  it("names SIGNING IN, and never calls it a confirmation", async () => {
+    const copy = await codeMailCopy("123456", "login");
     expect(copy.subject).toContain("sign-in");
     expect(copy.subject.toLowerCase()).not.toContain("confirm");
     expect(copy.text).toContain("123456");
     expect(copy.text.toLowerCase()).not.toContain("confirmation code");
   });
 
-  it("tells somebody who did NOT sign in what it means for them", () => {
+  it("tells somebody who did NOT sign in what it means for them", async () => {
     // Not "ignore this" — that is advice for spam. Their address is known to
     // someone, and their account is safe only while the code stays unshared.
-    const copy = codeMailCopy("123456", "login");
+    const copy = await codeMailCopy("123456", "login");
     expect(copy.text).toContain("did not try to sign in");
     expect(copy.text).toContain("do not share this code");
   });
 
-  it("leaves the confirmation copy exactly as it was", () => {
-    const copy = codeMailCopy("123456", "email_change");
+  it("leaves the confirmation copy exactly as it was", async () => {
+    const copy = await codeMailCopy("123456", "email_change");
     expect(copy.subject).toBe("Confirm your email for DesiAuction");
     expect(copy.text).toContain("confirmation code is 123456");
   });
 
-  it("puts NO link in either — a typed code cannot be followed out of a forward", () => {
+  it("puts NO link in either — a typed code cannot be followed out of a forward", async () => {
     for (const purpose of ["login", "email_change"] as const) {
-      expect(codeMailCopy("123456", purpose).text).not.toMatch(/https?:\/\//);
+      expect((await codeMailCopy("123456", purpose)).text).not.toMatch(/https?:\/\//);
     }
   });
 });

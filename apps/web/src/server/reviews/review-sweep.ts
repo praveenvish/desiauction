@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db, systemDb } from "../db";
-import { sendNotificationMail } from "../messaging/notify";
+import { languageForMail, sendNotificationMail } from "../messaging/notify";
 import { reviewAskMail, type AskAudience } from "./review-mail";
 import { askForPlatformReview, isKnownMinor, markAskSent } from "./reviews";
 import { askSeason, seasonRef } from "./season";
@@ -226,7 +226,12 @@ export async function sweepReviewAsks(now: Date = new Date()): Promise<SweepResu
         personId: candidate.personId,
         now,
       },
-      reviewAskMail(candidate.name, ask.link, candidate.audience),
+      await reviewAskMail(
+        candidate.name,
+        ask.link,
+        candidate.audience,
+        await languageForMail(db, { personId: candidate.personId }),
+      ),
     );
     if (outcome === "suppressed") {
       optedOut += 1;

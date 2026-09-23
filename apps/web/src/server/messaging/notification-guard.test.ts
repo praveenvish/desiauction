@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
+import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults";
 import { describe, expect, it } from "vitest";
 
 import { KNOWN_EVENT_ACTIONS } from "../../lib/inbox-events";
@@ -111,6 +112,8 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
       "server/messaging/transactional-mail.ts": "defines it",
       "server/messaging/notify.ts": "gate-owning",
       "server/messaging/outbox.ts": "gate-owning (the drain)",
+      "server/messaging/template-writer.ts":
+        "an admin's 'Send test to me' — only to the operator's own verified address, ten an hour, audited; not a notification to anybody, so no gate",
     },
   },
   {
@@ -239,6 +242,61 @@ describe("no send path around the notification gate", () => {
   });
 });
 
+/**
+ * THE WORDING GUARD (Phase 2): no email subject or body is written outside the
+ * template registry.
+ *
+ * The type system does most of it — `sendNotificationMail` and `QueuedMail`
+ * accept only a `NotificationMail`, which only notification-email.ts can make.
+ * What a type cannot stop is a module laying out its own mail with
+ * `renderEmail` and casting its way past the brand, so both are pinned here.
+ */
+const WORDING_TOKENS: readonly { token: string; allowed: Readonly<Record<string, string>> }[] = [
+  {
+    token: "renderEmail(",
+    allowed: {
+      "server/messaging/email-layout.ts": "defines the layout",
+      "server/messaging/notification-email.ts": "the one renderer — wording from the registry",
+    },
+  },
+  {
+    token: "as NotificationMail",
+    allowed: { "server/messaging/notification-email.ts": "brands what it rendered" },
+  },
+  {
+    token: "as QueuedMail",
+    allowed: {},
+  },
+];
+
+describe("no email wording outside the template registry", () => {
+  for (const { token, allowed } of WORDING_TOKENS) {
+    it(`only the listed modules use ${token.replace("(", "")}`, () => {
+      const users = [...FILES].filter(([, text]) => text.includes(token)).map(([file]) => file);
+      expect(
+        users.filter((file) => allowed[file] === undefined),
+        "render through renderNotificationEmail (notification-email.ts) instead",
+      ).toEqual([]);
+      expect(
+        Object.keys(allowed).filter((file) => !users.includes(file)),
+        "an allowlist entry that no longer uses the token — delete it",
+      ).toEqual([]);
+    });
+  }
+
+  it("every email kind has a template, and no template exists for a kind that sends none", () => {
+    const emailKinds = NOTIFICATIONS.filter((entry) => entry.channels.includes("email"))
+      .map((entry) => entry.key as string)
+      .sort();
+    expect(Object.keys(EMAIL_TEMPLATES).sort()).toEqual(emailKinds);
+  });
+
+  it("the finance adapter's subject comes from the registry, not a literal", () => {
+    const adapter = FILES.get("packages/messaging/src/email-adapter.ts") ?? "";
+    expect(adapter).not.toMatch(/"Your receipt from DesiAuction"/);
+  });
+});
+
 describe("every notification is in the catalogue, and every entry is sent", () => {
   const byKey = new Map(NOTIFICATIONS.map((entry) => [entry.key as string, entry]));
 
@@ -264,8 +322,14 @@ describe("every notification is in the catalogue, and every entry is sent", () =
   });
 
   it("has no entry that no sender names", () => {
+    // The template registry names every email kind by construction, so it is
+    // not evidence that anything SENDS one.
     const elsewhere = [...FILES]
-      .filter(([file]) => file !== "packages/messaging/src/catalogue.ts")
+      .filter(
+        ([file]) =>
+          file !== "packages/messaging/src/catalogue.ts" &&
+          file !== "packages/messaging/src/email-template-defaults.ts",
+      )
       .map(([, text]) => text)
       .join("\n");
     const unused = NOTIFICATIONS.map((entry) => entry.key).filter(

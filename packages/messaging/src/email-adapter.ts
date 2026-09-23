@@ -1,5 +1,7 @@
-import type { DeliveryPort } from "@desiauction/financial-operations";
+import type { DeliveryPort, DeliveryRequest } from "@desiauction/financial-operations";
 
+import { EMAIL_TEMPLATES } from "./email-template-defaults";
+import { defaultContent, type TemplateFields } from "./email-templates";
 import type { GateReason } from "./gate";
 import { providerFetch } from "./provider-fetch";
 
@@ -64,6 +66,16 @@ export interface EmailAdapterConfig {
   readonly idempotencyHeader?: string | null;
   readonly transport?: EmailTransport;
   readonly buildRequest?: (message: EmailMessage, from: string) => unknown;
+  /**
+   * The subject and text for one dispatch, given who it resolved to. Left out:
+   * the English code default (`financeDocumentMail` over the default wording).
+   * finance-delivery.ts passes one that reads the owner's language and the
+   * published wording (Notification Control Center, Phase 2).
+   */
+  readonly compose?: (
+    request: DeliveryRequest,
+    recipient: { readonly to: string; readonly personId: string | null },
+  ) => Promise<{ readonly subject: string; readonly text: string }>;
   readonly now?: () => number;
   readonly breakerThreshold?: number;
   readonly breakerCooldownMs?: number;
@@ -85,20 +97,45 @@ const defaultBuildRequest = (message: EmailMessage, from: string): unknown => ({
 });
 
 /**
- * A subject line for a document dispatch.
+ * Which wording a document dispatch uses — one variant per document type
+ * (email-template-defaults.ts, `finance.document.issued`).
  *
  * Derived from the template id rather than the body, because the body is the
  * reproduced document bytes and a subject cut from it would change whenever the
  * document does. A subject that changes under a customer is a subject they
  * cannot search for.
  */
-export function subjectFor(templateId: string): string {
+export function financeVariantFor(templateId: string): string {
   const known: Record<string, string> = {
-    "receipt.issued": "Your receipt from DesiAuction",
-    "invoice.issued": "Your invoice from DesiAuction",
-    "correction.issued": "A corrected document from DesiAuction",
+    "receipt.issued": "receipt",
+    "invoice.issued": "invoice",
+    "correction.issued": "correction",
   };
-  return known[templateId] ?? "A document from DesiAuction";
+  return known[templateId] ?? "other";
+}
+
+/**
+ * A finance document's email: the (editable) subject, the (editable, empty by
+ * default) opening paragraphs, and then the document — always, whole, last.
+ * Plain text: the body is the certified document text, reproduced exactly.
+ */
+export function financeDocumentMail(
+  fields: TemplateFields,
+  body: string,
+): { subject: string; text: string } {
+  return { subject: fields.subject, text: [...fields.paragraphs, body].join("\n\n") };
+}
+
+function defaultFinanceFields(templateId: string): TemplateFields {
+  const content = defaultContent(EMAIL_TEMPLATES["finance.document.issued"], "en");
+  const fields = content.variants[financeVariantFor(templateId)] ?? content.variants["other"];
+  if (fields === undefined) throw new Error("finance.document.issued has no default wording");
+  return fields;
+}
+
+/** The English default subject line for a document dispatch. */
+export function subjectFor(templateId: string): string {
+  return defaultFinanceFields(templateId).subject;
 }
 
 export class EmailBreaker {
@@ -141,7 +178,12 @@ export class EmailBreaker {
  * the address is on the suppression list (gate.ts). Distinct from null because
  * the fix is different: nobody needs to add an address, somebody chose this.
  */
-export type EmailResolution = string | null | { readonly withheld: GateReason };
+export type EmailResolution =
+  | string
+  | null
+  | { readonly withheld: GateReason }
+  /** An address, with the person it belongs to — whose language the mail is in. */
+  | { readonly to: string; readonly personId: string };
 
 export type EmailResolver = (
   recipientRef: string,
@@ -252,7 +294,15 @@ export function createHttpEmailAdapter(
         // Retryable: the provider is melted, not the message malformed.
         return { ok: false as const, code: "provider_unavailable", retryable: true };
       }
-      const to = await resolve(request.recipientRef, { orgId: request.orgId });
+      const resolved = await resolve(request.recipientRef, { orgId: request.orgId });
+      const to =
+        typeof resolved === "object" && resolved !== null && "to" in resolved
+          ? resolved.to
+          : resolved;
+      const personId =
+        typeof resolved === "object" && resolved !== null && "personId" in resolved
+          ? resolved.personId
+          : null;
       if (typeof to === "object" && to !== null) {
         /*
          * WITHHELD, and reported as what it is: a terminal, non-retryable
@@ -309,13 +359,18 @@ export function createHttpEmailAdapter(
       if (idempotencyHeader !== null) {
         headers[idempotencyHeader] = request.idempotencyKey;
       }
+      // Composed before the provider call, outside its try: a failure to read
+      // the person's language is not the provider's, so it must not trip the
+      // breaker — it throws, and the job retries like any other refused read.
+      const mail =
+        config.compose === undefined
+          ? financeDocumentMail(defaultFinanceFields(request.templateId), request.body)
+          : await config.compose(request, { to, personId });
       try {
         const response = await transport(config.endpoint, {
           method: "POST",
           headers,
-          body: JSON.stringify(
-            build({ to, subject: subjectFor(request.templateId), text: request.body }, config.from),
-          ),
+          body: JSON.stringify(build({ to, subject: mail.subject, text: mail.text }, config.from)),
         });
         if (response.status >= 400) {
           breaker.recordFailure();
