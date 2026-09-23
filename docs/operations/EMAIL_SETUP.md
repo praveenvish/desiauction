@@ -141,6 +141,9 @@ requires an https origin.
   2026-09-13 after reading the aggregate reports arriving at `praveen@`, and only
   once transactional sending is confirmed aligned. Going stricter early makes our
   own mail disappear. Edit the existing record.
-- **Deployment env** needs all four `EMAIL_*` vars. `.env.local` is local only.
+- **Deployment env** needs all four `EMAIL_*` vars in `web.env`, and
+  `EMAIL_API_ENDPOINT`/`EMAIL_API_KEY`/`EMAIL_FROM` in `runner.env` too — the
+  finops runner is what emails receipts and refuses to boot in production
+  without them. `.env.local` is local only.
 - **DKIM keys are 1024-bit** on both domains (provider defaults). Upgrade to
   2048 if either console offers it.

@@ -60,6 +60,23 @@ const RUNNER_WRITES = [
 ];
 
 /**
+ * What the RUNNER reads to deliver a financial document (packages/messaging
+ * finance-delivery.ts): the team's owners, their verified address, and the
+ * notification gate's layers. The runner drains `dispatch.send`, so these are
+ * the reads between a receipt and the person it is for; it inherits them from
+ * `grant select on all tables`, and naming them keeps a future revoke of
+ * "personal" tables from quietly turning every receipt into a dead letter.
+ */
+const RUNNER_DELIVERY_READS = [
+  "paddles",
+  "people",
+  "suppressions",
+  "notification_preferences",
+  "org_messaging_settings",
+  "consent_records",
+];
+
+/**
  * Append-only evidence. Every runtime role may INSERT and none may rewrite:
  * these are what the projections are rebuilt FROM, so a role that can edit them
  * can make the replay agree with a lie.
@@ -330,6 +347,22 @@ function expectations(allTables: string[]): Expectation[] {
     verb: "INSERT",
     allowed: true,
     why: "the runner appends the finops event stream",
+  });
+  for (const table of RUNNER_DELIVERY_READS) {
+    out.push({
+      role: "desiauction_runner",
+      table,
+      verb: "SELECT",
+      allowed: true,
+      why: "the runner resolves a document's recipient and asks the notification gate",
+    });
+  }
+  out.push({
+    role: "desiauction_runner",
+    table: "audit_log",
+    verb: "INSERT",
+    allowed: true,
+    why: "the runner's in-app delivery writes the person-scoped row /inbox reads",
   });
   out.push({
     role: "desiauction_app",

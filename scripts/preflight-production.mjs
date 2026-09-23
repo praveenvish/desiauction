@@ -449,6 +449,31 @@ check(
   "set EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM (and leave EMAIL_PROVIDER unset or http)",
 );
 
+// --- Receipt delivery (the runner) -------------------------------------------
+// The runner drains `dispatch.send`, so it is the process that actually emails
+// receipts, invoices and corrections. It used to read no mail settings at all
+// and wrote every document to a file on its own disk; its env.ts now refuses to
+// boot without them. With split files, say so here — and hold it to the SAME
+// provider as the web tier, whose callback route confirms what the runner sent.
+if (runnerFile !== undefined) {
+  check(
+    "EMAIL_MAILER-runner",
+    runnerEnv.EMAIL_PROVIDER !== "dev" &&
+      Boolean(runnerEnv.EMAIL_API_ENDPOINT) &&
+      Boolean(runnerEnv.EMAIL_API_KEY) &&
+      Boolean(runnerEnv.EMAIL_FROM),
+    "the runner emails every financial document — without a mailer it writes them to its own disk",
+    "set EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM in runner.env (the same values as web.env)",
+  );
+  check(
+    "EMAIL_MAILER-runner-matches-web",
+    runnerEnv.EMAIL_API_ENDPOINT === env.EMAIL_API_ENDPOINT &&
+      runnerEnv.EMAIL_FROM === env.EMAIL_FROM,
+    "the runner and the web tier send through the same provider and From address",
+    "copy EMAIL_API_ENDPOINT and EMAIL_FROM from web.env into runner.env",
+  );
+}
+
 // --- Per-IP throttles (audit PA-1 §25) ---------------------------------------
 // `clientIp` now refuses to read `x-real-ip` unless a trusted proxy is declared,
 // because at 0 there is nothing in front to overwrite it and the header is
