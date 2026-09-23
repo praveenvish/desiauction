@@ -18,7 +18,7 @@ function moment(key: string) {
   return {
     personId: person,
     orgId: null,
-    kind: "auction.sold",
+    kind: "auction.sold" as const,
     dedupeKey: `retention:${RUN}:${key}`,
     subject: "Sold to Cup Kings",
     text: "Cup Kings bought you for Rs 75,000.",

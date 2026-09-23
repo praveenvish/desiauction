@@ -25,9 +25,15 @@ import type { MessageCategory } from "./templates";
  * texts STOP does not care how we classify our own messages.
  *
  * Sign-in codes are the one exception and they are exempt by NOT coming through
- * here: the OTP sender is its own path. If they ever route through this module
- * they must stay exempt, because "turn off SMS" locking a person out of their
- * own account is a worse outcome than an unwanted message.
+ * here: they are `login` in the catalogue, and `notificationGate` (gate.ts)
+ * answers yes for them before it reaches this function, because "turn off SMS"
+ * locking a person out of their own account is a worse outcome than an
+ * unwanted message.
+ *
+ * NOBODY CALLS THIS DIRECTLY ANY MORE. It is the layers; `notificationGate` is
+ * the gate, and decides from the catalogue entry which of these layers a kind
+ * may see (no person's switch for a security alert, no club's for a staff
+ * notice). The guard test fails the build on a direct call outside gate.ts.
  */
 
 export type SendDecision =

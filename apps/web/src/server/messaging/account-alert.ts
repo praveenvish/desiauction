@@ -1,7 +1,7 @@
 import { people, type Db } from "@desiauction/db";
 import { eq } from "drizzle-orm";
 
-import { maySend } from "./consent";
+import { notificationGate } from "./gate";
 import { createPlayerSmsSender, type PlayerSmsSender } from "./sms";
 import { renderTemplate, SMS_TEMPLATES } from "./templates";
 import {
@@ -33,7 +33,9 @@ import {
  *
  * The gate still applies. Somebody who sent STOP has said they want no
  * messages, and a security notice does not outrank that — the change is on
- * their security ledger either way, which is a place they can look.
+ * their security ledger either way, which is a place they can look. What it no
+ * longer reads is any switch of theirs or a club's: the catalogue makes these
+ * `security`, which only a platform admin may turn off (gate.ts).
  */
 
 export type AccountAlertKey = "security.phone_changed" | "security.email_changed";
@@ -63,11 +65,13 @@ export async function sendAccountAlert(
     readonly sms?: PlayerSmsSender | null;
   } = {},
 ): Promise<AccountAlertOutcome> {
-  const decision = await maySend(db, {
-    contact: input.phone,
-    channel: "sms",
-    category: "transactional",
-    scope: "security",
+  // Asked for the TEXT first — WhatsApp and SMS are one row below the admin
+  // layer — and once more for SMS below, so an admin switch per app holds.
+  const text = { personId: input.personId, contact: input.phone };
+  const decision = await notificationGate(db, {
+    kind: input.key,
+    channel: "whatsapp",
+    recipient: text,
   });
   if (!decision.send) {
     return "suppressed";
@@ -113,6 +117,10 @@ export async function sendAccountAlert(
   const sms = channels.sms === undefined ? createPlayerSmsSender(db) : channels.sms;
   if (sms === null) {
     return "no_text_channel";
+  }
+  const bySms = await notificationGate(db, { kind: input.key, channel: "sms", recipient: text });
+  if (!bySms.send) {
+    return "suppressed";
   }
   const template = SMS_TEMPLATES[input.key];
   const rendered = renderTemplate(template, input.slots);
