@@ -6,10 +6,8 @@ import {
   IconLock,
   Pill,
   SectionCard,
-  buttonClassName,
   type KitTone,
 } from "@desiauction/ui";
-import Link from "next/link";
 
 import type {
   CellCounts,
@@ -18,6 +16,7 @@ import type {
   NotificationCenter,
 } from "../../../server/admin/notification-views";
 import type { WordingSummary } from "../../../server/admin/template-views";
+import { NavButton } from "../../players/nav-button";
 import { RelativeTime } from "../admin-ui";
 import { ChannelControl, ControlToggle, RevertButton, SwitchToggle } from "./notification-controls";
 
@@ -149,12 +148,11 @@ function WordingLine({
           </span>
         ))}
       </span>
-      <Link
-        href={wording.href}
-        className={buttonClassName({ variant: "secondary", size: "touch" })}
-      >
+      {/* NavButton, not buttonClassName(): this is a server component, and the
+          kit's class helper lives in a "use client" module. */}
+      <NavButton href={wording.href} variant="secondary">
         Edit email wording<span className="admin-sr-only"> — {label}</span>
-      </Link>
+      </NavButton>
     </div>
   );
 }

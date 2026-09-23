@@ -6,10 +6,8 @@ import {
   Pill,
   SectionCard,
   ToastProvider,
-  buttonClassName,
   type KitTone,
 } from "@desiauction/ui";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -19,6 +17,7 @@ import {
   type LanguageView,
   type TemplateEditorView,
 } from "../../../../../server/admin/template-views";
+import { NavButton } from "../../../../players/nav-button";
 import { RelativeTime } from "../../../admin-ui";
 import { RestoreButton, TemplateEditor } from "./template-editor";
 import "../../../../seasons/seasons.css";
@@ -83,13 +82,10 @@ export default async function EmailWordingPage({ params }: { params: Promise<{ k
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
           <header className="dash-head tpl-page-head">
-            <Link
-              href="/admin/notifications"
-              className={buttonClassName({ variant: "ghost", size: "touch" }, "tpl-back")}
-            >
+            <NavButton href="/admin/notifications" variant="ghost" className="tpl-back">
               <IconArrowLeft size={18} aria-hidden />
               All notifications
-            </Link>
+            </NavButton>
             <p className="dash-hint">
               The words of one email. Links, the layout and the facts in it (codes, amounts, squads)
               stay DesiAuction&rsquo;s; the wording is yours to change. A publish goes out to
