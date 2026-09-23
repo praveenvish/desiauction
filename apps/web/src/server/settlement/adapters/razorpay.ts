@@ -39,14 +39,30 @@ export interface RazorpayConfig {
   readonly keySecret: string;
   readonly webhookSecret: string;
   readonly apiBase?: string;
-  /** Timestamp window for webhook freshness (default 5 minutes). */
+  /** Timestamp window for webhook freshness (default 48 hours — see below). */
   readonly windowMs?: number;
   readonly transport?: HttpTransport;
   readonly now?: () => number;
 }
 
 const DEFAULT_API_BASE = "https://api.razorpay.com/v1";
-const DEFAULT_WINDOW_MS = 5 * 60 * 1000;
+/**
+ * FORTY-EIGHT HOURS, not five minutes (gate P1-5).
+ *
+ * The window is measured against the payload's `created_at`, and Razorpay
+ * re-delivers the SAME payload — same `created_at` — on its retry schedule for
+ * roughly a day after a failed delivery. A five-minute window therefore turned
+ * every retry after an outage of ours into a 400 "stale", and a capture that
+ * missed its first delivery was never recorded at all.
+ *
+ * The window was never the replay defence: the HMAC proves Razorpay sent the
+ * body, and `providerEventId` (`kind:providerRef`) makes a re-delivered event
+ * return its original ack and append nothing (webhook.ts step 7). So it only
+ * has to be wide enough to cover the provider's whole retry horizon, with room
+ * for skew — and it stays as a bound on how old a signed body may be, rather
+ * than being removed outright.
+ */
+const DEFAULT_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 export function createRazorpayAdapter(config: RazorpayConfig): PaymentGatewayPort {
   const apiBase = config.apiBase ?? DEFAULT_API_BASE;
