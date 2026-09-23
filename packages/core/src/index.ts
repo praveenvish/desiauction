@@ -290,6 +290,7 @@ export {
   styleLabel,
   deriveAge,
   isMinor,
+  mayPublishPhoto,
   MINOR_AGE_THRESHOLD,
   GENDERS,
   GENDER_SELF_DESCRIBED_MAX,

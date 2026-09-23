@@ -1,4 +1,4 @@
-import { isMinor } from "@desiauction/core";
+import { mayPublishPhoto } from "@desiauction/core";
 import { people, registrations } from "@desiauction/db";
 import { sql } from "drizzle-orm";
 
@@ -53,11 +53,15 @@ export function consentedPhotoUrl(
  * reach (live rooms, broadcast pages, posters, share cards): consent AND age.
  * PRR P0-2 (DPDP §9) — a minor's face never rides a public surface, whatever
  * consent was recorded. Same rule as `toShowcasePlayer` on /c.
+ *
+ * P0-6: and neither does a face of UNKNOWN age. `mayPublishPhoto`, not
+ * `!isMinor` — the latter lets a DOB-less import row (a child, as often as
+ * not) through.
  */
 export function publicPhotoUrl(
   row: ShownPhotoRow & { dateOfBirth: string | null },
   now: Date,
   readUrl: (key: string) => string,
 ): string | null {
-  return isMinor(row.dateOfBirth, now) ? null : consentedPhotoUrl(row, readUrl);
+  return mayPublishPhoto(row.dateOfBirth, now) ? consentedPhotoUrl(row, readUrl) : null;
 }

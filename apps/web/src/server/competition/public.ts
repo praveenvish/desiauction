@@ -1,4 +1,11 @@
-import { deriveAge, describeAttributes, isMinor, paise, type Paise } from "@desiauction/core";
+import {
+  deriveAge,
+  describeAttributes,
+  isMinor,
+  mayPublishPhoto,
+  paise,
+  type Paise,
+} from "@desiauction/core";
 import {
   auctionEvents,
   auctions,
@@ -276,12 +283,16 @@ const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1
 
 /**
  * The stored photo KEY a public surface may render, or null — the same two
- * gates `toShowcasePlayer` applies to `photoUrl` (consent AND not a minor), for
- * the one caller that needs bytes rather than a URL: the share card inlines
+ * gates `toShowcasePlayer` applies to `photoUrl` (consent AND a known adult),
+ * for the one caller that needs bytes rather than a URL: the share card inlines
  * the image because the rasterizer cannot fetch a relative path.
+ *
+ * P0-6: `mayPublishPhoto`, not `!isMinor` — an unknown DOB (every CSV import
+ * row) withholds the face. The AGE below keeps `isMinor`, which is right for an
+ * age: with no date there is none to publish.
  */
 function publicPhotoKey(r: ShowcaseRow, now: Date): string | null {
-  return isMinor(r.dateOfBirth, now) || r.photoConsentAt === null ? null : r.photoKey;
+  return mayPublishPhoto(r.dateOfBirth, now) && r.photoConsentAt !== null ? r.photoKey : null;
 }
 
 /**
