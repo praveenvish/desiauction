@@ -9,6 +9,7 @@ import {
   shownPhotoConsentAt,
   shownPhotoKey,
 } from "../competition/shown-name";
+import { containsPattern } from "../../lib/like-pattern";
 
 /**
  * /players — EVERY PLAYER ACROSS THE SEASONS A PERSON REVIEWS.
@@ -97,11 +98,6 @@ export interface PlayersSlice {
  */
 const soldSql = sql<boolean>`exists (select 1 from lots sold_lot inner join auctions sold_auction on sold_auction.id = sold_lot.auction_id where sold_lot.registration_id = "registrations"."id" and sold_lot.status = 'sold' and sold_auction.status <> 'abandoned')`;
 
-/** `%` and `_` typed into a search box are letters, not wildcards. */
-function likeTerm(term: string): string {
-  return `%${term.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
-}
-
 function filtersOf(seasonIds: readonly string[], query: Omit<PlayersQuery, "page">): SQL[] {
   const filters: SQL[] = [
     inArray(registrations.competitionId, [...seasonIds]),
@@ -121,7 +117,8 @@ function filtersOf(seasonIds: readonly string[], query: Omit<PlayersQuery, "page
   }
   const term = query.search?.trim();
   if (term !== undefined && term !== "") {
-    const like = likeTerm(term);
+    // `%` and `_` typed into a search box are letters, not wildcards.
+    const like = containsPattern(term);
     const clause = or(ilike(shownName, like), ilike(registrations.registrationNumber, like));
     if (clause !== undefined) {
       filters.push(clause);

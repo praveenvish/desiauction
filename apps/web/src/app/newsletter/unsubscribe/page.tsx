@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 import { env } from "../../../env";
-import { UnsubscribeForm } from "./unsubscribe-form";
+import { unsubscribeTokenMatches } from "../../../server/marketing/newsletter";
+import { UnsubscribeForm, UnsubscribeLinkForm } from "./unsubscribe-form";
 import "../../content.css";
 import "../../marketing.css";
 
@@ -14,7 +15,21 @@ export const metadata: Metadata = {
 };
 
 /** Public and sign-in-free: the list asked nobody to sign in, so leaving it can't either. */
-export default function UnsubscribePage() {
+export default async function UnsubscribePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Arrived from a newsletter's own link: one button, no typing.
+  const { address, token } = await searchParams;
+  if (typeof address === "string" && unsubscribeTokenMatches(address, token)) {
+    return (
+      <main className="content-page mk">
+        <h1>Unsubscribe</h1>
+        <UnsubscribeLinkForm address={address} token={token as string} />
+      </main>
+    );
+  }
   return (
     <main className="content-page mk">
       <h1>Unsubscribe</h1>

@@ -1,4 +1,5 @@
 import type { DeliveryPort } from "@desiauction/financial-operations";
+import { providerFetch } from "./provider-fetch";
 
 /**
  * EMAIL DELIVERY OVER HTTP.
@@ -69,10 +70,9 @@ export interface EmailAdapterConfig {
 const DEFAULT_BREAKER_THRESHOLD = 3;
 const DEFAULT_BREAKER_COOLDOWN_MS = 60 * 1000;
 
-const defaultTransport: EmailTransport = async (url, init) => {
-  const response = await fetch(url, init);
-  return { status: response.status, body: await response.text() };
-};
+// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
+// outbox's claim lease, or two drains deliver the same message.
+const defaultTransport: EmailTransport = providerFetch;
 
 /** The intersection of every provider we are choosing between. */
 const defaultBuildRequest = (message: EmailMessage, from: string): unknown => ({

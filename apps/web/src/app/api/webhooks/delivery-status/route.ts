@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
+import { readCapped } from "../../../../lib/read-capped";
 import { db, dbHandle, systemDb } from "../../../../server/db";
 import { webFinopsDeps } from "../../../../server/financial-operations/deps";
 import { suppress } from "../../../../server/messaging/consent";
@@ -79,7 +80,13 @@ async function handle(request: Request): Promise<NextResponse> {
     return new NextResponse(null, { status: 401 });
   }
 
-  const raw = await request.text();
+  // Provider delivery reports are a few KB. Read under a cap: the secret check
+  // above is one shared string, and an unbounded `request.text()` behind it is
+  // a memory budget for whoever learns it (the Razorpay route's rule).
+  const raw = await readCapped(request, 64 * 1024);
+  if (raw === null) {
+    return new NextResponse(null, { status: 413 });
+  }
 
   /*
    * The suppression happens BEFORE the ingest, and on purpose.

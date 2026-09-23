@@ -39,6 +39,18 @@ const WINDOW_WORDS: Record<string, string> = {
   any: "any time",
 };
 
+/**
+ * NOTHING THE STRANGER TYPED GOES BACK OUT (gate P2).
+ *
+ * This mail goes to an address nobody has verified, typed by somebody with no
+ * session, from our domain. It used to open "Hi {name}" and repeat the
+ * organisation name — two free-text fields — so the form was a way to have
+ * DesiAuction deliver any sentence you liked ("Hi Your account is locked,
+ * visit …") to any inbox you liked, under our reputation. So the receipt
+ * carries only what the form offered as CHOICES (a size band, a date, a time
+ * window) and greets generically. The founder's copy below still has
+ * everything; it goes to our own address.
+ */
 export function requesterAcknowledgement(request: ValidDemoRequest): {
   subject: string;
   text: string;
@@ -50,23 +62,21 @@ export function requesterAcknowledgement(request: ValidDemoRequest): {
       preheader: "We'll get back to you within one working day to fix a time.",
       heading: "We've got your demo request",
       paragraphs: [
-        `Hi ${request.name},`,
-        `Thanks for asking about a demo for ${request.orgName}. We'll get back to you within one working day to fix a time.`,
+        "Hello,",
+        "Thanks for asking about a demo of DesiAuction. We'll get back to you within one working day to fix a time.",
       ],
       details: [
-        [
-          "Tournament",
-          `${request.orgName} (${SIZE_WORDS[request.tournamentSize] ?? request.tournamentSize})`,
-        ],
+        ["Tournament size", SIZE_WORDS[request.tournamentSize] ?? "not sure yet"],
         ["Auction date", request.auctionOn ?? "not fixed yet"],
-        ["Best time to talk", WINDOW_WORDS[request.preferredWindow] ?? request.preferredWindow],
+        ["Best time to talk", WINDOW_WORDS[request.preferredWindow] ?? "any time"],
       ],
       after: [
         "The demo is a live walkthrough of a real auction — squads, the bidding, the gavel, and the money afterwards — on a tournament we've already run, so you see the whole night rather than an empty screen.",
         "In a hurry? You don't have to wait for us: every tournament gets the full platform free during beta.",
+        "Didn't ask for this? Somebody typed your address into our demo form. You can ignore this email — we won't write again unless you reply.",
       ],
       action: { label: "Start free", url: `${env.PUBLIC_BASE_URL}/login` },
-      footnote: `You received this because you asked for a demo. Reply or write to ${SUPPORT_EMAIL} if anything changes.`,
+      footnote: `You received this because this address was entered on our demo request form. Write to ${SUPPORT_EMAIL} if anything changes.`,
     }),
   };
 }
@@ -101,13 +111,23 @@ export function founderNotification(
 export async function sendDemoRequestMail(
   request: ValidDemoRequest,
   requestId: string,
-): Promise<{ requester: MailOutcome | "no-address"; founder: MailOutcome }> {
+  options: {
+    /**
+     * False when the platform-wide hourly cap on acknowledgements is spent
+     * (`acknowledgementsSpent`). The lead is still recorded and the founder
+     * still told — only the mail to the unverified address is withheld.
+     */
+    acknowledge?: boolean;
+  } = {},
+): Promise<{ requester: MailOutcome | "no-address" | "capped"; founder: MailOutcome }> {
   const mailer = transactionalMailer();
 
-  const requesterOutcome: MailOutcome | "no-address" =
+  const requesterOutcome: MailOutcome | "no-address" | "capped" =
     request.email === null
       ? "no-address"
-      : await mailer.send({ to: request.email, ...requesterAcknowledgement(request) });
+      : options.acknowledge === false
+        ? "capped"
+        : await mailer.send({ to: request.email, ...requesterAcknowledgement(request) });
 
   const founderOutcome = await mailer.send({
     to: SUPPORT_EMAIL,

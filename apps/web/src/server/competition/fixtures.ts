@@ -11,6 +11,7 @@ import {
 } from "@desiauction/db";
 import { alias } from "drizzle-orm/pg-core";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, sql, type SQL } from "drizzle-orm";
+import { containsPattern } from "../../lib/like-pattern";
 
 // FIXTURE SNAPSHOTS (M-IP3-3, CTO addition 2). The immutable projection every
 // downstream surface reads — calendar, exports, and (future) the Auction and
@@ -298,7 +299,7 @@ export async function queryFixtures(
   }
   const term = query.search?.trim();
   if (term !== undefined && term !== "") {
-    filters.push(ilike(fixtures.fixtureNumber, `%${term}%`));
+    filters.push(ilike(fixtures.fixtureNumber, containsPattern(term)));
   }
   if (query.from !== undefined && query.from !== "") {
     filters.push(gte(fixtures.kickoffAt, query.from));

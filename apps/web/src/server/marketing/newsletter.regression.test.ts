@@ -16,6 +16,8 @@ import {
   purgeExpiredNewsletter,
   subscribe,
   unsubscribe,
+  unsubscribeTokenMatches,
+  unsubscribeUrl,
 } from "./newsletter";
 
 const handle = createDb(env.DATABASE_URL);
@@ -86,5 +88,18 @@ describe("NEWSLETTER — limited, retained, removable", () => {
     // And a second run finds nothing left to do.
     const again = await purgeExpiredNewsletter(db, new Date(now));
     expect(again.addressesCleared).toBe(0);
+  });
+});
+
+describe("NEWSLETTER — the link a mail carries (gate P3)", () => {
+  it("names one address and cannot be moved to another", () => {
+    const url = new URL(unsubscribeUrl(` ${address(300).toUpperCase()} `));
+    expect(url.pathname).toBe("/newsletter/unsubscribe");
+    const token = url.searchParams.get("token");
+    expect(url.searchParams.get("address")).toBe(address(300));
+    expect(unsubscribeTokenMatches(address(300), token)).toBe(true);
+    expect(unsubscribeTokenMatches(address(301), token)).toBe(false);
+    expect(unsubscribeTokenMatches(address(300), `${token ?? ""}x`)).toBe(false);
+    expect(unsubscribeTokenMatches(address(300), null)).toBe(false);
   });
 });

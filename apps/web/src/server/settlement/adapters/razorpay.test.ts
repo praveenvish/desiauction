@@ -72,9 +72,18 @@ describe("Razorpay adapter — webhook verification (the trusted-envelope core)"
     });
   });
 
-  it("REJECTS a stale event outside the freshness window (clock skew)", () => {
+  it("ACCEPTS a provider retry a day later — the payload's created_at does not move", () => {
+    // Razorpay re-delivers the same body for ~24h after a failed delivery. The
+    // five-minute window 400'd every one of them (gate P1-5); the replay
+    // defence is the HMAC plus providerEventId idempotency, not the clock.
     const body = captureBody();
-    const result = adapter.verifyWebhook(body, sign(body), NOW + 10 * 60 * 1000);
+    const result = adapter.verifyWebhook(body, sign(body), NOW + 24 * 60 * 60 * 1000);
+    expect(result.ok).toBe(true);
+  });
+
+  it("REJECTS a stale event outside the freshness window", () => {
+    const body = captureBody();
+    const result = adapter.verifyWebhook(body, sign(body), NOW + 49 * 60 * 60 * 1000);
     expect(result).toEqual({ ok: false, reason: "stale" });
   });
 

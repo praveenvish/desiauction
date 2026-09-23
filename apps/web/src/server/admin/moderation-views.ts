@@ -3,6 +3,7 @@ import { and, desc, eq, ilike, isNotNull, or, sql, type SQL } from "drizzle-orm"
 
 import { systemDb } from "../db";
 import { platformModerationGate } from "./authz";
+import { containsPattern } from "../../lib/like-pattern";
 
 /**
  * THE MODERATION DESK, read (0072).
@@ -48,19 +49,15 @@ export interface ModerationDesk {
   readonly held: readonly HeldSeasonRow[];
 }
 
-function escapeLike(term: string): string {
-  return term.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
-
 export async function moderationDesk(db: Db, query = ""): Promise<ModerationDesk> {
   const term = query.trim();
   const match: SQL | undefined =
     term === ""
       ? undefined
       : or(
-          ilike(competitions.name, `%${escapeLike(term)}%`),
-          ilike(competitions.slug, `%${escapeLike(term)}%`),
-          ilike(organizations.name, `%${escapeLike(term)}%`),
+          ilike(competitions.name, containsPattern(term)),
+          ilike(competitions.slug, containsPattern(term)),
+          ilike(organizations.name, containsPattern(term)),
         );
   const isPublic = eq(competitions.visibility, "public");
   const publishedWhere = match === undefined ? isPublic : and(isPublic, match);

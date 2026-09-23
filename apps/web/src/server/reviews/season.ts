@@ -37,6 +37,8 @@ export const PUBLIC_MIN_REVIEWS = 3;
 export const ORG_ASK_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 export const REPLY_LIMIT = 1000;
 const REPORTS_PER_IP_PER_HOUR = 10;
+/** Reports with no address AND no session, counted together across the platform. */
+const ANONYMOUS_UNADDRESSED_REPORTS_PER_HOUR = 30;
 const HOUR_MS = 60 * 60 * 1000;
 
 export interface SeasonRef {
@@ -436,19 +438,33 @@ export async function reportReview(input: {
     return { ok: false, error: "That review isn't available." };
   }
 
-  if (input.ip !== null) {
-    const [recent] = (await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(reviewReports)
-      .where(
-        and(
-          eq(reviewReports.reporterIp, input.ip),
-          gt(reviewReports.createdAt, new Date(now.getTime() - HOUR_MS)),
-        ),
-      )) as [{ count: number }];
-    if (recent.count >= REPORTS_PER_IP_PER_HOUR) {
-      return { ok: true };
-    }
+  /*
+   * WHO IS COUNTED. By network address when we have one — the cheap signal
+   * that stops a script. But the address is null whenever no trusted proxy
+   * header arrives, and the throttle used to simply stop there: no address, no
+   * limit (gate P3). So a missing address falls back to the signed-in person,
+   * and a report with neither shares ONE platform-wide allowance with every
+   * other report like it — generous for the honest trickle, a wall for a flood.
+   */
+  const since = new Date(now.getTime() - HOUR_MS);
+  const key =
+    input.ip !== null
+      ? { where: eq(reviewReports.reporterIp, input.ip), cap: REPORTS_PER_IP_PER_HOUR }
+      : input.personId !== null
+        ? {
+            where: eq(reviewReports.reporterPersonId, input.personId),
+            cap: REPORTS_PER_IP_PER_HOUR,
+          }
+        : {
+            where: and(isNull(reviewReports.reporterIp), isNull(reviewReports.reporterPersonId)),
+            cap: ANONYMOUS_UNADDRESSED_REPORTS_PER_HOUR,
+          };
+  const [recent] = (await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(reviewReports)
+    .where(and(key.where, gt(reviewReports.createdAt, since)))) as [{ count: number }];
+  if (recent.count >= key.cap) {
+    return { ok: true };
   }
 
   await db.insert(reviewReports).values({

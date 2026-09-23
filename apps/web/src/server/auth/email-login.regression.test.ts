@@ -317,6 +317,8 @@ describe("EMAIL SIGN-UP — the account the mailbox creates", () => {
     expect(await confirmEmailVerification(db, { personId, code: changeCode })).toEqual({
       ok: true,
       email: newEmail,
+      // The old address was verified, so it is the one told about the move.
+      previousEmail: oldEmail,
     });
 
     // The old mailbox no longer belongs to this account and must not open it.

@@ -46,6 +46,7 @@ import {
 import { SMS_TEMPLATES } from "../messaging/templates";
 import { ADMIN_ACCESS_ACTION } from "./capabilities";
 import { countNoun, waitedFor } from "./format";
+import { containsPattern } from "../../lib/like-pattern";
 
 /**
  * PX-9 read composition — the Platform Administration projections.
@@ -724,14 +725,6 @@ async function orgCursor(db: Db, after: string | undefined): Promise<SQL | undef
   );
 }
 
-/**
- * A search term as a LIKE pattern body: `%`, `_` and the escape character
- * itself match literally, so "u_19" finds "u_19" rather than "u119".
- */
-function escapeLike(term: string): string {
-  return term.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
-
 export async function organizationDirectory(
   db: Db,
   options: {
@@ -743,7 +736,7 @@ export async function organizationDirectory(
   const query = (options.query ?? "").trim();
   const filter = options.filter ?? "all";
   const clauses: SQL[] = [];
-  const pattern = `%${escapeLike(query)}%`;
+  const pattern = containsPattern(query);
   if (query !== "") {
     // Hand-written aliases, never `${table.col}` inside a raw template (PX-9
     // finding: drizzle emits it unqualified, binding a correlated subquery to
@@ -1030,9 +1023,9 @@ export async function userDirectory(
     term === ""
       ? undefined
       : or(
-          ilike(people.name, `%${term}%`),
-          ilike(people.phone, `%${term}%`),
-          ilike(people.email, `%${term}%`),
+          ilike(people.name, containsPattern(term)),
+          ilike(people.phone, containsPattern(term)),
+          ilike(people.email, containsPattern(term)),
         );
   // PI-1 P6: profile-aware facets. EXISTS subqueries, so the directory stays
   // one indexed pass (registrations_person_idx / player_profiles_person_uq).
@@ -1304,7 +1297,7 @@ export async function auditExplorer(db: Db, filters: AuditFilters = {}): Promise
   if (q !== "") {
     // Correlation identifiers are ids: subject, scope and actor are all ULIDs,
     // so one box searches the whole correlation chain.
-    const like = `%${q}%`;
+    const like = containsPattern(q);
     const match = or(
       ilike(auditLog.subject, like),
       ilike(auditLog.scopeId, like),

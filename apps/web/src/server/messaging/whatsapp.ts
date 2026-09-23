@@ -3,9 +3,10 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { env } from "../../env";
 import { WHATSAPP_CONSENT_LABEL } from "../../lib/whatsapp-consent";
-import type { HttpResponse, SmsTransport } from "../competition/registration-notify";
+import type { SmsTransport } from "../competition/registration-notify";
 import { recordConsent } from "./consent";
 import type { TemplateKey } from "./templates";
+import { isProviderTimeout, providerFetch } from "./provider-fetch";
 
 /**
  * PERSONAL MESSAGES ON WHATSAPP (Phase 3).
@@ -173,7 +174,14 @@ export interface PersonalWhatsAppSender {
 }
 
 export class WhatsAppSendError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /**
+     * Meta may have ACCEPTED it: the call died on our deadline, not on a
+     * refusal. The drain must not cover this with an SMS (outbox.ts).
+     */
+    readonly outcomeUnknown = false,
+  ) {
     super(message);
     this.name = "WhatsAppSendError";
   }
@@ -182,10 +190,9 @@ export class WhatsAppSendError extends Error {
 /** Pinned like the OTP sender's: a vendor's "latest" must not move this path. */
 const WHATSAPP_API_BASE = "https://graph.facebook.com/v21.0";
 
-const defaultTransport: SmsTransport = async (url, init): Promise<HttpResponse> => {
-  const response = await fetch(url, init);
-  return { status: response.status, body: await response.text() };
-};
+// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
+// outbox's claim lease, or two drains deliver the same message.
+const defaultTransport: SmsTransport = providerFetch;
 
 /**
  * Meta Cloud API, utility templates. Same breaker contract as every sender in
@@ -233,6 +240,7 @@ export class WhatsAppCloudSender implements PersonalWhatsAppSender {
     });
     const base = this.config.apiBase ?? WHATSAPP_API_BASE;
     let failed: string | null = null;
+    let unknown = false;
     try {
       const response = await this.transport(
         `${base}/${encodeURIComponent(this.config.phoneNumberId)}/messages`,
@@ -260,15 +268,16 @@ export class WhatsAppCloudSender implements PersonalWhatsAppSender {
       if (response.status >= 400 || response.body.includes('"error"')) {
         failed = `WhatsApp refused the send (status ${String(response.status)})`;
       }
-    } catch {
-      failed = "WhatsApp unreachable";
+    } catch (error) {
+      unknown = isProviderTimeout(error);
+      failed = unknown ? "WhatsApp did not answer in time" : "WhatsApp unreachable";
     }
     if (failed !== null) {
       this.consecutiveFailures += 1;
       if (this.consecutiveFailures >= 3) {
         this.openedAt = this.now();
       }
-      throw new WhatsAppSendError(failed);
+      throw new WhatsAppSendError(failed, unknown);
     }
     this.consecutiveFailures = 0;
     this.openedAt = null;
