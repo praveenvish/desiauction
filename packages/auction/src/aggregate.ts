@@ -2173,9 +2173,20 @@ export async function undoLastAction(
     // Undoing a sale must also undo the squad placement, or the roster keeps a
     // player the ledger says was never signed — the failure mode that looks
     // correct and so never gets reported.
+    //
+    // The armband goes with the placement. A bought player may be named
+    // captain once the auction is open (`captainChangeRefusal`, apps/web
+    // roster-lock.ts: `bought` is enough), so an undone sale could leave
+    // isCaptain=true on a player with no team. Resold to a team that already
+    // has a captain, that collides on `registrations_team_captain_uq` and the
+    // gavel can never close the lot — the _TimerClose retries forever. Nothing
+    // else pre-signs a player whose lot SOLD: settlePool withdrew every lot of
+    // an Icon or Retained player when the auction opened, and those marks
+    // freeze with the roster from then on — so the captain mark here can only
+    // have come from the sale, and it is undone with it.
     await tx
       .update(registrations)
-      .set({ teamId: null })
+      .set({ teamId: null, isCaptain: false })
       .where(eq(registrations.id, lot.registrationId));
     await appendEvent(
       tx,

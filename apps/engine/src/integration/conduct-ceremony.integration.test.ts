@@ -79,6 +79,7 @@ let paddleB = "";
 let lot1 = "";
 let lot2 = "";
 let lot3 = "";
+let lot1Registration = "";
 
 async function command(
   type: string,
@@ -155,6 +156,21 @@ beforeAll(async () => {
       registrationNumber: registrationNumber(id),
     })),
   );
+  // Blasters' captain, named before the night: pre-signed, so no lot. It is
+  // what makes the undo-then-resell below a real test of the captain unique
+  // (DA-04) rather than a sale into a team with no armband to collide with.
+  const captainRegId = newId();
+  await db.insert(registrations).values({
+    id: captainRegId,
+    orgId,
+    competitionId: compId,
+    personId: outsiderId,
+    role: "batter" as const,
+    status: "approved" as const,
+    registrationNumber: registrationNumber(captainRegId),
+    teamId: teamIds[1] as string,
+    isCaptain: true,
+  });
   const created = await createAuction(
     db,
     { id: compId, orgId, name: `Conduct Cup ${RUN}` },
@@ -426,6 +442,19 @@ describe("COMPENSATING UNDO — history immutable, replay identical", () => {
     // The purse committed the sale.
     const paddle = snapshot().paddles.find((entry) => entry.paddleId === paddleA);
     expect(paddle?.committed).toBe(1_000_000);
+
+    // Arrows name the player they just bought as captain — allowed once the
+    // auction is open, because the player is `bought` (captainChangeRefusal).
+    const [sold] = await db
+      .select({ registrationId: lotsTable.registrationId })
+      .from(lotsTable)
+      .where(eq(lotsTable.id, lot1))
+      .limit(1);
+    lot1Registration = sold?.registrationId ?? "";
+    await db
+      .update(registrations)
+      .set({ isCaptain: true })
+      .where(eq(registrations.id, lot1Registration));
   });
 
   it("undo demands conduct AND override — the highest-friction action", async () => {
@@ -463,6 +492,16 @@ describe("COMPENSATING UNDO — history immutable, replay identical", () => {
     const paddle = snap.paddles.find((entry) => entry.paddleId === paddleA);
     expect(paddle?.committed).toBe(0);
     expect(snap.lastOutcome).toMatchObject({ kind: "reopened", lotNumber: "L001" });
+
+    // The squad placement is undone, and the armband with it (go-live gate
+    // P2): a captain with no team would collide with the next buyer's own
+    // captain on registrations_team_captain_uq, and the gavel could not close.
+    const [reg] = await db
+      .select({ teamId: registrations.teamId, isCaptain: registrations.isCaptain })
+      .from(registrations)
+      .where(eq(registrations.id, lot1Registration))
+      .limit(1);
+    expect(reg).toEqual({ teamId: null, isCaptain: false });
 
     // The winning bid is voided-but-VISIBLE: the row survives as invalidated.
     const bidRows = await db
@@ -550,6 +589,14 @@ describe("COMPENSATING UNDO — history immutable, replay identical", () => {
     ).toBe(true);
     const sold = snapshot();
     expect(sold.lastOutcome).toMatchObject({ kind: "sold", teamName: "Blasters" });
+    // Blasters already have a captain; the resale landed anyway, the undone
+    // armband having gone with the undone sale.
+    const [resold] = await db
+      .select({ teamId: registrations.teamId, isCaptain: registrations.isCaptain })
+      .from(registrations)
+      .where(eq(registrations.id, lot1Registration))
+      .limit(1);
+    expect(resold).toEqual({ teamId: teamIds[1], isCaptain: false });
 
     // Pass lot 2 with no bids, then undo the pass.
     expect(
