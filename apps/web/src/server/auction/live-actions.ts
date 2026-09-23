@@ -26,6 +26,7 @@ import { dbHandle } from "../db";
 import { featureEnabled } from "../feature-settings";
 import { storage } from "../media";
 import { announceAuctionOutcomes } from "./auction-notify";
+import { isSeasonAuctioneer, lockSeasonAppointments } from "./auctioneers";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
 import {
   preSignedPlayers,
@@ -558,6 +559,37 @@ async function holdsPaddle(gate: LiveGate, paddleId: unknown): Promise<boolean> 
 const GATEWAY_BLOCKED = new Set(["InviteOwner", "AcceptOwnerInvite"]);
 
 /**
+ * A paddle in hand makes a person a team owner, and the season's auctioneer
+ * may never be one — conducting shows every rival's purse (security review,
+ * launch Phase 5). Appointment already refuses a paddle holder
+ * (`teamOwnersOf`); this is the same rule from the other side, and it runs
+ * under the season's appointment lock so the two cannot pass each other
+ * (go-live gate P3).
+ */
+async function issueUnlessAuctioneer(
+  gate: LiveGate,
+  commandId: string,
+  payload: Record<string, unknown>,
+  send: () => Promise<CommandAck>,
+): Promise<CommandAck> {
+  const personId = payload["personId"];
+  return withTenantDb(
+    dbHandle,
+    { personId: gate.personId, orgId: gate.competition.orgId },
+    async (db) => {
+      await lockSeasonAppointments(db, gate.competition.id);
+      if (
+        typeof personId === "string" &&
+        (await isSeasonAuctioneer(db, gate.competition.id, personId))
+      ) {
+        return { commandId, accepted: false, reason: "auctioneer", version: 0 };
+      }
+      return send();
+    },
+  );
+}
+
+/**
  * The single command gateway. `commandId` comes from the CLIENT so retries
  * (double-click, network replay) are idempotent end to end — the engine
  * returns the original ack for a repeated id.
@@ -598,16 +630,21 @@ export async function submitAuctionCommand(
   if (type === "PlaceBid" && !manualMode && !(await holdsPaddle(gate, payload["paddleId"]))) {
     return { commandId, accepted: false, reason: "not_authorized", version: 0 };
   }
-  const ack = await sendEngineCommand({
-    commandId,
-    auctionId: gate.auction.id,
-    type,
-    actor: gate.personId,
-    conduct: gate.canConduct,
-    override: gate.canOverride,
-    manage: gate.canManage,
-    payload,
-  });
+  const send = () =>
+    sendEngineCommand({
+      commandId,
+      auctionId: gate.auction.id,
+      type,
+      actor: gate.personId,
+      conduct: gate.canConduct,
+      override: gate.canOverride,
+      manage: gate.canManage,
+      payload,
+    });
+  const ack =
+    type === "IssuePaddle"
+      ? await issueUnlessAuctioneer(gate, commandId, payload, send)
+      : await send();
   /*
    * THE ONE MESSAGE THE PLAYER WAS NEVER SENT.
    *

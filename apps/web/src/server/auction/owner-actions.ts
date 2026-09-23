@@ -19,8 +19,7 @@ import { personLabel } from "../../lib/person-label";
 
 import { currentSession } from "../auth/actions";
 import { systemDb } from "../db";
-import { grantsOfPerson } from "../request-cache";
-import { AUCTIONEER_SET } from "./auctioneers";
+import { isSeasonAuctioneer, lockSeasonAppointments } from "./auctioneers";
 import { sendEngineCommand } from "./engine-client";
 import { liveGate } from "./live-actions";
 import { rulesOf } from "./live-summary";
@@ -375,16 +374,13 @@ export async function acceptOwnerJoin(token: string): Promise<AcceptOwnerJoinRes
   // THE AUCTIONEER CANNOT OWN A TEAM in the season they run (security review,
   // launch Phase 5): conducting shows every rival's purse. Appointment already
   // refuses a team owner; this is the same rule from the other side.
-  const conducting = (await grantsOfPerson(session.personId)).some(
-    (grant) =>
-      grant.revokedAt === null &&
-      grant.scopeType === "tournament" &&
-      grant.scopeId === row.competitionId &&
-      grant.capabilitySet === AUCTIONEER_SET,
-  );
-  if (conducting) {
-    return { ok: false };
-  }
+  //
+  // Checked and acted on under the season's appointment lock
+  // (lockSeasonAppointments): an appointment racing this acceptance either
+  // committed first and is seen here, or waits until the engine has recorded
+  // the acceptance and then sees this person as a team owner. The read is
+  // direct, not the per-request grants cache, so it cannot predate the lock.
+  //
   // Auction side FIRST: the acceptance travels the command path, and the engine
   // is the authority on whether it happened.
   //
@@ -393,14 +389,21 @@ export async function acceptOwnerJoin(token: string): Promise<AcceptOwnerJoinRes
   // member of a club they had never joined, holding an audit row asserting an
   // acceptance that never occurred, and `{ok:false}` on their screen. Nothing
   // is written on the identity side until the engine has said yes.
-  const ack = await sendEngineCommand({
-    auctionId: row.auctionId,
-    type: "AcceptOwnerInvite",
-    actor: session.personId,
-    conduct: false,
-    payload: { inviteId: row.id },
+  const accepted = await systemDb.transaction(async (tx) => {
+    await lockSeasonAppointments(tx, row.competitionId);
+    if (await isSeasonAuctioneer(tx, row.competitionId, session.personId)) {
+      return false;
+    }
+    const ack = await sendEngineCommand({
+      auctionId: row.auctionId,
+      type: "AcceptOwnerInvite",
+      actor: session.personId,
+      conduct: false,
+      payload: { inviteId: row.id },
+    });
+    return ack.accepted;
   });
-  if (!ack.accepted) {
+  if (!accepted) {
     return { ok: false };
   }
   // Identity side: the owner becomes an org member (viewer-level; grants-not-

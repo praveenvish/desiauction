@@ -6,10 +6,11 @@ import {
   newId,
   orgMembers,
   paddleGrants,
+  paddles,
   people,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 /**
  * THE AUCTIONEER — a per-season conduct grant (launch polish, Phase 3).
@@ -57,8 +58,55 @@ export async function auctioneersOf(db: Db, competitionId: string): Promise<Auct
 }
 
 /**
- * People who own a TEAM in this season: an accepted owner link, or a live
- * paddle grant, on any of its auctions that was not abandoned.
+ * SERIALISE "WHO CONDUCTS" AGAINST "WHO OWNS", per season.
+ *
+ * Appointment refuses a team owner and acceptance refuses an appointee, but
+ * each was check-then-write with nothing between them: an appointment and an
+ * owner-link acceptance for the same person, racing, could both pass their
+ * check and leave one person bidding for a team while seeing every rival's
+ * purse (go-live gate P3). Both sides now take this lock first, inside their
+ * transaction, and check after it — so whichever runs second sees the other's
+ * committed write.
+ *
+ * An advisory lock rather than `SELECT … FOR UPDATE` on the competition row:
+ * the acceptance side runs on the system pool, which is read-only in
+ * production, and a row lock needs UPDATE. Transaction-scoped, so it can never
+ * outlive the work it guards.
+ */
+export async function lockSeasonAppointments(db: Db, competitionId: string): Promise<void> {
+  await db.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`auctioneer-owner:${competitionId}`}, 0))`,
+  );
+}
+
+/** Does this person hold a live auctioneer grant for this season? */
+export async function isSeasonAuctioneer(
+  db: Db,
+  competitionId: string,
+  personId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: grants.id })
+    .from(grants)
+    .where(
+      and(
+        eq(grants.personId, personId),
+        eq(grants.scopeType, SCOPE),
+        eq(grants.scopeId, competitionId),
+        eq(grants.capabilitySet, AUCTIONEER_SET),
+        isNull(grants.revokedAt),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
+ * People who own a TEAM in this season: an accepted owner link, a live paddle
+ * grant, or a paddle actually in hand (unreleased), on any of its auctions
+ * that was not abandoned. The last route was missing: IssuePaddle hands a
+ * paddle straight to a person with no invite and no grant, so a paddle holder
+ * could be appointed to conduct the night they were bidding in.
  *
  * They can never be its auctioneer (security review, launch Phase 5). Team
  * owners are viewer-level members of the club, so they pass the membership
@@ -66,7 +114,7 @@ export async function auctioneersOf(db: Db, competitionId: string): Promise<Auct
  * every owner's phone, which DA-30 exists to keep from a bidder.
  */
 async function teamOwnersOf(db: Db, competitionId: string): Promise<Set<string>> {
-  const [accepted, granted] = await Promise.all([
+  const [accepted, granted, holding] = await Promise.all([
     db
       .select({ personId: auctionOwnerInvites.acceptedBy })
       .from(auctionOwnerInvites)
@@ -90,9 +138,22 @@ async function teamOwnersOf(db: Db, competitionId: string): Promise<Set<string>>
           isNull(paddleGrants.revokedAt),
         ),
       ),
+    db
+      .select({ personId: paddles.personId })
+      .from(paddles)
+      .innerJoin(auctions, eq(auctions.id, paddles.auctionId))
+      .where(
+        and(
+          eq(auctions.competitionId, competitionId),
+          ne(auctions.status, "abandoned"),
+          isNull(paddles.releasedAt),
+        ),
+      ),
   ]);
   return new Set(
-    [...accepted, ...granted].flatMap((row) => (row.personId === null ? [] : [row.personId])),
+    [...accepted, ...granted, ...holding].flatMap((row) =>
+      row.personId === null ? [] : [row.personId],
+    ),
   );
 }
 
@@ -140,6 +201,10 @@ export async function assignAuctioneer(
   if (member === undefined) {
     return { ok: false, reason: "not_a_member" };
   }
+  // Checked under the lock: an owner-link acceptance racing this appointment
+  // either committed first (and is seen below) or waits for this to commit
+  // (and sees the grant). `db` is the caller's tenant transaction.
+  await lockSeasonAppointments(db, input.competitionId);
   if ((await teamOwnersOf(db, input.competitionId)).has(input.personId)) {
     return { ok: false, reason: "team_owner" };
   }

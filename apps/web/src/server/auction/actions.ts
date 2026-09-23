@@ -51,6 +51,7 @@ import {
   type LotMedia,
 } from "./live-summary";
 import { storage } from "../media";
+import { isSeasonAuctioneer } from "./auctioneers";
 import { engineWsUrl, sendEngineCommand } from "./engine-client";
 import { auctionOverview, type AuctionOverview } from "./auction-overview";
 
@@ -540,6 +541,18 @@ export async function issuePaddleAction(
   const gate = await manageGate(slug);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
+  }
+  // The season's auctioneer never holds a paddle (security review, launch
+  // Phase 5; teamOwnersOf refuses the reverse order). An owner who appointed
+  // themselves would see nothing new, but the rule has no exceptions to argue.
+  const appointed = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    isSeasonAuctioneer(db, gate.competition.id, gate.personId),
+  );
+  if (appointed) {
+    return {
+      ok: false,
+      error: "You're this season's auctioneer — the auctioneer can't hold a team's paddle.",
+    };
   }
   // Manual mode: the conductor holds the paddle — an EXPLICIT organizer act
   // (the grant-then-claim self-service path lives on the cockpit).
