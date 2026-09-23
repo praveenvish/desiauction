@@ -129,4 +129,28 @@ describe("the Cloud API sender", () => {
     await expect(sender.send("+919812345678", message)).rejects.toThrow(/breaker open/);
     expect(http.calls).toHaveLength(3);
   });
+
+  it("marks a send that died on the deadline as UNKNOWN — Meta may have it already", async () => {
+    const timedOut = (): Promise<HttpResponse> =>
+      Promise.reject(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+    const sender = new WhatsAppCloudSender({
+      phoneNumberId: "1",
+      accessToken: "t",
+      transport: timedOut,
+    });
+    const error: unknown = await sender.send("+919812345678", message).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(WhatsAppSendError);
+    expect((error as WhatsAppSendError).outcomeUnknown).toBe(true);
+  });
+
+  it("keeps a refused connection KNOWN — nothing reached Meta, so SMS may cover it", async () => {
+    const refused = (): Promise<HttpResponse> => Promise.reject(new TypeError("fetch failed"));
+    const sender = new WhatsAppCloudSender({
+      phoneNumberId: "1",
+      accessToken: "t",
+      transport: refused,
+    });
+    const error: unknown = await sender.send("+919812345678", message).catch((e: unknown) => e);
+    expect((error as WhatsAppSendError).outcomeUnknown).toBe(false);
+  });
 });

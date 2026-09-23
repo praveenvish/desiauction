@@ -2,6 +2,7 @@ import { newId, otpInbox, type Db } from "@desiauction/db";
 
 import { env } from "../../env";
 import { renderEmail } from "../messaging/email-layout";
+import { providerFetch } from "../messaging/provider-fetch";
 
 /**
  * Sending a verification code to a mailbox.
@@ -187,10 +188,9 @@ export class HttpMailer implements CodeMailer {
   }
 }
 
-const defaultTransport: MailTransport = async (url, init) => {
-  const response = await fetch(url, init);
-  return { status: response.status, body: await response.text() };
-};
+// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
+// outbox's claim lease, or two drains deliver the same message.
+const defaultTransport: MailTransport = providerFetch;
 
 /**
  * One construction point. The real mailer is selected only when all three
