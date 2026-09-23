@@ -438,6 +438,60 @@ export const notificationTemplates = pgTable(
   ],
 );
 
+/**
+ * WHICH APPROVED TEMPLATE EACH KIND USES (0088) — per text channel. WhatsApp
+ * names the template Meta approved; SMS names the DLT id. No row: the env var
+ * the template declares (apps/web server/messaging/provider-templates.ts).
+ */
+export const providerTemplateMappings = pgTable(
+  "provider_template_mappings",
+  {
+    kind: text("kind").notNull(),
+    channel: text("channel", { enum: ["whatsapp", "sms"] }).notNull(),
+    providerTemplateName: text("provider_template_name"),
+    providerTemplateId: text("provider_template_id"),
+    languages: text("languages").array().notNull().default(sql`ARRAY['en', 'hi']::text[]`),
+    note: text("note"),
+    updatedBy: char("updated_by", { length: 26 }).references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ name: "provider_template_mappings_pk", columns: [table.kind, table.channel] }),
+  ],
+);
+
+/** What Meta last said about a template, per language (0088) — a snapshot. */
+export const providerTemplateStatus = pgTable(
+  "provider_template_status",
+  {
+    name: text("name").notNull(),
+    language: text("language").notNull(),
+    status: text("status").notNull(),
+    category: text("category"),
+    quality: text("quality"),
+    rejectedReason: text("rejected_reason"),
+    metaId: text("meta_id"),
+    source: text("source", { enum: ["sync", "submitted"] })
+      .notNull()
+      .default("sync"),
+    syncedAt: ts("synced_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ name: "provider_template_status_pk", columns: [table.name, table.language] }),
+  ],
+);
+
+/** The status sync's own record, one row per provider (0088). */
+export const providerTemplateSyncs = pgTable("provider_template_syncs", {
+  provider: text("provider", { enum: ["whatsapp"] }).primaryKey(),
+  lastAttemptAt: ts("last_attempt_at"),
+  lastSuccessAt: ts("last_success_at"),
+  lastError: text("last_error"),
+  templateCount: integer("template_count").notNull().default(0),
+});
+
 export const otpCodes = pgTable(
   "otp_codes",
   {

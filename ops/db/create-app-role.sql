@@ -265,5 +265,9 @@ revoke all on whatsapp_inbound from desiauction_engine, desiauction_runner;
 -- 0087: editable email wording. The engine sends nothing; the RUNNER keeps its
 -- read, because it sends receipts and their subject line is editable.
 revoke all on notification_templates from desiauction_engine;
+-- 0088: WhatsApp/SMS template mapping and Meta's status. Only the web tier
+-- sends a text; the runner's receipts go by email and in-app.
+revoke all on provider_template_mappings, provider_template_status, provider_template_syncs
+  from desiauction_engine, desiauction_runner;
 
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'
