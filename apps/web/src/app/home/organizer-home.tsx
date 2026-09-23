@@ -1,74 +1,295 @@
-import { ButtonLink, IconArrowRight } from "@desiauction/ui";
+import { formatPaiseINR, paise } from "@desiauction/core";
+import {
+  ButtonLink,
+  CardGrid,
+  IconAlert,
+  IconArrowRight,
+  IconBolt,
+  IconCalendar,
+  IconCheck,
+  IconCheckCircle,
+  IconChevronRight,
+  IconFileCheck,
+  IconGavel,
+  IconPlus,
+  IconRupee,
+  IconTile,
+  IconTrophy,
+  IconUser,
+  IconUsers,
+  IconWallet,
+  JourneyStepper,
+  Money,
+  Pill,
+  PlayerImage,
+  SectionCard,
+  StatCard,
+  StatGrid,
+  VisuallyHidden,
+  type JourneyStep,
+} from "@desiauction/ui";
 import Link from "next/link";
-import { Fragment } from "react";
+import type { ReactNode } from "react";
 
 import { FormDialog } from "../../components/form-dialog";
+import { monogram } from "../../components/season-hero/season-hero";
 import { roleLabeller } from "../../lib/role-label";
 import { auctionDashboard } from "../../server/auction/actions";
-import { competitionsView } from "../../server/competition/actions";
+import {
+  competitionsView,
+  registrationDashboard,
+  seasonOverviewView,
+} from "../../server/competition/actions";
 import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { homeDashboard } from "../../server/home/dashboard";
+import { rolesOf } from "../../server/roles/roles";
+import type { HomeDashboardData } from "../../server/home/dashboard";
 import { CreateOrgForm } from "../orgs/create-org-form";
 import { CreateTournamentForm } from "../tournaments/create-tournament-form";
+import { dateRange } from "../tournaments/season-card";
+import { seasonJourney } from "../tournaments/season-journey";
+import { ClubHero } from "./club-hero";
+import { activityLabel, activityStyle, ago } from "./home-activity";
+import { seasonBadge } from "./home-parts";
 import { HomeShortcuts } from "./home-shortcuts";
 import type { NextStep } from "./next-step";
 import { NextStepBanner } from "./next-step-banner";
-import { OrganizerPanels } from "./organizer-panels";
-import {
-  ATTENTION_SCAN_LIMIT,
-  SetupLadder,
-  attentionFor,
-  lifecycleFor,
-  rupees,
-  rupeesShort,
-  type AttentionRow,
-  type SetupRung,
-} from "./organizer-parts";
+import "./home.css";
+
+interface AttentionRow {
+  key: string;
+  label: string;
+  detail: string;
+  href: string;
+}
+
+const ATTENTION_SCAN_LIMIT = 8;
 
 /**
- * THE ORGANIZER'S HOME — the club's whole operation on one screen.
+ * What this one season is waiting on, or null if it is waiting on nothing.
  *
- * This is the dashboard /home used to hand to everybody, including the team
- * owners and players who could not act on a single figure in it. It is now
- * rendered only for people who hold `org:owner` or `org:staff` somewhere, and
- * it loads its own data: before RN-1 Phase 3 a player's visit ran the season
- * scan, the money roll-up and the activity feed to render none of them.
- *
- * Its one job (RN-1 §0): unblock the next thing. Everything above the fold is
- * either the night in progress or what is waiting on this person.
+ * `draft` and `setup` used to be skipped outright: the scan only looked at
+ * `registration_open` and `registration_closed`, so a season that had not
+ * opened its doors could never produce a row — and 100% of new organizers are
+ * in exactly that state. The panel whose entire job is to say what to do next
+ * told the people who most needed telling that there was nothing to do. The
+ * setup states are now scanned, and they need no database read at all: the
+ * per-season team and registration counts already came back with the dashboard.
  */
+async function attentionFor(
+  competition: { id: string; slug: string; name: string; status: string },
+  dash: HomeDashboardData,
+): Promise<AttentionRow | null> {
+  if (competition.status === "registration_open") {
+    const dashboard = await registrationDashboard(competition.slug, {});
+    // DA-35: `stats` is now absent for a viewer who cannot review — the same
+    // condition `canReview` already expressed, now carried by the type.
+    const stats = dashboard?.stats;
+    if (stats !== undefined && stats.submitted > 0) {
+      return {
+        key: `reg-${competition.id}`,
+        label: `${String(stats.submitted)} registration${stats.submitted === 1 ? "" : "s"} to review`,
+        detail: competition.name,
+        href: `/seasons/${competition.slug}/registrations`,
+      };
+    }
+    return null;
+  }
+  if (competition.status === "registration_closed") {
+    const dashboard = await auctionDashboard(competition.slug);
+    if (dashboard !== null && dashboard.viewer.canConduct && dashboard.view === null) {
+      const blockers = dashboard.ready.checks.filter((check) => !check.pass).length;
+      return {
+        key: `auction-${competition.id}`,
+        label:
+          blockers > 0
+            ? `Auction readiness: ${String(blockers)} blocker${blockers === 1 ? "" : "s"}`
+            : "Ready — create the auction",
+        detail: competition.name,
+        href:
+          blockers > 0
+            ? `/seasons/${competition.slug}/readiness`
+            : `/seasons/${competition.slug}/auction`,
+      };
+    }
+    return null;
+  }
+  // draft / setup — the states the scan could not see.
+  const counts = dash.counts[competition.id] ?? { teams: 0, registrations: 0 };
+  if (counts.teams === 0) {
+    return {
+      key: `teams-${competition.id}`,
+      label: "Add the teams that will bid",
+      detail: competition.name,
+      href: `/seasons/${competition.slug}/teams`,
+    };
+  }
+  if (competition.status === "draft") {
+    return {
+      key: `setup-${competition.id}`,
+      label: "Begin setup",
+      detail: competition.name,
+      href: `/seasons/${competition.slug}`,
+    };
+  }
+  return {
+    key: `open-${competition.id}`,
+    label: `Open registration — ${String(counts.teams)} team${counts.teams === 1 ? "" : "s"} ready`,
+    detail: competition.name,
+    href: `/seasons/${competition.slug}`,
+  };
+}
 
+function rupees(value: number): string {
+  return formatPaiseINR(paise(value));
+}
+
+/**
+ * Compact INR for tiles: ₹48,000 / ₹1.2L / ₹2.4Cr.
+ *
+ * There is no "K" rung. The Indian numbering system groups at thousand, lakh
+ * and crore, and its written short forms are L and Cr — "₹48K" is a scale
+ * borrowed from a different system, sitting one step below "lakh" in the same
+ * sentence. Below a lakh the number is simply grouped the Indian way (48,000),
+ * which is both correct and shorter to read than an abbreviation.
+ */
+function rupeesShort(value: number): string {
+  const r = value / 100;
+  if (r >= 10_000_000) return `₹${(r / 10_000_000).toFixed(r % 10_000_000 === 0 ? 0 : 2)}Cr`;
+  if (r >= 100_000) return `₹${(r / 100_000).toFixed(r % 100_000 === 0 ? 0 : 1)}L`;
+  return `₹${Math.round(r).toLocaleString("en-IN")}`;
+}
+
+/**
+ * Every date on this page is an Indian tournament's date.
+ *
+ * `Date#getHours()` and a bare `toLocaleString` read the SERVER's zone. That is
+ * correct on a laptop in Asia/Calcutta and wrong on every UTC host we would
+ * actually deploy to — IST 17:00–22:30, which is the auction-night window this
+ * console exists for, renders as "Good afternoon" under UTC. Pinning the zone
+ * keeps the greeting and the fixture dates true wherever the server runs.
+ */
+const IST = "Asia/Kolkata";
+const IST_DAY = new Intl.DateTimeFormat("en-IN", { timeZone: IST, day: "2-digit" });
+const IST_MONTH = new Intl.DateTimeFormat("en-IN", { timeZone: IST, month: "short" });
+
+/** Build a polyline `points` string for a 7-value series. */
+function points(series: number[], max: number): string {
+  const x0 = 44;
+  const x1 = 452;
+  const yTop = 16;
+  const yBase = 132;
+  const step = (x1 - x0) / 6;
+  return series
+    .map((value, index) => {
+      const x = x0 + index * step;
+      const y = yBase - (max === 0 ? 0 : (value / max) * (yBase - yTop));
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
+
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/**
+ * GATE FIRST, then stream — the pattern worked out in
+ * `app/org/[slug]/settlement/page.tsx`.
+ *
+ * There is deliberately NO `loading.tsx` in this segment, and there must never
+ * be one again. A route-level Suspense boundary sits ABOVE the page, so React
+ * commits `200 OK` and starts streaming before either `redirect()` below ever
+ * runs; the redirect then degrades to a client-side navigation carried inside a
+ * 49KB body titled "Home · DesiAuction". Measured: anonymous `/home` answered
+ * 200 while `/seasons`, `/orgs`, `/inbox` and `/money` all answered 307. This
+ * is the THIRD time the trap has been hit here — the root `loading.tsx` in
+ * PX-2, then `app/c/loading.tsx` in PX-10, now this one.
+ *
+ * The gate is cheap (one session read), so it costs nothing to run it before
+ * the boundary. Everything expensive lives in `<HomeBody>` behind an IN-PAGE
+ * `<Suspense>`, which streams exactly as the old `loading.tsx` did — but under
+ * a status code that has already been decided.
+/** The season /home leads with when the URL names none. */
+const IN_FLIGHT = new Set(["setup", "registration_open", "registration_closed"]);
+
+/**
+ * THE ORGANIZER'S HOME.
+ *
+ * The MARKUP is the founder's 2026-09-19 redesign (club hero, journey stepper,
+ * stat cards, section cards). The STRUCTURE is RN-1's: this renders only for
+ * somebody holding `org:owner` or `org:staff`, chosen upstream by
+ * `home-router.ts`, and it loads only what an organizer needs.
+ *
+ * Those arrived on branches that never saw each other — the redesign restyled
+ * the old single-file /home, which had `manages ?` woven through it for five
+ * roles at once. Keeping the paint meant throwing the conditionals away: the
+ * router already answered the question they were asking, and a branch that can
+ * no longer be false is a lie about what this page is for.
+ */
 export async function OrganizerHome({
+  personId,
+  focusSlug,
   nextStepFor,
 }: {
+  personId: string;
+  /** `?season=` — the hero's switcher writes it; anything unknown is ignored. */
+  focusSlug: string | null;
   /** The router owns the one next step, across every role this person holds. */
   nextStepFor: (input: {
     managedLive: { competitionSlug: string; competitionName: string } | null;
     attention: AttentionRow[];
   }) => NextStep | null;
 }) {
-  const [view, schedule, dash] = await Promise.all([
+  const [view, schedule, dash, roles] = await Promise.all([
     competitionsView(),
     organizerScheduleView(),
     homeDashboard(),
+    rolesOf(personId),
   ]);
-
+  /*
+   * WHO IS READING (launch polish, Phase 2). The organizer dashboard below —
+   * hero, journey, figures, attention, seasons, activity — is for people who
+   * MANAGE a club. A team owner, a plain member and a player used to get it
+   * too, with an offer to create tournaments they had no power to create.
+   */
+  const managedOrgs = new Set(roles.organizes.map((club) => club.orgId));
+  // The night in progress leads the page (managers only).
   const liveRow = dash.auctions.find((auction) => auction.status === "live") ?? null;
+  // The live panel owns the live auction, so the list lists only the rest.
   const otherAuctions = dash.auctions.filter((auction) => auction.auctionId !== liveRow?.auctionId);
 
+  /*
+   * THE SEASON IN FOCUS — what the club hero, the journey row and the four
+   * figures describe. The switcher's choice when it names one of this person's
+   * managed seasons; otherwise the live night, then the newest season still in
+   * flight, then the newest of all (the list is newest-created first).
+   */
+  const managedSeasons = view.competitions.filter((competition) =>
+    managedOrgs.has(competition.orgId),
+  );
+  const focus =
+    managedSeasons.find((competition) => competition.slug === focusSlug) ??
+    managedSeasons.find((competition) => competition.slug === liveRow?.competitionSlug) ??
+    managedSeasons.find(
+      (competition) =>
+        IN_FLIGHT.has(competition.status) &&
+        dash.top.find((row) => row.slug === competition.slug)?.settlement !== "settled",
+    ) ??
+    managedSeasons[0];
+
+  // The scan used to be a sequential loop of composite reads; one batch now,
+  // with the live board and the focus season's overview riding along.
+  // Only managers are asked what is waiting on them.
   const scanned = view.competitions.slice(0, ATTENTION_SCAN_LIMIT);
-  const [liveBoard, scannedRows] = await Promise.all([
+  const [liveBoard, focusOverview, scannedRows] = await Promise.all([
     liveRow === null
       ? Promise.resolve(null)
       : auctionDashboard(liveRow.competitionSlug).then((board) => board?.overview ?? null),
+    focus === undefined ? Promise.resolve(null) : seasonOverviewView(focus.slug),
     Promise.all(scanned.map((competition) => attentionFor(competition, dash))),
   ]);
   const attention = scannedRows.filter((row): row is AttentionRow => row !== null);
   const unscanned = view.competitions.length - scanned.length;
 
-  const chartMax = Math.max(...dash.money.thisWeek, ...dash.money.lastWeek, 0);
-
-  const totalTeams = Object.values(dash.counts).reduce((sum, row) => sum + row.teams, 0);
   const seasonNeedingTeams =
     view.competitions.find((competition) => (dash.counts[competition.id]?.teams ?? 0) === 0) ??
     view.competitions[0];
@@ -76,6 +297,7 @@ export async function OrganizerHome({
     view.competitions.find((competition) => competition.status !== "registration_open") ??
     view.competitions[0];
 
+  const totalTeams = Object.values(dash.counts).reduce((sum, row) => sum + row.teams, 0);
   const rungs: SetupRung[] = [
     {
       key: "org",
@@ -145,7 +367,11 @@ export async function OrganizerHome({
         ),
     },
   ];
+  // The ladder retires when the LAST rung is done — rungs can complete out of
+  // order (a one-off season leaves the tournament rung open forever).
   const currentRung = rungs.findIndex((rung) => !rung.done);
+  // An ORGANIZER's first-run guide. A brand-new account chooses a path first
+  // (the next-step card); a player or a member never climbs it.
   const laddering = currentRung !== -1 && !(rungs[rungs.length - 1]?.done ?? false);
 
   const nextStep = laddering
@@ -158,28 +384,182 @@ export async function OrganizerHome({
         attention,
       });
 
+  /* ---- which panels have earned their space ------------------------------ */
   const moneyTotal =
     dash.money.collectedPaise + dash.money.outstandingPaise + dash.money.waivedPaise;
+  // One capture is not a trend: a lone payment drew six flat days and a spike.
   const chartDays = [...dash.money.thisWeek, ...dash.money.lastWeek].filter(
     (value) => value > 0,
   ).length;
+  // The next step leads the attention card with the first thing waiting; the
+  const chartMax = Math.max(...dash.money.thisWeek, ...dash.money.lastWeek, 0);
   const showChart = chartDays >= 2;
+  // The next step leads the attention card with the first thing waiting; the
+  // rows under it list only what comes after it.
   const restAttention = nextStep?.key === "organizer-attention" ? attention.slice(1) : attention;
-  const showAttention = !laddering && (nextStep === null || restAttention.length > 0);
+  const attentionCount = restAttention.length + (nextStep !== null ? 1 : 0);
   const showMoney = moneyTotal > 0;
   const showSeasons = dash.top.length > 0;
   const showAuctions = otherAuctions.length > 0 || (!laddering && liveRow === null);
   const showEvents = schedule.length > 0 || !laddering;
   const showActivity = dash.activity.length > 0;
-  const showLeft = showAttention || showMoney || showSeasons;
-  const showRight = showAuctions || showEvents || showActivity;
+
   const liveDone =
     liveRow !== null && liveRow.lotsTotal > 0 && liveRow.lotsSold === liveRow.lotsTotal;
+
+  const bySlug = new Map(view.competitions.map((competition) => [competition.slug, competition]));
+  const seasonMeta = (slug: string): string | null => {
+    const competition = bySlug.get(slug);
+    if (competition === undefined) return null;
+    const parts = [
+      dateRange(competition.startsOn, competition.endsOn),
+      competition.location,
+    ].filter((part): part is string => part !== null);
+    return parts.length === 0 ? null : parts.join(" · ");
+  };
+
+  // Offered to people who MANAGE a club, in the clubs they manage — the same
+  // gate as the top bar's "+ New tournament".
+  const creatableOrgs = view.orgs.filter((org) => managedOrgs.has(org.id));
+  const createCard =
+    creatableOrgs.length > 0 ? (
+      <FormDialog
+        title="New tournament"
+        triggerAsLink
+        triggerClassName="home-create-card"
+        triggerTestId="home-create-tournament-card"
+        triggerLabel={
+          <>
+            <span className="home-create-plus" aria-hidden>
+              <IconPlus size={20} />
+            </span>
+            <span className="home-create-text">
+              <strong>Create a new tournament</strong>
+              <span>Start a new season and build your next story.</span>
+            </span>
+          </>
+        }
+      >
+        <CreateTournamentForm orgs={creatableOrgs} />
+      </FormDialog>
+    ) : undefined;
+
+  const shortcuts = (
+    <HomeShortcuts
+      competitions={view.competitions.map((competition) => {
+        const meta = seasonMeta(competition.slug);
+        return {
+          slug: competition.slug,
+          name: competition.name,
+          orgName: competition.orgName,
+          ...(meta !== null ? { meta } : {}),
+        };
+      })}
+      {...(createCard !== undefined ? { createCard } : {})}
+    />
+  );
+
+  /* ---- the focus season: journey + figures ------------------------------- */
+  const focusBase = focus === undefined ? "" : `/seasons/${focus.slug}`;
+  const journey =
+    focusOverview === null
+      ? null
+      : seasonJourney(
+          {
+            status: focusOverview.competition.status,
+            teams: focusOverview.teamCount,
+            registrations: focusOverview.approvedPlayers + focusOverview.pendingPlayers,
+            auctionStatus: focusOverview.auctionStatus,
+            settlement: focusOverview.settlement?.status ?? null,
+          },
+          { withTeams: false },
+        );
+  // With several seasons, each stage also says how many of them sit there —
+  // the portfolio figures the old lifecycle strip carried.
+  const stageCount: Record<string, number> = {
+    setup: dash.stages.setup.competitions,
+    registration: dash.stages.registration.competitions,
+    auction: dash.stages.auction.competitions,
+    settlement: dash.stages.settlement.competitions,
+  };
+  const journeyHref: Record<string, string | undefined> = {
+    setup: `${focusBase}/teams`,
+    registration: `${focusBase}/registrations`,
+    auction: `${focusBase}/auction`,
+    // The Money tab 404s without `settlement.view`: no link beats a dead end.
+    settlement: focusOverview?.viewer.canSettle === true ? `${focusBase}/money` : undefined,
+  };
+  const journeyIcon: Record<string, ReactNode> = {
+    setup: <IconTrophy size={14} />,
+    registration: <IconFileCheck size={14} />,
+    auction: <IconGavel size={14} />,
+    settlement: <IconRupee size={14} />,
+  };
+  const lotsPct =
+    focusOverview === null || focusOverview.lotsTotal === 0
+      ? 0
+      : Math.round((focusOverview.lotsSold / focusOverview.lotsTotal) * 100);
+
+  const attentionCard = (
+    <SectionCard
+      data-testid="attention-queue"
+      className="home-attention"
+      icon={<IconAlert />}
+      tone={attentionCount > 0 ? "red" : "green"}
+      title="Needs attention"
+      action={
+        attentionCount > 0 ? (
+          <span className="home-count" aria-live="polite">
+            {attentionCount}
+            <VisuallyHidden>
+              {" "}
+              item{attentionCount === 1 ? "" : "s"} needing attention
+            </VisuallyHidden>
+          </span>
+        ) : undefined
+      }
+    >
+      {nextStep !== null ? <NextStepBanner step={nextStep} embedded /> : null}
+      {restAttention.length > 0 ? (
+        <ul className="home-list">
+          {restAttention.map((row) => (
+            <li key={row.key}>
+              <Link href={row.href} className="home-row-link">
+                <IconTile icon={<IconBolt />} tone="amber" size="sm" />
+                <span className="home-row-text">
+                  <strong>{row.label}</strong>
+                  <span>{row.detail}</span>
+                </span>
+                <IconChevronRight size={18} className="home-row-go" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {nextStep === null && restAttention.length === 0 ? (
+        <div className="home-clear">
+          <IconTile icon={<IconCheckCircle />} tone="green" size="lg" />
+          <span className="home-row-text">
+            <strong>All clear — nothing is waiting on you.</strong>
+            <span>You&apos;re all caught up.</span>
+          </span>
+        </div>
+      ) : null}
+      {/* The scan stops at eight and says so, so a portfolio of twenty never
+          reads as "these eight are all there is". */}
+      {unscanned > 0 ? (
+        <p className="home-scan-note">
+          Checked the {ATTENTION_SCAN_LIMIT} most recent of {view.competitions.length} seasons.{" "}
+          <Link href="/tournaments?view=seasons">See every season</Link>
+        </p>
+      ) : null}
+    </SectionCard>
+  );
 
   return (
     <>
       {laddering ? <SetupLadder rungs={rungs} current={currentRung} /> : null}
-      {nextStep !== null ? <NextStepBanner step={nextStep} /> : null}
+
       {/* ---- the night in progress: nothing outranks a live auction ---- */}
       {liveRow !== null ? (
         <section
@@ -189,10 +569,7 @@ export async function OrganizerHome({
         >
           <div className="home-live-body">
             <p className="home-live-kicker">
-              {/* Every lot has gone. The hero still said LIVE NOW over a
-                      100% progress bar with one CTA into the room, which is the
-                      one state where "live" is the wrong word: the bidding is
-                      over and what is left is closing it out. */}
+              {/* Every lot has gone: "live" is the wrong word, closing out is. */}
               <span className="home-live-badge">
                 {liveDone ? null : <i aria-hidden />}
                 {liveDone ? "ALL LOTS SOLD" : "LIVE NOW"}
@@ -205,11 +582,21 @@ export async function OrganizerHome({
               {liveBoard?.onBlock !== null && liveBoard?.onBlock !== undefined ? (
                 <div>
                   <dt>On the block</dt>
-                  <dd>
-                    {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
-                    <span className="home-live-role">
-                      {" · "}
-                      {roleLabeller(liveBoard.roles)(liveBoard.onBlock.role)}
+                  <dd className="home-live-player">
+                    <PlayerImage
+                      name={liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
+                      seed={liveBoard.onBlock.registrationId}
+                      src={liveBoard.onBlock.photoUrl}
+                      size="xs"
+                      shape="round"
+                      decorative
+                    />
+                    <span>
+                      {liveBoard.onBlock.playerName ?? `Lot ${liveBoard.onBlock.lotNumber}`}
+                      <span className="home-live-role">
+                        {" · "}
+                        {roleLabeller(liveBoard.roles)(liveBoard.onBlock.role)}
+                      </span>
                     </span>
                   </dd>
                 </div>
@@ -262,75 +649,612 @@ export async function OrganizerHome({
         </section>
       ) : null}
 
-      {/* ---- lifecycle: what the platform does, and where your work sits ---- */}
-      {/* The chevrons are ITEMS in this row, not decoration pinned to a
-            step's edge. Pinned, they sat on the column boundary — which is
-            flush against the next stage's icon and nowhere near the middle of
-            the whitespace. As items they take an equal share of the free
-            space, so each one lands midway between the stages it joins.
+      {/* ---- the club hero, its road and its four figures ---- */}
+      {focusOverview !== null ? (
+        <ClubHero
+          overview={focusOverview}
+          seasonsInClub={
+            view.competitions.filter(
+              (competition) => competition.orgId === focusOverview.competition.orgId,
+            ).length
+          }
+          switchable={managedSeasons.map((competition) => ({
+            slug: competition.slug,
+            name: competition.name,
+          }))}
+        />
+      ) : null}
 
-            It renders in the empty state too, greyed, as a MAP. It is the best
-            teaching device on the screen — the whole product in one row — and
-            it used to appear only once the reader already understood the
-            model. */}
-      <section
-        className={`home-flow${laddering ? " home-flow--map" : ""}`}
-        aria-label="Season lifecycle"
-      >
-        {lifecycleFor(dash).map((stage, index) => {
-          const count = stage.count;
-          return (
-            <Fragment key={stage.key}>
-              {index > 0 ? <span className="home-step-sep" aria-hidden /> : null}
-              <Link
-                href={stage.href}
-                className={`home-step${count > 0 ? " home-step--on" : ""}`}
-                style={{ ["--step" as string]: String(index + 1) }}
-              >
-                <span className={`home-ic home-ic--${stage.tone} home-ic--sm`}>{stage.icon}</span>
-                <span className="home-step-text">
-                  <span className="home-step-head">
-                    <span className="home-step-name">{stage.name}</span>
-                    <span className="home-step-count">{count}</span>
+      {journey !== null ? (
+        <div className="home-journey">
+          <JourneyStepper
+            label={`${focusOverview?.competition.name ?? "Season"} progress`}
+            linkComponent={Link}
+            steps={journey.map((step): JourneyStep => {
+              const href = journeyHref[step.key];
+              // Zero is left unsaid: a "0" beside a completed step reads as a fault.
+              const many = view.competitions.length > 1 && (stageCount[step.key] ?? 0) > 0;
+              const item: JourneyStep = {
+                key: step.key,
+                label: (
+                  <>
+                    {step.label}
+                    {many ? (
+                      <span className="home-journey-count">
+                        {stageCount[step.key] ?? 0}
+                        <VisuallyHidden>
+                          {" "}
+                          of your seasons {(stageCount[step.key] ?? 0) === 1 ? "is" : "are"} here
+                        </VisuallyHidden>
+                      </span>
+                    ) : null}
+                  </>
+                ),
+                state: step.state,
+                hint: step.hint,
+                icon: journeyIcon[step.key],
+              };
+              return href === undefined ? item : { ...item, href };
+            })}
+          />
+        </div>
+      ) : null}
+
+      {focusOverview !== null ? (
+        <StatGrid testId="home-figures">
+          <StatCard
+            icon={<IconUsers />}
+            tone="green"
+            value={focusOverview.teamCount.toLocaleString("en-IN")}
+            label="Teams"
+            href={`${focusBase}/teams`}
+            linkComponent={Link}
+          />
+          <StatCard
+            icon={<IconUser />}
+            tone="blue"
+            value={focusOverview.approvedPlayers.toLocaleString("en-IN")}
+            label="Players"
+            hint={
+              focusOverview.pendingPlayers > 0
+                ? `${focusOverview.pendingPlayers.toLocaleString("en-IN")} to review`
+                : "In the auction pool"
+            }
+            href={`${focusBase}/registrations`}
+            linkComponent={Link}
+          />
+          {/* Money-gated in the read: absent for a reader without money sight,
+              who gets the season's fixtures in its place. */}
+          {focusOverview.purseCommitted !== undefined ? (
+            <StatCard
+              icon={<IconWallet />}
+              tone="amber"
+              value={rupeesShort(focusOverview.purseCommitted)}
+              label="Purse committed"
+              {...(focusOverview.pursePct != null
+                ? { hint: `${String(focusOverview.pursePct)}% of every purse` }
+                : {})}
+              href={`${focusBase}/auction`}
+              linkComponent={Link}
+            />
+          ) : (
+            <StatCard
+              icon={<IconCalendar />}
+              tone="amber"
+              value={focusOverview.fixtureCount.toLocaleString("en-IN")}
+              label="Fixtures"
+              href={`${focusBase}/fixtures`}
+              linkComponent={Link}
+            />
+          )}
+          <StatCard
+            icon={<IconGavel />}
+            tone="purple"
+            value={`${String(focusOverview.lotsSold)}/${String(focusOverview.lotsTotal)}`}
+            label="Lots sold"
+            hint={focusOverview.lotsTotal === 0 ? "No lots yet" : `${String(lotsPct)}%`}
+            progress={lotsPct}
+            href={`${focusBase}/auction`}
+            linkComponent={Link}
+          />
+        </StatGrid>
+      ) : null}
+
+      <CardGrid weight="wide-left">
+        {/* ================= LEFT ================= */}
+        <div className="home-col">
+          {!laddering ? attentionCard : null}
+
+          {showSeasons ? (
+            <SectionCard
+              flush
+              icon={<IconTrophy />}
+              tone="gold"
+              title="Top seasons"
+              action={
+                <Link href="/tournaments?view=seasons" className="home-more">
+                  View all
+                  <IconArrowRight size={14} />
+                </Link>
+              }
+            >
+              {/* Two renderings, one visible at a time (see home.css): a
+                    table on a laptop, one card per season on a phone — a fixed
+                    table left the name 0px wide at 390. */}
+              <div className="home-table-wrap" data-testid="home-competitions">
+                <table className="home-table">
+                  <thead>
+                    <tr>
+                      <th>Season</th>
+                      <th className="home-num">Teams</th>
+                      <th className="home-num">Players</th>
+                      <th>Status</th>
+                      <th className="home-end">
+                        <VisuallyHidden>Actions</VisuallyHidden>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dash.top.map((row) => {
+                      const badge = seasonBadge(row);
+                      const meta = seasonMeta(row.slug);
+                      return (
+                        <tr key={row.slug}>
+                          <td>
+                            <span className="home-tcell">
+                              <span className="home-crest" aria-hidden>
+                                {monogram(row.name)}
+                              </span>
+                              <span className="home-tcell-text">
+                                <Link href={`/seasons/${row.slug}`}>{row.name}</Link>
+                                {meta !== null || row.canSeeMoney ? (
+                                  <span>
+                                    {[
+                                      meta,
+                                      row.canSeeMoney
+                                        ? `${rupeesShort(row.collectedPaise)} collected`
+                                        : null,
+                                    ]
+                                      .filter((part) => part !== null)
+                                      .join(" · ")}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </span>
+                          </td>
+                          <td className="home-num home-mono">{row.teams}</td>
+                          <td className="home-num home-mono">{row.registrations}</td>
+                          <td>
+                            <Pill tone={badge.tone}>{badge.label}</Pill>
+                          </td>
+                          <td className="home-end">
+                            <Link
+                              href={`/seasons/${row.slug}`}
+                              className="home-view"
+                              aria-label={`View ${row.name}`}
+                            >
+                              View
+                              <IconArrowRight size={14} />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <ul className="home-season-cards">
+                  {dash.top.map((row) => {
+                    const badge = seasonBadge(row);
+                    const meta = seasonMeta(row.slug);
+                    return (
+                      <li key={row.slug}>
+                        <Link href={`/seasons/${row.slug}`} className="home-season-card">
+                          <span className="home-crest" aria-hidden>
+                            {monogram(row.name)}
+                          </span>
+                          <span className="home-season-main">
+                            <strong className="home-season-name">{row.name}</strong>
+                            <span className="home-season-meta">
+                              {[
+                                `${String(row.teams)} team${row.teams === 1 ? "" : "s"}`,
+                                `${String(row.registrations)} player${row.registrations === 1 ? "" : "s"}`,
+                                meta,
+                              ]
+                                .filter((part) => part !== null)
+                                .join(" · ")}
+                            </span>
+                          </span>
+                          <Pill tone={badge.tone}>{badge.label}</Pill>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </SectionCard>
+          ) : null}
+
+          {showMoney ? (
+            <SectionCard
+              icon={<IconRupee />}
+              tone="blue"
+              title="Money overview"
+              action={
+                showChart ? (
+                  <span className="home-legend">
+                    <span>
+                      <i className="home-dot home-dot--accent" />
+                      This week
+                    </span>
+                    <span>
+                      <i className="home-dot home-dot--muted" />
+                      Last week
+                    </span>
                   </span>
-                  <span className="home-step-blurb">{stage.detail}</span>
-                </span>
-              </Link>
-            </Fragment>
+                ) : undefined
+              }
+            >
+              {showChart ? (
+                <div className="home-chart-wrap">
+                  {chartMax > 0 ? (
+                    <span className="home-chart-peak">Peak {rupeesShort(chartMax)}/day</span>
+                  ) : null}
+                  <svg
+                    className="home-chart"
+                    viewBox="0 0 470 156"
+                    role="img"
+                    aria-label="Money collected per day, this week versus last week"
+                  >
+                    <defs>
+                      <linearGradient id="home-area" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="var(--accent)" stopOpacity="0.24" />
+                        <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    {[16, 45, 74, 103, 132].map((y) => (
+                      <line
+                        key={y}
+                        x1="44"
+                        y1={y}
+                        x2="452"
+                        y2={y}
+                        stroke="var(--border-subtle)"
+                        strokeWidth="1"
+                      />
+                    ))}
+                    <polygon
+                      fill="url(#home-area)"
+                      points={`44,132 ${points(dash.money.thisWeek, chartMax)} 452,132`}
+                    />
+                    <polyline
+                      fill="none"
+                      stroke="var(--text-muted)"
+                      strokeWidth="2"
+                      strokeDasharray="4 5"
+                      strokeLinecap="round"
+                      points={points(dash.money.lastWeek, chartMax)}
+                    />
+                    <polyline
+                      fill="none"
+                      stroke="var(--accent)"
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      points={points(dash.money.thisWeek, chartMax)}
+                    />
+                    {DAY_LABELS.map((label, index) => (
+                      <text
+                        key={label}
+                        x={44 + index * ((452 - 44) / 6)}
+                        y="150"
+                        fill="var(--text-muted)"
+                        fontSize="10"
+                        textAnchor="middle"
+                      >
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                  {/* A polyline says nothing to a screen reader. */}
+                  <VisuallyHidden>
+                    Collected per day this week:{" "}
+                    {DAY_LABELS.map(
+                      (label, index) => `${label} ${rupeesShort(dash.money.thisWeek[index] ?? 0)}`,
+                    ).join(", ")}
+                    .
+                  </VisuallyHidden>
+                </div>
+              ) : null}
+              <div className="home-money">
+                <MoneyCell href={dash.moneyHref} label="Collected" tone="remaining">
+                  {rupees(dash.money.collectedPaise)}
+                </MoneyCell>
+                <MoneyCell href={dash.moneyHref} label="Outstanding" tone="frozen">
+                  {rupees(dash.money.outstandingPaise)}
+                </MoneyCell>
+                <MoneyCell href={dash.moneyHref} label="Waived" tone="spent">
+                  {rupees(dash.money.waivedPaise)}
+                </MoneyCell>
+              </div>
+            </SectionCard>
+          ) : null}
+
+          {shortcuts}
+        </div>
+
+        {/* ================= RIGHT ================= */}
+        <div className="home-col">
+          {showAuctions ? (
+            <SectionCard
+              icon={<IconGavel />}
+              tone="gold"
+              title="Active auctions"
+              action={
+                <Link href="/tournaments?view=seasons" className="home-more">
+                  View all
+                  <IconArrowRight size={14} />
+                </Link>
+              }
+            >
+              {otherAuctions.length === 0 ? (
+                <PanelEmpty
+                  icon={<IconGavel />}
+                  title={liveRow === null ? "No auction running yet." : "Nothing else scheduled."}
+                  text={
+                    liveRow === null
+                      ? "Set one up to start the action."
+                      : "The live night is above; plan the next one here."
+                  }
+                  ctaHref={
+                    seasonToOpen === undefined
+                      ? "/tournaments?view=seasons"
+                      : `/seasons/${seasonToOpen.slug}/auction`
+                  }
+                  ctaLabel={liveRow === null ? "Set up auction" : "Plan the next one"}
+                />
+              ) : (
+                <ul className="home-list">
+                  {otherAuctions.map((auction) => {
+                    const pct =
+                      auction.lotsTotal === 0
+                        ? 0
+                        : Math.round((auction.lotsSold / auction.lotsTotal) * 100);
+                    return (
+                      <li key={auction.auctionId}>
+                        <Link
+                          href={`/seasons/${auction.competitionSlug}/auction`}
+                          className="home-row-link home-auction"
+                        >
+                          <span className="home-crest" aria-hidden>
+                            {monogram(auction.competitionName)}
+                          </span>
+                          <span className="home-row-text">
+                            <strong>{auction.competitionName}</strong>
+                            <span>
+                              Spend {rupeesShort(auction.spendPaise)} · Lots {auction.lotsSold}/
+                              {auction.lotsTotal}
+                            </span>
+                            <span className="home-progress" aria-hidden>
+                              <i style={{ width: `${String(pct)}%` }} />
+                            </span>
+                          </span>
+                          {auction.status === "live" ? (
+                            <Pill tone="red" dot>
+                              Live
+                            </Pill>
+                          ) : (
+                            <Pill tone="blue">Scheduled</Pill>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </SectionCard>
+          ) : null}
+
+          {showEvents ? (
+            <SectionCard icon={<IconCalendar />} tone="blue" title="Upcoming events">
+              {schedule.length === 0 ? (
+                <PanelEmpty
+                  icon={<IconCalendar />}
+                  title="No fixtures scheduled."
+                  text="Create a match schedule to keep your community engaged."
+                  ctaHref={
+                    seasonToOpen === undefined
+                      ? "/tournaments?view=seasons"
+                      : `/seasons/${seasonToOpen.slug}/fixtures`
+                  }
+                  ctaLabel="Generate a schedule"
+                />
+              ) : (
+                <ul className="home-list">
+                  {schedule.slice(0, 5).map((fixture) => {
+                    const when = fixture.kickoffAt !== null ? new Date(fixture.kickoffAt) : null;
+                    return (
+                      <li key={fixture.id}>
+                        <Link
+                          href={`/seasons/${fixture.competitionSlug}/fixtures`}
+                          className="home-row-link"
+                        >
+                          <span className="home-date">
+                            <b>{when !== null ? IST_DAY.format(when) : "--"}</b>
+                            <span>
+                              {when !== null ? IST_MONTH.format(when).toUpperCase() : "TBD"}
+                            </span>
+                          </span>
+                          <span className="home-row-text">
+                            <strong>
+                              {fixture.homeTeamName} vs {fixture.awayTeamName}
+                            </strong>
+                            <span>{fixture.competitionName}</span>
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </SectionCard>
+          ) : null}
+
+          {showActivity ? (
+            <SectionCard
+              icon={<IconBolt />}
+              tone="purple"
+              title="Recent activity"
+              action={
+                <Link href="/inbox" className="home-more">
+                  View all
+                  <IconArrowRight size={14} />
+                </Link>
+              }
+            >
+              <ul className="home-list">
+                {dash.activity.map((row) => {
+                  const style = activityStyle(row.action);
+                  return (
+                    <li key={row.id} className="home-feed">
+                      <IconTile icon={style.icon} tone={style.tone} size="sm" />
+                      <span className="home-row-text">
+                        <strong>
+                          {row.action === "finops.summary"
+                            ? `${String(row.count)} finance ${row.count === 1 ? "update" : "updates"}`
+                            : activityLabel(row.action)}
+                        </strong>
+                        {/* Which season the event belongs to — six anonymous
+                              "Paddle granted" lines answer nothing without it. */}
+                        {row.scope !== null ? <span>{row.scope}</span> : null}
+                      </span>
+                      <span className="home-time">{ago(row.at)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </SectionCard>
+          ) : null}
+        </div>
+      </CardGrid>
+    </>
+  );
+}
+
+/** An empty panel should still sell the next move, not just report nothing. */
+function PanelEmpty({
+  icon,
+  title,
+  text,
+  ctaHref,
+  ctaLabel,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  ctaHref: string;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="home-blank">
+      <IconTile icon={icon} tone="gold" size="md" />
+      <span className="home-row-text">
+        <strong>{title}</strong>
+        <span>{text}</span>
+      </span>
+      <ButtonLink href={ctaHref} variant="secondary" size="sm" className="home-blank-cta">
+        {ctaLabel}
+      </ButtonLink>
+    </div>
+  );
+}
+
+/**
+ * A money figure, linked only where the link goes somewhere real.
+ *
+ * All three cells pointed at `/money`, which answers "This area is being built
+ * during the beta" — so a panel showing ₹2,00,000 of genuinely settled money
+ * was three dead ends. Where no single season owns the total (or the reader may
+ * not open its books) the cell is plain text: no link beats a link to an
+ * apology.
+ */
+function MoneyCell({
+  href,
+  label,
+  tone,
+  children,
+}: {
+  href: string | null;
+  label: string;
+  tone: "remaining" | "frozen" | "spent";
+  children: string;
+}) {
+  const inner = (
+    <>
+      <span className="home-money-label">{label}</span>
+      <Money tone={tone}>{children}</Money>
+    </>
+  );
+  return href === null ? (
+    <div className="home-money-cell home-money-cell--flat">{inner}</div>
+  ) : (
+    <Link href={href} className="home-money-cell">
+      {inner}
+    </Link>
+  );
+}
+
+interface SetupRung {
+  key: string;
+  title: string;
+  blurb: string;
+  done: boolean;
+  cta: ReactNode;
+}
+
+/**
+ * The five rungs between signing up and an auction pool, with exactly one live
+ * CTA — the one the reader is actually on.
+ *
+ * It is a ladder rather than a checklist because the order is real: you cannot
+ * add teams to a season that does not exist. Completed rungs stay visible so
+ * the reader can see how far along they are and what is still ahead; the
+ * lifecycle strip below then shows what happens AFTER all five.
+ */
+function SetupLadder({ rungs, current }: { rungs: SetupRung[]; current: number }) {
+  return (
+    <section
+      className="home-ladder"
+      aria-labelledby="home-ladder-title"
+      data-testid="home-setup-ladder"
+    >
+      <div className="home-ladder-head">
+        <h2 id="home-ladder-title">Set up your first auction night</h2>
+        <p>
+          Step {current + 1} of {rungs.length}
+        </p>
+      </div>
+      <ol className="home-ladder-steps">
+        {rungs.map((rung, index) => {
+          const state = rung.done ? "done" : index === current ? "now" : "todo";
+          return (
+            <li key={rung.key} className={`home-rung home-rung--${state}`}>
+              <span className="home-rung-mark" aria-hidden>
+                {rung.done ? <IconCheck size={14} /> : index + 1}
+              </span>
+              <span className="home-rung-text">
+                <strong>
+                  <VisuallyHidden>
+                    {state === "done" ? "Done: " : state === "now" ? "Next: " : "Later: "}
+                  </VisuallyHidden>
+                  {rung.title}
+                </strong>
+                <span>{rung.blurb}</span>
+              </span>
+              {index === current ? <span className="home-rung-cta">{rung.cta}</span> : null}
+            </li>
           );
         })}
-      </section>
-
-      <OrganizerPanels
-        dash={dash}
-        view={view}
-        schedule={schedule}
-        restAttention={restAttention}
-        unscanned={unscanned}
-        chartMax={chartMax}
-        showChart={showChart}
-        showLeft={showLeft}
-        showRight={showRight}
-        showAttention={showAttention}
-        showMoney={showMoney}
-        showSeasons={showSeasons}
-        showAuctions={showAuctions}
-        showEvents={showEvents}
-        showActivity={showActivity}
-        otherAuctions={otherAuctions}
-        liveRow={liveRow}
-        seasonToOpen={seasonToOpen}
-      />
-
-      {/* A member who manages nothing still belongs to a club: its seasons,
-            as plain doors, without the organizer's figures or offers. */}
-      <HomeShortcuts
-        competitions={view.competitions.map((competition) => ({
-          slug: competition.slug,
-          name: competition.name,
-          orgName: competition.orgName,
-        }))}
-      />
-    </>
+      </ol>
+    </section>
   );
 }

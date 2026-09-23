@@ -1,8 +1,22 @@
+import {
+  ButtonLink,
+  IconArrowRight,
+  IconFileCheck,
+  IconRupee,
+  IconShieldCheck,
+  IconUsers,
+  IconWallet,
+  Pill,
+  SectionCard,
+  StatCard,
+  StatGrid,
+} from "@desiauction/ui";
 import Link from "next/link";
 
 import { compactFloorINR, compactINR } from "../../lib/inr";
 import { planView } from "../../server/auction/owner-plan-actions";
 import type { OwnedTeam } from "../../server/roles/roles";
+import type { Tone } from "./home-parts";
 
 /**
  * A TEAM OWNER'S HOME HALF (launch polish, Phase 2).
@@ -16,82 +30,110 @@ import type { OwnedTeam } from "../../server/roles/roles";
  * nothing here is visible that the plan page would not show this person. When
  * planning is switched off for the auction (or the gate declines), the section
  * keeps the doors and drops the figures rather than guessing them.
+ *
+ * Dressed in the organizer's kit — a section card, stat cards with the same
+ * thin progress bars, pills for status — so an owner's home reads as the same
+ * product as the club's, only narrower.
  */
-const STATUS_LABEL: Record<string, string> = {
-  scheduled: "Auction coming up",
-  live: "Auction live",
-  paused: "Auction paused",
-  completed: "Auction finished",
-  reconciled: "Auction finished",
+const STATUS: Record<string, { label: string; tone: Tone; dot?: boolean }> = {
+  scheduled: { label: "Auction coming up", tone: "blue" },
+  live: { label: "Auction live", tone: "red", dot: true },
+  paused: { label: "Auction paused", tone: "amber", dot: true },
+  completed: { label: "Auction finished", tone: "green" },
+  reconciled: { label: "Auction finished", tone: "green" },
 };
+
+/** Share of a whole, as the 0–100 a stat card's bar takes; 0 for no whole. */
+function pct(part: number, whole: number): number {
+  return whole <= 0 ? 0 : Math.round((part / whole) * 100);
+}
 
 export async function OwnerSection({ team }: { team: OwnedTeam }) {
   const plan = await planView(team.competitionSlug, team.teamId);
   const base = `/seasons/${team.competitionSlug}`;
   const live = team.auctionStatus === "live" || team.auctionStatus === "paused";
   const over = team.auctionStatus === "completed" || team.auctionStatus === "reconciled";
-  const figures =
-    plan === null
-      ? null
-      : [
-          {
-            label: "Purse left",
-            value: compactFloorINR(plan.standing.purseRemaining),
-            sub: `of ${compactINR(plan.rules.pursePerTeam)}`,
-          },
-          {
-            label: "Squad",
-            value: `${String(plan.standing.squadSize)} / ${String(plan.rules.squadMax)}`,
-            sub: `at least ${String(plan.rules.squadMin)}`,
-          },
-          // Before the night the plan is the work; after it, what was spent is
-          // the fact — a count of targets for a finished auction means nothing.
-          over
-            ? {
-                label: "Spent",
-                value: compactINR(plan.rules.pursePerTeam - plan.standing.purseRemaining),
-                sub: "at the auction",
-              }
-            : {
-                label: "My plan",
-                value: `${String(plan.targets.length)} target${plan.targets.length === 1 ? "" : "s"}`,
-                sub: "only you can see it",
-              },
-        ];
+  const status = STATUS[team.auctionStatus] ?? { label: "Auction", tone: "neutral" };
   return (
-    <section className="home-owner" aria-labelledby="home-owner-title" data-testid="home-owner">
-      <header className="home-flat-head">
-        <h2 id="home-owner-title" className="home-flat-title">
-          {team.teamName}
-        </h2>
-        <span className="home-flat-meta">
-          {team.competitionName} · {STATUS_LABEL[team.auctionStatus] ?? "Auction"}
-        </span>
-      </header>
-      {figures !== null ? (
-        <dl className="home-figures">
-          {figures.map((figure) => (
-            <div key={figure.label} className="home-figure">
-              <dt>{figure.label}</dt>
-              <dd className="home-figure-value">{figure.value}</dd>
-              <dd className="home-figure-sub">{figure.sub}</dd>
-            </div>
-          ))}
-        </dl>
+    <SectionCard
+      data-testid="home-owner"
+      icon={<IconShieldCheck />}
+      tone="gold"
+      title={team.teamName}
+      description={team.competitionName}
+      action={
+        <Pill tone={status.tone} dot={status.dot === true}>
+          {status.label}
+        </Pill>
+      }
+    >
+      {plan !== null ? (
+        <StatGrid testId="home-owner-figures">
+          <StatCard
+            icon={<IconWallet />}
+            tone="gold"
+            value={compactFloorINR(plan.standing.purseRemaining)}
+            label="Purse left"
+            hint={`of ${compactINR(plan.rules.pursePerTeam)}`}
+            progress={pct(plan.standing.purseRemaining, plan.rules.pursePerTeam)}
+          />
+          <StatCard
+            icon={<IconUsers />}
+            tone="blue"
+            value={`${String(plan.standing.squadSize)} / ${String(plan.rules.squadMax)}`}
+            label="Squad"
+            hint={`at least ${String(plan.rules.squadMin)}`}
+            progress={pct(plan.standing.squadSize, plan.rules.squadMax)}
+          />
+          {/* Before the night the plan is the work; after it, what was spent
+              is the fact — a count of targets for a finished auction means
+              nothing. */}
+          {over ? (
+            <StatCard
+              icon={<IconRupee />}
+              tone="green"
+              value={compactINR(plan.rules.pursePerTeam - plan.standing.purseRemaining)}
+              label="Spent"
+              hint="at the auction"
+            />
+          ) : (
+            <StatCard
+              icon={<IconFileCheck />}
+              tone="purple"
+              value={`${String(plan.targets.length)} target${plan.targets.length === 1 ? "" : "s"}`}
+              label="My plan"
+              hint="only you can see it"
+              href={`${base}/auction/plan`}
+              linkComponent={Link}
+            />
+          )}
+        </StatGrid>
       ) : null}
       <nav className="home-owner-links" aria-label={`${team.teamName} shortcuts`}>
-        <Link href={`${base}/teams`}>Team page</Link>
         {over ? (
-          <Link href={`${base}/fixtures`}>Fixtures</Link>
+          <ButtonLink href={`${base}/fixtures`} size="sm">
+            Fixtures
+            <IconArrowRight size={14} />
+          </ButtonLink>
         ) : (
-          <>
-            <Link href={`${base}/auction/plan`}>My plan</Link>
-            <Link href={`${base}/auction/live`}>
-              {live ? "Enter the live room" : "Auction room"}
-            </Link>
-          </>
+          <ButtonLink
+            href={`${base}/auction/live`}
+            size="sm"
+            variant={live ? "primary" : "secondary"}
+          >
+            {live ? "Enter the live room" : "Auction room"}
+            <IconArrowRight size={14} />
+          </ButtonLink>
         )}
+        {over ? null : (
+          <ButtonLink href={`${base}/auction/plan`} size="sm" variant="secondary">
+            My plan
+          </ButtonLink>
+        )}
+        <ButtonLink href={`${base}/teams`} size="sm" variant="ghost">
+          Team page
+        </ButtonLink>
       </nav>
-    </section>
+    </SectionCard>
   );
 }

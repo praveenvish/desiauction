@@ -1,5 +1,4 @@
-import { IconArrowRight } from "@desiauction/ui";
-import Link from "next/link";
+import { ButtonLink, IconArrowRight, IconSpark, SectionCard } from "@desiauction/ui";
 
 import { FormDialog } from "../../components/form-dialog";
 import { CreateOrgForm } from "../orgs/create-org-form";
@@ -18,13 +17,16 @@ import { CreateOrgForm } from "../orgs/create-org-form";
  */
 export function NewcomerHome() {
   return (
-    <section className="home-choose" aria-labelledby="home-choose-title" data-testid="home-choose">
-      <h2 id="home-choose-title" className="home-flat-title">
-        Run a tournament, or play in one?
-      </h2>
-      <p>
+    <SectionCard
+      data-testid="home-choose"
+      icon={<IconSpark />}
+      tone="gold"
+      title="Run a tournament, or play in one?"
+      description="You can do both, and nothing here is permanent."
+    >
+      <p className="home-card-note">
         Organizers set up a club and run the auction night. Players find a tournament and register —
-        no club needed. You can do both, and nothing here is permanent.
+        no club needed.
       </p>
       <div className="home-choose-doors">
         <FormDialog
@@ -35,11 +37,11 @@ export function NewcomerHome() {
         >
           <CreateOrgForm />
         </FormDialog>
-        <Link href="/c" className="home-own-poster" data-testid="home-choose-play">
+        <ButtonLink href="/c" variant="secondary" size="touch" data-testid="home-choose-play">
           Find a tournament to play
           <IconArrowRight size={16} className="icon-trail" />
-        </Link>
+        </ButtonLink>
       </div>
-    </section>
+    </SectionCard>
   );
 }

@@ -1,3 +1,5 @@
+import type { KitTone } from "@desiauction/ui";
+
 /**
  * WHAT EVERY HOME SHARES (RN-1 Phase 3).
  *
@@ -8,13 +10,14 @@
  * one of them needs. Nothing role-specific belongs here.
  */
 
-export type Tone = "info" | "success" | "warning" | "danger" | "neutral";
+/** Every home speaks the kit's colour words — one grammar across roles. */
+export type Tone = KitTone;
 
 export const REG_TONE: Record<string, Tone> = {
-  submitted: "info",
-  approved: "success",
-  waitlisted: "warning",
-  rejected: "danger",
+  submitted: "blue",
+  approved: "green",
+  waitlisted: "amber",
+  rejected: "red",
   withdrawn: "neutral",
   draft: "neutral",
 };
@@ -23,9 +26,9 @@ export function statusTone(status: string): Tone {
   switch (status) {
     // The console's one colour grammar — see STATUS_TONE in season-card.
     case "registration_open":
-      return "info";
+      return "blue";
     case "registration_closed":
-      return "warning";
+      return "amber";
     default:
       return "neutral";
   }
@@ -64,10 +67,10 @@ export function seasonBadge(row: { status: string; settlement: "settling" | "set
   tone: Tone;
 } {
   if (row.settlement === "settled") {
-    return { label: "Settled", tone: "success" };
+    return { label: "Settled", tone: "green" };
   }
   if (row.settlement === "settling") {
-    return { label: "Settling", tone: "warning" };
+    return { label: "Settling", tone: "amber" };
   }
   return { label: statusLabel(row.status), tone: statusTone(row.status) };
 }

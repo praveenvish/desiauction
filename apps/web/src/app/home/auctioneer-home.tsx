@@ -1,4 +1,11 @@
-import { Badge, ButtonLink, Card, SectionHeader, IconArrowRight } from "@desiauction/ui";
+import {
+  ButtonLink,
+  IconArrowRight,
+  IconCalendar,
+  IconCheckCircle,
+  Pill,
+  SectionCard,
+} from "@desiauction/ui";
 import Link from "next/link";
 
 import type { ConductedSeason } from "../../server/roles/roles";
@@ -25,19 +32,21 @@ import { monogram, type Tone } from "./home-parts";
 const OVER = new Set(["completed", "reconciled"]);
 const LIVE = new Set(["live", "paused"]);
 
-function readiness(season: ConductedSeason): { label: string; tone: Tone } {
+function readiness(season: ConductedSeason): { label: string; tone: Tone; dot?: boolean } {
   if (season.auctionStatus === null) {
     // The organizer has not built the auction yet. Saying so is the useful
     // thing: it tells the auctioneer the delay is not theirs to fix.
     return { label: "Not set up yet", tone: "neutral" };
   }
   if (LIVE.has(season.auctionStatus)) {
-    return { label: season.auctionStatus === "paused" ? "Paused" : "Live now", tone: "danger" };
+    return season.auctionStatus === "paused"
+      ? { label: "Paused", tone: "amber", dot: true }
+      : { label: "Live now", tone: "red", dot: true };
   }
   if (OVER.has(season.auctionStatus)) {
-    return { label: "Finished", tone: "success" };
+    return { label: "Finished", tone: "green" };
   }
-  return { label: "Ready", tone: "info" };
+  return { label: "Ready", tone: "blue" };
 }
 
 /** "2026-03-14T18:30" → "14 Mar". Null where the organizer has set no date. */
@@ -54,15 +63,17 @@ function Row({ season }: { season: ConductedSeason }) {
   const date = when(season.startsOn);
   return (
     <li>
-      <Link href={`/seasons/${season.competitionSlug}/auction`} className="home-attn">
-        <span className="home-crest home-crest--sm" aria-hidden>
+      <Link href={`/seasons/${season.competitionSlug}/auction`} className="home-row-link">
+        <span className="home-crest" aria-hidden>
           {monogram(season.competitionName)}
         </span>
-        <span className="home-attn-text">
+        <span className="home-row-text">
           <strong>{season.competitionName}</strong>
           <span>{date === null ? "No date set" : date}</span>
         </span>
-        <Badge tone={state.tone}>{state.label}</Badge>
+        <Pill tone={state.tone} dot={state.dot === true}>
+          {state.label}
+        </Pill>
       </Link>
     </li>
   );
@@ -106,29 +117,35 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
       ) : null}
 
       {queue.length > 0 ? (
-        <>
-          <SectionHeader title={tonight === null ? "Your auction nights" : "Also coming up"} />
-          <Card data-testid="home-conduct-queue">
-            <ul className="home-list">
-              {queue.map((season) => (
-                <Row key={season.competitionSlug} season={season} />
-              ))}
-            </ul>
-          </Card>
-        </>
+        <SectionCard
+          data-testid="home-conduct-queue"
+          icon={<IconCalendar />}
+          tone="blue"
+          title={tonight === null ? "Your auction nights" : "Also coming up"}
+          description={`${String(queue.length)} in the queue`}
+        >
+          <ul className="home-list">
+            {queue.map((season) => (
+              <Row key={season.competitionSlug} season={season} />
+            ))}
+          </ul>
+        </SectionCard>
       ) : null}
 
       {done.length > 0 ? (
-        <>
-          <SectionHeader title="Nights you've run" />
-          <Card data-testid="home-conduct-record">
-            <ul className="home-list">
-              {done.map((season) => (
-                <Row key={season.competitionSlug} season={season} />
-              ))}
-            </ul>
-          </Card>
-        </>
+        <SectionCard
+          data-testid="home-conduct-record"
+          icon={<IconCheckCircle />}
+          tone="green"
+          title="Nights you've run"
+          description={`${String(done.length)} ${done.length === 1 ? "auction" : "auctions"} conducted`}
+        >
+          <ul className="home-list">
+            {done.map((season) => (
+              <Row key={season.competitionSlug} season={season} />
+            ))}
+          </ul>
+        </SectionCard>
       ) : null}
     </>
   );
