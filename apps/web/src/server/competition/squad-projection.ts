@@ -17,6 +17,13 @@ import { preSignedSql } from "./pre-signed";
  * at auction and pre-signed icons alike, because both occupy a place in the XI
  * — which is also why icons count toward `squadMax`. A team with an icon buys
  * one fewer at auction; that is the rule the interface has always claimed.
+ *
+ * APPROVED ONLY (audit P1-9). A withdrawn or rejected registration used to keep
+ * its `team_id`, and this count — keyed on the column alone — kept counting
+ * them, while the lineups and squad sheets, which ask for approved players,
+ * did not. The aggregate now clears the team on the way out, but a count that
+ * disagreed with the sheets whenever a row carried stale state was never
+ * right; the status filter makes the two definitions one.
  */
 export interface TeamSquad {
   teamId: string;
@@ -35,7 +42,11 @@ export async function squadSizes(db: Db, competitionId: string): Promise<Map<str
     })
     .from(registrations)
     .where(
-      and(eq(registrations.competitionId, competitionId), sql`${registrations.teamId} is not null`),
+      and(
+        eq(registrations.competitionId, competitionId),
+        eq(registrations.status, "approved"),
+        sql`${registrations.teamId} is not null`,
+      ),
     )
     .groupBy(registrations.teamId);
   const byTeam = new Map<string, TeamSquad>();
@@ -66,6 +77,7 @@ export async function teamsBelowSquadMin(
         sql`(
           select count(*) from ${registrations}
           where ${registrations.teamId} = ${teams.id}
+            and ${registrations.status} = 'approved'
         ) < ${squadMin}`,
       ),
     );

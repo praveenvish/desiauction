@@ -174,7 +174,10 @@ const REGISTRATION_EDGES: Record<RegistrationStatus, ReadonlySet<RegistrationEve
   draft: new Set(["submit"]),
   submitted: new Set(["approve", "reject", "waitlist", "withdraw"]),
   waitlisted: new Set(["approve", "reject", "withdraw"]),
-  approved: new Set(["withdraw"]), // withdrawable pre-pool-lock (doc 42); pool lock is IP-4
+  // Withdrawable before the pool locks (doc 42). The lock itself — an auction
+  // that has left `scheduled` — is invisible to this machine, so the web
+  // aggregate refuses approved → withdrawn there (`rosterLockRefuses`).
+  approved: new Set(["withdraw"]),
   // Rejected / withdrawn are recoverable only via an explicit organizer restore —
   // the single audited exit, never a hidden path (M-IP3-2 aggregate contract).
   rejected: new Set(["restore"]),

@@ -410,7 +410,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     const a = await seed(compId, org.id, "Audit A", "a01", "submitted");
     await transition(db, org.id, compId, a, owner, { type: "waitlist" });
     await transition(db, org.id, compId, a, owner, { type: "approve" });
-    await addNote(db, org.id, a, owner, "checked ID");
+    await addNote(db, org.id, compId, a, owner, "checked ID");
     const timeline = await timelineOf(db, a, compId);
     const actions = timeline.map((t) => t.action);
     expect(actions).toContain("registration.waitlist");
@@ -1188,6 +1188,11 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
           ),
         );
       const id = seeded?.id ?? "";
+      // Approved, since only an approved player can be marked (P1-9).
+      await db
+        .update(registrationsTable)
+        .set({ status: "approved" })
+        .where(eq(registrationsTable.id, id));
       // Then marked by hand on the dashboard, as an organizer would.
       await setRegistrationMarks(
         db,
@@ -1227,7 +1232,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
       const team = await createTeam(db, org.id, compId, owner, `Armband XI ${RUN}`);
       expect(team.ok).toBe(true);
       if (!team.ok) return;
-      const incumbent = await seed(compId, org.id, "Old Captain", "arm1");
+      const incumbent = await seed(compId, org.id, "Old Captain", "arm1", "approved");
       await setRegistrationMarks(
         db,
         org.id,
@@ -1280,6 +1285,10 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
         .where(and(eq(registrationsTable.competitionId, compId), eq(people.phone, `+91${phone}`)));
       if (row === undefined) throw new Error("the imported registration should exist");
       seededPersonIds.push(row.personId);
+      await db
+        .update(registrationsTable)
+        .set({ status: "approved" })
+        .where(eq(registrationsTable.id, row.id));
       await setRegistrationMarks(db, org.id, compId, row.id, { ...marks, teamId }, owner);
       return row.id;
     };
@@ -1347,8 +1356,8 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     const team = await createTeam(db, org.id, compId, owner, `Captaincy XI ${RUN}`);
     expect(team.ok).toBe(true);
     if (!team.ok) return;
-    const first = await seed(compId, org.id, "First Captain", "cap1");
-    const second = await seed(compId, org.id, "Second Captain", "cap2");
+    const first = await seed(compId, org.id, "First Captain", "cap1", "approved");
+    const second = await seed(compId, org.id, "Second Captain", "cap2", "approved");
 
     await setRegistrationMarks(
       db,
@@ -1382,8 +1391,8 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     const team = await createTeam(db, org.id, compId, owner, `Exclusive XI ${RUN}`);
     expect(team.ok).toBe(true);
     if (!team.ok) return;
-    const captain = await seed(compId, org.id, "Armband Holder", "excl1");
-    const icon = await seed(compId, org.id, "Marquee Signing", "excl2");
+    const captain = await seed(compId, org.id, "Armband Holder", "excl1", "approved");
+    const icon = await seed(compId, org.id, "Marquee Signing", "excl2", "approved");
 
     expect(
       await setRegistrationMarks(
@@ -1435,8 +1444,8 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     const to = await createTeam(db, org.id, compId, owner, `Mover To ${RUN}`);
     expect(from.ok && to.ok).toBe(true);
     if (!from.ok || !to.ok) return;
-    const incumbent = await seed(compId, org.id, "Sitting Captain", "move1");
-    const mover = await seed(compId, org.id, "Moving Captain", "move2");
+    const incumbent = await seed(compId, org.id, "Sitting Captain", "move1", "approved");
+    const mover = await seed(compId, org.id, "Moving Captain", "move2", "approved");
     await setRegistrationMarks(
       db,
       org.id,

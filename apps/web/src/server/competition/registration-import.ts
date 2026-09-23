@@ -209,6 +209,23 @@ function deskFields(row: CsvRegistrationRow): Record<string, unknown> {
   return out;
 }
 
+/**
+ * A role or base-price band the file changes once the auction has opened; the
+ * file is not imported (audit F-D4).
+ *
+ * The single-row edit has refused these since the roster lock existed
+ * (`planRegistrationEdit`, `rosterLocked`): a band IS a lot's base price and a
+ * role is how the room and the owners' plans read a player, both already
+ * priced against. A re-imported sheet was the way round it. Refused rather
+ * than silently stripped, because the preview listed the change and an import
+ * that quietly did less than it showed would make the preview a lie.
+ */
+export class RosterFieldImportRefused extends Error {
+  constructor(readonly player: string) {
+    super("roster field import refused");
+  }
+}
+
 /** A captain change in the file that the opened auction refuses; the file is not imported. */
 export class CaptainImportRefused extends Error {
   constructor(readonly refusal: CaptainRefusal) {
@@ -227,7 +244,8 @@ export async function commitRegistrationImport(
   /**
    * The season's auction, once it has left `scheduled`. A captain the file
    * changes is then held to the dashboard's rule (`captainChangeRefusal`), and
-   * the first refusal aborts the whole file with `CaptainImportRefused`.
+   * the first refusal aborts the whole file with `CaptainImportRefused`; a
+   * changed role or band aborts it with `RosterFieldImportRefused`.
    */
   lockedAuctionId: string | null = null,
 ): Promise<ImportResult> {
@@ -399,6 +417,9 @@ export async function commitRegistrationImport(
         const changedTeam = teamIdFor(row);
         const values = changedValues(plan.changes, row, changedTeam);
         if (Object.keys(values).length > 0) {
+          if (lockedAuctionId !== null && ("role" in values || "basePriceBand" in values)) {
+            throw new RosterFieldImportRefused(row.name || row.phone);
+          }
           if (lockedAuctionId !== null && typeof values["isCaptain"] === "boolean") {
             const refusal = await captainLockRefusal(
               tx,
