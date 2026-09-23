@@ -330,6 +330,16 @@ export const messageOutbox = pgTable(
       .on(table.nextAttemptAt)
       .where(sql`status = 'pending'`),
     index("message_outbox_person_idx").on(table.personId),
+    // 0089: the admin counts, analytics and retention all read a `created_at`
+    // window; the trailing columns are the counts' GROUP BY, so those scans
+    // are index-only and never touch the wide rendered-body rows.
+    index("message_outbox_window_idx").on(
+      table.createdAt,
+      table.kind,
+      table.channel,
+      table.status,
+      table.deliveryStatus,
+    ),
     uniqueIndex("message_outbox_provider_message_uq")
       .on(table.providerMessageId)
       .where(sql`provider_message_id is not null`),

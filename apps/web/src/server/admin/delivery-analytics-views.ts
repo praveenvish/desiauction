@@ -20,11 +20,11 @@ import {
  * database as raw `last_error` strings only to be collapsed into redacted
  * labels (`normalizeFailureReason`) before anything is returned.
  *
- * THE WINDOW SCAN. `message_outbox` has no index on `created_at`: the
- * window's filter is a sequential scan, which is what Phase 1's thirty-day
- * counts already do. Fine at today's volume; the day the outbox is large, an
- * index on (created_at) — or a partial one on failed/suppressed rows for the
- * reason query — is the change to make, in a migration of its own.
+ * THE WINDOW. `message_outbox_window_idx` (0089) leads with `created_at` and
+ * carries kind, channel, status and delivery_status after it, so the counts
+ * and the daily series are index-only range scans; the reason queries visit
+ * the heap for their error text, but only inside the window. Keep a new query
+ * here on that shape — a `created_at` range first — or it scans the table.
  *
  * SCOPE. The outbox is QUEUED messages. Sign-in codes, receipts and our own
  * security emails are sent directly and are not here; the page says so.

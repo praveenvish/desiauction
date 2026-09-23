@@ -617,6 +617,13 @@
       "when": 1791302400000,
       "tag": "0088_provider_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1791388800000,
+      "tag": "0089_outbox_window_index",
+      "breakpoints": true
     }
   ]
 }
