@@ -397,7 +397,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
           ? null
           : await Promise.all([
               ownerBoard(db, auction),
-              ownerAcceptancesOf(db, auction.id, competition.orgId),
+              ownerAcceptancesOf(db, auction.id, competition.orgId, { fullContact: manage }),
             ]).then(([board, acceptances]) => ({ board, acceptances })),
     };
   });

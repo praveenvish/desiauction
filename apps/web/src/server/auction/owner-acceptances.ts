@@ -50,6 +50,14 @@ export async function ownerAcceptancesOf(
   db: Db,
   auctionId: string,
   orgId: string,
+  /**
+   * Full phone and email — for whoever runs the SEASON (`competition.manage`).
+   * An appointed auctioneer conducts the room and needs to tell two accepted
+   * rows apart, not to ring every owner in the club: they get the last four
+   * digits and the email's domain (go-live gate P3). Required, so no caller
+   * gets the full numbers by forgetting to ask.
+   */
+  options: { fullContact: boolean },
 ): Promise<OwnerAcceptance[]> {
   const rows = await db
     .select({
@@ -78,9 +86,32 @@ export async function ownerAcceptancesOf(
     inviteId: row.inviteId,
     personId: row.personId ?? "",
     name: row.name,
-    phone: row.phone,
-    email: row.email,
+    phone: options.fullContact ? row.phone : maskPhone(row.phone),
+    email: options.fullContact ? row.email : maskEmail(row.email),
     acceptedAt: row.acceptedAt === null ? null : row.acceptedAt.toISOString(),
     stillMember: row.memberOrgId !== null,
   }));
+}
+
+/**
+ * The last four digits and nothing else. Enough to tell two accepted rows for
+ * the same team apart (the reason the phone is on the screen at all), not
+ * enough to call anyone. `formatPhone` leaves a string it cannot parse as it
+ * is, so the mask renders unchanged.
+ */
+export function maskPhone(phone: string | null): string | null {
+  if (phone === null) {
+    return null;
+  }
+  const digits = phone.replace(/\D/g, "");
+  return digits.length <= 4 ? "••••" : `••••••${digits.slice(-4)}`;
+}
+
+/** The domain only: "…@example.com". A malformed address masks to nothing. */
+export function maskEmail(email: string | null): string | null {
+  if (email === null) {
+    return null;
+  }
+  const at = email.lastIndexOf("@");
+  return at < 0 ? "…" : `…${email.slice(at)}`;
 }
