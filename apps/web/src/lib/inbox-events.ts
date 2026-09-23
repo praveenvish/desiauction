@@ -86,6 +86,9 @@ export function labelForEvent(action: string): string {
   return LABELS[action] ?? action;
 }
 
+/** Every action key with prose — the notification guard checks the catalogue against it. */
+export const KNOWN_EVENT_ACTIONS: readonly string[] = Object.keys(LABELS);
+
 /** True when we have real prose — the caller can then drop the monospace. */
 export function isKnownEvent(action: string): boolean {
   return LABELS[action] !== undefined;
