@@ -80,11 +80,13 @@ const lines: string[] = [
   "1. **Meta Business account** verified, with a WhatsApp Business phone number on the",
   "   Cloud API. The same `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_ACCESS_TOKEN` serve",
   "   sign-in codes and these messages.",
-  "2. Create each template below in **WhatsApp Manager → Message templates**: category",
-  "   **Utility**, ONE template name with **two languages** — English (`en`) and Hindi",
-  "   (`hi`). Use the suggested name or your own, then put the APPROVED name in the env",
-  "   var listed for it. Both languages must be approved before a Hindi reader gets it;",
-  "   until then their send is refused and handled like any other refusal.",
+  "2. Submit each template below — from **/admin/notifications/templates → Submit to",
+  "   Meta** (it sends exactly this text; needs `WHATSAPP_BUSINESS_ACCOUNT_ID`; the sale's picture template only by hand), or by hand",
+  "   in **WhatsApp Manager → Message templates**: category **Utility**, ONE template name",
+  "   with **two languages** — English (`en`) and Hindi (`hi`). Use the suggested name or",
+  "   your own. Once APPROVED, **map** the name on the same admin page (the env var listed",
+  "   for it is the fallback when nothing is mapped). A Hindi reader gets English until",
+  "   the Hindi version is approved.",
   "3. The button is a **static URL** (no variable) — its label is per language. The",
   "   sale's header is an **image**: the player card for a public, adult player, the",
   "   DesiAuction card otherwise.",
@@ -93,7 +95,7 @@ const lines: string[] = [
   "",
   "## Templates",
   "",
-  "| Moment | Suggested name | Env var for the approved name |",
+  "| Moment | Suggested name | Env fallback for the approved name |",
   "|---|---|---|",
   ...Object.values(WHATSAPP_TEMPLATES).map(
     (template) =>
@@ -116,7 +118,7 @@ for (const template of Object.values(WHATSAPP_TEMPLATES)) {
     `| Header | ${template.header === "image" ? "Image (sample: any player card PNG)" : "None"} |`,
     `| Footer | ${template.footer} |`,
     `| Button | Visit website → ${template.button.url} |`,
-    `| Env var for the approved name | \`${template.nameEnv}\` |`,
+    `| Env fallback for the approved name | \`${template.nameEnv}\` |`,
     "",
   );
   for (const language of WHATSAPP_LANGUAGES) {
