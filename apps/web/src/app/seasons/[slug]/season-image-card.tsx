@@ -140,8 +140,9 @@ export function SeasonImageCard({
         {cover ? (
           <span className="ov-cover-frame" data-empty={shown === null ? "true" : undefined}>
             {shown !== null ? (
-              // Shown as the hero will crop it: object-fit cover, wide.
-              <img src={shown} alt="" />
+              // Shown as the hero will crop it: object-fit cover, wide. The
+              // intrinsic size is the frame's own 16:5 at its 208px width.
+              <img src={shown} alt="" width={208} height={65} decoding="async" loading="lazy" />
             ) : (
               <IconImage size={28} />
             )}
