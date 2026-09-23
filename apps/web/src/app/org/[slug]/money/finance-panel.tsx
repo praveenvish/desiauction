@@ -126,12 +126,18 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
   const totals = useMemo(() => registerTotals(register, board.fy), [register, board.fy]);
 
   /*
-   * The filter bar writes the URL and the SERVER reads it back, so the write
-   * has to be deliberate: a navigation per keystroke, built from a live
-   * `useSearchParams` snapshot, is what made clearing this box leave the empty
-   * state up for twenty seconds on Safari. `useFilterQuery` explains it.
+   * The filter bar writes the URL — the view IS the address — but nothing on
+   * the server reads it: the rows above filter in the browser. So the write is
+   * `serverReads: false`, the address changes in place, and the register
+   * answers at once instead of waiting on a navigation that on Safari and
+   * Firefox sometimes never landed. `useFilterQuery` explains it.
    */
-  const { commit, search, setSearch } = useFilterQuery({ view: rawView, kind, q: query });
+  const { commit, search, setSearch } = useFilterQuery(
+    { view: rawView, kind, q: query },
+    {
+      serverReads: false,
+    },
+  );
 
   return (
     <>

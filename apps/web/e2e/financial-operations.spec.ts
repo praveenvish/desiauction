@@ -193,9 +193,11 @@ test("founder demo: settle an auction → open Financial Operations → observe,
   /*
    * TWO ASSERTIONS, IN THIS ORDER, ON PURPOSE.
    *
-   * Clearing the box calls `router.replace` with `q` deleted — no debounce, one
-   * replace per input event — and then the server re-renders the register. The
-   * `goto` below was being cancelled by that replace on WebKit.
+   * Clearing the box drops `q` from the address (debounced, written in place —
+   * the server never reads it; see `serverReads` in useFilterQuery) and the
+   * register re-filters in the browser. It used to be a router navigation per
+   * input event, which cancelled the `goto` below on WebKit and, later, was
+   * sometimes never committed at all on Firefox and WebKit.
    *
    * The URL is what the component controls, so it is asserted first: if it does
    * not clear, the fault is the input handler. The register repopulating is the
