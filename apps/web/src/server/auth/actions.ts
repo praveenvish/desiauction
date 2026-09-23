@@ -17,9 +17,7 @@ import { eq } from "drizzle-orm";
 import { env } from "../../env";
 import { clientIp } from "../../lib/client-ip";
 import { db, dbHandle } from "../db";
-import { createPlayerSmsSender } from "../competition/registration-notify";
-import { maySend } from "../messaging/consent";
-import { SMS_TEMPLATES, renderTemplate } from "../messaging/templates";
+import { sendAccountAlert } from "../messaging/account-alert";
 import { openChallenge, sealChallenge } from "./challenge-cookie";
 import { requestOtp, verifyOtp } from "./otp";
 import {
@@ -28,7 +26,8 @@ import {
   type EmailVerificationResult,
 } from "./email-change";
 import { requestEmailLogin, verifyEmailLogin } from "./email-login";
-import { notifyEmailChanged } from "./email-changed-notice";
+import { verifiedEmailOf } from "./email-change";
+import { maskEmail, notifyEmailChanged, notifyPhoneChangedByEmail } from "./email-changed-notice";
 import { createCodeMailer, MailSendError } from "./email-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
@@ -1031,42 +1030,40 @@ export async function confirmPhoneChangeAction(
    * must cost a warning message, never leave the account half-moved.
    */
   try {
-    await notifyPhoneChanged(result.previousPhone, result.newPhone);
+    await notifyPhoneChanged(session.personId, result.previousPhone, result.newPhone);
   } catch {
     // Deliberately swallowed. See above.
   }
   return { step: "idle", done: true };
 }
 
-async function notifyPhoneChanged(previousPhone: string | null, newPhone: string): Promise<void> {
+async function notifyPhoneChanged(
+  personId: string,
+  previousPhone: string | null,
+  newPhone: string,
+): Promise<void> {
   if (previousPhone === null) {
     // An email-anchored account attaching its FIRST number (0062). There is no
     // old handset, so there is nobody to warn — and the security ledger row
     // written by the caller records the attach either way.
     return;
   }
-  const template = SMS_TEMPLATES["security.phone_changed"];
-  const rendered = renderTemplate(template, { last4: newPhone.slice(-4) });
-  if (!rendered.ok) {
-    return;
-  }
-  // The gate still applies. Somebody who texted STOP has said they want no
-  // messages, and a security notice does not outrank that — the change is on
-  // their security ledger either way, which is a place they can look.
-  const decision = await maySend(db, {
-    contact: previousPhone,
-    channel: "sms",
-    category: template.category,
-    scope: "security",
-  });
-  if (!decision.send) {
-    return;
-  }
-  await createPlayerSmsSender(db).send(previousPhone, {
-    template,
-    slots: rendered.slots,
-    body: rendered.body,
-  });
+  /*
+   * Two halves, each best effort and neither waiting on the other: the text to
+   * the OUTGOING number (WhatsApp for an owner who opted in, else SMS where a
+   * gateway exists — messaging/account-alert.ts), and the email to the
+   * verified address, which since SMS was deferred is the warning most owners
+   * actually get.
+   */
+  await Promise.allSettled([
+    sendAccountAlert(db, {
+      personId,
+      phone: previousPhone,
+      key: "security.phone_changed",
+      slots: { last4: newPhone.slice(-4) },
+    }),
+    verifiedEmailOf(db, personId).then((email) => notifyPhoneChangedByEmail(db, email, newPhone)),
+  ]);
 }
 
 /**
@@ -1191,6 +1188,28 @@ export async function confirmEmailVerificationAction(
     }
   } catch {
     // Deliberately swallowed: the change has committed.
+  }
+  // And the account's phone, on WhatsApp for an owner who opted in — the one
+  // channel somebody who moved the address from a stolen session does not
+  // also hold. A first address (nothing was changed) warns nobody.
+  if (result.previousEmail !== null && result.previousEmail !== result.email) {
+    try {
+      const [owner] = await db
+        .select({ phone: people.phone })
+        .from(people)
+        .where(eq(people.id, session.personId))
+        .limit(1);
+      if (owner?.phone != null) {
+        await sendAccountAlert(db, {
+          personId: session.personId,
+          phone: owner.phone,
+          key: "security.email_changed",
+          slots: { email: maskEmail(result.email) },
+        });
+      }
+    } catch {
+      // Same rule: the change has committed.
+    }
   }
   revalidatePath("/account");
   return { step: "idle", done: true, email: result.email };

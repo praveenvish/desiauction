@@ -22,7 +22,10 @@ import { transactionalMailer, type TransactionalMailer } from "../messaging/tran
  *
  * NO SMS alongside it. The one registered security text says "mobile number
  * was changed" and cannot be bent into this sentence, and DLT will not carry an
- * unregistered one. The email is the notice; a text needs its own template.
+ * unregistered one. It has a WhatsApp template of its own
+ * (`security.email_changed`), sent to the account's phone for an owner who
+ * opted in (messaging/account-alert.ts) — the one channel a thief who moved
+ * the address does not also hold.
  */
 
 /** `arjun@example.com` → `a•••@example.com`. */
@@ -86,5 +89,61 @@ export async function notifyEmailChanged(
     return "refused";
   }
   const outcome = await mailer.send({ to: previousEmail, ...emailChangedCopy(newEmail) });
+  return outcome === "sent" ? "sent" : "failed";
+}
+
+/**
+ * "YOUR MOBILE NUMBER WAS CHANGED" — the email half of the phone-change alert.
+ *
+ * The text goes to the number being given up (auth/actions.ts), but only on
+ * WhatsApp for somebody who opted in, and SMS is deferred — so for most owners
+ * the only warning is this one, to the verified address on the account. The
+ * new number is not named: "ending 4321" is enough to recognise, and not
+ * enough to use.
+ */
+export function phoneChangedCopy(last4: string): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  return {
+    subject: "Your DesiAuction mobile number was changed",
+    ...renderEmail({
+      preheader: `This account's mobile number now ends ${last4}.`,
+      heading: "Your mobile number was changed",
+      paragraphs: [
+        `The mobile number on your DesiAuction account was changed to one ending ${last4}. Sign-in codes and texts go there from now on, and every other device was signed out.`,
+        "If that was you, there is nothing to do.",
+      ],
+      after: [
+        `If it wasn't you, somebody may have reached your account. Write to ${SUPPORT_EMAIL} straight away from this address and we will help you get it back.`,
+      ],
+      action: { label: "Get help", url: `${env.PUBLIC_BASE_URL}/support` },
+      footnote:
+        "You received this because this is the verified email on a DesiAuction account whose mobile number just changed.",
+    }),
+  };
+}
+
+/** Best effort, through the gate — `notifyEmailChanged`'s rules exactly. */
+export async function notifyPhoneChangedByEmail(
+  db: Db,
+  email: string | null,
+  newPhone: string,
+  mailer: TransactionalMailer = transactionalMailer(),
+): Promise<"sent" | "skipped" | "refused" | "failed"> {
+  if (email === null) {
+    return "skipped";
+  }
+  const decision = await maySend(db, {
+    contact: email,
+    channel: "email",
+    category: "transactional",
+    scope: "security",
+  });
+  if (!decision.send) {
+    return "refused";
+  }
+  const outcome = await mailer.send({ to: email, ...phoneChangedCopy(newPhone.slice(-4)) });
   return outcome === "sent" ? "sent" : "failed";
 }

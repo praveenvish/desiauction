@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { emailChangedCopy, phoneChangedCopy } from "../auth/email-changed-notice";
+import { applyWhatsAppNudge, hasWhatsAppNudge } from "./email-layout";
 import { DLT_VAR_MAX, smsPrice } from "./templates";
 
 import {
@@ -7,6 +9,7 @@ import {
   lineupMail,
   bidStory,
   ownerSummaryMail,
+  registrationDecisionMail,
   rolesTitle,
   smsRolePhrase,
   soldMail,
@@ -222,5 +225,75 @@ describe("the lineup", () => {
 
   it("leaves the ground out when the fixture has none", () => {
     expect(lineupMail({ ...facts, where: null }).text).not.toContain(" at ");
+  });
+});
+
+describe("the registration decisions, by email", () => {
+  it("says the decision in the subject — most people read nothing else", () => {
+    const facts = { name: "Arjun", season: "Malad Premier League 2026" };
+    expect(registrationDecisionMail({ ...facts, decision: "approve" }).subject).toBe(
+      "You're approved for Malad Premier League 2026",
+    );
+    expect(registrationDecisionMail({ ...facts, decision: "waitlist" }).subject).toContain(
+      "waitlist",
+    );
+    const rejected = registrationDecisionMail({
+      ...facts,
+      decision: "reject",
+      reason: "the season is full",
+    });
+    expect(rejected.subject).toContain("wasn't approved");
+    expect(rejected.text).toContain("The reason given: the season is full.");
+    expect(rejected.text).toContain('Switch off "Registration decisions"');
+  });
+});
+
+describe("THE WHATSAPP NUDGE — decided at send time", () => {
+  const personal = [
+    soldMail(sale),
+    appointmentMail({
+      name: "Vikram",
+      season: "MPL 2026",
+      orgName: "Malad CC",
+      teamName: "Cup Kings",
+      roles: ["captain"],
+      bought: false,
+    }),
+    lineupMail({
+      name: "Arjun",
+      season: "MPL 2026",
+      teamName: "Cup Kings",
+      opponent: "Tigers",
+      when: "Sun, 4 Oct 2026, 7:30 pm",
+      where: null,
+      lineup: [],
+    }),
+    registrationDecisionMail({ name: "Arjun", season: "MPL 2026", decision: "approve" }),
+  ];
+
+  it("leaves room for it under every personal moment, and shows nothing until asked", () => {
+    for (const mail of personal) {
+      expect(hasWhatsAppNudge(mail.html)).toBe(true);
+      expect(mail.text).not.toContain("WhatsApp");
+      expect(applyWhatsAppNudge(mail, false)).toEqual({ text: mail.text, html: mail.html });
+    }
+  });
+
+  it("fills it with one line linking to the switch on /account", () => {
+    for (const mail of personal) {
+      const nudged = applyWhatsAppNudge(mail, true);
+      expect(nudged.html).toContain("Get these on WhatsApp");
+      expect(nudged.html).toContain("/account#whatsapp");
+      expect(nudged.text).toMatch(
+        /Get these on WhatsApp — turn it on in your account: \S+\/account#whatsapp\n\n—\n/,
+      );
+    }
+  });
+
+  it("NEVER touches a security mail, whatever the drain asks", () => {
+    for (const mail of [emailChangedCopy("new@example.com"), phoneChangedCopy("4321")]) {
+      expect(hasWhatsAppNudge(mail.html)).toBe(false);
+      expect(applyWhatsAppNudge(mail, true)).toEqual({ text: mail.text, html: mail.html });
+    }
   });
 });
