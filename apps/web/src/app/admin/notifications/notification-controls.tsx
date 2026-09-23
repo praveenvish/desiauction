@@ -26,10 +26,15 @@ function useRun() {
   const toast = useToast();
   const router = useRouter();
   const [pending, start] = useTransition();
-  const run = (act: () => Promise<NotificationActionResult>, onDone?: () => void) => {
+  const run = (
+    act: () => Promise<NotificationActionResult>,
+    onDone?: () => void,
+    onFail?: () => void,
+  ) => {
     start(async () => {
       const result = await act();
       if (!result.ok) {
+        onFail?.();
         toast({ title: result.error, tone: "danger" });
         return;
       }
@@ -39,6 +44,27 @@ function useRun() {
     });
   };
   return { pending, run };
+}
+
+/**
+ * A switch moves when it is clicked. Bound only to the server's answer it sat
+ * still for the whole save-and-refresh, which reads as a click that did nothing
+ * (and invites a second). The intent is kept WITH the server value it was made
+ * against, so it lapses on its own the moment refreshed props differ — no
+ * effect, no reset — and `clear` drops it when the action is refused.
+ */
+function useIntended(server: boolean) {
+  const [intent, setIntent] = useState<{ value: boolean; against: boolean } | null>(null);
+  const shown = intent !== null && intent.against === server ? intent.value : server;
+  return {
+    shown,
+    intend: (value: boolean) => {
+      setIntent({ value, against: server });
+    },
+    clear: () => {
+      setIntent(null);
+    },
+  };
 }
 
 /**
@@ -64,6 +90,7 @@ export function SwitchToggle({
   const { pending, run } = useRun();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const { shown, intend, clear } = useIntended(enabled);
   const length = reason.trim().length;
   const valid = length >= SECURITY_REASON_MIN && length <= REASON_MAX;
   const id = `notify-cell-${kind}-${channel}`;
@@ -73,7 +100,7 @@ export function SwitchToggle({
         <input
           id={id}
           type="checkbox"
-          checked={enabled}
+          checked={shown}
           disabled={pending}
           data-testid={id}
           onChange={(event) => {
@@ -83,7 +110,8 @@ export function SwitchToggle({
               setOpen(true);
               return;
             }
-            run(() => setNotificationSwitch(kind, channel, next));
+            intend(next);
+            run(() => setNotificationSwitch(kind, channel, next), undefined, clear);
           }}
         />
         <span className="notify-switch-label">
@@ -165,6 +193,7 @@ export function ControlToggle({
   effective: boolean;
 }) {
   const { pending, run } = useRun();
+  const { shown, intend, clear } = useIntended(effective);
   const id = `notify-${side}-${kind}`;
   const label = side === "person" ? "People can turn this off" : "Clubs can turn this off";
   return (
@@ -172,18 +201,22 @@ export function ControlToggle({
       <input
         id={id}
         type="checkbox"
-        checked={effective}
+        checked={shown}
         disabled={pending}
         data-testid={id}
         onChange={(event) => {
           const next = event.target.checked;
-          run(() =>
-            setControllability(
-              kind,
-              undefined,
-              side === "person" ? next : undefined,
-              side === "org" ? next : undefined,
-            ),
+          intend(next);
+          run(
+            () =>
+              setControllability(
+                kind,
+                undefined,
+                side === "person" ? next : undefined,
+                side === "org" ? next : undefined,
+              ),
+            undefined,
+            clear,
           );
         }}
       />

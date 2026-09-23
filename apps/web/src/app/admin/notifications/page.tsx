@@ -1,6 +1,5 @@
-import { LoadingState, ToastProvider } from "@desiauction/ui";
+import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 
 import { platformAdminPageGate } from "../../../server/admin/authz";
 import { adminNotificationCenter } from "../../../server/admin/notification-views";
@@ -37,9 +36,11 @@ export default async function AdminNotificationsPage() {
               your name, and can be reverted below.
             </p>
           </header>
-          <Suspense fallback={<LoadingState variant="page" />}>
-            <Center />
-          </Suspense>
+          {/* No Suspense here, unlike the read-only desks: this page is
+              changed by its own actions, and a refresh that re-renders a
+              streamed boundary kept showing the switch from before the
+              change. Rendered whole, like /admin/moderation. */}
+          <Center />
         </div>
       </main>
     </ToastProvider>

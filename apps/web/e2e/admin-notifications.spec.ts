@@ -96,7 +96,10 @@ test("a security alert will not switch off without a written reason", async ({ p
   await otpLogin(page, FOUNDER);
   await page.goto("/admin/notifications");
 
-  await page.getByTestId(`notify-cell-${SECURITY}-whatsapp`).uncheck();
+  // A click, not uncheck(): a security alert's switch stays ON while the dialog
+  // asks for a reason — it only goes off once the reason is confirmed.
+  await page.getByTestId(`notify-cell-${SECURITY}-whatsapp`).click();
+  await expect(page.getByTestId(`notify-cell-${SECURITY}-whatsapp`)).toBeChecked();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByTestId("notify-security-warning")).toBeVisible();
   const confirm = dialog.getByTestId("notify-reason-confirm");
