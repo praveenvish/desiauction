@@ -372,6 +372,14 @@ describe("THE NOTICE — a null phone is SUPPRESSED, never counted as failed", (
       registrationNumber: registrationNumber(registrationId),
     });
 
+    /*
+     * Since the notices ride the outbox (WhatsApp first, 2026-09-23) a decision
+     * has an EMAIL too, and this person has a verified address — so they are
+     * no longer untold at all: no text row (no number), and the email goes.
+     * The property held is the same one: a phoneless row is never FAILED.
+     * The mailer is injected: .env.local sends real mail.
+     */
+    const mailed: string[] = [];
     const outcome = await notifyDecision(
       db,
       {
@@ -381,8 +389,19 @@ describe("THE NOTICE — a null phone is SUPPRESSED, never counted as failed", (
         event: "approve",
         actorId: organizerId,
       },
-      new DevInboxSmsSender(db),
+      {
+        sms: new DevInboxSmsSender(db),
+        whatsapp: null,
+        outboxDb: db,
+        mailer: {
+          send: (mail) => {
+            mailed.push(mail.to);
+            return Promise.resolve("sent");
+          },
+        },
+      },
     );
-    expect(outcome).toEqual({ sent: 0, failed: 0, suppressed: 1 });
+    expect(outcome).toEqual({ sent: 1, failed: 0, suppressed: 0, pending: 0 });
+    expect(mailed).toEqual([`notify${RUN}@example.test`]);
   });
 });
