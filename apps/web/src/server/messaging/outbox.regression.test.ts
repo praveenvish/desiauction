@@ -14,11 +14,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { env } from "../../env";
-import {
-  SmsSendError,
-  type PlayerSmsSender,
-  type TemplatedSms,
-} from "../competition/registration-notify";
+import { SmsSendError, type PlayerSmsSender, type TemplatedSms } from "./sms";
 import {
   drainOutbox,
   enqueueMail,
@@ -326,6 +322,8 @@ describe("the text window (IST)", () => {
   });
 });
 
+let wamids = 0;
+
 function whatsapp(fail = false): PersonalWhatsAppSender & { sent: [string, WhatsAppMessage][] } {
   const sent: [string, WhatsAppMessage][] = [];
   return {
@@ -333,7 +331,9 @@ function whatsapp(fail = false): PersonalWhatsAppSender & { sent: [string, Whats
     send: vi.fn((to: string, message: WhatsAppMessage) => {
       if (fail) return Promise.reject(new WhatsAppSendError("WhatsApp refused the send"));
       sent.push([to, message]);
-      return Promise.resolve();
+      // Unique across runs: provider_message_id is a unique index (0085).
+      wamids += 1;
+      return Promise.resolve({ messageId: `wamid.${RUN}.${String(wamids)}.${newId()}` });
     }),
   };
 }
@@ -594,5 +594,177 @@ describe("WHATSAPP TIMEOUT — unknown is not undeliverable", () => {
       .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:wa-timeout`));
     expect(row?.status).toBe("failed");
     expect(row?.lastError).toContain("delivery unknown");
+  });
+});
+
+describe("WHATSAPP FIRST — the wamid, the reader's language, and no SMS to fall back on", () => {
+  let waHindi = "";
+  let waNever = "";
+
+  beforeAll(async () => {
+    waHindi = newId();
+    waNever = newId();
+    await db.insert(people).values([
+      { id: waHindi, phone: `+9196${RUN}1`, name: "Hindi Reader" },
+      {
+        id: waNever,
+        phone: `+9196${RUN}2`,
+        name: "Never Asked",
+        email: `never-${RUN}@example.test`,
+        emailVerifiedAt: new Date(),
+      },
+    ]);
+    await setWhatsappOptIn(db, {
+      personId: waHindi,
+      granted: true,
+      source: "account",
+      language: "hi",
+    });
+  });
+
+  afterAll(async () => {
+    const ids = [waHindi, waNever];
+    await db.delete(messageOutbox).where(inArray(messageOutbox.personId, ids));
+    await db.delete(consentRecords).where(inArray(consentRecords.personId, ids));
+    await db.delete(people).where(inArray(people.id, ids));
+  });
+
+  it("stores Meta's wamid and 'sent' on the row, in the write that marks it sent (English)", async () => {
+    await enqueueSms([text(waFan, "wa-wamid-en")], db);
+    const wa = whatsapp();
+    const result = await drainOutbox({
+      db,
+      sms: null,
+      whatsapp: wa,
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [waFan],
+    });
+    expect(result.sent).toBe(1);
+    expect(wa.sent[0]?.[1].language).toBe("en");
+    const [row] = await db
+      .select()
+      .from(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:wa-wamid-en`));
+    expect(row?.status).toBe("sent");
+    expect(row?.channel).toBe("whatsapp");
+    expect(row?.providerMessageId).toMatch(/^wamid\./);
+    expect(row?.deliveryStatus).toBe("sent");
+  });
+
+  it("sends the Hindi version to somebody who chose हिन्दी, and still keeps the wamid", async () => {
+    await enqueueSms([text(waHindi, "wa-wamid-hi")], db);
+    const wa = whatsapp();
+    const result = await drainOutbox({
+      db,
+      sms: null,
+      whatsapp: wa,
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [waHindi],
+    });
+    expect(result.sent).toBe(1);
+    expect(wa.sent[0]?.[1]).toMatchObject({ language: "hi", name: "da_auction_sold" });
+    const [row] = await db
+      .select()
+      .from(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:wa-wamid-hi`));
+    expect(row?.providerMessageId).toMatch(/^wamid\./);
+    expect(row?.deliveryStatus).toBe("sent");
+  });
+
+  it("NOT OPTED IN, NO SMS: the text is suppressed as no_text_channel — and the email still goes", async () => {
+    await enqueueSms([text(waNever, "wa-no-channel")], db);
+    await enqueueMail([mail(waNever, "wa-no-channel-mail")], db);
+    const wa = whatsapp();
+    const provider = mailer("sent");
+    const result = await drainOutbox({
+      db,
+      sms: null,
+      mailer: provider,
+      whatsapp: wa,
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [waNever],
+    });
+    expect(wa.sent).toHaveLength(0);
+    expect(result).toMatchObject({ sent: 1, suppressed: 1, failed: 0, retrying: 0 });
+    const [textRow] = await db
+      .select()
+      .from(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:wa-no-channel`));
+    expect(textRow?.status).toBe("suppressed");
+    expect(textRow?.lastError).toBe("no_text_channel: not opted in to WhatsApp");
+    const [mailRow] = await db
+      .select()
+      .from(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:wa-no-channel-mail`));
+    expect(mailRow?.status).toBe("sent");
+    expect(provider.sent[0]?.to).toBe(`never-${RUN}@example.test`);
+  });
+
+  it("a template Meta has not approved, with no SMS: suppressed, named as such", async () => {
+    await enqueueSms([text(waFan, "wa-unapproved-no-sms")], db);
+    await drainOutbox({
+      db,
+      sms: null,
+      whatsapp: whatsapp(),
+      whatsappTemplate: () => undefined,
+      now: NOON_IST,
+      personIds: [waFan],
+    });
+    const [row] = await db
+      .select()
+      .from(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:wa-unapproved-no-sms`));
+    expect(row?.status).toBe("suppressed");
+    expect(row?.lastError).toBe("no_text_channel: WhatsApp template not approved");
+  });
+
+  it("a breaker-open WhatsApp with no SMS WAITS — the attempt is put back, nothing is lost", async () => {
+    await enqueueSms([text(waFan, "wa-breaker-no-sms")], db);
+    const down: PersonalWhatsAppSender = {
+      send: () =>
+        Promise.reject(
+          new WhatsAppSendError("WhatsApp provider unavailable (breaker open)", false, "breaker"),
+        ),
+    };
+    const result = await drainOutbox({
+      db,
+      sms: null,
+      whatsapp: down,
+      whatsappTemplate: APPROVED,
+      now: NOON_IST,
+      personIds: [waFan],
+    });
+    expect(result.retrying).toBe(1);
+    const [row] = await db
+      .select()
+      .from(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:wa-breaker-no-sms`));
+    expect(row?.status).toBe("pending");
+    expect(row?.attempts).toBe(0);
+    await db
+      .delete(messageOutbox)
+      .where(eq(messageOutbox.dedupeKey, `test:${RUN}:sms:wa-breaker-no-sms`));
+  });
+
+  it("nudges a person who has not opted in, in the email — and not one who has", async () => {
+    const withMark = {
+      ...mail(waNever, "nudge"),
+      html: "<p>You were bought.</p><!--da:whatsapp-nudge-->",
+      text: "You were bought.\n\n—\nfooter",
+    };
+    await enqueueMail([withMark], db);
+    const provider = mailer("sent");
+    await drainOutbox({
+      db,
+      mailer: provider,
+      whatsapp: whatsapp(),
+      whatsappTemplate: APPROVED,
+      personIds: [waNever],
+    });
+    expect(provider.sent[0]?.html).toContain("/account#whatsapp");
+    expect(provider.sent[0]?.text).toContain("Get these on WhatsApp");
   });
 });

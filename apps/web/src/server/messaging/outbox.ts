@@ -1,16 +1,14 @@
 import { messageOutbox, newId, people, type Db } from "@desiauction/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { after } from "next/server";
 
 import { verifiedEmailOf } from "../auth/email-change";
-import {
-  createPlayerSmsSender,
-  SmsSendError,
-  type PlayerSmsSender,
-} from "../competition/registration-notify";
 import { db as appDb } from "../db";
 import { maySend } from "./consent";
+import { applyWhatsAppNudge, hasWhatsAppNudge } from "./email-layout";
+import { createPlayerSmsSender, SmsSendError, type PlayerSmsSender } from "./sms";
 import { renderTemplate, SMS_TEMPLATES, type TemplateKey } from "./templates";
+import { textFallback, type WhatsAppBlock } from "./text-route";
 import {
   createWhatsAppSender,
   whatsappOptedIn,
@@ -46,6 +44,11 @@ import { transactionalMailer, type TransactionalMailer } from "./transactional-m
  * moments, because most players sign up by phone and never verify an email.
  * The row carries the template and its slots — what the gateway is given — and
  * the number and consent are decided at send time like an email's.
+ *
+ * WHATSAPP FIRST (2026-09-23). SMS is deferred; a text row goes on WhatsApp to
+ * a person who opted in, by SMS where a gateway exists, and otherwise nowhere —
+ * `suppressed` as `no_text_channel`, the email row beside it unaffected
+ * (text-route.ts has every branch).
  */
 
 export interface QueuedMail {
@@ -141,6 +144,28 @@ export async function enqueueMail(mails: readonly QueuedMail[], db: Db = appDb):
 }
 
 /**
+ * What became of these rows — for a caller that queued a moment and drained it
+ * at once, and wants to record the outcome (competition/registration-notify.ts).
+ */
+export async function outboxOutcomes(
+  dedupeKeys: readonly string[],
+  db: Db = appDb,
+): Promise<{ dedupeKey: string; channel: string; status: string; lastError: string | null }[]> {
+  if (dedupeKeys.length === 0) {
+    return [];
+  }
+  return db
+    .select({
+      dedupeKey: messageOutbox.dedupeKey,
+      channel: messageOutbox.channel,
+      status: messageOutbox.status,
+      lastError: messageOutbox.lastError,
+    })
+    .from(messageOutbox)
+    .where(inArray(messageOutbox.dedupeKey, [...dedupeKeys]));
+}
+
+/**
  * Deliver what was just queued, after the response. Best effort by design:
  * outside a request (a test, a script) there is no `after`, and the scheduled
  * drain (`/api/jobs/messages`) picks the rows up instead.
@@ -189,6 +214,7 @@ type ClaimedRow = {
   id: string;
   person_id: string;
   org_id: string | null;
+  kind: string;
   channel: "email" | "sms";
   subject: string;
   body_text: string;
@@ -251,9 +277,9 @@ async function stillOurs(db: Db, row: ClaimedRow): Promise<boolean> {
 function mayDeliver(
   db: Db,
   row: ClaimedRow,
-  input: Omit<Parameters<typeof maySend>[1], "orgId" | "personId">,
+  input: Omit<Parameters<typeof maySend>[1], "orgId" | "personId" | "scope">,
 ): ReturnType<typeof maySend> {
-  const gate = { ...input, personId: row.person_id };
+  const gate = { ...input, scope: scopeOf(row.kind), personId: row.person_id };
   const orgId = row.org_id;
   if (orgId === null) {
     return maySend(db, gate);
@@ -263,6 +289,18 @@ function mayDeliver(
     await tx.execute(sql`select set_config('app.org_id', ${orgId}, true)`);
     return maySend(tx, { ...gate, orgId });
   });
+}
+
+/**
+ * The /account topic a row belongs to, which is the switch that stops it.
+ *
+ * Every row used to be asked about "auction" — right for the moments this
+ * queue was built for, wrong the day registration decisions joined it: a person
+ * who switched "Registration decisions" off would still have been told, and one
+ * who switched "Auction updates" off would have lost their approval notice.
+ */
+export function scopeOf(kind: string): "registration" | "auction" {
+  return kind.startsWith("registration.") ? "registration" : "auction";
 }
 
 /**
@@ -293,7 +331,11 @@ export async function drainOutbox(
   options: {
     db?: Db;
     mailer?: TransactionalMailer;
-    sms?: PlayerSmsSender;
+    /**
+     * Omitted: the platform's SMS gateway — which is null where there is none
+     * (sms.ts), and then a text that cannot go on WhatsApp has no channel.
+     */
+    sms?: PlayerSmsSender | null;
     /** Omitted: the platform's (null when WhatsApp is not set up). */
     whatsapp?: PersonalWhatsAppSender | null;
     /** The approved template name for a key — injected by tests. */
@@ -302,6 +344,11 @@ export async function drainOutbox(
     limit?: number;
     /** Only these people's rows — a test's own, in a shared database. */
     personIds?: readonly string[];
+    /**
+     * Only these rows: a caller delivering what it just queued, now, so it can
+     * read back what became of each (competition/registration-notify.ts).
+     */
+    dedupeKeys?: readonly string[];
   } = {},
 ): Promise<DrainResult> {
   const db = options.db ?? appDb;
@@ -312,6 +359,15 @@ export async function drainOutbox(
           options.personIds.map((id) => sql`${id}`),
           sql`, `,
         )})`;
+  const onlyKeys =
+    options.dedupeKeys === undefined
+      ? sql``
+      : options.dedupeKeys.length === 0
+        ? sql`and false`
+        : sql`and dedupe_key in (${sql.join(
+            options.dedupeKeys.map((key) => sql`${key}`),
+            sql`, `,
+          )})`;
   const mailer = options.mailer ?? transactionalMailer();
   const limit = options.limit ?? 50;
   const claimed = await db.execute<ClaimedRow>(sql`
@@ -320,12 +376,12 @@ export async function drainOutbox(
         attempts = ${messageOutbox.attempts} + 1
     where ${messageOutbox.id} in (
       select id from ${messageOutbox}
-      where status = 'pending' and next_attempt_at <= now() ${onlyPersons}
+      where status = 'pending' and next_attempt_at <= now() ${onlyPersons} ${onlyKeys}
       order by next_attempt_at
       limit ${limit}
       for update skip locked
     )
-    returning id, person_id, org_id, channel, subject, body_text, body_html,
+    returning id, person_id, org_id, kind, channel, subject, body_text, body_html,
               template_key, slots, media_url, attempts, ${LEASE_TOKEN} as lease
   `);
 
@@ -334,7 +390,9 @@ export async function drainOutbox(
   let failed = 0;
   let retrying = 0;
   let skipped = 0;
-  let sms: PlayerSmsSender | null = null;
+  // Built on the first text row, once: `undefined` is "not asked yet", null is
+  // "asked, and there is no SMS".
+  let sms: PlayerSmsSender | null | undefined = options.sms;
   const whatsapp: TextChannels["whatsapp"] = {
     sender: options.whatsapp === undefined ? createWhatsAppSender() : options.whatsapp,
     templateName: options.whatsappTemplate ?? whatsappTemplateName,
@@ -345,7 +403,7 @@ export async function drainOutbox(
       continue;
     }
     if (row.channel === "sms") {
-      sms ??= options.sms ?? createPlayerSmsSender(db);
+      if (sms === undefined) sms = createPlayerSmsSender(db);
       const result = await sendText(db, row, { sms, whatsapp }, options.now ?? new Date());
       if (result === "sent") sent += 1;
       else if (result === "suppressed") suppressed += 1;
@@ -363,18 +421,28 @@ export async function drainOutbox(
       contact: email,
       channel: "email",
       category: "transactional",
-      scope: "auction",
     });
     if (!decision.send) {
       await settle(db, row.id, "suppressed", decision.reason);
       suppressed += 1;
       continue;
     }
+    /*
+     * The WhatsApp nudge, decided now: a personal moment's mail (the layout
+     * left a mark for it) carries "Get these on WhatsApp" for a person who has
+     * not turned it on — and only where WhatsApp is actually set up, because
+     * a switch that turns on nothing is not an offer worth making.
+     */
+    const nudge =
+      whatsapp.sender !== null &&
+      hasWhatsAppNudge(row.body_html) &&
+      !(await whatsappOptedIn(db, row.person_id)).optedIn;
+    const body = applyWhatsAppNudge({ text: row.body_text, html: row.body_html }, nudge);
     const outcome = await mailer.send({
       to: email,
       subject: row.subject,
-      text: row.body_text,
-      html: row.body_html,
+      text: body.text,
+      html: body.html,
     });
     if (outcome === "sent") {
       await db
@@ -438,7 +506,8 @@ export function textWindowOpensAt(now: Date): Date {
 }
 
 interface TextChannels {
-  readonly sms: PlayerSmsSender;
+  /** Null: no SMS gateway — see text-route.ts for what a text does then. */
+  readonly sms: PlayerSmsSender | null;
   readonly whatsapp: {
     readonly sender: PersonalWhatsAppSender | null;
     readonly templateName: (key: string) => string | undefined;
@@ -481,23 +550,22 @@ async function sendText(
     contact: person.phone,
     channel: "sms",
     category: template.category,
-    scope: "auction",
   });
   if (!decision.send) {
     await settle(db, row.id, "suppressed", decision.reason);
     return "suppressed";
   }
   /*
-   * WHATSAPP INSTEAD, for a player who opted in (founder decision, Phase 3):
-   * the same moment, one ping. Only when their latest answer is yes AND Meta
-   * has approved this template (its name is configured) AND the account is set
-   * up — otherwise it is the SMS below, exactly as before. The STOP list and
-   * the "Auction updates" switch above have already been honoured: they are
-   * about being messaged at all, whichever app it lands in.
+   * WHATSAPP FIRST, for a person who opted in: the same moment, one ping. Only
+   * when their latest answer is yes AND Meta has approved this template (its
+   * name is configured) AND the account is set up. The STOP list and the topic
+   * switches above have already been honoured: they are about being messaged
+   * at all, whichever app it lands in.
    *
-   * A WhatsApp failure is not the end of the moment: it falls straight back to
-   * SMS in this same pass (C-19, "SMS when WhatsApp is undeliverable"), and the
-   * row keeps the WhatsApp error so the fallback is visible.
+   * A WhatsApp that cannot be used is not the end of the moment: text-route.ts
+   * decides — SMS in this same pass where a gateway exists (the row keeps the
+   * WhatsApp error so the fallback is visible), and where none does, a
+   * `no_text_channel` suppression, a wait for the breaker, or a retry.
    *
    * EXCEPT a timeout. A refusal or a dead connection means Meta never had the
    * message; a call that died on our deadline may well have been accepted and
@@ -506,42 +574,99 @@ async function sendText(
    * at most once, so the row stops here, failed with the reason spelled out;
    * the in-app inbox line the caller wrote still carries the moment.
    */
-  let whatsappError: string | null = null;
   const waTemplate = WHATSAPP_TEMPLATES[template.key];
   const waName = channels.whatsapp.templateName(template.key);
-  if (
-    channels.whatsapp.sender !== null &&
-    waTemplate !== undefined &&
-    waName !== undefined &&
-    (await whatsappOptedIn(db, row.person_id))
-  ) {
-    try {
-      await channels.whatsapp.sender.send(person.phone, {
-        name: waName,
-        template: waTemplate,
-        params: whatsappParams(waTemplate, row.slots, person.name?.trim() || "there"),
-        imageUrl: row.media_url,
-      });
-      await db
-        .update(messageOutbox)
-        .set({ status: "sent", channel: "whatsapp", sentAt: now, lastError: null })
-        .where(eq(messageOutbox.id, row.id));
-      return "sent";
-    } catch (error) {
-      if (error instanceof WhatsAppSendError && error.outcomeUnknown) {
-        await settle(
-          db,
-          row.id,
-          "failed",
-          `WhatsApp: ${error.message} — delivery unknown, not retried or sent by SMS`,
-        );
-        return "failed";
+  let block: WhatsAppBlock;
+  if (channels.whatsapp.sender === null) {
+    block = { kind: "unconfigured" };
+  } else if (waName === undefined) {
+    block = { kind: "template_unset" };
+  } else {
+    const consent = await whatsappOptedIn(db, row.person_id);
+    if (!consent.optedIn) {
+      block = { kind: "not_opted_in" };
+    } else {
+      try {
+        const receipt = await channels.whatsapp.sender.send(person.phone, {
+          name: waName,
+          template: waTemplate,
+          params: whatsappParams(
+            waTemplate,
+            row.slots,
+            person.name?.trim() || "there",
+            consent.language,
+          ),
+          imageUrl: row.media_url,
+          language: consent.language,
+        });
+        // The wamid is what Meta's delivery callbacks name, so it is stored in
+        // the same write that marks the row sent: a callback that arrives a
+        // moment later always finds its row (/api/webhooks/whatsapp).
+        await db
+          .update(messageOutbox)
+          .set({
+            status: "sent",
+            channel: "whatsapp",
+            sentAt: now,
+            lastError: null,
+            providerMessageId: receipt.messageId,
+            deliveryStatus: "sent",
+          })
+          .where(eq(messageOutbox.id, row.id));
+        return "sent";
+      } catch (error) {
+        if (error instanceof WhatsAppSendError && error.outcomeUnknown) {
+          await settle(
+            db,
+            row.id,
+            "failed",
+            `WhatsApp: ${error.message} — delivery unknown, not retried or sent by SMS`,
+          );
+          return "failed";
+        }
+        const message = error instanceof Error ? error.message : "send failed";
+        const failure = error instanceof WhatsAppSendError ? error.failure : "unavailable";
+        block =
+          failure === "breaker"
+            ? { kind: "breaker_open", error: message }
+            : failure === "refused"
+              ? { kind: "refused", error: message }
+              : { kind: "unavailable", error: message };
       }
-      whatsappError = `WhatsApp: ${error instanceof Error ? error.message : "send failed"}`;
     }
   }
+  const route = textFallback(block, {
+    smsAvailable: channels.sms !== null,
+    attempts: row.attempts,
+    maxAttempts: MAX_ATTEMPTS,
+  });
+  if (route.action === "suppress") {
+    await settle(db, row.id, "suppressed", route.reason);
+    return "suppressed";
+  }
+  if (route.action === "wait_breaker") {
+    await waitOutBreaker(db, row, now, route.reason);
+    return "retrying";
+  }
+  if (route.action === "retry") {
+    await db
+      .update(messageOutbox)
+      .set({
+        lastError: route.reason,
+        nextAttemptAt: new Date(now.getTime() + backoffMs(row.attempts)),
+      })
+      .where(eq(messageOutbox.id, row.id));
+    return "retrying";
+  }
+  // "sms" is only ever answered when a gateway exists; the check is for the
+  // compiler, and settles honestly if that ever stops being true.
+  const gateway = channels.sms;
+  if (gateway === null) {
+    await settle(db, row.id, "suppressed", "no_text_channel: no SMS gateway");
+    return "suppressed";
+  }
   try {
-    await channels.sms.send(person.phone, { template, slots: row.slots, body: row.body_text });
+    await gateway.send(person.phone, { template, slots: row.slots, body: row.body_text });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "send failed";
     if (error instanceof SmsSendError && error.breakerOpen) {
@@ -566,7 +691,7 @@ async function sendText(
   await db
     .update(messageOutbox)
     // A WhatsApp failure that SMS covered stays on the row, so it is seen.
-    .set({ status: "sent", sentAt: now, lastError: whatsappError })
+    .set({ status: "sent", sentAt: now, lastError: route.note })
     .where(eq(messageOutbox.id, row.id));
   return "sent";
 }
