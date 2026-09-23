@@ -260,6 +260,7 @@
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: var(--text-sm-size);
   overflow-wrap: anywhere;
+}
 
 /* "Template: da_auction_sold (mapped here) · approved" — the way to
    /admin/notifications/templates from a WhatsApp or SMS cell. A 44px target
