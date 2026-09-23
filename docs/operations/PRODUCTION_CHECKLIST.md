@@ -148,13 +148,15 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   `p=quarantine` ~2026-09-13, after reading the aggregate reports and
   confirming alignment — earlier and our own mail disappears. EDIT the existing
   `_dmarc` record; a second one invalidates both.
-- ☐E finops dispatch adapters (email, and WhatsApp via the Cloud API — no BSP). `EmailHttpSender`
-  (`messaging/email-adapter.ts`) is the finops `DeliveryPort` and is still
-  constructed **nowhere outside its own tests** — the transactional mailer is a
-  different, smaller object and proving one says nothing about the other. The
-  credentials it needs now exist, so this is wiring it into `webFinopsDeps`
-  plus the WhatsApp equivalent (outbox + in-app are already first-class; SDKs
-  are drop-ins per IP-6)
+- ☑E finops dispatch adapters — email + in-app. The HTTP email adapter and the
+  person-scoped in-app adapter live in `packages/messaging` (with the
+  notification gate they pass) and are injected by BOTH `webFinopsDeps` and the
+  finops runner, which is the process that actually drains `dispatch.send`.
+  Until 2026-09-23 the runner injected nothing and ran the package defaults, so
+  every production document was "delivered" to a no-op and a file on the
+  runner's disk. `runner.env` now needs `EMAIL_API_ENDPOINT`, `EMAIL_API_KEY`,
+  `EMAIL_FROM` (same values as `web.env`); the runner refuses to boot in
+  production without them. ☐E WhatsApp remains.
 - ☐E Provider health monitoring (poll provider status into the finops supervisor's component list)
 
 ## 4 · Observability (PRP-1 §4)

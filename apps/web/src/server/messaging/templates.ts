@@ -1,3 +1,5 @@
+import type { MessageCategory } from "@desiauction/messaging/consent";
+
 /**
  * THE MESSAGE TEMPLATE REGISTRY.
  *
@@ -46,7 +48,8 @@ export type TemplateKey =
  * how a sender id gets blocked, so the category is declared per template rather
  * than inferred from whichever code path happens to call the sender.
  */
-export type MessageCategory = "transactional" | "promotional";
+// One definition, beside the gate that reads it (packages/messaging).
+export type { MessageCategory };
 
 export interface SlotSpec {
   readonly name: string;

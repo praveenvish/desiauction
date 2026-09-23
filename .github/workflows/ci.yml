@@ -124,6 +124,13 @@ jobs:
             -f ops/db/create-app-role.sql
       - name: Grant drift gate
         run: pnpm --filter @desiauction/web grants:verify
+      # The runner's receipt delivery, run AS desiauction_runner: the gate and
+      # recipient reads plus the /inbox row write, proven against the real role
+      # rather than the owner the step above ran it as.
+      - name: Runner delivery under the runner role
+        run: pnpm --filter @desiauction/finops-runner test:integration
+        env:
+          RUNNER_DATABASE_URL: postgres://desiauction_runner:ci-runner@localhost:5433/desiauction
       - name: RLS probe under the non-BYPASSRLS app role
         run: pnpm --filter @desiauction/web rls:verify
         env:

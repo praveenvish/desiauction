@@ -10,6 +10,7 @@ import {
 import { scrub } from "@desiauction/core";
 import * as Sentry from "@sentry/node";
 
+import { mailConfigFor, runnerDelivery } from "./delivery";
 import { env } from "./env";
 import { logger } from "./logger";
 
@@ -76,6 +77,9 @@ const artifactStore = bucketArtifactStoreFromEnv(env) ?? undefined;
 const deps = finopsDeps(handle.db, {
   storageDir: resolve(process.cwd(), env.FINOPS_STORAGE_DIR),
   ...(artifactStore === undefined ? {} : { artifacts: artifactStore }),
+  // The adapters that reach a person — without this every document was
+  // "delivered" to a no-op and a file on this container's disk (delivery.ts).
+  delivery: runnerDelivery(handle.db, env),
 });
 
 let stopping = false;
@@ -118,7 +122,15 @@ async function tick(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  logger.info({ tickMs: env.RUNNER_TICK_MS }, "finops-runner started");
+  logger.info(
+    {
+      tickMs: env.RUNNER_TICK_MS,
+      // Said at boot so a runner mailing receipts to its own disk is one log
+      // line away from noticed, rather than a founder asking where they went.
+      emailDelivery: mailConfigFor(env) === null ? "file-outbox" : "http",
+    },
+    "finops-runner started",
+  );
   while (!stopping) {
     await tick();
     await new Promise((resolve) => setTimeout(resolve, env.RUNNER_TICK_MS));

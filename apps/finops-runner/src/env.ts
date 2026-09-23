@@ -37,7 +37,41 @@ const envSchema = z.object({
   FINOPS_S3_BUCKET: z.string().min(1).optional(),
   FINOPS_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
   FINOPS_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  /**
+   * THE MAILER THAT SENDS RECEIPTS — the same four settings as apps/web/src/env.ts.
+   *
+   * This process drains `dispatch.send`, so it is the tier that actually emails
+   * a receipt, invoice or correction. It used to read none of these and ran the
+   * platform's filesystem outbox in production: every document was "delivered"
+   * to a `.txt` file on the runner's disk and nobody received one.
+   *
+   *   · auto — the real mailer when all three are set, the file outbox when not.
+   *   · http — the real mailer, and boot is refused without all three.
+   *   · dev  — the file outbox even with credentials (a local suite whose
+   *            .env.local carries live keys must not mail test addresses).
+   *
+   * Production refuses `dev` and refuses a missing setting (below). The values
+   * must match the web tier's: its provider callback route confirms what this
+   * process sent.
+   */
+  EMAIL_PROVIDER: z.enum(["auto", "dev", "http"]).default("auto"),
+  EMAIL_API_ENDPOINT: z.url().optional(),
+  EMAIL_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().min(3).optional(),
 });
+
+/** All three mail settings present — what "configured" means in both tiers. */
+export function mailConfigured(v: {
+  EMAIL_API_ENDPOINT?: string | undefined;
+  EMAIL_API_KEY?: string | undefined;
+  EMAIL_FROM?: string | undefined;
+}): boolean {
+  return (
+    v.EMAIL_API_ENDPOINT !== undefined &&
+    v.EMAIL_API_KEY !== undefined &&
+    v.EMAIL_FROM !== undefined
+  );
+}
 
 /**
  * PRR P1-4 (split-brain guard): the web tier refuses to boot in production on the
@@ -64,6 +98,21 @@ const productionSchema = envSchema
     message:
       "SENTRY_DSN must be set in production so runner failures are captured (a missing DSN is silent)",
     path: ["SENTRY_DSN"],
+  })
+  // Asked for the real mailer and not given one: in any environment that is a
+  // misconfiguration, not a reason to fall back to writing files.
+  .refine((v) => v.EMAIL_PROVIDER !== "http" || mailConfigured(v), {
+    message: "EMAIL_PROVIDER=http needs EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM",
+    path: ["EMAIL_PROVIDER"],
+  })
+  // THE FILE OUTBOX IS NOT A PRODUCTION CHANNEL. Without this a production
+  // runner boots, drains every dispatch, records each as delivered and writes
+  // it to its own disk — the defect this refinement exists to make impossible.
+  // The rehearsal escape keeps serving() false, exactly as for SENTRY_DSN.
+  .refine((v) => !serving(v) || (v.EMAIL_PROVIDER !== "dev" && mailConfigured(v)), {
+    message:
+      "receipts need EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM in production (and EMAIL_PROVIDER not dev) — otherwise every financial document is written to a file on the runner's disk instead of being emailed",
+    path: ["EMAIL_PROVIDER"],
   });
 
 export type Env = z.infer<typeof envSchema>;

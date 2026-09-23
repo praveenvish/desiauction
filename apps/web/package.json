@@ -43,6 +43,7 @@
     "@desiauction/core": "workspace:*",
     "@desiauction/db": "workspace:*",
     "@desiauction/financial-operations": "workspace:*",
+    "@desiauction/messaging": "workspace:*",
     "@desiauction/settlement": "workspace:*",
     "@desiauction/ui": "workspace:*",
     "@sentry/nextjs": "10.65.0",

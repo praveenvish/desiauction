@@ -134,7 +134,12 @@ with `pnpm env:check`). Web: `DATABASE_URL` (app role), `SYSTEM_DATABASE_URL`
 (system role), `ENGINE_URL`, `ENGINE_PUBLIC_WS_URL`, `ENGINE_SECRET`,
 `RP_ID`/`RP_ORIGINS` (WebAuthn — must match the public domain), `SENTRY_DSN`.
 Engine: `DATABASE_URL` (writer credential), `ENGINE_SECRET`, `PORT`,
-`SENTRY_DSN`. Runner: `DATABASE_URL` (writer credential), `RUNNER_TICK_MS`.
+`SENTRY_DSN`. Runner: `DATABASE_URL` (writer credential), `RUNNER_TICK_MS`,
+`SENTRY_DSN`, `FINOPS_*`, and the mailer — `EMAIL_API_ENDPOINT`, `EMAIL_API_KEY`,
+`EMAIL_FROM` (optionally `EMAIL_PROVIDER`). The runner drains `dispatch.send`, so
+it is the process that emails every receipt, invoice and correction; a
+production runner refuses to boot without all three or with
+`EMAIL_PROVIDER=dev` (the filesystem outbox that used to swallow every document).
 
 Added after RC-1. That open item is **closed** (re-verified 2026-08-30): every
 variable below now appears in `.env.example`, commented out and annotated with
@@ -152,10 +157,11 @@ for validation; `.env.example` documents, it does not enforce.
 | `ENGINE_ALLOWED_ORIGINS` | engine | **yes in production** | Comma-separated browser origins allowed to open the spectate WebSocket. A ticket authorises an *auction*, not a *page*, so unset means any origin can open a socket with a scraped ticket. Unset = "do not check", correct only for local dev and native clients. |
 | `WS_MAX_SOCKETS_PER_ROOM` | engine | optional (default 2000) | Per-auction socket ceiling; a DoS bound, not a product limit. |
 | `WS_MAX_SOCKETS_PER_IP` | engine | optional (default 50) | Per-client-address socket ceiling. |
-| `EMAIL_API_ENDPOINT` | web | **all three or none** | Provider send endpoint (`https://api.resend.com/emails`). |
-| `EMAIL_API_KEY` | web | **all three or none** | Provider key, sent as a bearer token. |
-| `EMAIL_FROM` | web | **all three or none** | Envelope sender, e.g. `DesiAuction <no-reply@mail.desiauction.in>`. On the **sending subdomain**, never the root — the root's reputation carries the statutory `privacy@` and `navrangi@` mailboxes. Miss any one of these three and `transactionalMailer()` returns `UnconfiguredMailer`, which reports `"unconfigured"` rather than pretending to send. |
+| `EMAIL_API_ENDPOINT` | web **and runner** | **all three or none** (runner: **required in production**) | Provider send endpoint (`https://api.resend.com/emails`). |
+| `EMAIL_API_KEY` | web **and runner** | **all three or none** (runner: **required in production**) | Provider key, sent as a bearer token. |
+| `EMAIL_FROM` | web **and runner** | **all three or none** (runner: **required in production**) | Envelope sender, e.g. `DesiAuction <no-reply@mail.desiauction.in>`. On the **sending subdomain**, never the root — the root's reputation carries the statutory `privacy@` and `navrangi@` mailboxes. Miss any one of these three and `transactionalMailer()` returns `UnconfiguredMailer`, which reports `"unconfigured"` rather than pretending to send. |
 | `EMAIL_REPLY_TO` | web | optional | Where a human reply lands (`support@desiauction.in`). Deliberately outside the three-way check above: absent, someone replying to a receipt is talking to a wall, but the provider is still configured. See [EMAIL_SETUP](EMAIL_SETUP.md). |
+| `EMAIL_PROVIDER` | web, runner | optional (default `auto`) | `auto` = the real mailer when all three are set; `http` = the real mailer, refuse to boot without it; `dev` = the dev inbox (web) / filesystem outbox (runner). Refused in production in both. The runner's values must match web's: the web tier's `/api/webhooks/delivery-status` confirms what the runner sent. |
 
 `ENGINE_SECRET` gained two boot-time rules (`apps/engine/src/env.ts`): it must be
 **≥ 32 characters in production**, and the repo's `dev-engine-secret` default is
