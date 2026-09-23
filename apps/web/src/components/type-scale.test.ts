@@ -40,7 +40,6 @@ const ALLOW = [
   ".live-brand",
   ".home-crest",
   ".public-card-mark",
-  ".mk-stage-mark",
   ".glyph",
   // Numerals set for figure impact (money, counts, dates).
   // The schedule-demo step counter — a figure in a circle, not a sentence.
@@ -62,10 +61,6 @@ const ALLOW = [
   // The console summary row's figure. Same case again: a count, compacted to
   // 24px so a row of five tiles fits above the fold.
   ".stat-value",
-  // Ceremony graphics: the name the stamp lands on. (The stamp itself is
-  // `SoldStamp` in @desiauction/ui, which sets the face and the size in
-  // separate rules and is a mark, not a sentence.)
-  ".mk-stage-name",
   // The design gallery's own type specimen must be able to show the face.
   ".type-sample",
 ];
