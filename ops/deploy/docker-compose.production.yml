@@ -91,6 +91,29 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
+  # THE WEB TIER'S JOB ROUTES, ON A CLOCK (ops/deploy/jobs/scheduler.mjs).
+  #
+  # `/api/jobs/{messages,settlement-coordination,demo-reminders,feedback}` are
+  # doors a scheduler calls, and nothing on this host called them: the outbox
+  # never drained after a restart, the retention purge never purged, and the
+  # settlement catch-up sweep never swept. Every one is fail-closed and
+  # idempotent, so an unscheduled door was indistinguishable from a quiet one.
+  #
+  # The WEB image, running a script from a read-only mount: its own node, no
+  # third-party image to pin, and web.env as the ONE source of the job secrets —
+  # a second copy is how a sender and a route come to disagree, and a
+  # disagreement here is a 404 that looks like "nothing to do".
+  scheduler:
+    image: ${REGISTRY}/web:${TAG}
+    <<: *logs
+    restart: unless-stopped
+    env_file: [./web.env]
+    command: ["/etc/desiauction/scheduler.mjs"]
+    volumes:
+      - ./jobs/scheduler.mjs:/etc/desiauction/scheduler.mjs:ro
+    depends_on:
+      web: { condition: service_healthy }
+
   # OBJECT STORAGE, ON THIS BOX. Player photos and finops artifacts need a
   # store both the web tier and the runner can reach, and the adapters written
   # for them speak S3 — so the cheapest correct answer is an S3 server here
