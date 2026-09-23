@@ -301,18 +301,11 @@ export async function applyStatus(db: Db, update: StatusUpdate): Promise<StatusO
 // --- Inbound -------------------------------------------------------------------
 
 /**
- * THE CONSENT ROW'S `source`, and an honest compromise.
- *
- * `consent_records.source` is a closed set in the DATABASE (0044's CHECK), and
- * it has no WhatsApp value. Adding one is a migration, and this change carries
- * none. What the set does have is the keyword-reply pair — `sms_stop` /
- * `sms_start` — which is what this is in every respect but the carrier, so the
- * row uses them and says WHICH channel in its evidence (`channel: "whatsapp"`).
- * The purpose (`whatsapp.updates`) already makes the row unambiguous; when the
- * CHECK gains `whatsapp_stop` / `whatsapp_start`, these two strings change and
- * nothing else does.
+ * THE CONSENT ROW'S `source`: a WhatsApp reply is filed as one (0085 widened
+ * 0044's closed set), so an audit can tell a STOP on WhatsApp from a STOP by SMS
+ * without opening the evidence.
  */
-export const WHATSAPP_REPLY_SOURCE = { stop: "sms_stop", start: "sms_start" } as const;
+export const WHATSAPP_REPLY_SOURCE = { stop: "whatsapp_stop", start: "whatsapp_start" } as const;
 
 export interface InboundOutcome {
   /** False when Meta retried a message already handled — nothing was done. */
