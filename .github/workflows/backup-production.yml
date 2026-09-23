@@ -40,6 +40,10 @@ jobs:
   verify-backups:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The DEPLOY_* secrets are scoped to this environment (deploy-host.yml reads
+    # the same ones). If `production` ever gains required reviewers, this
+    # nightly will wait for an approval nobody gives — move the three secrets to
+    # a reviewer-free environment rather than let the check quietly stall.
     environment: production
     steps:
       - name: Check the host credentials exist
