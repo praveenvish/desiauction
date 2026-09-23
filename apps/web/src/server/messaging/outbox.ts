@@ -6,6 +6,7 @@ import { verifiedEmailOf } from "../auth/email-change";
 import { db as appDb } from "../db";
 import { isNotificationKind, type NotificationKind } from "./catalogue";
 import { notificationGate, type GateDecision, type GateInput } from "./gate";
+import { platformVerdict } from "./platform-switches";
 import { applyWhatsAppNudge, hasWhatsAppNudge } from "./email-layout";
 import { createPlayerSmsSender, SmsSendError, type PlayerSmsSender } from "./sms";
 import { renderTemplate, SMS_TEMPLATES, type TemplateKey } from "./templates";
@@ -550,8 +551,17 @@ async function sendText(
    * because "stop texting me about auctions" means both apps. The category now
    * comes from the catalogue entry rather than the DLT template — the two agree
    * for every template today, and the catalogue is the one the admin edits.
+   *
+   * THE PLATFORM'S SWITCHES are per app, though (/admin/notifications): the
+   * text is asked for as WhatsApp while the admin lets this kind out on
+   * WhatsApp, and as SMS otherwise — so it is refused outright only when BOTH
+   * apps are switched off, and an SMS fallback below asks for SMS again.
    */
-  const decision = await mayDeliver(db, row, { contact: person.phone, channel: "sms" });
+  const whatsappVerdict = await platformVerdict(db, row.kind, "whatsapp");
+  const decision = await mayDeliver(db, row, {
+    contact: person.phone,
+    channel: whatsappVerdict.enabled ? "whatsapp" : "sms",
+  });
   if (!decision.send) {
     await settle(db, row.id, "suppressed", decision.reason);
     return "suppressed";
@@ -578,7 +588,9 @@ async function sendText(
   const waTemplate = WHATSAPP_TEMPLATES[template.key];
   const waName = channels.whatsapp.templateName(template.key);
   let block: WhatsAppBlock;
-  if (channels.whatsapp.sender === null) {
+  if (!whatsappVerdict.enabled) {
+    block = { kind: "platform_off", reason: whatsappVerdict.reason };
+  } else if (channels.whatsapp.sender === null) {
     block = { kind: "unconfigured" };
   } else if (waName === undefined) {
     block = { kind: "template_unset" };
@@ -682,6 +694,12 @@ async function sendText(
   const gateway = channels.sms;
   if (gateway === null) {
     await settle(db, row.id, "suppressed", "no_text_channel: no SMS gateway");
+    return "suppressed";
+  }
+  // The text passed the gate as WhatsApp; SMS is its own switch.
+  const smsVerdict = await platformVerdict(db, row.kind, "sms");
+  if (!smsVerdict.enabled) {
+    await settle(db, row.id, "suppressed", smsVerdict.reason);
     return "suppressed";
   }
   try {

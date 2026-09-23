@@ -6,9 +6,15 @@ import {
   notificationOf,
   type NotificationChannel,
   type NotificationKind,
-  type ResolvedNotification,
 } from "./catalogue";
 import { maySend, type SendDecision } from "./consent";
+import {
+  effectiveOn,
+  platformSwitches,
+  withPlatformSwitches,
+  type EffectiveNotification,
+  type PlatformRefusal,
+} from "./platform-switches";
 
 /**
  * ONE GATE FOR EVERY SEND.
@@ -27,9 +33,9 @@ import { maySend, type SendDecision } from "./consent";
  *       did not ask for, and "I texted STOP once" must not lock somebody out of
  *       their own account. That was already the rule — the OTP sender never
  *       reached `maySend` — and is now written down where it is enforced.
- *   (b) ADMIN. The platform's switch for this kind on this channel
- *       (`platformSwitch`). Always on in Phase 0; Phase 1's /admin/notifications
- *       fills it in, and this is its one call site.
+ *   (b) ADMIN. The platform's switches (platform-switches.ts, filled in at
+ *       /admin/notifications): the channel's kill switch, then this kind on
+ *       this channel. Its controllability overrides narrow (d) and (e) below.
  *   (c) SUPPRESSION. A STOP, bounce or complaint on this contact and channel —
  *       for strangers too (a demo requester who bounced). Security alerts obey
  *       it: somebody who said STOP has said they want no messages, and the
@@ -59,7 +65,7 @@ import { maySend, type SendDecision } from "./consent";
 
 export type GateReason =
   | Extract<SendDecision, { send: false }>["reason"]
-  | "platform_disabled"
+  | PlatformRefusal
   | "channel_not_catalogued"
   /** An outbox row whose `kind` the catalogue does not know (outbox.ts). */
   | "kind_not_catalogued";
@@ -86,24 +92,8 @@ export interface GateInput {
   readonly now?: Date;
 }
 
-/**
- * THE ADMIN LAYER, Phase 0: everything on.
- *
- * Deliberately a function with the final signature rather than nothing, so
- * Phase 1 changes one body and no call site. A locked kind never reaches it.
- */
-export function platformSwitch(
-  kind: NotificationKind,
-  channel: NotificationChannel,
-): { readonly enabled: boolean } {
-  // Named so Phase 1's lookup has its key; nothing is stored to look up yet.
-  void kind;
-  void channel;
-  return { enabled: true };
-}
-
 export async function notificationGate(db: Db, input: GateInput): Promise<GateDecision> {
-  const entry = notificationOf(input.kind);
+  const entry = await withPlatformSwitches(db, notificationOf(input.kind), input.channel);
   if (!entry.channels.includes(input.channel)) {
     // A sender using a channel its entry does not list is a bug in the sender.
     // Refused, with a reason that says so on the outbox row, rather than sent
@@ -113,8 +103,8 @@ export async function notificationGate(db: Db, input: GateInput): Promise<GateDe
   if (entry.category === "login") {
     return { send: true };
   }
-  if (!platformSwitch(input.kind, input.channel).enabled) {
-    return { send: false, reason: "platform_disabled" };
+  if (!entry.platform.enabled) {
+    return { send: false, reason: entry.platform.reason };
   }
   if (input.channel === "in_app") {
     const personId = input.recipient.personId;
@@ -168,16 +158,17 @@ async function inAppTopicsOff(db: Db, personId: string): Promise<Set<string>> {
  */
 export async function hiddenInboxActions(db: Db, personId: string): Promise<string[]> {
   const off = await inAppTopicsOff(db, personId);
+  const platform = await platformSwitches(db);
   const hidden: string[] = [];
   for (const entry of NOTIFICATIONS) {
     if (entry.inboxKeys.length === 0) continue;
-    if (inboxHides(entry, off)) hidden.push(...entry.inboxKeys);
+    if (inboxHides(effectiveOn(platform, entry, "in_app"), off)) hidden.push(...entry.inboxKeys);
   }
   return hidden;
 }
 
-function inboxHides(entry: ResolvedNotification, topicsOff: ReadonlySet<string>): boolean {
+function inboxHides(entry: EffectiveNotification, topicsOff: ReadonlySet<string>): boolean {
   if (entry.category === "login") return false;
-  if (!platformSwitch(entry.key, "in_app").enabled) return true;
+  if (!entry.platform.enabled) return true;
   return entry.personControllable && topicsOff.has(entry.topic);
 }
