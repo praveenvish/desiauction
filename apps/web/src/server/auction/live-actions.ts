@@ -503,6 +503,7 @@ const CONDUCT_ONLY = new Set([
   "RequeueLot",
   "GrantPaddle",
   "UndoLastAction",
+  "RevokeOwnerInvite",
 ]);
 
 // Conduct commands an appointed auctioneer may NOT send (security review,
@@ -511,7 +512,45 @@ const CONDUCT_ONLY = new Set([
 // themselves an ownerless team's paddle and spend its purse. Both need the
 // season's manager. (GrantPaddle stays conduct: the engine only grants to a
 // person who accepted an owner invitation for that team.)
-const MANAGE_ONLY = new Set(["AbortAuction", "IssuePaddle"]);
+//
+// RevokeOwnerInvite joins them. Its dedicated action (revokeOwnerInviteAction)
+// already demanded the season's manager, but the command also travelled this
+// generic gateway on conduct alone — an auctioneer could withdraw a link they
+// could never have minted (go-live gate, P3).
+const MANAGE_ONLY = new Set(["AbortAuction", "IssuePaddle", "RevokeOwnerInvite"]);
+
+/**
+ * Does this person HOLD the paddle they are bidding with, right now?
+ *
+ * The engine answers the same question (holder, or manual mode = conduct AND
+ * manage) and is the authority. This is the near end of the fence, for the
+ * same reason the command-id shape is checked here too: an appointed
+ * auctioneer's bid with a team's paddle should never leave the web tier
+ * (go-live gate P0-5).
+ */
+async function holdsPaddle(gate: LiveGate, paddleId: unknown): Promise<boolean> {
+  if (typeof paddleId !== "string") {
+    return false;
+  }
+  const rows = await withTenantDb(
+    dbHandle,
+    { personId: gate.personId, orgId: gate.competition.orgId },
+    (db) =>
+      db
+        .select({ id: paddles.id })
+        .from(paddles)
+        .where(
+          and(
+            eq(paddles.id, paddleId),
+            eq(paddles.auctionId, gate.auction.id),
+            eq(paddles.personId, gate.personId),
+            isNull(paddles.releasedAt),
+          ),
+        )
+        .limit(1),
+  );
+  return rows.length > 0;
+}
 
 // Token-flow commands never travel the generic gateway: invitations mint
 // secrets (dedicated action returns the URL) and acceptance must present the
@@ -553,6 +592,12 @@ export async function submitAuctionCommand(
   if (type === "UndoLastAction" && !gate.canOverride) {
     return { commandId, accepted: false, reason: "not_authorized", version: 0 };
   }
+  // A bid with a paddle you do not hold is manual mode (doc 41): the season's
+  // owners only. Conduct is not enough — see holdsPaddle.
+  const manualMode = gate.canConduct && gate.canManage;
+  if (type === "PlaceBid" && !manualMode && !(await holdsPaddle(gate, payload["paddleId"]))) {
+    return { commandId, accepted: false, reason: "not_authorized", version: 0 };
+  }
   const ack = await sendEngineCommand({
     commandId,
     auctionId: gate.auction.id,
@@ -560,6 +605,7 @@ export async function submitAuctionCommand(
     actor: gate.personId,
     conduct: gate.canConduct,
     override: gate.canOverride,
+    manage: gate.canManage,
     payload,
   });
   /*

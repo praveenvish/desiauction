@@ -358,6 +358,7 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
       actor: body.actor,
       conduct: body.conduct === true,
       override: body.override === true,
+      manage: body.manage === true,
       payload: body.payload ?? {},
     });
     return reply.status(200).send(ack);

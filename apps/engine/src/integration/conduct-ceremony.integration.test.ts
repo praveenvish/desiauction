@@ -84,7 +84,7 @@ async function command(
   type: string,
   actor: string,
   payload: Record<string, unknown> = {},
-  options: { conduct?: boolean; override?: boolean; commandId?: string } = {},
+  options: { conduct?: boolean; override?: boolean; manage?: boolean; commandId?: string } = {},
 ): Promise<CommandAck> {
   return engine.submit({
     commandId: options.commandId ?? newId(),
@@ -93,6 +93,7 @@ async function command(
     actor,
     conduct: options.conduct ?? false,
     override: options.override ?? false,
+    manage: options.manage ?? false,
     payload,
   });
 }
@@ -494,6 +495,47 @@ describe("COMPENSATING UNDO — history immutable, replay identical", () => {
       { conduct: true, override: true },
     );
     expect(again).toMatchObject({ accepted: false, reason: "undo_window_closed" });
+  });
+
+  it("P0-5: conduct alone never bids with a paddle it does not hold; the season's manager may", async () => {
+    /*
+     * An appointed auctioneer holds `auction.conduct` and nothing else. The
+     * bid gate read `holder || conduct`, so the neutral person at the gavel
+     * could bid with ANY team's paddle and spend a purse that was never
+     * theirs. Manual mode (doc 41) is the season's owners' act: conduct AND
+     * competition.manage. `outsiderId` plays the auctioneer here — they hold
+     * no paddle, exactly like a real appointee.
+     */
+    const auctioneer = await command(
+      "PlaceBid",
+      outsiderId,
+      { lotId: lot1, paddleId: paddleA, amountRaw: 1_000_000 },
+      { conduct: true },
+    );
+    expect(auctioneer, "an auctioneer bid with a team's paddle").toMatchObject({
+      accepted: false,
+      reason: "NOT_AUTHORIZED",
+    });
+
+    // `manage` without conduct is not manual mode either — both, or holder.
+    const manageOnly = await command(
+      "PlaceBid",
+      outsiderId,
+      { lotId: lot1, paddleId: paddleA, amountRaw: 1_000_000 },
+      { manage: true },
+    );
+    expect(manageOnly).toMatchObject({ accepted: false, reason: "NOT_AUTHORIZED" });
+
+    // The organizer holds no paddle, but runs the season: manual mode stands.
+    // (The holder's own bid — no capability at all — is the next test's first
+    // step, and it outbids this one.)
+    const manual = await command(
+      "PlaceBid",
+      organizerId,
+      { lotId: lot1, paddleId: paddleA, amountRaw: 1_000_000 },
+      { conduct: true, manage: true },
+    );
+    expect(manual.accepted, "the owner's manual-mode bid was refused").toBe(true);
   });
 
   it("the night continues: the reopened lot sells to the OTHER team; undo of an unsold pass works too", async () => {
