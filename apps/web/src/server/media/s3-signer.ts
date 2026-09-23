@@ -19,9 +19,11 @@ import type { ObjectSigner } from "./storage-port";
  * `content-type` is a SIGNED header: the browser's PUT must carry exactly the
  * type declared at presign, so a URL minted for a JPEG cannot upload anything
  * that claims to be something else. The payload itself is UNSIGNED-PAYLOAD —
- * bytes never pass through the Next server (the port's founding rule), so the
- * type pin plus the 5 MiB presign-time validation is the honest boundary, and
- * it is stated here rather than implied.
+ * the upload never passes through the Next server (the port's founding rule),
+ * so the type pin and the presign-time size check bound only what the client
+ * DECLARES. The real boundary is the attach: it GETs the object back (signed
+ * here too), capped, and stores only its own sanitized re-encode (ingest.ts,
+ * sanitize.ts — go-live gate P0-6).
  */
 
 export interface MediaS3Config {
@@ -72,7 +74,7 @@ export function createMediaSigner(config: MediaS3Config): ObjectSigner {
     const scope = `${dateStamp}/${config.region}/s3/aws4_request`;
     const credential = `${config.accessKeyId}/${scope}`;
 
-    // content-type is signed only when declared (PUT); DELETE carries none.
+    // content-type is signed only when declared (PUT); GET/DELETE carry none.
     const signedHeaderNames = contentType === undefined ? ["host"] : ["content-type", "host"];
     const signedHeaders = signedHeaderNames.join(";");
     const canonicalHeaders = signedHeaderNames
