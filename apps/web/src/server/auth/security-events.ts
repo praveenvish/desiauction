@@ -1,7 +1,8 @@
 import { auditLog, newId, withTenantDb } from "@desiauction/db";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, notInArray, sql } from "drizzle-orm";
 
 import { dbHandle } from "../db";
+import { hiddenInboxActions } from "../messaging/gate";
 
 // Security events ride the append-only audit substrate (IP-2_DESIGN D8) with
 // person scope — one ledger, one query surface, no parallel event store.
@@ -127,6 +128,33 @@ export async function listSecurityEvents(
   );
 }
 
+/**
+ * THE INBOX: the same ledger, minus the notifications this person switched off
+ * for the app (gate.ts `hiddenInboxActions`).
+ *
+ * Filtered HERE, at read, and nowhere near the write. The row is the audit
+ * trail of what happened to somebody; a preference hides it from their inbox
+ * and brings it back when switched on, and never erases it — /account's
+ * security panel, which reads `listSecurityEvents`, still shows the ledger
+ * whole. The preference is read inside the same person boundary as the rows.
+ */
+export async function listInboxEvents(personId: string, limit = 10): Promise<SecurityEvent[]> {
+  return withTenantDb(dbHandle, { personId }, async (db) => {
+    const hidden = await hiddenInboxActions(db, personId);
+    return db
+      .select({ action: auditLog.action, at: auditLog.at, meta: auditLog.meta })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.scopeId, personId),
+          hidden.length === 0 ? undefined : notInArray(auditLog.action, hidden),
+        ),
+      )
+      .orderBy(desc(auditLog.at))
+      .limit(limit);
+  });
+}
+
 /** How many person-scoped events exist — so a truncated list can admit it. */
 export async function countSecurityEvents(personId: string): Promise<number> {
   const rows = await withTenantDb(dbHandle, { personId }, (db) =>
@@ -138,15 +166,25 @@ export async function countSecurityEvents(personId: string): Promise<number> {
   return rows[0]?.total ?? 0;
 }
 
-/** PX-3 bell indicator: the newest person-scoped event's timestamp (one row). */
+/**
+ * PX-3 bell indicator: the newest person-scoped event's timestamp (one row).
+ * Filtered exactly as the inbox is, or the bell would light for a notice the
+ * inbox then refuses to show.
+ */
 export async function latestSecurityEventAt(personId: string): Promise<Date | null> {
-  const rows = await withTenantDb(dbHandle, { personId }, (db) =>
-    db
+  const rows = await withTenantDb(dbHandle, { personId }, async (db) => {
+    const hidden = await hiddenInboxActions(db, personId);
+    return db
       .select({ at: auditLog.at })
       .from(auditLog)
-      .where(eq(auditLog.scopeId, personId))
+      .where(
+        and(
+          eq(auditLog.scopeId, personId),
+          hidden.length === 0 ? undefined : notInArray(auditLog.action, hidden),
+        ),
+      )
       .orderBy(desc(auditLog.at))
-      .limit(1),
-  );
+      .limit(1);
+  });
   return rows[0]?.at ?? null;
 }

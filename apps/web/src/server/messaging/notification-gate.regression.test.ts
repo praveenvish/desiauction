@@ -20,10 +20,16 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
+import {
+  latestSecurityEventAt,
+  listInboxEvents,
+  listSecurityEvents,
+} from "../auth/security-events";
 import { resolveOwnerEmail } from "../financial-operations/deps";
 import { setPreference } from "./consent";
 import { createHttpEmailAdapter, type EmailTransport } from "./email-adapter";
 import { notificationGate } from "./gate";
+import { FINANCE_DOCUMENT_ISSUED, createPersonInAppAdapter } from "./in-app-adapter";
 
 /**
  * THE GATE'S FOUR GAPS, against a real database (Notification Control Center,
@@ -215,5 +221,50 @@ describe("gap 1 — the money switch stops receipt emails", () => {
     });
     expect(decision.send).toBe(true);
     await setPreference(db, { personId: ownerA, topic: "money", channel: "email", allowed: true });
+  });
+});
+
+describe("gap 2 — the in-app switch hides the inbox row, and keeps the evidence", () => {
+  it("shows a receipt in the inbox until the person switches money off for the app", async () => {
+    const sent = await createPersonInAppAdapter(db).send({
+      ...receipt(`owner:${teamSolo}`),
+      channel: "in-app",
+    });
+    expect(sent.ok).toBe(true);
+    const before = await listInboxEvents(ownerA, 50);
+    expect(before.map((event) => event.action)).toContain(FINANCE_DOCUMENT_ISSUED);
+
+    await setPreference(db, {
+      personId: ownerA,
+      topic: "money",
+      channel: "in-app",
+      allowed: false,
+    });
+    const after = await listInboxEvents(ownerA, 50);
+    expect(
+      after.map((event) => event.action),
+      "hidden from the inbox",
+    ).not.toContain(FINANCE_DOCUMENT_ISSUED);
+    const bell = await latestSecurityEventAt(ownerA);
+    const newestShown = after[0]?.at ?? null;
+    expect(bell?.getTime() ?? null, "the bell agrees with the inbox").toBe(
+      newestShown?.getTime() ?? null,
+    );
+
+    // The audit row is the evidence, and a preference never erases it.
+    const ledger = await listSecurityEvents(ownerA, 50);
+    expect(ledger.map((event) => event.action)).toContain(FINANCE_DOCUMENT_ISSUED);
+    const rows = await db
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(eq(auditLog.scopeId, ownerA));
+    expect(rows.length).toBeGreaterThan(0);
+
+    await setPreference(db, { personId: ownerA, topic: "money", channel: "in-app", allowed: true });
+    const back = await listInboxEvents(ownerA, 50);
+    expect(
+      back.map((event) => event.action),
+      "and it comes back",
+    ).toContain(FINANCE_DOCUMENT_ISSUED);
   });
 });
