@@ -11,7 +11,15 @@ import {
   type NotificationChannel,
   type NotificationTopic,
 } from "../messaging/catalogue";
-import { notConfiguredReason } from "../messaging/delivery-readiness";
+import { notConfiguredCause, type TemplateReadiness } from "../messaging/delivery-readiness";
+import {
+  loadProviderTemplateMappings,
+  NO_MAPPINGS,
+  resolveSmsTemplate,
+  resolveWhatsAppTemplate,
+  type MappingSource,
+} from "../messaging/provider-templates";
+import { approvalOf, EMPTY_STATUS, loadStatusSnapshot } from "../messaging/template-status";
 import {
   CHANNELS,
   effectiveOn,
@@ -76,7 +84,43 @@ export interface GridCell {
   readonly reason: string | null;
   /** Null when a provider is behind this cell; else why nothing can go. */
   readonly notConfigured: string | null;
+  /** The fix for `notConfigured` is a template mapping or approval. */
+  readonly templateIssue: boolean;
+  /** WhatsApp/SMS: which approved template this kind goes out under. */
+  readonly template: CellTemplate | null;
   readonly counts: CellCounts;
+}
+
+export interface CellTemplate {
+  /** The name (WhatsApp) or DLT id (SMS); null when none is set anywhere. */
+  readonly handle: string | null;
+  readonly source: MappingSource;
+  /** Meta's verdict from the last sync — WhatsApp only. */
+  readonly approval: "approved" | "not_approved" | "unknown" | null;
+}
+
+function cellTemplate(
+  key: string,
+  channel: NotificationChannel,
+  envRecord: Readonly<Record<string, string | undefined>>,
+  templates: TemplateReadiness,
+): CellTemplate | null {
+  if (channel === "whatsapp") {
+    const resolved = resolveWhatsAppTemplate(key, templates.mappings, envRecord);
+    return {
+      handle: resolved.name ?? null,
+      source: resolved.source,
+      approval:
+        resolved.name === undefined
+          ? null
+          : approvalOf(resolved.name, resolved.languages, templates.status).verdict,
+    };
+  }
+  if (channel === "sms") {
+    const resolved = resolveSmsTemplate(key, templates.mappings, envRecord);
+    return { handle: resolved.id ?? null, source: resolved.source, approval: null };
+  }
+  return null;
 }
 
 export interface Controllability {
@@ -178,6 +222,7 @@ export function buildGrid(
   snapshot: PlatformSwitches,
   counts: ReadonlyMap<string, CellCounts>,
   envRecord: Readonly<Record<string, string | undefined>>,
+  templates: TemplateReadiness = { mappings: NO_MAPPINGS, status: EMPTY_STATUS },
 ): GridGroup[] {
   return GROUPS.map((group) => ({
     key: group.key,
@@ -195,13 +240,19 @@ export function buildGrid(
               : kindEnabled
                 ? "on"
                 : "admin_off";
+        const notConfigured = notConfiguredCause(entry, channel, envRecord, templates);
         return {
           channel,
           channelLabel: channelLabel(channel),
           state,
           kindEnabled,
           reason: row?.reason ?? null,
-          notConfigured: notConfiguredReason(entry, channel, envRecord),
+          notConfigured: notConfigured?.reason ?? null,
+          templateIssue: notConfigured?.templates === true,
+          template:
+            entry.category === "login"
+              ? null
+              : cellTemplate(entry.key, channel, envRecord, templates),
           counts: counts.get(switchKey(entry.key, channel)) ?? ZERO,
         };
       });
@@ -374,7 +425,10 @@ export async function notificationControlCenter(
         updatedAt: row?.updatedAt ?? null,
       };
     }),
-    groups: buildGrid(snapshot, countsBy(countRows), envRecord),
+    groups: buildGrid(snapshot, countsBy(countRows), envRecord, {
+      mappings: await loadProviderTemplateMappings(db),
+      status: await loadStatusSnapshot(db),
+    }),
     recent,
     windowDays: WINDOW_DAYS,
   };

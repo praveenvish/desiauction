@@ -109,13 +109,49 @@ function Cell({ row, cell, days }: { row: GridRow; cell: GridCell; days: number 
         <StateChip row={row} cell={cell} />
       </div>
       {cell.notConfigured === null ? null : (
-        <span className="admin-meta ntc-note">{cell.notConfigured}</span>
+        <span className="admin-meta ntc-note" data-testid={`notify-why-${row.key}-${cell.channel}`}>
+          {cell.notConfigured}
+        </span>
       )}
+      {cell.template === null ? null : <TemplateLine row={row} cell={cell} />}
       {cell.state === "admin_off" && cell.reason !== null ? (
         <span className="admin-meta ntc-note">Reason: {cell.reason}</span>
       ) : null}
       <Counts counts={cell.counts} channel={cell.channel} days={days} />
     </li>
+  );
+}
+
+const SOURCE_LABEL = { admin: "mapped here", env: "server setting", unset: "" } as const;
+
+/**
+ * Which approved template a WhatsApp or SMS cell goes out under, and where
+ * that came from — with the way to the templates page, where it is changed.
+ * A plain link (not NavButton): it sits inside a dense cell, and the whole
+ * line is the target (44px via .ntc-template-link).
+ */
+function TemplateLine({ row, cell }: { row: GridRow; cell: GridCell }) {
+  const template = cell.template;
+  if (template === null) return null;
+  const word = cell.channel === "sms" ? "DLT template" : "Template";
+  const approval =
+    template.approval === "approved"
+      ? " · approved"
+      : template.approval === "not_approved"
+        ? " · not approved"
+        : "";
+  return (
+    <a
+      className="admin-meta ntc-template-link"
+      href={`/admin/notifications/templates#tpl-${row.key}`}
+      data-testid={`notify-template-${row.key}-${cell.channel}`}
+      data-source={template.source}
+    >
+      {template.handle === null
+        ? `${word}: none mapped`
+        : `${word}: ${template.handle} (${SOURCE_LABEL[template.source]})${approval}`}
+      <span className="admin-sr-only"> — manage templates for {row.label}</span>
+    </a>
   );
 }
 
