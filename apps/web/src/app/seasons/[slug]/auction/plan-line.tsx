@@ -1,10 +1,11 @@
 "use client";
 
-import { formatPaiseINR, paise, type LotVerdict, type PlanState } from "@desiauction/core";
+import { type LotVerdict, type PlanState } from "@desiauction/core";
 import { Badge, type BadgeTone } from "@desiauction/ui";
 import { useMemo } from "react";
 
 import { backupFor } from "./plan-live";
+import { ledgerINR } from "../../../../lib/inr";
 
 /**
  * ONE LINE UNDER THE RAISE BUTTON (WR-1, M4).
@@ -18,10 +19,6 @@ import { backupFor } from "./plan-live";
  * The visually-hidden live region announces the VERDICT only, so a screen
  * reader hears "over your max" once, not every rung.
  */
-
-function money(value: number): string {
-  return formatPaiseINR(paise(value));
-}
 
 const VERDICT_BADGE: Record<
   Exclude<LotVerdict, "not_a_target">,
@@ -80,39 +77,39 @@ export function PlanLine({
         ) : null}
         {badge !== null ? (
           <Badge tone={badge.tone} data-testid="plan-line-verdict">
-            {badge.label(advice.overBy === null ? null : money(advice.overBy))}
+            {badge.label(advice.overBy === null ? null : ledgerINR(advice.overBy))}
           </Badge>
         ) : null}
         {verdict === "leading" && advice.leadingOverBy !== null ? (
           <span>
-            <span className="plan-line-money">{money(advice.leadingOverBy)}</span> over your max
+            <span className="plan-line-money">{ledgerINR(advice.leadingOverBy)}</span> over your max
           </span>
         ) : null}
         {max !== null ? (
           <span>
-            Your max <span className="plan-line-money">{money(max)}</span>
+            Your max <span className="plan-line-money">{ledgerINR(max)}</span>
           </span>
         ) : target !== null && target.basePrice !== null ? (
           <span>
-            Counted at base <span className="plan-line-money">{money(target.basePrice)}</span>
+            Counted at base <span className="plan-line-money">{ledgerINR(target.basePrice)}</span>
           </span>
         ) : null}
         {verdict !== "leading" ? (
           <span>
-            · next bid <span className="plan-line-money">{money(advice.nextBid)}</span>
+            · next bid <span className="plan-line-money">{ledgerINR(advice.nextBid)}</span>
           </span>
         ) : null}
       </p>
       <p className="plan-line-next" data-testid="plan-line-next">
         {verdict === "leading" ? "If you win at" : "Win at"}{" "}
-        <span className="plan-line-money">{money(after.amount)}</span> →{" "}
-        <span className="plan-line-money">{money(after.purseAfter)}</span> left
+        <span className="plan-line-money">{ledgerINR(after.amount)}</span> →{" "}
+        <span className="plan-line-money">{ledgerINR(after.purseAfter)}</span> left
         {openAfter === 0 ? (
           ", nothing else planned"
         ) : (
           <>
-            , <span className="plan-line-money">{money(after.plannedExposureAfter)}</span> planned
-            for {openAfter} {openAfter === 1 ? "target" : "targets"}
+            , <span className="plan-line-money">{ledgerINR(after.plannedExposureAfter)}</span>{" "}
+            planned for {openAfter} {openAfter === 1 ? "target" : "targets"}
           </>
         )}
         {after.fitAfter === "does_not_fit"

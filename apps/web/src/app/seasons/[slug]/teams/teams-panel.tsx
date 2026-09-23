@@ -36,6 +36,7 @@ import { useCallback, useMemo, useRef, useState, useTransition, type CSSProperti
 import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { formatPhone } from "../../../../lib/format-phone";
+import { compactINR, exactINR } from "../../../../lib/inr";
 import { setTeamCoachAction, updateTeamAction } from "../../../../server/competition/actions";
 import type { TeamsWorkspaceView } from "../../../../server/competition/actions";
 import type { TeamCard } from "../../../../server/competition/team-workspace";
@@ -43,19 +44,6 @@ import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
 import { ExportDialog } from "../_players/export-dialog";
 import { RosterSheetHost, SquadPreSign } from "./squad-desk";
 import { TeamLogoUploader } from "./team-logo-uploader";
-
-/** "₹74,31,250" — exact rupees, Indian grouping. */
-function exactINR(paise: number): string {
-  return `₹${(paise / 100).toLocaleString("en-IN")}`;
-}
-
-/** "₹2 Cr" — the compact purse figure for the header line. */
-function compactINR(paise: number): string {
-  const rupees = paise / 100;
-  if (rupees >= 10_000_000) return `₹${String(Math.round((rupees / 10_000_000) * 100) / 100)} Cr`;
-  if (rupees >= 100_000) return `₹${String(Math.round((rupees / 100_000) * 100) / 100)} L`;
-  return `₹${rupees.toLocaleString("en-IN")}`;
-}
 
 /**
  * DA-36: ONE monogram algorithm for a team, everywhere.

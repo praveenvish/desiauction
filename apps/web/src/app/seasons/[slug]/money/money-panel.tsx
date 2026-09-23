@@ -1,6 +1,5 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
 import {
   Button,
   ButtonLink,
@@ -50,6 +49,7 @@ import {
 } from "../../../../server/settlement/actions";
 import type { CaseView, ObligationView, PaymentView } from "../../../../server/settlement/views";
 import { formatDateTime } from "../../../../lib/format-date";
+import { ledgerINR } from "../../../../lib/inr";
 import { CASE_STATE, PAYMENT_STATE } from "./money-words";
 import "./money.css";
 import "./season-money.css";
@@ -110,18 +110,14 @@ const PAYMENT_TONE: Record<string, KitTone> = {
   disputed: "amber",
 };
 
-function inr(value: number): string {
-  return formatPaiseINR(paise(value));
-}
-
 /** Money always renders with its exact value inspectable (C-7). */
 function Amount({ value, label }: { value: number; label?: string }) {
   return (
     <span
       title={`${String(value)} paise`}
-      aria-label={label === undefined ? undefined : `${label}: ${inr(value)}`}
+      aria-label={label === undefined ? undefined : `${label}: ${ledgerINR(value)}`}
     >
-      {inr(value)}
+      {ledgerINR(value)}
     </span>
   );
 }
@@ -720,8 +716,8 @@ function NextStep({
         </p>
         {pending > 0 ? (
           <p className="section-note" data-testid="pending-note">
-            {inr(pending)} has been recorded but not yet confirmed as received. It is not on the
-            books and does not count against what a team owes until someone confirms it.
+            {ledgerINR(pending)} has been recorded but not yet confirmed as received. It is not on
+            the books and does not count against what a team owes until someone confirms it.
           </p>
         ) : null}
         {/* Why there are two finishing steps at all. */}
@@ -764,10 +760,11 @@ function NextStep({
           }
         >
           <p className="section-note">
-            Settling locks every team's amount at {inr(settlementCase.financial.totalObligations)}{" "}
-            in dues, {inr(settlementCase.financial.discharged)} collected and{" "}
-            {inr(settlementCase.financial.waived)} waived. After this, no payment can be recorded
-            and nothing can be waived on this case.
+            Settling locks every team's amount at{" "}
+            {ledgerINR(settlementCase.financial.totalObligations)} in dues,{" "}
+            {ledgerINR(settlementCase.financial.discharged)} collected and{" "}
+            {ledgerINR(settlementCase.financial.waived)} waived. After this, no payment can be
+            recorded and nothing can be waived on this case.
           </p>
           <p className="section-note">
             This is reversible: a settlement controller can reopen the case, with a reason on the
@@ -1200,7 +1197,7 @@ function Obligations({
         <p className="section-note">
           Waiving forgives money this team owes. It is recorded against your name with the reason
           you give, it posts to the books, and it cannot be undone — only reopened.
-          {waiving !== null ? ` They still owe ${inr(waiving.outstanding)}.` : ""}
+          {waiving !== null ? ` They still owe ${ledgerINR(waiving.outstanding)}.` : ""}
         </p>
         <Field
           label="Amount to waive (₹)"
@@ -1283,7 +1280,7 @@ function Collect({
           <option value="">Choose a team</option>
           {owing.map((obligation) => (
             <option key={obligation.teamId} value={obligation.teamId}>
-              {obligation.teamName} — owes {inr(obligation.outstanding)}
+              {obligation.teamName} — owes {ledgerINR(obligation.outstanding)}
             </option>
           ))}
         </Select>
@@ -1485,9 +1482,9 @@ function Payments({
           puts the amount back on what the team owes, and it is recorded against your name with the
           reason you give.
           {refunding !== null
-            ? ` This payment collected ${inr(refunding.captured)}${
+            ? ` This payment collected ${ledgerINR(refunding.captured)}${
                 refunding.refundedTotal > 0
-                  ? `, of which ${inr(refunding.refundedTotal)} is already refunded`
+                  ? `, of which ${ledgerINR(refunding.refundedTotal)} is already refunded`
                   : ""
               }.`
             : ""}
@@ -1566,7 +1563,7 @@ function PaymentRow({
       <td data-label="Collected" className="st-num">
         <Amount value={payment.captured} />
         {payment.refundedTotal > 0 ? (
-          <span className="section-note"> less {inr(payment.refundedTotal)} refunded</span>
+          <span className="section-note"> less {ledgerINR(payment.refundedTotal)} refunded</span>
         ) : null}
       </td>
       <td data-label="" className="st-num" data-span="full">
