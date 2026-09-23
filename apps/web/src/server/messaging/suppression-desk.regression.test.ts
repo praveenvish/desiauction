@@ -261,7 +261,7 @@ describe("a manual suppression reaches the outbox", () => {
     await liftSuppression(db, { contact: PLAYER_PHONE, channel: "sms" });
     expect(await revertSuppression(added.auditId)).toMatchObject({
       ok: false,
-      error: expect.stringContaining("changed since") as unknown as string,
+      error: expect.stringContaining("changed since"),
     });
     const recent = await recentSuppressionChanges(db);
     const entry = recent.find((change) => change.id === added.auditId);
