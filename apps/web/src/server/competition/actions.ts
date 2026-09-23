@@ -95,6 +95,8 @@ import { isSportEnabled } from "./sports";
 import {
   addNote,
   assignTeam,
+  auctionHoldsRoster,
+  rosterAuction,
   setRegistrationMarks,
   transition,
   transitionBatch,
@@ -114,6 +116,7 @@ import {
   CaptainImportRefused,
   commitRegistrationImport,
   existingForImport,
+  RosterFieldImportRefused,
 } from "./registration-import";
 import {
   forgetImportMapping,
@@ -832,7 +835,9 @@ export async function triageRegistrationAction(
       error:
         result.reason === "tier_limit"
           ? result.message
-          : "That action isn't available for this registration.",
+          : result.reason === "roster_locked"
+            ? POOL_PLAYER_LOCKED
+            : "That action isn't available for this registration.",
     };
   }
   return { ok: true, notifying: notifyLater(gate, [registrationId], event) };
@@ -1066,6 +1071,14 @@ async function auctionLocksRoster(
 
 const ROSTER_LOCKED = "The auction has started — squads are set by the auction now, not by hand.";
 
+/**
+ * An approved player may already be on the block, or sold and paid for, so
+ * the auction owns them until it is over — the organizer's withdraw is held to
+ * the rule the player's own always was (audit F-D2). The aggregate enforces it.
+ */
+const POOL_PLAYER_LOCKED =
+  "The auction has started — an approved player stays in the season until it is over. Use the auction's own withdraw for a lot that has not been sold.";
+
 export async function withdrawMyRegistrationAction(
   slug: string,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -1081,11 +1094,13 @@ export async function withdrawMyRegistrationAction(
     return { ok: false, error: "You don't have a registration for this season." };
   }
   // A player cannot withdraw themselves out from under a live auction: they may
-  // already be a lot, or already sold and paid for.
+  // already be a lot, or already sold and paid for. This early answer names the
+  // reason; the aggregate holds the same line inside the write (`roster_locked`),
+  // which is what makes it race-free.
   if (await auctionLocksRoster(session.personId, competition)) {
     return {
       ok: false,
-      error: "The auction has started — ask the organizer to withdraw you.",
+      error: "The auction has started — talk to the organizer.",
     };
   }
   const result = await withTenantDb(
@@ -1105,11 +1120,24 @@ export async function withdrawMyRegistrationAction(
   return { ok: true };
 }
 
+/**
+ * What a registration submit answers. `code` is the part a client may BRANCH
+ * on: the sentence is copy and will be reworded, and the register form used to
+ * reload the page when the text happened to contain "already registered" — a
+ * copy edit away from silently breaking.
+ */
+export interface SubmitRegistrationResult {
+  error?: string;
+  done?: boolean;
+  /** The player already has a live registration here — another device got there first. */
+  code?: "already_registered";
+}
+
 export async function submitRegistrationAction(
   slug: string,
-  _previous: { error?: string; done?: boolean },
+  _previous: SubmitRegistrationResult,
   formData: FormData,
-): Promise<{ error?: string; done?: boolean }> {
+): Promise<SubmitRegistrationResult> {
   const session = await requireSession();
   const competition = await publicCompetitionBySlug(slug);
   if (competition === null) {
@@ -1257,18 +1285,22 @@ export async function submitRegistrationAction(
     return { error: "We couldn't save your registration just now. Please try again." };
   }
   if (!result.ok) {
+    if (result.reason === "duplicate") {
+      return {
+        code: "already_registered",
+        error: "You've already registered for this competition — check your status.",
+      };
+    }
     return {
       error:
         result.reason === "not_open"
           ? "Registration for this competition is not open."
-          : result.reason === "duplicate"
-            ? "You've already registered for this competition — check your status."
-            : result.reason === "no_phone"
-              ? // The register page says this before the form is ever shown; this
-                // is the same rule held at the server, for the request that
-                // skipped the page.
-                "Add a mobile number to your account before registering as a player — organizers text you about your registration and on auction day."
-              : "Choose a valid playing role.",
+          : result.reason === "no_phone"
+            ? // The register page says this before the form is ever shown; this
+              // is the same rule held at the server, for the request that
+              // skipped the page.
+              "Add a mobile number to your account before registering as a player — organizers text you about your registration and on auction day."
+            : "Choose a valid playing role.",
     };
   }
   /*
@@ -1674,7 +1706,7 @@ export async function addNoteAction(
     return { ok: false, error: gate.error };
   }
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
-    addNote(db, gate.competition.orgId, registrationId, gate.personId, note),
+    addNote(db, gate.competition.orgId, gate.competition.id, registrationId, gate.personId, note),
   );
   return result.ok ? { ok: true } : { ok: false, error: "Write a note first." };
 }
@@ -1717,10 +1749,12 @@ async function inSeasonAs<T>(
   }
 }
 
-/** `auctionLocksRoster`, read inside a boundary the caller already holds. */
+/**
+ * `auctionLocksRoster`, read inside the boundary the WRITE runs in — and read
+ * FOR SHARE, so the answer holds until that write commits (`rosterAuction`).
+ */
 async function rosterLockedIn(db: Db, competitionId: string): Promise<boolean> {
-  const auction = await auctionOf(db, competitionId);
-  return auction !== null && auction.status !== "scheduled";
+  return auctionHoldsRoster(await rosterAuction(db, competitionId));
 }
 
 export async function assignTeamAction(
@@ -1732,7 +1766,7 @@ export async function assignTeamAction(
     if (await rosterLockedIn(db, competition.id)) {
       return "locked" as const;
     }
-    await assignTeam(
+    const assigned = await assignTeam(
       db,
       competition.orgId,
       competition.id,
@@ -1740,7 +1774,7 @@ export async function assignTeamAction(
       teamId === "" ? null : teamId,
       personId,
     );
-    return "done" as const;
+    return assigned.ok ? ("done" as const) : assigned.reason;
   });
   if (!result.ok) {
     return {
@@ -1748,7 +1782,14 @@ export async function assignTeamAction(
       error: result.reason === "forbidden" ? "You can't assign teams here." : "Not available.",
     };
   }
-  return result.value === "locked" ? { ok: false, error: ROSTER_LOCKED } : { ok: true };
+  switch (result.value) {
+    case "done":
+      return { ok: true };
+    case "locked":
+      return { ok: false, error: ROSTER_LOCKED };
+    default:
+      return { ok: false, error: MARK_REFUSED[result.value] };
+  }
 }
 
 /**
@@ -1764,8 +1805,10 @@ export async function markRegistrationAction(
   marks: { isIcon?: boolean; isRetained?: boolean; isCaptain?: boolean; teamId?: string | null },
 ): Promise<{ ok: boolean; error?: string }> {
   const result = await inSeasonAs(slug, "team.manage", async ({ db, personId, competition }) => {
-    const auction = await auctionOf(db, competition.id);
-    if (auction !== null && auction.status !== "scheduled") {
+    // FOR SHARE: the decision below must still be true when the mark commits,
+    // or a captain named as the auction opens misses the pool's settle.
+    const auction = await rosterAuction(db, competition.id);
+    if (auction !== null && auctionHoldsRoster(auction)) {
       // Only the marks that move the pool freeze with it — see `marksFreezeWithRoster`.
       if (marksFreezeWithRoster(marks)) {
         return { ok: false as const, reason: "locked" as const };
@@ -1801,11 +1844,18 @@ export async function markRegistrationAction(
           ? ROSTER_LOCKED
           : result.value.reason === "captain"
             ? captainRefusalMessage(result.value.refusal)
-            : "That registration is not in this season.",
+            : MARK_REFUSED[result.value.reason],
     };
   }
   return { ok: true };
 }
+
+const MARK_REFUSED: Record<"not_found" | "unknown_team" | "not_approved", string> = {
+  not_found: "That registration is not in this season.",
+  unknown_team: "That team is not in this season.",
+  not_approved:
+    "Approve this player first — only an approved player can be put on a team or pre-signed.",
+};
 
 /**
  * ONE PLAYER, for a sheet opened somewhere the row is not already on the page —
@@ -1939,7 +1989,7 @@ export async function updateRegistrationDetailsAction(
       const plan = planRegistrationEdit(input, {
         pack: sportPackFor(competition.sport),
         bands: Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands),
-        rosterLocked: auction !== null && auction.status !== "scheduled",
+        rosterLocked: await rosterLockedIn(db, competition.id),
         storedAttributes: (stored.attributes ?? {}) as Record<string, unknown>,
         now: new Date(),
       });
@@ -2604,19 +2654,19 @@ export async function importCommitAction(
    * player instead, by the dashboard's rule, inside the commit
    * (`captainChangeRefusal`); one refusal leaves the whole file unimported.
    */
-  if (marksFreezeWithRoster(squadMarksIn(parsed.rows))) {
-    if (await auctionLocksRoster(gate.personId, gate.competition)) {
-      return {
-        ok: false,
-        error:
-          "The auction has started, so team, Icon and Retained columns can no longer be imported. Remove them from the file to import the rest.",
-      };
-    }
-  }
-  let result: Awaited<ReturnType<typeof commitRegistrationImport>>;
+  const carriesSquad = marksFreezeWithRoster(squadMarksIn(parsed.rows));
+  const SQUAD_COLUMNS_LOCKED =
+    "The auction has started, so team, Icon and Retained columns can no longer be imported. Remove them from the file to import the rest.";
+  let result: Awaited<ReturnType<typeof commitRegistrationImport>> | "squad_locked";
   try {
     result = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
-      const auction = await auctionOf(db, gate.competition.id);
+      // Read FOR SHARE in the commit's own transaction, so the lock this file
+      // is judged by cannot change before the file lands (`rosterAuction`).
+      const auction = await rosterAuction(db, gate.competition.id);
+      const locked = auctionHoldsRoster(auction);
+      if (carriesSquad && locked) {
+        return "squad_locked" as const;
+      }
       return commitRegistrationImport(
         db,
         gate.competition.id,
@@ -2624,7 +2674,7 @@ export async function importCommitAction(
         gate.personId,
         parsed.rows,
         options?.shape?.policy ?? options?.policy ?? "fill-blanks",
-        auction !== null && auction.status !== "scheduled" ? auction.id : null,
+        locked && auction !== null ? auction.id : null,
       );
     });
   } catch (error) {
@@ -2634,7 +2684,16 @@ export async function importCommitAction(
         error: `${captainRefusalMessage(error.refusal)} Nothing was imported — remove that captain from the file to import the rest.`,
       };
     }
+    if (error instanceof RosterFieldImportRefused) {
+      return {
+        ok: false,
+        error: `The auction has started — role and band are locked with the roster, and this file changes them for ${error.player}. Nothing was imported — remove those changes from the file to import the rest.`,
+      };
+    }
     throw error;
+  }
+  if (result === "squad_locked") {
+    return { ok: false, error: SQUAD_COLUMNS_LOCKED };
   }
   return {
     ok: true,

@@ -48,7 +48,10 @@ export interface ImportResult {
   unchanged: number;
   /** Rows whose person had withdrawn and is back in triage. */
   reinstated: number;
-  /** Existing nameless person stubs the file was able to name. */
+  /**
+   * Existing nameless accounts the file named — for THIS SEASON only, as the
+   * entry's `enteredName`. The account itself is never named from a file.
+   */
   named: number;
 }
 
@@ -209,6 +212,23 @@ function deskFields(row: CsvRegistrationRow): Record<string, unknown> {
   return out;
 }
 
+/**
+ * A role or base-price band the file changes once the auction has opened; the
+ * file is not imported (audit F-D4).
+ *
+ * The single-row edit has refused these since the roster lock existed
+ * (`planRegistrationEdit`, `rosterLocked`): a band IS a lot's base price and a
+ * role is how the room and the owners' plans read a player, both already
+ * priced against. A re-imported sheet was the way round it. Refused rather
+ * than silently stripped, because the preview listed the change and an import
+ * that quietly did less than it showed would make the preview a lie.
+ */
+export class RosterFieldImportRefused extends Error {
+  constructor(readonly player: string) {
+    super("roster field import refused");
+  }
+}
+
 /** A captain change in the file that the opened auction refuses; the file is not imported. */
 export class CaptainImportRefused extends Error {
   constructor(readonly refusal: CaptainRefusal) {
@@ -227,7 +247,8 @@ export async function commitRegistrationImport(
   /**
    * The season's auction, once it has left `scheduled`. A captain the file
    * changes is then held to the dashboard's rule (`captainChangeRefusal`), and
-   * the first refusal aborts the whole file with `CaptainImportRefused`.
+   * the first refusal aborts the whole file with `CaptainImportRefused`; a
+   * changed role or band aborts it with `RosterFieldImportRefused`.
    */
   lockedAuctionId: string | null = null,
 ): Promise<ImportResult> {
@@ -282,10 +303,13 @@ export async function commitRegistrationImport(
       .from(people)
       .where(inArray(people.phone, phones));
     const personByPhone = new Map(existing.map((p) => [p.phone, p.id]));
-    // Phones whose account already carries its own name (0075): the season
-    // shows the name this FILE gives, never the account's — see shown-name.ts.
-    const namedAccounts = new Set(
-      existing.filter((p) => p.name !== null && p.phone !== null).map((p) => p.phone),
+    // Phones that already had an account (0075): the season shows the name
+    // this FILE gives, never the account's — see shown-name.ts. Named or not.
+    const existingAccounts = new Set(existing.filter((p) => p.phone !== null).map((p) => p.phone));
+    // The nameless ones among them: an entry that names one is counted as
+    // `named`, which is the only naming a club's file can do.
+    const namelessAccounts = new Set(
+      existing.filter((p) => p.name === null && p.phone !== null).map((p) => p.phone),
     );
 
     // The first name the file gives each phone — the same row `find` returned,
@@ -336,32 +360,20 @@ export async function commitRegistrationImport(
       }
     }
 
+    /*
+     * A FILE NAMES AN ENTRY, NEVER AN ACCOUNT (go-live gate, media P2).
+     *
+     * This used to write the file's name onto a nameless `people` row, on the
+     * reasoning that every screen otherwise showed "Unnamed" for a player whose
+     * name was sitting in the column just read. But `people.name` is platform-
+     * wide: the stub may be another club's import or a real person who has not
+     * finished onboarding, and whatever this club's spreadsheet called them
+     * became what every other club — and the person — read. The name goes on
+     * this season's registration instead (`enteredName`, 0075), which is what
+     * the season's screens show (shown-name.ts). `addPlayerByPhone` does the
+     * same.
+     */
     let named = 0;
-    for (const found of existing) {
-      const phone = found.phone;
-      if (phone === null) {
-        continue;
-      }
-      const name = nameByPhone.get(phone) ?? null;
-      /*
-       * NAME A STUB THE FILE CAN NAME.
-       *
-       * `addPlayerByPhone` has always done this and the comments here claim the
-       * two paths mirror each other — they did not. A person created by some
-       * earlier import or invite has a phone and no name; every screen then
-       * showed "Unnamed" for a player whose name was sitting in the column we
-       * had just read. An EXISTING name is never overwritten: it is the
-       * person's own, not ours to correct from a spreadsheet.
-       */
-      if (found.name === null && name !== null && name !== "") {
-        const updated = await tx
-          .update(people)
-          .set({ name })
-          .where(and(eq(people.id, found.id), isNull(people.name)))
-          .returning({ id: people.id });
-        named += updated.length;
-      }
-    }
 
     /*
      * THE SECOND FILE IS THE NORMAL CASE.
@@ -399,6 +411,9 @@ export async function commitRegistrationImport(
         const changedTeam = teamIdFor(row);
         const values = changedValues(plan.changes, row, changedTeam);
         if (Object.keys(values).length > 0) {
+          if (lockedAuctionId !== null && ("role" in values || "basePriceBand" in values)) {
+            throw new RosterFieldImportRefused(row.name || row.phone);
+          }
           if (lockedAuctionId !== null && typeof values["isCaptain"] === "boolean") {
             const refusal = await captainLockRefusal(
               tx,
@@ -477,7 +492,7 @@ export async function commitRegistrationImport(
           role: row.role,
           status: "submitted",
           registrationNumber: registrationNumber(id),
-          ...(namedAccounts.has(row.phone) && row.name !== "" ? { enteredName: row.name } : {}),
+          ...(existingAccounts.has(row.phone) && row.name !== "" ? { enteredName: row.name } : {}),
           ...(row.basePriceBand !== null ? { basePriceBand: row.basePriceBand } : {}),
           // DA-28: whatever the file supplied, so an imported player is not
           // permanently thinner than one who self-registered.
@@ -508,6 +523,9 @@ export async function commitRegistrationImport(
           throw new CaptainImportRefused({ kind: "not_in_squad", name: row.name || row.phone });
         }
         imported++;
+        if (namelessAccounts.has(row.phone) && row.name !== "") {
+          named++;
+        }
         // DA-27: the batch row below is subject=competition, so a timeline
         // keyed on the REGISTRATION found nothing and an imported player's
         // history began at their first approval — as if they had appeared
@@ -547,6 +565,16 @@ export async function commitRegistrationImport(
         continue;
       }
       reinstated++;
+      // The rejoin of a nameless account takes the file's name too — for this
+      // season, and only where the entry has none of its own yet.
+      if (namelessAccounts.has(row.phone) && row.name !== "") {
+        const entry = await tx
+          .update(registrations)
+          .set({ enteredName: row.name })
+          .where(and(eq(registrations.id, restored.id), isNull(registrations.enteredName)))
+          .returning({ id: registrations.id });
+        named += entry.length;
+      }
       await tx.insert(auditLog).values({
         id: newId(),
         actor: actorId,

@@ -517,7 +517,7 @@ describe("FIXTURE OPS REGRESSION — lifecycle, conflicts, protection", () => {
       kickoffAt: "2026-09-01T18:00",
     });
     expect(moved).toEqual({ ok: true, status: "published" });
-    const timeline = await fixtureTimeline(db, published.id);
+    const timeline = await fixtureTimeline(db, comp.id, published.id);
     const reschedule = timeline.find((t) => t.action === "fixture.rescheduled");
     expect(reschedule).toBeDefined();
     const meta = reschedule?.meta as { fromKickoff?: string; toKickoff?: string };
@@ -597,7 +597,7 @@ describe("FIXTURE OPS REGRESSION — lifecycle, conflicts, protection", () => {
       (await queryFixtures(db, comp.id, { status: "completed", page: 1, pageSize: 1 })).rows[0],
       "a completed fixture",
     );
-    const actions = (await fixtureTimeline(db, completed.id)).map((t) => t.action);
+    const actions = (await fixtureTimeline(db, comp.id, completed.id)).map((t) => t.action);
     for (const expected of [
       "fixture.schedule",
       "fixture.publish",

@@ -2,6 +2,7 @@ import {
   auditLog,
   competitions,
   fixtureLineups,
+  fixtures,
   messageOutbox,
   newId,
   people,
@@ -105,7 +106,16 @@ export async function announceLineup(
   input: { competitionId: string; fixtureId: string; teamId: string; actorId: string },
   now: Date = new Date(),
 ): Promise<AnnounceLineupResult> {
-  const fixture = await fixtureSnapshot(db, input.fixtureId);
+  // The fixture must be THIS season's (audit P3): the id comes from the
+  // browser, the capability was checked for the season, and a snapshot read by
+  // id alone would text another season's players about another season's match.
+  // `saveLineup` has always bound it the same way.
+  const [bound] = await db
+    .select({ id: fixtures.id })
+    .from(fixtures)
+    .where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.competitionId, input.competitionId)))
+    .limit(1);
+  const fixture = bound === undefined ? null : await fixtureSnapshot(db, input.fixtureId);
   if (fixture === null) {
     return { ok: false, reason: "not_found" };
   }
