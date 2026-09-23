@@ -4,6 +4,7 @@ import { completeAuction } from "./complete-auction";
 import { withRunnerHeld } from "./finops-runner";
 import { latestOtp } from "./otp";
 import { issuePaddleTo, queueAllFromSetup } from "./auction-tabs";
+import { axeClean } from "./axe";
 
 // PX-8 COMPLETION · FOUNDER DEMONSTRATION — a FRESH organization, no demo seed,
 // no SQL, no engineering assistance:
@@ -35,11 +36,6 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await page.getByLabel("6-digit code").fill(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 function playersCsv(stamp: string): string {

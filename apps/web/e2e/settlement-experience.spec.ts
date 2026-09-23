@@ -3,6 +3,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { completeAuction } from "./complete-auction";
 import { latestOtp } from "./otp";
 import { issuePaddleTo, queueAllFromSetup } from "./auction-tabs";
+import { axeClean } from "./axe";
 
 // PX-7 FOUNDER DEMONSTRATION: complete an auction → open the Settlement
 // Workspace → review the case → verify → record a manual payment → waive one
@@ -55,11 +56,6 @@ async function caseReady(page: Page): Promise<void> {
   await expect(page.getByTestId("case-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 function playersCsv(stamp: string): string {

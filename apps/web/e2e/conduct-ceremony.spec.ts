@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { latestOtp } from "./otp";
 import { completeAuction } from "./complete-auction";
+import { axeClean } from "./axe";
 
 /**
  * v1.1 (G2): closing a lot requires a real, timed HOLD (useHoldGate measures
@@ -45,11 +46,6 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page).toHaveURL(/\/home/);
   }
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 function playersCsv(stamp: string): string {

@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { latestOtp, resetOtpBudget } from "./otp";
+import { axeClean } from "./axe";
 
 // PX-8 FOUNDER DEMONSTRATION: conduct an auction → complete settlement → open
 // Financial Operations → observe the new financial activity → review the
@@ -52,11 +53,6 @@ async function onboardWithName(page: Page, phone: string, name: string): Promise
   await page.getByLabel("What should we call you?").fill(name);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/home/);
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 async function inSecondBrowser(browser: Browser, fn: (page: Page) => Promise<void>): Promise<void> {
