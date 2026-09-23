@@ -4,6 +4,11 @@ import { useAnnouncer } from "@desiauction/ui";
 import { useState, useTransition } from "react";
 
 import {
+  WHATSAPP_LANGUAGE_LABELS,
+  WHATSAPP_LANGUAGES,
+  type WhatsAppLanguage,
+} from "../../lib/whatsapp-consent";
+import {
   setNotificationPreferenceAction,
   setWhatsappPreferenceAction,
   type NotificationSettings,
@@ -80,21 +85,35 @@ export function NotificationSwitches({ settings }: { settings: NotificationSetti
 }
 
 /**
- * WhatsApp instead of SMS (Phase 3): the one switch that is a CONSENT rather
- * than a preference — so it starts off, and turning it on is recorded with the
- * words shown. Stopping a topic above still stops it here too.
+ * WhatsApp updates: the one switch that is a CONSENT rather than a preference —
+ * so it starts off, and turning it on is recorded with the words shown.
+ * Stopping a topic above still stops it here too.
+ *
+ * The language rides with it, shown only once it is on: which version of each
+ * message they get. A radio group, not a select — two options, both visible,
+ * each named in its own script so a Hindi reader finds हिन्दी without reading
+ * English first. Changing it is a new consent record naming the language.
  */
-export function WhatsAppSwitch({ optedIn, label }: { optedIn: boolean; label: string }) {
+export function WhatsAppSwitch({
+  optedIn,
+  label,
+  language: initialLanguage,
+}: {
+  optedIn: boolean;
+  label: string;
+  language: WhatsAppLanguage;
+}) {
   const announce = useAnnouncer();
   const [pending, startTransition] = useTransition();
   const [on, setOn] = useState(optedIn);
+  const [language, setLanguage] = useState<WhatsAppLanguage>(initialLanguage);
   const [error, setError] = useState<string | null>(null);
 
   const toggle = (next: boolean) => {
     setOn(next);
     setError(null);
     startTransition(async () => {
-      const result = await setWhatsappPreferenceAction(next);
+      const result = await setWhatsappPreferenceAction(next, language);
       if (result.ok) {
         announce(next ? "WhatsApp updates turned on" : "WhatsApp updates turned off", "polite");
         return;
@@ -104,8 +123,25 @@ export function WhatsAppSwitch({ optedIn, label }: { optedIn: boolean; label: st
     });
   };
 
+  const choose = (next: WhatsAppLanguage) => {
+    const previous = language;
+    setLanguage(next);
+    setError(null);
+    startTransition(async () => {
+      const result = await setWhatsappPreferenceAction(true, next);
+      if (result.ok) {
+        announce(`WhatsApp messages in ${WHATSAPP_LANGUAGE_LABELS[next].label}`, "polite");
+        return;
+      }
+      setLanguage(previous);
+      setError(result.error ?? "That did not save. Try again.");
+    });
+  };
+
   return (
-    <div className="notify-switches" data-testid="whatsapp-switch">
+    // `#whatsapp` is where the email nudge ("Get these on WhatsApp — turn it
+    // on in your account") lands, so the switch is the first thing seen.
+    <div className="notify-switches" data-testid="whatsapp-switch" id="whatsapp">
       <label className="notify-switch" htmlFor="notify-whatsapp">
         <input
           id="notify-whatsapp"
@@ -122,6 +158,29 @@ export function WhatsAppSwitch({ optedIn, label }: { optedIn: boolean; label: st
           <span className="notify-switch-detail">{label}</span>
         </span>
       </label>
+      {on ? (
+        <fieldset className="notify-language" data-testid="whatsapp-language">
+          <legend className="notify-language-legend">Language for WhatsApp messages</legend>
+          <div className="notify-language-options">
+            {WHATSAPP_LANGUAGES.map((option) => (
+              <label key={option} className="notify-language-option" lang={option}>
+                <input
+                  type="radio"
+                  name="whatsapp-language"
+                  value={option}
+                  checked={language === option}
+                  disabled={pending}
+                  data-testid={`whatsapp-language-${option}`}
+                  onChange={() => {
+                    choose(option);
+                  }}
+                />
+                <span>{WHATSAPP_LANGUAGE_LABELS[option].label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
       {error !== null ? (
         <p role="alert" className="notify-error">
           {error}

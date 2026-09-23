@@ -785,6 +785,61 @@
   color: var(--text-secondary);
 }
 
+/* The WhatsApp language, under its box once ticked — indented to sit with it,
+   each option a whole 44px label rather than a 20px dot. */
+.reg-wa-language {
+  min-width: 0;
+  margin: 0 0 var(--space-2);
+  padding: 0 0 0 calc(20px + var(--space-3));
+  border: 0;
+}
+
+.reg-wa-language-legend {
+  margin-bottom: var(--space-1);
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.reg-wa-language-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.reg-wa-language-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+}
+
+.reg-wa-language-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.reg-wa-language-option input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.reg-wa-language-option input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* --- Mobile step ----------------------------------------------------------- */
 .reg-phone {
   display: flex;

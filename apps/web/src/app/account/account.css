@@ -794,6 +794,69 @@ a.acct-check-row:hover {
   opacity: 0.7;
 }
 
+/* The WhatsApp language, under its switch once it is on: two pill-shaped
+   radios, each a full 44px target (the input alone would be a 20px one). */
+.acct #whatsapp {
+  scroll-margin-top: var(--space-8);
+}
+
+.acct .notify-language {
+  min-width: 0;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  border: 0;
+}
+
+.acct .notify-language-legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.acct .notify-language-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.acct .notify-language-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+}
+
+.acct .notify-language-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.acct .notify-language-option input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.acct .notify-language-option input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.acct .notify-language-option input:disabled {
+  cursor: progress;
+}
+
 /* ---- privacy & data ------------------------------------------------------------ */
 
 .account-erasure {
