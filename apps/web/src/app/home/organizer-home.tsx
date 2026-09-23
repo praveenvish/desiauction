@@ -384,8 +384,10 @@ export async function OrganizerHome({
   const showEvents = schedule.length > 0 || !laddering;
   const showActivity = dash.activity.length > 0;
 
-  const liveDone =
-    liveRow !== null && liveRow.lotsTotal > 0 && liveRow.lotsSold === liveRow.lotsTotal;
+  // Done when no lot is left to call — an unsold or withdrawn lot is called
+  // too, so `sold === total` stayed false all night the moment one went unsold.
+  const liveDone = liveRow !== null && liveRow.lotsTotal > 0 && liveRow.lotsRemaining === 0;
+  const allSold = liveDone && liveRow.lotsSold === liveRow.lotsTotal;
 
   const bySlug = new Map(view.competitions.map((competition) => [competition.slug, competition]));
   const seasonMeta = (slug: string): string | null => {
@@ -552,7 +554,7 @@ export async function OrganizerHome({
               {/* Every lot has gone: "live" is the wrong word, closing out is. */}
               <span className="home-live-badge">
                 {liveDone ? null : <i aria-hidden />}
-                {liveDone ? "ALL LOTS SOLD" : "LIVE NOW"}
+                {liveDone ? (allSold ? "ALL LOTS SOLD" : "EVERY LOT CALLED") : "LIVE NOW"}
               </span>
             </p>
             <h2 id="home-live-name" className="home-live-name">
