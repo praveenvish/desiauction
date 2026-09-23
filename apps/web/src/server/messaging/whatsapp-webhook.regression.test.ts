@@ -231,7 +231,7 @@ describe("inbound: STOP and START, each acted on once", () => {
     expect(consents).toHaveLength(1);
     expect(consents[0]?.granted).toBe(false);
     expect(consents[0]?.evidence).toMatchObject({ channel: "whatsapp", keyword: "STOP" });
-    expect(await whatsappOptedIn(db, personId)).toBe(false);
+    expect((await whatsappOptedIn(db, personId)).optedIn).toBe(false);
 
     const [inbound] = await db
       .select()
@@ -262,7 +262,7 @@ describe("inbound: STOP and START, each acted on once", () => {
     expect(replier.sent).toEqual([{ to: KNOWN_DIGITS, text: START_REPLY }]);
     const consents = await whatsappConsents();
     expect(consents.map((row) => row.granted)).toEqual([false, true]);
-    expect(await whatsappOptedIn(db, personId)).toBe(true);
+    expect((await whatsappOptedIn(db, personId)).optedIn).toBe(true);
   });
 
   it("anything else is recorded and not answered — this is not a chatbot", async () => {
@@ -338,7 +338,7 @@ describe("the route, end to end, with a signed request", () => {
 
       const consents = await whatsappConsents();
       expect(consents.map((row) => row.granted)).toEqual([false, true, false]);
-      expect(await whatsappOptedIn(db, personId)).toBe(false);
+      expect((await whatsappOptedIn(db, personId)).optedIn).toBe(false);
     } finally {
       vi.unstubAllEnvs();
     }
