@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
+import { readCapped } from "../../../../lib/read-capped";
 import { db } from "../../../../server/db";
 import { applyInbound } from "../../../../server/messaging/inbound";
 import { withRequestId } from "../../../../server/logger";
@@ -68,13 +69,19 @@ async function handle(request: Request): Promise<NextResponse> {
     return new NextResponse(null, { status: 401 });
   }
 
+  // An inbound SMS is a few hundred bytes; the cap is generous and still
+  // stops an unbounded body from being buffered (same rule as delivery-status).
+  const raw = await readCapped(request, 16 * 1024);
+  if (raw === null) {
+    return new NextResponse(null, { status: 413 });
+  }
   let payload: Record<string, unknown> = {};
   try {
     const contentType = request.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
-      payload = (await request.json()) as Record<string, unknown>;
+      payload = JSON.parse(raw) as Record<string, unknown>;
     } else {
-      payload = Object.fromEntries(new URLSearchParams(await request.text()));
+      payload = Object.fromEntries(new URLSearchParams(raw));
     }
   } catch {
     return new NextResponse(null, { status: 400 });
