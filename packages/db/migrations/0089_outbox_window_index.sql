@@ -1,0 +1,36 @@
+-- THE OUTBOX'S TIME-WINDOW READS HAD NO INDEX (audit P3).
+--
+-- Every reader that asks "what did the outbox do lately?" filters on
+-- `created_at` and nothing narrower:
+--
+--   /admin/notifications            30-day counts GROUP BY kind, channel,
+--                                   status, delivery_status
+--   /admin/notifications/analytics  the same counts over 7–90 days, a daily
+--                                   series GROUP BY (day of created_at, status),
+--                                   failure reasons (status failed/suppressed)
+--                                   and WhatsApp delivery errors
+--   /admin messaging summary        WhatsApp sent rows by delivery_status
+--   the retention job               settled rows with created_at < a cutoff
+--
+-- With no index each of those was a sequential scan of the whole table —
+-- bodies and all, since the heap rows carry the rendered message — and the
+-- outbox only grows between retention passes. At 50k synthetic rows (a year,
+-- 4k in the last thirty days) the counts query read 8,334 pages; with this
+-- index it reads the thirty days' worth of index and nothing else.
+--
+-- ONE COMPOSITE, NOT (created_at) ALONE. `created_at` leads, so every range
+-- above — `>= since` and the retention's `< cutoff` — is an index range. The
+-- four trailing columns are exactly what the count and daily-series queries
+-- group by, so those become index-only scans that never touch the wide heap
+-- rows. The reason and delivery-error queries still visit the heap for
+-- `last_error` / `delivery_error`, but only for rows inside the window. One
+-- index rather than a (created_at) plus a covering twin keeps the write cost
+-- on the send path to a single extra btree insert.
+--
+-- NOT CONCURRENTLY, deliberately, as in 0083: the drizzle migrator runs the
+-- batch in one transaction, where CREATE INDEX CONCURRENTLY is refused, and
+-- the outbox is small at launch, so the brief write lock is milliseconds. If
+-- this ever has to run against a large outbox, build it by hand CONCURRENTLY
+-- first — the IF NOT EXISTS then makes this statement a no-op.
+CREATE INDEX IF NOT EXISTS "message_outbox_window_idx"
+  ON "message_outbox" ("created_at", "kind", "channel", "status", "delivery_status");
