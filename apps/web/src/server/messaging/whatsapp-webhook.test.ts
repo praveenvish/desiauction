@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
+  classifyWhatsAppReply,
   createWhatsAppReplier,
   inboundText,
   mayAdvance,
@@ -324,5 +325,24 @@ describe("createWhatsAppReplier", () => {
       transport: () => Promise.reject(new Error("ECONNRESET")),
     });
     await expect(dead.reply("919800000004", "x")).resolves.toBe(false);
+  });
+});
+
+describe("a WhatsApp reply's meaning — STOP as wide as SMS, START as narrow as one word", () => {
+  it("honours every stop word the SMS side does", () => {
+    for (const body of ["STOP", "stop.", "Unsubscribe", "stop sending me this", "OPT-OUT"]) {
+      expect(classifyWhatsAppReply(body), body).toBe("stop");
+    }
+  });
+
+  it("turns updates back on for START alone (founder decision, 2026-09-23)", () => {
+    for (const body of ["START", "start", "Start!", "start please"]) {
+      expect(classifyWhatsAppReply(body), body).toBe("start");
+    }
+    // The SMS list's other start words are chat on WhatsApp, not consent.
+    for (const body of ["yes", "Yes!", "subscribe", "resume", "unstop", "opt-in"]) {
+      expect(classifyWhatsAppReply(body), body).toBe("unknown");
+    }
+    expect(classifyWhatsAppReply("thanks, see you at the auction")).toBe("unknown");
   });
 });

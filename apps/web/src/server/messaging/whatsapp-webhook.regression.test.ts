@@ -252,6 +252,18 @@ describe("inbound: STOP and START, each acted on once", () => {
     expect(await whatsappConsents()).toHaveLength(1);
   });
 
+  it("a 'Yes' after STOP does NOT turn WhatsApp back on — only START does (founder, 2026-09-23)", async () => {
+    const replier = recordingReplier();
+    const summary = await handleWhatsAppCallback(
+      db,
+      textCallback(WAMID("yes-1"), KNOWN_DIGITS, "Yes"),
+      replier,
+    );
+    expect(summary).toMatchObject({ consentsRecorded: 0, repliesSent: 0 });
+    expect(replier.sent).toEqual([]);
+    expect((await whatsappOptedIn(db, personId)).optedIn).toBe(false);
+  });
+
   it("START afterwards turns WhatsApp back on — the latest row wins", async () => {
     const replier = recordingReplier();
     await handleWhatsAppCallback(
