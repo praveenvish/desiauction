@@ -1,26 +1,31 @@
-# NIGHTLY PRODUCTION BACKUP (PA-1R Phase 7.3).
+# NIGHTLY PROOF THAT PRODUCTION BACKUPS EXIST (PA-1R Phase 7.3, go-live gate P0-1).
 #
-# `pnpm backup` has existed since the last remediation and nothing has ever run
-# it. That is the difference the audit drew and this file closes: a COMMAND that
-# produces a backup is not the same as BACKUPS EXISTING (PA-1 §19, and
-# docs/62-backup-strategy.md says so on its own page).
+# A COMMAND that produces a backup is not the same as BACKUPS EXISTING (PA-1
+# §19). This workflow used to take a `pg_dump` from this GitHub runner — and the
+# production database publishes no port, deliberately, so the dump could never
+# connect. Worse, when its secrets were missing it wrote "Backup skipped" to the
+# summary and exited GREEN: a nightly badge that said "backups OK" on a platform
+# with none. A backup job that fails quietly is worse than none, because it is
+# believed.
 #
-# Three properties this is built for, none of them accidental:
+# THE AUTHORITATIVE BACKUP IS ON THE HOST, and this workflow no longer pretends
+# to be it. The `pgbackrest` sidecar (ops/deploy/docker-compose.production.yml)
+# archives WAL continuously and takes a nightly full/differential into repo1,
+# which belongs on an OFF-BOX S3 bucket (the sidecar refuses an on-box repo
+# unless PGBACKREST_ALLOW_ONBOX_REPO=1). What was missing was anybody checking.
+# So this job SSHes to the host and asks pgBackRest itself:
 #
-#   OFF-HOST. The dump is copied to object storage. A dump beside the database
-#   it came from does not survive the thing a backup exists for.
+#   · `check`  — the repo is reachable and WAL archiving works right now;
+#   · `info`   — the newest backup finished within the last 26 hours.
 #
-#   SEPARATE CREDENTIALS. `BACKUP_DATABASE_URL` should be a read-only role the
-#   running application does not hold, and the bucket credentials likewise —
-#   ransomware isolation is the reason, and it only works if the app cannot
-#   reach the backups.
+# LOUD FAILURE, both ways. Missing SSH secrets FAIL the job (exit 1) with the
+# explanation in the summary — the badge must tell the truth before the
+# founder externals exist, not only after. A stale or failing backup fails it
+# too. It has no `continue-on-error`.
 #
-#   LOUD FAILURE. A backup job that fails quietly is worse than none, because
-#   it is believed. This job has no `continue-on-error`, and the script exits
-#   non-zero on a zero-byte dump or a failed off-host copy.
-#
-# It no-ops with a summary note until the secrets exist, matching the deploy
-# workflows — the founder externals in PRODUCTION_CHECKLIST §2 gate it.
+# The Grafana rules `da-backup-failed` / `da-backup-stale` watch the same thing
+# from inside the box; this is the outside view, which still works when the box
+# (and its Grafana) is the thing that is wrong.
 name: backup-production
 
 on:
@@ -28,63 +33,76 @@ on:
     - cron: "30 21 * * *" # 03:00 IST, before the nightly verify
   workflow_dispatch:
 
-jobs:
-  backup:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
+permissions:
+  contents: read
 
-      - name: Check backup credentials
-        id: creds
+jobs:
+  verify-backups:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Check the host credentials exist
         env:
-          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
-          BACKUP_S3_URI: ${{ secrets.BACKUP_S3_URI }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          if [ -z "$BACKUP_DATABASE_URL" ] || [ -z "$BACKUP_S3_URI" ]; then
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
             {
-              echo "### Backup skipped"
+              echo "### Backups NOT verified"
               echo ""
-              echo "BACKUP_DATABASE_URL and BACKUP_S3_URI are not both configured, so"
-              echo "**no backup was taken**. These are founder-held (PRODUCTION_CHECKLIST §2)."
+              echo "DEPLOY_HOST, DEPLOY_USER and DEPLOY_SSH_KEY are not all configured for the"
+              echo "\`production\` environment, so nothing could be checked. These are founder-held"
+              echo "(PRODUCTION_CHECKLIST §2)."
               echo ""
-              echo "Until they exist the platform has a backup COMMAND and no backups."
+              echo "**This job fails until they exist**, on purpose: a green badge here must mean"
+              echo "a backup finished in the last 26 hours, never \"nobody looked\"."
             } >> "$GITHUB_STEP_SUMMARY"
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
-      # The dump must be taken by a client of the SAME major version as the
-      # server, or pg_dump refuses — which is correct and is how a silently
-      # unusable dump is avoided. Pinned to 17 to match the managed instance.
-      - name: Install postgresql-client-17
-        if: steps.creds.outputs.configured == 'true'
-        run: |
-          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+      - name: Ask pgBackRest on the host
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/desiauction
+            pgb() { docker compose exec -T pgbackrest su postgres -c "pgbackrest --stanza=desiauction $*"; }
 
-      - name: Take the backup
-        if: steps.creds.outputs.configured == 'true'
-        env:
-          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
-          BACKUP_S3_URI: ${{ secrets.BACKUP_S3_URI }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.BACKUP_AWS_REGION }}
-          # The runner is ephemeral, so local retention is irrelevant here —
-          # the bucket's own lifecycle policy owns retention.
-          BACKUP_RETAIN: "1"
-        run: node scripts/backup-database.mjs
+            # Repo reachable, stanza valid, and a WAL segment actually archives.
+            pgb check
+
+            # The newest backup's stop time, from pgBackRest's own JSON. No jq
+            # on the host or in the image, and none is needed: the `backup`
+            # array is oldest-first, so the last "stop" is the newest.
+            INFO="$(pgb "info --output=json")"
+            STOP="$(printf '%s' "$INFO" | grep -o '"stop":[0-9]*' | tail -1 | cut -d: -f2)"
+            if [ -z "$STOP" ]; then
+              echo "NO BACKUP in the repo at all — the sidecar has never completed one."
+              exit 1
+            fi
+            AGE=$(( $(date +%s) - STOP ))
+            echo "newest backup finished $(( AGE / 3600 ))h ago ($(date -u -d "@$STOP" '+%F %TZ'))"
+            if [ "$AGE" -gt $(( 26 * 3600 )) ]; then
+              echo "STALE: older than 26h. docker compose logs pgbackrest shows why."
+              exit 1
+            fi
+
+            # Say where repo1 is, so an on-box repo is never mistaken for a
+            # disaster-recovery copy (README "Backups").
+            docker compose exec -T pgbackrest sh -c \
+              'echo "repo1 endpoint: ${PGBACKREST_REPO1_S3_ENDPOINT:-(unset)}; on-box override: ${PGBACKREST_ALLOW_ONBOX_REPO:-0}"'
 
       - name: Record it
-        if: steps.creds.outputs.configured == 'true'
         run: |
           {
-            echo "### Backup taken"
+            echo "### Backups verified on the host"
             echo ""
-            echo "Copied off-host. **A backup that has never been restored is a hope,"
-            echo "not a backup** — rehearse a restore and record the RTO in"
-            echo "docs/operations/RESTORE_RUNBOOK.md."
+            echo "pgBackRest \`check\` passed and the newest backup is under 26 hours old."
+            echo "**A backup that has never been restored is a hope, not a backup** — the"
+            echo "restore drill and its measured RTO live in docs/operations/RESTORE_RUNBOOK.md."
           } >> "$GITHUB_STEP_SUMMARY"
