@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+import { axeClean } from "./axe";
 import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
 
 // THE PRODUCT-NEWS LIST, end to end: the footer says how to leave, the leaving
@@ -37,8 +37,10 @@ test("sign up, find the way out in the footer, and leave", async ({ page }) => {
   await page.goto("/pricing");
   await page.locator("footer").getByRole("link", { name: "Unsubscribe" }).click();
   await expect(page).toHaveURL(/\/newsletter\/unsubscribe$/);
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations).toEqual([]);
+  // The shared gate, not a bare scan: after a client-side navigation the new
+  // <title> lands a beat after the DOM, and a bare scan in that gap reports
+  // `document-title` against a page that has one (see axe.ts).
+  await axeClean(page, "newsletter unsubscribe");
 
   const main = page.locator("main");
   await main.getByLabel("Email address to remove").fill(`leaver.${STAMP}@example.test`);
