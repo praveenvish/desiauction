@@ -125,6 +125,50 @@ describe("web env — production refuses every dev-only default", () => {
   });
 });
 
+describe("web env — WhatsApp as the launch text channel", () => {
+  // SMS is dormant for launch: a WhatsApp-only production has no MSG91 at all.
+  const WHATSAPP_PROD: Raw = {
+    ...PROD_OK,
+    OTP_PROVIDER: "whatsapp",
+    MSG91_AUTH_KEY: undefined,
+    MSG91_TEMPLATE_ID: undefined,
+    WHATSAPP_PHONE_NUMBER_ID: "123456789012345",
+    WHATSAPP_ACCESS_TOKEN: "EAAG-token",
+    WHATSAPP_TEMPLATE_NAME: "desiauction_login_code",
+    WHATSAPP_APP_SECRET: "a".repeat(32),
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "v".repeat(32),
+  };
+
+  it("boots with no MSG91 credentials at all", () => {
+    expect(() => parseEnv(raw(WHATSAPP_PROD))).not.toThrow();
+  });
+
+  it("refuses a WhatsApp sender whose opt-out receiver is closed", () => {
+    expect(() => parseEnv(raw({ ...WHATSAPP_PROD, WHATSAPP_APP_SECRET: undefined }))).toThrow(
+      /WHATSAPP_APP_SECRET/,
+    );
+    expect(() =>
+      parseEnv(raw({ ...WHATSAPP_PROD, WHATSAPP_WEBHOOK_VERIFY_TOKEN: undefined })),
+    ).toThrow(/WHATSAPP_WEBHOOK_VERIFY_TOKEN/);
+  });
+
+  it("asks nothing of a deployment that does not send on WhatsApp", () => {
+    expect(() => parseEnv(raw(PROD_OK))).not.toThrow();
+  });
+
+  it("leaves development alone — no webhook secrets needed to send locally", () => {
+    expect(() =>
+      parseEnv(raw({ ...DEV, WHATSAPP_PHONE_NUMBER_ID: "1", WHATSAPP_ACCESS_TOKEN: "t" })),
+    ).not.toThrow();
+  });
+
+  it("refuses a webhook secret too short to be one", () => {
+    expect(() => parseEnv(raw({ ...DEV, WHATSAPP_APP_SECRET: "short" }))).toThrow(
+      /invalid environment/,
+    );
+  });
+});
+
 describe("web env — the two doors that must stay open", () => {
   it("lets `next build` compile: production NODE_ENV, none of the deploy's variables", () => {
     // The build runs with NODE_ENV=production by design and cannot be given the
