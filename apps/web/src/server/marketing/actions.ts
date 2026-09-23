@@ -8,6 +8,8 @@ import { db } from "../db";
 import { sendDemoRequestMail } from "./demo-mail";
 import {
   isSubscribeThrottled,
+  isUnsubscribeThrottled,
+  recordTypedUnsubscribe,
   subscribe,
   unsubscribe,
   unsubscribeTokenMatches,
@@ -56,6 +58,11 @@ export async function subscribeNewsletterAction(
 /**
  * Take an address off the list. The answer is the same whether or not it was on
  * it, so this page cannot be used to learn who subscribed.
+ *
+ * Limited per network address like joining (0084), and the limit answers
+ * PLAINLY rather than faking success: a person who types their own address
+ * must never be told they are off a list they are still on. The signed link a
+ * newsletter carries (below) is never limited.
  */
 export async function unsubscribeNewsletterAction(
   _previous: { error?: string; done?: boolean },
@@ -65,6 +72,14 @@ export async function unsubscribeNewsletterAction(
   if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
     return { error: "Enter a valid email address." };
   }
+  const ip = await requestIp();
+  if (await isUnsubscribeThrottled(db, ip)) {
+    return {
+      error:
+        "Too many removals from this network in the last hour. Try again later, or use the unsubscribe link in any of our emails.",
+    };
+  }
+  await recordTypedUnsubscribe(db, ip);
   await unsubscribe(db, email);
   return { done: true };
 }

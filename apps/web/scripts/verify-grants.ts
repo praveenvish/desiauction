@@ -143,6 +143,10 @@ const PERSONAL_CONTENT_TABLES = [
   "reviews",
   "review_reports",
   "erasure_requests",
+  // 0084: the marketing tables — addresses, phones, request IPs.
+  "newsletter_subscribers",
+  "newsletter_unsubscribes",
+  "demo_requests",
 ];
 
 const APP_WRITES_UNPROTECTED = [
@@ -165,6 +169,8 @@ const APP_WRITES_UNPROTECTED = [
   // and the announce enqueue, the drain updates, erasure and the retention
   // sweep delete — all on the app pool.
   "message_outbox",
+  // The typed newsletter removal's throttle row (0084), written by a stranger.
+  "newsletter_unsubscribes",
 ];
 
 /**

@@ -3,8 +3,8 @@
  * process memory), deleted on the schedule the retention policy states, and
  * removable by whoever holds the address.
  */
-import { createDb, newsletterSubscribers } from "@desiauction/db";
-import { inArray, like } from "drizzle-orm";
+import { createDb, newsletterSubscribers, newsletterUnsubscribes } from "@desiauction/db";
+import { eq, inArray, like } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
@@ -12,8 +12,11 @@ import {
   SUBSCRIBE_MAX_PER_IP_PER_HOUR,
   SUBSCRIBER_IP_RETENTION_MS,
   SUBSCRIBER_RETENTION_MS,
+  UNSUBSCRIBE_MAX_PER_IP_PER_HOUR,
   isSubscribeThrottled,
+  isUnsubscribeThrottled,
   purgeExpiredNewsletter,
+  recordTypedUnsubscribe,
   subscribe,
   unsubscribe,
   unsubscribeTokenMatches,
@@ -26,9 +29,12 @@ const RUN = String(Date.now()).slice(-8);
 const address = (n: number): string => `news.${RUN}.${String(n)}@example.test`;
 // An address from the documentation range, never a real client.
 const IP = `192.0.2.${String(Number(RUN.slice(-2)) % 250)}`;
+// Its own address for the removal limit, so the two ceilings never share rows.
+const UNSUB_IP = `198.51.100.${String(Number(RUN.slice(-2)) % 250)}`;
 
 afterAll(async () => {
   await db.delete(newsletterSubscribers).where(like(newsletterSubscribers.email, `news.${RUN}.%`));
+  await db.delete(newsletterUnsubscribes).where(eq(newsletterUnsubscribes.requestIp, UNSUB_IP));
   await handle.sql.end();
 });
 
@@ -64,6 +70,27 @@ describe("NEWSLETTER — limited, retained, removable", () => {
       .from(newsletterSubscribers)
       .where(inArray(newsletterSubscribers.email, [address(200)]));
     expect(rows).toHaveLength(0);
+  });
+
+  it("limits TYPED removals per address like sign-ups, storing no email (gate leftover)", async () => {
+    for (let i = 0; i < UNSUBSCRIBE_MAX_PER_IP_PER_HOUR; i++) {
+      expect(await isUnsubscribeThrottled(db, UNSUB_IP)).toBe(false);
+      await recordTypedUnsubscribe(db, UNSUB_IP);
+    }
+    expect(await isUnsubscribeThrottled(db, UNSUB_IP)).toBe(true);
+    // No known address, nothing to count by — same as joining.
+    expect(await isUnsubscribeThrottled(db, null)).toBe(false);
+    // The row is an address and a time; there is no column an email could sit in.
+    const [row] = await handle.sql<Record<string, unknown>[]>`
+      select * from newsletter_unsubscribes where request_ip = ${UNSUB_IP} limit 1`;
+    expect(Object.keys(row ?? {}).sort()).toEqual(["created_at", "id", "request_ip"]);
+    // And the retention sweep takes them at ninety days.
+    await handle.sql`update newsletter_unsubscribes
+      set created_at = ${new Date(Date.now() - SUBSCRIBER_IP_RETENTION_MS - 60_000).toISOString()}
+      where request_ip = ${UNSUB_IP}`;
+    const purged = await purgeExpiredNewsletter(db);
+    expect(purged.unsubscribeRowsDeleted).toBeGreaterThanOrEqual(UNSUBSCRIBE_MAX_PER_IP_PER_HOUR);
+    expect(await isUnsubscribeThrottled(db, UNSUB_IP)).toBe(false);
   });
 
   it("deletes addresses past twenty-four months and clears network addresses past ninety days", async () => {

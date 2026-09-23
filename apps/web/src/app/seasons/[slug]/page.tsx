@@ -1,7 +1,6 @@
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
-import { PageTitleHidden } from "../../../components/shell/page-title";
 import { requireOnboarded } from "../../../server/auth/onboarding-gate";
 import { seasonOverviewView } from "../../../server/competition/actions";
 import { seasonPass } from "../../../server/competition/pass";
@@ -32,9 +31,8 @@ export default async function CompetitionHomePage({
       {/* THE ONE <h1> ON THIS PAGE IS THE HERO'S. Every other season tab opens
           with the shell's page head (trail, title); on the overview the hero
           banner already says the season's name, over its cover photo, so the
-          shell's head stands down — `PageTitleHidden` drops its h1 from the DOM
-          and overview.css keeps the head from painting before hydration. */}
-      <PageTitleHidden />
+          shell names nothing here — `pageIdentity` (nav.ts) decides that from
+          the URL, on the server, so the HTML never carries a second h1. */}
       <main className="ov-page">
         <div className="ov-stack">
           <OverviewPanel

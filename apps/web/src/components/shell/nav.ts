@@ -664,7 +664,12 @@ export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdenti
         { label: season.orgName, href: `/org/${season.orgSlug}` },
         ...(section !== null ? [{ label: season.name, href: `/seasons/${slug}` }] : []),
       ],
-      title: section ?? season.name,
+      // The overview's hero banner is its one <h1> — the season's name over its
+      // cover — so the shell names nothing there and keeps only the trail up to
+      // the club. Decided HERE, from the URL, so the server renders one heading:
+      // a client-side stand-down left two in the HTML until hydration, which
+      // crawlers, no-JS readers and a slow CI all saw.
+      title: section,
     };
   }
 

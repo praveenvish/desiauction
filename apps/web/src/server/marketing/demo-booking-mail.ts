@@ -29,6 +29,17 @@ export function whenWords(at: Date): string {
   return `${dayLabel(dayKey)}, ${timeLabel(Math.round(minutes))} IST`;
 }
 
+/*
+ * NOTHING THE STRANGER TYPED GOES BACK OUT — the booking half (gate leftover).
+ *
+ * Booking, cancellation and reminder mail all go to the address on a demo
+ * request, which nobody verified; `name` and `orgName` are free text from the
+ * same anonymous form. The acknowledgement (`demo-mail.ts`) stopped echoing
+ * them; these three and the attached invite used to open "Hi {name}" and title
+ * the event with the organisation, which kept the same relay alive one step
+ * later. So they greet generically and the invite is just "DesiAuction demo".
+ * The fields stay on the input for the founder's side of the booking.
+ */
 export interface BookingMailInput {
   readonly to: string;
   readonly name: string;
@@ -59,7 +70,7 @@ export function bookingConfirmationMail(input: BookingMailInput): ComposedMail {
     ...renderEmail({
       preheader: `You're booked in for ${when}. The calendar invite is attached.`,
       heading: "Your demo is booked",
-      paragraphs: [`Hi ${input.name},`, `You're booked in for ${when}.`],
+      paragraphs: ["Hello,", `You're booked in for ${when}.`],
       details: [
         ["When", when],
         ["How", "We call the number you gave us"],
@@ -81,7 +92,7 @@ export function bookingCancellationMail(input: BookingMailInput): ComposedMail {
     ...renderEmail({
       preheader: `The demo on ${when} is cancelled.`,
       heading: "Your demo is cancelled",
-      paragraphs: [`Hi ${input.name},`, `The demo on ${when} is cancelled and nobody will call.`],
+      paragraphs: ["Hello,", `The demo on ${when} is cancelled and nobody will call.`],
       action: { label: "Pick another time", url: `${env.PUBLIC_BASE_URL}/schedule-demo` },
       footnote:
         "You received this because a DesiAuction demo booked with this address was cancelled.",
@@ -105,7 +116,7 @@ export function bookingReminderMail(input: BookingMailInput, hoursAhead: 24 | 1)
       preheader: hoursAhead === 24 ? `We're speaking ${when}.` : `We're calling in about an hour.`,
       heading: hoursAhead === 24 ? "Your demo is tomorrow" : "Your demo is in an hour",
       paragraphs: [
-        `Hi ${input.name},`,
+        "Hello,",
         hoursAhead === 24
           ? `A reminder that we're speaking ${when}. We'll call the number you gave us.`
           : `We're calling in about an hour, at ${when}.`,
@@ -122,7 +133,7 @@ function inviteFile(input: BookingMailInput, cancelled: boolean) {
     uid: inviteUid(input.requestId),
     start: input.slotStart,
     end: input.slotEnd,
-    summary: `DesiAuction demo — ${input.orgName}`,
+    summary: "DesiAuction demo",
     description: cancelled
       ? "Cancelled."
       : `A live walkthrough of a real auction. Manage this booking: ${url}`,

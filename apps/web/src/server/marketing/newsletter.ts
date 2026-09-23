@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { newId, newsletterSubscribers, type Db } from "@desiauction/db";
+import { newId, newsletterSubscribers, newsletterUnsubscribes, type Db } from "@desiauction/db";
 import { and, count, desc, eq, gt, isNotNull, lt } from "drizzle-orm";
 
 import { env } from "../../env";
@@ -78,7 +78,9 @@ export async function subscribe(db: Db, email: string, requestIp: string | null)
  * than joining — backwards for consent, and the DPDP Act asks withdrawal to be
  * as easy as giving it. The worst a typed removal can do is take somebody off
  * a list that has never sent them anything, which they can undo in one step.
- * The token is for the mail, where one click has to be enough.
+ * What typing does NOT get is script speed: it is limited per network address
+ * exactly as joining is (`isUnsubscribeThrottled`, 0084). The token is for the
+ * mail, where one click has to be enough, and it is not limited.
  */
 export function unsubscribeToken(email: string): string {
   return createHmac("sha256", env.DEMO_TOKEN_SECRET)
@@ -104,6 +106,42 @@ export function unsubscribeUrl(email: string): string {
   return `${env.PUBLIC_BASE_URL}/newsletter/unsubscribe?${query.toString()}`;
 }
 
+/**
+ * The typed removal's limit (0084) — the same ceiling joining has. Typing is
+ * kept (see above); what it lost is the ability to empty the list at script
+ * speed. A request with no known address is not limited, matching
+ * `isSubscribeThrottled`: without a trusted proxy there is nothing to count by.
+ */
+export const UNSUBSCRIBE_MAX_PER_IP_PER_HOUR = SUBSCRIBE_MAX_PER_IP_PER_HOUR;
+
+export async function isUnsubscribeThrottled(
+  db: Db,
+  requestIp: string | null,
+  now: Date = new Date(),
+): Promise<boolean> {
+  if (requestIp === null) {
+    return false;
+  }
+  const [row] = await db
+    .select({ n: count() })
+    .from(newsletterUnsubscribes)
+    .where(
+      and(
+        eq(newsletterUnsubscribes.requestIp, requestIp),
+        gt(newsletterUnsubscribes.createdAt, new Date(now.getTime() - HOUR_MS)),
+      ),
+    );
+  return (row?.n ?? 0) >= UNSUBSCRIBE_MAX_PER_IP_PER_HOUR;
+}
+
+/** Count one typed removal against its address. Stores the address, never the email. */
+export async function recordTypedUnsubscribe(db: Db, requestIp: string | null): Promise<void> {
+  if (requestIp === null) {
+    return;
+  }
+  await db.insert(newsletterUnsubscribes).values({ id: newId(), requestIp });
+}
+
 /** Remove an address. Says nothing about whether it was there. */
 export async function unsubscribe(db: Db, email: string): Promise<void> {
   await db
@@ -114,6 +152,7 @@ export async function unsubscribe(db: Db, email: string): Promise<void> {
 export interface NewsletterPurge {
   readonly subscribersDeleted: number;
   readonly addressesCleared: number;
+  readonly unsubscribeRowsDeleted: number;
 }
 
 /** The retention the data-retention policy states, enforced. Idempotent. */
@@ -135,7 +174,19 @@ export async function purgeExpiredNewsletter(
       ),
     )
     .returning({ id: newsletterSubscribers.id });
-  return { subscribersDeleted: deleted.length, addressesCleared: cleared.length };
+  // The typed-removal throttle rows hold nothing but an address and a time;
+  // they go at the same ninety days as every other request address.
+  const throttleRows = await db
+    .delete(newsletterUnsubscribes)
+    .where(
+      lt(newsletterUnsubscribes.createdAt, new Date(now.getTime() - SUBSCRIBER_IP_RETENTION_MS)),
+    )
+    .returning({ id: newsletterUnsubscribes.id });
+  return {
+    subscribersDeleted: deleted.length,
+    addressesCleared: cleared.length,
+    unsubscribeRowsDeleted: throttleRows.length,
+  };
 }
 
 export interface NewsletterSummary {

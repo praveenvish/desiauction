@@ -2092,6 +2092,22 @@ export const newsletterSubscribers = pgTable(
 );
 
 /**
+ * One row per TYPED unsubscribe (0084): the network address and the time,
+ * never the email removed. It exists only so the anonymous removal can be
+ * limited per address like every other anonymous write; the retention sweep
+ * deletes it after ninety days. Platform-level, no org, no RLS.
+ */
+export const newsletterUnsubscribes = pgTable(
+  "newsletter_unsubscribes",
+  {
+    id: id(),
+    requestIp: text("request_ip").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("newsletter_unsubscribes_ip_idx").on(table.requestIp, table.createdAt)],
+);
+
+/**
  * SOMEBODY WANTS TO BE SHOWN (migration 0031).
  *
  * Platform-level, ZERO tenant data, no RLS — the same posture as
