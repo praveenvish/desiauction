@@ -664,7 +664,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     expect(after?.role).toBe("all_rounder");
   });
 
-  it("CSV import names an existing nameless stub, and never renames a named person", async () => {
+  it("CSV import names a nameless stub's ENTRY, never the account", async () => {
     const stubPhone = `+9198${RUN}5`;
     const stubId = newId();
     await db.insert(people).values({ id: stubId, phone: stubPhone, name: null });
@@ -679,14 +679,24 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
       parseRegistrationCsv(csv).rows,
     );
     expect(first).toEqual({ imported: 1, updated: 0, unchanged: 0, reinstated: 0, named: 1 });
-    const [named] = await db
+    // The account is not the club's to name: it stays nameless platform-wide.
+    const [account] = await db
       .select({ name: people.name })
       .from(people)
       .where(eq(people.id, stubId))
       .limit(1);
-    expect(named?.name).toBe("Named By File");
+    expect(account?.name).toBeNull();
+    // This season's entry carries the name the file gave.
+    const [entry] = await db
+      .select({ enteredName: registrationsTable.enteredName })
+      .from(registrationsTable)
+      .where(
+        and(eq(registrationsTable.competitionId, compId), eq(registrationsTable.personId, stubId)),
+      )
+      .limit(1);
+    expect(entry?.enteredName).toBe("Named By File");
 
-    // A second file disagreeing about their name does NOT get to correct it.
+    // A second file disagreeing about their name still names no account.
     const rename = `name,phone,role\nSomebody Else,98${RUN}5,batter`;
     await commitRegistrationImport(db, compId, org.id, owner, parseRegistrationCsv(rename).rows);
     const [unchanged] = await db
@@ -694,7 +704,7 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
       .from(people)
       .where(eq(people.id, stubId))
       .limit(1);
-    expect(unchanged?.name).toBe("Named By File");
+    expect(unchanged?.name).toBeNull();
   });
 
   /*
