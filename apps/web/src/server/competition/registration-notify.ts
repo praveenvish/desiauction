@@ -1,17 +1,25 @@
 import type { RejectionReason } from "@desiauction/core";
-import { auditLog, newId, otpInbox, people, registrations, type Db } from "@desiauction/db";
+import { auditLog, newId, people, registrations, type Db } from "@desiauction/db";
 import { eq, inArray } from "drizzle-orm";
 
-import { env } from "../../env";
-import { maySend } from "../messaging/consent";
+import {
+  drainOutbox,
+  enqueueMail,
+  enqueueSms,
+  outboxOutcomes,
+  type QueuedMail,
+  type QueuedSms,
+} from "../messaging/outbox";
+import { registrationDecisionMail } from "../messaging/player-mail";
+import type { PlayerSmsSender, TemplatedSms } from "../messaging/sms";
 import {
   SMS_TEMPLATES,
   smsSeasonName,
   renderTemplate,
-  type MessageTemplate,
   type TemplateKey,
 } from "../messaging/templates";
-import { providerFetch } from "../messaging/provider-fetch";
+import type { TransactionalMailer } from "../messaging/transactional-mail";
+import type { PersonalWhatsAppSender } from "../messaging/whatsapp";
 
 /**
  * DA-35: THE LOOP DID NOT CLOSE. A registrant was rejected with reason
@@ -19,223 +27,34 @@ import { providerFetch } from "../messaging/provider-fetch";
  * line that admitted it ("Check back here"). The decision, its reason and its
  * audit row all existed; the human did not know.
  *
- * This module is the telling. It rides the SAME adapter idiom as the PX-3 OTP
- * sender — a port, an injected transport, a circuit breaker — because one
- * melted provider must not turn a bulk approval of 400 people into a paid-SMS
- * amplifier. Delivery is BEST EFFORT by construction: the decision has already
- * committed when we get here, and a player who misses a text still has their
- * status page, their Home card and their inbox. A player whose approval was
- * rolled back by a failed text has nothing.
+ * This module is the telling. It rides the personal-message queue (0079) like
+ * every other moment — WhatsApp for a person who opted in, SMS where a gateway
+ * exists, and an email for a verified address — so a decision obeys the same
+ * opt-in, the same three-layer send gate and the same no-SMS rule as a sale
+ * (messaging/outbox.ts, messaging/text-route.ts). Delivery is BEST EFFORT by
+ * construction: the decision has already committed when we get here, and a
+ * player who misses a message still has their status page, their Home card and
+ * their inbox. A player whose approval was rolled back by a failed text has
+ * nothing.
  */
 
-/**
- * What actually goes to a provider: a registered template, the values for its
- * declared slots, and the locally-rendered text.
- *
- * The rendered `body` is NOT what a real gateway sends — under DLT the operator
- * holds the fixed text and renders it from the slots. We keep it for the dev
- * inbox, for previews, and so a human reading a log can see what the recipient
- * would have read. Sending it as the message is precisely the defect this
- * replaces; see server/messaging/templates.ts.
+/*
+ * The SMS senders moved to messaging/sms.ts (the outbox needs them, and the
+ * outbox importing this module that imports the outbox is a cycle). Re-exported
+ * so every existing import of them from here still works.
  */
-export interface TemplatedSms {
-  readonly template: MessageTemplate;
-  readonly slots: Readonly<Record<string, string>>;
-  readonly body: string;
-}
-
-export interface PlayerSmsSender {
-  send(phone: string, message: TemplatedSms): Promise<void>;
-}
-
-/** Development delivery: messages land in the DB, rendered at /dev/inbox. */
-export class DevInboxSmsSender implements PlayerSmsSender {
-  constructor(private readonly db: Db) {}
-
-  async send(phone: string, message: TemplatedSms): Promise<void> {
-    return this.write(phone, message.body);
-  }
-
-  private async write(phone: string, message: string): Promise<void> {
-    // `code` is the inbox's message column; a decision notice is not a code, but
-    // it is the same "what did this number receive" question a developer asks.
-    await this.db.insert(otpInbox).values({ id: newId(), phone, code: message });
-  }
-}
-
-export interface HttpResponse {
-  readonly status: number;
-  readonly body: string;
-}
-
-export type SmsTransport = (
-  url: string,
-  init: { method: string; headers: Record<string, string>; body?: string },
-) => Promise<HttpResponse>;
-
-export interface Msg91FlowConfig {
-  readonly authKey: string;
-  /**
-   * Resolves a template to the DLT id registered for THAT shape. There is no
-   * single `flowId` any more: one id shared across five message shapes cannot
-   * satisfy DLT, which registers one template per shape — and the same id was
-   * also being shared with the OTP sender, whose registered text has a code
-   * slot and no room for a sentence.
-   */
-  readonly providerTemplateId: (template: MessageTemplate) => string | undefined;
-  readonly apiBase?: string;
-  readonly transport?: SmsTransport;
-  readonly now?: () => number;
-  readonly breakerThreshold?: number;
-  readonly breakerCooldownMs?: number;
-}
-
-const MSG91_API_BASE = "https://control.msg91.com/api/v5";
-const DEFAULT_BREAKER_THRESHOLD = 3;
-const DEFAULT_BREAKER_COOLDOWN_MS = 60 * 1000;
-
-export class SmsSendError extends Error {
-  constructor(
-    message: string,
-    readonly breakerOpen: boolean,
-    /** No retry can deliver it — the shape has no registered template id. */
-    readonly permanent = false,
-  ) {
-    super(message);
-    this.name = "SmsSendError";
-  }
-}
-
-// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
-// outbox's claim lease, or two drains deliver the same message.
-const defaultTransport: SmsTransport = providerFetch;
-
-/**
- * MSG91 Flow (v5) transactional SMS: the OTP endpoint sends codes, this one
- * sends messages. Same breaker contract as Msg91OtpSender — N consecutive
- * failures open it, a cooldown passes, the next send is the probe.
- */
-export class Msg91FlowSmsSender implements PlayerSmsSender {
-  private readonly transport: SmsTransport;
-  private readonly now: () => number;
-  private readonly threshold: number;
-  private readonly cooldownMs: number;
-  private consecutiveFailures = 0;
-  private openedAt: number | null = null;
-
-  constructor(private readonly config: Msg91FlowConfig) {
-    this.transport = config.transport ?? defaultTransport;
-    this.now = config.now ?? (() => Date.now());
-    this.threshold = config.breakerThreshold ?? DEFAULT_BREAKER_THRESHOLD;
-    this.cooldownMs = config.breakerCooldownMs ?? DEFAULT_BREAKER_COOLDOWN_MS;
-  }
-
-  breakerIsOpen(): boolean {
-    if (this.openedAt === null) {
-      return false;
-    }
-    return this.now() - this.openedAt < this.cooldownMs;
-  }
-
-  async send(phone: string, message: TemplatedSms): Promise<void> {
-    if (this.breakerIsOpen()) {
-      throw new SmsSendError("SMS provider unavailable (breaker open)", true);
-    }
-    const providerTemplateId = this.config.providerTemplateId(message.template);
-    if (providerTemplateId === undefined || providerTemplateId === "") {
-      // Not a transport failure and not retryable: this shape has no registered
-      // template, so no amount of retrying will deliver it. Name the shape and
-      // the env var so the fix is obvious from the log line alone.
-      throw new SmsSendError(
-        `no DLT template registered for ${message.template.key} (set ${message.template.providerTemplateEnv})`,
-        false,
-        true,
-      );
-    }
-    const base = this.config.apiBase ?? MSG91_API_BASE;
-    let failed: string | null = null;
-    try {
-      const response = await this.transport(`${base}/flow`, {
-        method: "POST",
-        headers: { authkey: this.config.authKey, "content-type": "application/json" },
-        body: JSON.stringify({
-          // The id registered for THIS shape, and the slots as named variables.
-          // The whole sentence used to travel here as a single `message`
-          // variable, which DLT cannot match against a registered template —
-          // the gateway scrubs it and the dev inbox never showed the difference.
-          template_id: providerTemplateId,
-          // Phones are stored E.164 (+91XXXXXXXXXX); MSG91 wants digits only.
-          recipients: [{ mobiles: phone.replace(/^\+/, ""), ...message.slots }],
-        }),
-      });
-      if (response.status >= 400 || response.body.includes('"type":"error"')) {
-        failed = `provider rejected send (status ${String(response.status)})`;
-      }
-    } catch {
-      failed = "provider unreachable";
-    }
-    if (failed !== null) {
-      this.consecutiveFailures += 1;
-      if (this.consecutiveFailures >= this.threshold) {
-        this.openedAt = this.now();
-      }
-      throw new SmsSendError(failed, false);
-    }
-    this.consecutiveFailures = 0;
-    this.openedAt = null;
-  }
-}
-
-/** The MSG91 template id configured for a template's env var, if any. */
-export function templateIdFromEnv(variable: string): string | undefined {
-  const value: unknown = (env as Readonly<Record<string, unknown>>)[variable];
-  return typeof value === "string" && value !== "" ? value : undefined;
-}
-
-/**
- * One construction point. The real provider is selected only when the platform
- * is already sending real SMS (OTP_PROVIDER=msg91) AND a transactional flow id
- * is configured; otherwise messages land in the dev inbox, where they are
- * VISIBLE rather than silently dropped. There is no third state in which a
- * decision goes untold.
- */
-export function createPlayerSmsSender(db: Db): PlayerSmsSender {
-  /*
-   * The real provider is selected when the platform is sending real SMS AND at
-   * least one decision template has a registered DLT id.
-   *
-   * `MSG91_TEMPLATE_ID` is deliberately NOT consulted here any more. It is the
-   * OTP flow's id — its registered text has a code slot and no room for a
-   * sentence — and it was being reused for all five decision notices, which is
-   * both a DLT mismatch and the reason a decision SMS would arrive as a
-   * mangled OTP. Each shape now reads its own env var, named on the template.
-   *
-   * A shape with no id configured raises a clear, non-retryable error naming
-   * the variable, rather than sending against the wrong registration.
-   */
-  // Read through `env`, never `process.env` — the validated surface is the only
-  // one allowed outside env.ts (IP-0_DESIGN §11). A variable a template names
-  // but env.ts does not declare fails templates.test ("names an env var that
-  // env.ts actually declares"), not an undelivered message.
-  //
-  // Every template's id, read by the variable it names — NOT a hand-kept list.
-  // The list was five registration shapes long, so the phone-change security
-  // alert (sent through this same sender) had no id in production however it
-  // was configured, and failed as "no DLT template registered". A template now
-  // cannot be added without its id being looked up.
-  const registered = (template: MessageTemplate): string | undefined =>
-    templateIdFromEnv(template.providerTemplateEnv);
-  const anyRegistered = Object.values(SMS_TEMPLATES).some(
-    (template) => (registered(template) ?? "") !== "",
-  );
-  if (env.OTP_PROVIDER === "msg91" && anyRegistered) {
-    return new Msg91FlowSmsSender({
-      authKey: env.MSG91_AUTH_KEY ?? "",
-      providerTemplateId: registered,
-    });
-  }
-  return new DevInboxSmsSender(db);
-}
+export {
+  createPlayerSmsSender,
+  DevInboxSmsSender,
+  Msg91FlowSmsSender,
+  SmsSendError,
+  templateIdFromEnv,
+  type HttpResponse,
+  type Msg91FlowConfig,
+  type PlayerSmsSender,
+  type SmsTransport,
+  type TemplatedSms,
+} from "../messaging/sms";
 
 // --- The copy ---------------------------------------------------------------
 
@@ -290,12 +109,74 @@ function messageFor(
   return { template, slots: rendered.slots, body: rendered.body };
 }
 
+/** What became of one person's notice, across its text and its email. */
+export type NoticeOutcome =
+  | { readonly state: "sent"; readonly channels: readonly string[] }
+  | { readonly state: "failed"; readonly error: string }
+  | { readonly state: "suppressed"; readonly reason: string }
+  /** Still queued: a text held for the morning, or a retry. The drain finishes it. */
+  | { readonly state: "pending" };
+
+/**
+ * One person's rows, read back after the drain, as one outcome. Pure.
+ *
+ * TOLD beats everything: a person whose text had no channel but whose email
+ * went WAS told, and the organizer's timeline should say so rather than
+ * "suppressed". Pending beats failed (it may yet go). And suppressed is only
+ * the answer when nothing went and nothing will — the reason is the text's,
+ * because that is the channel an organizer expects.
+ */
+export function noticeOutcome(
+  rows: readonly {
+    readonly channel: string;
+    readonly status: string;
+    readonly lastError: string | null;
+  }[],
+): NoticeOutcome {
+  const sent = rows.filter((row) => row.status === "sent").map((row) => row.channel);
+  if (sent.length > 0) {
+    return { state: "sent", channels: sent };
+  }
+  if (rows.some((row) => row.status === "pending")) {
+    return { state: "pending" };
+  }
+  const failed = rows.find((row) => row.status === "failed");
+  if (failed !== undefined) {
+    return { state: "failed", error: failed.lastError ?? "send failed" };
+  }
+  const text = rows.find((row) => row.channel !== "email") ?? rows[0];
+  return { state: "suppressed", reason: text?.lastError ?? "nothing to send to" };
+}
+
+/** Injected by tests; omitted, the platform's own — as the drain would use. */
+export interface NoticeChannels {
+  readonly sms?: PlayerSmsSender | null;
+  readonly whatsapp?: PersonalWhatsAppSender | null;
+  readonly whatsappTemplate?: (key: string) => string | undefined;
+  readonly mailer?: TransactionalMailer;
+  /**
+   * The pool the queue is written and drained on — the app pool, like every
+   * other moment, and never the caller's org-scoped transaction: the drain
+   * sets up its own tenant scope per row (outbox.ts `mayDeliver`).
+   */
+  readonly outboxDb?: Db;
+  /** The drain's clock — the text window (no texts 10 pm – 8 am IST) reads it. */
+  readonly now?: Date;
+}
+
 /**
  * Tell every affected player, and record whether they were told. The delivery
  * result is written to the ORG-scoped ledger against each registration, so it
  * appears on that player's timeline in the organizer's Details panel: an
  * organizer can see "we told them" or "we could not reach them" and act. The
  * person-scoped inbox notice is written separately by the aggregate.
+ *
+ * THROUGH THE QUEUE, delivered at once. Each person gets a text row (WhatsApp
+ * or SMS, decided when it goes) and an email row, written to the outbox and
+ * then drained right here for just these rows — so the ledger can still say
+ * what happened, and this already runs after the organizer's response
+ * (`notifyLater`). What the drain could not finish (a text held until 8 am, a
+ * retry) is `pending`, and the scheduled drain completes it.
  */
 export async function notifyDecision(
   db: Db,
@@ -307,10 +188,10 @@ export async function notifyDecision(
     reason?: RejectionReason;
     actorId: string;
   },
-  sender?: PlayerSmsSender,
-): Promise<{ sent: number; failed: number; suppressed: number }> {
+  channels: NoticeChannels = {},
+): Promise<{ sent: number; failed: number; suppressed: number; pending: number }> {
   if (input.registrationIds.length === 0) {
-    return { sent: 0, failed: 0, suppressed: 0 };
+    return { sent: 0, failed: 0, suppressed: 0, pending: 0 };
   }
   /*
    * THE LINK CARRIES NO SEASON, AND THAT IS THE FIX.
@@ -366,113 +247,136 @@ export async function notifyDecision(
         extra: { competitionNameLength: input.competitionName.length },
       },
     );
-    return { sent: 0, failed: input.registrationIds.length, suppressed: 0 };
+    return { sent: 0, failed: input.registrationIds.length, suppressed: 0, pending: 0 };
   }
   const rows = await db
-    .select({ id: registrations.id, phone: people.phone, personId: people.id })
+    .select({
+      id: registrations.id,
+      phone: people.phone,
+      personId: people.id,
+      name: people.name,
+    })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
     .where(inArray(registrations.id, input.registrationIds as string[]));
-  const delivery = sender ?? createPlayerSmsSender(db);
+  const kind = body.template.key;
+  const templateRef = `${body.template.key}@${body.template.version}`;
+  /*
+   * One key per decision, not per registration: a player can be approved,
+   * withdrawn and approved again, and the second approval is a new moment. The
+   * key still makes this call's rows exactly-once in the queue — and is how
+   * the drain below is pointed at them and nothing else.
+   */
+  const decision = newId();
+  const keyOf = (registrationId: string) => `${kind}:${registrationId}:${decision}`;
+  /*
+   * NO PHONE, NO TEXT — and that is not a failure either.
+   *
+   * Since 0062 a person can be anchored by email alone, so `people.phone` can
+   * be null. They get no text row; their email row, if they have a verified
+   * address, still tells them, and if neither exists they are suppressed —
+   * the decision still stands and their status page still shows it.
+   *
+   * (A player must supply a phone to register, so in practice this is the
+   * organizer who added a row by hand for somebody who has not registered
+   * yet — not a gap in player notification.)
+   */
+  const texts: QueuedSms[] = rows
+    .filter((row) => row.phone !== null)
+    .map((row) => ({
+      personId: row.personId,
+      orgId: input.orgId,
+      kind,
+      dedupeKey: `sms:${keyOf(row.id)}`,
+      templateKey: kind,
+      slots: body.slots,
+    }));
+  const mails: QueuedMail[] = rows.map((row) => ({
+    personId: row.personId,
+    orgId: input.orgId,
+    kind,
+    dedupeKey: keyOf(row.id),
+    ...registrationDecisionMail({
+      name: row.name?.trim() || "there",
+      season: input.competitionName.trim(),
+      decision: input.event,
+      ...(input.event === "reject" ? { reason: REASON_TO_PLAYER[input.reason ?? "other"] } : {}),
+    }),
+  }));
+  // Undefined falls through to the queue's own default, the app pool.
+  const outboxDb = channels.outboxDb;
+  await enqueueSms(texts, outboxDb);
+  await enqueueMail(mails, outboxDb);
+  const keys = [...texts.map((text) => text.dedupeKey), ...mails.map((mail) => mail.dedupeKey)];
+  /*
+   * The consent gate is the drain's, not ours: STOP list, the person's topic
+   * switch and the club's own switch, read inside the club's boundary
+   * (`mayDeliver`), for the "registration" topic — the same three layers that
+   * used to be checked here, now checked once, where every channel is decided.
+   */
+  await drainOutbox({
+    ...(outboxDb === undefined ? {} : { db: outboxDb }),
+    dedupeKeys: keys,
+    limit: keys.length,
+    ...(channels.sms === undefined ? {} : { sms: channels.sms }),
+    ...(channels.whatsapp === undefined ? {} : { whatsapp: channels.whatsapp }),
+    ...(channels.whatsappTemplate === undefined
+      ? {}
+      : { whatsappTemplate: channels.whatsappTemplate }),
+    ...(channels.mailer === undefined ? {} : { mailer: channels.mailer }),
+    ...(channels.now === undefined ? {} : { now: channels.now }),
+  });
+  const settled = await outboxOutcomes(keys, outboxDb);
   let sent = 0;
   let failed = 0;
   let suppressed = 0;
+  let pending = 0;
   for (const row of rows) {
-    /*
-     * NO PHONE, NO SMS — and that is not a failure either.
-     *
-     * Since 0062 a person can be anchored by email alone, so `people.phone` can
-     * be null. Counting those as FAILED would send an organizer chasing a
-     * delivery problem that does not exist, which is the same mistake the
-     * suppression branch below was written to avoid. They are suppressed: the
-     * decision still stands and their status page still shows it.
-     *
-     * (A player must supply a phone to register, so in practice this is the
-     * organizer who added a row by hand for somebody who has not registered
-     * yet — not a gap in player notification.)
-     */
-    if (row.phone === null) {
-      suppressed += 1;
+    const own = settled.filter(
+      (message) =>
+        message.dedupeKey === keyOf(row.id) || message.dedupeKey === `sms:${keyOf(row.id)}`,
+    );
+    const outcome = noticeOutcome(own);
+    if (outcome.state === "pending") {
+      // Nothing to write yet: the scheduled drain delivers it, and the queue
+      // row is the record until then.
+      pending += 1;
       continue;
     }
-    /*
-     * The consent gate, before the send and not after it.
-     *
-     * A decision notice is transactional — it is the direct consequence of
-     * something this person did — so it needs no opt-in. What it must honour is
-     * a STOP, and until now there was nothing to honour it with: no
-     * suppression list, no opt-out, no STOP handling anywhere in the product.
-     *
-     * A suppressed person is NOT a failure. Their decision still stands, their
-     * status page still shows it, and counting them as failed would send an
-     * organizer chasing a delivery problem that does not exist.
-     */
-    const decision = await maySend(db, {
-      contact: row.phone,
-      channel: "sms",
-      category: body.template.category,
-      scope: "registration",
-      personId: row.personId,
-      // The club's own switch. Passing it is what makes the organizer's
-      // Notifications tab do something rather than describe an intention.
-      orgId: input.orgId,
-    });
-    if (!decision.send) {
-      suppressed += 1;
-      try {
-        await db.insert(auditLog).values({
-          id: newId(),
-          actor: input.actorId,
-          action: "registration.notify_suppressed",
-          scopeType: "org",
-          scopeId: input.orgId,
-          subject: row.id,
-          // Recorded so "why didn't they get it?" has an answer that is not a
-          // shrug. A silent skip is indistinguishable from a bug.
-          //
-          // The template is named here as well as on the sent and failed rows,
-          // so per-shape delivery can be counted across all three outcomes. A
-          // suppression rate that is only knowable in aggregate hides the case
-          // that matters — one shape being refused far more than the others.
-          meta: {
-            channel: "sms",
-            reason: decision.reason,
-            template: `${body.template.key}@${body.template.version}`,
-          },
-        });
-      } catch {
-        // Same rule as below: evidence never fails a committed decision.
-      }
-      continue;
-    }
-    let error: string | null = null;
-    try {
-      await delivery.send(row.phone, body);
-    } catch (cause) {
-      error = cause instanceof Error ? cause.message : "send failed";
-    }
-    if (error === null) {
-      sent += 1;
-    } else {
-      failed += 1;
-    }
+    if (outcome.state === "sent") sent += 1;
+    else if (outcome.state === "failed") failed += 1;
+    else suppressed += 1;
     try {
       await db.insert(auditLog).values({
         id: newId(),
         actor: input.actorId,
-        action: error === null ? "registration.notified" : "registration.notify_failed",
+        action:
+          outcome.state === "sent"
+            ? "registration.notified"
+            : outcome.state === "failed"
+              ? "registration.notify_failed"
+              : "registration.notify_suppressed",
         scopeType: "org",
         scopeId: input.orgId,
         subject: row.id,
+        // Recorded so "why didn't they get it?" has an answer that is not a
+        // shrug. A silent skip is indistinguishable from a bug.
+        //
+        // The template is named on every outcome, so per-shape delivery can be
+        // counted across all three (admin/views.ts). A suppression rate that is
+        // only knowable in aggregate hides the case that matters — one shape
+        // being refused far more than the others.
         meta:
-          error === null
-            ? { channel: "sms", template: `${body.template.key}@${body.template.version}` }
-            : { channel: "sms", template: `${body.template.key}@${body.template.version}`, error },
+          outcome.state === "sent"
+            ? { channel: outcome.channels.join("+"), template: templateRef }
+            : outcome.state === "failed"
+              ? { channel: "text", template: templateRef, error: outcome.error }
+              : { channel: "text", reason: outcome.reason, template: templateRef },
       });
     } catch {
       // Evidence of a notification must never be the thing that fails a
       // decision that has already committed.
     }
   }
-  return { sent, failed, suppressed };
+  return { sent, failed, suppressed, pending };
 }
