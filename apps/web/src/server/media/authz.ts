@@ -20,10 +20,10 @@ export interface ResolvedMediaSubject {
   /** For a player, the owning person (enables the self-upload branch). */
   ownerPersonId: string | null;
   /**
-   * For a player: the photo belongs on the ENTRY, not the person (0077). The
-   * organizer typed this entry's name (0075), so the account behind the phone
-   * may be somebody the club has never met, and the club is the one acting.
-   * `storageSubjectId` is then the registration id.
+   * For a player: the photo belongs on the ENTRY, not the person (0077). Set
+   * whenever someone OTHER than the person is uploading — an organizer acts on
+   * this season's entry, never on the account behind it. `storageSubjectId` is
+   * then the registration id.
    */
   entryPhoto?: { registrationId: string };
 }
@@ -48,22 +48,24 @@ export async function resolveMediaSubject(
       .limit(1);
     return row === undefined ? null : { storageSubjectId: row.id, ownerPersonId: null };
   }
-  // player: subjectId is a registration id; the photo lands person-level (D7).
+  // player: subjectId is a registration id.
   const [row] = await db
-    .select({ personId: registrations.personId, enteredName: registrations.enteredName })
+    .select({ personId: registrations.personId })
     .from(registrations)
     .where(and(eq(registrations.id, subjectId), eq(registrations.competitionId, competition.id)))
     .limit(1);
   if (row === undefined) {
     return null;
   }
-  // A player photo lands on the PERSON, platform-wide (D7) — except when the
-  // club typed this entry's name and someone other than that person is
-  // uploading. Writing to `people` then replaced (or deleted) a stranger's
-  // picture and consent everywhere; refusing would tell the club the phone has
-  // an account. So the club's photo lives on the entry and only this season
-  // shows it (security review, launch Phase 5).
-  if (row.enteredName !== null && row.personId !== actorId) {
+  // Only the PERSON writes their platform-wide photo (D7). Anyone else — the
+  // club's organizer, attesting consent on the player's behalf — writes this
+  // season's ENTRY photo, and only this season shows it (shownPhotoKey prefers
+  // it). This used to apply only to typed-name entries (0077, launch Phase 5);
+  // for every other entry an organizer's upload replaced the player's picture
+  // and consent in every club and on every public page they appear on, and
+  // "remove photo" deleted it everywhere (go-live gate P2). A club's authority
+  // ends at its own season.
+  if (row.personId !== actorId) {
     return {
       storageSubjectId: subjectId,
       ownerPersonId: row.personId,

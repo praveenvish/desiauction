@@ -15,19 +15,25 @@ import { sql } from "drizzle-orm";
 export const shownName = sql<string | null>`coalesce(${registrations.enteredName}, ${people.name})`;
 
 /**
- * The account's photo, unless the season only knows this player by a typed
- * name: a face would unmask exactly what the typed name protects. A typed-name
- * entry shows the photo the CLUB attached to it instead (0077), if any.
+ * The photo a season shows for a registration.
+ *
+ * The ENTRY's photo wins whenever there is one (0077): anything the club
+ * attached is stored on the registration, never on the account, because a
+ * club may not rewrite a person's platform-wide picture (P2 — only the person
+ * writes `people.photo_url`). Without an entry photo, the account's own photo
+ * shows — unless the season only knows this player by a typed name: a face
+ * would unmask exactly what the typed name protects.
  */
 export const shownPhotoKey = sql<
   string | null
->`case when ${registrations.enteredName} is null then ${people.photoUrl} else ${registrations.enteredPhotoKey} end`;
+>`case when ${registrations.enteredPhotoKey} is not null then ${registrations.enteredPhotoKey} when ${registrations.enteredName} is null then ${people.photoUrl} else null end`;
 
 /**
  * The consent that makes `shownPhotoKey` renderable (DPDP §5) — read from the
- * same place the photo came from. Always select the two together.
+ * same place the photo came from, by the same branches in the same order.
+ * Always select the two together.
  */
-export const shownPhotoConsentAt = sql<Date | null>`case when ${registrations.enteredName} is null then ${people.photoConsentAt} else ${registrations.enteredPhotoConsentAt} end`;
+export const shownPhotoConsentAt = sql<Date | null>`case when ${registrations.enteredPhotoKey} is not null then ${registrations.enteredPhotoConsentAt} when ${registrations.enteredName} is null then ${people.photoConsentAt} else null end`;
 
 /** The two columns `shownPhotoKey` / `shownPhotoConsentAt` select, as read. */
 export interface ShownPhotoRow {
