@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { CrestImage } from "../../../../components/team/crest-image";
 
 /**
  * A team's tile: its uploaded crest, or its initials on a wash of its own
@@ -34,8 +34,9 @@ export function TeamCrest({
   logoUrl?: string | null;
   size?: "md" | "lg" | "xl";
 }) {
-  const [failed, setFailed] = useState(false);
-  const showLogo = logoUrl !== undefined && logoUrl !== null && !failed;
+  const initials = teamInitials(name, short);
+  const showLogo = logoUrl !== undefined && logoUrl !== null && logoUrl !== "";
+  const px = size === "xl" ? 64 : size === "lg" ? 48 : 32;
   return (
     <span
       className="st-crest"
@@ -45,15 +46,9 @@ export function TeamCrest({
       aria-hidden
     >
       {showLogo ? (
-        <img
-          src={logoUrl}
-          alt=""
-          onError={() => {
-            setFailed(true);
-          }}
-        />
+        <CrestImage src={logoUrl} width={px} height={px} loading="lazy" fallback={initials} />
       ) : (
-        teamInitials(name, short)
+        initials
       )}
     </span>
   );

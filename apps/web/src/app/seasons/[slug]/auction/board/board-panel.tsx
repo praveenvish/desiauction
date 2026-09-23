@@ -4,7 +4,7 @@ import { lotSeed } from "../../../../../lib/player-seed";
 import { roleLabeller } from "../../../../../lib/role-label";
 import { type AuctionStatus } from "@desiauction/core";
 import { PlayerImage, paintOnFill } from "@desiauction/ui";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
 import { useLiveFeed } from "../live-experience";
@@ -13,6 +13,7 @@ import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
 import { BrandLockup } from "../../../../../components/shell/brand";
 import { SoundToggle } from "../../../../../components/shell/sound-toggle";
+import { CrestImage } from "../../../../../components/team/crest-image";
 
 import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-summary";
 import { ledgerINR } from "../../../../../lib/inr";
@@ -81,21 +82,8 @@ function crestInitials(team: TeamIdentity | undefined, fallback: string): string
  * and the monogram is a better answer than a torn page icon.
  */
 function BoardCrest({ team, fallback }: { team: TeamIdentity | undefined; fallback: string }) {
-  const [broken, setBroken] = useState(false);
   const logoUrl = team?.logoUrl ?? null;
-  if (logoUrl !== null && logoUrl !== "" && !broken) {
-    return (
-      <img
-        className="board-crest"
-        src={logoUrl}
-        alt=""
-        onError={() => {
-          setBroken(true);
-        }}
-      />
-    );
-  }
-  return (
+  const mark = (
     <span
       className="board-crest board-crest-mark"
       style={paintOnFill(team?.primaryColor)}
@@ -103,6 +91,13 @@ function BoardCrest({ team, fallback }: { team: TeamIdentity | undefined; fallba
     >
       {crestInitials(team, fallback)}
     </span>
+  );
+  if (logoUrl === null || logoUrl === "") {
+    return mark;
+  }
+  // 46px is the ceiling of the board's clamp(); the CSS sizes it on the wall.
+  return (
+    <CrestImage className="board-crest" src={logoUrl} width={46} height={46} fallback={mark} />
   );
 }
 

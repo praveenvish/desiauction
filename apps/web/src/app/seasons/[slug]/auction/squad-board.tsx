@@ -7,7 +7,7 @@ import { formatPaiseINR, paise } from "@desiauction/core";
 import { Card, IconPlus, PlayerImage } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
-import { TeamChip, type TeamIdentity } from "./purse-board";
+import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
 
 import { lotSeed } from "../../../../lib/player-seed";
 import type {
@@ -226,7 +226,7 @@ export function SquadBoard({
           return (
             <section key={team.id} className="squad-team" data-testid={`squad-${team.id}`}>
               <div className="squad-team-head">
-                <TeamChip team={team} fallback={team.name} />
+                <PurseTeamCrest team={team} fallback={team.name} />
                 <span className="squad-team-name">{team.name}</span>
                 <span className="squad-team-count">
                   {members.length}/{squadMax}

@@ -35,6 +35,7 @@ import { useCallback, useMemo, useRef, useState, useTransition, type CSSProperti
 
 import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { PageTitle } from "../../../../components/shell/page-title";
+import { CrestImage } from "../../../../components/team/crest-image";
 import { formatPhone } from "../../../../lib/format-phone";
 import { compactINR, exactINR } from "../../../../lib/inr";
 import { setTeamCoachAction, updateTeamAction } from "../../../../server/competition/actions";
@@ -199,9 +200,7 @@ function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
 /** A team's mark: its crest, else its initials on its own colour. */
 function Crest({ team, size }: { team: TeamCard; size: "md" | "lg" }) {
   const px = size === "lg" ? 64 : 44;
-  return team.logoUrl !== null ? (
-    <img className="tm-crest" data-size={size} src={team.logoUrl} alt="" width={px} height={px} />
-  ) : (
+  const mono = (
     <span
       className="tm-crest tm-crest-mono"
       data-size={size}
@@ -210,6 +209,19 @@ function Crest({ team, size }: { team: TeamCard; size: "md" | "lg" }) {
     >
       {monogram(team)}
     </span>
+  );
+  return team.logoUrl !== null ? (
+    <CrestImage
+      className="tm-crest"
+      data-size={size}
+      src={team.logoUrl}
+      width={px}
+      height={px}
+      loading="lazy"
+      fallback={mono}
+    />
+  ) : (
+    mono
   );
 }
 
