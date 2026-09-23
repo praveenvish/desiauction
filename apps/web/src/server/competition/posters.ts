@@ -6,6 +6,7 @@ import {
   isMinor,
   isTier,
   isValidMediaKey,
+  MAX_IMAGE_BYTES,
   slugifyName,
   TOP_BUY_COUNTS,
   type AuctionConfig,
@@ -1171,15 +1172,17 @@ export async function inlineStoredImage(key: string | null, maxPx = 768): Promis
   if (key === null || !isValidMediaKey(key)) {
     return null;
   }
-  const url = storage.readUrl(key);
   let bytes: Buffer;
   try {
-    bytes = url.startsWith("http")
-      ? Buffer.from(await (await fetch(url, { signal: AbortSignal.timeout(5_000) })).arrayBuffer())
-      : // The local adapter's read URL is a path under `public/`, which is where
-        // it wrote the bytes. Deriving the path from the port's own answer keeps
-        // one source of truth for the layout instead of two.
-        await readFile(join(process.cwd(), "public", url));
+    // Through the port, capped (P0-6 d): this used to buffer the WHOLE object
+    // from the public URL and hand it to the decoder, so one oversized object
+    // — the bucket only ever held what the client chose to PUT — cost the
+    // public share card its memory. The port stops reading at the upload cap.
+    const read = await storage.readObject(key, MAX_IMAGE_BYTES);
+    if (read.status !== "ok") {
+      return null;
+    }
+    bytes = read.bytes;
   } catch {
     // A missing object is a monogram, never a failed poster.
     return null;
@@ -1211,7 +1214,12 @@ export async function inlineStoredImage(key: string | null, maxPx = 768): Promis
 async function thumbnail(bytes: Buffer, maxPx: number): Promise<Buffer | null> {
   try {
     const { default: sharp } = await import("sharp");
-    return await sharp(bytes)
+    return await sharp(bytes, {
+      // A small file may still CLAIM a gigapixel canvas; refuse the decode
+      // rather than allocate it (same ceiling as the upload sanitizer).
+      limitInputPixels: 40_000_000,
+      failOn: "error",
+    })
       .rotate()
       .resize({ width: maxPx, height: maxPx, fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 82, mozjpeg: true })

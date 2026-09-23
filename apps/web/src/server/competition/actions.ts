@@ -1968,6 +1968,7 @@ export async function updateRegistrationDetailsAction(
       const [stored] = await db
         .select({
           enteredName: registrations.enteredName,
+          enteredPhotoKey: registrations.enteredPhotoKey,
           attributes: registrations.attributes,
           personPhotoKey: people.photoUrl,
           personPhotoConsentAt: people.photoConsentAt,
@@ -2002,9 +2003,13 @@ export async function updateRegistrationDetailsAction(
       }
       // The first typed name switches this row to the entry's own photo
       // (`shownPhotoKey`), so the photo the club already sees moves with it —
-      // renaming a player must not make their picture disappear.
+      // renaming a player must not make their picture disappear. An entry that
+      // already carries the club's own photo keeps it (organizer uploads always
+      // land on the entry — go-live gate P2).
       const carryPhoto =
-        plan.set.enteredName !== undefined && stored.enteredName === null
+        plan.set.enteredName !== undefined &&
+        stored.enteredName === null &&
+        stored.enteredPhotoKey === null
           ? {
               enteredPhotoKey: stored.personPhotoKey,
               enteredPhotoConsentAt: stored.personPhotoConsentAt,

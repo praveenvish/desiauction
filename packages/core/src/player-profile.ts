@@ -158,6 +158,24 @@ export function isMinor(dateOfBirth: string | null, now: Date): boolean {
   return age !== null && age < MINOR_AGE_THRESHOLD;
 }
 
+/**
+ * May this registrant's FACE ride a public surface? (P0-6, DPDP Act 2023 §9.)
+ *
+ * Deliberately NOT `!isMinor(...)`. `isMinor` fails open on an unknown date of
+ * birth, and for an AGE that is right — a registrant who gave no date has no
+ * age to suppress. A photo is the opposite case: it exists whether or not
+ * anyone typed a birthday. The CSV import never carries a DOB and the
+ * add-player form marks it optional, so a child entered by the club with an
+ * organizer-attested photo was a public face on /c, the live rooms and every
+ * share card. Only a known, adult age publishes a photo; unknown or
+ * unparseable is withheld. The organizer's capability-gated desks still show
+ * it (consent alone decides there — `consentedPhotoUrl`).
+ */
+export function mayPublishPhoto(dateOfBirth: string | null, now: Date): boolean {
+  const age = deriveAge(dateOfBirth, now);
+  return age !== null && age >= MINOR_AGE_THRESHOLD;
+}
+
 // --- Person-level profile (PI-1) ---------------------------------------------
 //
 // GENDER, MODELED ONCE AND ASKED GENTLY.

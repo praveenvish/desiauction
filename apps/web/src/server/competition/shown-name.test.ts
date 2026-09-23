@@ -25,4 +25,12 @@ describe("the shown photo, as a URL", () => {
     expect(publicPhotoUrl({ ...row, dateOfBirth: "2015-01-01" }, NOW, sign)).toBeNull();
     expect(publicPhotoUrl({ ...row, dateOfBirth: "1995-01-01" }, NOW, sign)).toBe("/media/k/a.jpg");
   });
+
+  it("withholds a face of UNKNOWN age on public surfaces (P0-6 — fails closed)", () => {
+    const row = { photoKey: "k/a.jpg", photoConsentAt: NOW };
+    expect(publicPhotoUrl({ ...row, dateOfBirth: null }, NOW, sign)).toBeNull();
+    expect(publicPhotoUrl({ ...row, dateOfBirth: "not-a-date" }, NOW, sign)).toBeNull();
+    // The authenticated desk is unchanged: consent alone decides there.
+    expect(consentedPhotoUrl(row, sign)).toBe("/media/k/a.jpg");
+  });
 });
