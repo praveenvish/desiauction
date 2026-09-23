@@ -1,9 +1,18 @@
-import { createDb, newId, otpCodes, otpInbox, people, type DbHandle } from "@desiauction/db";
+import {
+  consentRecords,
+  createDb,
+  newId,
+  otpCodes,
+  otpInbox,
+  people,
+  type DbHandle,
+} from "@desiauction/db";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { phoneCodeDigest } from "./otp";
+import { setWhatsappOptIn, whatsappOptedIn, WHATSAPP_CONSENT_PURPOSE } from "../messaging/whatsapp";
 import { DevInboxSender } from "./otp-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 
@@ -32,7 +41,9 @@ const NEW = `+9198${RUN}2`;
 const OTHERS = `+9198${RUN}3`;
 const SPARE = `+9198${RUN}4`;
 const STOLEN = `+9198${RUN}5`;
-const PHONES = [OLD, NEW, OTHERS, SPARE, STOLEN];
+const FRESH = `+9198${RUN}6`;
+const FRESHER = `+9198${RUN}7`;
+const PHONES = [OLD, NEW, OTHERS, SPARE, STOLEN, FRESH, FRESHER];
 
 let personId = "";
 let otherId = "";
@@ -82,6 +93,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(otpCodes).where(inArray(otpCodes.phone, PHONES));
+  // consent_records holds people ON DELETE RESTRICT (0040): the record goes first.
+  await db.delete(consentRecords).where(inArray(consentRecords.personId, [personId, otherId]));
   await db.delete(people).where(inArray(people.id, [personId, otherId]));
   await handle.sql.end({ timeout: 5 });
 });
@@ -202,5 +215,60 @@ describe("confirming the change", () => {
     // carrier gives it to next cannot sign in as them.
     const [orphan] = await db.select({ id: people.id }).from(people).where(eq(people.phone, OLD));
     expect(orphan, "the released number belongs to nobody").toBeUndefined();
+  });
+
+  it("a new number starts with WhatsApp OFF, withdrawn in the same write (founder, 2026-09-23)", async () => {
+    await setWhatsappOptIn(db, { personId, granted: true, source: "account", language: "hi" });
+    expect((await whatsappOptedIn(db, personId)).optedIn).toBe(true);
+    await db.delete(otpCodes).where(eq(otpCodes.phone, FRESH));
+    await requestPhoneChange(db, sender, { personId, newPhone: FRESH });
+    const result = await confirmPhoneChange(db, {
+      personId,
+      newPhone: FRESH,
+      code: await latestCode(FRESH),
+    });
+    expect(result.ok).toBe(true);
+    expect((await whatsappOptedIn(db, personId)).optedIn).toBe(false);
+    const [withdrawal] = await db
+      .select({
+        granted: consentRecords.granted,
+        source: consentRecords.source,
+        evidence: consentRecords.evidence,
+      })
+      .from(consentRecords)
+      .where(
+        and(
+          eq(consentRecords.personId, personId),
+          eq(consentRecords.purpose, WHATSAPP_CONSENT_PURPOSE),
+        ),
+      )
+      .orderBy(desc(consentRecords.createdAt))
+      .limit(1);
+    // The reason, never the numbers.
+    expect(withdrawal).toEqual({
+      granted: false,
+      source: "account",
+      evidence: { reason: "phone_changed" },
+    });
+  });
+
+  it("a person already opted out gets no second 'no' on a phone change", async () => {
+    const before = await db
+      .select({ id: consentRecords.id })
+      .from(consentRecords)
+      .where(eq(consentRecords.personId, personId));
+    await db.delete(otpCodes).where(eq(otpCodes.phone, FRESHER));
+    await requestPhoneChange(db, sender, { personId, newPhone: FRESHER });
+    const result = await confirmPhoneChange(db, {
+      personId,
+      newPhone: FRESHER,
+      code: await latestCode(FRESHER),
+    });
+    expect(result.ok).toBe(true);
+    const after = await db
+      .select({ id: consentRecords.id })
+      .from(consentRecords)
+      .where(eq(consentRecords.personId, personId));
+    expect(after).toHaveLength(before.length);
   });
 });
