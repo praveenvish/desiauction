@@ -257,5 +257,8 @@ revoke update, delete on auction_team_target_revisions
 revoke all on message_outbox, problem_reports, problem_report_screenshots,
   review_requests, reviews, review_reports, erasure_requests
   from desiauction_engine, desiauction_runner;
+-- 0084: the marketing tables, missed the first time round.
+revoke all on newsletter_subscribers, newsletter_unsubscribes, demo_requests
+  from desiauction_engine, desiauction_runner;
 
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'
