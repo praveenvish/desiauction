@@ -129,7 +129,8 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   on behalf of others is what drives compulsory GST registration for an operator
   and the RBI payment-aggregator question, and neither waits for a turnover
   threshold.
-- ☐F SMS provider account + DLT registration (go-live-critical: login is OTP-first, and production refuses `OTP_PROVIDER=dev`). ☑ The adapters exist: `Msg91OtpSender` and a WhatsApp sender behind the `OtpSender` port, each with the SMS-pumping circuit breaker (RC-4 condition 2), plus per-shape DLT template variables. This line said "only DevInboxSender exists" long after that stopped being true (corrected 2026-09-18). What remains is the account, the templates and the env — [GO_LIVE_RUNBOOK](GO_LIVE_RUNBOOK.md) §C.
+- ☐F Text channel for sign-in codes and personal messages: **WhatsApp (Meta Cloud API, direct) replaces SMS for launch** (founder decision 2026-09-23). ☑ The code exists: `WhatsAppCloudOtpSender` (authentication template, circuit breaker), `WhatsAppCloudSender` for utility templates, and the callback URL `/api/webhooks/whatsapp` (HMAC-verified; forward-only delivery status on `message_outbox`; STOP/START as `whatsapp.updates` consent rows, handled once per message id). `env.ts` refuses a production boot that sends on WhatsApp with `WHATSAPP_APP_SECRET` / `WHATSAPP_WEBHOOK_VERIFY_TOKEN` unset. What remains is founder-held: Meta Business verification, the number and display name, the System User token, template approval and the webhook subscription — [WHATSAPP_SETUP](../messaging/WHATSAPP_SETUP.md), [GO_LIVE_RUNBOOK](GO_LIVE_RUNBOOK.md) §C.
+- ☐F _Deferred, not launch-critical:_ SMS provider account (MSG91) + DLT registration. `Msg91OtpSender` and the per-shape DLT template variables exist and stay dormant; nothing requires them while `OTP_PROVIDER=whatsapp`. Keep `LOGIN_DEFAULT_METHOD=email` until SMS is live.
 - ☑ Email provider (2026-08-30). Two systems on two domains on purpose: Zoho
   mailboxes on the root, Resend sending on `mail.desiauction.in`, so a bounce
   storm from registration mail cannot degrade the reputation `privacy@` and
@@ -147,7 +148,7 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   `p=quarantine` ~2026-09-13, after reading the aggregate reports and
   confirming alignment — earlier and our own mail disappears. EDIT the existing
   `_dmarc` record; a second one invalidates both.
-- ☐F WhatsApp BSP → ☐E finops dispatch adapters. `EmailHttpSender`
+- ☐E finops dispatch adapters (email, and WhatsApp via the Cloud API — no BSP). `EmailHttpSender`
   (`messaging/email-adapter.ts`) is the finops `DeliveryPort` and is still
   constructed **nowhere outside its own tests** — the transactional mailer is a
   different, smaller object and proving one says nothing about the other. The
@@ -410,8 +411,8 @@ GO on their own, since several of them were measured before migrations
 **And as of 2026-08-27 — the three hard stops, in the order they bite:**
 
 1. **Nobody can sign in.** Login is OTP-first and production refuses
-   `OTP_PROVIDER=dev`, so without the SMS account in §3 the front door is shut
-   for every user. This is the single largest gap between "deployable" and
+   `OTP_PROVIDER=dev`, so without the text channel in §3 (WhatsApp for launch
+   since 2026-09-23; SMS deferred) the phone door is shut for every user. This is the single largest gap between "deployable" and
    "usable".
 2. **Nothing can be charged.** Both paid tiers read "Published at GA" — no price
    exists, and the upgrade path is a request a human grants out-of-band. Launching
