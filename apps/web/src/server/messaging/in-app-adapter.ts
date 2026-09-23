@@ -27,6 +27,13 @@ import { eq } from "drizzle-orm";
  * `paddles`, which records which person bid for which team. So the chain is
  * team → paddle → person, and a team nobody claimed a paddle for has no one to
  * notify.
+ *
+ * THE NOTIFICATION GATE IS APPLIED WHERE THE ROW IS READ, not here. The row is
+ * the person-scoped evidence that a document was issued to their team; a
+ * person who switched "Receipts and money" off for in-app has it hidden from
+ * /inbox (gate.ts `hiddenInboxActions`), and it comes back if they switch it on
+ * — which a row never written could not. Every other in-app notification (a
+ * sale, an approval) is written and gated the same way.
  */
 
 /** What the inbox will render. Kept here so the label map has one thing to match. */

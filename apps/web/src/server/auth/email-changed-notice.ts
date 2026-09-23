@@ -1,9 +1,9 @@
 import type { Db } from "@desiauction/db";
 
 import { env } from "../../env";
-import { maySend } from "../messaging/consent";
 import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
-import { transactionalMailer, type TransactionalMailer } from "../messaging/transactional-mail";
+import { sendNotificationMail } from "../messaging/notify";
+import type { TransactionalMailer } from "../messaging/transactional-mail";
 
 /**
  * "YOUR SIGN-IN EMAIL WAS CHANGED" — told to the address that just lost it.
@@ -68,28 +68,25 @@ export function emailChangedCopy(newEmail: string): {
  *
  * Through the gate for the same reason the phone warning is: a hard
  * suppression (a bounce, a complaint) on that address still means stop. It is
- * transactional, so no marketing opt-out applies and none is needed.
+ * `security` in the catalogue, so no switch of the person's or a club's
+ * applies — only a platform admin may stop it, with a written reason.
  */
 export async function notifyEmailChanged(
   db: Db,
   previousEmail: string | null,
   newEmail: string,
-  mailer: TransactionalMailer = transactionalMailer(),
+  mailer?: TransactionalMailer,
 ): Promise<"sent" | "skipped" | "refused" | "failed"> {
   if (previousEmail === null || previousEmail === newEmail) {
     return "skipped";
   }
-  const decision = await maySend(db, {
-    contact: previousEmail,
-    channel: "email",
-    category: "transactional",
-    scope: "security",
-  });
-  if (!decision.send) {
-    return "refused";
-  }
-  const outcome = await mailer.send({ to: previousEmail, ...emailChangedCopy(newEmail) });
-  return outcome === "sent" ? "sent" : "failed";
+  const { outcome } = await sendNotificationMail(
+    db,
+    { kind: "security.email_changed", to: previousEmail },
+    emailChangedCopy(newEmail),
+    mailer,
+  );
+  return outcome === "suppressed" ? "refused" : outcome === "sent" ? "sent" : "failed";
 }
 
 /**
@@ -130,20 +127,16 @@ export async function notifyPhoneChangedByEmail(
   db: Db,
   email: string | null,
   newPhone: string,
-  mailer: TransactionalMailer = transactionalMailer(),
+  mailer?: TransactionalMailer,
 ): Promise<"sent" | "skipped" | "refused" | "failed"> {
   if (email === null) {
     return "skipped";
   }
-  const decision = await maySend(db, {
-    contact: email,
-    channel: "email",
-    category: "transactional",
-    scope: "security",
-  });
-  if (!decision.send) {
-    return "refused";
-  }
-  const outcome = await mailer.send({ to: email, ...phoneChangedCopy(newPhone.slice(-4)) });
-  return outcome === "sent" ? "sent" : "failed";
+  const { outcome } = await sendNotificationMail(
+    db,
+    { kind: "security.phone_changed", to: email },
+    phoneChangedCopy(newPhone.slice(-4)),
+    mailer,
+  );
+  return outcome === "suppressed" ? "refused" : outcome === "sent" ? "sent" : "failed";
 }

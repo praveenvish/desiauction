@@ -4,6 +4,7 @@ import { newId, otpCodes, people, type Db } from "@desiauction/db";
 import { normalizePhone } from "@desiauction/core";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
+import { notificationGate } from "../messaging/gate";
 import { boundSubject, codeDigest } from "./code-digest";
 import type { OtpSender } from "./otp-sender";
 import { logSecurityEvent } from "./security-events";
@@ -130,6 +131,20 @@ export async function requestOtp(
     expiresAt: new Date(now + CODE_TTL_MS),
     requestIp,
   });
+  /*
+   * The gate, for a sign-in code, always says yes (catalogue: `login`, locked —
+   * not even a STOP; gate.ts says why). It is asked so the code is one of the
+   * sends the gate sees, and so an unlocked entry could never be silently
+   * dropped here: a refusal throws rather than leaving somebody waiting.
+   */
+  const decision = await notificationGate(db, {
+    kind: "auth.phone_code",
+    channel: sender.channel ?? "sms",
+    recipient: { contact: phone },
+  });
+  if (!decision.send) {
+    throw new Error(`sign-in code refused by the notification gate: ${decision.reason}`);
+  }
   await sender.send(phone, code);
   // PI-1 audit-gap closure: the request itself becomes ledger evidence — but
   // only where a ledger exists. The lookup runs for every phone (identical

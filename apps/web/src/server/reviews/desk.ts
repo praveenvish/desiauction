@@ -1,6 +1,6 @@
 import { db, systemDb } from "../db";
-import { maySend } from "../messaging/consent";
-import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
+import { sendNotificationMail } from "../messaging/notify";
+import type { MailOutcome } from "../messaging/transactional-mail";
 import { resolveReports } from "./season";
 import { reviewAskMail } from "./review-mail";
 import {
@@ -83,21 +83,14 @@ export async function askByContact(
   if (person.email === null) {
     return { ...base, delivery: "no-address" };
   }
-  const decision = await maySend(db, {
-    contact: person.email,
-    channel: "email",
-    category: "transactional",
-    scope: "feedback",
-    personId: person.id,
-    now,
-  });
-  if (!decision.send) {
+  const { outcome } = await sendNotificationMail(
+    db,
+    { kind: "review.platform_ask", to: person.email, personId: person.id, now },
+    reviewAskMail(person.name, ask.link),
+  );
+  if (outcome === "suppressed") {
     return { ...base, delivery: "opted-out" };
   }
-  const outcome = await transactionalMailer().send({
-    to: person.email,
-    ...reviewAskMail(person.name, ask.link),
-  });
   if (outcome === "sent") {
     await markAskSent(db, ask.requestId, person.email, now);
   }

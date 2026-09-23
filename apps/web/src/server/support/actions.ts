@@ -109,7 +109,7 @@ export async function submitProblemReportAction(
     report.replyEmail === session.email.toLowerCase()
       ? report.replyEmail
       : null;
-  const outcomes = await sendProblemReportMail(report, reportId, reporterLabel, receiptTo);
+  const outcomes = await sendProblemReportMail(db, report, reportId, reporterLabel, receiptTo);
   if (outcomes.support === "failed" || outcomes.reporter === "failed") {
     logger().error({ problemReportId: reportId, ...outcomes }, "support.report_mail_failed");
   }

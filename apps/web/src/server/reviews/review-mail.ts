@@ -1,6 +1,8 @@
+import type { Db } from "@desiauction/db";
+
 import { env } from "../../env";
 import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
-import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
+import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
 import { REVIEW_LINK_TTL_MS, type ValidReview } from "./reviews";
 
 /**
@@ -84,13 +86,16 @@ export function reviewArrivedMail(
 }
 
 export async function sendReviewArrived(
+  db: Db,
   review: ValidReview,
   personName: string | null,
-): Promise<MailOutcome> {
-  return transactionalMailer().send({
-    to: SUPPORT_EMAIL,
-    ...reviewArrivedMail(review, personName),
-  });
+): Promise<GatedMailOutcome> {
+  const { outcome } = await sendNotificationMail(
+    db,
+    { kind: "staff.review_arrived", to: SUPPORT_EMAIL },
+    reviewArrivedMail(review, personName),
+  );
+  return outcome;
 }
 
 /**

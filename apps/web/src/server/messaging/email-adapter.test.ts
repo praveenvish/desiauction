@@ -63,6 +63,26 @@ describe("http email adapter", () => {
     }
   });
 
+  it("fails, never delivers, a document the notification gate withheld", async () => {
+    // The person switched "Receipts and money" off (or the address is on the
+    // suppression list). The certified machine has no "suppressed", and `sent`
+    // would be the one lie this adapter must not tell — so a terminal failure
+    // naming the reason, and the provider is never called.
+    let called = false;
+    const result = await adapter(
+      () => {
+        called = true;
+        return Promise.resolve({ status: 202, body: "{}" });
+      },
+      (_ref, context) => {
+        expect(context.orgId).toBe("01ORG");
+        return Promise.resolve({ withheld: "opted_out" as const });
+      },
+    ).send(request);
+    expect(called, "nothing reached the provider").toBe(false);
+    expect(result).toEqual({ ok: false, code: "withheld:opted_out", retryable: false });
+  });
+
   it("treats a 4xx as the message's fault and does not retry it", async () => {
     const result = await adapter(() => Promise.resolve({ status: 422, body: "bad" })).send(request);
     expect(result.ok).toBe(false);

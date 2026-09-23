@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { detailOf } from "../../lib/inbox-events";
 import { currentSession } from "../../server/auth/actions";
 import { systemDb } from "../../server/db";
-import { listSecurityEvents } from "../../server/auth/security-events";
+import { listInboxEvents } from "../../server/auth/security-events";
 import { InboxList } from "./inbox-list";
 import "./inbox.css";
 
@@ -67,14 +67,14 @@ function competitionIdOf(meta: unknown): string | null {
 
 // PX-3: notifications over EXISTING events (the person-scoped security ledger).
 // No notification storage was invented: rows come from audit_log via
-// listSecurityEvents; read-state is device-local (same contract as pins), now
+// listInboxEvents (the ledger minus what the person switched off); read-state is device-local (same contract as pins), now
 // keyed per account so it cannot cross people on a shared handset.
 export default async function InboxPage() {
   const session = await currentSession();
   if (session === null) {
     redirect("/login?next=/inbox");
   }
-  const events = await listSecurityEvents(session.personId, WINDOW);
+  const events = await listInboxEvents(session.personId, WINDOW);
   const named = await competitionsNamed(
     events.map((event) => competitionIdOf(event.meta) ?? "").filter((id) => id !== ""),
   );

@@ -1,8 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db, systemDb } from "../db";
-import { maySend } from "../messaging/consent";
-import { transactionalMailer } from "../messaging/transactional-mail";
+import { sendNotificationMail } from "../messaging/notify";
 import { reviewAskMail, type AskAudience } from "./review-mail";
 import { askForPlatformReview, isKnownMinor, markAskSent } from "./reviews";
 import { askSeason, seasonRef } from "./season";
@@ -201,8 +200,6 @@ export async function sweepReviewAsks(now: Date = new Date()): Promise<SweepResu
   let optedOut = 0;
   let minors = 0;
   let mailFailed = 0;
-  const mailer = transactionalMailer();
-
   for (const candidate of candidates) {
     if (isKnownMinor(candidate, now)) {
       minors += 1;
@@ -221,22 +218,20 @@ export async function sweepReviewAsks(now: Date = new Date()): Promise<SweepResu
       continue;
     }
     asked += 1;
-    const decision = await maySend(db, {
-      contact: candidate.email,
-      channel: "email",
-      category: "transactional",
-      scope: "feedback",
-      personId: candidate.personId,
-      now,
-    });
-    if (!decision.send) {
+    const { outcome } = await sendNotificationMail(
+      db,
+      {
+        kind: "review.platform_ask",
+        to: candidate.email,
+        personId: candidate.personId,
+        now,
+      },
+      reviewAskMail(candidate.name, ask.link, candidate.audience),
+    );
+    if (outcome === "suppressed") {
       optedOut += 1;
       continue;
     }
-    const outcome = await mailer.send({
-      to: candidate.email,
-      ...reviewAskMail(candidate.name, ask.link, candidate.audience),
-    });
     if (outcome === "sent") {
       await markAskSent(db, ask.requestId, candidate.email, now);
       mailed += 1;

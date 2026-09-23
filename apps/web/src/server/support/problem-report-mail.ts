@@ -1,5 +1,7 @@
+import type { Db } from "@desiauction/db";
+
 import { env } from "../../env";
-import { transactionalMailer, type MailOutcome } from "../messaging/transactional-mail";
+import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
 import type { ProblemCategory, ValidProblemReport } from "./problem-reports";
 
 /**
@@ -99,31 +101,42 @@ export function reporterAcknowledgement(report: ValidProblemReport): {
  * report for the team to reply to by hand.
  */
 export async function sendProblemReportMail(
+  db: Db,
   report: ValidProblemReport,
   reportId: string,
   reporterLabel: string,
   receiptTo: string | null,
-): Promise<{ reporter: MailOutcome | "no-address"; support: MailOutcome }> {
-  const mailer = transactionalMailer();
+): Promise<{ reporter: GatedMailOutcome | "no-address"; support: GatedMailOutcome }> {
+  // Both through the gate (catalogue `staff.problem_report`,
+  // `support.report_received`): our own notice can only be stopped by a
+  // platform admin, the receipt by a bounce or complaint on that address.
+  const { outcome: support } = await sendNotificationMail(
+    db,
+    { kind: "staff.problem_report", to: SUPPORT_EMAIL },
+    {
+      ...supportNotification(report, reportId, reporterLabel),
+      ...(report.screenshot === null
+        ? {}
+        : {
+            attachment: {
+              filename: `report-${reportId}.${EXTENSIONS[report.screenshot.contentType] ?? "img"}`,
+              contentType: report.screenshot.contentType,
+              contentBase64: Buffer.from(report.screenshot.bytes).toString("base64"),
+            },
+          }),
+    },
+  );
 
-  const support = await mailer.send({
-    to: SUPPORT_EMAIL,
-    ...supportNotification(report, reportId, reporterLabel),
-    ...(report.screenshot === null
-      ? {}
-      : {
-          attachment: {
-            filename: `report-${reportId}.${EXTENSIONS[report.screenshot.contentType] ?? "img"}`,
-            contentType: report.screenshot.contentType,
-            contentBase64: Buffer.from(report.screenshot.bytes).toString("base64"),
-          },
-        }),
-  });
-
-  const reporter: MailOutcome | "no-address" =
+  const reporter: GatedMailOutcome | "no-address" =
     receiptTo === null
       ? "no-address"
-      : await mailer.send({ to: receiptTo, ...reporterAcknowledgement(report) });
+      : (
+          await sendNotificationMail(
+            db,
+            { kind: "support.report_received", to: receiptTo },
+            reporterAcknowledgement(report),
+          )
+        ).outcome;
 
   return { reporter, support };
 }

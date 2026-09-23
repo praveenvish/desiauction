@@ -28,7 +28,8 @@ import {
 import { requestEmailLogin, verifyEmailLogin } from "./email-login";
 import { verifiedEmailOf } from "./email-change";
 import { maskEmail, notifyEmailChanged, notifyPhoneChangedByEmail } from "./email-changed-notice";
-import { createCodeMailer, MailSendError } from "./email-sender";
+import { MailSendError } from "./email-sender";
+import { sendSignInCodeMail } from "../messaging/notify";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
 import { logger } from "../logger";
@@ -424,7 +425,10 @@ export async function requestEmailLoginAction(
     try {
       // `isNew` decides the WORDING and travels no further — see its doc on
       // `EmailLoginRequest`. The state returned below is identical either way.
-      await createCodeMailer(db).send(
+      // Through the gate, which answers yes for a code (catalogue: login,
+      // locked) — asked so every send is visible from one place.
+      await sendSignInCodeMail(
+        db,
         result.email,
         result.code,
         result.isNew === true ? "signup" : "login",
@@ -1130,7 +1134,7 @@ export async function requestEmailVerificationAction(
     return { step: previous.step, error: message[result.reason] };
   }
   try {
-    await createCodeMailer(db).send(result.email, result.code, "email_change");
+    await sendSignInCodeMail(db, result.email, result.code, "email_change");
   } catch (error) {
     if (error instanceof MailSendError) {
       logger().warn({ reason: error.message }, "email.send_failed");

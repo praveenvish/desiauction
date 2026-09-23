@@ -101,7 +101,7 @@ export async function bookSlotAction(
   if (recipient !== null) {
     const booking = await bookingByToken(result.booking.token);
     if (booking !== null) {
-      const outcome = await sendBookingConfirmation({
+      const outcome = await sendBookingConfirmation(db, {
         to: recipient.email,
         name: recipient.name,
         orgName: recipient.orgName,
@@ -158,7 +158,7 @@ export async function cancelBookingAction(
       .where(eq(demoBookings.id, booking.id))
       .limit(1);
     if (request !== undefined) {
-      await sendBookingCancellation({
+      await sendBookingCancellation(db, {
         to: booking.email,
         name: booking.name,
         orgName: booking.orgName,
@@ -206,7 +206,7 @@ export async function rescheduleBookingAction(
       .where(eq(demoBookings.id, moved.id))
       .limit(1);
     if (row !== undefined) {
-      await sendBookingConfirmation({
+      await sendBookingConfirmation(db, {
         to: moved.email,
         name: moved.name,
         orgName: moved.orgName,

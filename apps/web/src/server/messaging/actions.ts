@@ -10,9 +10,10 @@ import { parseWhatsAppLanguage, type WhatsAppLanguage } from "../../lib/whatsapp
 import { setWhatsappOptIn, whatsappOptedIn } from "./whatsapp";
 import { ForbiddenError, can, requireCapability } from "../orgs/authz";
 import { resolveTenant } from "../orgs/orgs";
+import { ORG_SWITCH_CHANNELS, PERSON_SWITCH_CHANNELS, orgTopics } from "./catalogue";
 import {
   NOTIFICATION_TOPICS,
-  orgMessagingSettingsFor,
+  orgSwitchesFor,
   preferencesFor,
   setOrgMessagingSetting,
   setPreference,
@@ -82,7 +83,7 @@ export async function setNotificationPreferenceAction(
   // and worked everywhere else, because every local process is the DB owner.
   // No RLS on the table; the lock is that it only ever writes the session's
   // own person.
-  for (const channel of ["sms", "email"] as const) {
+  for (const channel of PERSON_SWITCH_CHANNELS) {
     await setPreference(appDb, { personId: session.personId, topic, channel, allowed });
   }
   revalidatePath("/account");
@@ -154,10 +155,12 @@ export async function orgMessagingSettingsView(slug: string): Promise<OrgMessagi
       { scopeType: "org", scopeId: org.id },
       "org.manage",
     );
-    const current = await orgMessagingSettingsFor(db, org.id, "sms");
+    // Every row the switch covers, not the SMS row alone (consent.ts).
+    const current = await orgSwitchesFor(db, org.id);
     return {
       canManage,
-      topics: NOTIFICATION_TOPICS.map((entry) => ({
+      // Only the topics a club's sends actually consult (catalogue).
+      topics: orgTopics().map((entry) => ({
         topic: entry.topic,
         label: entry.label,
         detail: entry.detail,
@@ -176,8 +179,8 @@ export async function setOrgMessagingSettingAction(
   if (session === null) {
     return { ok: false, error: "Sign in to change this." };
   }
-  if (!NOTIFICATION_TOPICS.some((entry) => entry.topic === topic)) {
-    // An unpublished topic would write a row `maySend` never reads for it, so
+  if (!orgTopics().some((entry) => entry.topic === topic)) {
+    // An unpublished topic would write a row the gate never reads for it, so
     // the switch would look like it worked and change nothing.
     return { ok: false, error: "That is not a notification you can change." };
   }
@@ -193,11 +196,11 @@ export async function setOrgMessagingSettingAction(
         { scopeType: "org", scopeId: org.id },
         "org.manage",
       );
-      // One switch per topic, both channels: since the personal messages
-      // (0079/0080) a club tells its players by email as well as by text, and
-      // "stop sending this" has to mean both. The view reads the SMS row; the
-      // two are only ever written together.
-      for (const channel of ["sms", "email"] as const) {
+      // One switch per topic, both rows: since the personal messages
+      // (0079/0080) a club tells its players by email as well as by text
+      // (SMS or WhatsApp — one row), and "stop sending this" has to mean all
+      // of them. The view reads every row it writes (`orgSwitchesFor`).
+      for (const channel of ORG_SWITCH_CHANNELS) {
         await setOrgMessagingSetting(db, {
           orgId: org.id,
           topic,

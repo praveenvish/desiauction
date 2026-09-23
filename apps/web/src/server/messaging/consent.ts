@@ -8,6 +8,7 @@ import {
 } from "@desiauction/db";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
+import { ORG_SWITCH_CHANNELS, orgTopics, personTopics, type SwitchTopic } from "./catalogue";
 import type { MessageCategory } from "./templates";
 
 /**
@@ -25,9 +26,15 @@ import type { MessageCategory } from "./templates";
  * texts STOP does not care how we classify our own messages.
  *
  * Sign-in codes are the one exception and they are exempt by NOT coming through
- * here: the OTP sender is its own path. If they ever route through this module
- * they must stay exempt, because "turn off SMS" locking a person out of their
- * own account is a worse outcome than an unwanted message.
+ * here: they are `login` in the catalogue, and `notificationGate` (gate.ts)
+ * answers yes for them before it reaches this function, because "turn off SMS"
+ * locking a person out of their own account is a worse outcome than an
+ * unwanted message.
+ *
+ * NOBODY CALLS THIS DIRECTLY ANY MORE. It is the layers; `notificationGate` is
+ * the gate, and decides from the catalogue entry which of these layers a kind
+ * may see (no person's switch for a security alert, no club's for a staff
+ * notice). The guard test fails the build on a direct call outside gate.ts.
  */
 
 export type SendDecision =
@@ -270,29 +277,11 @@ export async function suppress(
   });
 }
 
-/** The topics a person can switch, in the order /account shows them. */
-export const NOTIFICATION_TOPICS = [
-  {
-    topic: "registration",
-    label: "Registration decisions",
-    detail: "When an organizer approves, waitlists or declines you.",
-  },
-  {
-    topic: "auction",
-    label: "Auction updates",
-    detail: "When an auction you are in is about to start, and how it went.",
-  },
-  {
-    topic: "money",
-    label: "Receipts and money",
-    detail: "When a club issues you a receipt or records a payment.",
-  },
-  {
-    topic: "feedback",
-    label: "Feedback requests",
-    detail: "When we ask how a season or DesiAuction worked for you.",
-  },
-] as const;
+/**
+ * The topics a person can switch, in the order /account shows them — read from
+ * the catalogue, so a switch exists only for a topic some kind actually obeys.
+ */
+export const NOTIFICATION_TOPICS: readonly SwitchTopic[] = personTopics();
 
 /** Every topic's current answer for one person, defaulted where unset. */
 export async function preferencesFor(
@@ -357,16 +346,52 @@ export async function setPreference(
 }
 
 /**
- * The channels a club can switch a topic off on.
+ * The channels a club's switch covers — and, since the view was fixed, the
+ * channels it SHOWS.
  *
- * SMS only, today, and that is a statement of fact rather than a limitation of
- * this table: it is the one channel a club's messages actually go out on. Email
- * has no address to send to and in-app writes to the person's own ledger, which
- * is theirs and not a club's to silence.
+ * This said `["sms"]` while the writer wrote SMS and email and the gate
+ * honoured both, so the screen described a switch narrower than the one it
+ * pulled: an organizer who read "texts" had also stopped every email. One
+ * switch per topic now covers both rows, and the view reads both
+ * (`orgSwitchesFor`).
+ *
+ * WhatsApp is not a third row: it is the text row (catalogue `rowChannelOf`).
+ * A club that stops texts about auctions has stopped them in both apps, which
+ * is what "texts" means to the person holding the phone. In-app stays off this
+ * list — the person's own ledger is not a club's to silence.
  */
-export const ORG_MESSAGING_CHANNELS = ["sms"] as const;
+export const ORG_MESSAGING_CHANNELS = ORG_SWITCH_CHANNELS;
 
-/** Every topic's current answer for one club, defaulted to on where unset. */
+/**
+ * One club's switches as the screen shows them: a topic is ON only when every
+ * row it covers is on. Absent rows are on. A topic whose SMS and email rows
+ * disagree (written before both were written together) shows OFF, because
+ * something is being withheld — and switching it on writes both, which heals
+ * it. Showing the SMS row alone was how the screen came to lie.
+ */
+export async function orgSwitchesFor(db: Db, orgId: string): Promise<Record<string, boolean>> {
+  const rows = await db
+    .select({
+      topic: orgMessagingSettings.topic,
+      channel: orgMessagingSettings.channel,
+      enabled: orgMessagingSettings.enabled,
+    })
+    .from(orgMessagingSettings)
+    .where(
+      and(
+        eq(orgMessagingSettings.orgId, orgId),
+        inArray(orgMessagingSettings.channel, [...ORG_SWITCH_CHANNELS]),
+      ),
+    );
+  return Object.fromEntries(
+    orgTopics().map(({ topic }) => [
+      topic,
+      rows.every((row) => row.topic !== topic || row.enabled),
+    ]),
+  );
+}
+
+/** Every topic's current answer for one club on ONE channel, defaulted to on where unset. */
 export async function orgMessagingSettingsFor(
   db: Db,
   orgId: string,
@@ -377,9 +402,7 @@ export async function orgMessagingSettingsFor(
     .from(orgMessagingSettings)
     .where(and(eq(orgMessagingSettings.orgId, orgId), eq(orgMessagingSettings.channel, channel)));
   const set = new Map(rows.map((row) => [row.topic, row.enabled]));
-  return Object.fromEntries(
-    NOTIFICATION_TOPICS.map(({ topic }) => [topic, set.get(topic) ?? true]),
-  );
+  return Object.fromEntries(orgTopics().map(({ topic }) => [topic, set.get(topic) ?? true]));
 }
 
 /**

@@ -4,7 +4,8 @@ import { after } from "next/server";
 
 import { verifiedEmailOf } from "../auth/email-change";
 import { db as appDb } from "../db";
-import { maySend } from "./consent";
+import { isNotificationKind, type NotificationKind } from "./catalogue";
+import { notificationGate, type GateDecision, type GateInput } from "./gate";
 import { applyWhatsAppNudge, hasWhatsAppNudge } from "./email-layout";
 import { createPlayerSmsSender, SmsSendError, type PlayerSmsSender } from "./sms";
 import { renderTemplate, SMS_TEMPLATES, type TemplateKey } from "./templates";
@@ -55,8 +56,8 @@ import { transactionalMailer, type TransactionalMailer } from "./transactional-m
 export interface QueuedMail {
   readonly personId: string;
   readonly orgId: string | null;
-  /** What happened — `auction.sold`, `team.appointed`, … */
-  readonly kind: string;
+  /** What happened — its catalogue entry (`auction.sold`, `team.appointed`, …). */
+  readonly kind: NotificationKind;
   /** One per person per moment; a repeat is ignored. */
   readonly dedupeKey: string;
   readonly subject: string;
@@ -68,7 +69,7 @@ export interface QueuedMail {
 export interface QueuedSms {
   readonly personId: string;
   readonly orgId: string | null;
-  readonly kind: string;
+  readonly kind: NotificationKind;
   /** Its own key, apart from the email's: `sms:` + the moment. */
   readonly dedupeKey: string;
   readonly templateKey: TemplateKey;
@@ -264,7 +265,7 @@ async function stillOurs(db: Db, row: ClaimedRow): Promise<boolean> {
 /**
  * The send gate, asked INSIDE the club's own boundary.
  *
- * `maySend` reads `org_messaging_settings` — a club's "don't send" switch —
+ * The gate reads `org_messaging_settings` — a club's "don't send" switch —
  * and that table is FORCE ROW LEVEL SECURITY, visible only where `app.org_id`
  * names its club. The drain works across every org on the bare app pool, so in
  * production the read saw no row, and "no row" means "enabled": a club that
@@ -274,34 +275,34 @@ async function stillOurs(db: Db, row: ClaimedRow): Promise<boolean> {
  * So a row that belongs to a club has its consent read in a short transaction
  * scoped to that club, exactly as `withTenantDb` would set it up — and only the
  * reads: the provider call stays outside, so no connection is held across it.
+ *
+ * WHICH SWITCH STOPS A ROW is the catalogue's answer now, not a prefix test on
+ * the kind: `scopeOf` here used to send everything that was not `registration.*` to
+ * "auction", which would have filed the next kind anybody queued under the
+ * wrong switch. A kind the catalogue does not know is refused, never guessed.
  */
 function mayDeliver(
   db: Db,
   row: ClaimedRow,
-  input: Omit<Parameters<typeof maySend>[1], "orgId" | "personId" | "scope">,
-): ReturnType<typeof maySend> {
-  const gate = { ...input, scope: scopeOf(row.kind), personId: row.person_id };
+  input: { contact: string; channel: GateInput["channel"] },
+): Promise<GateDecision> {
+  if (!isNotificationKind(row.kind)) {
+    return Promise.resolve({ send: false, reason: "kind_not_catalogued" });
+  }
+  const gate: GateInput = {
+    kind: row.kind,
+    channel: input.channel,
+    recipient: { personId: row.person_id, contact: input.contact },
+  };
   const orgId = row.org_id;
   if (orgId === null) {
-    return maySend(db, gate);
+    return notificationGate(db, gate);
   }
   return db.transaction(async (tx) => {
     await tx.execute(sql`select set_config('app.person_id', ${row.person_id}, true)`);
     await tx.execute(sql`select set_config('app.org_id', ${orgId}, true)`);
-    return maySend(tx, { ...gate, orgId });
+    return notificationGate(tx, { ...gate, orgId });
   });
-}
-
-/**
- * The /account topic a row belongs to, which is the switch that stops it.
- *
- * Every row used to be asked about "auction" — right for the moments this
- * queue was built for, wrong the day registration decisions joined it: a person
- * who switched "Registration decisions" off would still have been told, and one
- * who switched "Auction updates" off would have lost their approval notice.
- */
-export function scopeOf(kind: string): "registration" | "auction" {
-  return kind.startsWith("registration.") ? "registration" : "auction";
 }
 
 /**
@@ -418,11 +419,7 @@ export async function drainOutbox(
       suppressed += 1;
       continue;
     }
-    const decision = await mayDeliver(db, row, {
-      contact: email,
-      channel: "email",
-      category: "transactional",
-    });
+    const decision = await mayDeliver(db, row, { contact: email, channel: "email" });
     if (!decision.send) {
       await settle(db, row.id, "suppressed", decision.reason);
       suppressed += 1;
@@ -547,11 +544,14 @@ async function sendText(
     await settle(db, row.id, "suppressed", "no phone number");
     return "suppressed";
   }
-  const decision = await mayDeliver(db, row, {
-    contact: person.phone,
-    channel: "sms",
-    category: template.category,
-  });
+  /*
+   * Asked once for the TEXT, before the app is chosen: WhatsApp and SMS are one
+   * row at the suppression, person and club layers (catalogue `rowChannelOf`),
+   * because "stop texting me about auctions" means both apps. The category now
+   * comes from the catalogue entry rather than the DLT template — the two agree
+   * for every template today, and the catalogue is the one the admin edits.
+   */
+  const decision = await mayDeliver(db, row, { contact: person.phone, channel: "sms" });
   if (!decision.send) {
     await settle(db, row.id, "suppressed", decision.reason);
     return "suppressed";
