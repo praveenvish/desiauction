@@ -13,6 +13,7 @@ import {
   otpInbox,
   paddles,
   people,
+  teams,
   type DbHandle,
 } from "@desiauction/db";
 import { desc, eq, inArray } from "drizzle-orm";
@@ -199,12 +200,21 @@ describe("AUCTIONEER — conduct one season, nothing more", () => {
 
   it("never appoints someone holding a paddle in the season (go-live gate P3)", async () => {
     // IssuePaddle hands a paddle straight to a person — no owner link, no
-    // grant — so the two routes above missed them.
+    // grant — so the two routes above missed them. The paddle needs a real
+    // team: paddles.team_id is a foreign key.
+    const teamId = newId();
+    await db.insert(teams).values({
+      id: teamId,
+      orgId,
+      competitionId: season.id,
+      name: `Paddle Team ${RUN}`,
+      createdBy: owner,
+    });
     await db.insert(paddles).values({
       id: newId(),
       orgId,
       auctionId: seasonAuctionId,
-      teamId: newId(),
+      teamId,
       personId: paddleHolder,
       paddleNumber: `P-${RUN}`,
     });
