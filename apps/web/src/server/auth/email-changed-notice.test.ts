@@ -76,8 +76,8 @@ describe("the email-change notice (gate P1-6)", () => {
     expect(mailer.sent).toHaveLength(0);
   });
 
-  it("masks to the first letter and the domain", () => {
+  it("masks to the first letter and the domain", async () => {
     expect(maskEmail("arjun@example.com")).toBe("a•••@example.com");
-    expect(emailChangedCopy("arjun@example.com").text).toContain("a•••@example.com");
+    expect((await emailChangedCopy("arjun@example.com")).text).toContain("a•••@example.com");
   });
 });

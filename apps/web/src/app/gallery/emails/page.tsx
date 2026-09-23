@@ -13,6 +13,7 @@ import {
   squadSheetMail,
   unsoldMail,
 } from "../../../server/messaging/player-mail";
+import type { NotificationMail } from "../../../server/messaging/notification-email";
 import { reviewAskMail, seasonAskMail } from "../../../server/reviews/review-mail";
 import "./emails.css";
 
@@ -23,7 +24,7 @@ export const metadata = { title: "Emails · Gallery" };
  * them — nothing here is a mock-up, and nothing here sends. Dev-only, like the
  * rest of /gallery (its layout 404s outside development).
  */
-export default function EmailGalleryPage() {
+export default async function EmailGalleryPage() {
   const booking = {
     to: "rohan@example.com",
     name: "Rohan",
@@ -39,7 +40,9 @@ export default function EmailGalleryPage() {
     { name: "Vikram Patel", note: "Captain · ₹25,000" },
     { name: "Rahul Desai", note: "Icon" },
   ];
-  const samples: { name: string; mail: { subject: string; text: string; html: string } }[] = [
+  // Pending renders, awaited together: every builder reads the published
+  // wording (notification-email.ts), so the gallery shows what an admin set.
+  const pending: { name: string; mail: Promise<NotificationMail> }[] = [
     {
       name: "Sold — with the bidding story",
       mail: soldMail({
@@ -184,6 +187,10 @@ export default function EmailGalleryPage() {
     { name: "Demo cancelled", mail: bookingCancellationMail(booking) },
   ];
 
+  const samples = await Promise.all(
+    pending.map(async ({ name, mail }) => ({ name, mail: await mail })),
+  );
+
   return (
     <main className="email-gallery">
       <h1>Emails</h1>
@@ -198,10 +205,10 @@ export default function EmailGalleryPage() {
             <span>Subject</span> {mail.subject}
           </p>
           <div className="email-frames">
-            <iframe title={`${name} — desktop`} srcDoc={mail.html} className="email-frame" />
+            <iframe title={`${name} — desktop`} srcDoc={mail.html ?? ""} className="email-frame" />
             <iframe
               title={`${name} — phone`}
-              srcDoc={mail.html}
+              srcDoc={mail.html ?? ""}
               className="email-frame email-frame--phone"
             />
           </div>

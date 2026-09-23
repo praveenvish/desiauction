@@ -13,6 +13,8 @@ import {
 } from "@desiauction/db";
 import { and, asc, eq, isNotNull, like, or, sql } from "drizzle-orm";
 
+import { messageLanguagesOf } from "@desiauction/messaging/language";
+
 import { logSecurityEvent } from "../auth/security-events";
 import { db as appDb } from "../db";
 import { enqueueMail, enqueueSms, kickDrain, type QueuedMail } from "../messaging/outbox";
@@ -209,20 +211,29 @@ export async function announceAppointments(
     return 0;
   }
   const { pending } = await appointmentsView(db, input.competitionId);
-  const mails: QueuedMail[] = pending.map((item) => ({
-    personId: item.personId,
-    orgId: context.orgId,
-    kind: "team.appointed",
-    dedupeKey: dedupeKey(item),
-    ...appointmentMail({
-      name: item.greetingName,
-      season: context.season,
-      orgName: context.orgName,
-      teamName: item.teamName,
-      roles: item.roles,
-      bought: item.bought,
-    }),
-  }));
+  const languages = await messageLanguagesOf(
+    db,
+    pending.map((item) => item.personId),
+  );
+  const mails: QueuedMail[] = await Promise.all(
+    pending.map(async (item) => ({
+      personId: item.personId,
+      orgId: context.orgId,
+      kind: "team.appointed" as const,
+      dedupeKey: dedupeKey(item),
+      ...(await appointmentMail(
+        {
+          name: item.greetingName,
+          season: context.season,
+          orgName: context.orgName,
+          teamName: item.teamName,
+          roles: item.roles,
+          bought: item.bought,
+        },
+        languages.get(item.personId) ?? "en",
+      )),
+    })),
+  );
   const fresh = new Set(await enqueueMail(mails));
   const told = pending.filter((item) => fresh.has(dedupeKey(item)));
   // And one line of SMS each — most players have no verified email. Keyed apart

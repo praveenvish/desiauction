@@ -14,6 +14,7 @@ import {
 } from "@desiauction/messaging/finance-delivery";
 
 import { env } from "../../env";
+import { logger } from "../logger";
 
 /**
  * The web tier's FinOps dependencies — built in exactly ONE place (PX-8).
@@ -78,6 +79,14 @@ export function webFinopsDeps(db: Db): FinopsDeps {
      * adapters (packages/messaging/src/finance-delivery.ts); this copy serves
      * the web tier's reads of `configured` and the provider callback route.
      */
-    delivery: financeDeliveryAdapters(db, emailConfig),
+    delivery: financeDeliveryAdapters(db, emailConfig, {
+      publicBaseUrl: env.PUBLIC_BASE_URL,
+      onTemplateProblem: (problem) => {
+        logger().error(
+          { kind: problem.kind, language: problem.language, reason: problem.reason },
+          "notification_template.fallback",
+        );
+      },
+    }),
   });
 }

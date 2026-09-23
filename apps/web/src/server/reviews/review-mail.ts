@@ -1,8 +1,10 @@
 import type { Db } from "@desiauction/db";
+import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 
 import { env } from "../../env";
-import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
+import { SUPPORT_EMAIL } from "../messaging/email-layout";
 import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
+import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import { REVIEW_LINK_TTL_MS, type ValidReview } from "./reviews";
 
 /**
@@ -24,65 +26,47 @@ import { REVIEW_LINK_TTL_MS, type ValidReview } from "./reviews";
  */
 export type AskAudience = "organizer" | "owner" | "general";
 
-const OPENING: Record<AskAudience, readonly string[]> = {
-  organizer: [
-    "You've run a tournament on DesiAuction, and we'd like to know how it went — what",
-    "worked, and what got in your way. It takes two minutes:",
-  ],
-  owner: [
-    "You bid for a team in an auction on DesiAuction, and we'd like to know how it went",
-    "from your side of the room — what worked, and what got in your way. Two minutes:",
-  ],
-  general: [
-    "You've used DesiAuction, and we'd like to know how it went — what worked, and what",
-    "got in your way. It takes two minutes:",
-  ],
-};
+/** The link, the ask's shared variables, and the account page they can stop it from. */
+function askVariables(name: string | null) {
+  return {
+    name: name ?? "",
+    ifNoName: name === null,
+    days: String(Math.round(REVIEW_LINK_TTL_MS / 86_400_000)),
+    accountUrl: `${env.PUBLIC_BASE_URL}/account`,
+  };
+}
 
+/**
+ * The words — one variant per audience, so the first line is true — are the
+ * template registry's (`review.platform_ask`); the link is ours.
+ */
 export function reviewAskMail(
   name: string | null,
   link: string,
   audience: AskAudience = "general",
-): { subject: string; text: string; html: string } {
-  const days = Math.round(REVIEW_LINK_TTL_MS / 86_400_000);
-  return {
-    subject: "How has DesiAuction worked for you?",
-    ...renderEmail({
-      preheader: "Two minutes on what worked and what got in your way.",
-      heading: "How has DesiAuction worked for you?",
-      paragraphs: [name === null ? "Hi," : `Hi ${name},`, OPENING[audience].join(" ")],
-      action: { label: "Write your review", url: link },
-      actionFirst: true,
-      after: [
-        `The link is yours and works for ${String(days)} days. Nothing you write is shown to anyone unless you tick the box that says we may quote it.`,
-        `Don't want to be asked? Switch off "Feedback requests" in your account settings: ${env.PUBLIC_BASE_URL}/account`,
-      ],
-      footnote: "You received this because you used DesiAuction recently.",
-    }),
-  };
+  language: MessageLanguage = "en",
+): Promise<NotificationMail> {
+  return renderNotificationEmail("review.platform_ask", language, askVariables(name), {
+    variant: audience,
+    action: { id: "review", url: link },
+  });
 }
 
 export function reviewArrivedMail(
   review: ValidReview,
   personName: string | null,
-): { subject: string; text: string } {
-  return {
-    subject: `[Review] ${String(review.rating)}/5 from ${personName ?? "a customer"}`,
-    text: [
-      `${String(review.rating)}/5 — ${personName ?? "name not on file"}`,
-      review.mayQuote
-        ? `May quote, signed: ${review.displayName ?? ""}${review.displayOrg === null ? "" : `, ${review.displayOrg}`}`
-        : "Not for quoting.",
-      "",
-      "What went well:",
-      review.wentWell ?? "(nothing written)",
-      "",
-      "What to improve:",
-      review.improve ?? "(nothing written)",
-      "",
-      `${env.PUBLIC_BASE_URL}/admin/reviews`,
-    ].join("\n"),
-  };
+): Promise<NotificationMail> {
+  return renderNotificationEmail("staff.review_arrived", "en", {
+    rating: String(review.rating),
+    personName: personName ?? "a customer",
+    personLine: personName ?? "name not on file",
+    quoteLine: review.mayQuote
+      ? `May quote, signed: ${review.displayName ?? ""}${review.displayOrg === null ? "" : `, ${review.displayOrg}`}`
+      : "Not for quoting.",
+    wentWell: review.wentWell ?? "(nothing written)",
+    improve: review.improve ?? "(nothing written)",
+    deskUrl: `${env.PUBLIC_BASE_URL}/admin/reviews`,
+  });
 }
 
 export async function sendReviewArrived(
@@ -93,7 +77,7 @@ export async function sendReviewArrived(
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "staff.review_arrived", to: SUPPORT_EMAIL },
-    reviewArrivedMail(review, personName),
+    await reviewArrivedMail(review, personName),
   );
   return outcome;
 }
@@ -104,34 +88,22 @@ export async function sendReviewArrived(
  * page, so the mail says so before they click — nobody should learn that from
  * the form.
  */
-export function seasonAskMail(input: {
-  name: string | null;
-  seasonName: string;
-  orgName: string;
-  role: "player" | "owner";
-  link: string;
-}): { subject: string; text: string; html: string } {
-  const days = Math.round(REVIEW_LINK_TTL_MS / 86_400_000);
+export function seasonAskMail(
+  input: {
+    name: string | null;
+    seasonName: string;
+    orgName: string;
+    role: "player" | "owner";
+    link: string;
+  },
+  language: MessageLanguage = "en",
+): Promise<NotificationMail> {
   // Season and club names are organizer-typed; keep the subject to one line.
   const season = input.seasonName.replace(/[\r\n]+/g, " ").slice(0, 80);
-  return {
-    subject: `How was ${season}?`,
-    ...renderEmail({
-      preheader: `Two minutes on ${season} — for the players and owners deciding on next season.`,
-      heading: `How was ${season}?`,
-      paragraphs: [
-        input.name === null ? "Hi," : `Hi ${input.name},`,
-        input.role === "owner"
-          ? `You bid for a team in ${season}, run by ${input.orgName}. How did it go? Other players and owners deciding whether to join next time would like to know.`
-          : `You played in ${season}, run by ${input.orgName}. How did it go? Other players and owners deciding whether to join next time would like to know.`,
-      ],
-      action: { label: "Review the season", url: input.link },
-      actionFirst: true,
-      after: [
-        `Once our team has read it, your review may appear on the season's public page. It carries your name only if you tick the box that says so; otherwise it says ${input.role === "owner" ? '"A team owner"' : '"A player"'}.`,
-        `The link is yours and works for ${String(days)} days. Don't want to be asked? Switch off "Feedback requests" at ${env.PUBLIC_BASE_URL}/account`,
-      ],
-      footnote: `You received this because you took part in ${season} on DesiAuction.`,
-    }),
-  };
+  return renderNotificationEmail(
+    "review.season_ask",
+    language,
+    { ...askVariables(input.name), season, orgName: input.orgName },
+    { variant: input.role, action: { id: "review", url: input.link } },
+  );
 }

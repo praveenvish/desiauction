@@ -1,7 +1,9 @@
 import type { Db } from "@desiauction/db";
+import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 
 import { env } from "../../env";
-import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
+import { languageForMail, sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
+import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import type { ProblemCategory, ValidProblemReport } from "./problem-reports";
 
 /**
@@ -45,51 +47,44 @@ export function supportNotification(
   report: ValidProblemReport,
   reportId: string,
   reporterLabel: string,
-): { subject: string; text: string } {
+): Promise<NotificationMail> {
   const contextLines = Object.entries(report.context).map(([key, value]) => `  ${key}: ${value}`);
-  return {
-    subject: `[Report] ${CATEGORY_WORDS[report.category]} — ${firstLine(report.description)}`,
-    text: [
-      `${CATEGORY_WORDS[report.category]}, from ${reporterLabel}`,
+  return renderNotificationEmail("staff.problem_report", "en", {
+    category: CATEGORY_WORDS[report.category],
+    summary: firstLine(report.description),
+    reporter: reporterLabel,
+    replyLine:
       report.replyEmail === null ? "No reply address given." : `Reply to: ${report.replyEmail}`,
-      "",
-      `Page: ${report.pageUrl}`,
-      ...(contextLines.length > 0 ? ["", "Context:", ...contextLines] : []),
-      "",
-      report.description,
-      "",
-      report.screenshot === null ? "No screenshot." : "Screenshot attached.",
-      "",
-      `${env.PUBLIC_BASE_URL}/admin/reports#${reportId}`,
-    ].join("\n"),
-  };
+    pageUrl: report.pageUrl,
+    contextBlock: contextLines.length > 0 ? ["", "", "Context:", ...contextLines].join("\n") : "",
+    description: report.description,
+    screenshotLine: report.screenshot === null ? "No screenshot." : "Screenshot attached.",
+    deskUrl: `${env.PUBLIC_BASE_URL}/admin/reports#${reportId}`,
+  });
 }
 
-export function reporterAcknowledgement(report: ValidProblemReport): {
-  subject: string;
-  text: string;
-} {
-  return {
-    subject: "We've got your report — DesiAuction",
-    text: [
-      "Hi,",
-      "",
-      "Thanks for telling us. Your report has reached the team, with the page you were on",
-      report.screenshot === null ? "so we can look at it." : "and the screenshot you sent.",
-      "",
-      // The description is NOT repeated here. This mail goes to an address the
-      // form was given, and repeating what was typed turned the form into a
-      // way to send any text, from us, to anyone ("your account is suspended,
-      // verify at…"). The team has the words; the reporter wrote them.
-      "We read every report. If we need more detail, or once it's fixed, we'll write back",
-      "to this address.",
-      "",
-      `If it's urgent — an auction is live right now — write to ${SUPPORT_EMAIL} and say so`,
-      "in the subject line.",
-      "",
-      "— DesiAuction",
-    ].join("\n"),
-  };
+/**
+ * The receipt. The description is NOT repeated in it: this mail goes to an
+ * address the form was given, and repeating what was typed turned the form
+ * into a way to send any text, from us, to anyone ("your account is
+ * suspended, verify at…"). The team has the words; the reporter wrote them.
+ */
+export function reporterAcknowledgement(
+  report: ValidProblemReport,
+  language: MessageLanguage = "en",
+): Promise<NotificationMail> {
+  const withShot = report.screenshot !== null;
+  const clause =
+    language === "hi"
+      ? withShot
+        ? ", और आपका भेजा स्क्रीनशॉट भी।"
+        : " ताकि हम इसे देख सकें।"
+      : withShot
+        ? "and the screenshot you sent."
+        : "so we can look at it.";
+  return renderNotificationEmail("support.report_received", language, {
+    screenshotClause: clause,
+  });
 }
 
 /**
@@ -114,7 +109,7 @@ export async function sendProblemReportMail(
     db,
     { kind: "staff.problem_report", to: SUPPORT_EMAIL },
     {
-      ...supportNotification(report, reportId, reporterLabel),
+      ...(await supportNotification(report, reportId, reporterLabel)),
       ...(report.screenshot === null
         ? {}
         : {
@@ -134,7 +129,7 @@ export async function sendProblemReportMail(
           await sendNotificationMail(
             db,
             { kind: "support.report_received", to: receiptTo },
-            reporterAcknowledgement(report),
+            await reporterAcknowledgement(report, await languageForMail(db, { email: receiptTo })),
           )
         ).outcome;
 

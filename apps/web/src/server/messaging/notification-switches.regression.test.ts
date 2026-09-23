@@ -21,6 +21,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { env } from "../../env";
+import type { QueuedMail } from "./outbox";
 
 /*
  * The actions' door. `platformAdminGate` resolves the session from cookies,
@@ -57,7 +58,8 @@ const player = newId();
 const optedOut = newId();
 const OTP_PHONE = `+9193${RUN}9`;
 
-function mail(personId: string, key: string) {
+function mail(personId: string, key: string): QueuedMail {
+  // A test stands in for the template registry; production code cannot.
   return {
     personId,
     orgId: null,
@@ -66,7 +68,7 @@ function mail(personId: string, key: string) {
     subject: "Congratulations",
     text: "You were bought.",
     html: "<p>You were bought.</p>",
-  };
+  } as QueuedMail;
 }
 
 function text(personId: string, key: string) {

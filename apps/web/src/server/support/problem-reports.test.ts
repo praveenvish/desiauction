@@ -217,17 +217,17 @@ describe("validateProblemReport", () => {
 });
 
 describe("the mail", () => {
-  it("keeps a subject to one line, whatever was typed", () => {
+  it("keeps a subject to one line, whatever was typed", async () => {
     const report = valid({ description: "Line one\nBcc: everyone@example.com\nmore" });
-    const { subject } = supportNotification(report, "01J0000000000000000000000", "a guest");
+    const { subject } = await supportNotification(report, "01J0000000000000000000000", "a guest");
     expect(subject).not.toMatch(/[\r\n]/);
     expect(subject).toContain("Line one");
   });
 
-  it("acknowledges without promising a fix — and never repeats what was typed", () => {
+  it("acknowledges without promising a fix — and never repeats what was typed", async () => {
     // Echoing the description made the form a way to mail any text, from us,
     // to any address typed into it.
-    const { text } = reporterAcknowledgement(
+    const { text } = await reporterAcknowledgement(
       valid({ replyEmail: "ravi@example.com", description: "Verify at https://evil.example" }),
     );
     expect(text).not.toContain("evil.example");

@@ -1,29 +1,68 @@
+import type { MessageLanguage } from "@desiauction/messaging/email-templates";
+
 import { env } from "../../env";
-import { renderEmail } from "./email-layout";
+import { renderNotificationEmail, type NotificationMail } from "./notification-email";
+import { REASON_HI } from "./whatsapp";
 
 /**
- * THE PERSONAL MOMENTS — what a player and an owner are told, in words.
+ * THE PERSONAL MOMENTS — what a player and an owner are told.
  *
- * Pure: every builder takes plain facts and returns a subject, the HTML and the
- * plain-text part (email-layout.ts). The data is gathered elsewhere
- * (auction/outcome-mail.ts, competition/appointments.ts), so the gallery and
- * the tests render exactly what is sent without a database.
+ * Every builder takes plain facts and the reader's language, and hands the
+ * words to the template registry (notification-email.ts): the subject, the
+ * paragraphs and the button labels are the published wording, or the code
+ * default in packages/messaging (email-template-defaults.ts). What stays here
+ * is what the CODE owns: which kind and variant, the button's URL, the facts
+ * table, and the sentences whose grammar depends on the data — "Cup Kings,
+ * Tigers and Falcons all bid for you" — written once per language and handed
+ * over as variables. The data is gathered elsewhere (auction/outcome-mail.ts,
+ * competition/appointments.ts), so the gallery and the tests render exactly
+ * what is sent.
  *
  * The voice: warm, specific, never generic. "Cup Kings bought you for
  * ₹75,000 — three times your base" is the product's reason to exist, said to
  * the one person it matters most to.
  */
 
-export interface ComposedMail {
-  readonly subject: string;
-  readonly text: string;
-  readonly html: string;
-}
+export type ComposedMail = NotificationMail;
 
 export interface SquadLine {
   readonly name: string;
   /** "Captain", "Icon", "₹75,000", … — the one fact worth a second column. */
   readonly note: string;
+}
+
+/**
+ * The squad notes are written in English where the facts are gathered
+ * ("Captain · ₹25,000", "Arjun (you)"); a Hindi reader gets them in Hindi. Only
+ * the closed set of words the gatherers use is translated — a name never is.
+ */
+const NOTE_HI: Readonly<Record<string, string>> = {
+  Captain: "कप्तान",
+  "Vice-captain": "उप-कप्तान",
+  Icon: "आइकन",
+  Retained: "रिटेन",
+  Signed: "साइन",
+  Player: "खिलाड़ी",
+};
+
+function localLine(line: SquadLine, language: MessageLanguage): readonly [string, string] {
+  if (language === "en") return [line.name, line.note];
+  const name = line.name.endsWith(" (you)") ? `${line.name.slice(0, -6)} (आप)` : line.name;
+  const note = line.note
+    .split(" · ")
+    .map((part) => NOTE_HI[part] ?? part)
+    .join(" · ");
+  return [name, note];
+}
+
+function listWords(items: readonly string[], language: MessageLanguage = "en"): string {
+  if (items.length <= 1) return items.join("");
+  const and = language === "hi" ? "और" : "and";
+  return `${items.slice(0, -1).join(", ")} ${and} ${items[items.length - 1] ?? ""}`;
+}
+
+function seasonUrl(): string {
+  return `${env.PUBLIC_BASE_URL}/home`;
 }
 
 // --- The sale ---------------------------------------------------------------
@@ -41,7 +80,7 @@ export interface SoldFacts {
   /** Teams that bid, first bidder first; includes the winner. */
   readonly bidders: readonly string[];
   readonly bidCount: number;
-  /** "Most expensive buy of the night", "First player sold", … */
+  /** "You were the most expensive buy of the night", … */
   readonly highlight: string | null;
   /** The squad so far, the player included. */
   readonly squad: readonly SquadLine[];
@@ -49,76 +88,95 @@ export interface SoldFacts {
   readonly cardUrl: string | null;
 }
 
-function listWords(items: readonly string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1] ?? ""}`;
-}
-
 /** "Cup Kings, Tigers and Falcons all bid for you — 7 bids …" */
-export function bidStory(facts: SoldFacts): string {
+export function bidStory(facts: SoldFacts, language: MessageLanguage = "en"): string {
   const rivals = facts.bidders.filter((team) => team !== facts.teamName);
+  const count = String(facts.bidCount);
+  if (language === "hi") {
+    if (rivals.length === 0) {
+      return facts.bidCount <= 1
+        ? `${facts.teamName} ने आपके बेस प्राइस ${facts.basePrice} पर बोली लगाई।`
+        : `${facts.teamName} ने आप पर ${count} बार बोली लगाई और आपको ${facts.price} में जीता।`;
+    }
+    return `${listWords(facts.bidders, "hi")} — सबने आप पर बोली लगाई। कुल ${count} बोलियाँ लगीं, ${facts.basePrice} से ${facts.price} तक। ${facts.teamName} जीती।`;
+  }
   if (rivals.length === 0) {
     return facts.bidCount <= 1
       ? `${facts.teamName} bid for you at your base price of ${facts.basePrice}.`
-      : `${facts.teamName} bid for you ${String(facts.bidCount)} times and won you at ${facts.price}.`;
+      : `${facts.teamName} bid for you ${count} times and won you at ${facts.price}.`;
   }
   const all = listWords(facts.bidders);
-  return `${all} all bid for you — ${String(facts.bidCount)} bids in all, from ${facts.basePrice} to ${facts.price}. ${facts.teamName} won.`;
+  return `${all} all bid for you — ${count} bids in all, from ${facts.basePrice} to ${facts.price}. ${facts.teamName} won.`;
 }
 
-export function soldMail(facts: SoldFacts): ComposedMail {
-  const multiple =
-    facts.multiple !== null && facts.multiple >= 1.5
-      ? ` — ${facts.multiple >= 2 ? `${String(Math.round(facts.multiple * 10) / 10)} times` : "well above"} your base`
-      : "";
-  return {
-    subject: `Congratulations — ${facts.teamName} bought you for ${facts.price}`,
-    ...renderEmail({
-      preheader: `${facts.teamName} bought you in the ${facts.season} auction.`,
-      heading: `You're a ${facts.teamName} player`,
-      paragraphs: [
-        `Congratulations, ${facts.name}!`,
-        `${facts.teamName} bought you for ${facts.price} in the ${facts.season} auction${multiple}.`,
-        bidStory(facts),
-        ...(facts.highlight === null ? [] : [`${facts.highlight}.`]),
-      ],
-      details: facts.squad.map((line) => [line.name, line.note] as const),
-      after: [
-        `That is your squad so far at ${facts.teamName}. Your organizer, ${facts.orgName}, will share fixtures next.`,
-      ],
+/** The highlights the auction writes (auction/outcome-mail.ts), in Hindi. */
+const HIGHLIGHT_HI: Readonly<Record<string, string>> = {
+  "You were the most expensive buy of the night": "आप इस रात की सबसे महंगी खरीद रहे",
+};
+
+function multipleNote(multiple: number | null, language: MessageLanguage): string {
+  if (multiple === null || multiple < 1.5) return "";
+  const times = String(Math.round(multiple * 10) / 10);
+  if (language === "hi") {
+    return multiple >= 2
+      ? ` — आपके बेस प्राइस का ${times} गुना`
+      : " — आपके बेस प्राइस से कहीं ज़्यादा";
+  }
+  return ` — ${multiple >= 2 ? `${times} times` : "well above"} your base`;
+}
+
+export function soldMail(
+  facts: SoldFacts,
+  language: MessageLanguage = "en",
+): Promise<ComposedMail> {
+  const highlight =
+    facts.highlight === null
+      ? ""
+      : language === "hi"
+        ? (HIGHLIGHT_HI[facts.highlight] ?? facts.highlight)
+        : facts.highlight;
+  return renderNotificationEmail(
+    "auction.sold",
+    language,
+    {
+      name: facts.name,
+      season: facts.season,
+      orgName: facts.orgName,
+      teamName: facts.teamName,
+      price: facts.price,
+      basePrice: facts.basePrice,
+      multipleNote: multipleNote(facts.multiple, language),
+      bidStory: bidStory(facts, language),
+      highlight,
+    },
+    {
+      details: facts.squad.map((line) => localLine(line, language)),
       action:
         facts.cardUrl === null
-          ? { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` }
-          : { label: "See your player card", url: facts.cardUrl },
-      footnote: `You received this because you played in the ${facts.season} auction. Switch off "Auction updates" in your account to stop these.`,
-      whatsappNudge: true,
-    }),
-  };
+          ? { id: "season", url: seasonUrl() }
+          : { id: "card", url: facts.cardUrl },
+    },
+  );
 }
 
 // --- Not picked -------------------------------------------------------------
 
-export function unsoldMail(facts: {
-  readonly name: string;
-  readonly season: string;
-  readonly orgName: string;
-}): ComposedMail {
-  return {
-    // Said plainly and kindly. Never by SMS (founder decision): a text that
-    // just says "unsold" lands too hard.
-    subject: `Your ${facts.season} auction`,
-    ...renderEmail({
-      preheader: "You weren't picked this time — you're still registered.",
-      heading: "Not this time",
-      paragraphs: [
-        `Hi ${facts.name},`,
-        `The ${facts.season} auction has finished, and you weren't picked this time. That happens to good players on every auction night — squads fill up fast and teams plan around a few names.`,
-        `You're still registered with ${facts.orgName}, and organizers often bring players in as replacements during the season.`,
-      ],
-      action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
-      footnote: `You received this because you registered for ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
-    }),
-  };
+export function unsoldMail(
+  facts: {
+    readonly name: string;
+    readonly season: string;
+    readonly orgName: string;
+  },
+  language: MessageLanguage = "en",
+): Promise<ComposedMail> {
+  // Said plainly and kindly. Never by SMS (founder decision): a text that
+  // just says "unsold" lands too hard.
+  return renderNotificationEmail(
+    "auction.unsold",
+    language,
+    { name: facts.name, season: facts.season, orgName: facts.orgName },
+    { action: { id: "season", url: seasonUrl() } },
+  );
 }
 
 // --- Appointments ------------------------------------------------------------
@@ -128,22 +186,45 @@ export type AppointedRole = "captain" | "vice_captain" | "icon" | "retained";
 /** Captain first: the order a person would say their own roles in. */
 const ROLE_ORDER: readonly AppointedRole[] = ["captain", "vice_captain", "icon", "retained"];
 
-const ROLE_WORDS: Record<AppointedRole, { title: string; line: string }> = {
-  captain: {
-    title: "captain",
-    line: "You'll lead the side — setting the tone, rallying the team, and making the calls that win close games.",
+const ROLE_WORDS: Record<
+  MessageLanguage,
+  Record<AppointedRole, { title: string; line: string }>
+> = {
+  en: {
+    captain: {
+      title: "captain",
+      line: "You'll lead the side — setting the tone, rallying the team, and making the calls that win close games.",
+    },
+    vice_captain: {
+      title: "vice-captain",
+      line: "You'll back up the captain and lead the side whenever they can't.",
+    },
+    icon: {
+      title: "icon player",
+      line: "Icon players are the marquee names a team is built around.",
+    },
+    retained: {
+      title: "retained player",
+      line: "Your team kept you from last season.",
+    },
   },
-  vice_captain: {
-    title: "vice-captain",
-    line: "You'll back up the captain and lead the side whenever they can't.",
-  },
-  icon: {
-    title: "icon player",
-    line: "Icon players are the marquee names a team is built around.",
-  },
-  retained: {
-    title: "retained player",
-    line: "Your team kept you from last season.",
+  hi: {
+    captain: {
+      title: "कप्तान",
+      line: "आप टीम की अगुवाई करेंगे — माहौल बनाएँगे, टीम का हौसला बढ़ाएँगे, और करीबी मुकाबलों में जीत दिलाने वाले फ़ैसले लेंगे।",
+    },
+    vice_captain: {
+      title: "उप-कप्तान",
+      line: "आप कप्तान का साथ देंगे, और जब वे न हों तब टीम की अगुवाई करेंगे।",
+    },
+    icon: {
+      title: "आइकन खिलाड़ी",
+      line: "आइकन खिलाड़ी वे बड़े नाम होते हैं जिनके इर्द-गिर्द टीम बनाई जाती है।",
+    },
+    retained: {
+      title: "रिटेन किए गए खिलाड़ी",
+      line: "आपकी टीम ने आपको पिछले सीज़न से अपने साथ बनाए रखा है।",
+    },
   },
 };
 
@@ -151,19 +232,22 @@ const ROLE_WORDS: Record<AppointedRole, { title: string; line: string }> = {
 const PRE_SIGNING: ReadonlySet<AppointedRole> = new Set(["captain", "icon", "retained"]);
 
 /** "captain", "captain and icon player", "captain, icon player and retained player". */
-export function rolesTitle(roles: readonly AppointedRole[]): string {
+export function rolesTitle(
+  roles: readonly AppointedRole[],
+  language: MessageLanguage = "en",
+): string {
   const titles = ROLE_ORDER.filter((role) => roles.includes(role)).map(
-    (role) => ROLE_WORDS[role].title,
+    (role) => ROLE_WORDS[language][role].title,
   );
   if (titles.length <= 1) return titles[0] ?? "";
-  return `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1] ?? ""}`;
+  return listWords(titles, language);
 }
 
 /**
  * The roles as they fit ONE DLT variable (30 characters, templates.ts). The
  * full words first ("captain and icon player"); past the cap, the short words
  * ("vice-captain, icon and retained"); past that, the first role alone —
- * never a truncated phrase.
+ * never a truncated phrase. English: the registered SMS text is English.
  */
 export function smsRolePhrase(roles: readonly AppointedRole[], max = 30): string {
   const ordered = ROLE_ORDER.filter((role) => roles.includes(role));
@@ -180,7 +264,7 @@ export function smsRolePhrase(roles: readonly AppointedRole[], max = 30): string
     words.length <= 1
       ? (words[0] ?? "")
       : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1] ?? ""}`;
-  return short.length <= max ? short : ROLE_WORDS[ordered[0] ?? "captain"].title;
+  return short.length <= max ? short : ROLE_WORDS.en[ordered[0] ?? "captain"].title;
 }
 
 export interface AppointmentFacts {
@@ -198,28 +282,26 @@ export interface AppointmentFacts {
   readonly bought: boolean;
 }
 
-export function appointmentMail(facts: AppointmentFacts): ComposedMail {
+export function appointmentMail(
+  facts: AppointmentFacts,
+  language: MessageLanguage = "en",
+): Promise<ComposedMail> {
   const roles = ROLE_ORDER.filter((role) => facts.roles.includes(role));
-  const title = rolesTitle(roles);
   const signedDirect = !facts.bought && roles.some((role) => PRE_SIGNING.has(role));
-  return {
-    subject: `You're the ${title} of ${facts.teamName}`,
-    ...renderEmail({
-      preheader: `${facts.orgName} named you ${title} of ${facts.teamName} for ${facts.season}.`,
-      heading: `You're the ${title} of ${facts.teamName}`,
-      paragraphs: [
-        `Congratulations, ${facts.name}!`,
-        `${facts.orgName} has named you ${title} of ${facts.teamName} for ${facts.season}.`,
-        ...roles.map((role) => ROLE_WORDS[role].line),
-        ...(signedDirect
-          ? [`You join ${facts.teamName} directly, without going through the auction.`]
-          : []),
-      ],
-      action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
-      footnote: `You received this because ${facts.orgName} named you in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
-      whatsappNudge: true,
-    }),
-  };
+  return renderNotificationEmail(
+    "team.appointed",
+    language,
+    {
+      name: facts.name,
+      season: facts.season,
+      orgName: facts.orgName,
+      teamName: facts.teamName,
+      roleTitle: rolesTitle(roles, language),
+      roleLines: roles.map((role) => ROLE_WORDS[language][role].line),
+      ifSignedDirect: signedDirect,
+    },
+    { action: { id: "season", url: seasonUrl() } },
+  );
 }
 
 // --- The squad sheet -----------------------------------------------------------
@@ -242,30 +324,39 @@ export interface SquadSheetFacts {
  * every squad member gets, including the captain and icons, who never had a
  * sale to be told about.
  */
-export function squadSheetMail(facts: SquadSheetFacts): ComposedMail {
-  const count = facts.squad.length;
-  return {
-    subject: `Meet your ${facts.teamName} squad`,
-    ...renderEmail({
-      preheader: `${String(count)} players${facts.coach === null ? "" : `, coached by ${facts.coach}`} — the ${facts.teamName} squad for ${facts.season}.`,
-      heading: `Meet your ${facts.teamName} squad`,
-      paragraphs: [
-        `Hi ${facts.name},`,
-        `${facts.orgName} has set the ${facts.teamName} squad for ${facts.season}. Here is who you'll be playing with.`,
-      ],
+export function squadSheetMail(
+  facts: SquadSheetFacts,
+  language: MessageLanguage = "en",
+): Promise<ComposedMail> {
+  const coachClause =
+    facts.coach === null
+      ? ""
+      : language === "hi"
+        ? `, कोच ${facts.coach}`
+        : `, coached by ${facts.coach}`;
+  return renderNotificationEmail(
+    "team.squad_sheet",
+    language,
+    {
+      name: facts.name,
+      season: facts.season,
+      orgName: facts.orgName,
+      teamName: facts.teamName,
+      playerCount: String(facts.squad.length),
+      coachClause,
+      firstMatch: facts.firstMatch ?? "",
+      ifNoFirstMatch: facts.firstMatch === null,
+    },
+    {
       details: [
-        ...facts.squad.map((line) => [line.name, line.note] as const),
-        ...(facts.coach === null ? [] : [["Coach", facts.coach] as const]),
+        ...facts.squad.map((line) => localLine(line, language)),
+        ...(facts.coach === null
+          ? []
+          : [[language === "hi" ? "कोच" : "Coach", facts.coach] as const]),
       ],
-      after: [
-        facts.firstMatch === null
-          ? `${facts.orgName} will share the fixtures soon.`
-          : `Your first match: ${facts.firstMatch}.`,
-      ],
-      action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
-      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
-    }),
-  };
+      action: { id: "season", url: seasonUrl() },
+    },
+  );
 }
 
 // --- The lineup ------------------------------------------------------------------
@@ -284,24 +375,28 @@ export interface LineupFacts {
 }
 
 /** "You're in the Cup Kings lineup vs Tigers" — sent on the organizer's Announce. */
-export function lineupMail(facts: LineupFacts): ComposedMail {
-  const place = facts.where === null ? "" : ` at ${facts.where}`;
-  return {
-    subject: `You're in the ${facts.teamName} lineup vs ${facts.opponent}`,
-    ...renderEmail({
-      preheader: `${facts.when}${place} — ${facts.season}.`,
-      heading: `You're in the ${facts.teamName} lineup`,
-      paragraphs: [
-        `Hi ${facts.name},`,
-        `You're playing for ${facts.teamName} against ${facts.opponent} on ${facts.when}${place}. Here's the lineup.`,
-      ],
-      details: facts.lineup.map((line) => [line.name, line.note] as const),
-      after: ["Good luck!"],
-      action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
-      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
-      whatsappNudge: true,
-    }),
-  };
+export function lineupMail(
+  facts: LineupFacts,
+  language: MessageLanguage = "en",
+): Promise<ComposedMail> {
+  const placeClause =
+    facts.where === null ? "" : language === "hi" ? `, ${facts.where} में` : ` at ${facts.where}`;
+  return renderNotificationEmail(
+    "lineup.announced",
+    language,
+    {
+      name: facts.name,
+      season: facts.season,
+      teamName: facts.teamName,
+      opponent: facts.opponent,
+      when: facts.when,
+      placeClause,
+    },
+    {
+      details: facts.lineup.map((line) => localLine(line, language)),
+      action: { id: "season", url: seasonUrl() },
+    },
+  );
 }
 
 // --- The owner's night ---------------------------------------------------------
@@ -319,41 +414,51 @@ export interface OwnerSummaryFacts {
   readonly teamUrl: string;
 }
 
-export function ownerSummaryMail(facts: OwnerSummaryFacts): ComposedMail {
+export function ownerSummaryMail(
+  facts: OwnerSummaryFacts,
+  language: MessageLanguage = "en",
+): Promise<ComposedMail> {
   const short = facts.squadSize < facts.squadMin;
-  return {
-    subject: `${facts.teamName}: your squad from the ${facts.season} auction`,
-    ...renderEmail({
-      preheader: `${String(facts.squadSize)} players · ${facts.spent} spent · ${facts.purseLeft} left.`,
-      heading: `Your ${facts.teamName} squad`,
-      paragraphs: [
-        `Hi ${facts.name},`,
-        `The ${facts.season} auction is done. Here is the squad you built, with what you paid for each player.`,
-      ],
+  const size = String(facts.squadSize);
+  const range = `${String(facts.squadMin)}–${String(facts.squadMax)}`;
+  const hi = language === "hi";
+  return renderNotificationEmail(
+    "auction.owner_summary",
+    language,
+    {
+      name: facts.name,
+      season: facts.season,
+      teamName: facts.teamName,
+      squadSize: size,
+      spent: facts.spent,
+      purseLeft: facts.purseLeft,
+      squadMin: String(facts.squadMin),
+      shortBy: short ? String(facts.squadMin - facts.squadSize) : "",
+    },
+    {
       details: [
-        ...facts.squad.map((line) => [line.name, line.note] as const),
-        ["Spent", facts.spent],
-        ["Purse left", facts.purseLeft],
-        [
-          "Squad",
-          `${String(facts.squadSize)} of ${String(facts.squadMin)}–${String(facts.squadMax)}`,
-        ],
+        ...facts.squad.map((line) => localLine(line, language)),
+        [hi ? "खर्च" : "Spent", facts.spent],
+        [hi ? "बचा हुआ पर्स" : "Purse left", facts.purseLeft],
+        [hi ? "टीम" : "Squad", hi ? `${range} में से ${size}` : `${size} of ${range}`],
       ],
-      after: short
-        ? [
-            `Your squad is ${String(facts.squadMin - facts.squadSize)} short of the minimum of ${String(facts.squadMin)}. Your organizer will tell you how the gap is filled.`,
-          ]
-        : [],
-      action: { label: "Open your team", url: facts.teamUrl },
-      footnote: `You received this because you own ${facts.teamName} in ${facts.season}.`,
-    }),
-  };
+      action: { id: "team", url: facts.teamUrl },
+    },
+  );
 }
 
 // --- Registration decisions -----------------------------------------------------
 
 /** The five decisions a registrant is told about (competition/registration-notify.ts). */
 export type RegistrationDecision = "approve" | "waitlist" | "reject" | "withdraw" | "restore";
+
+const DECISION_KIND = {
+  approve: "registration.approved",
+  waitlist: "registration.waitlisted",
+  reject: "registration.rejected",
+  withdraw: "registration.withdrawn",
+  restore: "registration.restored",
+} as const;
 
 export interface RegistrationDecisionFacts {
   readonly name: string;
@@ -369,59 +474,19 @@ export interface RegistrationDecisionFacts {
  * for anybody who has not opted in to WhatsApp, so it says the decision in the
  * subject line: most people read that and nothing else.
  */
-export function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMail {
-  const { season } = facts;
-  const copy: Record<
-    RegistrationDecision,
-    { subject: string; heading: string; lines: readonly string[] }
-  > = {
-    approve: {
-      subject: `You're approved for ${season}`,
-      heading: "You're in",
-      lines: [
-        `Your registration for ${season} is approved. You're in the player pool for auction day.`,
-      ],
+export function registrationDecisionMail(
+  facts: RegistrationDecisionFacts,
+  language: MessageLanguage = "en",
+): Promise<ComposedMail> {
+  const reason = facts.reason ?? "no reason was given";
+  return renderNotificationEmail(
+    DECISION_KIND[facts.decision],
+    language,
+    {
+      name: facts.name,
+      season: facts.season,
+      reason: language === "hi" ? (REASON_HI[reason] ?? reason) : reason,
     },
-    waitlist: {
-      subject: `You're on the waitlist for ${season}`,
-      heading: "You're on the waitlist",
-      lines: [
-        `Your registration for ${season} is on the waitlist. The organizer moves players up if a place opens, and we'll tell you if that happens.`,
-      ],
-    },
-    reject: {
-      subject: `Your registration for ${season} wasn't approved`,
-      heading: "Your registration wasn't approved",
-      lines: [
-        `Your registration for ${season} was not approved.`,
-        `The reason given: ${facts.reason ?? "no reason was given"}.`,
-      ],
-    },
-    withdraw: {
-      subject: `Your registration for ${season} was withdrawn`,
-      heading: "Your registration was withdrawn",
-      lines: [
-        `Your registration for ${season} was withdrawn. You can register again while registration is open.`,
-      ],
-    },
-    restore: {
-      subject: `Your registration for ${season} is back under review`,
-      heading: "Back under review",
-      lines: [
-        `Your registration for ${season} is back under review. We'll tell you what the organizer decides.`,
-      ],
-    },
-  };
-  const chosen = copy[facts.decision];
-  return {
-    subject: chosen.subject,
-    ...renderEmail({
-      preheader: chosen.lines[0] ?? chosen.heading,
-      heading: chosen.heading,
-      paragraphs: [`Hi ${facts.name},`, ...chosen.lines],
-      action: { label: "See your registration", url: `${env.PUBLIC_BASE_URL}/home` },
-      footnote: `You received this because you registered for ${season}. Switch off "Registration decisions" in your account to stop these.`,
-      whatsappNudge: true,
-    }),
-  };
+    { action: { id: "registration", url: seasonUrl() } },
+  );
 }

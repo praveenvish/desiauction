@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { emailChangedCopy, phoneChangedCopy } from "../auth/email-changed-notice";
 import { applyWhatsAppNudge, hasWhatsAppNudge } from "./email-layout";
+import type { NotificationMail } from "./notification-email";
 import { DLT_VAR_MAX, smsPrice } from "./templates";
 
 import {
@@ -49,8 +50,8 @@ describe("the sale", () => {
     );
   });
 
-  it("names the team and the price in the subject, and the multiple of base in the body", () => {
-    const mail = soldMail(sale);
+  it("names the team and the price in the subject, and the multiple of base in the body", async () => {
+    const mail = await soldMail(sale);
     expect(mail.subject).toBe("Congratulations — Cup Kings bought you for ₹75,000");
     expect(mail.text).toContain("3 times your base");
     expect(mail.text).toContain("most expensive buy of the night");
@@ -58,14 +59,14 @@ describe("the sale", () => {
     expect(mail.html).toContain("See your player card");
   });
 
-  it("sends a player with no public card to their season instead", () => {
-    expect(soldMail({ ...sale, cardUrl: null }).html).toContain("See your season");
+  it("sends a player with no public card to their season instead", async () => {
+    expect((await soldMail({ ...sale, cardUrl: null })).html).toContain("See your season");
   });
 });
 
 describe("not picked", () => {
-  it("is kind: the subject does not say unsold, and the body says they are still registered", () => {
-    const mail = unsoldMail({ name: "Rohit", season: "MPL 2026", orgName: "Malad CC" });
+  it("is kind: the subject does not say unsold, and the body says they are still registered", async () => {
+    const mail = await unsoldMail({ name: "Rohit", season: "MPL 2026", orgName: "Malad CC" });
     expect(mail.subject.toLowerCase()).not.toContain("unsold");
     expect(mail.text).toContain("still registered");
   });
@@ -80,41 +81,41 @@ describe("appointments", () => {
     bought: false,
   };
 
-  it("names the role and the team for each of the four roles", () => {
+  it("names the role and the team for each of the four roles", async () => {
     for (const [role, title] of [
       ["captain", "captain"],
       ["vice_captain", "vice-captain"],
       ["icon", "icon player"],
       ["retained", "retained player"],
     ] as const) {
-      expect(appointmentMail({ ...base, roles: [role] }).subject).toBe(
+      expect((await appointmentMail({ ...base, roles: [role] })).subject).toBe(
         `You're the ${title} of Cup Kings`,
       );
     }
   });
 
-  it("tells a captain, an icon and a retained player they skip the auction", () => {
+  it("tells a captain, an icon and a retained player they skip the auction", async () => {
     for (const role of ["captain", "icon", "retained"] as const) {
-      expect(appointmentMail({ ...base, roles: [role] }).text).toContain(
+      expect((await appointmentMail({ ...base, roles: [role] })).text).toContain(
         "without going through the auction",
       );
     }
   });
 
-  it("never says so to a vice-captain, who still goes under the hammer", () => {
-    expect(appointmentMail({ ...base, roles: ["vice_captain"] }).text).not.toContain(
+  it("never says so to a vice-captain, who still goes under the hammer", async () => {
+    expect((await appointmentMail({ ...base, roles: ["vice_captain"] })).text).not.toContain(
       "without going through the auction",
     );
   });
 
-  it("never says so to a captain the auction bought", () => {
-    const mail = appointmentMail({ ...base, roles: ["captain"], bought: true });
+  it("never says so to a captain the auction bought", async () => {
+    const mail = await appointmentMail({ ...base, roles: ["captain"], bought: true });
     expect(mail.subject).toBe("You're the captain of Cup Kings");
     expect(mail.text).not.toContain("without going through the auction");
   });
 
-  it("one email for a captain who is also the icon, captain first", () => {
-    const mail = appointmentMail({ ...base, roles: ["icon", "captain"] });
+  it("one email for a captain who is also the icon, captain first", async () => {
+    const mail = await appointmentMail({ ...base, roles: ["icon", "captain"] });
     expect(mail.subject).toBe("You're the captain and icon player of Cup Kings");
     expect(mail.text).toContain("You'll lead the side");
     expect(mail.text).toContain("marquee names");
@@ -129,8 +130,8 @@ describe("appointments", () => {
 });
 
 describe("the owner's night", () => {
-  it("lists the squad, the spend and the purse left, and names a shortfall", () => {
-    const mail = ownerSummaryMail({
+  it("lists the squad, the spend and the purse left, and names a shortfall", async () => {
+    const mail = await ownerSummaryMail({
       name: "Priya",
       season: "MPL 2026",
       teamName: "Cup Kings",
@@ -161,8 +162,8 @@ describe("the squad sheet", () => {
     firstMatch: "vs Tigers · Sun, 4 Oct 2026, 7:30 am · Malad Ground",
   };
 
-  it("names the team, the whole squad with the reader marked, the coach and the first match", () => {
-    const mail = squadSheetMail(facts);
+  it("names the team, the whole squad with the reader marked, the coach and the first match", async () => {
+    const mail = await squadSheetMail(facts);
     expect(mail.subject).toBe("Meet your Cup Kings squad");
     expect(mail.text).toContain("Arjun Sharma (you)");
     expect(mail.text).toContain("Vikram Patel");
@@ -170,8 +171,8 @@ describe("the squad sheet", () => {
     expect(mail.text).toContain("Your first match: vs Tigers");
   });
 
-  it("promises fixtures rather than inventing one, and leaves out a coach nobody named", () => {
-    const mail = squadSheetMail({ ...facts, coach: null, firstMatch: null });
+  it("promises fixtures rather than inventing one, and leaves out a coach nobody named", async () => {
+    const mail = await squadSheetMail({ ...facts, coach: null, firstMatch: null });
     expect(mail.text).toContain("will share the fixtures soon");
     expect(mail.text).not.toContain("Coach");
   });
@@ -212,32 +213,32 @@ describe("the lineup", () => {
     ],
   };
 
-  it("names the team, the opponent, when and where, and the whole lineup", () => {
-    const mail = lineupMail(facts);
+  it("names the team, the opponent, when and where, and the whole lineup", async () => {
+    const mail = await lineupMail(facts);
     expect(mail.subject).toBe("You're in the Cup Kings lineup vs Tigers");
     expect(mail.text).toContain("Sun, 4 Oct 2026, 7:30 am at Malad Ground");
     expect(mail.text).toContain("Arjun Sharma (you)");
   });
 
-  it("says lineup, never XI — a kabaddi side is seven", () => {
-    expect(lineupMail(facts).text).not.toMatch(/\bXI\b/);
+  it("says lineup, never XI — a kabaddi side is seven", async () => {
+    expect((await lineupMail(facts)).text).not.toMatch(/\bXI\b/);
   });
 
-  it("leaves the ground out when the fixture has none", () => {
-    expect(lineupMail({ ...facts, where: null }).text).not.toContain(" at ");
+  it("leaves the ground out when the fixture has none", async () => {
+    expect((await lineupMail({ ...facts, where: null })).text).not.toContain(" at ");
   });
 });
 
 describe("the registration decisions, by email", () => {
-  it("says the decision in the subject — most people read nothing else", () => {
+  it("says the decision in the subject — most people read nothing else", async () => {
     const facts = { name: "Arjun", season: "Malad Premier League 2026" };
-    expect(registrationDecisionMail({ ...facts, decision: "approve" }).subject).toBe(
+    expect((await registrationDecisionMail({ ...facts, decision: "approve" })).subject).toBe(
       "You're approved for Malad Premier League 2026",
     );
-    expect(registrationDecisionMail({ ...facts, decision: "waitlist" }).subject).toContain(
+    expect((await registrationDecisionMail({ ...facts, decision: "waitlist" })).subject).toContain(
       "waitlist",
     );
-    const rejected = registrationDecisionMail({
+    const rejected = await registrationDecisionMail({
       ...facts,
       decision: "reject",
       reason: "the season is full",
@@ -248,28 +249,36 @@ describe("the registration decisions, by email", () => {
   });
 });
 
+/** Every layout mail has its HTML part; the nudge helpers take both parts. */
+function parts(mail: NotificationMail): { text: string; html: string } {
+  return { text: mail.text, html: mail.html ?? "" };
+}
+
 describe("THE WHATSAPP NUDGE — decided at send time", () => {
-  const personal = [
-    soldMail(sale),
-    appointmentMail({
-      name: "Vikram",
-      season: "MPL 2026",
-      orgName: "Malad CC",
-      teamName: "Cup Kings",
-      roles: ["captain"],
-      bought: false,
-    }),
-    lineupMail({
-      name: "Arjun",
-      season: "MPL 2026",
-      teamName: "Cup Kings",
-      opponent: "Tigers",
-      when: "Sun, 4 Oct 2026, 7:30 pm",
-      where: null,
-      lineup: [],
-    }),
-    registrationDecisionMail({ name: "Arjun", season: "MPL 2026", decision: "approve" }),
-  ];
+  let personal: { text: string; html: string }[] = [];
+  beforeAll(async () => {
+    personal = [
+      await soldMail(sale),
+      await appointmentMail({
+        name: "Vikram",
+        season: "MPL 2026",
+        orgName: "Malad CC",
+        teamName: "Cup Kings",
+        roles: ["captain"],
+        bought: false,
+      }),
+      await lineupMail({
+        name: "Arjun",
+        season: "MPL 2026",
+        teamName: "Cup Kings",
+        opponent: "Tigers",
+        when: "Sun, 4 Oct 2026, 7:30 pm",
+        where: null,
+        lineup: [],
+      }),
+      await registrationDecisionMail({ name: "Arjun", season: "MPL 2026", decision: "approve" }),
+    ].map(parts);
+  });
 
   it("leaves room for it under every personal moment, and shows nothing until asked", () => {
     for (const mail of personal) {
@@ -290,8 +299,11 @@ describe("THE WHATSAPP NUDGE — decided at send time", () => {
     }
   });
 
-  it("NEVER touches a security mail, whatever the drain asks", () => {
-    for (const mail of [emailChangedCopy("new@example.com"), phoneChangedCopy("4321")]) {
+  it("NEVER touches a security mail, whatever the drain asks", async () => {
+    for (const mail of [
+      parts(await emailChangedCopy("new@example.com")),
+      parts(await phoneChangedCopy("4321")),
+    ]) {
       expect(hasWhatsAppNudge(mail.html)).toBe(false);
       expect(applyWhatsAppNudge(mail, true)).toEqual({ text: mail.text, html: mail.html });
     }

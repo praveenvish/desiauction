@@ -1,8 +1,9 @@
 import type { Db } from "@desiauction/db";
 
 import { env } from "../../env";
-import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
+import { SUPPORT_EMAIL } from "../messaging/email-layout";
 import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
+import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import type { ValidDemoRequest } from "./demo-requests";
 
 /**
@@ -53,54 +54,43 @@ const WINDOW_WORDS: Record<string, string> = {
  * window) and greets generically. The founder's copy below still has
  * everything; it goes to our own address.
  */
-export function requesterAcknowledgement(request: ValidDemoRequest): {
-  subject: string;
-  text: string;
-  html: string;
-} {
-  return {
-    subject: "We've got your demo request — DesiAuction",
-    ...renderEmail({
-      preheader: "We'll get back to you within one working day to fix a time.",
-      heading: "We've got your demo request",
-      paragraphs: [
-        "Hello,",
-        "Thanks for asking about a demo of DesiAuction. We'll get back to you within one working day to fix a time.",
-      ],
+export function requesterAcknowledgement(request: ValidDemoRequest): Promise<NotificationMail> {
+  // A stranger has no account and so no language: English, always. Only the
+  // form's CHOICES go into the table, never a word they typed.
+  return renderNotificationEmail(
+    "demo.request_received",
+    "en",
+    {},
+    {
       details: [
         ["Tournament size", SIZE_WORDS[request.tournamentSize] ?? "not sure yet"],
         ["Auction date", request.auctionOn ?? "not fixed yet"],
         ["Best time to talk", WINDOW_WORDS[request.preferredWindow] ?? "any time"],
       ],
-      after: [
-        "The demo is a live walkthrough of a real auction — squads, the bidding, the gavel, and the money afterwards — on a tournament we've already run, so you see the whole night rather than an empty screen.",
-        "In a hurry? You don't have to wait for us: every tournament gets the full platform free during beta.",
-        "Didn't ask for this? Somebody typed your address into our demo form. You can ignore this email — we won't write again unless you reply.",
-      ],
-      action: { label: "Start free", url: `${env.PUBLIC_BASE_URL}/login` },
-      footnote: `You received this because this address was entered on our demo request form. Write to ${SUPPORT_EMAIL} if anything changes.`,
-    }),
-  };
+      action: { id: "start", url: `${env.PUBLIC_BASE_URL}/login` },
+    },
+  );
 }
 
+/** Our own copy: everything they sent, to the support mailbox (plain text, English). */
 export function founderNotification(
   request: ValidDemoRequest,
   requestId: string,
-): { subject: string; text: string } {
-  return {
-    subject: `Demo request — ${request.orgName} (${SIZE_WORDS[request.tournamentSize] ?? request.tournamentSize})`,
-    text: [
-      `${request.name} · ${request.phone}${request.email === null ? "" : ` · ${request.email}`}`,
-      `${request.orgName} — ${SIZE_WORDS[request.tournamentSize] ?? request.tournamentSize}`,
+): Promise<NotificationMail> {
+  const size = SIZE_WORDS[request.tournamentSize] ?? request.tournamentSize;
+  return renderNotificationEmail("staff.demo_request", "en", {
+    name: request.name,
+    phone: request.phone,
+    emailClause: request.email === null ? "" : ` · ${request.email}`,
+    orgName: request.orgName,
+    size,
+    auctionLine:
       request.auctionOn === null ? "Auction: no date yet" : `Auction: ${request.auctionOn}`,
-      `Prefers: ${WINDOW_WORDS[request.preferredWindow] ?? request.preferredWindow}`,
-      `Came from: ${request.source}`,
-      "",
-      request.note === null ? "(no note)" : request.note,
-      "",
-      `${env.PUBLIC_BASE_URL}/admin/demos#${requestId}`,
-    ].join("\n"),
-  };
+    window: WINDOW_WORDS[request.preferredWindow] ?? request.preferredWindow,
+    source: request.source,
+    note: request.note === null ? "(no note)" : request.note,
+    deskUrl: `${env.PUBLIC_BASE_URL}/admin/demos#${requestId}`,
+  });
 }
 
 /**
@@ -138,14 +128,14 @@ export async function sendDemoRequestMail(
             await sendNotificationMail(
               db,
               { kind: "demo.request_received", to: request.email },
-              requesterAcknowledgement(request),
+              await requesterAcknowledgement(request),
             )
           ).outcome;
 
   const { outcome: founderOutcome } = await sendNotificationMail(
     db,
     { kind: "staff.demo_request", to: SUPPORT_EMAIL },
-    founderNotification(request, requestId),
+    await founderNotification(request, requestId),
   );
 
   return { requester: requesterOutcome, founder: founderOutcome };

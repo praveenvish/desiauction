@@ -1,7 +1,9 @@
 import { newId, otpInbox, type Db } from "@desiauction/db";
 
+import type { MessageLanguage } from "@desiauction/messaging/email-templates";
+
 import { env } from "../../env";
-import { renderEmail } from "../messaging/email-layout";
+import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import { providerFetch } from "../messaging/provider-fetch";
 
 /**
@@ -30,69 +32,30 @@ import { providerFetch } from "../messaging/provider-fetch";
 export type CodeMailPurpose = "email_change" | "login" | "signup";
 
 export interface CodeMailer {
-  send(email: string, code: string, purpose: CodeMailPurpose): Promise<void>;
+  send(
+    email: string,
+    code: string,
+    purpose: CodeMailPurpose,
+    language?: MessageLanguage,
+  ): Promise<void>;
 }
 
-/** Subject and body per purpose — the only thing that differs between them. */
+/**
+ * Subject and body per purpose — the only thing that differs between them.
+ *
+ * The words are the template registry's (`auth.email_code`, one variant per
+ * purpose): sign-in codes are never switched off, but their wording may be
+ * edited — with the `{{code}}` placeholder and the expiry line locked in
+ * (email-template-defaults.ts). A DIFFERENT PERSON reads the sign-up mail:
+ * "sign-in code" to somebody who has no account reads as a mistake or a
+ * breach, which is why it is a variant of its own and not a word swapped.
+ */
 export function codeMailCopy(
   code: string,
   purpose: CodeMailPurpose,
-): { subject: string; text: string; html: string } {
-  if (purpose === "signup") {
-    /*
-     * A DIFFERENT PERSON IS READING THIS. "Sign-in code" to somebody who has no
-     * account reads as a mistake or a breach, and the closing sentence of the
-     * login copy — "your account is safe" — is about an account that does not
-     * exist. Both halves have to change together.
-     */
-    return {
-      subject: "Your DesiAuction sign-up code",
-      ...renderEmail({
-        preheader: `Your sign-up code is ${code}. It expires in 15 minutes.`,
-        heading: "Welcome to DesiAuction",
-        paragraphs: ["Your sign-up code is:"],
-        code,
-        after: [
-          "It expires in 15 minutes. Entering it creates your account on this address.",
-          "If you did not ask for this, ignore this message — nothing is created until the code is used.",
-        ],
-        footnote: "You received this because this address was entered on our sign-up page.",
-        noLinks: true,
-      }),
-    };
-  }
-  if (purpose === "login") {
-    return {
-      subject: "Your DesiAuction sign-in code",
-      ...renderEmail({
-        preheader: `Your sign-in code is ${code}. It expires in 15 minutes.`,
-        heading: "Your sign-in code",
-        paragraphs: ["Your DesiAuction sign-in code is:"],
-        code,
-        after: [
-          "It expires in 15 minutes.",
-          "If you did not try to sign in, someone entered your address on our sign-in page. Your account is safe as long as you do not share this code.",
-        ],
-        footnote: "You received this because this address was entered on our sign-in page.",
-        noLinks: true,
-      }),
-    };
-  }
-  return {
-    subject: "Confirm your email for DesiAuction",
-    ...renderEmail({
-      preheader: `Your confirmation code is ${code}.`,
-      heading: "Confirm your email",
-      paragraphs: [`Your DesiAuction confirmation code is ${code}.`],
-      code,
-      after: [
-        "Enter it on your account page to confirm this address. It expires in 15 minutes.",
-        "If you did not ask for this, ignore this message.",
-      ],
-      footnote: "You received this because this address was added to a DesiAuction account.",
-      noLinks: true,
-    }),
-  };
+  language: MessageLanguage = "en",
+): Promise<NotificationMail> {
+  return renderNotificationEmail("auth.email_code", language, { code }, { variant: purpose, code });
 }
 
 export class DevInboxMailer implements CodeMailer {
@@ -146,9 +109,14 @@ export class HttpMailer implements CodeMailer {
     },
   ) {}
 
-  async send(email: string, code: string, purpose: CodeMailPurpose): Promise<void> {
+  async send(
+    email: string,
+    code: string,
+    purpose: CodeMailPurpose,
+    language: MessageLanguage = "en",
+  ): Promise<void> {
     const transport = this.config.transport ?? defaultTransport;
-    const copy = codeMailCopy(code, purpose);
+    const copy = await codeMailCopy(code, purpose, language);
     let response: MailerHttpResponse;
     try {
       response = await transport(this.config.endpoint, {

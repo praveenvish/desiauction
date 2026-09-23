@@ -11,6 +11,8 @@ import {
 } from "@desiauction/db";
 import { and, eq, like } from "drizzle-orm";
 
+import { messageLanguagesOf } from "@desiauction/messaging/language";
+
 import { formatKickoff, formatWallDate, formatWallTime } from "../../lib/format-date";
 import { logSecurityEvent } from "../auth/security-events";
 import { db as appDb } from "../db";
@@ -176,21 +178,30 @@ export async function announceLineup(
       note: player.isCaptain ? "Captain" : player.isViceCaptain ? "Vice-captain" : "Player",
     }));
 
-  const mails: QueuedMail[] = fresh.map((player) => ({
-    personId: player.personId,
-    orgId: season.orgId,
-    kind: "lineup.announced",
-    dedupeKey: lineupKey(input.fixtureId, player.registrationId),
-    ...lineupMail({
-      name: player.greetingName?.trim() || "there",
-      season: season.name,
-      teamName: side.team ?? "",
-      opponent: side.opponent ?? "",
-      when: formatKickoff(fixture.kickoffAt ?? ""),
-      where,
-      lineup: lineupFor(player.registrationId),
-    }),
-  }));
+  const languages = await messageLanguagesOf(
+    db,
+    fresh.map((player) => player.personId),
+  );
+  const mails: QueuedMail[] = await Promise.all(
+    fresh.map(async (player) => ({
+      personId: player.personId,
+      orgId: season.orgId,
+      kind: "lineup.announced" as const,
+      dedupeKey: lineupKey(input.fixtureId, player.registrationId),
+      ...(await lineupMail(
+        {
+          name: player.greetingName?.trim() || "there",
+          season: season.name,
+          teamName: side.team ?? "",
+          opponent: side.opponent ?? "",
+          when: formatKickoff(fixture.kickoffAt ?? ""),
+          where,
+          lineup: lineupFor(player.registrationId),
+        },
+        languages.get(player.personId) ?? "en",
+      )),
+    })),
+  );
   const queued = new Set(await enqueueMail(mails));
   const newlyTold = fresh.filter((player) =>
     queued.has(lineupKey(input.fixtureId, player.registrationId)),

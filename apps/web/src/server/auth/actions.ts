@@ -1066,7 +1066,9 @@ async function notifyPhoneChanged(
       key: "security.phone_changed",
       slots: { last4: newPhone.slice(-4) },
     }),
-    verifiedEmailOf(db, personId).then((email) => notifyPhoneChangedByEmail(db, email, newPhone)),
+    verifiedEmailOf(db, personId).then((email) =>
+      notifyPhoneChangedByEmail(db, email, newPhone, undefined, personId),
+    ),
   ]);
 }
 
@@ -1134,7 +1136,7 @@ export async function requestEmailVerificationAction(
     return { step: previous.step, error: message[result.reason] };
   }
   try {
-    await sendSignInCodeMail(db, result.email, result.code, "email_change");
+    await sendSignInCodeMail(db, result.email, result.code, "email_change", session.personId);
   } catch (error) {
     if (error instanceof MailSendError) {
       logger().warn({ reason: error.message }, "email.send_failed");
@@ -1186,7 +1188,13 @@ export async function confirmEmailVerificationAction(
    * they can still be told.
    */
   try {
-    const outcome = await notifyEmailChanged(db, result.previousEmail, result.email);
+    const outcome = await notifyEmailChanged(
+      db,
+      result.previousEmail,
+      result.email,
+      undefined,
+      session.personId,
+    );
     if (outcome === "failed") {
       logger().warn("email.change_notice_failed");
     }

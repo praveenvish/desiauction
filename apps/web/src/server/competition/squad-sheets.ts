@@ -13,6 +13,8 @@ import {
 } from "@desiauction/db";
 import { and, asc, eq, inArray, isNotNull, like } from "drizzle-orm";
 
+import { messageLanguagesOf } from "@desiauction/messaging/language";
+
 import { formatKickoff } from "../../lib/format-date";
 import { logSecurityEvent } from "../auth/security-events";
 import { db as appDb } from "../db";
@@ -266,6 +268,10 @@ export async function sendSquadSheets(
       }));
 
   const mails: QueuedMail[] = [];
+  const languages = await messageLanguagesOf(
+    db,
+    pending.map((member) => member.personId),
+  );
   for (const member of pending) {
     const team = teamById.get(member.teamId);
     if (team === undefined) continue;
@@ -274,15 +280,18 @@ export async function sendSquadSheets(
       orgId: context.orgId,
       kind: "team.squad_sheet",
       dedupeKey: sheetKey(input.competitionId, member.registrationId, member.teamId),
-      ...squadSheetMail({
-        name: member.greetingName,
-        season: context.season,
-        orgName: context.orgName,
-        teamName: team.name,
-        squad: squadOf(member.teamId, member),
-        coach: team.coach?.trim() || null,
-        firstMatch: matches.get(member.teamId) ?? null,
-      }),
+      ...(await squadSheetMail(
+        {
+          name: member.greetingName,
+          season: context.season,
+          orgName: context.orgName,
+          teamName: team.name,
+          squad: squadOf(member.teamId, member),
+          coach: team.coach?.trim() || null,
+          firstMatch: matches.get(member.teamId) ?? null,
+        },
+        languages.get(member.personId) ?? "en",
+      )),
     });
   }
   const fresh = new Set(await enqueueMail(mails));

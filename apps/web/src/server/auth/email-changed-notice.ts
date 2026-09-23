@@ -1,8 +1,9 @@
 import type { Db } from "@desiauction/db";
+import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 
 import { env } from "../../env";
-import { SUPPORT_EMAIL, renderEmail } from "../messaging/email-layout";
-import { sendNotificationMail } from "../messaging/notify";
+import { languageForMail, sendNotificationMail } from "../messaging/notify";
+import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import type { TransactionalMailer } from "../messaging/transactional-mail";
 
 /**
@@ -37,29 +38,18 @@ export function maskEmail(email: string): string {
   return `${email.slice(0, 1)}•••${email.slice(at)}`;
 }
 
-export function emailChangedCopy(newEmail: string): {
-  subject: string;
-  text: string;
-  html: string;
-} {
-  const masked = maskEmail(newEmail);
-  return {
-    subject: "Your DesiAuction sign-in email was changed",
-    ...renderEmail({
-      preheader: `This account now signs in with ${masked}.`,
-      heading: "Your sign-in email was changed",
-      paragraphs: [
-        `The DesiAuction account that used this address now signs in with ${masked}. Codes and account mail go there from now on, and every other device was signed out.`,
-        "If that was you, there is nothing to do.",
-      ],
-      after: [
-        `If it wasn't you, somebody may have reached your account. Write to ${SUPPORT_EMAIL} straight away from this address and we will help you get it back.`,
-      ],
-      action: { label: "Get help", url: `${env.PUBLIC_BASE_URL}/support` },
-      footnote:
-        "You received this because this address was the sign-in email on a DesiAuction account until a moment ago.",
-    }),
-  };
+export function emailChangedCopy(
+  newEmail: string,
+  language: MessageLanguage = "en",
+): Promise<NotificationMail> {
+  // The "if it wasn't you" line is LOCKED in the template: an admin can reword
+  // the rest, never remove the one sentence that tells the owner what to do.
+  return renderNotificationEmail(
+    "security.email_changed",
+    language,
+    { maskedEmail: maskEmail(newEmail) },
+    { action: { id: "help", url: `${env.PUBLIC_BASE_URL}/support` } },
+  );
 }
 
 /**
@@ -76,14 +66,17 @@ export async function notifyEmailChanged(
   previousEmail: string | null,
   newEmail: string,
   mailer?: TransactionalMailer,
+  /** Whose account moved — the warning is written in their language. */
+  personId?: string,
 ): Promise<"sent" | "skipped" | "refused" | "failed"> {
   if (previousEmail === null || previousEmail === newEmail) {
     return "skipped";
   }
+  const language = await languageForMail(db, { personId: personId ?? null });
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "security.email_changed", to: previousEmail },
-    emailChangedCopy(newEmail),
+    await emailChangedCopy(newEmail, language),
     mailer,
   );
   return outcome === "suppressed" ? "refused" : outcome === "sent" ? "sent" : "failed";
@@ -98,28 +91,16 @@ export async function notifyEmailChanged(
  * new number is not named: "ending 4321" is enough to recognise, and not
  * enough to use.
  */
-export function phoneChangedCopy(last4: string): {
-  subject: string;
-  text: string;
-  html: string;
-} {
-  return {
-    subject: "Your DesiAuction mobile number was changed",
-    ...renderEmail({
-      preheader: `This account's mobile number now ends ${last4}.`,
-      heading: "Your mobile number was changed",
-      paragraphs: [
-        `The mobile number on your DesiAuction account was changed to one ending ${last4}. Sign-in codes and texts go there from now on, and every other device was signed out.`,
-        "If that was you, there is nothing to do.",
-      ],
-      after: [
-        `If it wasn't you, somebody may have reached your account. Write to ${SUPPORT_EMAIL} straight away from this address and we will help you get it back.`,
-      ],
-      action: { label: "Get help", url: `${env.PUBLIC_BASE_URL}/support` },
-      footnote:
-        "You received this because this is the verified email on a DesiAuction account whose mobile number just changed.",
-    }),
-  };
+export function phoneChangedCopy(
+  last4: string,
+  language: MessageLanguage = "en",
+): Promise<NotificationMail> {
+  return renderNotificationEmail(
+    "security.phone_changed",
+    language,
+    { last4 },
+    { action: { id: "help", url: `${env.PUBLIC_BASE_URL}/support` } },
+  );
 }
 
 /** Best effort, through the gate — `notifyEmailChanged`'s rules exactly. */
@@ -128,14 +109,16 @@ export async function notifyPhoneChangedByEmail(
   email: string | null,
   newPhone: string,
   mailer?: TransactionalMailer,
+  personId?: string,
 ): Promise<"sent" | "skipped" | "refused" | "failed"> {
   if (email === null) {
     return "skipped";
   }
+  const language = await languageForMail(db, { personId: personId ?? null, email });
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "security.phone_changed", to: email },
-    phoneChangedCopy(newPhone.slice(-4)),
+    await phoneChangedCopy(newPhone.slice(-4), language),
     mailer,
   );
   return outcome === "suppressed" ? "refused" : outcome === "sent" ? "sent" : "failed";

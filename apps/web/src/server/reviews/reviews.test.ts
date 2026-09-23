@@ -112,8 +112,8 @@ describe("validateReview", () => {
 });
 
 describe("the mail", () => {
-  it("the ask names the link, how long it lasts, and how to stop being asked", () => {
-    const { subject, text } = reviewAskMail("Ravi", "https://desiauction.in/review/abc");
+  it("the ask names the link, how long it lasts, and how to stop being asked", async () => {
+    const { subject, text } = await reviewAskMail("Ravi", "https://desiauction.in/review/abc");
     expect(subject).not.toMatch(/[\r\n]/);
     expect(text).toContain("https://desiauction.in/review/abc");
     expect(text).toContain("30 days");
@@ -122,13 +122,13 @@ describe("the mail", () => {
     expect(text.toLowerCase()).not.toMatch(/5 stars|five stars|reward|discount|voucher/);
   });
 
-  it("the arrival note says whether it may be quoted", () => {
-    const quoted = reviewArrivedMail(
+  it("the arrival note says whether it may be quoted", async () => {
+    const quoted = await reviewArrivedMail(
       valid({ mayQuote: true, displayName: "Ravi K" }),
       "Ravi Kumar",
     );
     expect(quoted.subject).toBe("[Review] 4/5 from Ravi Kumar");
     expect(quoted.text).toContain("May quote, signed: Ravi K");
-    expect(reviewArrivedMail(valid(), null).text).toContain("Not for quoting.");
+    expect((await reviewArrivedMail(valid(), null)).text).toContain("Not for quoting.");
   });
 });

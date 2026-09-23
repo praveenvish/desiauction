@@ -16,6 +16,7 @@
 import { createDb, newId } from "@desiauction/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import type { QueuedMail } from "../server/messaging/outbox";
 import type { OutgoingMail, TransactionalMailer } from "../server/messaging/transactional-mail";
 
 // Fixtures run as the OWNER; only the drain under test runs as the app role.
@@ -69,7 +70,7 @@ describe("POSTURE — the outbox drain honours a club's switch as desiauction_ap
         subject: "Sold",
         text: "You were bought.",
         html: "<p>You were bought.</p>",
-      },
+      } as QueuedMail,
     ]);
     const provider = recorder();
     const result = await drainOutbox({ mailer: provider, personIds: [person] });
@@ -93,7 +94,7 @@ describe("POSTURE — the outbox drain honours a club's switch as desiauction_ap
         subject: "Sold",
         text: "You were bought.",
         html: "<p>You were bought.</p>",
-      },
+      } as QueuedMail,
     ]);
     const provider = recorder();
     const result = await drainOutbox({ mailer: provider, personIds: [person] });
