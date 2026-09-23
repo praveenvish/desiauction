@@ -41,11 +41,16 @@ CREATE TABLE "provider_template_mappings" (
       ("channel" = 'whatsapp' AND "provider_template_name" IS NOT NULL AND "provider_template_id" IS NULL)
       OR ("channel" = 'sms' AND "provider_template_id" IS NOT NULL AND "provider_template_name" IS NULL)
     ),
-  -- Meta's own rule for a template name.
+  -- Meta's own rule for a template name. The length is its own test: a
+  -- regex bound above 255 is refused by Postgres ("invalid repetition count").
   CONSTRAINT "provider_template_mappings_name_format"
-    CHECK ("provider_template_name" IS NULL OR "provider_template_name" ~ '^[a-z0-9_]{1,512}$'),
+    CHECK ("provider_template_name" IS NULL OR (
+      "provider_template_name" ~ '^[a-z0-9_]+$' AND char_length("provider_template_name") <= 512
+    )),
   CONSTRAINT "provider_template_mappings_id_format"
-    CHECK ("provider_template_id" IS NULL OR "provider_template_id" ~ '^[A-Za-z0-9_-]{1,64}$'),
+    CHECK ("provider_template_id" IS NULL OR (
+      "provider_template_id" ~ '^[A-Za-z0-9_-]+$' AND char_length("provider_template_id") <= 64
+    )),
   CONSTRAINT "provider_template_mappings_languages_check"
     CHECK (cardinality("languages") >= 1 AND "languages" <@ ARRAY['en', 'hi']::text[]),
   -- LOGIN IS ENV-MANAGED. The sign-in code's template decides whether anybody
