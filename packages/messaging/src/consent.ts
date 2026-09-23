@@ -6,7 +6,7 @@ import {
   suppressions,
   type Db,
 } from "@desiauction/db";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { ORG_SWITCH_CHANNELS, orgTopics, personTopics, type SwitchTopic } from "./catalogue";
 
@@ -262,7 +262,14 @@ export async function recordConsent(
 
 /**
  * Stop sending to a contact. Used by STOP handling, and by bounce and complaint
- * webhooks — continuing to send to a hard bounce is how a sending domain dies.
+ * webhooks — continuing to send to a hard bounce is how a sending domain dies —
+ * and by an admin's manual suppression (/admin/notifications/suppressions).
+ *
+ * Resolves to the new row's id, which the admin writer keeps on its audit row
+ * so the change can be reverted by id rather than by guessing. The inbound
+ * callers ignore it. There is no actor column: who suppressed a contact by hand,
+ * and why, is the audit row's job (suppression-writer.ts); `note` carries the
+ * reason too, so the row reads on its own.
  */
 export async function suppress(
   db: Db,
@@ -273,15 +280,17 @@ export async function suppress(
     reason: "stop" | "bounce" | "complaint" | "manual" | "unreachable";
     note?: string;
   },
-): Promise<void> {
+): Promise<string> {
+  const id = newId();
   await db.insert(suppressions).values({
-    id: newId(),
+    id,
     contact: input.contact,
     channel: input.channel,
     scope: input.scope ?? "global",
     reason: input.reason,
     note: input.note ?? null,
   });
+  return id;
 }
 
 /**
@@ -450,12 +459,18 @@ export async function setOrgMessagingSetting(
 /**
  * Reverse a STOP (someone texts START). The rows stay and are marked lifted
  * rather than deleted, so the history of what we were told, and when, survives.
+ *
+ * `ids` narrows the lift to named rows — an admin lifts ONE suppression from
+ * the list, not every row the contact has on the channel. Without it, every
+ * live row for the contact on the channel goes, which is what START means.
+ * Resolves to the ids actually lifted (already-lifted rows are left alone).
  */
 export async function liftSuppression(
   db: Db,
-  input: { contact: string; channel: "sms" | "email"; at?: Date },
-): Promise<void> {
-  await db
+  input: { contact: string; channel: "sms" | "email"; at?: Date; ids?: readonly string[] },
+): Promise<string[]> {
+  if (input.ids !== undefined && input.ids.length === 0) return [];
+  const rows = await db
     .update(suppressions)
     .set({ liftedAt: input.at ?? new Date() })
     .where(
@@ -463,6 +478,24 @@ export async function liftSuppression(
         eq(suppressions.contact, input.contact),
         eq(suppressions.channel, input.channel),
         isNull(suppressions.liftedAt),
+        ...(input.ids === undefined ? [] : [inArray(suppressions.id, [...input.ids])]),
       ),
-    );
+    )
+    .returning({ id: suppressions.id });
+  return rows.map((row) => row.id);
+}
+
+/**
+ * Put lifted rows back in force — the revert of an admin's lift. Only rows that
+ * are currently lifted change; resolves to those ids. The original `created_at`
+ * and reason stand, because the row is the same fact it always was.
+ */
+export async function reinstateSuppression(db: Db, ids: readonly string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .update(suppressions)
+    .set({ liftedAt: null })
+    .where(and(inArray(suppressions.id, [...ids]), isNotNull(suppressions.liftedAt)))
+    .returning({ id: suppressions.id });
+  return rows.map((row) => row.id);
 }

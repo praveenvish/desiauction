@@ -488,6 +488,8 @@ const SECTION_LABELS: [RegExp, string][] = [
   // admin", since `pageIdentity` falls back to the surface name when a section
   // has no label.
   [/^\/admin\/messaging$/, "Messaging"],
+  [/^\/admin\/notifications\/suppressions$/, "Suppressions"],
+  [/^\/admin\/notifications\/analytics$/, "Delivery analytics"],
   [/^\/admin\/notifications\/[^/]+\/email$/, "Email wording"],
   [/^\/admin\/notifications$/, "Notifications"],
   [/^\/admin\/passes$/, "Passes"],

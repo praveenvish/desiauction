@@ -85,6 +85,183 @@
   gap: 0 var(--space-4);
 }
 
+/* ── Phase 4: the header links, the suppression desk, delivery analytics ── */
+
+.ntc-page-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.ntc-back {
+  gap: var(--space-2);
+  margin-inline-start: calc(-1 * var(--space-3));
+}
+
+/* The Phase 1 page's doors to its two sub-pages. They wrap at 360px. */
+.ntc-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ntc-links a {
+  gap: var(--space-2);
+}
+
+.spr-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+/* The search field and its button share a row on a desktop and stack on a
+   phone; the button lines up with the input, not the help text. */
+.spr-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2) var(--space-3);
+}
+
+.spr-search > :first-child {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.spr-search > button {
+  margin-top: calc(var(--text-sm-size) * 1.5 + var(--space-1));
+}
+
+.spr-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* Analytics: the window switch, the per-channel figures and the trend. */
+.dla-windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dla-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.dla-channel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.dla-channel h3 {
+  margin: 0;
+}
+
+.dla-channel dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.dla-channel dt {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.dla-channel dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.dla-trend {
+  padding: var(--space-3) var(--space-4) var(--space-2);
+}
+
+.dla-trend svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 10rem;
+}
+
+.dla-bar-sent {
+  fill: var(--success-strong);
+}
+
+.dla-bar-failed {
+  fill: var(--danger-strong);
+}
+
+.dla-bar-suppressed {
+  fill: var(--warning-strong);
+}
+
+.dla-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.dla-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-inline-end: var(--space-1);
+  border-radius: 2px;
+  vertical-align: -0.1em;
+}
+
+/* The legend's swatches are spans, which take a background, not a fill. */
+.dla-swatch.dla-bar-sent {
+  background: var(--success-strong);
+}
+
+.dla-swatch.dla-bar-failed {
+  background: var(--danger-strong);
+}
+
+.dla-swatch.dla-bar-suppressed {
+  background: var(--warning-strong);
+}
+
+.dla-trend details {
+  margin-top: var(--space-2);
+}
+
+.dla-trend summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.dla-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-sm-size);
+  overflow-wrap: anywhere;
+}
+
 /* "Template: da_auction_sold (mapped here) · approved" — the way to
    /admin/notifications/templates from a WhatsApp or SMS cell. A 44px target
    in a dense cell, so the whole line is the link. */

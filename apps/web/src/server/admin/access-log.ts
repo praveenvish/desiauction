@@ -90,7 +90,11 @@ export type AdminSurface =
   /** The moderation desk (0072), behind `platform:moderation`. */
   | "moderation"
   /** The Notification Control Center: every message's switches, and who changed them. */
-  | "notifications";
+  | "notifications"
+  /** The suppression desk: who we must not contact, looked up one at a time. */
+  | "suppressions"
+  /** Delivery analytics: counts only, never a recipient. */
+  | "delivery-analytics";
 
 /**
  * Record that an administrator opened a surface.

@@ -226,6 +226,18 @@
       "class": "by-design",
       "reason": "Notification Control Center (Phase 2): the email wording editor, behind platform.admin. notification_templates (0087) is platform-level with no org_id and no RLS \u2014 DesiAuction's wording, never a club's \u2014 so it is written on the app pool, which holds its DML via default privileges (verify-grants APP_WRITES_UNPROTECTED). The platform-scoped audit row of each publish, restore, reset and test send goes on the system pool, the only role allowed to write it (audit_tenant WITH CHECK refuses platform scope to the app role), exactly as notification-actions.ts does. There is no tenant to scope either to."
     },
+    "apps/web/src/server/admin/suppression-actions.ts": {
+      "class": "by-design",
+      "reason": "Notification Control Center (Phase 4): the suppression desk, behind platform.admin. `suppressions` is platform-level with no org_id and no RLS \u2014 a STOP, bounce or complaint is a fact about a contact, not a club \u2014 so lifts and manual additions are written on the app pool, which holds its DML (the same pool the delivery webhook and inbound STOP/START write it on). The lookup reads it on the system pool (SELECT). The platform-scoped audit row goes on the system pool, the only role allowed to write it (audit_tenant WITH CHECK refuses platform scope to the app role), exactly as notification-actions.ts does. There is no tenant to scope any of it to."
+    },
+    "apps/web/src/server/admin/suppression-views.ts": {
+      "class": "by-design",
+      "reason": "Notification Control Center (Phase 4) projection (read-only), behind platform.admin: one typed contact's rows in `suppressions` (platform-level, no org_id, no RLS) by exact match, and the platform-scoped audit rows of the desk's changes, which no tenant context can read. Same shape as notification-views.ts."
+    },
+    "apps/web/src/server/admin/delivery-analytics-views.ts": {
+      "class": "by-design",
+      "reason": "Notification Control Center (Phase 4) projection (read-only), behind platform.admin: GROUP BY counts over message_outbox across every club inside a window capped at 90 days \u2014 never a recipient, a contact or a body; failure reasons leave only as redacted labels. Cross-tenant by definition, same shape as notification-views.ts."
+    },
     "apps/web/src/server/admin/template-views.ts": {
       "class": "by-design",
       "reason": "Notification Control Center (Phase 2) projection (read-only), behind platform.admin: the kind's template versions, the names of the operators who wrote them, and the platform-scoped audit rows of their publishes, which no tenant context can read. Platform data by definition, same shape as notification-views.ts."
