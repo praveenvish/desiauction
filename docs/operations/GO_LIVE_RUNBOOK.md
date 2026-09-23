@@ -96,61 +96,55 @@ Nothing here is optional, and none of it counts until a restore has been timed.
 Login is OTP-first. Until this section is done, nobody but the operator can
 sign in. `env.ts` refuses to start production with `OTP_PROVIDER=dev`.
 
-1. **F** — MSG91 account plus **DLT registration**: the principal entity, the
-   sender header, and one content template per message shape — every template
-   in [DLT_REGISTRATION](../messaging/DLT_REGISTRATION.md), generated from the
-   code. The OTP template needs a code slot. Registration decision notices are
-   separate templates (the regime registers one template per message shape),
-   the old number's phone-change notice is one more, and so are the three
-   personal texts (a sale, a named role, a lineup).
+**WhatsApp replaces SMS for launch** (founder decision 2026-09-23). Sign-in
+codes and personal messages go out on Meta's WhatsApp Cloud API directly; SMS
+through MSG91 is **deferred** until DLT registration, and nothing in env.ts or
+preflight requires it. Email sign-in stays the default door
+(`LOGIN_DEFAULT_METHOD=email`) and works with no text channel at all.
+
+1. **F** — Meta Business verification, a WhatsApp Business Account, a phone
+   number with the display name `DesiAuction` approved, a System User token,
+   the authentication template and the utility templates approved. Every step,
+   with where each value lives in Meta's dashboards:
+   [WHATSAPP_SETUP](../messaging/WHATSAPP_SETUP.md). The template texts to
+   submit (English and Hindi) are in
+   [WHATSAPP_TEMPLATES](../messaging/WHATSAPP_TEMPLATES.md), generated from the
+   code.
 2. **E** — Set in `web.env`:
    ```sh
-   OTP_PROVIDER=msg91
-   MSG91_AUTH_KEY=…
-   MSG91_TEMPLATE_ID=…                              # the OTP template
-   MSG91_TEMPLATE_REGISTRATION_APPROVED=…           # one per decision shape
-   MSG91_TEMPLATE_REGISTRATION_WAITLISTED=…
-   MSG91_TEMPLATE_REGISTRATION_REJECTED=…
-   MSG91_TEMPLATE_REGISTRATION_WITHDRAWN=…
-   MSG91_TEMPLATE_REGISTRATION_RESTORED=…
-   MSG91_TEMPLATE_SECURITY_PHONE_CHANGED=…          # the old number is told
-   MSG91_TEMPLATE_AUCTION_SOLD=…                    # "Cup Kings bought you for Rs 75,000"
-   MSG91_TEMPLATE_TEAM_APPOINTED=…                  # "You are named captain of Cup Kings"
-   MSG91_TEMPLATE_LINEUP_ANNOUNCED=…                # "You are in the Cup Kings lineup vs Tigers"
-   SMS_INBOUND_SECRET=…                             # ≥16 chars; STOP replies land here
+   OTP_PROVIDER=whatsapp
+   WHATSAPP_PHONE_NUMBER_ID=…                       # Meta's phone number ID, not the number
+   WHATSAPP_ACCESS_TOKEN=…                          # System User token, no expiry
+   WHATSAPP_TEMPLATE_NAME=…                         # the approved AUTHENTICATION template
+   WHATSAPP_APP_SECRET=…                            # App settings → Basic; signs every callback
+   WHATSAPP_WEBHOOK_VERIFY_TOKEN=…                  # ≥16 chars, yours; pasted into Meta's form
+   WHATSAPP_TEMPLATE_…=…                            # one per approved utility template
    ```
-   A missing decision template makes that one notice refuse with the variable
-   named; it does not send against another shape's registration. The two
-   auction texts are the same: without their ids the sale and the appointment
-   still reach the player by inbox and email, and the queued text fails once
-   with the variable named (`message_outbox.last_error`). Texts due between
-   10 pm and 8 am IST wait for 8 am. The circuit breaker (3 consecutive
-   provider failures, 60 s cool-down) is on by default.
-3. **E** — Configure the provider's inbound (STOP) webhook with the same
-   `SMS_INBOUND_SECRET`. While the secret is unset, that route answers 404.
-   **Proof:** sign in on a phone that has never used the product, from a
-   network that is not the office's. Time it: the code should arrive within
-   seconds. Then reply STOP and confirm the number appears on the suppression
-   list.
-4. **F** — _Optional, not a launch blocker._ WhatsApp for the personal
-   messages. A player who ticks "Send my auction and team updates on WhatsApp
-   instead of SMS" gets the sale (with their player card), a named role and a
-   lineup on WhatsApp instead of by text. Needs a verified Meta Business
-   account with a WhatsApp number on the Cloud API, and the three templates in
-   [WHATSAPP_TEMPLATES](../messaging/WHATSAPP_TEMPLATES.md) approved (Utility,
-   English). **E** — set in `web.env`:
-   ```sh
-   WHATSAPP_PHONE_NUMBER_ID=…                       # shared with WhatsApp sign-in codes
-   WHATSAPP_ACCESS_TOKEN=…
-   WHATSAPP_TEMPLATE_AUCTION_SOLD=…                 # the APPROVED template names
-   WHATSAPP_TEMPLATE_TEAM_APPOINTED=…
-   WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED=…
-   ```
-   Until a template's name is set, that moment goes by SMS even to players who
-   opted in, and any WhatsApp failure falls back to SMS in the same send.
-   **Proof:** opt in on /account with a test number, announce a lineup for a
-   test match, and see it arrive on WhatsApp; the queue row's `channel` reads
-   `whatsapp`.
+   `env.ts` refuses to boot production with WhatsApp sending configured and
+   either webhook secret unset: replies — STOP among them — land only on the
+   callback URL, and a number that cannot hear STOP breaks Meta's policy and
+   the DPDP Act. A utility template whose name is unset is simply not sent on
+   WhatsApp.
+3. **E** — In the Meta app, **WhatsApp → Configuration → Webhook**: Callback
+   URL `https://desiauction.in/api/webhooks/whatsapp`, Verify token =
+   `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, subscribe to the **`messages`** field, press
+   **Test**. Deploy the two secrets first: the route answers 404 until they are
+   set.
+   **Proof:** sign in by the phone tab on a phone that has never used the
+   product, from a network that is not the office's. Time it: the code should
+   arrive on WhatsApp within seconds. Opt in on /account, trigger a personal
+   message, and see its `message_outbox` row reach `delivery_status =
+   delivered`. Then reply STOP: the confirmation arrives, and the latest
+   `whatsapp.updates` row in `consent_records` for that person is
+   `granted = false`. Reply START and it flips back.
+4. **F** — _Deferred, not a launch blocker._ SMS via MSG91 and **DLT
+   registration** (principal entity, sender header, one content template per
+   shape — [DLT_REGISTRATION](../messaging/DLT_REGISTRATION.md)). When it
+   lands: `MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID` and the per-shape
+   `MSG91_TEMPLATE_*` ids, `SMS_INBOUND_SECRET` for the SMS STOP webhook, and
+   only then consider `LOGIN_DEFAULT_METHOD=phone` — preflight warns about
+   phone-first login with no SMS fallback, because a Meta outage would close
+   the default door.
 
 ## D · Environment and preflight (P0-3, second half)
 
@@ -275,11 +269,12 @@ If you turn it on:
 Run it on production, with real phones, before the first organizer is invited.
 It is the whole product in one evening:
 
-1. An organizer signs in by SMS, names themselves, creates an organization and
+1. An organizer signs in (email, or a WhatsApp code on the phone tab), names themselves, creates an organization and
    a season in a non-cricket sport, and publishes registration.
 2. Four players register from their own phones (one of them a minor, with
    guardian consent). The organizer approves three and waitlists one, and each
-   gets the right SMS.
+   is told (inbox and email; WhatsApp where a template is approved — SMS is
+   deferred for launch).
 3. The organizer creates teams, invites two owners by link, and grants them
    paddles. The owners claim the paddles on their own phones.
 4. A live auction: at least one extension, one undo, one unsold lot, and a

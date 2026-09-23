@@ -239,14 +239,18 @@ if (otpProvider === "whatsapp") {
     "WhatsApp Cloud API credentials",
     "set WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN and WHATSAPP_TEMPLATE_NAME",
   );
-  // Not a blocker: WhatsApp is the primary channel, SMS is the documented
-  // fallback (C-19). A deployment with no fallback still works — it just has
-  // nowhere to go when Meta is down, which the operator should decide knowingly.
+  // SMS IS DORMANT FOR LAUNCH (founder decision 2026-09-23): WhatsApp is the
+  // text channel and MSG91/DLT is deferred, so no MSG91 variable is REQUIRED
+  // here. The one case worth a warning is phone-first login with no SMS
+  // fallback — then a Meta outage closes the front door, and only the email
+  // tab still works. With email as the default door (the launch setting) a
+  // WhatsApp outage costs the phone tab, not sign-in, and nothing is said.
   warn(
     "MSG91-fallback",
-    nonEmpty(env.MSG91_AUTH_KEY) && nonEmpty(env.MSG91_TEMPLATE_ID),
-    "SMS fallback credentials",
-    "set MSG91_AUTH_KEY and MSG91_TEMPLATE_ID so a WhatsApp outage is not a login outage",
+    env.LOGIN_DEFAULT_METHOD !== "phone" ||
+      (nonEmpty(env.MSG91_AUTH_KEY) && nonEmpty(env.MSG91_TEMPLATE_ID)),
+    "phone-first login with no SMS fallback",
+    "LOGIN_DEFAULT_METHOD=phone and no MSG91: a WhatsApp outage closes the default door — keep LOGIN_DEFAULT_METHOD=email until SMS/DLT is live, or set MSG91_AUTH_KEY + MSG91_TEMPLATE_ID",
   );
 } else {
   check(
@@ -254,6 +258,22 @@ if (otpProvider === "whatsapp") {
     nonEmpty(env.MSG91_AUTH_KEY) && nonEmpty(env.MSG91_TEMPLATE_ID),
     "SMS provider credentials",
     "set MSG91_AUTH_KEY and MSG91_TEMPLATE_ID",
+  );
+}
+
+// --- WhatsApp callback (opt-outs and delivery receipts) -------------------------
+// A number that sends on WhatsApp must be able to hear "STOP": replies land on
+// /api/webhooks/whatsapp, which is closed (404) without these two secrets.
+// env.ts refuses to boot the same way; this says so before the deploy. Meta
+// setup: docs/messaging/WHATSAPP_SETUP.md.
+const whatsappSends = nonEmpty(env.WHATSAPP_PHONE_NUMBER_ID) && nonEmpty(env.WHATSAPP_ACCESS_TOKEN);
+if (whatsappSends) {
+  check(
+    "WHATSAPP-webhook",
+    (env.WHATSAPP_APP_SECRET ?? "").length >= 16 &&
+      (env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ?? "").length >= 16,
+    "the WhatsApp callback URL verifies Meta's signature and handshake with these",
+    "set WHATSAPP_APP_SECRET (Meta app → Settings → Basic → App secret) and WHATSAPP_WEBHOOK_VERIFY_TOKEN (>=16 random chars, pasted into Meta's webhook form) in web.env — without them STOP replies are dropped",
   );
 }
 

@@ -5,6 +5,7 @@ import {
   problemReportScreenshots,
   problemReports,
   reviewReports,
+  whatsappInbound,
 } from "@desiauction/db";
 import { and, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 
@@ -162,4 +163,24 @@ export async function purgeSpentSecurityRecords(
     emailCodesDeleted: emailCodes.length,
     reviewAddressesCleared: reviewAddresses.length,
   };
+}
+
+/**
+ * WHAT PEOPLE SENT US ON WHATSAPP (0085) — ninety days.
+ *
+ * A row is a number, the keyword its message was read as, and when. Its jobs
+ * are done within minutes: stopping Meta's retries from acting twice, and
+ * being the record behind a consent row. The consent row itself is the durable
+ * evidence (append-only, with the message id in its evidence), so the inbound
+ * row outliving a quarter would only be a list of phone numbers. Account
+ * erasure removes a person's rows at once (privacy/erasure.ts).
+ */
+export const WHATSAPP_INBOUND_RETENTION_MS = 90 * DAY_MS;
+
+export async function purgeWhatsAppInbound(now: Date = new Date()): Promise<number> {
+  const deleted = await db
+    .delete(whatsappInbound)
+    .where(lt(whatsappInbound.receivedAt, new Date(now.getTime() - WHATSAPP_INBOUND_RETENTION_MS)))
+    .returning({ id: whatsappInbound.providerMessageId });
+  return deleted.length;
 }
