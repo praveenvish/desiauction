@@ -7,6 +7,8 @@ import {
   isSuppressionAuditMeta,
   type SuppressionAuditMeta,
 } from "../messaging/suppression-writer";
+import { systemDb } from "../db";
+import { platformAdminGate } from "./authz";
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "./capabilities";
 
 /**
@@ -187,4 +189,13 @@ export interface SuppressionDesk {
 
 export async function suppressionDesk(db: Db): Promise<SuppressionDesk> {
   return { recent: await recentSuppressionChanges(db) };
+}
+
+/**
+ * The page's read: `platform.admin`, or nothing. On the SYSTEM pool: the
+ * change log is platform-scoped audit rows no tenant context can read.
+ */
+export async function adminSuppressionDesk(): Promise<SuppressionDesk | null> {
+  if ((await platformAdminGate()) === null) return null;
+  return suppressionDesk(systemDb);
 }
