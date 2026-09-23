@@ -11,7 +11,9 @@ import {
   orgMembers,
   otpCodes,
   otpInbox,
+  paddles,
   people,
+  teams,
   type DbHandle,
 } from "@desiauction/db";
 import { desc, eq, inArray } from "drizzle-orm";
@@ -29,6 +31,7 @@ import {
   assignAuctioneer,
   auctioneerCandidates,
   auctioneersOf,
+  lockSeasonAppointments,
   removeAuctioneer,
 } from "./auctioneers";
 
@@ -42,6 +45,8 @@ let owner = "";
 let member = "";
 let stranger = "";
 let teamOwner = "";
+let paddleHolder = "";
+let seasonAuctionId = "";
 let orgId = "";
 let season: CompetitionSummary = null as unknown as CompetitionSummary;
 let otherSeason: CompetitionSummary = null as unknown as CompetitionSummary;
@@ -65,20 +70,25 @@ beforeAll(async () => {
   member = newId();
   stranger = newId();
   teamOwner = newId();
+  paddleHolder = newId();
   await db.insert(people).values([
     { id: member, phone: `+9195${RUN}1`, name: "Host Member" },
     { id: stranger, phone: `+9195${RUN}2`, name: "Stranger" },
     { id: teamOwner, phone: `+9195${RUN}3`, name: "Team Owner" },
+    { id: paddleHolder, phone: `+9195${RUN}4`, name: "Paddle Holder" },
   ]);
   await db.insert(orgMembers).values([
     { orgId, personId: member },
     { orgId, personId: teamOwner },
+    { orgId, personId: paddleHolder },
   ]);
 });
 
 afterAll(async () => {
   if (orgId !== "") await purgeOrg(db, orgId);
-  await db.delete(people).where(inArray(people.id, [member, stranger, teamOwner, owner]));
+  await db
+    .delete(people)
+    .where(inArray(people.id, [member, stranger, teamOwner, paddleHolder, owner]));
   await db.delete(otpCodes).where(eq(otpCodes.phone, PHONE_OWNER));
   await db.delete(otpInbox).where(eq(otpInbox.phone, PHONE_OWNER));
   await handle.sql.end();
@@ -151,6 +161,7 @@ describe("AUCTIONEER — conduct one season, nothing more", () => {
     // Team owners are viewer-level club members, so they pass the membership
     // check — and conducting shows every rival's purse and every owner's phone.
     const auctionId = newId();
+    seasonAuctionId = auctionId;
     await db.insert(auctions).values({
       id: auctionId,
       orgId,
@@ -185,6 +196,69 @@ describe("AUCTIONEER — conduct one season, nothing more", () => {
     expect(
       (await auctioneerCandidates(db, orgId, otherSeason.id)).map((row) => row.personId),
     ).toContain(teamOwner);
+  });
+
+  it("never appoints someone holding a paddle in the season (go-live gate P3)", async () => {
+    // IssuePaddle hands a paddle straight to a person — no owner link, no
+    // grant — so the two routes above missed them. The paddle needs a real
+    // team: paddles.team_id is a foreign key.
+    const teamId = newId();
+    await db.insert(teams).values({
+      id: teamId,
+      orgId,
+      competitionId: season.id,
+      name: `Paddle Team ${RUN}`,
+      createdBy: owner,
+    });
+    await db.insert(paddles).values({
+      id: newId(),
+      orgId,
+      auctionId: seasonAuctionId,
+      teamId,
+      personId: paddleHolder,
+      paddleNumber: `P-${RUN}`,
+    });
+    const candidates = await auctioneerCandidates(db, orgId, season.id);
+    expect(candidates.map((row) => row.personId)).not.toContain(paddleHolder);
+    expect(
+      await assignAuctioneer(db, {
+        orgId,
+        competitionId: season.id,
+        personId: paddleHolder,
+        actorId: owner,
+      }),
+    ).toEqual({ ok: false, reason: "team_owner" });
+  });
+
+  it("appointment and acceptance serialise on one lock per season (go-live gate P3)", async () => {
+    // Two transactions on the same season: the second waits for the first to
+    // commit. Proven by ordering, not timing — the waiter can only record its
+    // step after the holder has recorded both of its own.
+    const steps: string[] = [];
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = db.transaction(async (tx) => {
+      await lockSeasonAppointments(tx, season.id);
+      steps.push("first:locked");
+      await held;
+      steps.push("first:done");
+    });
+    // Give the first transaction the lock before the second asks for it.
+    while (!steps.includes("first:locked")) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const second = db.transaction(async (tx) => {
+      await lockSeasonAppointments(tx, season.id);
+      steps.push("second:locked");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    release();
+    await Promise.all([first, second]);
+    expect(steps).toEqual(["first:locked", "first:done", "second:locked"]);
+    // A different season is a different lock: nothing waits on it.
+    await db.transaction((tx) => lockSeasonAppointments(tx, otherSeason.id));
   });
 
   it("the database refuses any other set on a season scope, and a second live grant (0077)", async () => {

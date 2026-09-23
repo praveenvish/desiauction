@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   Badge,
   ButtonLink,
@@ -30,6 +31,15 @@ import "../../marketing.css";
 import "../directory.css";
 import "./competition.css";
 
+/**
+ * `generateMetadata` and the page both need this read, and Next runs them as
+ * two calls in one request — so it was fetched twice per render. React
+ * `cache` makes the second a memo hit for the rest of the request (wrapped
+ * here, not in the server module, because a "use server" file may only export
+ * async functions).
+ */
+const competitionView = cache(publicCompetitionView);
+
 // PX-5 public competition landing (PX-1 P-06). Renders only what is true and
 // public-safe: identity, dates, organizer, teams, the published schedule, and
 // the registration door. No phones, no registration lists, no money.
@@ -40,7 +50,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const view = await publicCompetitionView(slug);
+  const view = await competitionView(slug);
   if (view === null) {
     return { title: "Season · DesiAuction" };
   }
@@ -89,7 +99,7 @@ export default async function PublicCompetitionPage({
   const { ref } = await searchParams;
   // Carry a shared link's `?ref` through to registration for attribution.
   const refSuffix = typeof ref === "string" && ref !== "" ? `?ref=${encodeURIComponent(ref)}` : "";
-  const [view, pool] = await Promise.all([publicCompetitionView(slug), publicShowcase(slug)]);
+  const [view, pool] = await Promise.all([competitionView(slug), publicShowcase(slug)]);
   if (view === null) {
     notFound();
   }

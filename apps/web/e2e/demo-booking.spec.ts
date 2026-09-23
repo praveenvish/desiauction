@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { E2E_MARK, clearTestDemoData, publishTestAvailability } from "./demo-availability";
+import { axeClean } from "./axe";
 
 /**
  * DEMO-1 — the whole journey an anonymous stranger lives, in a real browser.
@@ -28,12 +29,6 @@ test.beforeAll(async () => {
 /** A number that is valid, and that no other suite in this repo uses. */
 function freshPhone(): string {
   return `98${String(Math.floor(Math.random() * 90_000_000) + 10_000_000)}`;
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  await page.waitForFunction(() => document.title.length > 0);
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 async function fillDemoForm(page: Page, phone: string): Promise<void> {

@@ -264,6 +264,7 @@ export function PlayerImage({
             width={px}
             height={px}
             loading="lazy"
+            decoding="async"
             // A server-rendered photo can finish loading BEFORE hydration
             // attaches `onLoad`, and React never replays that event — the frame
             // then sat in its loading state (photo at opacity 0) forever, which

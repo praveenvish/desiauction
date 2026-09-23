@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import {
@@ -15,7 +15,9 @@ import {
  *
  * We persist storage KEYS (see @desiauction/core `deriveMediaKey`); the port
  * turns a key into an upload target (browser PUTs bytes directly) and a read
- * URL. Image bytes never pass through the Next server.
+ * URL. The UPLOAD never passes through the Next server; the attach does read
+ * the object back once, capped, to sanitize it (sanitize.ts, P0-6) — the one
+ * place the server touches image bytes on the write path.
  */
 export interface PresignedUpload {
   /** URL the browser PUTs the raw image bytes to. */
@@ -37,6 +39,36 @@ export interface StoragePort {
   readUrl(key: string): string;
   /** Remove a stored object (best-effort; missing is not an error). */
   delete(key: string): Promise<void>;
+  /**
+   * Read an object's bytes, refusing to buffer more than `maxBytes` — the
+   * client chose what it PUT, so its size is a claim until counted here.
+   */
+  readObject(key: string, maxBytes: number): Promise<StoredObject>;
+  /** Write bytes the SERVER produced (the sanitized re-encode) under `key`. */
+  writeObject(key: string, contentType: AllowedImageType, bytes: Buffer): Promise<void>;
+}
+
+export type StoredObject =
+  { status: "ok"; bytes: Buffer } | { status: "missing" } | { status: "too_large" };
+
+/**
+ * Drain a body, stopping the moment it passes `maxBytes` — so a 2 GB object
+ * costs us 5 MB and a cancelled stream, not 2 GB of heap.
+ */
+export async function readCapped(
+  body: AsyncIterable<Uint8Array>,
+  maxBytes: number,
+): Promise<Buffer | null> {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for await (const chunk of body) {
+    total += chunk.byteLength;
+    if (total > maxBytes) {
+      return null;
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 // --- Development: local filesystem under apps/web/public/_media -------------
@@ -69,6 +101,32 @@ export class LocalStorage implements StoragePort {
     await rm(join(LOCAL_ROOT, key), { force: true });
   }
 
+  async readObject(key: string, maxBytes: number): Promise<StoredObject> {
+    if (!isValidMediaKey(key)) {
+      throw new Error("Rejected: malformed media key");
+    }
+    let handle;
+    try {
+      handle = await open(join(LOCAL_ROOT, key), "r");
+    } catch {
+      return { status: "missing" };
+    }
+    try {
+      const { size } = await handle.stat();
+      if (size > maxBytes) {
+        return { status: "too_large" };
+      }
+      const bytes = await readCapped(handle.createReadStream(), maxBytes);
+      return bytes === null ? { status: "too_large" } : { status: "ok", bytes };
+    } finally {
+      await handle.close();
+    }
+  }
+
+  async writeObject(key: string, contentType: AllowedImageType, bytes: Buffer): Promise<void> {
+    await this.writeLocal(key, contentType, bytes);
+  }
+
   /** Used by the local upload route to persist bytes for a key. Prod uploads
    * go straight to the bucket and never hit this path. */
   async writeLocal(key: string, contentType: string, bytes: Buffer): Promise<void> {
@@ -92,14 +150,21 @@ export class LocalStorage implements StoragePort {
 // changes which endpoint/signer we construct in createStorageFromEnv.
 
 export type ObjectSigner = (args: {
-  method: "PUT" | "DELETE";
+  method: "GET" | "PUT" | "DELETE";
   key: string;
   contentType?: string;
   expiresSeconds: number;
 }) => string;
 
 export interface HttpTransport {
-  (url: string, init: { method: string }): Promise<{ status: number }>;
+  (
+    url: string,
+    init: { method: string; headers?: Record<string, string>; body?: Uint8Array },
+  ): Promise<{
+    status: number;
+    headers?: { get(name: string): string | null };
+    body?: AsyncIterable<Uint8Array> | null;
+  }>;
 }
 
 export interface BucketConfig {
@@ -114,7 +179,23 @@ export class BucketStorage implements StoragePort {
   private readonly uploadExpiry: number;
 
   constructor(private readonly config: BucketConfig) {
-    this.transport = config.transport ?? ((url, init) => fetch(url, init));
+    this.transport =
+      config.transport ??
+      (async (url, init) => {
+        const response = await fetch(url, {
+          method: init.method,
+          ...(init.headers !== undefined ? { headers: init.headers } : {}),
+          // A copy onto a plain ArrayBuffer: what `BodyInit` accepts.
+          ...(init.body !== undefined ? { body: new Uint8Array(init.body) } : {}),
+          // Server-to-bucket IO: a hung origin must not hang an attach.
+          signal: AbortSignal.timeout(15_000),
+        });
+        return {
+          status: response.status,
+          headers: response.headers,
+          body: response.body as AsyncIterable<Uint8Array> | null,
+        };
+      });
     this.uploadExpiry = config.uploadExpirySeconds ?? 300;
   }
 
@@ -142,6 +223,51 @@ export class BucketStorage implements StoragePort {
   async delete(key: string): Promise<void> {
     const url = this.config.sign({ method: "DELETE", key, expiresSeconds: this.uploadExpiry });
     await this.transport(url, { method: "DELETE" });
+  }
+
+  async readObject(key: string, maxBytes: number): Promise<StoredObject> {
+    if (!isValidMediaKey(key)) {
+      throw new Error("Rejected: malformed media key");
+    }
+    const url = this.config.sign({ method: "GET", key, expiresSeconds: 60 });
+    const response = await this.transport(url, { method: "GET" });
+    if (response.status === 404 || response.status === 403) {
+      // S3 answers 403 for a missing key when the signer lacks ListBucket.
+      return { status: "missing" };
+    }
+    if (response.status < 200 || response.status >= 300 || !response.body) {
+      throw new Error(`Media read failed: HTTP ${String(response.status)}`);
+    }
+    // Refuse on the declared length first; count the bytes regardless, since a
+    // chunked response need not declare one.
+    const declared = Number(response.headers?.get("content-length") ?? NaN);
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      return { status: "too_large" };
+    }
+    const bytes = await readCapped(response.body, maxBytes);
+    return bytes === null ? { status: "too_large" } : { status: "ok", bytes };
+  }
+
+  async writeObject(key: string, contentType: AllowedImageType, bytes: Buffer): Promise<void> {
+    if (!isValidMediaKey(key) || !isAllowedImageType(contentType)) {
+      throw new Error("Rejected: malformed media key or type");
+    }
+    // Same signed-content-type PUT the browser uses, so the object is served
+    // with the type we actually encoded.
+    const url = this.config.sign({
+      method: "PUT",
+      key,
+      contentType,
+      expiresSeconds: 60,
+    });
+    const response = await this.transport(url, {
+      method: "PUT",
+      headers: { "content-type": contentType },
+      body: bytes,
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Media write failed: HTTP ${String(response.status)}`);
+    }
   }
 }
 

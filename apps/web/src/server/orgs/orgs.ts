@@ -204,8 +204,22 @@ export async function memberCountOf(db: Db, orgId: string): Promise<number> {
  * resolves membership first. Counting it as authority was the one place it
  * meant anything.
  */
-export async function holdersOf(db: Db, orgId: string, capabilitySet: string): Promise<string[]> {
-  const rows = await db
+export async function holdersOf(
+  db: Db,
+  orgId: string,
+  capabilitySet: string,
+  /**
+   * Lock the live grant rows FOR UPDATE, for a caller about to revoke one of
+   * them on the strength of this count (the last-owner rule). Without it two
+   * owners revoking EACH OTHER at once both read "two owners", both pass, and
+   * the org commits with none. Locked in id order, so two such transactions
+   * queue on the first row instead of deadlocking; the second one re-reads
+   * after the first commits, finds the revoked row gone from its answer, and
+   * is refused. Only meaningful inside a transaction.
+   */
+  options: { lock?: boolean } = {},
+): Promise<string[]> {
+  const query = db
     .select({ personId: grants.personId })
     .from(grants)
     .innerJoin(
@@ -219,7 +233,9 @@ export async function holdersOf(db: Db, orgId: string, capabilitySet: string): P
         eq(grants.capabilitySet, capabilitySet),
         isNull(grants.revokedAt),
       ),
-    );
+    )
+    .orderBy(asc(grants.id));
+  const rows = options.lock === true ? await query.for("update", { of: grants }) : await query;
   return [...new Set(rows.map((row) => row.personId))];
 }
 
@@ -233,6 +249,19 @@ export async function holdersOf(db: Db, orgId: string, capabilitySet: string): P
  */
 export function wouldOrphanOrg(owners: readonly string[], targetPersonId: string): boolean {
   return owners.length <= 1 && owners.includes(targetPersonId);
+}
+
+/**
+ * `wouldOrphanOrg`, read under a lock that holds until the caller's revocation
+ * commits (see `holdersOf`'s `lock`). Call it in the SAME transaction as the
+ * write it guards — the check is only as good as the moment it is true at.
+ */
+export async function lastOwnerRefuses(
+  db: Db,
+  orgId: string,
+  targetPersonId: string,
+): Promise<boolean> {
+  return wouldOrphanOrg(await holdersOf(db, orgId, "org:owner", { lock: true }), targetPersonId);
 }
 
 /**

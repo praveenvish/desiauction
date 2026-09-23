@@ -787,18 +787,24 @@ export class AuctionEngine {
         if (lotId === null || paddleId === null || typeof amountRaw !== "number") {
           return rejected("invalid_payload");
         }
-        // The actor must HOLD the paddle (or be a conductor: manual mode, doc 41).
+        // The actor must HOLD the paddle — or run the season: manual mode
+        // (doc 41) is an owner bidding on a team's behalf, which takes conduct
+        // AND competition.manage. Conduct alone is what an appointed
+        // auctioneer holds, and it used to be enough: the one person in the
+        // room trusted to be neutral could bid with any team's paddle
+        // (go-live gate P0-5).
         const [paddle] = await db
           .select({ personId: paddles.personId })
           .from(paddles)
           .where(and(eq(paddles.id, paddleId), eq(paddles.auctionId, auction.id)))
           .limit(1);
         const holder = paddle?.personId === actor;
+        const manualMode = envelope.conduct && envelope.manage === true;
         const result = await placeBid(db, auction, actor, {
           lotId,
           paddleId,
           amountRaw,
-          bidderAuthorized: holder || envelope.conduct,
+          bidderAuthorized: holder || manualMode,
           ...(envelope.receivedAtMs === undefined ? {} : { receivedAtMs: envelope.receivedAtMs }),
         });
         return result.ok

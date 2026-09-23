@@ -125,7 +125,9 @@ export async function cockpitView(slug: string): Promise<CockpitView | null> {
           .orderBy(asc(teams.name)),
         preSignedPlayers(db, gate.competition.id, (key) => storage.readUrl(key)),
         resolvedLots(db, gate.auction.id),
-        ownerAcceptancesOf(db, gate.auction.id, gate.competition.orgId),
+        ownerAcceptancesOf(db, gate.auction.id, gate.competition.orgId, {
+          fullContact: gate.canManage,
+        }),
         lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
       ]),
   );

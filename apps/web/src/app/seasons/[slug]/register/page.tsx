@@ -14,6 +14,7 @@ import {
   IconLock,
   IconUsers,
 } from "@desiauction/ui";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -22,6 +23,8 @@ import { env } from "../../../../env";
 import { currentSession } from "../../../../server/auth/actions";
 import { ownPhotoUrl, playerProfileFor, sportProfileFor } from "../../../../server/player/profile";
 import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
+import { publicCompetitionView } from "../../../../server/competition/public";
+import { SHARE_IMAGE_SIZE } from "../../../c/[slug]/share-image-card";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
 import { dateRange } from "../../../tournaments/season-card";
 import { RegisterFlow } from "./register-flow";
@@ -29,7 +32,51 @@ import { RegistrationStatus } from "./registration-status";
 import "../../seasons.css";
 import "./register.css";
 
-export const metadata = { title: "Register · DesiAuction" };
+/**
+ * THE LINK ORGANIZERS ACTUALLY SHARE.
+ *
+ * `/seasons/<slug>/register` is what goes into the WhatsApp group, and it
+ * previewed as "Register · DesiAuction" with no picture — the one link whose
+ * whole job is to be tapped by strangers said nothing about what it opens.
+ *
+ * `publicCompetitionView` is the same visibility gate `/c/<slug>` and its
+ * share card use: a PRIVATE season returns null and keeps the generic title,
+ * because its name is not a stranger's to read (the page itself redirects
+ * them to sign in for the same reason). A public season borrows its public
+ * card image rather than rendering a second one. Not indexed either way —
+ * the canonical page for a season is `/c/<slug>`.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const view = await publicCompetitionView(slug);
+  if (view === null) {
+    return { title: "Register · DesiAuction", robots: { index: false, follow: false } };
+  }
+  const title = `Register for ${view.name}`;
+  const description = view.open
+    ? `Join the player pool for ${view.name} — on auction day, team owners bid to sign you.`
+    : `${view.name} on DesiAuction.`;
+  const card = `${env.PUBLIC_BASE_URL}/c/${view.slug}/opengraph-image`;
+  return {
+    title: `${title} · DesiAuction`,
+    description,
+    robots: { index: false, follow: true },
+    alternates: { canonical: `${env.PUBLIC_BASE_URL}/c/${view.slug}` },
+    openGraph: {
+      title,
+      description,
+      url: `${env.PUBLIC_BASE_URL}/seasons/${view.slug}/register`,
+      type: "website",
+      siteName: "DesiAuction",
+      images: [{ url: card, ...SHARE_IMAGE_SIZE, alt: `${view.name} on DesiAuction` }],
+    },
+    twitter: { card: "summary_large_image", title, description, images: [card] },
+  };
+}
 
 /** The season's own line under its name: "1 Aug – 15 Sep 2026 · Malad, Mumbai". */
 function seasonMeta(

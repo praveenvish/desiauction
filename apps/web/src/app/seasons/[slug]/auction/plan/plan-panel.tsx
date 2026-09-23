@@ -4,7 +4,6 @@ import {
   TARGET_PRIORITIES,
   TARGET_PRIORITY_LABELS,
   evaluatePlan,
-  formatPaiseINR,
   paise,
   type AuctionStatus,
   type PlanInput,
@@ -47,6 +46,7 @@ import {
 import { PlanReportCard } from "./plan-report";
 import { PlanWhatIf } from "./plan-what-if";
 import { useHydrated } from "../../../../../lib/use-hydrated";
+import { ledgerINR } from "../../../../../lib/inr";
 
 /**
  * MY PLAN — the page (WR-1).
@@ -72,12 +72,8 @@ const STATUS_BADGE: Record<AuctionStatus, { tone: BadgeTone; label: string }> = 
   abandoned: { tone: "neutral", label: "Abandoned" },
 };
 
-function money(value: number): string {
-  return formatPaiseINR(paise(value));
-}
-
 function signedMoney(value: number): string {
-  return value < 0 ? `−${money(-value)}` : money(value);
+  return value < 0 ? `−${ledgerINR(-value)}` : ledgerINR(value);
 }
 
 function nameOf(lot: PlanLotRow | undefined, fallback: string): string {
@@ -156,7 +152,7 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     () => searchPool(view.lots, targeted, query, labelOf),
     [view.lots, targeted, query, labelOf],
   );
-  const purseLabel = money(view.planRules.pursePerTeam);
+  const purseLabel = ledgerINR(view.planRules.pursePerTeam);
   const roleKeys = useMemo(() => view.roles.map((role) => role.key), [view.roles]);
   const roles = useMemo(
     () => roleFacts(view.lots, view.preSignedRoles, view.team.id, roleKeys),
@@ -243,7 +239,7 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
         (message) => {
           setRowErrors((current) => ({ ...current, [row.id]: message }));
         },
-        lot === undefined ? {} : { basePrice: money(lot.basePrice) },
+        lot === undefined ? {} : { basePrice: ledgerINR(lot.basePrice) },
       );
     });
   };
@@ -311,11 +307,11 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
 
       <div className="stat-row plan-stats">
         <div className="stat-tile" data-testid="plan-purse">
-          <span className="stat-value">{money(state.budget.purseRemaining)}</span>
+          <span className="stat-value">{ledgerINR(state.budget.purseRemaining)}</span>
           <span className="stat-label">Purse remaining</span>
         </div>
         <div className="stat-tile" data-testid="plan-exposure">
-          <span className="stat-value">{money(state.budget.plannedExposure)}</span>
+          <span className="stat-value">{ledgerINR(state.budget.plannedExposure)}</span>
           <span className="stat-label">
             Planned for {state.budget.openTargets}{" "}
             {state.budget.openTargets === 1 ? "target" : "targets"}
@@ -342,14 +338,14 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
         <Badge tone={fit.tone}>{fit.label}</Badge>
         {recover?.kind === "recover" ? (
           <p className="plan-note">
-            To fit, the plan needs {money(recover.amount)} less.{" "}
+            To fit, the plan needs {ledgerINR(recover.amount)} less.{" "}
             {recover.candidates.length > 0 ? (
               <>
                 Lowest priority first:{" "}
                 {recover.candidates
                   .map(
                     (c) =>
-                      `${nameOf(lotsByRegistration.get(c.registrationId), "a player")} (${money(c.plannedAmount)})`,
+                      `${nameOf(lotsByRegistration.get(c.registrationId), "a player")} (${ledgerINR(c.plannedAmount)})`,
                   )
                   .join(", ")}
                 .
@@ -366,7 +362,8 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
         {unaffordable.map((s) => (
           <p className="plan-note" key={s.registrationId}>
             {nameOf(lotsByRegistration.get(s.registrationId), "A player")} is planned at{" "}
-            {money(s.plannedAmount)}, above what you could bid right now ({money(s.maxAffordable)}
+            {ledgerINR(s.plannedAmount)}, above what you could bid right now (
+            {ledgerINR(s.maxAffordable)}
             ).
           </p>
         ))}
@@ -507,7 +504,7 @@ function Identity({
       <div className="plan-identity-text">
         <span className="registration-name">{name}</span>
         <span className="plan-sub">
-          {lot.number} · {labelOf(lot.role ?? "")} · base {money(lot.basePrice)}
+          {lot.number} · {labelOf(lot.role ?? "")} · base {ledgerINR(lot.basePrice)}
         </span>
       </div>
     </div>
@@ -570,7 +567,7 @@ function TargetLine({
         <div className="plan-row-marks">
           {badge !== null ? <Badge tone={badge.tone}>{badge.label}</Badge> : null}
           {target.paidAmount !== null ? (
-            <span className="plan-sub">for {money(target.paidAmount)}</span>
+            <span className="plan-sub">for {ledgerINR(target.paidAmount)}</span>
           ) : null}
         </div>
       </div>
@@ -597,10 +594,10 @@ function TargetLine({
           }}
           {...(error !== null ? { error } : {})}
           {...(target.countedAtBase && open && target.basePrice !== null
-            ? { help: `Counted at base, ${money(target.basePrice)}` }
+            ? { help: `Counted at base, ${ledgerINR(target.basePrice)}` }
             : target.ladderFloor !== null && target.maxBid !== null
               ? {
-                  help: `Not on the bid ladder — the last legal bid under it is ${money(target.ladderFloor)}`,
+                  help: `Not on the bid ladder — the last legal bid under it is ${ledgerINR(target.ladderFloor)}`,
                 }
               : {})}
           data-testid={`plan-max-${id}`}

@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { latestOtp } from "./otp";
+import { axeClean } from "./axe";
 
 // PX-10 FOUNDER DEMONSTRATION: an anonymous visitor opens the landing page →
 // reads the product overview → discovers competitions → reads help → views legal
@@ -31,15 +32,6 @@ const PUBLIC_ROUTES = [
   "/releases",
   "/search?q=receipt",
 ];
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  // After a client-side (next/link) navigation, the new <title> is committed a
-  // microtask after the DOM swaps. Wait for it so axe's document-title rule sees
-  // the title the SSR HTML always carries — not a transient empty one.
-  await page.waitForFunction(() => document.title.length > 0);
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
-}
 
 test("every public page renders without authentication", async ({ page }) => {
   test.setTimeout(180_000);

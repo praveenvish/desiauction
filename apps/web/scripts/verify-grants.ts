@@ -126,6 +126,25 @@ const APP_WRITES_TENANT = ["org_import_mappings", "auction_team_targets", "featu
  */
 const PRIVATE_PLAN_TABLES = ["auction_team_targets", "auction_team_target_revisions"];
 
+/**
+ * PERSONAL CONTENT THE SERVICE WRITERS MUST NOT READ (go-live gate P2, 0083).
+ *
+ * Default privileges gave the engine and the runner SELECT on each of these the
+ * day it was created: every rendered message, problem report, screenshot,
+ * review and erasure request, readable by two BYPASSRLS service credentials
+ * that fold none of them. Stated here so a recipe re-run or a new default
+ * cannot quietly hand the read back.
+ */
+const PERSONAL_CONTENT_TABLES = [
+  "message_outbox",
+  "problem_reports",
+  "problem_report_screenshots",
+  "review_requests",
+  "reviews",
+  "review_reports",
+  "erasure_requests",
+];
+
 const APP_WRITES_UNPROTECTED = [
   "demo_requests",
   "demo_availability",
@@ -322,6 +341,17 @@ function expectations(allTables: string[]): Expectation[] {
         verb: "SELECT",
         allowed: false,
         why: "a private plan is not auction or finops truth; service writers must not even read it (WR-1)",
+      });
+    }
+  }
+  for (const table of PERSONAL_CONTENT_TABLES) {
+    for (const role of ["desiauction_engine", "desiauction_runner"]) {
+      out.push({
+        role,
+        table,
+        verb: "SELECT",
+        allowed: false,
+        why: "personal content is not auction or finops truth; no service writer folds it (0083)",
       });
     }
   }

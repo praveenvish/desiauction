@@ -1,0 +1,470 @@
+# ALERT RULES, PROVISIONED FROM THIS FILE (go-live gate P1-3).
+#
+# docs/operations/ALERTS.md named five alerts and nothing evaluated any of them.
+# These are the ones expressible from the logs Loki already holds, plus the
+# three that the backup, mirror and scheduler sidecars were built to feed. What
+# a log CANNOT say — the whole box being down, TLS expiring, DNS — is the
+# external uptime check's job (ALERTS.md "Outside the box"): Grafana on this
+# host goes silent exactly when the host does.
+#
+# Delivery is ONE webhook, from ALERT_WEBHOOK_URL (compose refuses to start
+# without it). `severity=page` vs `ticket` is a label for the receiver to route
+# on; a single operator will want both on the phone at beta.
+#
+# Every rule's "no data" is OK: a count over a quiet window returns nothing, and
+# `absent_over_time` returns nothing precisely when the heartbeat IS present.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: operator
+    receivers:
+      - uid: operator-webhook
+        type: webhook
+        settings:
+          url: $ALERT_WEBHOOK_URL
+          httpMethod: POST
+
+policies:
+  - orgId: 1
+    receiver: operator
+    group_by: [grafana_folder, alertname]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
+groups:
+  - orgId: 1
+    name: desiauction
+    folder: DesiAuction
+    interval: 1m
+    rules:
+      - uid: da-service-unhealthy
+        title: "Service unhealthy (autoheal restarted a container)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({service="autoheal"} |= "found to be unhealthy" [10m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "A container failed its healthcheck (web /readyz, engine /healthz) and autoheal restarted it."
+          action: "ALERTS.md 1 - TROUBLESHOOTING.md. Several restarts in a row across web AND engine points at the database, not the apps."
+      - uid: da-engine-unhealthy
+        title: "Engine unhealthy (restarted by autoheal)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({service="autoheal"} |= "found to be unhealthy" |= "engine" [10m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: page }
+        annotations:
+          summary: "The engine failed /healthz and was restarted. During a live auction the countdown stopped in the room."
+          action: "ALERTS.md 4 - check for a live window first; DEPLOYMENT.md covers a wedged single-writer lease."
+      - uid: da-error-rate
+        title: "Error rate above 10 per 5 minutes"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum by (service) (count_over_time({job="docker", level="error"}[5m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "More than 10 error-level lines in 5 minutes from one service."
+          action: "ALERTS.md 2 - join a line to its request with requestId; Sentry has the stack."
+      - uid: da-fatal
+        title: "Fatal log line"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum by (service) (count_over_time({job="docker", level="fatal"}[5m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: page }
+        annotations:
+          summary: "A process logged fatal - it is about to die (engine lease loss, runner unhandled rejection)."
+          action: "ALERTS.md 2 - fatal is only emitted on the way down; read the lines just before it."
+      - uid: da-runner-crashloop
+        title: "FinOps runner crash loop"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({service="runner"} |= "finops-runner started" [30m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [3] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "The runner started more than 3 times in 30 minutes."
+          action: "ALERTS.md 3 - a boot refusal prints its reason as the first lines; queue age is on /admin/health."
+      - uid: da-webhook-5xx
+        title: "Webhook route returned 5xx"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({service="caddy"} |= "handled request" |= "/api/webhooks/" | json | status >= 500 [5m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: page }
+        annotations:
+          summary: "A payment or messaging provider's webhook got a server error - the class of write refused by a role."
+          action: "ALERTS.md 5 - posture:verify under the production roles reproduces the class locally."
+      - uid: da-webhook-4xx
+        title: "Webhook refusals (4xx) repeating"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({service="caddy"} |= "handled request" |= "/api/webhooks/" | json | status >= 400 and status < 500 [15m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [3] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "More than 3 webhook refusals in 15 minutes: a rotated secret (401) or a route that believes it is unconfigured (404)."
+          action: "ALERTS.md 5 - SECRET_ROTATION.md for 401s; check the *_SECRET for 404s."
+      - uid: da-backup-failed
+        title: "Database backup failed or refused"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({service="pgbackrest"} |~ "BACKUP_FAILED|BACKUP_REFUSED" [1h]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: page }
+        annotations:
+          summary: "pgBackRest failed a backup, or refused to run against an on-box repo."
+          action: "ALERTS.md 6 - docker compose logs pgbackrest; RESTORE_RUNBOOK.md."
+      - uid: da-backup-stale
+        title: "No successful database backup in 26 hours"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'absent_over_time({service="pgbackrest"} |= "BACKUP_OK" [26h])'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: page }
+        annotations:
+          summary: "No BACKUP_OK line for 26 hours - the nightly backup did not complete."
+          action: "ALERTS.md 6 - docker compose logs pgbackrest; pgbackrest info inside the sidecar."
+      - uid: da-mirror-failed
+        title: "Object-storage mirror failed or refused"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 7200, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({service="minio-mirror"} |~ "MIRROR_FAILED|MIRROR_REFUSED" [2h]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "The off-box copy of photos and finops artifacts failed or is not configured."
+          action: "ALERTS.md 6 - docker compose logs minio-mirror."
+      - uid: da-mirror-stale
+        title: "No successful object-storage mirror in 3 hours"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'absent_over_time({service="minio-mirror"} |= "MIRROR_OK" [3h])'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "No MIRROR_OK line for 3 hours."
+          action: "ALERTS.md 6 - docker compose logs minio-mirror."
+      - uid: da-jobs-failed
+        title: "Scheduled job failing"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({service="scheduler"} |= "job.failed" [15m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [2] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "A /api/jobs route answered non-2xx (404 = its secret is unset or differs) or the web tier was unreachable."
+          action: "ALERTS.md 7 - docker compose logs scheduler names the job and the status."
+      - uid: da-jobs-silent
+        title: "Scheduled jobs went silent"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'absent_over_time({service="scheduler"} |= "job.ok" [15m])'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "No job has succeeded for 15 minutes: the outbox is not draining and the settlement sweep is not sweeping."
+          action: "ALERTS.md 7 - is the scheduler container running? does web.env carry the job secrets?"

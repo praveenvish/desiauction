@@ -1,6 +1,5 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
 import {
   IconAlert,
   IconCheckCircle,
@@ -24,6 +23,7 @@ import {
 import { useState, type ReactNode } from "react";
 
 import { formatDateTime } from "../../../../../../lib/format-date";
+import { ledgerINR } from "../../../../../../lib/inr";
 import { replayEvidence, type ReviewView } from "../../../../../../server/settlement/actions";
 import { CASE_STATE, PAYMENT_STATE } from "../../money-words";
 import "../../money.css";
@@ -98,12 +98,8 @@ const EVIDENCE_FIELDS: { key: string; label: string; help: string }[] = [
   },
 ];
 
-function inr(value: number): string {
-  return formatPaiseINR(paise(value));
-}
-
 function Amount({ value }: { value: number }) {
-  return <span title={`${String(value)} paise`}>{inr(value)}</span>;
+  return <span title={`${String(value)} paise`}>{ledgerINR(value)}</span>;
 }
 
 /**

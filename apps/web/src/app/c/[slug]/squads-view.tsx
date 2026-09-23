@@ -3,7 +3,8 @@
 import { PlayerImage } from "@desiauction/ui";
 import { useMemo } from "react";
 
-import { TeamCard, TeamGrid } from "../../../components/public/team-card";
+import { TeamCard, TeamGrid, teamCardInitials } from "../../../components/public/team-card";
+import { CrestImage } from "../../../components/team/crest-image";
 import { groupSquads } from "../../../components/showcase/showcase-filter";
 import type { ShowcasePlayer } from "../../../server/competition/public";
 
@@ -76,8 +77,15 @@ export function SquadsView({
             crest:
               team.logoUrl === null ? undefined : (
                 // A signed storage URL, already sized by the card; next/image
-                // would add a proxy hop for a 40px crest.
-                <img src={team.logoUrl} alt="" width={40} height={40} loading="lazy" />
+                // would add a proxy hop for a 40px crest. A file that fails
+                // falls back to the initials the card draws without one.
+                <CrestImage
+                  src={team.logoUrl}
+                  width={40}
+                  height={40}
+                  loading="lazy"
+                  fallback={teamCardInitials(team.name)}
+                />
               ),
             players: squad.map((player) => ({
               name: player.name,

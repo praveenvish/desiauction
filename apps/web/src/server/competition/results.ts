@@ -415,6 +415,7 @@ export interface LobbyParticipantRow {
 export async function lobbyParticipantsOf(
   db: Db,
   orgId: string,
+  competitionId: string,
   fixtureId: string,
 ): Promise<readonly LobbyParticipantRow[]> {
   const rows = await db
@@ -426,6 +427,14 @@ export async function lobbyParticipantsOf(
     })
     .from(fixtureParticipants)
     .innerJoin(teams, eq(teams.id, fixtureParticipants.teamId))
+    // The season's own fixture only: the id comes from the browser.
+    .innerJoin(
+      fixtures,
+      and(
+        eq(fixtures.id, fixtureParticipants.fixtureId),
+        eq(fixtures.competitionId, competitionId),
+      ),
+    )
     .where(and(eq(fixtureParticipants.fixtureId, fixtureId), eq(fixtureParticipants.orgId, orgId)));
   return [...rows]
     .sort((a, b) => {

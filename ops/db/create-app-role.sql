@@ -245,4 +245,17 @@ revoke all on auction_team_targets, auction_team_target_revisions
 revoke update, delete on auction_team_target_revisions
   from desiauction_app, desiauction_engine, desiauction_runner, desiauction_system;
 
+-- PERSONAL CONTENT IS NOT SERVICE TRUTH (go-live gate P2, migration 0083).
+--
+-- The `grant select on all tables` above hands both service writers every
+-- rendered message, problem report, screenshot, review and erasure request on
+-- the platform. Neither reads one — nothing in the engine, the runner or the
+-- packages they import names these tables — so the grant was pure blast
+-- radius on two BYPASSRLS credentials. 0083 revokes it on databases that
+-- already ran this file; this line keeps a re-run from handing it back.
+-- `grants:verify` pins it (PERSONAL_CONTENT_TABLES).
+revoke all on message_outbox, problem_reports, problem_report_screenshots,
+  review_requests, reviews, review_reports, erasure_requests
+  from desiauction_engine, desiauction_runner;
+
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'

@@ -1,15 +1,10 @@
 "use client";
 
-import {
-  TARGET_PRIORITY_LABELS,
-  formatPaiseINR,
-  paise,
-  type PlanReport,
-  type ReportOutcome,
-} from "@desiauction/core";
+import { TARGET_PRIORITY_LABELS, type PlanReport, type ReportOutcome } from "@desiauction/core";
 import { Badge, Card, type BadgeTone } from "@desiauction/ui";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
+import { ledgerINR } from "../../../../../lib/inr";
 
 /**
  * HOW THE NIGHT WENT (WR-1, Phase 1.5). Shown on the plan page once the auction
@@ -18,10 +13,6 @@ import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
  * owner who went past a max to sign a must-have did exactly what the plan was
  * for, and the page says so in numbers, not adjectives.
  */
-
-function money(value: number): string {
-  return formatPaiseINR(paise(value));
-}
 
 const OUTCOME: Record<ReportOutcome, { tone: BadgeTone; label: string }> = {
   won: { tone: "success", label: "Signed" },
@@ -51,12 +42,14 @@ export function PlanReportCard({
           <span className="stat-label">Targets signed</span>
         </div>
         <div className="stat-tile" data-testid="plan-report-paid">
-          <span className="stat-value">{money(report.paidForTargets)}</span>
-          <span className="stat-label">Paid for them · planned {money(report.plannedTotal)}</span>
+          <span className="stat-value">{ledgerINR(report.paidForTargets)}</span>
+          <span className="stat-label">
+            Paid for them · planned {ledgerINR(report.plannedTotal)}
+          </span>
         </div>
         <div className="stat-tile" data-testid="plan-report-over">
           <span className="stat-value">
-            {report.overMaxCount === 0 ? "—" : money(report.overMaxTotal)}
+            {report.overMaxCount === 0 ? "—" : ledgerINR(report.overMaxTotal)}
           </span>
           <span className="stat-label">
             {report.overMaxCount === 0
@@ -66,7 +59,7 @@ export function PlanReportCard({
         </div>
         <div className="stat-tile" data-testid="plan-report-outside">
           <span className="stat-value">
-            {report.outsidePlan.length === 0 ? "—" : money(report.outsidePlanTotal)}
+            {report.outsidePlan.length === 0 ? "—" : ledgerINR(report.outsidePlanTotal)}
           </span>
           <span className="stat-label">
             {report.outsidePlan.length === 0
@@ -91,15 +84,15 @@ export function PlanReportCard({
                   <span className="registration-name">{name(row.registrationId)}</span>
                   <span className="plan-sub">
                     {TARGET_PRIORITY_LABELS[row.priority]} ·{" "}
-                    {row.maxBid === null ? "no max" : `max ${money(row.maxBid)}`}
+                    {row.maxBid === null ? "no max" : `max ${ledgerINR(row.maxBid)}`}
                   </span>
                 </span>
                 <span className="plan-report-outcome">
                   <Badge tone={outcome.tone}>{outcome.label}</Badge>
                   {row.paid !== null ? (
                     <span className="plan-sub">
-                      {row.outcome === "won" ? "for" : "at"} {money(row.paid)}
-                      {row.overBy !== null ? ` · ${money(row.overBy)} past your max` : ""}
+                      {row.outcome === "won" ? "for" : "at"} {ledgerINR(row.paid)}
+                      {row.overBy !== null ? ` · ${ledgerINR(row.overBy)} past your max` : ""}
                     </span>
                   ) : null}
                 </span>
@@ -112,7 +105,7 @@ export function PlanReportCard({
         <p className="plan-hint" data-testid="plan-report-outside-list">
           Off-plan:{" "}
           {report.outsidePlan
-            .map((row) => `${name(row.registrationId)} (${money(row.paid)})`)
+            .map((row) => `${name(row.registrationId)} (${ledgerINR(row.paid)})`)
             .join(", ")}
         </p>
       ) : null}

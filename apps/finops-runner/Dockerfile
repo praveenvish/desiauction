@@ -6,13 +6,18 @@ FROM node:24-slim AS build
 WORKDIR /repo
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+# The lockfile pins patchedDependencies (patches/); a frozen install refuses without them.
+COPY patches ./patches
 COPY packages ./packages
 COPY apps/finops-runner ./apps/finops-runner
 RUN pnpm install --frozen-lockfile --filter @desiauction/finops-runner...
 RUN pnpm --filter @desiauction/finops-runner build
 # --legacy: workspace code is bundled into dist/index.mjs; the deployed
 # node_modules only carries npm runtime deps (pnpm v10 injection not needed).
-RUN pnpm --filter @desiauction/finops-runner deploy --legacy --prod /deployed
+# The next@ patch belongs to apps/web, which this context never copies, so
+# pnpm deploy calls it unused and refuses (ERR_PNPM_UNUSED_PATCH). Allowed
+# here only: the workspace install still fails on a genuinely stale patch.
+RUN pnpm --config.allow-unused-patches=true --filter @desiauction/finops-runner deploy --legacy --prod /deployed
 
 FROM gcr.io/distroless/nodejs24-debian12:nonroot
 WORKDIR /app

@@ -1,6 +1,6 @@
 import { demoRequests, newId, type Db } from "@desiauction/db";
 import { normalizePhone } from "@desiauction/core";
-import { and, gt, eq, sql } from "drizzle-orm";
+import { and, gt, eq, isNotNull, sql } from "drizzle-orm";
 
 import { DEMAND_SPORTS, type DemandSportKey } from "../../content/demand-sports";
 
@@ -257,6 +257,41 @@ export async function isThrottled(
       ),
     )) as [{ count: number }];
   return byIp.count >= MAX_PER_IP_PER_HOUR;
+}
+
+/**
+ * THE PLATFORM-WIDE CEILING ON ACKNOWLEDGEMENTS (gate P2).
+ *
+ * The per-phone and per-address limits above stop one sender. They do not
+ * stop many: a phone number is free to invent and an address rotates behind
+ * any proxy pool, and each accepted request mails an UNVERIFIED address from
+ * our domain. A spray of those is sender-reputation damage we pay for. So the
+ * acknowledgements, not the requests, get a ceiling across everybody — the
+ * same DB-backed shape as the sign-in mail's `DEFAULT_GLOBAL_PER_HOUR`, counted
+ * from the rows themselves so a restart cannot reset it.
+ *
+ * Over the ceiling the lead is still recorded and the founder still told —
+ * a real person loses only the receipt, and sees the same success screen.
+ * Thirty an hour is an order of magnitude above any honest week's demand.
+ */
+export const MAX_ACKNOWLEDGEMENTS_PER_HOUR = 30;
+
+export async function acknowledgementsSpent(
+  db: Db,
+  now: Date = new Date(),
+  ceiling: number = MAX_ACKNOWLEDGEMENTS_PER_HOUR,
+): Promise<boolean> {
+  const [recent] = (await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(demoRequests)
+    .where(
+      and(
+        isNotNull(demoRequests.email),
+        gt(demoRequests.createdAt, new Date(now.getTime() - HOUR_MS)),
+      ),
+    )) as [{ count: number }];
+  // The request being answered is already among them (insert comes first).
+  return recent.count > ceiling;
 }
 
 /** The insert, and the id it produced — the booking flow needs that id. */

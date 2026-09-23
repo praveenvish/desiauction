@@ -1,5 +1,6 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
 import {
+  auctions,
   lots,
   paddles,
   people,
@@ -8,7 +9,7 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { logSecurityEvent } from "../auth/security-events";
 import { dbHandle } from "../db";
@@ -153,4 +154,62 @@ export async function announceAuctionOutcomes(input: {
     // Nor may the whole announcement cost the auction its completion.
   }
   return sent;
+}
+
+/**
+ * COMPLETE THE AUCTION, AND ANNOUNCE IT ONCE.
+ *
+ * Every completion path goes through here. The gateway's `commandId` exists so
+ * a retry is idempotent, and the engine keeps that promise: a repeated id gets
+ * the ORIGINAL accepted ack back. So "announce on an accepted ack" announced
+ * again on every retry — a double-click, a network replay — and each player got
+ * a second, third "You were sold" row in /inbox (go-live gate P3). The emails
+ * and texts were already deduped by the outbox key; the inbox rows were not.
+ *
+ * The acknowledgement cannot tell a fresh completion from a replayed one, but
+ * the auction row can: announce only when it was NOT already completed before
+ * this command ran. The per-auction advisory lock makes that read and the
+ * command one step, so two concurrent retries cannot both read "live".
+ *
+ * `send` returns whatever its caller's command path returns; `accepted` says
+ * whether it succeeded.
+ */
+export async function completeAuctionOnce<T>(
+  input: {
+    personId: string;
+    orgId: string;
+    auctionId: string;
+    competition: { id: string; name: string };
+  },
+  send: () => Promise<T>,
+  accepted: (result: T) => boolean,
+): Promise<T> {
+  return withTenantDb(dbHandle, { personId: input.personId, orgId: input.orgId }, async (db) => {
+    await db.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`auction-complete:${input.auctionId}`}, 0))`,
+    );
+    const [before] = await db
+      .select({ status: auctions.status })
+      .from(auctions)
+      .where(eq(auctions.id, input.auctionId))
+      .limit(1);
+    const result = await send();
+    /*
+     * THE ONE MESSAGE THE PLAYER WAS NEVER SENT.
+     *
+     * Announced only on an ACCEPTED completion: the engine owns the auction
+     * but cannot reach the messaging adapters (`apps/*` may not import
+     * `apps/*`). A refused command must announce nothing — a short-squad close
+     * that DA-06 rejects has not ended anybody's night.
+     *
+     * Awaited rather than fired and forgotten, so the conductor's screen does
+     * not refresh into a finished auction before the inbox rows exist; it
+     * swallows its own failures so a completed auction can never be undone by
+     * a notification.
+     */
+    if (accepted(result) && before?.status !== "completed") {
+      await announceAuctionOutcomes(input);
+    }
+    return result;
+  });
 }

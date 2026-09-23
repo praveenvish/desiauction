@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  BATTING_STYLES,
-  BOWLING_STYLES,
-  battingStyleLabel,
-  bowlingStyleLabel,
-} from "@desiauction/core";
+import type { AttributeOption } from "@desiauction/core";
 import { Button, Dialog, Field, IconPlus, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -47,6 +42,7 @@ export function AddPlayerDialog({
   slug,
   roles,
   rolesRequired,
+  attributes,
 }: {
   slug: string;
   /**
@@ -66,9 +62,21 @@ export function AddPlayerDialog({
    * choose, in a sport that does not require one.
    */
   rolesRequired: boolean;
+  /**
+   * What this season's sport asks about a player (`attributeOptions`).
+   *
+   * The dialog used to offer cricket's batting and bowling selects to every
+   * sport — a footballer added by hand was asked for his bowling style. The
+   * two selects now render only when the pack declares the attribute, with the
+   * pack's own options; the action behind them stores exactly these two
+   * columns, so a sport that declares neither simply has no extra questions.
+   */
+  attributes: readonly AttributeOption[];
 }) {
   const router = useRouter();
   const toast = useToast();
+  const batting = attributes.find((attribute) => attribute.column === "batting_style");
+  const bowling = attributes.find((attribute) => attribute.column === "bowling_style");
   const [open, setOpen] = useState(false);
   const blank = { ...EMPTY_FORM, role: rolesRequired ? (roles[0]?.key ?? "") : "" };
   const [form, setForm] = useState(blank);
@@ -208,32 +216,36 @@ export function AddPlayerDialog({
               value={form.dateOfBirth}
               onChange={set("dateOfBirth")}
             />
-            <Select
-              label="Batting style (optional)"
-              name="battingStyle"
-              value={form.battingStyle}
-              onChange={set("battingStyle")}
-            >
-              <option value="">Not specified</option>
-              {BATTING_STYLES.map((style) => (
-                <option key={style} value={style}>
-                  {battingStyleLabel(style)}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Bowling style (optional)"
-              name="bowlingStyle"
-              value={form.bowlingStyle}
-              onChange={set("bowlingStyle")}
-            >
-              <option value="">Not specified</option>
-              {BOWLING_STYLES.map((style) => (
-                <option key={style} value={style}>
-                  {bowlingStyleLabel(style)}
-                </option>
-              ))}
-            </Select>
+            {batting !== undefined ? (
+              <Select
+                label={`${batting.label} (optional)`}
+                name="battingStyle"
+                value={form.battingStyle}
+                onChange={set("battingStyle")}
+              >
+                <option value="">Not specified</option>
+                {batting.options.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
+            {bowling !== undefined ? (
+              <Select
+                label={`${bowling.label} (optional)`}
+                name="bowlingStyle"
+                value={form.bowlingStyle}
+                onChange={set("bowlingStyle")}
+              >
+                <option value="">Not specified</option>
+                {bowling.options.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
             {/* Submit on Enter without a visible duplicate of the footer button. */}
             <button type="submit" hidden aria-hidden />
           </form>

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { standingsView } from "../../../../server/competition/fixture-actions";
 import { TeamCrest } from "../_tabs/team-crest";
+import { standingsFootnote } from "./footnote";
 import "../../seasons.css";
 import "../_tabs/tabs.css";
 import "./standings.css";
@@ -181,11 +182,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                   </tbody>
                 </table>
               </div>
-              <p className="st-foot-note">
-                {lobby
-                  ? "Points come from where each squad finished in each lobby, plus the sport's own extras. A lobby counts once every squad in it is placed."
-                  : "Two points for a win, one for a tie or a no result. Net run rate is runs per over scored minus runs per over conceded, counted in balls — an abandoned match counts as nothing at all, a no result counts as played."}
-              </p>
+              <p className="st-foot-note">{standingsFootnote(standings.sport)}</p>
             </>
           )}
         </SectionCard>

@@ -10,6 +10,16 @@
 //
 //   pnpm preflight:production      # with the production env exported/sourced
 //
+//   # the self-hosted stack keeps one env file PER SERVICE, so read them as such:
+//   node scripts/preflight-production.mjs \
+//     --env=web.env --engine-env=engine.env --runner-env=runner.env
+//
+// With the split files, each rule reads the file of the process that actually
+// consumes the value. That is not pedantry: the engine keys its per-client
+// socket cap on TRUSTED_PROXY_COUNT from engine.env, and a check that read the
+// web tier's copy passed while the engine counted every spectator behind Caddy
+// as ONE client. `deploy-host.yml` runs this form on the host before migrating.
+//
 // Exit 0 = every rule passes. Exit 1 = one or more FAILs (printed with the fix).
 // Rules are derived from apps/{web,engine,finops-runner}/src/env.ts and the
 // PRODUCTION_CHECKLIST. This is release engineering, not business logic — it
@@ -20,7 +30,45 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const env = process.env;
+
+/**
+ * A dotenv file as compose reads it: KEY=VALUE per line, `#` comments, optional
+ * surrounding quotes. No interpolation — compose does none inside env_file
+ * either, so a `$` here is a literal `$` in the container too.
+ */
+function readEnvFile(path) {
+  const out = {};
+  for (const raw of readFileSync(path, "utf8").split("\n")) {
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line
+      .slice(0, eq)
+      .replace(/^export\s+/, "")
+      .trim();
+    let value = line.slice(eq + 1).trim();
+    if (value.length >= 2 && (value[0] === '"' || value[0] === "'") && value.at(-1) === value[0]) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+  return out;
+}
+const flag = (name) => {
+  const hit = process.argv.find((arg) => arg.startsWith(`--${name}=`));
+  return hit === undefined ? undefined : hit.slice(name.length + 3);
+};
+const webFile = flag("env");
+const engineFile = flag("engine-env");
+const runnerFile = flag("runner-env");
+
+// The file wins over the process environment; the process still supplies what
+// the IMAGE sets rather than the env file (NODE_ENV, APP_VERSION).
+const env = { ...process.env, ...(webFile === undefined ? {} : readEnvFile(webFile)) };
+/** The engine's own environment, or — without split files — the one env. */
+const engineEnv = engineFile === undefined ? env : { ...process.env, ...readEnvFile(engineFile) };
+const runnerEnv = runnerFile === undefined ? env : { ...process.env, ...readEnvFile(runnerFile) };
 const results = [];
 function check(id, ok, detail, fix) {
   results.push({ id, level: ok ? "pass" : "fail", detail, fix });
@@ -95,14 +143,23 @@ check(
 // PRODUCTION_CHECKLIST §8 requires. That door is closed here: if this script is
 // being run against an environment that carries it, the environment is not a
 // production environment yet, whatever else it gets right.
-check(
-  "ALLOW_INSECURE_LOCAL_PRODUCTION-absent",
-  env.ALLOW_INSECURE_LOCAL_PRODUCTION === undefined ||
-    env.ALLOW_INSECURE_LOCAL_PRODUCTION === "" ||
-    env.ALLOW_INSECURE_LOCAL_PRODUCTION === "0",
-  "the local-rehearsal escape is not set",
-  "unset ALLOW_INSECURE_LOCAL_PRODUCTION — it disables every production boot check in apps/web",
-);
+// The runner honours the same escape now (its SENTRY_DSN refusal), so its file
+// is held to the same rule.
+for (const [service, scoped] of [
+  ["web", env],
+  ["runner", runnerEnv],
+]) {
+  check(
+    service === "web"
+      ? "ALLOW_INSECURE_LOCAL_PRODUCTION-absent"
+      : `ALLOW_INSECURE_LOCAL_PRODUCTION-absent-${service}`,
+    scoped.ALLOW_INSECURE_LOCAL_PRODUCTION === undefined ||
+      scoped.ALLOW_INSECURE_LOCAL_PRODUCTION === "" ||
+      scoped.ALLOW_INSECURE_LOCAL_PRODUCTION === "0",
+    `the local-rehearsal escape is not set (${service})`,
+    `unset ALLOW_INSECURE_LOCAL_PRODUCTION in the ${service} env — it disables the production boot checks`,
+  );
+}
 
 // --- Engine trust ------------------------------------------------------------
 const secret = env.ENGINE_SECRET ?? "";
@@ -136,15 +193,26 @@ check(
 // "accept any origin with a valid ticket", so a scraped ticket opens a socket
 // from a hostile page. Required (and https-only) in production.
 {
-  const origins = (env.ENGINE_ALLOWED_ORIGINS ?? "")
+  const origins = (engineEnv.ENGINE_ALLOWED_ORIGINS ?? "")
     .split(",")
     .map((o) => o.trim())
     .filter((o) => o !== "");
   check(
     "ENGINE_ALLOWED_ORIGINS",
     origins.length > 0 && origins.every((o) => o.startsWith("https://")),
-    `ENGINE_ALLOWED_ORIGINS=${env.ENGINE_ALLOWED_ORIGINS ?? "(unset)"}`,
-    "set ENGINE_ALLOWED_ORIGINS to the https browser origin(s) allowed to open a spectate socket",
+    `ENGINE_ALLOWED_ORIGINS=${engineEnv.ENGINE_ALLOWED_ORIGINS ?? "(unset)"}`,
+    "set ENGINE_ALLOWED_ORIGINS (in the ENGINE's env) to the https browser origin(s) allowed to open a spectate socket",
+  );
+}
+// Split files: two copies of one secret. The engine refuses every command whose
+// header does not match its own, so a mismatch is not a warning — it is every
+// bid of every auction answered 401.
+if (engineFile !== undefined) {
+  check(
+    "ENGINE_SECRET-matches-engine",
+    typeof engineEnv.ENGINE_SECRET === "string" && engineEnv.ENGINE_SECRET === env.ENGINE_SECRET,
+    "web and engine must hold the SAME ENGINE_SECRET",
+    "copy ENGINE_SECRET from web.env into engine.env (or rotate both together — SECRET_ROTATION.md)",
   );
 }
 
@@ -298,11 +366,31 @@ check(
 // --- Observability -----------------------------------------------------------
 // PRR P1-6: a launch you cannot diagnose is not a launch. A missing DSN is a
 // silent no-op in every app, so this is a hard blocker, not a warning.
-check(
-  "SENTRY_DSN",
-  typeof env.SENTRY_DSN === "string" && env.SENTRY_DSN.length > 0,
-  "error tracking",
-  "set SENTRY_DSN so errors are captured (a missing DSN is a silent no-op in every app)",
+for (const [service, scoped, file] of [
+  ["web", env, webFile],
+  ["engine", engineEnv, engineFile],
+  ["runner", runnerEnv, runnerFile],
+]) {
+  // Without split files all three read the one env, so one check says it all.
+  if (service !== "web" && file === undefined) continue;
+  check(
+    service === "web" ? "SENTRY_DSN" : `SENTRY_DSN-${service}`,
+    typeof scoped.SENTRY_DSN === "string" && scoped.SENTRY_DSN.length > 0,
+    `error tracking (${service})`,
+    `set SENTRY_DSN in the ${service} env so errors are captured (a missing DSN is a silent no-op)`,
+  );
+}
+
+// --- Content Security Policy ---------------------------------------------------
+// A warning and never a failure: the nonce policy ships Report-Only on purpose,
+// and enforcing it is a decision taken AFTER a clean production week of
+// /api/csp-report, not before the first deploy. What this line prevents is the
+// other failure — the week passing and nobody remembering the switch exists.
+warn(
+  "CSP_ENFORCE",
+  env.CSP_ENFORCE === "1" || env.CSP_ENFORCE === "true",
+  "the script policy is Report-Only — browsers report violations and block nothing",
+  "after one clean production week of /api/csp-report, set CSP_ENFORCE=1 in web.env (unset backs out, no deploy)",
 );
 
 // --- Email sign-in -----------------------------------------------------------
@@ -329,8 +417,21 @@ check(
   "TRUSTED_PROXY_COUNT",
   Number(env.TRUSTED_PROXY_COUNT ?? "0") > 0,
   "per-IP throttles need a trusted proxy hop count",
-  "set TRUSTED_PROXY_COUNT (1 behind a single Vercel/Fly ingress) or every per-IP limit keys on nothing",
+  "set TRUSTED_PROXY_COUNT (1 behind the one Caddy) or every per-IP limit keys on nothing",
 );
+// THE ENGINE READS ITS OWN COPY. Its per-client socket cap keys on the client
+// address, and at 0 the only address it can see behind Caddy is Caddy's — so
+// every spectator of every live room shares ONE cap of 50 sockets. The web
+// check above passing said nothing about this; with split files it is read
+// from engine.env, where the engine reads it.
+if (engineFile !== undefined) {
+  check(
+    "TRUSTED_PROXY_COUNT-engine",
+    Number(engineEnv.TRUSTED_PROXY_COUNT ?? "0") > 0,
+    "the engine's per-client socket cap needs the proxy hop count too",
+    "set TRUSTED_PROXY_COUNT=1 in engine.env, or every client behind Caddy counts as one",
+  );
+}
 
 // --- Scheduled money repair (PRR P1-3) ---------------------------------------
 // The settlement catch-up sweep endpoint is fail-closed (404 without a secret),
@@ -341,7 +442,22 @@ warn(
   "SETTLEMENT_JOB_SECRET",
   typeof env.SETTLEMENT_JOB_SECRET === "string" && env.SETTLEMENT_JOB_SECRET.length >= 16,
   "the settlement catch-up sweep is unreachable without it",
-  "set SETTLEMENT_JOB_SECRET (>=16 chars) and schedule POST /api/jobs/settlement-coordination so a lost journal effect self-heals",
+  "set SETTLEMENT_JOB_SECRET (>=16 chars) in web.env — the compose `scheduler` calls POST /api/jobs/settlement-coordination with it",
+);
+// The same scheduler drains the personal-message outbox and runs the retention
+// purge with FEEDBACK_JOB_SECRET, and sends demo reminders with DEMO_JOB_SECRET.
+// Unset, each route 404s by design and the scheduler logs it as disabled.
+warn(
+  "FEEDBACK_JOB_SECRET",
+  typeof env.FEEDBACK_JOB_SECRET === "string" && env.FEEDBACK_JOB_SECRET.length >= 16,
+  "the outbox drain and retention purge are unscheduled without it",
+  "set FEEDBACK_JOB_SECRET (>=16 chars) in web.env — without it a message left pending by a restart is never retried",
+);
+warn(
+  "DEMO_JOB_SECRET",
+  typeof env.DEMO_JOB_SECRET === "string" && env.DEMO_JOB_SECRET.length >= 16,
+  "demo-call reminders are unscheduled without it",
+  "set DEMO_JOB_SECRET (>=16 chars) in web.env",
 );
 
 // --- Payments (webhook ingress) ---------------------------------------------

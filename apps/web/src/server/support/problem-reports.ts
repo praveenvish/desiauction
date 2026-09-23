@@ -1,5 +1,5 @@
 import { newId, problemReportScreenshots, problemReports, type Db } from "@desiauction/db";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 
 /**
  * A PROBLEM REPORT, VALIDATED AND RATE-LIMITED — everything except the IO
@@ -34,6 +34,15 @@ export const SCREENSHOT_MAX_BYTES = 1024 * 1024;
  */
 const MAX_PER_PERSON_PER_HOUR = 10;
 const MAX_PER_IP_PER_HOUR = 10;
+/**
+ * Every GUEST report together, platform-wide (gate P3). The per-connection
+ * limit stops one address; a guest who rotates addresses — or arrives with
+ * none, which the per-connection limit never counted — is stopped only by a
+ * ceiling on guests as a whole. Signed-in reporters are unaffected: they are
+ * counted per person, and the one support path that works when the rest of
+ * the product doesn't must not be closed to them by a stranger's flood.
+ */
+export const MAX_ANONYMOUS_PER_HOUR = 60;
 const HOUR_MS = 60 * 60 * 1000;
 
 // No `?`, `&`, `%` or `#`: the address is later placed in a `mailto:` link on
@@ -261,6 +270,7 @@ export async function isReportThrottled(
   personId: string | null,
   requestIp: string | null,
   now: Date = new Date(),
+  anonymousPerHour: number = MAX_ANONYMOUS_PER_HOUR,
 ): Promise<boolean> {
   const since = new Date(now.getTime() - HOUR_MS);
   if (personId !== null) {
@@ -271,6 +281,17 @@ export async function isReportThrottled(
       { count: number },
     ];
     if (byPerson.count >= MAX_PER_PERSON_PER_HOUR) {
+      return true;
+    }
+  }
+  if (personId === null) {
+    const [guests] = (await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(problemReports)
+      .where(and(isNull(problemReports.personId), gt(problemReports.createdAt, since)))) as [
+      { count: number },
+    ];
+    if (guests.count >= anonymousPerHour) {
       return true;
     }
   }

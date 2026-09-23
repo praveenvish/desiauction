@@ -36,7 +36,7 @@ import { env } from "../../env";
 import { requestOtp, verifyOtp } from "../auth/otp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { canCompetition } from "../competition/authz";
-import { announceAuctionOutcomes } from "./auction-notify";
+import { announceAuctionOutcomes, completeAuctionOnce } from "./auction-notify";
 import { lotMediaOf, registrationPhotosOf } from "./live-summary";
 import {
   advanceCompetition,
@@ -538,6 +538,71 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
       const each = (row.meta ?? {}) as Record<string, unknown>;
       expect(each["price"]).toBeTypeOf("string");
       expect(each["team"]).toBeTypeOf("string");
+    }
+  });
+
+  /*
+   * A RETRIED COMPLETION ANNOUNCES NOTHING (go-live gate P3). The engine hands
+   * a repeated commandId its ORIGINAL accepted ack, so "announce on accepted"
+   * wrote a second inbox row per player on every double-click. The engine is
+   * stubbed here by a `send` that does what its completion does to the row.
+   */
+  it("announces a completion once — a replayed accepted ack writes no second row", async () => {
+    const kohli = await personBehind(auction.id, "Kohli Local");
+    const soldRows = async () =>
+      (
+        await db
+          .select({ id: auditLog.id })
+          .from(auditLog)
+          .where(and(eq(auditLog.scopeId, kohli), eq(auditLog.action, "auction.sold")))
+      ).length;
+    const input = {
+      personId: owner,
+      orgId: org.id,
+      auctionId: auction.id,
+      competition: { id: comp.id, name: comp.name },
+    };
+    const before = await soldRows();
+    const [row] = await db
+      .select({ status: auctionsTable.status })
+      .from(auctionsTable)
+      .where(eq(auctionsTable.id, auction.id));
+    const liveStatus = must(row, "auction row").status;
+    expect(liveStatus).not.toBe("completed");
+    try {
+      // Fresh: the row flips to completed under this command → announced.
+      await completeAuctionOnce(
+        input,
+        async () => {
+          await db
+            .update(auctionsTable)
+            .set({ status: "completed" })
+            .where(eq(auctionsTable.id, auction.id));
+          return { accepted: true };
+        },
+        (ack) => ack.accepted,
+      );
+      expect(await soldRows()).toBe(before + 1);
+      // Replayed: the row was already completed → the same ack, no announcement.
+      await completeAuctionOnce(
+        input,
+        () => Promise.resolve({ accepted: true }),
+        (ack) => ack.accepted,
+      );
+      expect(await soldRows()).toBe(before + 1);
+      // Refused: nothing, whatever the row says.
+      await completeAuctionOnce(
+        input,
+        () => Promise.resolve({ accepted: false }),
+        (ack) => ack.accepted,
+      );
+      expect(await soldRows()).toBe(before + 1);
+    } finally {
+      // The rest of the suite runs the auction on.
+      await db
+        .update(auctionsTable)
+        .set({ status: liveStatus })
+        .where(eq(auctionsTable.id, auction.id));
     }
   });
 

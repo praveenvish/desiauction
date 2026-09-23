@@ -33,6 +33,7 @@ import { resolveExportColumns, type ExportRows } from "../../lib/export-columns"
 import { preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
+import { containsPattern } from "../../lib/like-pattern";
 
 // Registration reads + creation (IP-3 §4, doc 42). TRIAGE TRANSITIONS live only
 // in registration-aggregate.ts; this module owns ENTRY into the competition —
@@ -382,11 +383,12 @@ export async function addPlayerByPhone(
     if (personId === undefined) {
       return { ok: false, reason: "duplicate" };
     }
-  } else if (found?.name === null) {
-    // A stub someone else created has no name yet; the organizer just supplied
-    // one. An existing name is never overwritten — it is not ours to correct.
-    await db.update(people).set({ name: player.name }).where(eq(people.id, personId));
   }
+  // An EXISTING account is never renamed from here — not even a nameless stub.
+  // The stub may belong to another club's import, or to a real person who has
+  // not finished onboarding, and `people.name` is what every other club and the
+  // person themselves read (go-live gate P2). The name the organizer typed is
+  // this ENTRY's (0075, shown-name.ts): the season shows it, nobody else does.
 
   const id = newId();
   const created = await writeSurvivingConstraint(db, (tx) =>
@@ -398,10 +400,11 @@ export async function addPlayerByPhone(
       role: player.role,
       status: "submitted",
       registrationNumber: registrationNumber(id),
-      // An account that already had its own name: the season shows the name
-      // the organizer typed instead (0075, shown-name.ts), so adding a phone
-      // number is never a way to learn who it belongs to.
-      ...(found !== undefined && found.name !== null ? { enteredName: player.name } : {}),
+      // An account that already existed: the season shows the name the
+      // organizer typed instead (0075, shown-name.ts), so adding a phone number
+      // is never a way to learn who it belongs to — and a nameless account is
+      // named for this season only, never platform-wide.
+      ...(found !== undefined ? { enteredName: player.name } : {}),
       ...(player.basePriceBand !== null ? { basePriceBand: player.basePriceBand } : {}),
       ...validProfile(player.profile),
     }),
@@ -422,6 +425,16 @@ export async function addPlayerByPhone(
     }
     registrationId = reinstated.id;
     number = reinstated.number;
+    // The rejoin of a nameless account needs the typed name too — this used to
+    // come from writing it onto `people.name`, which is no longer ours to write.
+    if (found !== undefined && found.name === null) {
+      await db
+        .update(registrations)
+        .set({ enteredName: player.name })
+        .where(
+          and(eq(registrations.id, registrationId), sql`${registrations.enteredName} is null`),
+        );
+    }
   }
   // Subject = the registration, so the player's timeline begins where they
   // entered the competition (the DA-27 lesson from the import path).
@@ -793,7 +806,7 @@ function registrationFilters(
   }
   const term = query.search?.trim();
   if (term !== undefined && term !== "") {
-    const like = `%${term}%`;
+    const like = containsPattern(term);
     const clause = or(
       ilike(shownName, like),
       ilike(people.phone, like),

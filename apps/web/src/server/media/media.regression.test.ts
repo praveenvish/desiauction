@@ -21,7 +21,7 @@ import {
   teams as teamsTable,
   type DbHandle,
 } from "@desiauction/db";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { requestOtp, verifyOtp } from "../auth/otp";
@@ -36,11 +36,16 @@ import { createOrg } from "../orgs/orgs";
 import { env } from "../../env";
 import {
   clearCompetitionImage,
+  clearEntryPhoto,
   currentCompetitionImageKey,
+  currentPlayerPhotoKey,
   persistMediaKey,
   requireMediaWrite,
   resolveMediaSubject,
 } from "./authz";
+import { PRESIGN_QUOTAS, takePresignQuota } from "./presign-quota";
+import { addPlayerByPhone } from "../competition/registrations";
+import { shownName, shownPhotoConsentAt, shownPhotoKey } from "../competition/shown-name";
 import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
@@ -143,9 +148,15 @@ describe("MEDIA REGRESSION — write authorization contract", () => {
       ownerPersonId: null,
     });
     expect(await resolveMediaSubject(db, comp, "competition", newId(), owner)).toBeNull();
-    // Player subject resolves to the PERSON (person-level photo, D7) when the
-    // entry carries no typed name (0075).
+    // An ORGANIZER's player photo resolves to the ENTRY, typed name or not
+    // (go-live gate P2): only the person writes their platform-wide photo.
     expect(await resolveMediaSubject(db, comp, "player", registrationId, owner)).toEqual({
+      storageSubjectId: registrationId,
+      ownerPersonId: player,
+      entryPhoto: { registrationId },
+    });
+    // The person themselves resolves to their own account (D7).
+    expect(await resolveMediaSubject(db, comp, "player", registrationId, player)).toEqual({
       storageSubjectId: player,
       ownerPersonId: player,
     });
@@ -310,5 +321,104 @@ describe("MEDIA REGRESSION — write authorization contract", () => {
         enteredPhotoConsentAt: null,
       })
       .where(eq(registrationsTable.id, registrationId));
+  });
+});
+
+describe("MEDIA REGRESSION — a club's writes stop at its own entry (go-live gate P2)", () => {
+  async function shown(regId: string) {
+    const [row] = await db
+      .select({ name: shownName, photoKey: shownPhotoKey, consentAt: shownPhotoConsentAt })
+      .from(registrationsTable)
+      .innerJoin(people, eq(people.id, registrationsTable.personId))
+      .where(eq(registrationsTable.id, regId))
+      .limit(1);
+    return row;
+  }
+
+  it("an organizer's photo on an UNtyped entry lands on the entry; the account is untouched", async () => {
+    await db
+      .update(people)
+      .set({ photoUrl: "k/own.jpg", photoConsentAt: new Date(), photoConsentVia: "self_upload" })
+      .where(eq(people.id, player));
+    const byClub = await resolveMediaSubject(db, comp, "player", registrationId, owner);
+    if (byClub === null) throw new Error("unreachable");
+    await requireMediaWrite(db, owner, comp, "player", byClub);
+    await persistMediaKey(
+      db,
+      "player",
+      byClub,
+      "k/club.jpg",
+      new Date(),
+      "organizer_upload_attestation",
+    );
+
+    const [account] = await db
+      .select({ photoUrl: people.photoUrl, via: people.photoConsentVia })
+      .from(people)
+      .where(eq(people.id, player));
+    expect(account).toEqual({ photoUrl: "k/own.jpg", via: "self_upload" });
+    // The season shows the club's entry photo, with the entry's consent.
+    const seen = await shown(registrationId);
+    expect(seen?.photoKey).toBe("k/club.jpg");
+    expect(seen?.consentAt).not.toBeNull();
+
+    // Removing it clears only the entry — the season falls back to the
+    // player's own photo, which the club could never delete.
+    expect(await currentPlayerPhotoKey(db, byClub)).toBe("k/club.jpg");
+    await clearEntryPhoto(db, registrationId);
+    expect((await shown(registrationId))?.photoKey).toBe("k/own.jpg");
+    const [still] = await db
+      .select({ photoUrl: people.photoUrl })
+      .from(people)
+      .where(eq(people.id, player));
+    expect(still?.photoUrl).toBe("k/own.jpg");
+  });
+
+  it("adding a nameless account names the ENTRY, never people.name", async () => {
+    const phone = `+9195${RUN}6`;
+    const stubId = newId();
+    await db.insert(people).values({ id: stubId, phone, name: null });
+    try {
+      const added = await addPlayerByPhone(db, comp.id, orgX.id, owner, {
+        name: "Club Typed Stub",
+        phone,
+        role: "batter",
+        basePriceBand: null,
+      });
+      if (!added.ok) throw new Error("expected ok");
+      expect(added.personId).toBe(stubId);
+      const [account] = await db
+        .select({ name: people.name })
+        .from(people)
+        .where(eq(people.id, stubId));
+      expect(account?.name).toBeNull();
+      expect((await shown(added.registrationId))?.name).toBe("Club Typed Stub");
+    } finally {
+      await db
+        .delete(auditLog)
+        .where(and(eq(auditLog.scopeId, orgX.id), eq(auditLog.action, "registration.added")));
+      await db.delete(registrationsTable).where(eq(registrationsTable.personId, stubId));
+      await db.delete(people).where(eq(people.id, stubId));
+    }
+  });
+});
+
+describe("MEDIA REGRESSION — presign budget (go-live gate P0-6 c)", () => {
+  it("allows the hour's budget, then refuses, per person and per path", async () => {
+    const at = new Date();
+    const cap = PRESIGN_QUOTAS["media.own_upload_requested"];
+    for (let i = 0; i < cap; i++) {
+      expect(await takePresignQuota(db, outsider, "media.own_upload_requested", {}, at)).toBe(true);
+    }
+    expect(await takePresignQuota(db, outsider, "media.own_upload_requested", {}, at)).toBe(false);
+    // The organizer path has its own, larger budget.
+    expect(await takePresignQuota(db, outsider, "media.upload_requested", {}, at)).toBe(true);
+    // Another person is unaffected.
+    expect(await takePresignQuota(db, player, "media.own_upload_requested", {}, at)).toBe(true);
+    // An hour later the budget has refilled.
+    const later = new Date(at.getTime() + 61 * 60 * 1000);
+    expect(await takePresignQuota(db, outsider, "media.own_upload_requested", {}, later)).toBe(
+      true,
+    );
   });
 });

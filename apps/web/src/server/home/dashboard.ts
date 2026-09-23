@@ -51,6 +51,13 @@ export interface HomeAuctionRow {
   status: string;
   lotsTotal: number;
   lotsSold: number;
+  /**
+   * Lots still to be called (prepared, queued, on the block, closing, or
+   * frozen awaiting the conductor's ruling). "Done"
+   * is this reaching zero — NOT sold equalling total, which a single unsold or
+   * withdrawn lot kept false for the rest of the night.
+   */
+  lotsRemaining: number;
   spendPaise: number;
 }
 
@@ -336,7 +343,13 @@ async function readClubSlice(
     caseRows: [] as { id: string; competitionId: string; status: string }[],
     registrationRows: [] as { competitionId: string; status: string; count: number }[],
     teamRows: [] as { competitionId: string; count: number }[],
-    lotRows: [] as { auctionId: string; total: number; sold: number; spend: number }[],
+    lotRows: [] as {
+      auctionId: string;
+      total: number;
+      sold: number;
+      remaining: number;
+      spend: number;
+    }[],
     bidCountRows: [] as { auctionId: string; count: number }[],
     obligationRows: [] as { caseId: string; amount: number; discharged: number; waived: number }[],
     paymentRows: [] as { caseId: string; at: Date; captured: number }[],
@@ -383,6 +396,7 @@ async function readClubSlice(
               auctionId: lots.auctionId,
               total: sql<number>`count(*)::int`,
               sold: sql<number>`count(*) filter (where ${lots.status} = 'sold')::int`,
+              remaining: sql<number>`count(*) filter (where ${lots.status} in ('prepared', 'queued', 'on_block', 'closing_soon', 'frozen'))::int`,
               spend: sql<number>`coalesce(sum(${lots.soldPrice}) filter (where ${lots.status} = 'sold'), 0)::double precision`,
             })
             .from(lots)
@@ -668,6 +682,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
         status: row.status,
         lotsTotal: progress?.total ?? 0,
         lotsSold: progress?.sold ?? 0,
+        lotsRemaining: progress?.remaining ?? 0,
         spendPaise: progress?.spend ?? 0,
       };
     })

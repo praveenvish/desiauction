@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 
 import { clearNameGate } from "./onboarding";
 import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
+import { axeClean } from "./axe";
 
 // ACCOUNT ERASURE, as the person and the privacy desk each experience it:
 // a player asks from /account → the desk erases them → the player is signed out
@@ -43,11 +44,6 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await expect(page).not.toHaveURL(/\/login/);
   });
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 test.beforeAll(async () => {

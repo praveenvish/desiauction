@@ -1,4 +1,11 @@
-import { deriveAge, describeAttributes, isMinor, paise, type Paise } from "@desiauction/core";
+import {
+  deriveAge,
+  describeAttributes,
+  isMinor,
+  mayPublishPhoto,
+  paise,
+  type Paise,
+} from "@desiauction/core";
 import {
   auctionEvents,
   auctions,
@@ -18,6 +25,7 @@ import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
+import { containsPattern } from "../../lib/like-pattern";
 
 // PX-5 public reads (PX-1 02 §I thin-wiring class): anonymous, system-pool
 // composites over EXISTING queries. Public exposure is governed by the
@@ -276,12 +284,16 @@ const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1
 
 /**
  * The stored photo KEY a public surface may render, or null — the same two
- * gates `toShowcasePlayer` applies to `photoUrl` (consent AND not a minor), for
- * the one caller that needs bytes rather than a URL: the share card inlines
+ * gates `toShowcasePlayer` applies to `photoUrl` (consent AND a known adult),
+ * for the one caller that needs bytes rather than a URL: the share card inlines
  * the image because the rasterizer cannot fetch a relative path.
+ *
+ * P0-6: `mayPublishPhoto`, not `!isMinor` — an unknown DOB (every CSV import
+ * row) withholds the face. The AGE below keeps `isMinor`, which is right for an
+ * age: with no date there is none to publish.
  */
 function publicPhotoKey(r: ShowcaseRow, now: Date): string | null {
-  return isMinor(r.dateOfBirth, now) || r.photoConsentAt === null ? null : r.photoKey;
+  return mayPublishPhoto(r.dateOfBirth, now) && r.photoConsentAt !== null ? r.photoKey : null;
 }
 
 /**
@@ -707,9 +719,9 @@ export async function publicCompetitionsDirectory(params: {
     term === undefined || term === ""
       ? undefined
       : or(
-          ilike(competitions.name, `%${term}%`),
-          ilike(competitions.location, `%${term}%`),
-          ilike(organizations.name, `%${term}%`),
+          ilike(competitions.name, containsPattern(term)),
+          ilike(competitions.location, containsPattern(term)),
+          ilike(organizations.name, containsPattern(term)),
         );
   // The search predicate WITHOUT the facet: the chip counts have to describe
   // the facets a visitor could switch TO, not the one already applied.

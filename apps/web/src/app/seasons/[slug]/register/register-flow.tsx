@@ -399,7 +399,7 @@ export function RegisterFlow({
       } else {
         setError(result.error ?? "That didn't save. Try again.");
         // A duplicate means truth moved on another device — show the status.
-        if (result.error?.includes("already registered") === true) {
+        if (result.code === "already_registered") {
           window.location.reload();
         }
       }

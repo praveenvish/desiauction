@@ -10,6 +10,7 @@ import {
   isBowlingStyle,
   isGender,
   isMinor,
+  mayPublishPhoto,
   roleLabel,
   validateDateOfBirth,
   validateJerseyNumber,
@@ -68,6 +69,26 @@ describe("isMinor (PRR P0-2 / DPDP §9)", () => {
     expect(isMinor(null, now)).toBe(false);
     expect(isMinor("", now)).toBe(false);
     expect(isMinor("not-a-date", now)).toBe(false);
+  });
+});
+
+describe("mayPublishPhoto (P0-6 — a face fails CLOSED on an unknown age)", () => {
+  const now = new Date(Date.UTC(2026, 6, 22)); // 2026-07-22
+
+  it("publishes only a known adult's photo", () => {
+    expect(mayPublishPhoto("2008-07-22", now)).toBe(true); // 18 exactly today
+    expect(mayPublishPhoto("2000-01-01", now)).toBe(true);
+    expect(mayPublishPhoto("2008-07-23", now)).toBe(false); // turns 18 tomorrow
+    expect(mayPublishPhoto("2015-01-01", now)).toBe(false);
+  });
+
+  it("withholds the photo when the date of birth is unknown — unlike isMinor", () => {
+    // The import never carries a DOB; a child entered that way must not become
+    // a public face just because nobody typed a birthday.
+    expect(mayPublishPhoto(null, now)).toBe(false);
+    expect(mayPublishPhoto("", now)).toBe(false);
+    expect(mayPublishPhoto("not-a-date", now)).toBe(false);
+    expect(mayPublishPhoto("2027-01-01", now)).toBe(false); // a future date is no age
   });
 });
 

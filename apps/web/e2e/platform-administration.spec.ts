@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
+import { axeClean } from "./axe";
 
 // PX-9 FOUNDER DEMONSTRATION: a platform administrator signs in → views overall
 // platform health → finds an organization → inspects its competitions → views a
@@ -52,11 +53,6 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await expect(page).not.toHaveURL(/\/login/);
   });
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 test("founder demo: sign in → platform health → find an org → inspect → grants → audit → finops health → navigate out", async ({

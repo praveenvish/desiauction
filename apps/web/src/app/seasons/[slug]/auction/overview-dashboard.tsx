@@ -23,7 +23,7 @@ import {
 import type { AuctionDashboard } from "../../../../server/auction/actions";
 import type { AppointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { formatTime } from "../../../../lib/format-date";
-import { compactINR, exactINR } from "../../../../lib/inr";
+import { compactFloorINR, compactINR, exactINR } from "../../../../lib/inr";
 import { lotSeed } from "../../../../lib/player-seed";
 import { roleLabeller } from "../../../../lib/role-label";
 import { LotStatusPill, PaddleChip, eventLabel } from "./auction-bits";
@@ -253,7 +253,7 @@ export function OverviewDashboard({
                   <span />
                 )}
                 {paddle.remaining !== undefined ? (
-                  <span className="dash-purse-left">{compactINR(paddle.remaining)} left</span>
+                  <span className="dash-purse-left">{compactFloorINR(paddle.remaining)} left</span>
                 ) : (
                   <span className="dash-purse-left">sealed</span>
                 )}

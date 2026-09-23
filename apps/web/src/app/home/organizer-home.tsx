@@ -1,4 +1,3 @@
-import { formatPaiseINR, paise } from "@desiauction/core";
 import {
   ButtonLink,
   CardGrid,
@@ -34,6 +33,7 @@ import { Fragment, type ReactNode } from "react";
 import { FormDialog } from "../../components/form-dialog";
 import { monogram } from "../../components/season-hero/season-hero";
 import { roleLabeller } from "../../lib/role-label";
+import { compactINR, ledgerINR } from "../../lib/inr";
 import { auctionDashboard } from "../../server/auction/actions";
 import {
   competitionsView,
@@ -161,26 +161,6 @@ async function attentionFor(
     detail: competition.name,
     href: `/seasons/${competition.slug}`,
   };
-}
-
-function rupees(value: number): string {
-  return formatPaiseINR(paise(value));
-}
-
-/**
- * Compact INR for tiles: ₹48,000 / ₹1.2L / ₹2.4Cr.
- *
- * There is no "K" rung. The Indian numbering system groups at thousand, lakh
- * and crore, and its written short forms are L and Cr — "₹48K" is a scale
- * borrowed from a different system, sitting one step below "lakh" in the same
- * sentence. Below a lakh the number is simply grouped the Indian way (48,000),
- * which is both correct and shorter to read than an abbreviation.
- */
-function rupeesShort(value: number): string {
-  const r = value / 100;
-  if (r >= 10_000_000) return `₹${(r / 10_000_000).toFixed(r % 10_000_000 === 0 ? 0 : 2)}Cr`;
-  if (r >= 100_000) return `₹${(r / 100_000).toFixed(r % 100_000 === 0 ? 0 : 1)}L`;
-  return `₹${Math.round(r).toLocaleString("en-IN")}`;
 }
 
 /**
@@ -427,8 +407,10 @@ export async function OrganizerHome({
   const showEvents = schedule.length > 0 || !laddering;
   const showActivity = dash.activity.length > 0;
 
-  const liveDone =
-    liveRow !== null && liveRow.lotsTotal > 0 && liveRow.lotsSold === liveRow.lotsTotal;
+  // Done when no lot is left to call — an unsold or withdrawn lot is called
+  // too, so `sold === total` stayed false all night the moment one went unsold.
+  const liveDone = liveRow !== null && liveRow.lotsTotal > 0 && liveRow.lotsRemaining === 0;
+  const allSold = liveDone && liveRow.lotsSold === liveRow.lotsTotal;
 
   const bySlug = new Map(view.competitions.map((competition) => [competition.slug, competition]));
   const seasonFacts = (slug: string): string[] => {
@@ -597,7 +579,7 @@ export async function OrganizerHome({
               {/* Every lot has gone: "live" is the wrong word, closing out is. */}
               <span className="home-live-badge">
                 {liveDone ? null : <i aria-hidden />}
-                {liveDone ? "ALL LOTS SOLD" : "LIVE NOW"}
+                {liveDone ? (allSold ? "ALL LOTS SOLD" : "EVERY LOT CALLED") : "LIVE NOW"}
               </span>
             </p>
             <h2 id="home-live-name" className="home-live-name">
@@ -630,7 +612,7 @@ export async function OrganizerHome({
                 <div>
                   <dt>Top bid</dt>
                   <dd className="home-live-bid">
-                    {rupees(liveBoard.onBlock.currentBid)}
+                    {ledgerINR(liveBoard.onBlock.currentBid)}
                     {liveBoard.onBlock.leadingTeamName !== null ? (
                       <span className="home-live-team">
                         {" · "}
@@ -642,7 +624,7 @@ export async function OrganizerHome({
               ) : null}
               <div>
                 <dt>Spend</dt>
-                <dd>{rupeesShort(liveRow.spendPaise)}</dd>
+                <dd>{compactINR(liveRow.spendPaise)}</dd>
               </div>
               <div>
                 <dt>Lots sold</dt>
@@ -754,7 +736,7 @@ export async function OrganizerHome({
             <StatCard
               icon={<IconWallet />}
               tone="amber"
-              value={rupeesShort(focusOverview.purseCommitted)}
+              value={compactINR(focusOverview.purseCommitted)}
               label="Purse committed"
               {...(focusOverview.pursePct != null
                 ? { hint: `${String(focusOverview.pursePct)}% of every purse` }
@@ -827,9 +809,7 @@ export async function OrganizerHome({
                       const badge = seasonBadge(row);
                       const facts = [
                         ...seasonFacts(row.slug),
-                        ...(row.canSeeMoney
-                          ? [`${rupeesShort(row.collectedPaise)} collected`]
-                          : []),
+                        ...(row.canSeeMoney ? [`${compactINR(row.collectedPaise)} collected`] : []),
                       ];
                       return (
                         <tr key={row.slug}>
@@ -886,7 +866,7 @@ export async function OrganizerHome({
                                 // out would hide the figure from the very
                                 // organizer it was for.
                                 ...(row.canSeeMoney
-                                  ? [`${rupeesShort(row.collectedPaise)} collected`]
+                                  ? [`${compactINR(row.collectedPaise)} collected`]
                                   : []),
                               ]}
                             />
@@ -924,7 +904,7 @@ export async function OrganizerHome({
               {showChart ? (
                 <div className="home-chart-wrap">
                   {chartMax > 0 ? (
-                    <span className="home-chart-peak">Peak {rupeesShort(chartMax)}/day</span>
+                    <span className="home-chart-peak">Peak {compactINR(chartMax)}/day</span>
                   ) : null}
                   <svg
                     className="home-chart"
@@ -986,7 +966,7 @@ export async function OrganizerHome({
                   <VisuallyHidden>
                     Collected per day this week:{" "}
                     {DAY_LABELS.map(
-                      (label, index) => `${label} ${rupeesShort(dash.money.thisWeek[index] ?? 0)}`,
+                      (label, index) => `${label} ${compactINR(dash.money.thisWeek[index] ?? 0)}`,
                     ).join(", ")}
                     .
                   </VisuallyHidden>
@@ -994,13 +974,13 @@ export async function OrganizerHome({
               ) : null}
               <div className="home-money">
                 <MoneyCell href={dash.moneyHref} label="Collected" tone="remaining">
-                  {rupees(dash.money.collectedPaise)}
+                  {ledgerINR(dash.money.collectedPaise)}
                 </MoneyCell>
                 <MoneyCell href={dash.moneyHref} label="Outstanding" tone="frozen">
-                  {rupees(dash.money.outstandingPaise)}
+                  {ledgerINR(dash.money.outstandingPaise)}
                 </MoneyCell>
                 <MoneyCell href={dash.moneyHref} label="Waived" tone="spent">
-                  {rupees(dash.money.waivedPaise)}
+                  {ledgerINR(dash.money.waivedPaise)}
                 </MoneyCell>
               </div>
             </SectionCard>
@@ -1058,7 +1038,7 @@ export async function OrganizerHome({
                           <span className="home-row-text">
                             <strong>{auction.competitionName}</strong>
                             <span>
-                              Spend {rupeesShort(auction.spendPaise)} · Lots {auction.lotsSold}/
+                              Spend {compactINR(auction.spendPaise)} · Lots {auction.lotsSold}/
                               {auction.lotsTotal}
                             </span>
                             <span className="home-progress" aria-hidden>

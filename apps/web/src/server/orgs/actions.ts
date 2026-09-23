@@ -38,7 +38,7 @@ import {
 } from "./invites";
 import {
   createOrg,
-  holdersOf,
+  lastOwnerRefuses,
   issueGrant,
   memberCountOf,
   membersOf,
@@ -46,7 +46,6 @@ import {
   removeMember,
   resolveTenant,
   revokeGrants,
-  wouldOrphanOrg,
   type MemberRow,
   type OrgSummary,
 } from "./orgs";
@@ -606,10 +605,11 @@ export async function revokeGrantAction(
         );
         // The one revocation that cannot be undone by anybody, because the
         // undoing itself needs the capability being removed. Refused at the
-        // ACTION, not in the button — a UI guard is a suggestion.
+        // ACTION, not in the button — a UI guard is a suggestion. And under a
+        // row lock, in this transaction: two owners revoking EACH OTHER at
+        // once used to both count two owners and leave the club with none.
         if (capabilitySet === "org:owner") {
-          const owners = await holdersOf(db, org.id, "org:owner");
-          if (wouldOrphanOrg(owners, targetPersonId)) {
+          if (await lastOwnerRefuses(db, org.id, targetPersonId)) {
             return { ok: false, error: LAST_OWNER_REFUSAL };
           }
         }
@@ -655,8 +655,7 @@ export async function removeMemberAction(
         if (targetPersonId === session.personId) {
           return { ok: false, error: "You can't remove yourself from this organization." };
         }
-        const owners = await holdersOf(db, org.id, "org:owner");
-        if (wouldOrphanOrg(owners, targetPersonId)) {
+        if (await lastOwnerRefuses(db, org.id, targetPersonId)) {
           return { ok: false, error: LAST_OWNER_REFUSAL };
         }
         await removeMember(db, org.id, targetPersonId, session.personId);

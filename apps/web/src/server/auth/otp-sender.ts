@@ -1,4 +1,5 @@
 import { newId, otpInbox, type Db } from "@desiauction/db";
+import { providerFetch } from "../messaging/provider-fetch";
 
 // The ED-1 port: RC-1's real SMS provider becomes a second implementation
 // of this interface — auth logic never changes (IP-2_DESIGN D3).
@@ -58,10 +59,9 @@ export class OtpSendError extends Error {
   }
 }
 
-const defaultTransport: SmsTransport = async (url, init) => {
-  const response = await fetch(url, init);
-  return { status: response.status, body: await response.text() };
-};
+// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
+// outbox's claim lease, or two drains deliver the same message.
+const defaultTransport: SmsTransport = providerFetch;
 
 /**
  * MSG91 Send-OTP (v5): POST /otp?template_id=…&mobile=91XXXXXXXXXX with the

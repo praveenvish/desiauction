@@ -6,7 +6,7 @@ import {
   problemReports,
   reviewReports,
 } from "@desiauction/db";
-import { and, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 
 import { db } from "../db";
 
@@ -82,8 +82,14 @@ export async function purgeExpiredProblemReports(
  */
 export const SECURITY_RECORD_RETENTION_MS = DAY_MS;
 
+/** A settled outbox row's words (below). */
+export const OUTBOX_CONTENT_RETENTION_MS = 30 * DAY_MS;
+/** A settled outbox row's dedupe key — the memory that stops a repeat. */
+export const OUTBOX_KEY_RETENTION_MS = 365 * DAY_MS;
+
 export interface SecurityPurgeResult {
   readonly deliveredMailDeleted: number;
+  readonly deliveredMailScrubbed: number;
   readonly phoneCodesDeleted: number;
   readonly emailCodesDeleted: number;
   readonly reviewAddressesCleared: number;
@@ -101,16 +107,47 @@ export async function purgeSpentSecurityRecords(
     .delete(emailVerifications)
     .where(lt(emailVerifications.createdAt, before))
     .returning({ id: emailVerifications.id });
-  // Personal mail (0079) once it is settled — sent, suppressed or given up on
-  // — is a copy of a name and a price the product holds elsewhere. Thirty days
-  // covers "I never got it" questions; pending rows are never touched.
+  /*
+   * Personal mail (0079) once it is settled — sent, suppressed or given up on.
+   *
+   * Two things live in the row and they deserve different lives. The CONTENT
+   * (a name, a price, a team) is a copy of what the product holds elsewhere;
+   * thirty days covers "I never got it" and then it goes. The DEDUPE KEY is the
+   * queue's memory of having told somebody — `enqueue*` refuses a repeat by
+   * it, and the appointment, lineup and squad-sheet screens ask the outbox
+   * "whom have we told?" by its prefix. Deleting the row at thirty days made a
+   * re-pressed "Announce" (or a retried completion) on an older moment send the
+   * whole thing again. So at thirty days the row is SCRUBBED — the key, ids and
+   * status stay, the words go — and only at a year is it deleted. What is kept
+   * is identifiers the product already holds; erasure still removes a person's
+   * rows at once (ON DELETE CASCADE).
+   */
+  const settled = inArray(messageOutbox.status, ["sent", "suppressed", "failed"]);
+  const scrubbedMail = await db
+    .update(messageOutbox)
+    .set({
+      subject: "",
+      bodyText: "",
+      bodyHtml: "",
+      // An SMS row must keep SOME slots (0080's template check); empty is
+      // enough to say "there were slots, and they are gone".
+      slots: sql`case when ${messageOutbox.channel} = 'sms' then '{}'::jsonb else null end`,
+      mediaUrl: null,
+    })
+    .where(
+      and(
+        settled,
+        lt(messageOutbox.createdAt, new Date(now.getTime() - OUTBOX_CONTENT_RETENTION_MS)),
+        // Only rows still carrying words — the job runs daily, and rewriting
+        // a year of scrubbed rows each time would be churn for nothing.
+        or(ne(messageOutbox.bodyText, ""), ne(messageOutbox.subject, "")),
+      ),
+    )
+    .returning({ id: messageOutbox.id });
   const deliveredMail = await db
     .delete(messageOutbox)
     .where(
-      and(
-        inArray(messageOutbox.status, ["sent", "suppressed", "failed"]),
-        lt(messageOutbox.createdAt, new Date(now.getTime() - 30 * DAY_MS)),
-      ),
+      and(settled, lt(messageOutbox.createdAt, new Date(now.getTime() - OUTBOX_KEY_RETENTION_MS))),
     )
     .returning({ id: messageOutbox.id });
   const reviewAddresses = await db
@@ -120,6 +157,7 @@ export async function purgeSpentSecurityRecords(
     .returning({ id: reviewReports.id });
   return {
     deliveredMailDeleted: deliveredMail.length,
+    deliveredMailScrubbed: scrubbedMail.length,
     phoneCodesDeleted: phoneCodes.length,
     emailCodesDeleted: emailCodes.length,
     reviewAddressesCleared: reviewAddresses.length,

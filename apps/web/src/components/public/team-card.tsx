@@ -36,8 +36,8 @@ export interface TeamCardData {
   players: TeamCardPlayer[];
 }
 
-/** Initials for a player with no photograph. */
-function initials(name: string): string {
+/** Initials for a player with no photograph, or a team with no crest. */
+export function teamCardInitials(name: string): string {
   const words = name.trim().split(/\s+/).slice(0, 2);
   return words.map((word) => word.charAt(0).toUpperCase()).join("");
 }
@@ -66,7 +66,7 @@ export function TeamCard({
     >
       <header className="team-card-head">
         <span className="team-card-crest" aria-hidden>
-          {crest ?? initials(name)}
+          {crest ?? teamCardInitials(name)}
         </span>
         <div className="team-card-id">
           <h3 className="team-card-name">{name}</h3>
@@ -84,7 +84,7 @@ export function TeamCard({
           {shown.map((player) => (
             <li className="team-card-player" key={player.number}>
               <span className="team-card-avatar" aria-hidden>
-                {player.photo ?? initials(player.name)}
+                {player.photo ?? teamCardInitials(player.name)}
               </span>
               <span className="team-card-player-name">{player.name}</span>
               {/* A star, not the word "Pre-signed": the word cost about 70px

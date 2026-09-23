@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { engineDiagnosticsAction } from "../../../../../server/auction/conduct-actions";
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
 import { useHydrated } from "../../../../../lib/use-hydrated";
+import { usePolled } from "../../../../admin/use-polled";
 
 // RECOVERY DASHBOARD + ENGINE DIAGNOSTICS (M-IP4-3). Everything read-only,
 // polled from the engine's diagnostics feed through the conduct-gated proxy.
@@ -19,39 +20,67 @@ function ms(value: number): string {
   return `${value.toFixed(1)} ms`;
 }
 
+/** One answer from the diagnostics feed, stamped so the newer of two wins. */
+interface Reading {
+  diagnostics: EngineDiagnostics | null;
+  unreachable: boolean;
+  refreshMs: number | null;
+  at: number;
+}
+
+const NOT_YET: Reading = { diagnostics: null, unreachable: false, refreshMs: null, at: 0 };
+
 export function EnginePanel({ slug }: { slug: string }) {
   const toast = useToast();
-  const [diagnostics, setDiagnostics] = useState<EngineDiagnostics | null>(null);
-  const [refreshMs, setRefreshMs] = useState<number | null>(null);
-  const [unreachable, setUnreachable] = useState(false);
   const [busy, setBusy] = useState(false);
   const hydrated = useHydrated();
 
-  // A promise chain rather than an async function: every state write sits in
-  // the callback that runs when the answer arrives, which is what it always
-  // did — this shape just makes that visible to the compiler's effect rule.
-  const refresh = useCallback((): Promise<void> => {
+  // Null only when the gate refuses (the conduct grant is gone): usePolled then
+  // stops asking, rather than polling a refusal every two seconds all night.
+  const read = useCallback(async (): Promise<Reading | null> => {
     const started = performance.now();
-    return engineDiagnosticsAction(slug).then((result) => {
-      setRefreshMs(performance.now() - started);
-      if (result.ok) {
-        setDiagnostics(result.diagnostics);
-        setUnreachable(false);
-      } else {
-        setUnreachable(true);
-      }
-    });
+    const result = await engineDiagnosticsAction(slug);
+    const at = performance.now();
+    if (result.ok) {
+      return { diagnostics: result.diagnostics, unreachable: false, refreshMs: at - started, at };
+    }
+    if (result.reason === "not_authorized") {
+      return null;
+    }
+    return { diagnostics: null, unreachable: true, refreshMs: at - started, at };
   }, [slug]);
 
+  // The shared poller (admin live board, auction watch): it pauses while the
+  // tab is hidden and never overlaps a slow answer with the next request. The
+  // hand-rolled setInterval here did neither — a dashboard left open in a
+  // background tab through an auction night asked the engine every 2 s, and a
+  // slow engine got a second request stacked on the first (go-live gate P3).
+  const polled = usePolled(NOT_YET, read, POLL_MS, true);
+
+  // The poller's first answer comes a full interval after mount, and a
+  // recovery wants its result at once — so an on-demand read sits beside it,
+  // and whichever answer is newer is the one on screen.
+  const [manual, setManual] = useState<Reading>(NOT_YET);
+  const refresh = useCallback(
+    (): Promise<void> =>
+      read().then((reading) => {
+        if (reading !== null) {
+          setManual(reading);
+        }
+      }),
+    [read],
+  );
   useEffect(() => {
     void refresh();
-    const interval = setInterval(() => {
-      void refresh();
-    }, POLL_MS);
-    return () => {
-      clearInterval(interval);
-    };
   }, [refresh]);
+
+  const latest = manual.at > polled.data.at ? manual : polled.data;
+  const diagnostics = latest.diagnostics;
+  const refreshMs = latest.refreshMs;
+  // A thrown read (the server action itself failed) or a refused one keeps the
+  // last numbers but says the engine could not be reached, as a refused read
+  // always did.
+  const unreachable = latest.unreachable || polled.failed || polled.revoked;
 
   const recover = async () => {
     setBusy(true);

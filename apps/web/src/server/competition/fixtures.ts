@@ -11,6 +11,7 @@ import {
 } from "@desiauction/db";
 import { alias } from "drizzle-orm/pg-core";
 import { and, asc, desc, eq, gte, ilike, inArray, lte, sql, type SQL } from "drizzle-orm";
+import { containsPattern } from "../../lib/like-pattern";
 
 // FIXTURE SNAPSHOTS (M-IP3-3, CTO addition 2). The immutable projection every
 // downstream surface reads — calendar, exports, and (future) the Auction and
@@ -298,7 +299,7 @@ export async function queryFixtures(
   }
   const term = query.search?.trim();
   if (term !== undefined && term !== "") {
-    filters.push(ilike(fixtures.fixtureNumber, `%${term}%`));
+    filters.push(ilike(fixtures.fixtureNumber, containsPattern(term)));
   }
   if (query.from !== undefined && query.from !== "") {
     filters.push(gte(fixtures.kickoffAt, query.from));
@@ -594,8 +595,28 @@ export interface FixtureTimelineEntry {
   meta: unknown;
 }
 
-/** A fixture's audit timeline (every transition + reschedule), oldest→newest. */
-export async function fixtureTimeline(db: Db, fixtureId: string): Promise<FixtureTimelineEntry[]> {
+/**
+ * A fixture's audit timeline (every transition + reschedule), oldest→newest.
+ *
+ * Bound to the season (audit P3). `audit_log.subject` is any id at all, and the
+ * caller's capability was checked for ONE season: reading by subject alone
+ * would return the history of any row in the org whose id the browser named —
+ * a registration's notes, another season's fixture. The fixture must be this
+ * season's first; once it is, its id is its own and every row under it is.
+ */
+export async function fixtureTimeline(
+  db: Db,
+  competitionId: string,
+  fixtureId: string,
+): Promise<FixtureTimelineEntry[]> {
+  const [bound] = await db
+    .select({ id: fixtures.id })
+    .from(fixtures)
+    .where(and(eq(fixtures.id, fixtureId), eq(fixtures.competitionId, competitionId)))
+    .limit(1);
+  if (bound === undefined) {
+    return [];
+  }
   return db
     .select({ action: auditLog.action, at: auditLog.at, meta: auditLog.meta })
     .from(auditLog)

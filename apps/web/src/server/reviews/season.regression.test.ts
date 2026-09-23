@@ -581,6 +581,44 @@ describe("FR-1 P4 · a reader objects", () => {
     expect((await dismissReports(reviewId, where.organizer)).ok).toBe(false);
   });
 
+  it("still throttles when there is no network address — by the signed-in person", async () => {
+    // Gate P3: a null address used to mean no limit at all.
+    const where = await season();
+    const reviewId = await publishedReview(where);
+    const reader = await person();
+    const at = new Date("2031-03-01T10:00:00.000Z");
+    for (let i = 0; i < 12; i += 1) {
+      await reportReview({
+        reviewId,
+        reason: "spam",
+        note: "",
+        ip: null,
+        personId: reader,
+        now: at,
+      });
+    }
+    const rows = await db
+      .select({ id: reviewReports.id })
+      .from(reviewReports)
+      .where(eq(reviewReports.reporterPersonId, reader));
+    expect(rows).toHaveLength(10);
+  });
+
+  it("caps reports with neither address nor session across the whole platform", async () => {
+    const where = await season();
+    const reviewId = await publishedReview(where);
+    // A clock no other test uses, so the hour holds only this test's rows.
+    const at = new Date("2031-04-01T10:00:00.000Z");
+    for (let i = 0; i < 33; i += 1) {
+      await reportReview({ reviewId, reason: "spam", note: "", ip: null, personId: null, now: at });
+    }
+    const rows = await db
+      .select({ id: reviewReports.id })
+      .from(reviewReports)
+      .where(eq(reviewReports.reviewId, reviewId));
+    expect(rows).toHaveLength(30);
+  });
+
   it("refuses what is not on show, and an unknown reason", async () => {
     const privateSeason = await season("private");
     const privateReview = await publishedReview(privateSeason);

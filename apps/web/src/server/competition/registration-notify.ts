@@ -11,6 +11,7 @@ import {
   type MessageTemplate,
   type TemplateKey,
 } from "../messaging/templates";
+import { providerFetch } from "../messaging/provider-fetch";
 
 /**
  * DA-35: THE LOOP DID NOT CLOSE. A registrant was rejected with reason
@@ -105,10 +106,9 @@ export class SmsSendError extends Error {
   }
 }
 
-const defaultTransport: SmsTransport = async (url, init) => {
-  const response = await fetch(url, init);
-  return { status: response.status, body: await response.text() };
-};
+// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
+// outbox's claim lease, or two drains deliver the same message.
+const defaultTransport: SmsTransport = providerFetch;
 
 /**
  * MSG91 Flow (v5) transactional SMS: the OTP endpoint sends codes, this one

@@ -28,6 +28,7 @@ import {
   type EmailVerificationResult,
 } from "./email-change";
 import { requestEmailLogin, verifyEmailLogin } from "./email-login";
+import { notifyEmailChanged } from "./email-changed-notice";
 import { createCodeMailer, MailSendError } from "./email-sender";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
@@ -627,6 +628,12 @@ export async function removePasskeyAction(passkeyId: string): Promise<ActionResu
   if (session === null) {
     return { ok: false, error: SESSION_LAPSED };
   }
+  // Step-up, like enrolling one. Removing the owner's passkey is how a stolen
+  // session takes away the one credential it does not hold — the recovery
+  // step-up PA-1R 5.1 leans on — so it is a credential change like any other.
+  if (!signedInRecently(session)) {
+    return { ok: false, error: SIGN_IN_AGAIN };
+  }
   try {
     await removePasskey(db, session.personId, passkeyId);
   } catch {
@@ -1170,6 +1177,21 @@ export async function confirmEmailVerificationAction(
   // close every other door. A session that planted this address from a stolen
   // cookie cannot outlive it, and the person here keeps theirs.
   await revokeOtherSessions(db, session.personId, session.sessionId);
+  /*
+   * Tell the OUTGOING address, and never fail the change on it — the phone
+   * change's compensating control, which this path lacked (gate P1-6). The
+   * address is the sign-in credential: a stolen session that moves it has
+   * just signed the owner out everywhere, and the old inbox is the one place
+   * they can still be told.
+   */
+  try {
+    const outcome = await notifyEmailChanged(db, result.previousEmail, result.email);
+    if (outcome === "failed") {
+      logger().warn("email.change_notice_failed");
+    }
+  } catch {
+    // Deliberately swallowed: the change has committed.
+  }
   revalidatePath("/account");
   return { step: "idle", done: true, email: result.email };
 }

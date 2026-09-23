@@ -306,6 +306,9 @@ export const messageOutbox = pgTable(
   },
   (table) => [
     uniqueIndex("message_outbox_dedupe_uq").on(table.dedupeKey),
+    // 0083: `LIKE '<kind>:<id>:%'` batch lookups; the unique index above cannot
+    // serve a prefix match under a non-C collation.
+    index("message_outbox_dedupe_prefix_idx").on(table.dedupeKey.op("text_pattern_ops")),
     index("message_outbox_due_idx")
       .on(table.nextAttemptAt)
       .where(sql`status = 'pending'`),

@@ -26,10 +26,19 @@ import {
   type CompetitionImageSlot,
 } from "./authz";
 import { storage } from "./index";
+import { discard, ingestUpload } from "./ingest";
+import { takePresignQuota } from "./presign-quota";
 
 // Media writes (parity §3.1). Every action: session → membership-gated
 // competition → tenant boundary → subject resolve + R6 authz → storage/db.
-// Image bytes never pass through here — the browser PUTs to the returned URL.
+// The upload itself never passes through here — the browser PUTs to the
+// returned URL — but the ATTACH reads it back, sanitizes it and stores our own
+// re-encode (ingest.ts, P0-6): what the client sent is never what is served.
+
+/** A presign refused by the hourly budget (presign-quota.ts). */
+class QuotaError extends Error {}
+
+const QUOTA_MESSAGE = "Too many uploads in the last hour. Please try again later.";
 
 export interface UploadRequestInput {
   slug: string;
@@ -75,6 +84,13 @@ export async function requestMediaUpload(input: UploadRequestInput): Promise<Upl
           throw new ForbiddenError();
         }
         await requireMediaWrite(db, session.personId, competition, input.subject, resolved);
+        const allowed = await takePresignQuota(db, session.personId, "media.upload_requested", {
+          subject: input.subject,
+          competitionId: competition.id,
+        });
+        if (!allowed) {
+          throw new QuotaError();
+        }
         return resolved.storageSubjectId;
       },
     );
@@ -89,6 +105,9 @@ export async function requestMediaUpload(input: UploadRequestInput): Promise<Upl
   } catch (error) {
     if (error instanceof ForbiddenError) {
       return { ok: false, error: "You don't have permission to upload this image." };
+    }
+    if (error instanceof QuotaError) {
+      return { ok: false, error: QUOTA_MESSAGE };
     }
     throw error;
   }
@@ -122,39 +141,59 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
   if (competition === null) {
     return { ok: false, error: "Competition not found." };
   }
+  // Resolve + authorize, inside the tenant boundary. Run twice: once before
+  // the storage IO (so an unauthorized caller never makes us read a byte) and
+  // again in the write transaction (so the row is written under a fresh check,
+  // without holding a connection across the bucket round-trips).
+  const authorize = async (db: Parameters<typeof resolveMediaSubject>[0]) => {
+    const resolved = await resolveMediaSubject(
+      db,
+      competition,
+      input.subject,
+      input.subjectId,
+      session.personId,
+    );
+    if (resolved === null) {
+      throw new ForbiddenError();
+    }
+    await requireMediaWrite(db, session.personId, competition, input.subject, resolved);
+    return resolved;
+  };
+  const tenant = { personId: session.personId, orgId: competition.orgId };
   try {
-    await withTenantDb(
-      dbHandle,
-      { personId: session.personId, orgId: competition.orgId },
-      async (db) => {
-        const resolved = await resolveMediaSubject(
-          db,
-          competition,
-          input.subject,
-          input.subjectId,
-          session.personId,
-        );
-        if (resolved === null) {
-          throw new ForbiddenError();
-        }
-        await requireMediaWrite(db, session.personId, competition, input.subject, resolved);
-        // Bind the key to what was just authorized (S2): reject any key that is
-        // malformed or whose org/subject/subjectId doesn't match this target,
-        // so a client cannot attach an arbitrary or cross-tenant object.
-        if (
-          !mediaKeyBelongsTo(input.key, {
-            orgId: competition.orgId,
-            subject: input.subject,
-            subjectId: resolved.storageSubjectId,
-          })
-        ) {
+    const target = await withTenantDb(dbHandle, tenant, async (db) => {
+      const resolved = await authorize(db);
+      // Bind the key to what was just authorized (S2): reject any key that is
+      // malformed or whose org/subject/subjectId doesn't match this target,
+      // so a client cannot attach an arbitrary or cross-tenant object.
+      const bound = {
+        orgId: competition.orgId,
+        subject: input.subject,
+        subjectId: resolved.storageSubjectId,
+      };
+      if (!mediaKeyBelongsTo(input.key, bound)) {
+        throw new ForbiddenError();
+      }
+      return bound;
+    });
+    // P0-6: the object is the client's bytes until this returns our own.
+    const ingested = await ingestUpload(storage, input.key, target, newId());
+    if (!ingested.ok) {
+      return ingested;
+    }
+    try {
+      await withTenantDb(dbHandle, tenant, async (db) => {
+        const resolved = await authorize(db);
+        if (resolved.storageSubjectId !== target.subjectId) {
+          // The subject moved between the two checks (a typed name, a
+          // withdrawal): the key no longer belongs to what is authorized now.
           throw new ForbiddenError();
         }
         const via =
           resolved.ownerPersonId === session.personId
             ? "self_upload"
             : "organizer_upload_attestation";
-        await persistMediaKey(db, input.subject, resolved, input.key, new Date(), via, slot);
+        await persistMediaKey(db, input.subject, resolved, ingested.key, new Date(), via, slot);
         // Append-only evidence (S3, DPDP §6): who attached media to what, and how
         // consent was captured. Metadata only — never the image or PII content.
         await db.insert(auditLog).values({
@@ -171,15 +210,19 @@ export async function attachMedia(input: AttachInput): Promise<AttachResult> {
             ...(input.subject === "competition" ? { slot } : {}),
           },
         });
-      },
-    );
+      });
+    } catch (error) {
+      await discard(storage, ingested.key);
+      throw error;
+    }
+    await discard(storage, ingested.rawKey);
     revalidatePath(`/c/${competition.slug}`);
     // The season overview renders the competition's own crest and offers to
     // replace it, so it is as stale after an attach as the tabs below it.
     revalidatePath(`/seasons/${competition.slug}`);
     revalidatePath(`/seasons/${competition.slug}/teams`);
     revalidatePath(`/seasons/${competition.slug}/registrations`);
-    return { ok: true, url: storage.readUrl(input.key) };
+    return { ok: true, url: storage.readUrl(ingested.key) };
   } catch (error) {
     if (error instanceof ForbiddenError) {
       return { ok: false, error: "You don't have permission to attach this image." };
@@ -361,6 +404,14 @@ export async function requestOwnPhotoUpload(input: {
     return { ok: false, error: "Registration is not open for this competition." };
   }
   const contentType: AllowedImageType = input.contentType;
+  const allowed = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
+    takePresignQuota(db, session.personId, "media.own_upload_requested", {
+      competitionId: competition.id,
+    }),
+  );
+  if (!allowed) {
+    return { ok: false, error: QUOTA_MESSAGE };
+  }
   const upload = await storage.presignUpload({
     orgId: competition.orgId,
     subject: "player",
@@ -390,23 +441,44 @@ export async function attachOwnPhoto(input: { slug: string; key: string }): Prom
   ) {
     return { ok: false, error: "Invalid image reference." };
   }
-  await withTenantDb(
-    dbHandle,
-    { personId: session.personId, orgId: competition.orgId },
-    async (db) => {
-      const resolved = { storageSubjectId: session.personId, ownerPersonId: session.personId };
-      await persistMediaKey(db, "player", resolved, input.key, new Date(), "self_upload");
-      await db.insert(auditLog).values({
-        id: newId(),
-        actor: session.personId,
-        action: "media.attached",
-        scopeType: "org",
-        scopeId: competition.orgId,
-        subject: session.personId,
-        meta: { subject: "player", competitionId: competition.id, via: "self_upload", self: true },
-      });
-    },
+  // P0-6: sanitize before a row points at it (ingest.ts).
+  const ingested = await ingestUpload(
+    storage,
+    input.key,
+    { orgId: competition.orgId, subject: "player", subjectId: session.personId },
+    newId(),
   );
+  if (!ingested.ok) {
+    return ingested;
+  }
+  try {
+    await withTenantDb(
+      dbHandle,
+      { personId: session.personId, orgId: competition.orgId },
+      async (db) => {
+        const resolved = { storageSubjectId: session.personId, ownerPersonId: session.personId };
+        await persistMediaKey(db, "player", resolved, ingested.key, new Date(), "self_upload");
+        await db.insert(auditLog).values({
+          id: newId(),
+          actor: session.personId,
+          action: "media.attached",
+          scopeType: "org",
+          scopeId: competition.orgId,
+          subject: session.personId,
+          meta: {
+            subject: "player",
+            competitionId: competition.id,
+            via: "self_upload",
+            self: true,
+          },
+        });
+      },
+    );
+  } catch (error) {
+    await discard(storage, ingested.key);
+    throw error;
+  }
+  await discard(storage, ingested.rawKey);
   revalidatePath(`/c/${input.slug}`);
-  return { ok: true, url: storage.readUrl(input.key) };
+  return { ok: true, url: storage.readUrl(ingested.key) };
 }

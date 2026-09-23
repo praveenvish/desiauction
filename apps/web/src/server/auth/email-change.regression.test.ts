@@ -107,7 +107,8 @@ describe("verification", () => {
       throw new Error(requested.reason);
     }
     const result = await confirmEmailVerification(db, { personId, code: requested.code });
-    expect(result).toEqual({ ok: true, email: MINE });
+    // A first address replaces nothing, so there is nobody to warn.
+    expect(result).toEqual({ ok: true, email: MINE, previousEmail: null });
     expect(await verifiedEmailOf(db, personId)).toBe(MINE);
   });
 
@@ -149,7 +150,12 @@ describe("verification", () => {
     if (!requested.ok) {
       throw new Error(requested.reason);
     }
-    expect((await confirmEmailVerification(db, { personId, code: requested.code })).ok).toBe(true);
+    expect(await confirmEmailVerification(db, { personId, code: requested.code })).toEqual({
+      ok: true,
+      email: OTHERS,
+      // The verified address it replaced — the inbox the owner still reads.
+      previousEmail: MINE,
+    });
     expect(await verifiedEmailOf(db, personId)).toBe(OTHERS);
   });
 });

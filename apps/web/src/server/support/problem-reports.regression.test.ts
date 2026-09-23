@@ -178,6 +178,28 @@ describe("FR-1 · the throttle", () => {
   });
 });
 
+describe("the guest ceiling (gate P3)", () => {
+  it("stops guests as a whole, whatever address they come from — and never a signed-in reporter", async () => {
+    // Measured against the guests already in this hour, so the shared database
+    // cannot make it pass or fail by accident.
+    const [baseline] = (await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(problemReports)
+      .where(
+        sql`${problemReports.personId} is null and ${problemReports.createdAt} > now() - interval '1 hour'`,
+      )) as [{ count: number }];
+    const ceiling = baseline.count + 2;
+    await file({ requestIp: "198.51.100.201" });
+    expect(await isReportThrottled(db, null, "198.51.100.202", new Date(), ceiling)).toBe(false);
+    await file({ requestIp: "198.51.100.203" });
+    // A fresh address, and one with none at all: both past the ceiling now.
+    expect(await isReportThrottled(db, null, "198.51.100.204", new Date(), ceiling)).toBe(true);
+    expect(await isReportThrottled(db, null, null, new Date(), ceiling)).toBe(true);
+    const reporter = await person();
+    expect(await isReportThrottled(db, reporter, null, new Date(), ceiling)).toBe(false);
+  });
+});
+
 describe("FR-1 · triage", () => {
   it("moves the status and records the operator in one write", async () => {
     const operator = await person();

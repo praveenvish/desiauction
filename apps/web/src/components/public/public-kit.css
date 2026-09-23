@@ -530,6 +530,12 @@
   opacity: 0.75;
 }
 
+/* On the gold fill a dimmed count drops to 4.17:1 (text-on-accent at 0.75 over
+   --accent), under AA. The active chip's count keeps full ink. */
+.pk-chip[data-active] .pk-chip-count {
+  opacity: 1;
+}
+
 .pk-chip-dot {
   inline-size: 8px;
   block-size: 8px;

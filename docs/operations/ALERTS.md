@@ -13,6 +13,30 @@ without an action is a notification, and notifications get muted.
 
 ---
 
+## What is actually evaluated today (go-live gate, 2026-09-23)
+
+Until this date none of the five below was evaluated by anything. The
+self-hosted stack now provisions the rules from
+`ops/deploy/observability/grafana-alerting.yml` (Grafana → Loki), delivers them
+to ONE webhook from `ALERT_WEBHOOK_URL` (compose refuses to start without it),
+and restarts unhealthy web/engine containers with `autoheal`. What a log cannot
+say is marked, with who owns closing it.
+
+| # | Alert | Provisioned rule(s) | Gap, and who closes it |
+|---|---|---|---|
+| 1 | Service health | `da-service-unhealthy` (autoheal restarted a container after its `/readyz`/`/healthz` healthcheck failed) | Whole box down, DNS, TLS: **external uptime check** below — founder |
+| 2 | Error rate | `da-error-rate` (>10 error lines / 5 min / service), `da-fatal` (any) | Sentry's own alerting on the DSN — founder, in Sentry |
+| 3 | Runner silence | `da-runner-crashloop` (>3 boots / 30 min) | Queue age is not in the logs; `/admin/health` shows it. A stuck-but-alive runner is still found by a person |
+| 4 | Engine liveness | `da-engine-unhealthy` (page) + `da-fatal` | "During a live window" is not in the logs, so it pages on EVERY engine restart |
+| 5 | Webhook refusals | `da-webhook-5xx` (page), `da-webhook-4xx` (>3 / 15 min) from Caddy's webhook-only access log | — |
+| 6 | Backups | `da-backup-failed`, `da-backup-stale` (no `BACKUP_OK` in 26 h), `da-mirror-failed`, `da-mirror-stale` (3 h) | Off-box targets — founder (`pgbackrest.env`, `mirror.env`) |
+| 7 | Jobs went silent | `da-jobs-failed`, `da-jobs-silent` (no `job.ok` in 15 min) | — |
+
+Every rule's no-data state is OK: a quiet count and a present heartbeat both
+return nothing, which is not an incident.
+
+---
+
 ## Why five, and why these
 
 The audit's top production risks were ranked by *detectability*, and the four
@@ -122,6 +146,67 @@ class of defect PA-1 found twice (a write attempted by a role that may not).
 **Action:** [SECRET_ROTATION](SECRET_ROTATION.md) for 401s; check the relevant
 `*_SECRET` for 404s; for 5xx, `pnpm --filter @desiauction/web posture:verify`
 under the production roles reproduces the whole class locally.
+
+---
+
+## 6 · Backups and the off-box copy
+
+**Signal:** the `pgbackrest` sidecar logs `BACKUP_OK`, `BACKUP_FAILED` or
+`BACKUP_REFUSED` (repo1 is on this box and nobody accepted that); `minio-mirror`
+logs `MIRROR_OK`, `MIRROR_FAILED` or `MIRROR_REFUSED`. Outside the box,
+`backup-production.yml` runs `pgbackrest check` and an age check over SSH every
+night and FAILS — including when its secrets are missing.
+
+**Alert when:** any failure or refusal; no `BACKUP_OK` for 26 hours; no
+`MIRROR_OK` for 3 hours.
+
+**Why:** the absence is the alert. The sidecar used to end every command in
+`|| true`, so a backup that failed every night looked exactly like one that
+worked, and the nightly workflow reported green with no backup taken.
+
+**Action:** `docker compose logs pgbackrest` (or `minio-mirror`). A
+`BACKUP_REFUSED` means `pgbackrest.env` still points at the on-box MinIO —
+ops/deploy/README "Backups".
+
+---
+
+## 7 · Jobs went silent
+
+**Signal:** the `scheduler` service logs `job.ok` / `job.failed` for every call
+to `/api/jobs/{messages,settlement-coordination,demo-reminders,feedback}`.
+
+**Alert when:** more than two `job.failed` in 15 minutes, or no `job.ok` at all
+for 15 minutes (messages runs every 2).
+
+**Why:** each job route is fail-closed and idempotent, so an unscheduled or
+misconfigured one is SILENT — a pending message is never retried, the retention
+purge never runs, a lost settlement effect never heals. Nothing on the host
+called these routes at all until the scheduler existed.
+
+**Action:** `docker compose logs scheduler`. A 404 means the route thinks its
+secret is unset — check `FEEDBACK_JOB_SECRET` / `SETTLEMENT_JOB_SECRET` /
+`DEMO_JOB_SECRET` in `web.env`. An unreachable web tier shows as a fetch error
+and usually arrives with alert 1.
+
+---
+
+## Outside the box (founder-held)
+
+Grafana runs on the host it watches, so it goes silent exactly when the host
+does. One external check covers what no rule on the box can: the machine gone,
+DNS broken, a certificate expired, Caddy down.
+
+Configure any external uptime service (UptimeRobot, Better Stack, Healthchecks,
+a cron on a second machine) to:
+
+- `GET https://<PUBLIC_DOMAIN>/readyz` every minute — alert after 2 failures;
+- `GET https://<ENGINE_DOMAIN>/healthz` every minute — alert after 2 failures,
+  as a PAGE (alert 4);
+- alert on TLS certificate expiry under 14 days for both hosts;
+- deliver to the same phone as `ALERT_WEBHOOK_URL`.
+
+Both probes are public and answer with a status, their checks and the release
+version — nothing personal — so an external probe needs no credentials.
 
 ---
 

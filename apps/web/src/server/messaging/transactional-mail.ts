@@ -1,5 +1,6 @@
 import { EmailBreaker, type EmailTransport } from "./email-adapter";
 import { env } from "../../env";
+import { providerFetch } from "./provider-fetch";
 
 /**
  * ONE-OFF TRANSACTIONAL MAIL — a receipt for something the person just did.
@@ -50,10 +51,9 @@ export interface TransactionalMailer {
 const BREAKER_THRESHOLD = 3;
 const BREAKER_COOLDOWN_MS = 60 * 1000;
 
-const defaultTransport: EmailTransport = async (url, init) => {
-  const response = await fetch(url, init);
-  return { status: response.status, body: await response.text() };
-};
+// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
+// outbox's claim lease, or two drains deliver the same message.
+const defaultTransport: EmailTransport = providerFetch;
 
 const defaultBuildRequest = (mail: OutgoingMail, from: string, replyTo?: string): unknown => ({
   from,

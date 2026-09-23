@@ -1,6 +1,6 @@
 import { Card, PlayerImage } from "@desiauction/ui";
 
-import { compactINR, exactINR } from "../../../../lib/inr";
+import { compactFloorINR, compactINR, exactINR } from "../../../../lib/inr";
 import { roleLabeller } from "../../../../lib/role-label";
 import type { AuctionOverview } from "../../../../server/auction/auction-overview";
 
@@ -155,7 +155,9 @@ export function AuctionOverviewPanel({
                         auction keeps back. Without money sight the figure is
                         not dimmed — it was never sent. */}
                     {paddle.remaining !== undefined ? (
-                      <span className="auc-paddle-left">{compactINR(paddle.remaining)} left</span>
+                      <span className="auc-paddle-left">
+                        {compactFloorINR(paddle.remaining)} left
+                      </span>
                     ) : null}
                   </span>
                   {paddle.purseTotal !== undefined && paddle.spent !== undefined ? (

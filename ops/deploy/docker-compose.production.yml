@@ -1,9 +1,11 @@
 # The whole platform on one host (DEPLOYMENT.md topology).
 #
-# Three app containers, a reverse proxy that terminates TLS, Postgres, and a
-# backup sidecar. Images are BUILT IN CI and pulled here — never built on the
-# production host: the Next.js build peaks at 4-8 GB, and a box sized for that
-# is a box you are paying for around the clock to use for ten minutes a week.
+# Three app containers, a reverse proxy that terminates TLS, Postgres, a
+# backup sidecar, an off-box mirror for object storage, a scheduler for the web
+# tier's job routes, and an autoheal watchdog. Images are BUILT IN CI and
+# pulled here — never built on the production host: the Next.js build peaks at
+# 4-8 GB, and a box sized for that is a box you are paying for around the clock
+# to use for ten minutes a week.
 #
 # Everything is pinned. `postgres:17-alpine` and not `:latest`, because a
 # database that silently majors on a `docker compose pull` is a data-loss
@@ -40,6 +42,7 @@ services:
     <<: *logs
     restart: unless-stopped
     env_file: [./web.env]
+    labels: [autoheal=true]
     depends_on:
       db: { condition: service_healthy }
     healthcheck:
@@ -61,6 +64,7 @@ services:
     <<: *logs
     restart: unless-stopped
     env_file: [./engine.env]
+    labels: [autoheal=true]
     depends_on:
       db: { condition: service_healthy }
     # EXACTLY ONE. The engine is the single mutation authority and claims a
@@ -86,6 +90,55 @@ services:
     <<: *logs
     restart: unless-stopped
     env_file: [./runner.env]
+    depends_on:
+      db: { condition: service_healthy }
+
+  # THE WEB TIER'S JOB ROUTES, ON A CLOCK (ops/deploy/jobs/scheduler.mjs).
+  #
+  # `/api/jobs/{messages,settlement-coordination,demo-reminders,feedback}` are
+  # doors a scheduler calls, and nothing on this host called them: the outbox
+  # never drained after a restart, the retention purge never purged, and the
+  # settlement catch-up sweep never swept. Every one is fail-closed and
+  # idempotent, so an unscheduled door was indistinguishable from a quiet one.
+  #
+  # The WEB image, running a script from a read-only mount: its own node, no
+  # third-party image to pin, and web.env as the ONE source of the job secrets —
+  # a second copy is how a sender and a route come to disagree, and a
+  # disagreement here is a 404 that looks like "nothing to do".
+  scheduler:
+    image: ${REGISTRY}/web:${TAG}
+    <<: *logs
+    restart: unless-stopped
+    env_file: [./web.env]
+    command: ["/etc/desiauction/scheduler.mjs"]
+    volumes:
+      - ./jobs/scheduler.mjs:/etc/desiauction/scheduler.mjs:ro
+    depends_on:
+      web: { condition: service_healthy }
+
+  # DEPLOY-TIME DATABASE WORK, RUN ON THIS HOST (deploy-host.yml).
+  #
+  # Migrations, the live-auction freeze check, the grant drift gate and the
+  # production preflight all need the database, and the database publishes no
+  # port — deliberately. They used to run from a GitHub-hosted runner against a
+  # `PRODUCTION_DATABASE_URL` that could not be reached, which is to say they
+  # could not run at all. Now the deploy job SSHes here and runs them in this
+  # container, on the compose network, before any serving container is swapped.
+  #
+  # Profile `ops`: never started by `docker compose up`, only by an explicit
+  # `docker compose --profile ops run --rm migrator …`. migrator.env holds ONE
+  # value, DATABASE_URL as the database OWNER (the role migrations need), e.g.
+  # postgres://postgres:<POSTGRES_PASSWORD>@db:5432/<POSTGRES_DB>. The
+  # preflight reads the service env files through the read-only mount.
+  migrator:
+    image: ${REGISTRY}/migrator:${TAG}
+    <<: *logs
+    profiles: [ops]
+    env_file: [./migrator.env]
+    volumes:
+      - ./web.env:/env/web.env:ro
+      - ./engine.env:/env/engine.env:ro
+      - ./runner.env:/env/runner.env:ro
     depends_on:
       db: { condition: service_healthy }
 
@@ -210,39 +263,146 @@ services:
   # there never have been — so a restore point is the only thing that can undo
   # one.
   #
-  # THE REPO IS THE MinIO ON THIS BOX, and that is a deliberate, limited choice.
-  # A single-host deployment has nowhere else free to put it, so this protects
-  # the failure you are most likely to actually have — a bad migration, a
-  # dropped table, a bug that writes nonsense — and NOT the loss of the machine.
-  # Losing the disk loses the backups with it. The README says so in those
-  # words; moving repo1 off the box is a credentials change and nothing more.
+  # THE REPO BELONGS OFF THIS BOX. pgbackrest.env points repo1 at an S3 bucket
+  # (PGBACKREST_REPO1_S3_ENDPOINT/BUCKET/KEY/KEY_SECRET) and the same file is
+  # read by `db`, whose archive_command pushes WAL there. A repo on the MinIO
+  # beside the database protects a bad migration and NOT the loss of the
+  # machine — the backups die with the disk they back up. So the sidecar
+  # REFUSES to run against the on-box MinIO unless PGBACKREST_ALLOW_ONBOX_REPO=1
+  # says, in writing, that this is an interim state (README "Backups").
+  #
+  # LOUD FAILURE. The loop used to end every command in `|| true`: a backup that
+  # failed every night logged one line and looked identical to one that worked.
+  # Now each run logs BACKUP_OK or BACKUP_FAILED (Grafana alerts on both — the
+  # failure, and the absence of success for 26h), and a failed run retries in
+  # an hour instead of waiting a day.
   pgbackrest:
     image: ${REGISTRY}/db:${DB_TAG}
     <<: *logs
     restart: unless-stopped
     env_file: [./pgbackrest.env]
+    environment:
+      # The on-box endpoint, so the refusal below can recognise it.
+      ONBOX_S3_DOMAIN: ${S3_DOMAIN}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - pgsocket:/var/run/postgresql
     depends_on:
       db: { condition: service_healthy }
-    # stanza-create is idempotent and runs on every boot, so a fresh volume
-    # becomes a working repo without an operator remembering a one-off command —
-    # the step most likely to be skipped is the step that makes the rest real.
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
         set -euo pipefail
-        su postgres -c "pgbackrest --stanza=desiauction stanza-create" || true
+        ENDPOINT="$${PGBACKREST_REPO1_S3_ENDPOINT:-}"
+        case "$$ENDPOINT" in
+          "" | "$$ONBOX_S3_DOMAIN" | minio | minio:* | localhost* | 127.*)
+            if [ "$${PGBACKREST_ALLOW_ONBOX_REPO:-0}" != "1" ]; then
+              echo "BACKUP_REFUSED repo1 endpoint '$$ENDPOINT' is ON THIS BOX (or unset)."
+              echo "A backup on the disk it backs up does not survive losing that disk."
+              echo "Point PGBACKREST_REPO1_S3_* in pgbackrest.env at an off-box bucket,"
+              echo "or set PGBACKREST_ALLOW_ONBOX_REPO=1 to accept an on-box repo for now."
+              exit 1
+            fi
+            echo "WARNING repo1 is ON THIS BOX (PGBACKREST_ALLOW_ONBOX_REPO=1): recoverable from a bad migration, NOT from losing the machine."
+            ;;
+        esac
+        # stanza-create IS idempotent on its own — on an existing, matching
+        # stanza it succeeds and changes nothing — so it needs no `|| true`.
+        # The `|| true` that used to be here hid the failures that matter: a
+        # repo that cannot be reached, and a stanza that no longer matches this
+        # cluster (a restored or re-initialised PGDATA), where continuing would
+        # archive into a history that is not this database's.
+        su postgres -c "pgbackrest --stanza=desiauction stanza-create"
         su postgres -c "pgbackrest --stanza=desiauction check"
         while true; do
           # Sunday a full, otherwise a differential. Retention is set in
           # pgbackrest.env; without it the repo grows until the disk is gone,
           # which is the same ending as no backup by a slower road.
           if [ "$$(date +%u)" = "7" ]; then TYPE=full; else TYPE=diff; fi
-          su postgres -c "pgbackrest --stanza=desiauction backup --type=$$TYPE" || true
-          sleep 86400
+          if su postgres -c "pgbackrest --stanza=desiauction backup --type=$$TYPE"; then
+            echo "BACKUP_OK type=$$TYPE"
+            sleep 86400
+          else
+            echo "BACKUP_FAILED type=$$TYPE — retrying in 1h"
+            sleep 3600
+          fi
         done
+
+  # OBJECT STORAGE, COPIED OFF THIS BOX.
+  #
+  # pgBackRest covers Postgres and nothing else, so `minio_data` — every player
+  # photo and every finops artifact, which are FINANCIAL RECORDS — lived only on
+  # this disk. This mirrors both buckets to an off-box S3 target on a timer.
+  #
+  #   finops: never deletes at the target. Artifacts are append-only records; a
+  #           delete on this box (a bug, an operator, an attacker) must not
+  #           propagate to the only other copy.
+  #   media:  `--remove` DOES propagate deletes, because a photo is deleted here
+  #           for an erasure or a take-down, and a backup that keeps an erased
+  #           minor's photo for ever is its own DPDP problem. Point-in-time
+  #           recovery for media is the target bucket's versioning, not this.
+  #
+  # mirror.env: MIRROR_S3_ENDPOINT (https://…), MIRROR_S3_ACCESS_KEY,
+  # MIRROR_S3_SECRET_KEY, MIRROR_MEDIA_BUCKET, MIRROR_FINOPS_BUCKET, optional
+  # MIRROR_INTERVAL_SECONDS (default 3600). Unconfigured is a refusal, not a
+  # silent no-op, for the same reason as the pgbackrest repo above. Each pass
+  # logs MIRROR_OK or MIRROR_FAILED; Grafana alerts on both.
+  minio-mirror:
+    image: quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    <<: *logs
+    restart: unless-stopped
+    env_file: [./minio.env, ./mirror.env]
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -u
+        for v in MIRROR_S3_ENDPOINT MIRROR_S3_ACCESS_KEY MIRROR_S3_SECRET_KEY MIRROR_MEDIA_BUCKET MIRROR_FINOPS_BUCKET; do
+          eval "val=\$${$$v:-}"
+          if [ -z "$$val" ]; then
+            echo "MIRROR_REFUSED $$v is unset in mirror.env — object storage has NO off-box copy."
+            exit 1
+          fi
+        done
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null
+        mc alias set offbox "$$MIRROR_S3_ENDPOINT" "$$MIRROR_S3_ACCESS_KEY" "$$MIRROR_S3_SECRET_KEY" >/dev/null
+        while true; do
+          if mc mirror --overwrite local/desiauction-finops "offbox/$$MIRROR_FINOPS_BUCKET" \
+            && mc mirror --overwrite --remove local/desiauction-media "offbox/$$MIRROR_MEDIA_BUCKET"; then
+            echo "MIRROR_OK"
+          else
+            echo "MIRROR_FAILED — retrying next interval"
+          fi
+          sleep "$${MIRROR_INTERVAL_SECONDS:-3600}"
+        done
+
+  # RESTARTS WHAT DOCKER ONLY LABELS.
+  #
+  # `restart: unless-stopped` acts on a container that EXITS. A container whose
+  # healthcheck fails but whose process lives — a web tier that cannot reach
+  # the database, an engine whose watchdog stopped ticking — is marked
+  # `unhealthy` and then left exactly as it is, for ever. This restarts the
+  # containers labelled `autoheal=true` (web, engine) when that happens, and
+  # its log line is what Grafana's service-health alert fires on.
+  #
+  # NOT the database: a Postgres in long crash recovery fails pg_isready, and
+  # restarting it mid-recovery is how recovery never finishes.
+  #
+  # The Docker socket again — the same trust decision as Alloy's, and the same
+  # containment: pinned by digest, no ports, nothing reaches it from outside.
+  autoheal:
+    image: willfarrell/autoheal@sha256:31f580ef0279eaced5b38d631b08c474d70d8403c1c2fdd6ddcf2e879d5f3f7c # 1.2.0
+    <<: *logs
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: "10"
+      # The healthchecks' own start_period already covers boot; this is the
+      # extra grace before autoheal will act on a freshly started container.
+      AUTOHEAL_START_PERIOD: "60"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   # ONE TIMELINE ACROSS EVERY SERVICE.
   #
@@ -302,8 +462,15 @@ services:
       GF_SECURITY_ALLOW_EMBEDDING: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      # Where alerts go (observability/grafana-alerting.yml). REQUIRED: an alert
+      # rule with nowhere to send it is a dashboard nobody is looking at, so a
+      # missing value stops `docker compose` here rather than at the incident.
+      # Any URL that accepts Grafana's webhook JSON — a Slack/Discord bridge,
+      # ntfy.sh, a PagerDuty/Opsgenie integration URL.
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:?set ALERT_WEBHOOK_URL in .env — see ops/deploy/README.md "Alerts"}
     volumes:
       - ./observability/grafana-datasource.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+      - ./observability/grafana-alerting.yml:/etc/grafana/provisioning/alerting/desiauction.yml:ro
       - grafana_data:/var/lib/grafana
     depends_on: [loki]
 

@@ -31,7 +31,9 @@ import {
   memberCountOf,
   membersOf,
   issueGrant,
+  lastOwnerRefuses,
   removeMember,
+  revokeGrants,
   wouldOrphanOrg,
 } from "./orgs";
 import { purgeOrg } from "../test-support/purge-org";
@@ -155,5 +157,39 @@ describe("removing a member", () => {
   it("leaves the remaining owner intact, so the club is still governable", async () => {
     expect(await holdersOf(db, org.id, "org:owner")).toEqual([owner]);
     expect(await can(db, owner, { scopeType: "org", scopeId: org.id }, "grant.issue")).toBe(true);
+  });
+});
+
+/**
+ * TWO OWNERS REVOKING EACH OTHER AT ONCE (audit P3).
+ *
+ * The guard used to be a plain read: each transaction counted two owners,
+ * each passed, each revoked the other, and the club committed with none — the
+ * one state no action can repair. The count now locks the owner grants, so the
+ * second transaction waits for the first and re-reads a single owner.
+ *
+ * The pause inside the first transaction is what makes the race real: it
+ * holds its answer open while the second one asks the same question.
+ */
+describe("last-owner protection under concurrency", () => {
+  it("lets exactly one of two mutual revocations through", async () => {
+    await db.insert(orgMembers).values({ orgId: org.id, personId: second }).onConflictDoNothing();
+    await issueGrant(db, org.id, second, "org:owner", owner);
+    expect((await holdersOf(db, org.id, "org:owner")).sort()).toEqual([owner, second].sort());
+
+    const revoke = (actor: string, target: string, pauseMs: number) =>
+      db.transaction(async (tx) => {
+        if (await lastOwnerRefuses(tx, org.id, target)) {
+          return "refused" as const;
+        }
+        await new Promise((resolve) => setTimeout(resolve, pauseMs));
+        await revokeGrants(tx, org.id, target, "org:owner", actor);
+        return "revoked" as const;
+      });
+    const outcomes = await Promise.all([revoke(owner, second, 300), revoke(second, owner, 0)]);
+
+    expect(outcomes.filter((outcome) => outcome === "revoked")).toHaveLength(1);
+    expect(outcomes.filter((outcome) => outcome === "refused")).toHaveLength(1);
+    expect(await holdersOf(db, org.id, "org:owner")).toHaveLength(1);
   });
 });

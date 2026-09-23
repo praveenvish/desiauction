@@ -1,6 +1,5 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
 import {
   Button,
   ButtonLink,
@@ -30,8 +29,7 @@ import {
   VisuallyHidden,
   type KitTone,
 } from "@desiauction/ui";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
   attestCaptureAction,
@@ -50,6 +48,8 @@ import {
 } from "../../../../server/settlement/actions";
 import type { CaseView, ObligationView, PaymentView } from "../../../../server/settlement/views";
 import { formatDateTime } from "../../../../lib/format-date";
+import { useOutcomeFocus } from "../../../../lib/use-outcome-focus";
+import { ledgerINR } from "../../../../lib/inr";
 import { CASE_STATE, PAYMENT_STATE } from "./money-words";
 import "./money.css";
 import "./season-money.css";
@@ -110,18 +110,14 @@ const PAYMENT_TONE: Record<string, KitTone> = {
   disputed: "amber",
 };
 
-function inr(value: number): string {
-  return formatPaiseINR(paise(value));
-}
-
 /** Money always renders with its exact value inspectable (C-7). */
 function Amount({ value, label }: { value: number; label?: string }) {
   return (
     <span
       title={`${String(value)} paise`}
-      aria-label={label === undefined ? undefined : `${label}: ${inr(value)}`}
+      aria-label={label === undefined ? undefined : `${label}: ${ledgerINR(value)}`}
     >
-      {inr(value)}
+      {ledgerINR(value)}
     </span>
   );
 }
@@ -166,16 +162,12 @@ function CaseStepper({ status }: { status: string }) {
 }
 
 export function MoneyPanel({ slug, console: view }: { slug: string; console: ConsoleView }) {
-  const router = useRouter();
   const toast = useToast();
   const announce = useAnnouncer();
   const [busy, setBusy] = useState(false);
-  // Carries a sequence so two identical outcomes still move focus twice.
-  const [outcome, setOutcome] = useState<{ text: string; seq: number } | null>(null);
-  const announceOutcome = (text: string) => {
-    setOutcome((current) => ({ text, seq: (current?.seq ?? 0) + 1 }));
-  };
-  const outcomeRef = useRef<HTMLParagraphElement | null>(null);
+  // Focus lands on the outcome once the refresh has committed — see
+  // `use-outcome-focus`, shared with the org money desks.
+  const { outcome, report, ref: outcomeRef } = useOutcomeFocus();
   // A click before hydration is a no-op; the surface says when it is live.
   const hydrated = useHydrated();
 
@@ -196,45 +188,14 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
     setBusy(false);
     if (result.ok) {
       toast({ title: done, tone: "success" });
-      announceOutcome(done);
-      router.refresh();
+      report(done, true);
       return true;
     }
     toast({ title: result.error, tone: "danger" });
     announce(result.error, "assertive");
-    announceOutcome(result.error);
+    report(result.error, false);
     return false;
   };
-
-  /*
-   * Focus has to be re-asserted, not set once.
-   *
-   * Two things take it away after a money command. A native <dialog>'s
-   * `close()` restores focus to whatever was focused when it opened — for
-   * Settle and Close that is a button the refreshed tree has just unmounted,
-   * so focus falls to <body>. And `router.refresh()` lands a new server tree a
-   * few hundred milliseconds later, which can drop it again. So the claim is
-   * re-made across that window, and ONLY while focus is sitting on <body> —
-   * nothing is ever taken from a real target the reader has moved to.
-   */
-  useEffect(() => {
-    if (outcome === null) {
-      return;
-    }
-    const timers = [0, 60, 200, 600, 1200].map((delay) =>
-      setTimeout(() => {
-        const node = outcomeRef.current;
-        if (node !== null && document.activeElement === document.body) {
-          node.focus();
-        }
-      }, delay),
-    );
-    return () => {
-      for (const timer of timers) {
-        clearTimeout(timer);
-      }
-    };
-  }, [outcome]);
 
   const outcomeNote =
     outcome === null ? null : (
@@ -720,8 +681,8 @@ function NextStep({
         </p>
         {pending > 0 ? (
           <p className="section-note" data-testid="pending-note">
-            {inr(pending)} has been recorded but not yet confirmed as received. It is not on the
-            books and does not count against what a team owes until someone confirms it.
+            {ledgerINR(pending)} has been recorded but not yet confirmed as received. It is not on
+            the books and does not count against what a team owes until someone confirms it.
           </p>
         ) : null}
         {/* Why there are two finishing steps at all. */}
@@ -764,10 +725,11 @@ function NextStep({
           }
         >
           <p className="section-note">
-            Settling locks every team's amount at {inr(settlementCase.financial.totalObligations)}{" "}
-            in dues, {inr(settlementCase.financial.discharged)} collected and{" "}
-            {inr(settlementCase.financial.waived)} waived. After this, no payment can be recorded
-            and nothing can be waived on this case.
+            Settling locks every team's amount at{" "}
+            {ledgerINR(settlementCase.financial.totalObligations)} in dues,{" "}
+            {ledgerINR(settlementCase.financial.discharged)} collected and{" "}
+            {ledgerINR(settlementCase.financial.waived)} waived. After this, no payment can be
+            recorded and nothing can be waived on this case.
           </p>
           <p className="section-note">
             This is reversible: a settlement controller can reopen the case, with a reason on the
@@ -1200,7 +1162,7 @@ function Obligations({
         <p className="section-note">
           Waiving forgives money this team owes. It is recorded against your name with the reason
           you give, it posts to the books, and it cannot be undone — only reopened.
-          {waiving !== null ? ` They still owe ${inr(waiving.outstanding)}.` : ""}
+          {waiving !== null ? ` They still owe ${ledgerINR(waiving.outstanding)}.` : ""}
         </p>
         <Field
           label="Amount to waive (₹)"
@@ -1283,7 +1245,7 @@ function Collect({
           <option value="">Choose a team</option>
           {owing.map((obligation) => (
             <option key={obligation.teamId} value={obligation.teamId}>
-              {obligation.teamName} — owes {inr(obligation.outstanding)}
+              {obligation.teamName} — owes {ledgerINR(obligation.outstanding)}
             </option>
           ))}
         </Select>
@@ -1485,9 +1447,9 @@ function Payments({
           puts the amount back on what the team owes, and it is recorded against your name with the
           reason you give.
           {refunding !== null
-            ? ` This payment collected ${inr(refunding.captured)}${
+            ? ` This payment collected ${ledgerINR(refunding.captured)}${
                 refunding.refundedTotal > 0
-                  ? `, of which ${inr(refunding.refundedTotal)} is already refunded`
+                  ? `, of which ${ledgerINR(refunding.refundedTotal)} is already refunded`
                   : ""
               }.`
             : ""}
@@ -1566,7 +1528,7 @@ function PaymentRow({
       <td data-label="Collected" className="st-num">
         <Amount value={payment.captured} />
         {payment.refundedTotal > 0 ? (
-          <span className="section-note"> less {inr(payment.refundedTotal)} refunded</span>
+          <span className="section-note"> less {ledgerINR(payment.refundedTotal)} refunded</span>
         ) : null}
       </td>
       <td data-label="" className="st-num" data-span="full">

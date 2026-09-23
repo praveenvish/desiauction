@@ -433,6 +433,14 @@ export interface AuctionCommandEnvelope {
    */
   override?: boolean;
   /**
+   * `competition.manage` resolved by the web gate — the season's owners, not
+   * an appointed auctioneer. Required to bid with a paddle the actor does NOT
+   * hold (manual mode, doc 41). `conduct` alone used to be enough, which let
+   * an `auction:conductor` appointee bid with any team's paddle and spend a
+   * purse that was never theirs (go-live gate P0-5). Absent means false.
+   */
+  manage?: boolean;
+  /**
    * When the engine RECEIVED this command, not when it got round to running it.
    *
    * The two differ by however deep the per-auction queue is, and for one rule

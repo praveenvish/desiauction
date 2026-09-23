@@ -1,10 +1,10 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
 import { Badge, Card, EmptyState, Field, Select, type BadgeTone } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useFilterQuery } from "../../../../lib/use-filter-query";
+import { ledgerINR } from "../../../../lib/inr";
 import { useMemo } from "react";
 
 import type { SettlementDashboard } from "../../../../server/settlement/actions";
@@ -35,10 +35,6 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   closed: "success",
   voided: "neutral",
 };
-
-function inr(value: number): string {
-  return formatPaiseINR(paise(value));
-}
 
 export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard }) {
   const pathname = usePathname();
@@ -89,11 +85,11 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
         />
         <Tile
           label="Collected today"
-          value={inr(stats.collectedToday)}
+          value={ledgerINR(stats.collectedToday)}
           id="stat-today"
           note={`${String(stats.collectedTodayCount)} payment${stats.collectedTodayCount === 1 ? "" : "s"}`}
         />
-        <Tile label="Outstanding" value={inr(stats.outstanding)} id="stat-outstanding" />
+        <Tile label="Outstanding" value={ledgerINR(stats.outstanding)} id="stat-outstanding" />
         <Tile label="Reconciled" value={String(stats.closed)} id="stat-closed" />
       </div>
 
@@ -213,16 +209,16 @@ function CaseCard({ row }: { row: DashboardCase }) {
       </span>
       <span className="case-card-money">
         <span>
-          Dues <strong>{inr(row.totalObligations)}</strong>
+          Dues <strong>{ledgerINR(row.totalObligations)}</strong>
         </span>
         <span>
-          Collected <strong>{inr(row.discharged)}</strong>
+          Collected <strong>{ledgerINR(row.discharged)}</strong>
         </span>
         <span>
-          Waived <strong>{inr(row.waived)}</strong>
+          Waived <strong>{ledgerINR(row.waived)}</strong>
         </span>
         <span>
-          Outstanding <strong>{inr(row.outstanding)}</strong>
+          Outstanding <strong>{ledgerINR(row.outstanding)}</strong>
         </span>
       </span>
       <span className="case-card-money">

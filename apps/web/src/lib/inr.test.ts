@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compactFloorINR, compactINR, exactINR } from "./inr";
+import { compactFloorINR, compactINR, exactINR, ledgerINR } from "./inr";
 
 describe("inr", () => {
   it("groups the exact figure the Indian way", () => {
@@ -21,5 +21,13 @@ describe("compactFloorINR — money that is left never rounds up", () => {
     expect(compactFloorINR(1_999_800_000)).toBe("₹1.99 Cr");
     expect(compactFloorINR(2_000_000_000)).toBe("₹2 Cr");
     expect(compactFloorINR(4_999_999)).toBe("₹49,999");
+  });
+});
+
+describe("ledgerINR — books show the recorded figure", () => {
+  it("keeps every paisa, grouped the Indian way", () => {
+    expect(ledgerINR(7_431_250_50)).toBe("₹74,31,250.50");
+    expect(ledgerINR(5_000_000)).toBe("₹50,000");
+    expect(ledgerINR(1)).toBe("₹0.01");
   });
 });

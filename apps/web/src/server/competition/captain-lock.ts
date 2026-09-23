@@ -1,4 +1,4 @@
-import { lots, people, registrations, type Db } from "@desiauction/db";
+import { auctions, lots, people, registrations, type Db } from "@desiauction/db";
 import { and, eq, ne, sql } from "drizzle-orm";
 
 import { captainChangeRefusal, type CaptainFacts, type CaptainRefusal } from "./roster-lock";
@@ -9,6 +9,12 @@ import { shownName } from "./shown-name";
  * are being named captain of a team that has one — the incumbent the armband
  * would be taken from. Only for an auction that has left `scheduled`; before
  * that the pool has not settled and every captain change is free.
+ *
+ * Both reads are bound to the AUCTION'S season (audit P3): the registration id
+ * comes from the browser, and a lookup by id alone would answer for a player
+ * in any season of the org — refusing, or clearing, on facts that are not this
+ * auction's. A player outside the season is `null` here and `not_found` at the
+ * write, which binds by season too.
  */
 export async function captainLockRefusal(
   db: Db | Parameters<Parameters<Db["transaction"]>[0]>[0],
@@ -25,11 +31,12 @@ export async function captainLockRefusal(
     teamId: registrations.teamId,
     bought: sql<boolean>`exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auctionId} and ${lots.status} = 'sold')`,
   };
+  const inAuctionSeason = sql`${registrations.competitionId} = (select ${auctions.competitionId} from ${auctions} where ${auctions.id} = ${auctionId})`;
   const [player] = await db
     .select(facts)
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
-    .where(eq(registrations.id, registrationId))
+    .where(and(eq(registrations.id, registrationId), inAuctionSeason))
     .limit(1);
   if (player === undefined) {
     return null;
@@ -42,6 +49,7 @@ export async function captainLockRefusal(
       .innerJoin(people, eq(people.id, registrations.personId))
       .where(
         and(
+          inAuctionSeason,
           eq(registrations.teamId, player.teamId),
           eq(registrations.isCaptain, true),
           ne(registrations.id, registrationId),

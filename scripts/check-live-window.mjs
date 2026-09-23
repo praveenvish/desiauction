@@ -67,6 +67,19 @@ try {
     .filter((line) => line !== "")
     .map((line) => line.split(""));
 } catch (error) {
+  // A FRESH DATABASE IS THE ONE ERROR THAT IS AN ANSWER. Before the first
+  // migration there is no `auctions` table, so no auction can be live — and the
+  // freeze now runs on the host BEFORE migrate (deploy-host.yml), so the first
+  // deploy onto an empty database would otherwise be refused forever, and
+  // `DEPLOY_ANYWAY` cannot help: an unanswerable question is never overridden.
+  // Only this exact error qualifies; anything else is still "could not tell".
+  const stderr = String(error?.stderr ?? "");
+  if (/relation "(?:public\.)?auctions" does not exist/.test(stderr)) {
+    console.log(
+      "live-window check: no auctions table yet (unmigrated database) — clear to deploy.",
+    );
+    process.exit(0);
+  }
   // Could not ask. That is not a "no".
   console.error(
     "\nCould not determine whether an auction is live:\n" +
