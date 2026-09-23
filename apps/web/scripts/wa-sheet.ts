@@ -15,23 +15,13 @@ import { fileURLToPath } from "node:url";
 import {
   WHATSAPP_CONSENT_LABEL,
   WHATSAPP_LANGUAGES,
+  WHATSAPP_SUGGESTED_NAMES,
   WHATSAPP_TEMPLATES,
   type WhatsAppKey,
   type WhatsAppLanguage,
 } from "../src/server/messaging/whatsapp";
 
-const SUGGESTED_NAME: Record<WhatsAppKey, string> = {
-  "registration.approved": "da_registration_approved",
-  "registration.waitlisted": "da_registration_waitlisted",
-  "registration.rejected": "da_registration_rejected",
-  "registration.withdrawn": "da_registration_withdrawn",
-  "registration.restored": "da_registration_restored",
-  "security.phone_changed": "da_security_phone_changed",
-  "security.email_changed": "da_security_email_changed",
-  "auction.sold": "da_auction_sold",
-  "team.appointed": "da_team_appointed",
-  "lineup.announced": "da_lineup_announced",
-};
+const SUGGESTED_NAME = WHATSAPP_SUGGESTED_NAMES;
 
 const WHEN: Record<WhatsAppKey, string> = {
   "registration.approved": "When an organizer approves a registration — to the player.",

@@ -230,6 +230,14 @@
       "class": "by-design",
       "reason": "Notification Control Center (Phase 2) projection (read-only), behind platform.admin: the kind's template versions, the names of the operators who wrote them, and the platform-scoped audit rows of their publishes, which no tenant context can read. Platform data by definition, same shape as notification-views.ts."
     },
+    "apps/web/src/server/admin/provider-template-actions.ts": {
+      "class": "by-design",
+      "reason": "Notification Control Center (Phase 3): WhatsApp/SMS template mapping, Meta status refresh and template submission, behind platform.admin. provider_template_mappings, provider_template_status and provider_template_syncs (0088) are platform-level with no org_id and no RLS \u2014 which approved template DesiAuction sends under is never a club's \u2014 so they are written on the app pool, which holds their DML via default privileges (verify-grants APP_WRITES_UNPROTECTED). The platform-scoped audit row of each mapping change and submission goes on the system pool, the only role allowed to write it, exactly as notification-actions.ts does. There is no tenant to scope either to."
+    },
+    "apps/web/src/server/admin/provider-template-views.ts": {
+      "class": "by-design",
+      "reason": "Notification Control Center (Phase 3) projection (read-only), behind platform.admin: the template mappings and Meta's status snapshot (0088, platform tables), the names of the operators who changed them and the platform-scoped audit rows of those changes, which no tenant context can read. Platform data by definition, same shape as notification-views.ts."
+    },
     "apps/web/src/server/admin/moderation-views.ts": {
       "class": "by-design",
       "reason": "0072. Platform moderation desk projection (read-only): every public season and every held one, across all clubs \u2014 cross-tenant by definition, gated by platform:moderation."

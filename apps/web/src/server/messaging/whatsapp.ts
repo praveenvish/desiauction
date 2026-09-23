@@ -302,6 +302,23 @@ export const WHATSAPP_TEMPLATES: Readonly<Record<WhatsAppKey, WhatsAppTemplate>>
   },
 };
 
+/**
+ * The name to submit each template under when nobody has chosen one — the
+ * generated sheet's suggestion and the admin submit dialog's default.
+ */
+export const WHATSAPP_SUGGESTED_NAMES: Readonly<Record<WhatsAppKey, string>> = {
+  "registration.approved": "da_registration_approved",
+  "registration.waitlisted": "da_registration_waitlisted",
+  "registration.rejected": "da_registration_rejected",
+  "registration.withdrawn": "da_registration_withdrawn",
+  "registration.restored": "da_registration_restored",
+  "security.phone_changed": "da_security_phone_changed",
+  "security.email_changed": "da_security_email_changed",
+  "auction.sold": "da_auction_sold",
+  "team.appointed": "da_team_appointed",
+  "lineup.announced": "da_lineup_announced",
+};
+
 export function isWhatsAppKey(key: string): key is WhatsAppKey {
   return Object.prototype.hasOwnProperty.call(WHATSAPP_TEMPLATES, key);
 }
