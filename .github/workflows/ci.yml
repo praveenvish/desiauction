@@ -51,6 +51,15 @@ jobs:
       - run: node packages/db/scripts/check-journal.mjs
       - run: pnpm --filter @desiauction/db db:migrate
       - run: pnpm build
+      # Audit P3 F14 — THE FIRST-LOAD JS BUDGET. Every app route's gzipped
+      # first-load JS, read from the build's manifests, against
+      # bundle-budget.json (a default ceiling + per-route overrides, ~10% over
+      # what each route weighed when set). A route that grows past its number
+      # fails here; raising one is a deliberate edit to that file, in the PR
+      # that grew it. The parser's own tests run first, so a manifest-shape
+      # change cannot turn the check into a pass over nothing.
+      - run: pnpm test:scripts
+      - run: pnpm check:bundle
       # Generated tokens are committed; a rebuild must be a no-op (IP-1_DESIGN §6).
       - run: git diff --exit-code packages/ui/src/generated
       - run: pnpm format:check
