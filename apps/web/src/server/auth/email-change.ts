@@ -154,7 +154,16 @@ export async function requestEmailVerification(
 }
 
 export type EmailVerificationResult =
-  | { ok: true; email: string }
+  | {
+      ok: true;
+      email: string;
+      /**
+       * The VERIFIED address this one replaced, or null (first address, or the
+       * old one was never confirmed). The caller tells it: it is the one inbox
+       * the owner still reads if somebody else made this change.
+       */
+      previousEmail: string | null;
+    }
   | {
       ok: false;
       reason: "invalid" | "expired" | "locked" | "taken";
@@ -236,6 +245,18 @@ export async function confirmEmailVerification(
     return { ok: false, reason: "taken" };
   }
 
+  // Read BEFORE the overwrite: once the row moves, nothing remembers where the
+  // account's mail used to go — and that is who must hear about the move.
+  const [before] = await db
+    .select({ email: people.email, verifiedAt: people.emailVerifiedAt })
+    .from(people)
+    .where(eq(people.id, input.personId))
+    .limit(1);
+  const previousEmail =
+    before?.email != null && before.verifiedAt !== null && before.email !== candidate.email
+      ? before.email
+      : null;
+
   await db
     .update(people)
     .set({ email: candidate.email, emailVerifiedAt: new Date() })
@@ -253,7 +274,7 @@ export async function confirmEmailVerification(
         isNull(emailVerifications.consumedAt),
       ),
     );
-  return { ok: true, email: candidate.email };
+  return { ok: true, email: candidate.email, previousEmail };
 }
 
 /**
