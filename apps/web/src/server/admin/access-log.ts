@@ -88,7 +88,9 @@ export type AdminSurface =
   /** One auction, watched: lots, bids and every team's purse. */
   | "auction"
   /** The moderation desk (0072), behind `platform:moderation`. */
-  | "moderation";
+  | "moderation"
+  /** The Notification Control Center: every message's switches, and who changed them. */
+  | "notifications";
 
 /**
  * Record that an administrator opened a surface.
