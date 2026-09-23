@@ -6,8 +6,10 @@ import {
   IconLock,
   Pill,
   SectionCard,
+  buttonClassName,
   type KitTone,
 } from "@desiauction/ui";
+import Link from "next/link";
 
 import type {
   CellCounts,
@@ -15,6 +17,7 @@ import type {
   GridRow,
   NotificationCenter,
 } from "../../../server/admin/notification-views";
+import type { WordingSummary } from "../../../server/admin/template-views";
 import { RelativeTime } from "../admin-ui";
 import { ChannelControl, ControlToggle, RevertButton, SwitchToggle } from "./notification-controls";
 
@@ -117,7 +120,54 @@ function Cell({ row, cell, days }: { row: GridRow; cell: GridCell; days: number 
   );
 }
 
-function KindRow({ row, days }: { row: GridRow; days: number }) {
+/**
+ * An email kind's wording, per language — what goes out now, and whether a
+ * draft waits — with the way into the editor (Phase 2). Only where the wording
+ * is editable: our own staff notices have no line.
+ */
+function WordingLine({
+  kind,
+  label,
+  wording,
+}: {
+  kind: string;
+  label: string;
+  wording: WordingSummary;
+}) {
+  return (
+    <div className="ntc-kind-head" data-testid={`notify-wording-${kind}`}>
+      <span className="admin-meta">
+        Email wording:{" "}
+        {wording.languages.map((entry, index) => (
+          <span key={entry.language}>
+            {index === 0 ? null : " · "}
+            <span lang={entry.language}>{entry.label}</span> —{" "}
+            {entry.status.state === "published"
+              ? `Published v${String(entry.status.version)}`
+              : "Default"}
+            {entry.draft === null ? null : ` (draft v${String(entry.draft)})`}
+          </span>
+        ))}
+      </span>
+      <Link
+        href={wording.href}
+        className={buttonClassName({ variant: "secondary", size: "touch" })}
+      >
+        Edit email wording<span className="admin-sr-only"> — {label}</span>
+      </Link>
+    </div>
+  );
+}
+
+function KindRow({
+  row,
+  days,
+  wording,
+}: {
+  row: GridRow;
+  days: number;
+  wording: WordingSummary | undefined;
+}) {
   const category = CATEGORY[row.category];
   return (
     <li data-testid={`notify-kind-${row.key}`}>
@@ -133,6 +183,9 @@ function KindRow({ row, days }: { row: GridRow; days: number }) {
           <Cell key={cell.channel} row={row} cell={cell} days={days} />
         ))}
       </ul>
+      {wording?.editable === true ? (
+        <WordingLine kind={row.key} label={row.label} wording={wording} />
+      ) : null}
       {row.locked ? (
         <p className="admin-meta">
           Sign-in codes are never stopped — not by a person, a club, or an admin.
@@ -226,7 +279,12 @@ export function NotificationsPanel({ center }: { center: NotificationCenter }) {
         >
           <ul className="admin-rows is-stacked">
             {group.rows.map((row) => (
-              <KindRow key={row.key} row={row} days={center.windowDays} />
+              <KindRow
+                key={row.key}
+                row={row}
+                days={center.windowDays}
+                wording={center.wording[row.key]}
+              />
             ))}
           </ul>
         </SectionCard>
