@@ -469,10 +469,34 @@ export class WhatsAppSendError extends Error {
      */
     readonly outcomeUnknown = false,
     failure?: WhatsAppFailure,
+    /** Meta's own error code on a refusal (`error.code`), when it gave one. */
+    readonly metaCode: number | null = null,
   ) {
     super(message);
     this.name = "WhatsAppSendError";
     this.failure = failure ?? (outcomeUnknown ? "timeout" : "refused");
+  }
+}
+
+/**
+ * Meta's "template name does not exist in the translation" — the template is
+ * approved, but not (yet) in the language asked for. Hindi approvals trail the
+ * English ones, so this is the refusal a Hindi reader meets in the gap, and the
+ * one the drain answers by sending the English version instead (outbox.ts).
+ */
+export const META_MISSING_TRANSLATION = 132001;
+
+/** `{"error":{"code":132001,…}}` → 132001; anything else → null. */
+export function parseMetaErrorCode(body: string): number | null {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const error = (parsed as { error?: unknown }).error;
+    if (typeof error !== "object" || error === null) return null;
+    const code = (error as { code?: unknown }).code;
+    return typeof code === "number" && Number.isInteger(code) ? code : null;
+  } catch {
+    return null;
   }
 }
 
@@ -593,7 +617,12 @@ export class WhatsAppCloudSender implements PersonalWhatsAppSender {
       if (this.consecutiveFailures >= 3) {
         this.openedAt = this.now();
       }
-      throw new WhatsAppSendError(failed.reason, failed.failure === "timeout", failed.failure);
+      throw new WhatsAppSendError(
+        failed.reason,
+        failed.failure === "timeout",
+        failed.failure,
+        failed.failure === "refused" ? parseMetaErrorCode(body) : null,
+      );
     }
     this.consecutiveFailures = 0;
     this.openedAt = null;

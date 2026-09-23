@@ -15,6 +15,7 @@ import {
   whatsappParams,
   whatsappTemplateName,
   WhatsAppSendError,
+  META_MISSING_TRANSLATION,
   WHATSAPP_TEMPLATES,
   type PersonalWhatsAppSender,
 } from "./whatsapp";
@@ -586,19 +587,37 @@ async function sendText(
     if (!consent.optedIn) {
       block = { kind: "not_opted_in" };
     } else {
+      // Bound here, where they are narrowed: the closure below cannot see that.
+      const sender = channels.whatsapp.sender;
+      const phone = person.phone;
+      const slots = row.slots;
       try {
-        const receipt = await channels.whatsapp.sender.send(person.phone, {
-          name: waName,
-          template: waTemplate,
-          params: whatsappParams(
-            waTemplate,
-            row.slots,
-            person.name?.trim() || "there",
-            consent.language,
-          ),
-          imageUrl: row.media_url,
-          language: consent.language,
-        });
+        const sendIn = (language: typeof consent.language) =>
+          sender.send(phone, {
+            name: waName,
+            template: waTemplate,
+            params: whatsappParams(waTemplate, slots, person.name?.trim() || "there", language),
+            imageUrl: row.media_url,
+            language,
+          });
+        let receipt;
+        try {
+          receipt = await sendIn(consent.language);
+        } catch (error) {
+          // A Hindi reader whose template Meta has approved in English but not
+          // yet in Hindi: send the English version rather than nothing. Meta
+          // refused outright, so nothing went — this is not a duplicate.
+          if (
+            consent.language !== "en" &&
+            error instanceof WhatsAppSendError &&
+            error.failure === "refused" &&
+            error.metaCode === META_MISSING_TRANSLATION
+          ) {
+            receipt = await sendIn("en");
+          } else {
+            throw error;
+          }
+        }
         // The wamid is what Meta's delivery callbacks name, so it is stored in
         // the same write that marks the row sent: a callback that arrives a
         // moment later always finds its row (/api/webhooks/whatsapp).

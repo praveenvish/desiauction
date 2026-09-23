@@ -8,7 +8,9 @@ import type { HttpResponse } from "./sms";
 import { SMS_TEMPLATES, type TemplateKey } from "./templates";
 import {
   languageFromEvidence,
+  META_MISSING_TRANSLATION,
   parseMessageId,
+  parseMetaErrorCode,
   REASON_HI,
   WhatsAppCloudSender,
   WhatsAppSendError,
@@ -241,6 +243,30 @@ describe("the Cloud API sender", () => {
     expect((a as WhatsAppSendError).failure).toBe("refused");
     expect((b as WhatsAppSendError).failure).toBe("unavailable");
     expect((b as WhatsAppSendError).outcomeUnknown).toBe(false);
+  });
+
+  it("carries Meta's error code on a refusal, so a missing Hindi translation can fall back to English", async () => {
+    const sender = new WhatsAppCloudSender({
+      phoneNumberId: "1",
+      accessToken: "t",
+      transport: transport({
+        status: 404,
+        body: `{"error":{"message":"(#132001) Template name does not exist in the translation","code":${String(META_MISSING_TRANSLATION)}}}`,
+      }).send,
+    });
+    const error: unknown = await sender
+      .send("+919812345678", { ...message, language: "hi" })
+      .catch((e: unknown) => e);
+    expect((error as WhatsAppSendError).failure).toBe("refused");
+    expect((error as WhatsAppSendError).metaCode).toBe(132001);
+  });
+
+  it("reads Meta's error code defensively", () => {
+    expect(parseMetaErrorCode('{"error":{"code":131026}}')).toBe(131026);
+    expect(parseMetaErrorCode('{"error":{"code":"131026"}}')).toBeNull();
+    expect(parseMetaErrorCode('{"messages":[{"id":"wamid.1"}]}')).toBeNull();
+    expect(parseMetaErrorCode("<html>bad gateway</html>")).toBeNull();
+    expect(parseMetaErrorCode("")).toBeNull();
   });
 
   it("treats Meta's 200-with-an-error as a failure", async () => {
