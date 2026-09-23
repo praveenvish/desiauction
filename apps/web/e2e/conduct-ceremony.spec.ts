@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { latestOtp } from "./otp";
 import { completeAuction } from "./complete-auction";
+import { restartEngineFor } from "./engine-restart";
 import { axeClean } from "./axe";
 
 /**
@@ -21,9 +22,6 @@ async function holdGavel(page: Page): Promise<void> {
 // live bids → gavel → compensating UNDO → ledger → replay viewer → engine
 // restart → recovery dashboard → spectator joins → auction completes. Every
 // browser converges to the same AuctionSnapshot; axe scans every new surface.
-
-const ENGINE = "http://127.0.0.1:4000";
-const ENGINE_SECRET = process.env["ENGINE_SECRET"] ?? "dev-engine-secret";
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   if (!page.url().includes("/login")) {
@@ -399,11 +397,9 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await axeClean(ledgerPage, "replay");
 
   // --- Engine restart + recovery dashboard ------------------------------------
-  const reset = await organizer.request.post(`${ENGINE}/admin/reset`, {
-    headers: { "x-engine-secret": ENGINE_SECRET },
-    data: {},
-  });
-  expect(reset.ok()).toBe(true);
+  // THIS auction only — an empty body restarts every room the shared engine
+  // holds, including another worker's (see engine-restart.ts).
+  await restartEngineFor(organizer.request, slug);
   await ledgerPage.goto(`/seasons/${slug}/auction/engine`);
   await expect(ledgerPage.getByTestId("engine-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
