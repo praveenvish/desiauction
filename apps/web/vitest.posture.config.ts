@@ -65,6 +65,10 @@ export default defineConfig({
       // any database work, and the test would pass by never running the code.
       SMS_INBOUND_SECRET: "posture-inbound-secret-0123456789",
       DELIVERY_CALLBACK_SECRET: "posture-delivery-secret-0123456789",
+      // The WhatsApp callback verifies Meta's HMAC with this; the suite signs
+      // its own requests with the same value.
+      WHATSAPP_APP_SECRET: "posture-whatsapp-app-secret-0123456789",
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: "posture-whatsapp-verify-token-0123456789",
       // The gateway must be CONFIGURED for the callback path to exist at all
       // (an unset secret 404s the route by design), so the posture suite can
       // reach the handler even though beta collects manually (decision D1).
