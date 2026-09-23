@@ -284,6 +284,11 @@ jobs:
           - name: finops-runner
             dockerfile: apps/finops-runner/Dockerfile
             context: .
+          # The deploy-time database toolbox (migrations, freeze, grants,
+          # preflight) that deploy-host.yml runs on the host.
+          - name: migrator
+            dockerfile: ops/deploy/migrator/Dockerfile
+            context: .
           # Same context the deploy uses: the database image is built from its
           # own directory, not the repo root.
           - name: db

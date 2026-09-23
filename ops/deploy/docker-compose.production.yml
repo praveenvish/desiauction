@@ -116,6 +116,32 @@ services:
     depends_on:
       web: { condition: service_healthy }
 
+  # DEPLOY-TIME DATABASE WORK, RUN ON THIS HOST (deploy-host.yml).
+  #
+  # Migrations, the live-auction freeze check, the grant drift gate and the
+  # production preflight all need the database, and the database publishes no
+  # port — deliberately. They used to run from a GitHub-hosted runner against a
+  # `PRODUCTION_DATABASE_URL` that could not be reached, which is to say they
+  # could not run at all. Now the deploy job SSHes here and runs them in this
+  # container, on the compose network, before any serving container is swapped.
+  #
+  # Profile `ops`: never started by `docker compose up`, only by an explicit
+  # `docker compose --profile ops run --rm migrator …`. migrator.env holds ONE
+  # value, DATABASE_URL as the database OWNER (the role migrations need), e.g.
+  # postgres://postgres:<POSTGRES_PASSWORD>@db:5432/<POSTGRES_DB>. The
+  # preflight reads the service env files through the read-only mount.
+  migrator:
+    image: ${REGISTRY}/migrator:${TAG}
+    <<: *logs
+    profiles: [ops]
+    env_file: [./migrator.env]
+    volumes:
+      - ./web.env:/env/web.env:ro
+      - ./engine.env:/env/engine.env:ro
+      - ./runner.env:/env/runner.env:ro
+    depends_on:
+      db: { condition: service_healthy }
+
   # OBJECT STORAGE, ON THIS BOX. Player photos and finops artifacts need a
   # store both the web tier and the runner can reach, and the adapters written
   # for them speak S3 — so the cheapest correct answer is an S3 server here

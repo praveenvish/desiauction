@@ -3,6 +3,18 @@
 # Replaces the Fly workflows for web/engine/runner. Same discipline, different
 # target: images are built HERE (never on the production box), the live-auction
 # window is checked BEFORE anything is touched, and production is dispatch-only.
+#
+# EVERY STEP THAT NEEDS THE DATABASE RUNS ON THE HOST. The freeze check, both
+# migration sets and the grant gate used to run on this GitHub runner against
+# `secrets.PRODUCTION_DATABASE_URL` — and the compose database publishes no
+# port, on purpose, so from here it was unreachable: the freeze check refused
+# every deploy (correctly: "unreachable is not evidence the room is empty"),
+# and the only way through was a database port open to the internet. They now
+# run in the `migrator` image (ops/deploy/migrator), built beside the app
+# images, over the same SSH session that swaps the containers.
+#
+# Order: CI green for this exact commit → build → [host] preflight → freeze →
+# pull → migrate → grants → engine swap + /readyz → the rest + /readyz.
 name: deploy-host
 
 on:
@@ -18,6 +30,12 @@ on:
         type: boolean
         default: false
 
+# `packages: write` to push images, `actions: read` for the CI gate below.
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
 concurrency:
   # Two deploys racing each other onto one host is how you get a half-swapped
   # stack. Never cancel in progress — let the first finish.
@@ -25,39 +43,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # --- NOTHING SHIPS THAT CI DID NOT PASS ------------------------------------
+  #
+  # workflow_dispatch builds whatever commit the chosen ref points at, and
+  # nothing checked that commit had ever been through `ci`. A dispatch from a
+  # branch with a red (or never-run) CI went to production on the operator's
+  # memory. This asks the Actions API for a SUCCESSFUL `ci` run on this exact
+  # sha; a run on the same branch at a different commit does not count.
+  #
+  # Deliberately NOT overridable, and unrelated to `deploy_anyway`: that input
+  # overrides the live-auction freeze because a deploy can be the repair for a
+  # broken engine. Untested code is never the repair — push the fix and let ci
+  # pass on it.
+  ci-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require a successful ci run for ${{ github.sha }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&status=success&per_page=1"
+          count="$(curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" "$url" | jq '.total_count')"
+          if [ "${count:-0}" -lt 1 ]; then
+            {
+              echo "### Deploy refused: no green \`ci\` run for ${GITHUB_SHA::12}"
+              echo ""
+              echo "Every job in \`ci\` (quality, integration, e2e, images, secrets-scan)"
+              echo "must have passed on THIS commit. Wait for it, or re-run it, then"
+              echo "dispatch again."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "no successful ci run for ${GITHUB_SHA}" >&2
+            exit 1
+          fi
+          echo "ci passed on ${GITHUB_SHA::12}"
+
   deploy:
+    needs: ci-green
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      # --- THE C-22 GUARD, WHICH USED TO LIVE IN THE FLY WORKFLOWS ------------
-      #
-      # "No production deploy while any auction is LIVE." Redeploying the engine
-      # mid-auction stops the countdown in the room and drops every spectator
-      # socket. The Fly workflows enforced this and moving off Fly would have
-      # silently dropped it — the guard is the point, not the platform.
-      #
-      # An unreachable database is ALSO a refusal: it is not evidence the room
-      # is empty.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Refuse to deploy during a live auction
-        if: ${{ !inputs.deploy_anyway }}
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-        run: node scripts/check-live-window.mjs
-      - name: Record that the freeze was overridden
+      - name: Record that the freeze will be overridden
         if: ${{ inputs.deploy_anyway }}
         run: |
-          echo "⚠️ The live-auction freeze was OVERRIDDEN for this deploy." >> "$GITHUB_STEP_SUMMARY"
+          echo "⚠️ The live-auction freeze is OVERRIDDEN for this deploy (deploy_anyway)." >> "$GITHUB_STEP_SUMMARY"
           echo "This is only correct when the engine is already broken and the deploy is the repair." >> "$GITHUB_STEP_SUMMARY"
 
-      # --- Build the three images --------------------------------------------
+      # --- Build the images ---------------------------------------------------
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -77,6 +114,14 @@ jobs:
               --push .
           done
 
+          # The deploy-time database toolbox, same commit as the apps: the
+          # migrations it applies are exactly the ones these images expect.
+          docker buildx build \
+            --file ops/deploy/migrator/Dockerfile \
+            --build-arg "APP_VERSION=${TAG}" \
+            --tag "${REG}/migrator:${TAG}" \
+            --push .
+
           # THE DATABASE IMAGE IS TAGGED BY ITS OWN CONTENT, not by the commit.
           # Postgres carries pgbackrest because `archive_command` runs inside
           # that container, so it has to be built — but it must NOT be rebuilt
@@ -95,44 +140,154 @@ jobs:
           echo "TAG=${TAG}" >> "$GITHUB_ENV"
           echo "DB_TAG=${DB_TAG}" >> "$GITHUB_ENV"
 
-      # --- Migrate, then swap -------------------------------------------------
+      # --- The stack's files travel with the release ---------------------------
+      #
+      # The compose file, Caddyfile, scheduler and alert rules are code, and a
+      # host running last month's copy of them is a deploy nobody reviewed. The
+      # env files are NOT in git and are never touched. Anything edited by hand
+      # on the host under these names is overwritten — change it here instead.
+      - name: Ship the stack definition to the host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "ops/deploy/docker-compose.production.yml,ops/deploy/Caddyfile,ops/deploy/jobs,ops/deploy/observability,ops/deploy/postgresql.conf.d"
+          target: /opt/desiauction
+          strip_components: 2
+
+      # --- On the host: gate, migrate, swap, prove ---------------------------
       #
       # ORDER MATTERS AND IS FORWARD-ONLY. Migrations run before the new images
       # serve traffic, and they cannot be rolled back — the restore point
       # recorded in the deploy note is the only undo (DEPLOYMENT.md §Rollback).
-      - name: Migrate
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-        run: |
-          pnpm --filter @desiauction/db db:migrate
-          pnpm --filter @desiauction/engine db:migrate
-
-      - name: Assert the grants still match the manifest
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-        run: pnpm --filter @desiauction/web grants:verify
-
-      - name: Pull and restart on the host
+      #
+      # Nothing below changes what is SERVING until the migrate step: the
+      # preflight and the freeze run first, and `.env` keeps the old TAG until
+      # the swap begins — a refused deploy leaves the host exactly as it was,
+      # so a later manual `docker compose up -d` cannot half-apply it.
+      - name: Gate, migrate and swap on the host
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 45m
+          # bash, not sh: the ERR trap (and -E, so it fires inside functions)
+          # is what prints the rollback instructions on a failed swap.
           script: |
-            set -euo pipefail
+            set -Eeuo pipefail
             cd /opt/desiauction
-            sed -i "s|^TAG=.*|TAG=${{ env.TAG }}|" .env
-            # DB_TAG changes only when the database Dockerfile does, so this is
-            # normally a no-op and `docker compose up -d` leaves Postgres alone.
-            if grep -q '^DB_TAG=' .env; then
-              sed -i "s|^DB_TAG=.*|DB_TAG=${{ env.DB_TAG }}|" .env
+
+            NEW_TAG="${{ env.TAG }}"
+            NEW_DB_TAG="${{ env.DB_TAG }}"
+            PREV_TAG="$(sed -n 's/^TAG=//p' .env)"
+            STAGE=gates
+
+            # The synced file is the stack; say so once so every plain
+            # `docker compose …` on this host reads it.
+            grep -q '^COMPOSE_FILE=' .env || echo 'COMPOSE_FILE=docker-compose.production.yml' >> .env
+
+            on_failure() {
+              echo ""
+              echo "DEPLOY FAILED during: ${STAGE}"
+              case "$STAGE" in
+                gates)
+                  echo "Nothing was changed. The previous release (${PREV_TAG}) is still serving." ;;
+                migrate)
+                  echo "Serving containers were NOT swapped (still ${PREV_TAG}). A failed migration"
+                  echo "batch rolls back as one transaction; read the error above before retrying." ;;
+                *)
+                  echo "Migrations for ${NEW_TAG} are applied. To put the previous images back:"
+                  echo "  cd /opt/desiauction"
+                  echo "  sed -i 's|^TAG=.*|TAG=${PREV_TAG}|' .env && docker compose up -d"
+                  echo "That is safe only if this release's migrations are expand-only —"
+                  echo "DEPLOYMENT.md §Rollback decides; a destructive one means restore." ;;
+              esac
+            }
+            trap on_failure ERR
+
+            # Compose reads shell env before .env, so the NEW tags apply to the
+            # commands below without writing them to .env yet.
+            export TAG="$NEW_TAG" DB_TAG="$NEW_DB_TAG"
+            ops() { docker compose --profile ops run --rm "$@"; }
+
+            docker compose --profile ops pull migrator
+
+            # 1. The cross-service env check, over the real env files.
+            #    Blocking for production; advisory on staging, whose env is a
+            #    rehearsal of production's and legitimately short of it.
+            if [ "${{ inputs.environment }}" = "production" ]; then
+              ops migrator preflight
             else
-              echo "DB_TAG=${{ env.DB_TAG }}" >> .env
+              ops migrator preflight || echo "preflight FAILED (staging: advisory, continuing)"
             fi
+
+            # 2. THE C-22 FREEZE. "No production deploy while any auction is
+            #    LIVE": an engine restart stops the countdown in the room. An
+            #    unreachable database also refuses. deploy_anyway is the ONE
+            #    override, and it is passed through explicitly so the script
+            #    still names the rooms it is walking into.
+            if [ "${{ inputs.deploy_anyway }}" = "true" ]; then
+              ops -e DEPLOY_ANYWAY=1 migrator live-window
+            else
+              ops migrator live-window
+            fi
+
             docker compose pull
-            # Engine first, then the rest: the engine hands its single-writer
-            # lease back on graceful SIGTERM and the replacement claims it at
-            # once. A brief overlap is normal — the new one exits 1 and retries.
+
+            # 3. Forward-only migrations, then the grant manifest against the
+            #    real roles (a new table must not reach production unreadable).
+            STAGE=migrate
+            ops migrator migrate
+            ops migrator grants
+
+            # 4. Swap. Engine first: it hands its single-writer lease back on
+            #    graceful SIGTERM and the replacement claims it at once. A brief
+            #    overlap is normal — the new one exits 1 and retries.
+            STAGE=swap
+            sed -i "s|^TAG=.*|TAG=${NEW_TAG}|" .env
+            if grep -q '^DB_TAG=' .env; then
+              sed -i "s|^DB_TAG=.*|DB_TAG=${NEW_DB_TAG}|" .env
+            else
+              echo "DB_TAG=${NEW_DB_TAG}" >> .env
+            fi
+
+            # /readyz, asked of the NEW container from inside it: it answers
+            # only once the process is up AND its database is reachable. A
+            # container that never gets there fails the deploy with its logs.
+            wait_ready() {
+              local svc="$1" port="$2" deadline=$(( $(date +%s) + $3 ))
+              until docker compose exec -T "$svc" /nodejs/bin/node -e \
+                "fetch('http://127.0.0.1:${port}/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" \
+                >/dev/null 2>&1; do
+                if [ "$(date +%s)" -ge "$deadline" ]; then
+                  echo "${svc}: /readyz not healthy after ${3}s"
+                  docker compose logs --tail 60 "$svc"
+                  return 1
+                fi
+                sleep 5
+              done
+              echo "${svc}: /readyz healthy"
+            }
+
             docker compose up -d --no-deps engine
+            wait_ready engine 4000 180
             docker compose up -d
+            wait_ready web 3000 180
+            # No port to probe on these two; "running, not restarting" is the
+            # claim that can be checked.
+            sleep 10
+            for svc in runner scheduler; do
+              docker compose ps --status running --services | grep -qx "$svc" \
+                || { echo "${svc} is not running"; docker compose logs --tail 60 "$svc"; false; }
+            done
+
+            # Bind-mounted config does not reload itself.
+            STAGE=config-reload
+            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+            docker compose restart grafana alloy
+
             docker image prune -f
+            trap - ERR
+            echo "deployed ${NEW_TAG} (previous: ${PREV_TAG})"
