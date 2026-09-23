@@ -9,6 +9,7 @@ import { sendDemoRequestMail } from "./demo-mail";
 import { isSubscribeThrottled, subscribe, unsubscribe } from "./newsletter";
 import { pickHandleFor } from "./demo-booking";
 import {
+  acknowledgementsSpent,
   isThrottled,
   recordDemoRequest,
   validateDemoRequest,
@@ -142,7 +143,9 @@ export async function requestDemoAction(
 
   const requestId = await recordDemoRequest(db, request);
 
-  const outcomes = await sendDemoRequestMail(request, requestId);
+  const outcomes = await sendDemoRequestMail(request, requestId, {
+    acknowledge: !(await acknowledgementsSpent(db)),
+  });
   if (outcomes.founder === "failed" || outcomes.requester === "failed") {
     // The lead is safe in the database and the person has been told on screen.
     // This is an operational problem, and an operational problem that is not

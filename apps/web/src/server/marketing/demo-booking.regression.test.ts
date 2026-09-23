@@ -12,7 +12,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { hashToken, tokenForRequest } from "./demo-booking";
-import { isThrottled, recordDemoRequest, type ValidDemoRequest } from "./demo-requests";
+import {
+  acknowledgementsSpent,
+  isThrottled,
+  recordDemoRequest,
+  type ValidDemoRequest,
+} from "./demo-requests";
 import { purgeExpiredDemoData } from "./demo-retention";
 
 /**
@@ -262,5 +267,35 @@ describe("DEMO-1 · the retention promise is enforced, not just printed", () => 
     // Still inside its own window, so the request stays — but the address it
     // arrived from has served its only purpose and is gone.
     expect(survivors[0]?.requestIp).toBeNull();
+  });
+});
+
+describe("the platform-wide ceiling on demo acknowledgements (gate P2)", () => {
+  it("counts every sender's acknowledged requests in the last hour, not one sender's", async () => {
+    // Measured against whatever the shared database already holds this hour:
+    // the ceiling is set just above it, then two strangers push it over.
+    const [baseline] = (await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(demoRequests)
+      .where(
+        sql`${demoRequests.email} is not null and ${demoRequests.createdAt} > now() - interval '1 hour'`,
+      )) as [{ count: number }];
+    const ceiling = baseline.count + 1;
+    await newRequest({ email: `ack-a-${String(Date.now())}@example.test` });
+    expect(await acknowledgementsSpent(db, new Date(), ceiling)).toBe(false);
+    await newRequest({ email: `ack-b-${String(Date.now())}@example.test` });
+    expect(await acknowledgementsSpent(db, new Date(), ceiling)).toBe(true);
+  });
+
+  it("does not count requests that gave no address — nothing was mailed for them", async () => {
+    const [baseline] = (await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(demoRequests)
+      .where(
+        sql`${demoRequests.email} is not null and ${demoRequests.createdAt} > now() - interval '1 hour'`,
+      )) as [{ count: number }];
+    await newRequest({ email: null });
+    await newRequest({ email: null });
+    expect(await acknowledgementsSpent(db, new Date(), baseline.count)).toBe(false);
   });
 });
