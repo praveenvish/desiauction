@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { withTenantDb } from "@desiauction/db";
+import { setMessageLanguage } from "@desiauction/messaging/language";
 
 import { currentSession } from "../auth/actions";
 import { db as appDb, dbHandle, systemDb } from "../db";
@@ -31,8 +32,12 @@ export interface NotificationSettings {
   readonly topics: readonly { topic: string; label: string; detail: string; allowed: boolean }[];
   /** WhatsApp: the one text channel, and only for somebody who opted in. */
   readonly whatsapp: boolean;
-  /** Which version of the templates they get — English until they choose. */
-  readonly whatsappLanguage: WhatsAppLanguage;
+  /**
+   * Their ONE language for messages — email and WhatsApp alike
+   * (packages/messaging language.ts): chosen, else the one given with the
+   * WhatsApp opt-in, else English.
+   */
+  readonly language: WhatsAppLanguage;
 }
 
 export async function notificationSettings(): Promise<NotificationSettings | null> {
@@ -47,7 +52,8 @@ export async function notificationSettings(): Promise<NotificationSettings | nul
   ]);
   return {
     whatsapp: whatsapp.optedIn,
-    whatsappLanguage: whatsapp.language,
+    // whatsappOptedIn resolves the same chain email uses, people.language first.
+    language: whatsapp.language,
     // Only the topics still the person's to switch: a platform admin can take
     // a kind's switch away (/admin/notifications), and a topic none of whose
     // kinds still listens to the person would be a switch that does nothing.
@@ -118,6 +124,27 @@ export async function setWhatsappPreferenceAction(
     source: "account",
     ...(granted && chosen !== undefined ? { language: chosen } : {}),
   });
+  revalidatePath("/account");
+  return { ok: true };
+}
+
+/**
+ * LANGUAGE FOR MESSAGES — the one language email and WhatsApp are written in
+ * (Notification Control Center, Phase 2). A preference of the person's own, on
+ * `people` (no RLS), written on the app pool for the session's own row only.
+ */
+export async function setMessageLanguageAction(
+  language: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: "Sign in to change your notification settings." };
+  }
+  const chosen = parseWhatsAppLanguage(language);
+  if (chosen === undefined) {
+    return { ok: false, error: "Choose English or Hindi." };
+  }
+  await setMessageLanguage(appDb, session.personId, chosen);
   revalidatePath("/account");
   return { ok: true };
 }
