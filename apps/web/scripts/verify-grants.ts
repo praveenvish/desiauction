@@ -74,6 +74,12 @@ const RUNNER_DELIVERY_READS = [
   "notification_preferences",
   "org_messaging_settings",
   "consent_records",
+  // The admin layer of the same gate (0086): a kill switch the runner could
+  // not read would throw on every receipt, and the outbox of finops would stall.
+  "notification_switches",
+  "notification_channels",
+  // A receipt's subject and opening line are admin-editable wording (0087).
+  "notification_templates",
 ];
 
 /**
@@ -197,6 +203,10 @@ const APP_WRITES_UNPROTECTED = [
   // belongs to DesiAuction, not a club, so there is no tenant and no RLS.
   "notification_switches",
   "notification_channels",
+  // The platform's email wording (0087): written from
+  // /admin/notifications/[kind]/email on the app pool, read by every email
+  // send. DesiAuction's words, not a club's — no tenant, no RLS.
+  "notification_templates",
 ];
 
 /**
@@ -392,6 +402,13 @@ function expectations(allTables: string[]): Expectation[] {
       });
     }
   }
+  out.push({
+    role: "desiauction_engine",
+    table: "notification_templates",
+    verb: "SELECT",
+    allowed: false,
+    why: "the auction engine sends no mail, so it has no use for email wording (0087)",
+  });
   for (const table of PERSONAL_CONTENT_TABLES) {
     for (const role of ["desiauction_engine", "desiauction_runner"]) {
       out.push({

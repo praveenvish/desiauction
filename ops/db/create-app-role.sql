@@ -262,5 +262,8 @@ revoke all on newsletter_subscribers, newsletter_unsubscribes, demo_requests
   from desiauction_engine, desiauction_runner;
 -- 0085: what people send us on WhatsApp.
 revoke all on whatsapp_inbound from desiauction_engine, desiauction_runner;
+-- 0087: editable email wording. The engine sends nothing; the RUNNER keeps its
+-- read, because it sends receipts and their subject line is editable.
+revoke all on notification_templates from desiauction_engine;
 
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'
