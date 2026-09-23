@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import {
   DEFAULT_AUCTION_CONFIG,
-  isMinor,
   isTier,
   isValidMediaKey,
+  mayPublishPhoto,
   MAX_IMAGE_BYTES,
   slugifyName,
   TOP_BUY_COUNTS,
@@ -534,7 +534,9 @@ async function playerPosterFrom(
        * single byte, so a withheld photo is never fetched at all.
        */
       const photoKey =
-        row.photoConsentAt === null || isMinor(row.dateOfBirth, new Date()) ? null : row.photoKey;
+        row.photoConsentAt === null || !mayPublishPhoto(row.dateOfBirth, new Date())
+          ? null
+          : row.photoKey;
 
       await recordPosterGenerated(db, gated, {
         action: "registration.poster_generated",
@@ -902,7 +904,9 @@ function posterPhotoKey(row: {
   photoConsentAt: Date | null;
   dateOfBirth: string | null;
 }): string | null {
-  return row.photoConsentAt === null || isMinor(row.dateOfBirth, new Date()) ? null : row.photoKey;
+  return row.photoConsentAt === null || !mayPublishPhoto(row.dateOfBirth, new Date())
+    ? null
+    : row.photoKey;
 }
 
 /**
