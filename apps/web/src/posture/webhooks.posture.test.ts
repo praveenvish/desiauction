@@ -18,6 +18,8 @@
  * Read the failures literally: a `permission denied` or a 404 here is the
  * production behaviour, reproduced. It is not a broken test.
  */
+import { createHmac } from "node:crypto";
+
 import { createDb, suppressions } from "@desiauction/db";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -309,5 +311,102 @@ describe("POSTURE — delivery callbacks reach their tables (PA-1 P0-2)", () => 
        where stream_id = ${dispatchId} and type = 'DispatchFailed'
     `) as unknown as { type: string }[];
     expect(events.length, "a retried provider callback appended a second event").toBe(1);
+  });
+});
+
+describe("POSTURE — the WhatsApp callback writes what it must, as the app role", () => {
+  /**
+   * The WhatsApp receiver writes four things through the raw app pool: it reads
+   * `people` by phone, inserts `whatsapp_inbound`, appends `consent_records`
+   * and moves `message_outbox.delivery_status`. None is org-scoped, so no
+   * boundary is entered — which is only correct if `desiauction_app` actually
+   * holds the DML on each. `whatsapp_inbound` is new in 0085 and reaches the
+   * app role through ALTER DEFAULT PRIVILEGES, never an explicit grant: this is
+   * the test that notices if that ever stops being true.
+   *
+   * Asserted on the rows, not the status — the route answers 503 to a failed
+   * write, and 200 to a great many things that write nothing.
+   */
+  const pad = (label: string): string => label.padEnd(26, "0");
+  const personId = pad("01M1POSTUREWAPERSON");
+  const outboxId = pad("01M1POSTUREWAOUTBOX");
+  const DIGITS = "919999000452";
+  const PHONE = `+${DIGITS}`;
+  const OUT = "wamid.posture-out";
+  const IN = "wamid.posture-stop";
+
+  async function clean(): Promise<void> {
+    await owner.sql`delete from whatsapp_inbound where provider_message_id = ${IN}`;
+    await owner.sql`delete from consent_records where person_id = ${personId}`;
+    await owner.sql`delete from message_outbox where id = ${outboxId}`;
+    await owner.sql`delete from people where id = ${personId}`;
+  }
+
+  beforeAll(async () => {
+    await clean();
+    await owner.sql`insert into people (id, phone, name) values (${personId}, ${PHONE}, 'Posture WhatsApp')`;
+    await owner.sql`
+      insert into message_outbox (id, person_id, kind, channel, dedupe_key, subject, body_text,
+                                  body_html, template_key, slots, status, provider_message_id,
+                                  delivery_status)
+      values (${outboxId}, ${personId}, 'auction.sold', 'whatsapp', 'posture:whatsapp', '', 'x',
+              '', 'auction.sold', '{}'::jsonb, 'sent', ${OUT}, 'sent')
+    `;
+  });
+  afterAll(clean);
+
+  it("records a delivery receipt and a STOP under the production roles", async () => {
+    const { POST } = await import("../app/api/webhooks/whatsapp/route");
+    const body = JSON.stringify({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          changes: [
+            {
+              field: "messages",
+              value: {
+                statuses: [{ id: OUT, status: "delivered", timestamp: "1727000000" }],
+                messages: [{ id: IN, from: DIGITS, type: "text", text: { body: "STOP" } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const secret = process.env["WHATSAPP_APP_SECRET"] ?? "";
+    const response = await POST(
+      new Request("https://example.test/api/webhooks/whatsapp", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-hub-signature-256": `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`,
+        },
+        body,
+      }),
+    );
+    expect(
+      response.status,
+      "503 is a write the app role was refused — read the log line for the table",
+    ).toBe(200);
+
+    const [outbox] = (await owner.sql`
+      select delivery_status from message_outbox where id = ${outboxId}
+    `) as unknown as { delivery_status: string }[];
+    expect(outbox?.delivery_status, "the delivery receipt did not land").toBe("delivered");
+
+    const inbound = (await owner.sql`
+      select intent, person_id from whatsapp_inbound where provider_message_id = ${IN}
+    `) as unknown as { intent: string; person_id: string }[];
+    expect(inbound, "the inbound STOP was not recorded").toHaveLength(1);
+    expect(inbound[0]?.person_id).toBe(personId);
+
+    const consent = (await owner.sql`
+      select granted from consent_records
+       where person_id = ${personId} and purpose = 'whatsapp.updates'
+    `) as unknown as { granted: boolean }[];
+    expect(
+      consent.map((row) => row.granted),
+      "STOP answered 200 but no withdrawal was recorded — the opt-out was lost",
+    ).toEqual([false]);
   });
 });

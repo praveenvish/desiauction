@@ -91,6 +91,7 @@ export function soldMail(facts: SoldFacts): ComposedMail {
           ? { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` }
           : { label: "See your player card", url: facts.cardUrl },
       footnote: `You received this because you played in the ${facts.season} auction. Switch off "Auction updates" in your account to stop these.`,
+      whatsappNudge: true,
     }),
   };
 }
@@ -216,6 +217,7 @@ export function appointmentMail(facts: AppointmentFacts): ComposedMail {
       ],
       action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
       footnote: `You received this because ${facts.orgName} named you in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      whatsappNudge: true,
     }),
   };
 }
@@ -297,6 +299,7 @@ export function lineupMail(facts: LineupFacts): ComposedMail {
       after: ["Good luck!"],
       action: { label: "See your season", url: `${env.PUBLIC_BASE_URL}/home` },
       footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      whatsappNudge: true,
     }),
   };
 }
@@ -343,6 +346,82 @@ export function ownerSummaryMail(facts: OwnerSummaryFacts): ComposedMail {
         : [],
       action: { label: "Open your team", url: facts.teamUrl },
       footnote: `You received this because you own ${facts.teamName} in ${facts.season}.`,
+    }),
+  };
+}
+
+// --- Registration decisions -----------------------------------------------------
+
+/** The five decisions a registrant is told about (competition/registration-notify.ts). */
+export type RegistrationDecision = "approve" | "waitlist" | "reject" | "withdraw" | "restore";
+
+export interface RegistrationDecisionFacts {
+  readonly name: string;
+  readonly season: string;
+  readonly decision: RegistrationDecision;
+  /** The rejection's reason in the player's words (REASON_TO_PLAYER), for `reject`. */
+  readonly reason?: string;
+}
+
+/**
+ * The decision by email — the same five moments the text carries, for the
+ * person with a verified address. Until SMS is registered this IS the notice
+ * for anybody who has not opted in to WhatsApp, so it says the decision in the
+ * subject line: most people read that and nothing else.
+ */
+export function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMail {
+  const { season } = facts;
+  const copy: Record<
+    RegistrationDecision,
+    { subject: string; heading: string; lines: readonly string[] }
+  > = {
+    approve: {
+      subject: `You're approved for ${season}`,
+      heading: "You're in",
+      lines: [
+        `Your registration for ${season} is approved. You're in the player pool for auction day.`,
+      ],
+    },
+    waitlist: {
+      subject: `You're on the waitlist for ${season}`,
+      heading: "You're on the waitlist",
+      lines: [
+        `Your registration for ${season} is on the waitlist. The organizer moves players up if a place opens, and we'll tell you if that happens.`,
+      ],
+    },
+    reject: {
+      subject: `Your registration for ${season} wasn't approved`,
+      heading: "Your registration wasn't approved",
+      lines: [
+        `Your registration for ${season} was not approved.`,
+        `The reason given: ${facts.reason ?? "no reason was given"}.`,
+      ],
+    },
+    withdraw: {
+      subject: `Your registration for ${season} was withdrawn`,
+      heading: "Your registration was withdrawn",
+      lines: [
+        `Your registration for ${season} was withdrawn. You can register again while registration is open.`,
+      ],
+    },
+    restore: {
+      subject: `Your registration for ${season} is back under review`,
+      heading: "Back under review",
+      lines: [
+        `Your registration for ${season} is back under review. We'll tell you what the organizer decides.`,
+      ],
+    },
+  };
+  const chosen = copy[facts.decision];
+  return {
+    subject: chosen.subject,
+    ...renderEmail({
+      preheader: chosen.lines[0] ?? chosen.heading,
+      heading: chosen.heading,
+      paragraphs: [`Hi ${facts.name},`, ...chosen.lines],
+      action: { label: "See your registration", url: `${env.PUBLIC_BASE_URL}/home` },
+      footnote: `You received this because you registered for ${season}. Switch off "Registration decisions" in your account to stop these.`,
+      whatsappNudge: true,
     }),
   };
 }

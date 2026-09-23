@@ -106,12 +106,21 @@ const envSchema = z.object({
   MSG91_TEMPLATE_AUCTION_SOLD: z.string().min(1).optional(),
   MSG91_TEMPLATE_TEAM_APPOINTED: z.string().min(1).optional(),
   MSG91_TEMPLATE_LINEUP_ANNOUNCED: z.string().min(1).optional(),
-  // Phase 3: the names Meta approved the personal WhatsApp templates under
-  // (docs/messaging/WHATSAPP_TEMPLATES.md). Unset = that moment goes by SMS,
-  // even for a player who opted in to WhatsApp.
+  // The names Meta approved the personal WhatsApp templates under, one name per
+  // template for both languages (docs/messaging/WHATSAPP_TEMPLATES.md). Unset =
+  // that moment has no WhatsApp: it goes by SMS when a gateway is configured,
+  // and otherwise the email carries it alone.
   WHATSAPP_TEMPLATE_AUCTION_SOLD: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_TEAM_APPOINTED: z.string().min(1).optional(),
   WHATSAPP_TEMPLATE_LINEUP_ANNOUNCED: z.string().min(1).optional(),
+  // WhatsApp first (2026-09-23): every text moment has a template.
+  WHATSAPP_TEMPLATE_REGISTRATION_APPROVED: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_REGISTRATION_WAITLISTED: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_REGISTRATION_REJECTED: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_REGISTRATION_WITHDRAWN: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_REGISTRATION_RESTORED: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_SECURITY_PHONE_CHANGED: z.string().min(1).optional(),
+  WHATSAPP_TEMPLATE_SECURITY_EMAIL_CHANGED: z.string().min(1).optional(),
   /**
    * Shared secret on the inbound-SMS webhook, which is where a STOP lands.
    *
@@ -121,6 +130,22 @@ const envSchema = z.object({
    * forgeries. Long, random, and set out of band on the operator's console.
    */
   SMS_INBOUND_SECRET: z.string().min(16).optional(),
+  /**
+   * The WhatsApp callback URL's two secrets (/api/webhooks/whatsapp), both from
+   * the Meta app, and the reason a WhatsApp number can honour a STOP at all.
+   *
+   *   · APP_SECRET — App settings → Basic. Meta signs every callback body with
+   *     it (`X-Hub-Signature-256`); an unsigned or mis-signed POST is refused
+   *     before a byte of it is read as JSON.
+   *   · WEBHOOK_VERIFY_TOKEN — a string WE choose and paste into Meta's webhook
+   *     form; Meta echoes it once, on the GET handshake, to prove the URL is
+   *     ours.
+   *
+   * Both unset means the endpoint is CLOSED (404), like the SMS receiver.
+   * docs/messaging/WHATSAPP_SETUP.md walks through where each one comes from.
+   */
+  WHATSAPP_APP_SECRET: z.string().min(16).optional(),
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(16).optional(),
   /**
    * Email over the provider's HTTP API. All three must be set together or the
    * platform keeps the filesystem outbox — a half-configured mailer that
@@ -380,9 +405,31 @@ const productionSchema = envSchema
       path: ["OTP_PROVIDER"],
     },
   )
+  /*
+   * A WHATSAPP NUMBER WITH NO RECEIVER CANNOT BE TOLD TO STOP.
+   *
+   * Once the platform sends on WhatsApp, the replies — "STOP" among them — go
+   * to the callback URL and nowhere else. Without its two secrets that route
+   * answers 404, Meta gives up, and a person's opt-out is silently dropped:
+   * a Meta policy breach (an opt-out must be honoured) and a DPDP one
+   * (withdrawing consent must be as easy as giving it). It also means no
+   * delivery receipt ever arrives, so a message nobody received looks sent.
+   */
+  .refine(
+    (v) =>
+      !serving(v) ||
+      v.WHATSAPP_PHONE_NUMBER_ID === undefined ||
+      v.WHATSAPP_ACCESS_TOKEN === undefined ||
+      (v.WHATSAPP_APP_SECRET !== undefined && v.WHATSAPP_WEBHOOK_VERIFY_TOKEN !== undefined),
+    {
+      message:
+        "WhatsApp sending is configured but its webhook is not — set WHATSAPP_APP_SECRET and WHATSAPP_WEBHOOK_VERIFY_TOKEN, or STOP replies and delivery receipts are dropped",
+      path: ["WHATSAPP_APP_SECRET"],
+    },
+  )
   .refine((v) => !serving(v) || v.OTP_PROVIDER !== "dev", {
     message:
-      "OTP_PROVIDER=dev writes codes to a table nobody can read in production — set OTP_PROVIDER=msg91 with credentials",
+      "OTP_PROVIDER=dev writes codes to a table nobody can read in production — set OTP_PROVIDER=whatsapp (or msg91) with credentials",
     path: ["OTP_PROVIDER"],
   })
   .refine(

@@ -46,6 +46,13 @@ export interface EmailContent {
    * cannot be followed out of a forwarded message, a link can.
    */
   readonly noLinks?: boolean;
+  /**
+   * Leave room for the WhatsApp nudge. Only the personal moments set it (a
+   * sale, an appointment, a lineup, a registration decision) — never a
+   * security mail or a sign-in code. The drain decides at send time whether
+   * the line is shown: see `applyWhatsAppNudge`.
+   */
+  readonly whatsappNudge?: boolean;
 }
 
 export interface RenderedEmail {
@@ -115,6 +122,7 @@ export function renderEmail(content: EmailContent): RenderedEmail {
       : detailsTable(content.details),
     ...(content.after ?? []).map(paragraph),
     first ? "" : action,
+    content.whatsappNudge === true ? WHATSAPP_NUDGE_MARK : "",
   ].join("");
 
   const html = `<!doctype html>
@@ -172,4 +180,53 @@ ${content.noLinks === true ? `<p style="margin:0;">DesiAuction &middot; Help: ${
   ].join("\n");
 
   return { html, text };
+}
+
+/**
+ * THE WHATSAPP NUDGE — one quiet line under a personal moment, for a person
+ * who has not turned WhatsApp on: "Get these on WhatsApp — turn it on in your
+ * account".
+ *
+ * Decided when the mail GOES, not when it was written, like the address and the
+ * consent (outbox.ts): somebody who switched WhatsApp on between the auction
+ * and the drain must not be asked to do what they just did. So the layout
+ * leaves an invisible mark where the line belongs, and the drain either fills
+ * it or leaves it — an HTML comment, which renders as nothing either way.
+ */
+export const WHATSAPP_NUDGE_MARK = "<!--da:whatsapp-nudge-->";
+
+export function whatsappNudgeUrl(): string {
+  return `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/account#whatsapp`;
+}
+
+export function hasWhatsAppNudge(html: string): boolean {
+  return html.includes(WHATSAPP_NUDGE_MARK);
+}
+
+/**
+ * Fill the mark with the line (`show`), or leave the mail as written. A mail
+ * without the mark is returned untouched whatever `show` says — which is how a
+ * security mail can never carry it.
+ */
+export function applyWhatsAppNudge(
+  mail: { readonly text: string; readonly html: string },
+  show: boolean,
+): { text: string; html: string } {
+  if (!show || !hasWhatsAppNudge(mail.html)) {
+    return { text: mail.text, html: mail.html };
+  }
+  const url = whatsappNudgeUrl();
+  const html = mail.html.replace(
+    WHATSAPP_NUDGE_MARK,
+    `<p style="margin:0 0 16px;font:14px/20px ${FONT};color:${MUTED};">Get these on WhatsApp — <a href="${escape(url)}" style="color:${MUTED};">turn it on in your account</a>.</p>`,
+  );
+  // The plain part: the line goes just above the footer rule ("—"), where the
+  // HTML puts it — after the button, before the fine print.
+  const line = `Get these on WhatsApp — turn it on in your account: ${url}`;
+  const rule = mail.text.lastIndexOf("\n—\n");
+  const text =
+    rule === -1
+      ? `${mail.text}\n\n${line}`
+      : `${mail.text.slice(0, rule)}\n${line}\n${mail.text.slice(rule)}`;
+  return { text, html };
 }

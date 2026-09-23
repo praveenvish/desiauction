@@ -47,7 +47,9 @@
 	# for no alert anybody asked for. And from what IS logged, the parts that
 	# identify a person or carry a credential are removed before the line is
 	# written: headers (the provider signatures and callback secrets ride
-	# there), the client addresses, and the query string.
+	# there), the client addresses, and the query string — which is not
+	# optional: Meta's WhatsApp handshake (GET /api/webhooks/whatsapp) carries
+	# its verify token as `hub.verify_token` in the query.
 	@not_webhook not path /api/webhooks/*
 	log_skip @not_webhook
 	log {

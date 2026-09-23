@@ -22,6 +22,7 @@ import {
   registrations,
   reviewRequests,
   sessions,
+  whatsappInbound,
   withTenantDb,
   type Db,
 } from "@desiauction/db";
@@ -316,6 +317,9 @@ export async function executeErasure(input: {
     if (before?.phone !== null && before?.phone !== undefined) {
       await tx.delete(otpCodes).where(eq(otpCodes.phone, before.phone));
       await tx.delete(otpInbox).where(eq(otpInbox.phone, before.phone));
+      // What they sent us on WhatsApp (0085): the number and a keyword. By
+      // phone, not person — a STOP sent before the account existed is theirs too.
+      await tx.delete(whatsappInbound).where(eq(whatsappInbound.phone, before.phone));
     }
     if (before?.email !== null && before?.email !== undefined) {
       const email = before.email.toLowerCase();

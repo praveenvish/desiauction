@@ -5,6 +5,7 @@ import {
   finopsJobs,
   finopsProfiles,
   grants,
+  messageOutbox,
   organizations,
   orgMembers,
   people,
@@ -12,6 +13,7 @@ import {
   settlementCases,
   sports,
   suppressions,
+  whatsappInbound,
   type Db,
 } from "@desiauction/db";
 import {
@@ -1596,6 +1598,23 @@ export interface MessagingOverview {
   readonly recent: readonly SuppressionRow[];
   readonly delivery: readonly TemplateDeliveryRow[];
   readonly deliveryWindowDays: number;
+  /** WhatsApp, over the same window: Meta's word on what we sent (0085). */
+  readonly whatsapp: WhatsAppDeliveryCounts;
+}
+
+/**
+ * What Meta's callbacks said about the WhatsApp messages the outbox sent.
+ *
+ * `awaiting` is a send Meta accepted and has said nothing more about — normal
+ * for a minute, and a sign the callback URL is not subscribed if it grows while
+ * `delivered` stays at zero. `stops` counts the STOP replies received.
+ */
+export interface WhatsAppDeliveryCounts {
+  readonly awaiting: number;
+  readonly delivered: number;
+  readonly read: number;
+  readonly failed: number;
+  readonly stops: number;
 }
 
 export async function messagingOverview(
@@ -1613,7 +1632,7 @@ export async function messagingOverview(
   }));
   const windowDays = 30;
   const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
-  const [byReason, recent, delivered] = await Promise.all([
+  const [byReason, recent, delivered, whatsappRows, whatsappStops] = await Promise.all([
     db
       .select({
         reason: suppressions.reason,
@@ -1658,7 +1677,23 @@ export async function messagingOverview(
         ),
       )
       .groupBy(sql`${auditLog.meta}->>'template'`, auditLog.action),
+    db
+      .select({ status: messageOutbox.deliveryStatus, count: sql<number>`count(*)::int` })
+      .from(messageOutbox)
+      .where(
+        and(
+          eq(messageOutbox.channel, "whatsapp"),
+          eq(messageOutbox.status, "sent"),
+          gte(messageOutbox.createdAt, since),
+        ),
+      )
+      .groupBy(messageOutbox.deliveryStatus),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(whatsappInbound)
+      .where(and(eq(whatsappInbound.intent, "stop"), gte(whatsappInbound.receivedAt, since))),
   ]);
+  const whatsappBy = new Map(whatsappRows.map((row) => [row.status, row.count]));
   const byTemplate = new Map<string, { sent: number; failed: number; suppressed: number }>();
   for (const row of delivered) {
     // Rows written before the suppressed audit carried a template name have no
@@ -1686,5 +1721,14 @@ export async function messagingOverview(
       .map(([template, counts]) => ({ template, ...counts }))
       .sort((a, b) => b.sent + b.failed + b.suppressed - (a.sent + a.failed + a.suppressed)),
     deliveryWindowDays: windowDays,
+    whatsapp: {
+      // `sent` is Meta's first word and null is none yet; both are "accepted,
+      // not yet known to have arrived".
+      awaiting: (whatsappBy.get("sent") ?? 0) + (whatsappBy.get(null) ?? 0),
+      delivered: whatsappBy.get("delivered") ?? 0,
+      read: whatsappBy.get("read") ?? 0,
+      failed: whatsappBy.get("failed") ?? 0,
+      stops: whatsappStops[0]?.count ?? 0,
+    },
   };
 }

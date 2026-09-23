@@ -147,6 +147,8 @@ const PERSONAL_CONTENT_TABLES = [
   "newsletter_subscribers",
   "newsletter_unsubscribes",
   "demo_requests",
+  // 0085: inbound WhatsApp keywords, keyed by phone.
+  "whatsapp_inbound",
 ];
 
 const APP_WRITES_UNPROTECTED = [
@@ -171,6 +173,8 @@ const APP_WRITES_UNPROTECTED = [
   "message_outbox",
   // The typed newsletter removal's throttle row (0084), written by a stranger.
   "newsletter_unsubscribes",
+  // The WhatsApp webhook (0085): a callback from Meta, no session, no tenant.
+  "whatsapp_inbound",
 ];
 
 /**

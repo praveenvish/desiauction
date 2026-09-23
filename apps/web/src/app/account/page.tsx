@@ -206,7 +206,11 @@ export default async function AccountPage() {
                 </div>
                 {settings === null ? null : <NotificationSwitches settings={settings} />}
                 {settings === null ? null : (
-                  <WhatsAppSwitch optedIn={settings.whatsapp} label={WHATSAPP_CONSENT_LABEL} />
+                  <WhatsAppSwitch
+                    optedIn={settings.whatsapp}
+                    label={WHATSAPP_CONSENT_LABEL}
+                    language={settings.whatsappLanguage}
+                  />
                 )}
                 <p className="acct-fineprint">
                   The big moments — a team buys you, you are named captain, you are in a lineup —

@@ -29,6 +29,8 @@ import { NAME_MAX_LENGTH, registrationNumber } from "@desiauction/core";
 import {
   auditLog,
   competitions as competitionsTable,
+  consentRecords,
+  messageOutbox,
   createDb,
   grants as grantsTable,
   newId,
@@ -48,6 +50,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../env";
 import { requestOtp, verifyOtp } from "../auth/otp";
 import { smsSeasonName } from "../messaging/templates";
+import {
+  setWhatsappOptIn,
+  type PersonalWhatsAppSender,
+  type WhatsAppMessage,
+} from "../messaging/whatsapp";
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { advanceCompetition, createCompetition, resolveCompetition } from "./competitions";
@@ -56,6 +63,21 @@ import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
+
+/**
+ * The notices ride the outbox now: the dev inbox as the SMS gateway, no
+ * WhatsApp, a mailer that sends nothing (.env.local sends REAL mail), and noon
+ * IST — a text drained at night is held for 8 am, and would read as pending.
+ */
+function channels() {
+  return {
+    sms: new DevInboxSmsSender(db),
+    whatsapp: null,
+    outboxDb: db,
+    now: new Date("2026-09-20T06:30:00Z"),
+    mailer: { send: () => Promise.resolve("unconfigured" as const) },
+  };
+}
 const sender = new DevInboxSender(db);
 
 const RUN = String(Date.now()).slice(-7);
@@ -146,6 +168,8 @@ afterAll(async () => {
   if (ids.length > 0) {
     await db.delete(sessions).where(inArray(sessions.personId, ids));
     await db.delete(auditLog).where(inArray(auditLog.actor, ids));
+    // consent_records restricts a person's deletion; the outbox cascades.
+    await db.delete(consentRecords).where(inArray(consentRecords.personId, ids));
     await db.delete(people).where(inArray(people.id, ids));
   }
   const phones = [ORGANIZER, PLAYER, OTHER_PLAYER];
@@ -187,9 +211,9 @@ describe("THE LONG SEASON NAME that silently swallowed every notice", () => {
         event: "approve",
         actorId: organizerId,
       },
-      new DevInboxSmsSender(db),
+      channels(),
     );
-    expect(outcome).toEqual({ sent: 1, failed: 0, suppressed: 0 });
+    expect(outcome).toEqual({ sent: 1, failed: 0, suppressed: 0, pending: 0 });
 
     // And a real message reached the real number, rather than a count that says
     // so. The old code's failure was precisely a count that agreed with itself.
@@ -250,9 +274,9 @@ describe("AN UNRENDERABLE MESSAGE IS COUNTED, NOT SWALLOWED", () => {
         event: "approve",
         actorId: organizerId,
       },
-      new DevInboxSmsSender(db),
+      channels(),
     );
-    expect(outcome).toEqual({ sent: 0, failed: 1, suppressed: 0 });
+    expect(outcome).toEqual({ sent: 0, failed: 1, suppressed: 0, pending: 0 });
   });
 
   it("still answers zero for an empty batch, which really is nothing to do", async () => {
@@ -263,6 +287,99 @@ describe("AN UNRENDERABLE MESSAGE IS COUNTED, NOT SWALLOWED", () => {
       event: "approve",
       actorId: organizerId,
     });
-    expect(outcome).toEqual({ sent: 0, failed: 0, suppressed: 0 });
+    expect(outcome).toEqual({ sent: 0, failed: 0, suppressed: 0, pending: 0 });
+  });
+});
+
+describe("WHATSAPP FIRST — a decision reaches the player where they asked for it", () => {
+  const WA_PLAYER = `+9198${RUN}4`;
+
+  it("sends an opted-in player's approval on WhatsApp, in their language, and records it", async () => {
+    const person = newId();
+    await db.insert(people).values({ id: person, phone: WA_PLAYER, name: "Wa Player" });
+    seeded.push(person);
+    await setWhatsappOptIn(db, {
+      personId: person,
+      granted: true,
+      source: "registration",
+      language: "hi",
+    });
+    const registrationId = await approvedRegistration(person);
+    const sent: WhatsAppMessage[] = [];
+    const wa: PersonalWhatsAppSender = {
+      send: (_to, message) => {
+        sent.push(message);
+        return Promise.resolve({ messageId: `wamid.notify.${RUN}.${newId()}` });
+      },
+    };
+    const outcome = await notifyDecision(
+      db,
+      {
+        orgId: org.id,
+        competitionName: "Bandra Premier League",
+        registrationIds: [registrationId],
+        event: "approve",
+        actorId: organizerId,
+      },
+      {
+        ...channels(),
+        // No SMS gateway: WhatsApp is the only text channel, as in production.
+        sms: null,
+        whatsapp: wa,
+        whatsappTemplate: (key) =>
+          key === "registration.approved" ? "da_registration_approved" : undefined,
+      },
+    );
+    expect(outcome).toEqual({ sent: 1, failed: 0, suppressed: 0, pending: 0 });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      name: "da_registration_approved",
+      language: "hi",
+      params: ["Wa Player", "Bandra Premier League"],
+    });
+    const [text] = await db
+      .select()
+      .from(messageOutbox)
+      .where(and(eq(messageOutbox.personId, person), eq(messageOutbox.channel, "whatsapp")));
+    expect(text?.status).toBe("sent");
+    expect(text?.kind).toBe("registration.approved");
+    expect(text?.providerMessageId).toMatch(/^wamid\.notify\./);
+    const [told] = await db
+      .select({ action: auditLog.action, meta: auditLog.meta })
+      .from(auditLog)
+      .where(and(eq(auditLog.subject, registrationId), eq(auditLog.scopeId, org.id)));
+    expect(told?.action).toBe("registration.notified");
+    expect(told?.meta).toMatchObject({ channel: "whatsapp" });
+  });
+
+  it("with no SMS and no opt-in, suppresses the text as no_text_channel — and says so", async () => {
+    const person = newId();
+    await db.insert(people).values({ id: person, phone: `+9198${RUN}5`, name: "Not Asked" });
+    seeded.push(person);
+    const registrationId = await approvedRegistration(person);
+    const outcome = await notifyDecision(
+      db,
+      {
+        orgId: org.id,
+        competitionName: "Bandra Premier League",
+        registrationIds: [registrationId],
+        event: "approve",
+        actorId: organizerId,
+      },
+      {
+        ...channels(),
+        sms: null,
+        whatsapp: { send: () => Promise.reject(new Error("never called")) },
+        // Approved, so the reason is the person's answer and not the template's.
+        whatsappTemplate: () => "da_registration_approved",
+      },
+    );
+    expect(outcome).toEqual({ sent: 0, failed: 0, suppressed: 1, pending: 0 });
+    const [text] = await db
+      .select()
+      .from(messageOutbox)
+      .where(and(eq(messageOutbox.personId, person), eq(messageOutbox.channel, "sms")));
+    expect(text?.status).toBe("suppressed");
+    expect(text?.lastError).toBe("no_text_channel: not opted in to WhatsApp");
   });
 });

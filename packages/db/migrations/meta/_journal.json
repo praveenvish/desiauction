@@ -589,6 +589,13 @@
       "when": 1790956800000,
       "tag": "0084_newsletter_unsubscribe_throttle",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1791043200000,
+      "tag": "0085_whatsapp_delivery",
+      "breakpoints": true
     }
   ]
 }

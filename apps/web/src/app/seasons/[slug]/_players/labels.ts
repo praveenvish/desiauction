@@ -85,9 +85,11 @@ export const TIMELINE_VERB: Record<string, string> = {
   "registration.marks_set": "Squad marks changed",
   "registration.team_assigned": "Assigned to a team",
   "registration.note": "Note",
-  "registration.notified": "Player notified by SMS",
-  "registration.notify_failed": "SMS to the player failed",
-  "registration.notify_suppressed": "No SMS sent (no number or opted out)",
+  // Channel-neutral since the notices go WhatsApp-first with an email beside
+  // them: "by SMS" would be untrue for nearly every one of them now.
+  "registration.notified": "Player notified",
+  "registration.notify_failed": "Message to the player failed",
+  "registration.notify_suppressed": "Not messaged (no channel, or opted out)",
   "registration.exported": "Included in a CSV export",
   "registration.details_edited": "Details edited",
 };

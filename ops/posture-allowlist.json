@@ -30,6 +30,10 @@
       "class": "by-design",
       "reason": "FIXED (PA-1R 2.1). Writes `suppressions` on the app pool, which holds the DML. The table is deliberately not org-scoped \u2014 a person texting STOP tells the platform, not one club \u2014 so it carries no org_id and no RLS, and there is no tenant boundary to enter."
     },
+    "apps/web/src/app/api/webhooks/whatsapp/route.ts": {
+      "class": "by-design",
+      "reason": "WhatsApp go-live. Meta's callback URL, on the app pool after its HMAC is verified. Writes message_outbox.delivery_status (forward-only conditional update) and whatsapp_inbound (keyed by Meta's message id), appends consent_records and reads people by phone \u2014 all platform-to-person tables with no org_id and no RLS, the same reasoning as sms-inbound, so there is no tenant boundary to enter. DML reaches desiauction_app via ALTER DEFAULT PRIVILEGES; webhooks.posture.test.ts proves the writes under that role."
+    },
     "apps/web/src/app/demo/[token]/invite.ics/route.ts": {
       "class": "by-design",
       "reason": "Pre-tenant token path. The demo tables carry no org_id and no RLS \u2014 the person holding the link is a stranger with no tenant to be scoped to."

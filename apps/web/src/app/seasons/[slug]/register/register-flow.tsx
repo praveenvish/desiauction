@@ -16,7 +16,12 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { formatDate } from "../../../../lib/format-date";
 import { formatPhone } from "../../../../lib/format-phone";
 import { useHydrated } from "../../../../lib/use-hydrated";
-import { WHATSAPP_CONSENT_LABEL } from "../../../../lib/whatsapp-consent";
+import {
+  WHATSAPP_CONSENT_LABEL,
+  WHATSAPP_LANGUAGE_LABELS,
+  WHATSAPP_LANGUAGES,
+  type WhatsAppLanguage,
+} from "../../../../lib/whatsapp-consent";
 import { track } from "../../../../lib/telemetry";
 import { updateProfileAction } from "../../../../server/auth/actions";
 import { submitRegistrationAction } from "../../../../server/competition/actions";
@@ -240,6 +245,8 @@ export function RegisterFlow({
   // WhatsApp opt-in: unticked, and like consent never restored from a draft —
   // Meta and DPDP both need it to be a choice made now (Phase 3).
   const [whatsapp, setWhatsapp] = useState(false);
+  // Which version of the messages, asked only once they tick the box.
+  const [whatsappLanguage, setWhatsappLanguage] = useState<WhatsAppLanguage>("en");
   const [pending, startTransition] = useTransition();
   const [restored, setRestored] = useState(false);
 
@@ -387,6 +394,7 @@ export function RegisterFlow({
       if (whatsapp) {
         formData.set("whatsappOptIn", "true");
         formData.set("whatsappConsentText", WHATSAPP_CONSENT_LABEL);
+        formData.set("whatsappLanguage", whatsappLanguage);
       }
       const result = await submitRegistrationAction(slug, {}, formData);
       if (result.done === true) {
@@ -837,7 +845,7 @@ export function RegisterFlow({
               />
               <span>{PUBLICATION_CONSENT_LABEL}</span>
             </label>
-            {/* Phase 3: WhatsApp instead of SMS for auction and team news.
+            {/* WhatsApp updates, and the language they come in once ticked.
                 Unticked; leaving it unticked changes nothing already chosen. */}
             <label
               className="register-consent-check reg-check-quiet"
@@ -854,6 +862,28 @@ export function RegisterFlow({
               />
               <span>{WHATSAPP_CONSENT_LABEL}</span>
             </label>
+            {whatsapp ? (
+              <fieldset className="reg-wa-language" data-testid="register-whatsapp-language">
+                <legend className="reg-wa-language-legend">Language for WhatsApp messages</legend>
+                <div className="reg-wa-language-options">
+                  {WHATSAPP_LANGUAGES.map((option) => (
+                    <label key={option} className="reg-wa-language-option" lang={option}>
+                      <input
+                        type="radio"
+                        name="register-whatsapp-language"
+                        value={option}
+                        checked={whatsappLanguage === option}
+                        data-testid={`register-whatsapp-language-${option}`}
+                        onChange={() => {
+                          setWhatsappLanguage(option);
+                        }}
+                      />
+                      <span>{WHATSAPP_LANGUAGE_LABELS[option].label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
             {/* PI-1 write-back. A convenience, not a consent — defaults on. */}
             <label
               className="register-consent-check reg-check-quiet"

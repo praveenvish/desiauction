@@ -108,6 +108,7 @@ import {
   type RegistrationEditInput,
 } from "./registration-edit";
 import { playerDeskContext, type PlayerDeskContext } from "./player-desk";
+import { parseWhatsAppLanguage } from "../../lib/whatsapp-consent";
 import { setWhatsappOptIn } from "../messaging/whatsapp";
 import type { ExportRows } from "../../lib/export-columns";
 import { captainLockRefusal } from "./captain-lock";
@@ -1224,6 +1225,9 @@ export async function submitRegistrationAction(
   // Phase 3: WhatsApp instead of SMS. Only a tick records anything — leaving
   // it unticked is not a withdrawal of a yes given on /account.
   const whatsappOptIn = formString(formData, "whatsappOptIn") === "true";
+  // The language chosen with it; anything but a language we have templates in
+  // is dropped, and the record then names none (English, by default).
+  const whatsappLanguage = parseWhatsAppLanguage(formString(formData, "whatsappLanguage"));
   /*
    * THE REGISTRATION AND WHAT THE PERSON AGREED TO COMMIT TOGETHER, OR NOT AT ALL.
    *
@@ -1271,6 +1275,7 @@ export async function submitRegistrationAction(
               granted: true,
               source: "registration",
               competition: slug,
+              ...(whatsappLanguage === undefined ? {} : { language: whatsappLanguage }),
             });
           }
         }

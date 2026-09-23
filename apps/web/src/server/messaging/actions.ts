@@ -6,6 +6,7 @@ import { withTenantDb } from "@desiauction/db";
 
 import { currentSession } from "../auth/actions";
 import { db as appDb, dbHandle, systemDb } from "../db";
+import { parseWhatsAppLanguage, type WhatsAppLanguage } from "../../lib/whatsapp-consent";
 import { setWhatsappOptIn, whatsappOptedIn } from "./whatsapp";
 import { ForbiddenError, can, requireCapability } from "../orgs/authz";
 import { resolveTenant } from "../orgs/orgs";
@@ -32,8 +33,10 @@ async function resolveTenantScoped(personId: string, slug: string) {
 
 export interface NotificationSettings {
   readonly topics: readonly { topic: string; label: string; detail: string; allowed: boolean }[];
-  /** Phase 3: auction and team texts on WhatsApp instead of SMS. */
+  /** WhatsApp: the one text channel, and only for somebody who opted in. */
   readonly whatsapp: boolean;
+  /** Which version of the templates they get — English until they choose. */
+  readonly whatsappLanguage: WhatsAppLanguage;
 }
 
 export async function notificationSettings(): Promise<NotificationSettings | null> {
@@ -46,7 +49,8 @@ export async function notificationSettings(): Promise<NotificationSettings | nul
     whatsappOptedIn(systemDb, session.personId),
   ]);
   return {
-    whatsapp,
+    whatsapp: whatsapp.optedIn,
+    whatsappLanguage: whatsapp.language,
     topics: NOTIFICATION_TOPICS.map((entry) => ({
       topic: entry.topic,
       label: entry.label,
@@ -86,18 +90,32 @@ export async function setNotificationPreferenceAction(
 }
 
 /**
- * WhatsApp instead of SMS (Phase 3). Consent, not a preference: every change is
- * a new `consent_records` row with the wording shown, and the latest one wins.
- * On the app pool, which may write consent (the system pool may not).
+ * WhatsApp updates. Consent, not a preference: every change is a new
+ * `consent_records` row with the wording shown, and the latest one wins. On the
+ * app pool, which may write consent (the system pool may not).
+ *
+ * The language rides on the same record. Changing it while opted in is a new
+ * "yes" naming the new language — append-only means a re-statement, never an
+ * edit — and a "no" keeps whatever was chosen for the day they come back
+ * (`languageFromEvidence`).
  */
 export async function setWhatsappPreferenceAction(
   granted: boolean,
+  language?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await currentSession();
   if (session === null) {
     return { ok: false, error: "Sign in to change your notification settings." };
   }
-  await setWhatsappOptIn(appDb, { personId: session.personId, granted, source: "account" });
+  // Only a language we have templates in. Anything else is ignored rather than
+  // stored: Meta would refuse a send in a language nobody approved.
+  const chosen = parseWhatsAppLanguage(language);
+  await setWhatsappOptIn(appDb, {
+    personId: session.personId,
+    granted,
+    source: "account",
+    ...(granted && chosen !== undefined ? { language: chosen } : {}),
+  });
   revalidatePath("/account");
   return { ok: true };
 }

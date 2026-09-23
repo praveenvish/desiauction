@@ -303,6 +303,16 @@ export const messageOutbox = pgTable(
     /** WhatsApp only (0081): the image a template's header shows. */
     mediaUrl: text("media_url"),
     createdAt: ts("created_at").notNull().defaultNow(),
+    /**
+     * WhatsApp delivery (0085): the id Meta answered the send with, and its
+     * latest callback about it. Status only moves forward; the webhook
+     * (/api/webhooks/whatsapp) enforces the order Meta does not.
+     */
+    providerMessageId: text("provider_message_id"),
+    deliveryStatus: text("delivery_status", { enum: ["sent", "delivered", "read", "failed"] }),
+    deliveredAt: ts("delivered_at"),
+    readAt: ts("read_at"),
+    deliveryError: text("delivery_error"),
   },
   (table) => [
     uniqueIndex("message_outbox_dedupe_uq").on(table.dedupeKey),
@@ -313,7 +323,29 @@ export const messageOutbox = pgTable(
       .on(table.nextAttemptAt)
       .where(sql`status = 'pending'`),
     index("message_outbox_person_idx").on(table.personId),
+    uniqueIndex("message_outbox_provider_message_uq")
+      .on(table.providerMessageId)
+      .where(sql`provider_message_id is not null`),
   ],
+);
+
+/**
+ * What people send us on WhatsApp (0085): one row per inbound message id, so a
+ * callback Meta retries is handled once. Keeps only the keyword the body was
+ * read as, never the body; swept after ninety days. Platform-level, no RLS.
+ */
+export const whatsappInbound = pgTable(
+  "whatsapp_inbound",
+  {
+    providerMessageId: text("provider_message_id").primaryKey(),
+    phone: text("phone").notNull(),
+    intent: text("intent", { enum: ["stop", "start", "unknown"] }).notNull(),
+    personId: char("person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (table) => [index("whatsapp_inbound_received_idx").on(table.receivedAt)],
 );
 
 export const otpCodes = pgTable(
@@ -372,7 +404,17 @@ export const consentRecords = pgTable(
     granted: boolean("granted").notNull(),
     /** Where the agreement came from, so an audit can retrace it. */
     source: text("source", {
-      enum: ["registration", "account", "sms_stop", "sms_start", "import", "support", "login"],
+      enum: [
+        "registration",
+        "account",
+        "sms_stop",
+        "sms_start",
+        "whatsapp_stop",
+        "whatsapp_start",
+        "import",
+        "support",
+        "login",
+      ],
     }).notNull(),
     /** The wording shown, the page, whatever proves what they actually saw. */
     evidence: jsonb("evidence").notNull().default({}),
