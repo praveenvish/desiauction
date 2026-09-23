@@ -39,7 +39,16 @@ ALTER TABLE "whatsapp_inbound" ADD CONSTRAINT "whatsapp_inbound_person_fk"
   FOREIGN KEY ("person_id") REFERENCES "people"("id") ON DELETE SET NULL;--> statement-breakpoint
 CREATE INDEX "whatsapp_inbound_received_idx" ON "whatsapp_inbound" ("received_at");--> statement-breakpoint
 
--- 3. Personal data the service roles never read (0083's rule, for the new table).
+-- 3. A STOP or START on WhatsApp is recorded as what it is. consent_records'
+--    closed set of sources (0044) knew only the SMS keywords, so a WhatsApp
+--    reply could not be written honestly. Widening only: every existing row
+--    still satisfies the new set.
+ALTER TABLE "consent_records" DROP CONSTRAINT "consent_records_source_check";--> statement-breakpoint
+ALTER TABLE "consent_records" ADD CONSTRAINT "consent_records_source_check"
+  CHECK ("source" IN ('registration','account','sms_stop','sms_start','whatsapp_stop','whatsapp_start','import','support','login')) NOT VALID;--> statement-breakpoint
+ALTER TABLE "consent_records" VALIDATE CONSTRAINT "consent_records_source_check";--> statement-breakpoint
+
+-- 4. Personal data the service roles never read (0083's rule, for the new table).
 DO $$
 DECLARE
   role_name text;
