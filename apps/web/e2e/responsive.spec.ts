@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { latestOtp } from "./otp";
+import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
 
 // RESPONSIVE CERTIFICATION (WS-9.1). The QA certification returned "Blocked"
 // for every breakpoint because the browser-automation surface it used rendered
@@ -100,6 +100,59 @@ test("the console holds its width across every breakpoint", async ({ page }) => 
       await page.waitForLoadState("domcontentloaded");
       await assertNoHorizontalOverflow(page, route, breakpoint.label);
     }
+  }
+});
+
+/*
+ * A CARD'S width, not the page's. The organizer's season list sits in the
+ * narrow half of a two-column grid, and it used to switch table→list on the
+ * VIEWPORT — so on a 1024 laptop the table ran ~70px past its card, and at 1280
+ * the season name got a 164px column and wrapped to six lines. The page never
+ * scrolled sideways, so the check above could not see it.
+ *
+ * It needs REAL season facts to show: a fresh season with no dates, place or
+ * money is narrow enough to fit either way (the first version of this guard
+ * passed against the broken CSS for exactly that reason). The demo founder's
+ * seeded seasons carry all three.
+ */
+const FOUNDER = "9999000001";
+
+test("the organizer's season list fits its card at every laptop width", async ({ page }) => {
+  await withSignInLock(FOUNDER, async () => {
+    await resetOtpBudget(FOUNDER);
+    await page.goto("/login");
+    await page.getByLabel("Mobile number").fill(FOUNDER);
+    await page.getByRole("button", { name: "Send code" }).click();
+    await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
+      timeout: 15_000,
+    });
+    await page.getByLabel("6-digit code").fill(await latestOtp(FOUNDER));
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(page).not.toHaveURL(/\/login/);
+  });
+  for (const width of [1024, 1280, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/home");
+    const list = page.getByTestId("home-competitions");
+    await expect(list).toBeVisible();
+    const fit = await list.evaluate((node) => ({
+      overflow: node.scrollWidth - node.clientWidth,
+      // Whichever rendering is showing, the season NAME gets a real column —
+      // the table cell or the list row's text block, both of which fill the
+      // space they are given (the name itself only spans its own text).
+      nameWidth: Math.min(
+        ...Array.from(
+          node.querySelectorAll<HTMLElement>(".home-table td:first-child, .home-season-main"),
+        )
+          .filter((cell) => cell.offsetParent !== null)
+          .map((cell) => cell.getBoundingClientRect().width),
+      ),
+    }));
+    expect(
+      fit.overflow,
+      `season list overflows its card at ${String(width)}px`,
+    ).toBeLessThanOrEqual(1);
+    expect(fit.nameWidth, `season name squeezed at ${String(width)}px`).toBeGreaterThanOrEqual(180);
   }
 });
 
