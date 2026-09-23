@@ -575,6 +575,13 @@
       "when": 1790784000000,
       "tag": "0082_competition_cover",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1790870400000,
+      "tag": "0083_service_roles_personal_reads",
+      "breakpoints": true
     }
   ]
 }
