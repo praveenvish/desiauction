@@ -68,16 +68,15 @@ Nothing here is optional, and none of it counts until a restore has been timed.
    "What was verified" records on the production stanza before the first real
    auction: write a row after a backup, restore, and confirm the row came back
    from WAL.
-2. **F + E** — **An off-host copy.** The pgBackRest repo lives in the MinIO on
-   the same box, so it protects against a bad migration and not against
-   losing the machine. Choose a second destination in a different account (any
-   S3-compatible bucket), then:
-   - schedule `pnpm backup` daily with `BACKUP_DIR` on that destination and
-     `BACKUP_DATABASE_URL` set to a backup-only role;
-   - copy `minio_data` there too (`mc mirror`). pgBackRest does not back up
-     MinIO, and the finops bucket holds financial records.
-   **Proof:** the dated dump and the mirrored objects are listed in the
-   off-host bucket from a machine that is not the host.
+2. **F** — **An off-host copy.** Choose a destination in a different account
+   (any S3-compatible bucket) and fill in `pgbackrest.env` (repo1) and
+   `mirror.env` (the MinIO buckets) per ops/deploy/README "Backups". The
+   sidecars are automated; until repo1 is off-box the `pgbackrest` sidecar
+   refuses to run unless `PGBACKREST_ALLOW_ONBOX_REPO=1` is set, and the mirror
+   refuses outright.
+   **Proof:** `pgbackrest info` lists a backup in the off-box repo, and the
+   mirrored objects are listed in the off-host bucket from a machine that is
+   not the host. `backup-production.yml` goes green.
 3. **E** — **Restore drill, timed.** Local rehearsal, then the same drill on
    staging against a real dump:
    ```sh
@@ -87,8 +86,10 @@ Nothing here is optional, and none of it counts until a restore has been timed.
    auction night on the copy under the four roles.
    **Proof:** record the wall-clock RTO in RESTORE_RUNBOOK "Rehearsal record"
    with the date and dump size. The local figure is in the audit REPORT §11.
-4. **E** — Put backup success on the alert list (section F). An alert has to
-   fire when a backup is **missing**, not only when one errors.
+4. ☑ Backup success is on the alert list: `da-backup-failed` and
+   `da-backup-stale` (no `BACKUP_OK` in 26 h) fire on the missing backup, not
+   only the failed one, and `backup-production.yml` checks the same from
+   outside nightly. **F** — `ALERT_WEBHOOK_URL` so they reach a phone.
 
 ## C · Sign-in works for real people (P0-1)
 
@@ -203,12 +204,12 @@ acceptable only because the engine recovers from its event log. The restart
 time the audit measured is in REPORT §11. Somebody has to learn of an outage
 before a club does.
 
-1. **E** — Uptime checks on `/healthz` (engine) and `/readyz` (web) from outside
-   the host, paging a phone.
-2. **E** — Alerts on the absence of things. Suggested starting thresholds: no
-   backup in 26 h, runner tick age over 5 min, a finops follower cursor not
-   advancing for 15 min. Tune them after the first month. PRODUCTION_CHECKLIST §4
-   lists the full set.
+1. **F** — Uptime checks on `/healthz` (engine) and `/readyz` (web) from outside
+   the host, paging a phone — ALERTS "Outside the box".
+2. ☑ Alerts on the absence of things, provisioned: no backup in 26 h, no mirror
+   in 3 h, no successful scheduled job in 15 min, plus runner crash loops. Runner
+   tick/queue AGE is still not in the logs (ALERTS table). **F** —
+   `ALERT_WEBHOOK_URL`.
 3. **E** — Drill it: stop the staging runner and confirm the page arrives.
    **Proof:** the page arrives, with a timestamp in the deploy log.
 

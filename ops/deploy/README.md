@@ -1,6 +1,8 @@
 # Self-hosted deployment
 
-Three containers, one Caddy, one Postgres, one backup sidecar — on one host.
+Three app containers, one Caddy, one Postgres, and the sidecars that keep it
+honest — pgBackRest, an off-box object-storage mirror, a scheduler for the web
+tier's job routes, and autoheal — on one host.
 This directory holds the files that describe it; `docs/operations/DEPLOYMENT.md`
 holds the procedure and the rollback decision tree.
 
@@ -19,7 +21,15 @@ It also means every deploy passes the same quality gates as `main`.
 | ------------------------------- | ----------------------------------------------------------- |
 | `docker-compose.production.yml` | The stack. Images pinned by `TAG`, Postgres pinned to 17    |
 | `Caddyfile`                     | TLS termination + reverse proxy. Certificates are automatic |
+| `jobs/scheduler.mjs`            | The clock for `/api/jobs/*` (see "Scheduled jobs")          |
+| `observability/`                | Alloy → Loki → Grafana, and the provisioned alert rules     |
+| `migrator/`                     | The deploy-time DB toolbox image (see "How a deploy runs")  |
+| `db/`                           | The Postgres + pgBackRest image                             |
 | `*.env`                         | **Not in git.** Created on the host, `chmod 600`            |
+
+`deploy-host.yml` copies the compose file, Caddyfile, `jobs/`, `observability/`
+and `postgresql.conf.d/` to `/opt/desiauction` on EVERY deploy. They are code:
+a hand edit on the host is overwritten by the next release, so make it here.
 
 ## The env files the host needs
 
@@ -34,7 +44,19 @@ Copy from the production template and split by service:
 - `minio.env` — `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` (read by both `minio`
   and `minio-init`)
 - `pgbackrest.env` — the WAL archive repo, read by BOTH `db` and `pgbackrest`
-- `.env` — `REGISTRY`, `TAG`, `PUBLIC_DOMAIN`, `ENGINE_DOMAIN`, `S3_DOMAIN`
+  (off-box — see "Backups")
+- `mirror.env` — the off-box copy of the MinIO buckets (see "Backups")
+- `migrator.env` — ONE value: `DATABASE_URL` as the database **owner**
+  (`postgres://postgres:<POSTGRES_PASSWORD>@db:5432/<POSTGRES_DB>`), used only by
+  the deploy's migrate / freeze / grants steps
+- `.env` — `REGISTRY`, `TAG`, `DB_TAG`, `PUBLIC_DOMAIN`, `ENGINE_DOMAIN`,
+  `S3_DOMAIN`, `ALERT_WEBHOOK_URL` (**required** — compose refuses to start
+  without it, see "Alerts"), and `COMPOSE_FILE=docker-compose.production.yml`
+  (the deploy adds it if missing, so a plain `docker compose …` reads this stack)
+
+`web.env` must also carry the three job secrets — `FEEDBACK_JOB_SECRET`,
+`SETTLEMENT_JOB_SECRET`, `DEMO_JOB_SECRET` (≥16 chars each). The scheduler reads
+them from the same file, so they cannot disagree with the routes.
 
 ### Object storage lives on this box
 
@@ -103,8 +125,9 @@ single difference is set by `minio-init` and is what makes a photo load in a
 browser while a receipt register stays behind a signed URL.
 
 **MinIO is not backed up by pgBackRest.** That sidecar archives Postgres WAL and
-nothing else, so `minio_data` needs its own copy off this box. A player photo is
-recoverable-ish; a finops artifact is a financial record.
+nothing else. `minio-mirror` is what copies `minio_data` off this box — see
+"Backups". A player photo is recoverable-ish; a finops artifact is a financial
+record.
 
 Each app refuses to boot on bad env, so a missing value fails fast and loudly
 rather than at a user's login.
@@ -133,24 +156,31 @@ cannot archive: "server does not shut down", and a first boot never completes.
 They live in `postgresql.conf.d/10-archive.conf`, made live by an initdb script
 that runs after initdb and before the real server.
 
-### The repo is the MinIO on this box
+### Backups: off the box, and loud when they are not
 
-A single-host deployment has nowhere else free to put it. Be exact about what
-that buys:
+**What is automated now, and what is founder-held.** The machinery is all here
+and runs on its own; what it cannot do is invent a second place to put the
+copies. Those credentials are the founder's.
 
-- It DOES protect a bad migration, a dropped table, a bug that writes nonsense —
-  the failure you are most likely to actually have.
-- It does NOT protect the loss of the machine. The backups are on the disk they
-  are backing up.
+| Piece                                          | Automated in this stack                                               | Founder-held                                                            |
+| ---------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| WAL archive + nightly full/diff (PITR)         | `db` archive_command + `pgbackrest` sidecar                           | an off-box S3 bucket + keys in `pgbackrest.env`                         |
+| Object storage copy (photos, finops artifacts) | `minio-mirror`, hourly                                                | an off-box S3 bucket + keys in `mirror.env`                             |
+| "Did last night's backup happen?"              | Grafana `da-backup-*` rules; `backup-production.yml` nightly over SSH | `ALERT_WEBHOOK_URL`; `DEPLOY_*` secrets in the `production` environment |
+| The whole machine                              | —                                                                     | Contabo Auto Backup (PRODUCTION_CHECKLIST §2)                           |
 
-Moving `repo1` off the box later is a credentials change in `pgbackrest.env` and
-nothing else. Until then, the honest description of this deployment is "one
-machine, recoverable from its own mistakes, not from its own death".
+**repo1 belongs on a different machine.** A repo on the MinIO beside the
+database protects a bad migration, a dropped table, a bug that writes nonsense —
+and NOT the loss of the machine, because the backups are on the disk they back
+up. So the `pgbackrest` sidecar **refuses to run** when repo1 is the on-box
+MinIO (its endpoint equals `S3_DOMAIN`, or is `minio`/`localhost`, or is unset),
+logging `BACKUP_REFUSED`, unless `PGBACKREST_ALLOW_ONBOX_REPO=1` says in writing
+that this is an interim state. The database's own `archive_command` reads the
+same file, so WAL goes wherever the sidecar's backups go.
 
-pgBackRest needs TLS for an S3 repo — `repo1-storage-verify-tls=n` only skips
-verification, it still speaks TLS, and MinIO here serves plain HTTP. So the repo
-points at `S3_DOMAIN` through Caddy, which already holds a real certificate:
-verification stays ON and there is no second certificate to manage.
+Any S3-compatible bucket in a **different account** works (Backblaze B2,
+Cloudflare R2, AWS S3, a second provider's object storage). pgBackRest needs
+TLS for an S3 repo, which every hosted one serves:
 
 ```sh
 PGBACKREST_STANZA=desiauction
@@ -158,14 +188,54 @@ PGBACKREST_PG1_PATH=/var/lib/postgresql/data
 PGBACKREST_PG1_SOCKET_PATH=/var/run/postgresql
 PGBACKREST_REPO1_TYPE=s3
 PGBACKREST_REPO1_PATH=/pgbackrest
-PGBACKREST_REPO1_S3_BUCKET=desiauction-backup
-PGBACKREST_REPO1_S3_ENDPOINT=s3.example.in
+PGBACKREST_REPO1_S3_ENDPOINT=s3.eu-central-003.backblazeb2.com   # off-box
+PGBACKREST_REPO1_S3_BUCKET=desiauction-pitr
 PGBACKREST_REPO1_S3_KEY=...
 PGBACKREST_REPO1_S3_KEY_SECRET=...
-PGBACKREST_REPO1_S3_REGION=us-east-1
+PGBACKREST_REPO1_S3_REGION=eu-central-003
 PGBACKREST_REPO1_S3_URI_STYLE=path
 PGBACKREST_REPO1_RETENTION_FULL=2
+# PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc   # recommended off-box
+# PGBACKREST_REPO1_CIPHER_PASS=...           # keep a copy OFF this box too
 ```
+
+**Interim, on-box** (the previous default — the `desiauction-backup` bucket on
+this MinIO, reached through Caddy at `S3_DOMAIN` so TLS verification stays on):
+the same file with `PGBACKREST_REPO1_S3_ENDPOINT=<S3_DOMAIN>`,
+`PGBACKREST_REPO1_S3_BUCKET=desiauction-backup`, the MinIO keys, and
+`PGBACKREST_ALLOW_ONBOX_REPO=1`. Every boot then logs a warning that says what
+it does not cover.
+
+Changing repo1 on a running system: `docker compose up -d db pgbackrest` so
+both read the new file; the sidecar's boot runs `stanza-create` against the new
+repo and takes a backup immediately.
+
+**Loud failure.** Every command in the sidecar used to end in `|| true`, so a
+backup that failed every night logged one line and looked identical to one that
+worked. `stanza-create` is idempotent on its own (an existing, matching stanza
+succeeds and changes nothing) — the swallow only ever hid the failures that
+matter: an unreachable repo, and a stanza that no longer matches this cluster.
+Each nightly run now logs `BACKUP_OK` or `BACKUP_FAILED` and retries a failure in
+an hour. Grafana pages on the failure and on the ABSENCE of `BACKUP_OK` for 26
+hours; `backup-production.yml` checks the same from outside every night.
+
+**Object storage.** `minio-mirror` copies both buckets to the off-box target in
+`mirror.env` every `MIRROR_INTERVAL_SECONDS` (default 3600), logging `MIRROR_OK`
+or `MIRROR_FAILED`; unconfigured, it refuses (`MIRROR_REFUSED`) and restarts:
+
+```sh
+MIRROR_S3_ENDPOINT=https://s3.eu-central-003.backblazeb2.com
+MIRROR_S3_ACCESS_KEY=...
+MIRROR_S3_SECRET_KEY=...
+MIRROR_MEDIA_BUCKET=desiauction-media-copy
+MIRROR_FINOPS_BUCKET=desiauction-finops-copy
+```
+
+The finops copy never deletes (artifacts are append-only records, and a delete
+here must not reach the only other copy). The media copy DOES propagate deletes:
+a photo is deleted for an erasure or a take-down, and a backup that keeps an
+erased minor's photo for ever is its own DPDP problem. Turn on versioning on the
+target media bucket if you want undelete.
 
 `PG1_SOCKET_PATH` is not decoration. pgBackRest is a local tool: it reads PGDATA
 directly and talks to the cluster over libpq, so the sidecar needs the socket as
@@ -176,7 +246,7 @@ problem and is not.
 The sidecar runs `stanza-create` on every boot (idempotent), then `check`, then
 a weekly full and a daily differential. Creating the stanza automatically is
 deliberate: the step most likely to be skipped is the one that makes the rest
-real.
+real. Restoring from it is RESTORE_RUNBOOK "Point-in-time restore".
 
 ### What was verified, and how
 
@@ -189,8 +259,83 @@ Against the real compose data plane, from an empty volume:
   `pgbackrest restore` brought the cluster back **with that row** — it existed
   only in WAL, so this is point-in-time recovery and not a file copy
 
-Re-run it on the production stanza before the first real auction and record the
-RTO. `pnpm restore:drill` exercises the separate `pg_dump` path, not this one.
+That was measured against the on-box repo. Re-run it on the production stanza,
+against the OFF-BOX repo, before the first real auction and record the RTO in
+RESTORE_RUNBOOK. `pnpm restore:drill` exercises the separate `pg_dump` path, not
+this one.
+
+## Scheduled jobs
+
+`/api/jobs/{messages,settlement-coordination,demo-reminders,feedback}` are
+doors a scheduler calls — fail-closed (no secret → 404) and idempotent — and
+until the `scheduler` service nothing on this host called them: the outbox
+never drained after a restart, and the retention purge and the settlement
+catch-up sweep never ran. `jobs/scheduler.mjs` runs on the web image's own node:
+
+| Route                               | Every  | Secret (web.env)        |
+| ----------------------------------- | ------ | ----------------------- |
+| `/api/jobs/messages`                | 2 min  | `FEEDBACK_JOB_SECRET`   |
+| `/api/jobs/settlement-coordination` | 5 min  | `SETTLEMENT_JOB_SECRET` |
+| `/api/jobs/demo-reminders`          | 10 min | `DEMO_JOB_SECRET`       |
+| `/api/jobs/feedback`                | 15 min | `FEEDBACK_JOB_SECRET`   |
+
+Each run logs `job.ok` or `job.failed` (with the HTTP status); a job whose
+secret is unset logs `job.disabled` once at boot. A `job.failed` with status 404
+means the ROUTE thinks it is unconfigured — the web tier and the scheduler are
+reading different values, which can only happen if one container is stale.
+
+## Alerts
+
+`observability/grafana-alerting.yml` provisions the rules in
+docs/operations/ALERTS.md that logs can express — plus backup, mirror and
+scheduler failure and silence — and one webhook contact point from
+`ALERT_WEBHOOK_URL` in `.env`. Compose **refuses to start** without that value:
+an alert with nowhere to go is a dashboard nobody is watching. Any endpoint that
+accepts Grafana's webhook JSON works — ntfy.sh, a Slack/Discord bridge, a
+PagerDuty or Opsgenie integration URL. Each rule carries `severity=page` or
+`ticket` for the receiver to route on.
+
+`autoheal` restarts `web` and `engine` (label `autoheal=true`) when their
+healthcheck fails — `restart: unless-stopped` only acts on a process that
+EXITS, and an unhealthy one that stays up was otherwise left alone for ever.
+Postgres is deliberately not labelled: restarting it mid crash-recovery is how
+recovery never finishes. Autoheal's restart line is what the service-health
+alerts fire on.
+
+What Grafana on this box cannot do is tell you the box is gone — it goes silent
+with it. The external uptime check in ALERTS.md "Outside the box" covers that,
+and it is founder-held.
+
+Caddy logs **only** `/api/webhooks/*` requests (the webhook alerts' signal),
+and every Caddy line — access or error — has headers, client addresses and
+query strings removed. Before that filter an upstream-error line carried the
+full request, so a webhook arriving during a restart wrote its provider
+signature into Loki.
+
+## How a deploy runs
+
+`deploy-host.yml` (workflow_dispatch) refuses a commit without a successful `ci`
+run, builds and pushes web, engine, finops-runner, **migrator** and db, ships
+the stack files, then over SSH on the host:
+
+1. `migrator preflight` — the cross-service env check over web/engine/runner.env
+   (blocking for production, advisory for staging)
+2. `migrator live-window` — the C-22 freeze; `deploy_anyway` passes
+   `DEPLOY_ANYWAY=1` explicitly, and the rooms are still named in the log
+3. `docker compose pull`, `migrator migrate`, `migrator grants`
+4. engine swapped, its `/readyz` polled (180 s); then everything else, web's
+   `/readyz` polled; runner and scheduler must be running
+5. Caddy reloaded, Grafana and Alloy restarted for their bind-mounted config
+
+`.env` keeps the old `TAG` until step 4, so a refused deploy leaves the host
+exactly as it was. A failure after that prints the one-line image rollback — and
+the reminder that it is only safe if the release's migrations were expand-only
+(docs/operations/DEPLOYMENT.md §Rollback).
+
+The migrator is a profile-gated service (`--profile ops`) that `up` never
+starts. It reaches the database over the compose network, which is why none of
+these steps needs a published database port — the thing that made the old
+runner-side steps impossible.
 
 ## Reading the logs
 

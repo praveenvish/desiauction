@@ -4,19 +4,31 @@ The platform's recovery story is event-sourced by design: Postgres is the
 single source of truth; every machine is disposable. Recovery = restore the
 database, restart the processes, let replay rebuild everything derived.
 
-## Recovery objectives (docs/61)
+## Recovery objectives (docs/61), for the self-hosted stack
 
-- RTO: one hour for full service; minutes for engine-only incidents.
-- RPO: PITR window (continuous WAL) — effectively seconds; the daily
-  `pg_dump` is the ransomware-isolated floor (35 daily, 12 monthly).
+| Failure | RPO target | RTO target | Mechanism |
+|---|---|---|---|
+| Bad migration / bad write | seconds (last archived WAL segment) | 1 h | pgBackRest PITR to a timestamp ([RESTORE_RUNBOOK](RESTORE_RUNBOOK.md) "Point-in-time restore") |
+| Host lost, disk intact elsewhere | seconds–minutes (WAL in the off-box repo) | 4 h | new host + compose + PITR from the off-box repo |
+| Host AND on-box data lost | as above for Postgres; ≤ 1 h for photos and finops artifacts (mirror interval) | 4 h | off-box repo + `minio-mirror` copy |
+| Engine process only | none (event-sourced) | minutes | restart; replay |
 
-**These are targets, not a measured posture.** PITR, the daily off-site dump and
-the retention schedule all live on a managed Postgres instance that is
-founder-held and **not yet provisioned** ([PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md)
-§2). No restore from a stored backup has ever been performed. Until that
-happens, treat the RPO above as the objective the provider must be configured to
-meet, and see [docs/62](../62-backup-strategy.md) for the implemented-vs-target
-split.
+The WAL RPO holds only while archiving keeps up: a segment is pushed when it
+fills (16 MB) or on `archive_timeout`, which is unset, so on a quiet database
+the newest unarchived writes can be older than "seconds". Set
+`archive_timeout = 60` in `postgresql.conf.d` if a one-minute bound matters
+more than a few extra segments a day.
+
+**These are targets, not a measured posture.** What exists as of 2026-09-23:
+the archive, the nightly backups, the object-storage mirror and the alerts on
+all three are automated in `ops/deploy/`. What does NOT exist yet is the place
+they write to: the off-box buckets are founder-held
+([PRODUCTION_CHECKLIST](PRODUCTION_CHECKLIST.md) §2), and until they are
+configured the pgBackRest sidecar refuses to run (unless the on-box interim is
+accepted in writing) and the mirror refuses outright. The one PITR restore ever
+performed was against the ON-box repo (ops/deploy/README "What was verified").
+Record the first off-box drill's RTO in RESTORE_RUNBOOK before quoting any
+number above as a capability.
 
 A note the rest of this runbook depends on: **migrations are forward-only** and
 there are no down migrations. A schema mistake is undone by a restore to a
@@ -95,11 +107,13 @@ by the SIGTERM boot-smoke (2026-07-16).
    with sequence numbers — a gap is unforgeable evidence; follow the
    auction/finops UNHEALABLE-log runbooks rather than hand-editing rows.
 
-### Region loss (Fly `bom` / Vercel)
-Engine + runner: `fly deploy` to an alternate region with the same secrets;
-latency degrades, correctness does not. Web: platform failover. Database:
-managed-provider cross-region replica or restore from the isolated dump
-account.
+### Host or region loss
+Provision a new host (any provider — the stack is one compose file), copy the
+env files from the founder's secret store, point the three DNS records at it,
+restore Postgres from the OFF-BOX pgBackRest repo (RESTORE_RUNBOOK
+"Point-in-time restore"), `mc mirror` the two buckets back from the off-box copy
+into the new MinIO, then run `deploy-host.yml` for the last good commit.
+Latency may degrade; correctness does not.
 
 ## Standing verification
 

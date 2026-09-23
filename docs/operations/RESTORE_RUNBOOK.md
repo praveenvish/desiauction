@@ -1,7 +1,8 @@
 # Restore Runbook
 
-> Operational procedure for recovering the DesiAuction database from a logical
-> backup. Pairs with `scripts/backup-database.mjs` (the dump) and
+> Operational procedure for recovering the DesiAuction database — from
+> pgBackRest to a point in time (primary, self-hosted stack), or from a logical
+> backup. The logical path pairs with `scripts/backup-database.mjs` (the dump) and
 > `docs/62-backup-strategy.md` (the strategy and what is still operator-provisioned).
 
 A backup you have never restored is a hope, not a backup. Rehearse this against
@@ -25,7 +26,83 @@ This is the daily logical-dump layer. Point-in-time recovery (continuous WAL) is
 a managed-Postgres feature and remains an operator provisioning item — see
 `docs/62-backup-strategy.md`.
 
-## Restore procedure
+## Point-in-time restore (pgBackRest, the self-hosted stack)
+
+This is the PRIMARY restore on the self-hosted stack, and the only one that can
+land on a moment — "just before the 21:04 migration" — rather than on last
+night. The logical-dump procedure further down is the secondary path.
+
+**Targets:** RPO seconds to a minute (the last archived WAL segment); RTO one
+hour on the same host. See [DISASTER_RECOVERY](DISASTER_RECOVERY.md) for the
+full table. Neither is measured against the off-box repo yet — record the first
+drill below.
+
+All commands run in `/opt/desiauction` on the host.
+
+1. **Stop writers, then the database.** Nothing may write while PGDATA is
+   replaced.
+
+   ```sh
+   docker compose stop scheduler web engine runner
+   docker compose stop pgbackrest db
+   ```
+
+2. **Keep the damaged cluster** — the restore overwrites PGDATA in place, and
+   this copy is the only undo:
+
+   ```sh
+   docker run --rm -v desiauction_pgdata:/from -v /var/backups:/to alpine \
+     tar -C /from -czf /to/pgdata-before-restore-$(date +%F-%H%M).tgz .
+   ```
+
+   (The volume is `<project>_pgdata`; `docker volume ls` names it.)
+
+3. **Restore to the moment before the damage.** Times are the database's
+   timezone unless given with an offset — give one.
+
+   ```sh
+   docker compose run --rm --no-deps --entrypoint bash pgbackrest -c \
+     'su postgres -c "pgbackrest --stanza=desiauction --delta \
+        --type=time --target=\"2026-09-23 21:03:00+05:30\" \
+        --target-action=promote restore"'
+   ```
+
+   `--type=immediate` instead restores the newest backup with no WAL replay
+   past its end; omit `--type`/`--target` to replay to the end of the archive.
+
+4. **Start the database** and let it replay WAL to the target; it promotes
+   itself when it gets there.
+
+   ```sh
+   docker compose up -d db
+   docker compose logs -f db     # wait for "database system is ready to accept connections"
+   ```
+
+5. **Prove it is the database you meant.** Query the row, the table or the
+   migration you were restoring around. Then the grants — a restore through
+   PGDATA keeps them, but a restore across a role-recipe change would not:
+
+   ```sh
+   docker compose --profile ops run --rm migrator grants
+   ```
+
+6. **Resume backups on the new timeline.** The sidecar's boot re-checks the
+   stanza and takes a backup at once; the next one should be a full:
+
+   ```sh
+   docker compose up -d pgbackrest
+   docker compose exec -T pgbackrest su postgres -c \
+     "pgbackrest --stanza=desiauction --type=full backup"
+   ```
+
+7. **Return writers and watch.** `docker compose up -d`, then `/readyz` on web
+   and engine, Sentry, and the first auction command.
+
+**A restore is a prefix, never a splice** (finops RUNBOOKS §4): everything
+written after the target is gone. Re-establish it from the event logs where it
+can be, never by hand-editing rows.
+
+## Restore procedure (logical dump)
 
 1. **Stop writers.** Take the web app and the finops runner out of rotation so
    nothing writes during the restore. The engine holds no durable truth beyond
@@ -106,7 +183,7 @@ target and start again from step 2.
 |------|-------------|--------|--------------------------|--------|----|
 | 2026-09-05 | 25 MB / 4,968 rows / 60 tables | local scratch DB, same cluster | 1.8 s | PASS — counts identical, and a full auction night ran on the restored copy through all four roles to two issued receipts | PA-1R Phase 8.4 |
 | 2026-09-18 | 108 MB / ~131,000 rows / 68 tables | local scratch DB, same cluster | 6.0 s (dump 0.9 s · restore 2.4 s · roles 0.2 s · night 1.9 s) | PASS — every row count identical; a whole auction night (51 steps) ran on the restored copy under the four roles to two numbered receipts, no owner connection on the write path | Final readiness audit, Phase 11 |
-| _pending — repeat against the production stanza before launch ([GO_LIVE_RUNBOOK](GO_LIVE_RUNBOOK.md) §B)_ | | | | | |
+| _pending — PITR from the OFF-BOX repo on the production stanza, before launch ([GO_LIVE_RUNBOOK](GO_LIVE_RUNBOOK.md) §B); record the RTO of steps 1–7 above_ | | | | | |
 
 **Read that 1.8 s correctly.** It is not a production RTO and must not be quoted
 as one: the database is 25 MB and the cluster is on the same machine. What the
