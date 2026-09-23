@@ -502,6 +502,66 @@ describe("FIXTURE OPS REGRESSION — lifecycle, conflicts, protection", () => {
     await cancelFixture(db, comp, created.fixtureId, owner);
   });
 
+  it("EDIT COMPARE-AND-SET: two moves of one fixture — exactly one lands (gate leftover)", async () => {
+    const created = await createFixture(db, comp, owner, {
+      homeTeamId: must(teamIds[0], "team"),
+      awayTeamId: must(teamIds[1], "team"),
+      groundId: groundB,
+      kickoffAt: "2026-09-12T07:00",
+      durationMinutes: 120,
+    });
+    if (!created.ok) {
+      throw new Error("create failed");
+    }
+    // Hold the row so both edits read it, decide, and then queue on the write.
+    // Released only once both are waiting — proven by lock state, not timing.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let signalLocked: () => void = () => undefined;
+    const locked = new Promise<void>((resolve) => {
+      signalLocked = resolve;
+    });
+    const holder = db.transaction(async (tx) => {
+      await tx.execute(sql`select id from fixtures where id = ${created.fixtureId} for update`);
+      signalLocked();
+      await held;
+    });
+    await locked;
+    const first = editFixture(db, comp, created.fixtureId, owner, {
+      kickoffAt: "2026-09-12T09:00",
+    });
+    const second = editFixture(db, comp, created.fixtureId, owner, {
+      kickoffAt: "2026-09-12T11:00",
+    });
+    for (let waited = 0; waited < 500; waited += 1) {
+      const [row] = await db.execute<{ waiting: number }>(
+        sql`select count(*)::int as waiting from pg_locks l join pg_class c on c.oid = l.relation
+            where c.relname = 'fixtures' and not l.granted`,
+      );
+      if ((row?.waiting ?? 0) >= 1) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // Both edits have loaded the row by now (the reads never block); let a
+    // beat pass so the second has too, then release the holder.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    release();
+    await holder;
+    const outcomes = await Promise.all([first, second]);
+    expect(outcomes.filter((o) => o.ok)).toHaveLength(1);
+    expect(outcomes.filter((o) => !o.ok)).toEqual([{ ok: false, reason: "illegal_transition" }]);
+    // One audit row, and its `from` is the slot that was really there.
+    const edits = (await fixtureTimeline(db, comp.id, created.fixtureId)).filter(
+      (t) => t.action === "fixture.edited",
+    );
+    expect(edits).toHaveLength(1);
+    expect((edits[0]?.meta as { fromKickoff?: string }).fromKickoff).toBe("2026-09-12T07:00");
+    await cancelFixture(db, comp, created.fixtureId, owner);
+  });
+
   it("RESCHEDULE CORRECTNESS: published fixtures move only via the workflow, with provenance", async () => {
     const published = must(
       (await queryFixtures(db, comp.id, { status: "published", page: 1, pageSize: 1 })).rows[0],

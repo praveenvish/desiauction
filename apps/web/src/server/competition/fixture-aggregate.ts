@@ -228,6 +228,26 @@ async function loadFixture(
   return row;
 }
 
+/**
+ * COMPARE-AND-SET for a slot edit (gate leftover, same shape as F-D3 above).
+ * `row` was read before the write and every check — the status gate, the
+ * patch, the conflict scan — was decided against it. The write lands only if
+ * the fixture still has that status AND that slot: otherwise an edit could
+ * move a fixture a scorer had just published (edits are draft/scheduled only),
+ * or two organisers' moves would both "succeed" and the second, decided about
+ * a slot that no longer existed, silently win — with an audit row naming a
+ * `from` that was never true.
+ */
+function unchangedSince(row: FixtureRow) {
+  return and(
+    eq(fixtures.id, row.id),
+    eq(fixtures.status, row.status),
+    sql`${fixtures.groundId} is not distinct from ${row.groundId}`,
+    sql`${fixtures.kickoffAt} is not distinct from ${row.kickoffAt}`,
+    sql`${fixtures.durationMinutes} is not distinct from ${row.durationMinutes}`,
+  );
+}
+
 /** Per-competition creation sequence — the fixture number's stable source. */
 async function nextSeq(db: Db, competitionId: string): Promise<number> {
   const [row] = await db
@@ -882,15 +902,19 @@ export async function editFixture(
       return { ok: false, reason: "conflicts", conflicts: blockers };
     }
   }
-  await db.transaction(async (tx) => {
-    await tx
+  const applied = await db.transaction(async (tx) => {
+    const written = await tx
       .update(fixtures)
       .set({
         groundId: next.groundId,
         kickoffAt: next.kickoffAt,
         durationMinutes: next.durationMinutes,
       })
-      .where(eq(fixtures.id, row.id));
+      .where(unchangedSince(row))
+      .returning({ id: fixtures.id });
+    if (written.length === 0) {
+      return false;
+    }
     await tx.insert(auditLog).values({
       id: newId(),
       actor: actorId,
@@ -907,7 +931,11 @@ export async function editFixture(
           : {}),
       },
     });
+    return true;
   });
+  if (!applied) {
+    return { ok: false, reason: "illegal_transition" };
+  }
   return { ok: true, status: row.status };
 }
 
@@ -1063,15 +1091,19 @@ export async function rescheduleFixture(
   if (blockers.length > 0) {
     return { ok: false, reason: "conflicts", conflicts: blockers };
   }
-  await db.transaction(async (tx) => {
-    await tx
+  const applied = await db.transaction(async (tx) => {
+    const written = await tx
       .update(fixtures)
       .set({
         groundId: next.groundId,
         kickoffAt: next.kickoffAt,
         durationMinutes: next.durationMinutes,
       })
-      .where(eq(fixtures.id, row.id));
+      .where(unchangedSince(row))
+      .returning({ id: fixtures.id });
+    if (written.length === 0) {
+      return false;
+    }
     await tx.insert(auditLog).values({
       id: newId(),
       actor: actorId,
@@ -1086,7 +1118,11 @@ export async function rescheduleFixture(
         toGround: next.groundId,
       },
     });
+    return true;
   });
+  if (!applied) {
+    return { ok: false, reason: "illegal_transition" };
+  }
   return { ok: true, status: row.status };
 }
 
