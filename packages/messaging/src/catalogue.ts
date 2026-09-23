@@ -125,7 +125,11 @@ const CATEGORY_RULES: Readonly<
   },
 };
 
-const TEXT: readonly NotificationChannel[] = ["sms", "whatsapp"];
+// A tuple, not `NotificationChannel[]`: the channel lists stay literal types, so
+// "which kinds send email" is a type (`EmailNotificationKind`) the email
+// template registry is keyed by — a template for a kind that sends no email is
+// then a compile error, not a row nobody renders.
+const TEXT = ["sms", "whatsapp"] as const;
 
 /**
  * Every notification. Order is the admin grid's order: login, security, the
@@ -406,6 +410,18 @@ const ENTRIES = [
 
 /** Every key a sender may name. A typo is a compile error. */
 export type NotificationKind = (typeof ENTRIES)[number]["key"];
+
+type KindOn<E, C extends NotificationChannel> = E extends {
+  readonly key: infer K;
+  readonly channels: readonly (infer X)[];
+}
+  ? C extends X
+    ? K
+    : never
+  : never;
+
+/** The kinds sent by email — what the email template registry must cover, exactly. */
+export type EmailNotificationKind = KindOn<(typeof ENTRIES)[number], "email">;
 
 /** One entry with its category's rules resolved — what the gate and the UIs read. */
 export interface ResolvedNotification {

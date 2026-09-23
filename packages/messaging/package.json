@@ -7,11 +7,15 @@
     "./catalogue": "./src/catalogue.ts",
     "./consent": "./src/consent.ts",
     "./email-adapter": "./src/email-adapter.ts",
+    "./email-template-defaults": "./src/email-template-defaults.ts",
+    "./email-templates": "./src/email-templates.ts",
     "./finance-delivery": "./src/finance-delivery.ts",
     "./gate": "./src/gate.ts",
     "./in-app-adapter": "./src/in-app-adapter.ts",
+    "./language": "./src/language.ts",
     "./platform-switches": "./src/platform-switches.ts",
     "./provider-fetch": "./src/provider-fetch.ts",
+    "./template-store": "./src/template-store.ts",
     "./verified-email": "./src/verified-email.ts"
   },
   "scripts": {
