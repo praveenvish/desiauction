@@ -222,6 +222,14 @@
       "class": "by-design",
       "reason": "Notification Control Center projection (read-only), behind platform.admin: the platform switches, outbox COUNTS across every club (never a body or contact) and the platform-scoped audit rows of the switches' changes, which no tenant context can read. Cross-tenant by definition, same shape as admin/actions.ts."
     },
+    "apps/web/src/server/admin/template-actions.ts": {
+      "class": "by-design",
+      "reason": "Notification Control Center (Phase 2): the email wording editor, behind platform.admin. notification_templates (0087) is platform-level with no org_id and no RLS \u2014 DesiAuction's wording, never a club's \u2014 so it is written on the app pool, which holds its DML via default privileges (verify-grants APP_WRITES_UNPROTECTED). The platform-scoped audit row of each publish, restore, reset and test send goes on the system pool, the only role allowed to write it (audit_tenant WITH CHECK refuses platform scope to the app role), exactly as notification-actions.ts does. There is no tenant to scope either to."
+    },
+    "apps/web/src/server/admin/template-views.ts": {
+      "class": "by-design",
+      "reason": "Notification Control Center (Phase 2) projection (read-only), behind platform.admin: the kind's template versions, the names of the operators who wrote them, and the platform-scoped audit rows of their publishes, which no tenant context can read. Platform data by definition, same shape as notification-views.ts."
+    },
     "apps/web/src/server/admin/moderation-views.ts": {
       "class": "by-design",
       "reason": "0072. Platform moderation desk projection (read-only): every public season and every held one, across all clubs \u2014 cross-tenant by definition, gated by platform:moderation."
@@ -253,6 +261,10 @@
     "apps/web/src/server/competition/squad-sheets.ts": {
       "class": "by-design",
       "reason": "Reads message_outbox dedupe keys (platform queue, no RLS) to tell which squad members already have their sheet for their current team; every season read stays inside the caller's withTenantDb. Behind team.manage (appointment-actions.ts)."
+    },
+    "apps/web/src/server/messaging/notification-email.ts": {
+      "class": "by-design",
+      "reason": "The one email renderer (Notification Control Center, Phase 2) reads the PUBLISHED wording from notification_templates (0087): platform-level, no org_id, no RLS \u2014 the same words go to every club's players. The app pool is only the default handle for that read (cached 30s, and a failed read falls back to the code default); it never reads or writes tenant data."
     }
   }
 }
