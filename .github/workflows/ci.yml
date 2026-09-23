@@ -45,6 +45,10 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # A journal entry whose `when` is not strictly after its predecessor is
+      # SKIPPED by the migrator on every database that already ran the one
+      # before — green here on a fresh database, absent in production.
+      - run: node packages/db/scripts/check-journal.mjs
       - run: pnpm --filter @desiauction/db db:migrate
       - run: pnpm build
       # Generated tokens are committed; a rebuild must be a no-op (IP-1_DESIGN §6).
