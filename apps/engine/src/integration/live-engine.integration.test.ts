@@ -707,6 +707,43 @@ describe("LIVE ENGINE — restart, recovery, fail-closed", () => {
     expect(fresh.snapshotOf(auctionId)?.halted).toBeNull();
   });
 
+  it("RESTART RACE: the first touches after a restart share ONE load, and a command among them stays applied", async () => {
+    /**
+     * After a restart every screen reconnects at once — each socket join is an
+     * `ensureAuction` — while the auctioneer's next command loads too. Each of
+     * those used to build its own state from the log and the LAST one to finish
+     * was installed, so a join whose replay began before the command appended
+     * could land after it and put the pre-command snapshot back: the room saw
+     * the command, the resident engine state did not.
+     *
+     * Identity is the deterministic half: concurrent first touches must get the
+     * one resident object. The command half is the symptom itself.
+     */
+    engine.reset(auctionId);
+    const touches = await Promise.all([
+      engine.ensureAuction(auctionId),
+      engine.ensureAuction(auctionId),
+      engine.ensureAuction(auctionId),
+    ]);
+    expect(touches[1]).toBe(touches[0]);
+    expect(touches[2]).toBe(touches[0]);
+    expect(engine.snapshotOf(auctionId)).toBe(touches[0]);
+
+    engine.reset(auctionId);
+    const [, paused] = await Promise.all([
+      engine.ensureAuction(auctionId),
+      command("PauseAuction", ownerId, {}, { conduct: true }),
+      engine.ensureAuction(auctionId),
+      engine.ensureAuction(auctionId),
+    ]);
+    expect(paused.accepted).toBe(true);
+    const resident = engine.snapshotOf(auctionId);
+    expect(resident?.version).toBe(paused.version);
+    expect(resident?.snapshot?.auctionStatus).toBe("paused");
+    expect((await command("ResumeAuction", ownerId, {}, { conduct: true })).accepted).toBe(true);
+    expect(engine.snapshotOf(auctionId)?.snapshot?.auctionStatus).toBe("live");
+  });
+
   it("the night continues: lot 2 opens and passes unsold; lot 3 withdrawn pre-block", async () => {
     engine.reset(auctionId);
     await engine.ensureAuction(auctionId);

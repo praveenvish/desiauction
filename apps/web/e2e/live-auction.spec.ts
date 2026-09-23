@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { completeAuction } from "./complete-auction";
+import { restartEngineFor } from "./engine-restart";
 import { latestOtp } from "./otp";
 
 /**
@@ -20,8 +21,6 @@ async function holdCloseLot(page: Page): Promise<void> {
 // AuctionSnapshot. Real web server + real engine process + real WebSockets.
 
 const STAMP = String(Date.now()).slice(-8);
-const ENGINE = "http://127.0.0.1:4000";
-const ENGINE_SECRET = process.env["ENGINE_SECRET"] ?? "dev-engine-secret";
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   if (!page.url().includes("/login")) {
@@ -286,11 +285,9 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
     everyone.map(async (page) => (await page.getByTestId("snapshot-version").textContent()) ?? ""),
   );
   expect(new Set(auctionsBefore).size).toBe(1); // already convergent pre-restart
-  const reset = await organizer.request.post(`${ENGINE}/admin/reset`, {
-    headers: { "x-engine-secret": ENGINE_SECRET },
-    data: {},
-  });
-  expect(reset.ok()).toBe(true);
+  // THIS auction only — an empty body restarts every room the shared engine
+  // holds, including another worker's (see engine-restart.ts).
+  await restartEngineFor(organizer.request, slug);
   // Open the second lot AFTER the restart-equivalent reset: the engine replays
   // from the event log, the lot opens, and every reconnected window sees it.
   await organizer.getByTestId("conduct-open-lot").click();

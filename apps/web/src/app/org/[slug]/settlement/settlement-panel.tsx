@@ -54,11 +54,17 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
 
   /*
    * Every control writes the URL — the view IS the address (deep links, §8) —
-   * and the server reads it back, so the write is debounced and built from
-   * these values rather than from a live `useSearchParams` snapshot. Same
-   * defect the finance register had; see `useFilterQuery`.
+   * debounced, and built from these values rather than from a live
+   * `useSearchParams` snapshot. Nothing on the server reads it (the rows filter
+   * in the browser), so it is written in place rather than navigated: see
+   * `serverReads` in `useFilterQuery`.
    */
-  const { commit, search, setSearch } = useFilterQuery({ view: rawView, status, q: query });
+  const { commit, search, setSearch } = useFilterQuery(
+    { view: rawView, status, q: query },
+    {
+      serverReads: false,
+    },
+  );
 
   const { stats } = dashboard.view;
 

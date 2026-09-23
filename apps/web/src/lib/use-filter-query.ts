@@ -47,7 +47,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * `showcase-grid.tsx` deliberately does NOT use this and should not: it filters
  * in the browser over an array it already holds, so its URL write is a
  * shareable side effect rather than the thing that fetches. Its own comment
- * says so. This hook is for filters whose value is READ BY THE SERVER.
+ * says so.
+ *
+ * WHO READS THE URL DECIDES HOW IT IS WRITTEN (`serverReads`).
+ *
+ * The players list and the reports picker are filtered BY THE SERVER, so their
+ * writes are router navigations and must be. The settlement console and the
+ * finance register are not: their pages never read `searchParams`, and the
+ * rows are filtered in the browser over data the panel already holds. Their
+ * writes were router navigations all the same — a full server re-render of the
+ * whole workspace per search, thrown away — and the rows could not move until
+ * that navigation COMMITTED. On Firefox and WebKit it sometimes never did: the
+ * request came back 200 and the router kept the old URL, so the box said
+ * "Settle Cup" over "Nothing matches this view" for as long as anyone waited
+ * (cross-browser e2e, settlement-experience and financial-operations — one
+ * each, same mechanism). Chromium never showed it, which proves only that it
+ * is faster.
+ *
+ * `serverReads: false` writes with `history.replaceState`, which Next folds
+ * into `useSearchParams` without a request: the URL is still the view (deep
+ * links, bookmarks, the back button) and the filter answers at once.
  */
 
 /**
@@ -93,11 +112,20 @@ export interface FilterQuery {
   readonly setSearch: (value: string) => void;
 }
 
+export interface FilterQueryOptions {
+  /** Which key the free-text box writes to. */
+  readonly searchKey?: string;
+  /**
+   * Does the page's SERVER read these params? True (the safe default) writes
+   * with a router navigation; false writes the address in place — see above.
+   */
+  readonly serverReads?: boolean;
+}
+
 export function useFilterQuery(
   /** Every filter this bar owns, at their current values. `""` means absent. */
   current: Readonly<Record<string, string>>,
-  /** Which key the free-text box writes to. */
-  searchKey = "q",
+  { searchKey = "q", serverReads = true }: FilterQueryOptions = {},
 ): FilterQuery {
   const router = useRouter();
   const pathname = usePathname();
@@ -123,9 +151,14 @@ export function useFilterQuery(
       // No trailing "?" when everything is cleared: `/org/x/money`, not
       // `/org/x/money?`. The old code produced the second, which is the URL the
       // WebKit failure kept showing.
-      router.replace(qs === "" ? pathname : `${pathname}?${qs}`, { scroll: false });
+      const href = qs === "" ? pathname : `${pathname}?${qs}`;
+      if (serverReads) {
+        router.replace(href, { scroll: false });
+      } else {
+        window.history.replaceState(null, "", href);
+      }
     },
-    [pathname, router],
+    [pathname, router, serverReads],
   );
 
   const commitDebounced = useCallback(

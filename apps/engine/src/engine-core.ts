@@ -263,6 +263,26 @@ export class AuctionEngine {
   private readonly rateBurst: number;
   private readonly rateRefillPerSec: number;
   private readonly queues = new Map<string, Promise<unknown>>();
+  /**
+   * ONE LOAD PER AUCTION, SHARED BY EVERYONE WHO ASKS WHILE IT RUNS.
+   *
+   * `ensureAuction` is the first touch after a restart, and after a restart the
+   * first touches arrive together: every screen in the room reconnects its
+   * socket (each join loads) while the auctioneer's next command loads too.
+   * Without this map each of them built its OWN state from the event log and
+   * the last one to finish was installed — so a join whose replay started
+   * before a command appended could land after it and put the pre-command
+   * snapshot back. The command had executed on a state that was no longer
+   * resident: the room saw the lot open, the engine's clock did not, and the
+   * next bid ran against a stale version and came back `command_failed`.
+   *
+   * Found by the cross-browser e2e (live-auction / conduct-ceremony restart
+   * steps): Firefox and WebKit reconnect on a different beat from Chromium,
+   * which is all it took to reorder the loads.
+   */
+  private readonly loading = new Map<string, Promise<AuctionState | null>>();
+  /** Bumped by every `reset()`, so a load that straddles one knows it is stale. */
+  private resetGeneration = 0;
   /** Commands enqueued but not yet finished — the diagnostics queue depth. */
   private readonly pending = new Map<string, number>();
   private readonly deps: EngineDeps;
@@ -528,6 +548,36 @@ export class AuctionEngine {
       existing.lastTouchMs = this.now();
       return existing;
     }
+    // Join a load already in flight rather than racing it (see `loading`).
+    let inFlight = this.loading.get(auctionId);
+    if (inFlight === undefined) {
+      inFlight = this.install(auctionId);
+      this.loading.set(auctionId, inFlight);
+    }
+    return inFlight;
+  }
+
+  /**
+   * Build from the log, then make it resident — unless a `reset()` landed while
+   * the build was running. A build that started before a reset may predate
+   * commands the reset let through, so it is thrown away and the auction loads
+   * again rather than installing a snapshot the log has already moved past.
+   */
+  private async install(auctionId: string): Promise<AuctionState | null> {
+    const generation = this.resetGeneration;
+    const state = await this.load(auctionId);
+    if (this.resetGeneration !== generation) {
+      return this.ensureAuction(auctionId);
+    }
+    this.loading.delete(auctionId);
+    if (state !== null) {
+      this.states.set(auctionId, state);
+    }
+    return state;
+  }
+
+  /** Replay one auction from its event log. Builds only — `install` makes it resident. */
+  private async load(auctionId: string): Promise<AuctionState | null> {
     const record = await this.loadRecord(auctionId);
     if (record === null) {
       return null;
@@ -547,7 +597,6 @@ export class AuctionEngine {
         stats,
         lastTouchMs: this.now(),
       };
-      this.states.set(auctionId, state);
       this.deps.logger.error(
         { auctionId, reason: built.reason, atSeq: built.atSeq },
         "REPLAY FAILED — auction halted",
@@ -574,7 +623,6 @@ export class AuctionEngine {
         "PROJECTION MISMATCH — auction halted",
       );
     }
-    this.states.set(auctionId, state);
     return state;
   }
 
@@ -608,14 +656,17 @@ export class AuctionEngine {
    * empties the meter, because a restart would.
    */
   reset(auctionId?: string): void {
+    this.resetGeneration += 1;
     if (auctionId !== undefined) {
       this.states.delete(auctionId);
       this.queues.delete(auctionId);
       this.pending.delete(auctionId);
+      this.loading.delete(auctionId);
     } else {
       this.states.clear();
       this.queues.clear();
       this.pending.clear();
+      this.loading.clear();
       this.buckets.clear();
     }
   }
