@@ -8,6 +8,7 @@ import { sweepReviewAsks } from "../../../../server/reviews/review-sweep";
 import {
   purgeExpiredProblemReports,
   purgeSpentSecurityRecords,
+  purgeWhatsAppInbound,
 } from "../../../../server/support/report-retention";
 
 /**
@@ -45,8 +46,9 @@ async function handle(request: Request): Promise<NextResponse> {
   // and a failure in one should be attributable from the response alone.
   const purged = await purgeExpiredProblemReports();
   const security = await purgeSpentSecurityRecords();
+  const whatsappInbound = await purgeWhatsAppInbound();
   const reviewAsks = await sweepReviewAsks();
-  return NextResponse.json({ purged, security, reviewAsks });
+  return NextResponse.json({ purged, security, whatsappInbound, reviewAsks });
 }
 
 export function POST(request: Request): Promise<NextResponse> {
