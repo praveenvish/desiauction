@@ -1,7 +1,9 @@
 import type { Db } from "@desiauction/db";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../messaging/consent", () => ({
+// The gate calls `maySend` inside packages/messaging, so the mock goes on the
+// module it actually imports; the web path below is a re-export of it.
+vi.mock("@desiauction/messaging/consent", () => ({
   maySend: vi.fn(() => Promise.resolve({ send: true })),
 }));
 

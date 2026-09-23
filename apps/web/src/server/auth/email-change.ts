@@ -278,17 +278,8 @@ export async function confirmEmailVerification(
 }
 
 /**
- * The address the delivery adapter may use, or null.
- *
- * Reads `email_verified_at`, never the column alone. An address a person typed
- * and never confirmed is a string, and the adapter refusing `no_email_on_file`
- * is the correct outcome for it.
+ * The address the delivery adapter may use, or null — defined in
+ * packages/messaging since the finops runner resolves receipt recipients with
+ * it too. Re-exported here so its web callers keep their import.
  */
-export async function verifiedEmailOf(db: Db, personId: string): Promise<string | null> {
-  const [row] = await db
-    .select({ email: people.email, verifiedAt: people.emailVerifiedAt })
-    .from(people)
-    .where(eq(people.id, personId))
-    .limit(1);
-  return row?.verifiedAt == null ? null : (row.email ?? null);
-}
+export { verifiedEmailOf } from "@desiauction/messaging/verified-email";

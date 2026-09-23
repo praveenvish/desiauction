@@ -1,0 +1,32 @@
+{
+  "name": "@desiauction/messaging",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./catalogue": "./src/catalogue.ts",
+    "./consent": "./src/consent.ts",
+    "./email-adapter": "./src/email-adapter.ts",
+    "./finance-delivery": "./src/finance-delivery.ts",
+    "./gate": "./src/gate.ts",
+    "./in-app-adapter": "./src/in-app-adapter.ts",
+    "./provider-fetch": "./src/provider-fetch.ts",
+    "./verified-email": "./src/verified-email.ts"
+  },
+  "scripts": {
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@desiauction/db": "workspace:*",
+    "@desiauction/financial-operations": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@desiauction/config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

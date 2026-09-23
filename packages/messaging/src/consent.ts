@@ -1,0 +1,468 @@
+import {
+  consentRecords,
+  newId,
+  notificationPreferences,
+  orgMessagingSettings,
+  suppressions,
+  type Db,
+} from "@desiauction/db";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+
+import { ORG_SWITCH_CHANNELS, orgTopics, personTopics, type SwitchTopic } from "./catalogue";
+
+/**
+ * Transactional or promotional — the one distinction the DLT regime and the
+ * DPDP Act draw between messages. Defined HERE, beside the gate that reads it,
+ * since the gate moved into this package (the finops runner needs it too);
+ * the web tier's SMS templates declare theirs with this same type.
+ */
+export type MessageCategory = "transactional" | "promotional";
+
+/**
+ * THE GATE EVERY SEND PASSES THROUGH.
+ *
+ * Before this existed, the product texted people with no opt-in record, no
+ * opt-out and no STOP handling — a grep for "opt.?out|unsubscribe|STOP to"
+ * across the app and packages returned one incidental hit. Under the DPDP Act
+ * and the DLT regime we have to be able to show what someone agreed to, and we
+ * have to honour a STOP.
+ *
+ * The order is deliberate: suppression first, category second. A STOP outranks
+ * everything, including a category we would otherwise be entitled to send. That
+ * is both the legally safer order and the one a person expects — someone who
+ * texts STOP does not care how we classify our own messages.
+ *
+ * Sign-in codes are the one exception and they are exempt by NOT coming through
+ * here: they are `login` in the catalogue, and `notificationGate` (gate.ts)
+ * answers yes for them before it reaches this function, because "turn off SMS"
+ * locking a person out of their own account is a worse outcome than an
+ * unwanted message.
+ *
+ * NOBODY CALLS THIS DIRECTLY ANY MORE. It is the layers; `notificationGate` is
+ * the gate, and decides from the catalogue entry which of these layers a kind
+ * may see (no person's switch for a security alert, no club's for a staff
+ * notice). The guard test fails the build on a direct call outside gate.ts.
+ */
+
+export type SendDecision =
+  | { readonly send: true }
+  | {
+      readonly send: false;
+      readonly reason: "suppressed" | "opted_out" | "no_consent" | "org_disabled" | "quiet_hours";
+    };
+
+/**
+ * May we send this category to this contact right now?
+ *
+ * `scope` lets a person stop one topic without stopping the rest; a `global`
+ * suppression stops everything on that channel.
+ */
+export async function maySend(
+  db: Db,
+  input: {
+    contact: string;
+    channel: "sms" | "email";
+    category: MessageCategory;
+    scope: string;
+    personId?: string;
+    /**
+     * The club the message is sent ON BEHALF OF, when there is one.
+     *
+     * Omitted for platform-to-person messages (sign-in, account notices), which
+     * no club may switch off. Supplying it is what subjects the send to that
+     * club's own topic settings, and nothing else changes.
+     */
+    orgId?: string;
+    /** Injected so quiet hours can be tested without waiting for 10pm. */
+    now?: Date;
+  },
+): Promise<SendDecision> {
+  const blocked = await db
+    .select({ id: suppressions.id })
+    .from(suppressions)
+    .where(
+      and(
+        eq(suppressions.contact, input.contact),
+        eq(suppressions.channel, input.channel),
+        // A global suppression stops every topic; a scoped one stops its own.
+        inArray(suppressions.scope, ["global", input.scope]),
+        // A lifted row is evidence of a past STOP, not a live one.
+        isNull(suppressions.liftedAt),
+      ),
+    )
+    .limit(1);
+  if (blocked.length > 0) {
+    return { send: false, reason: "suppressed" };
+  }
+  /*
+   * The per-topic preference, and a correction to the original design.
+   *
+   * The plan said transactional messages ignore preferences entirely. That is
+   * right about CONSENT — you should not have to opt in to being told your own
+   * registration was approved — and wrong about CONTROL. It would mean the
+   * per-topic switches on /account did nothing for the only category this
+   * product actually sends, and the copy there already promises otherwise.
+   *
+   * So the preference is honoured for every category. What differs is the
+   * DEFAULT when no row exists: transactional is allowed until switched off,
+   * promotional refused until switched on.
+   *
+   * Sign-in codes are unaffected because they never reach this function.
+   */
+  if (input.personId !== undefined) {
+    const [preference] = await db
+      .select({ allowed: notificationPreferences.allowed })
+      .from(notificationPreferences)
+      .where(
+        and(
+          eq(notificationPreferences.personId, input.personId),
+          eq(notificationPreferences.topic, input.scope),
+          eq(notificationPreferences.channel, input.channel),
+        ),
+      )
+      .limit(1);
+    if (preference !== undefined && !preference.allowed) {
+      return { send: false, reason: "opted_out" };
+    }
+  }
+  /*
+   * The club's own switch, checked AFTER the person's and never instead of it.
+   *
+   * An organizer can decide their club does not text people about registration
+   * decisions. They cannot decide that it does, for someone who said otherwise —
+   * the preference above has already returned by then.
+   *
+   * Absence means enabled, so this layer is inert until a club opens the screen.
+   * The read is tenant-scoped by RLS; `notifyDecision` runs inside the
+   * competition's org, which is what puts these rows in view.
+   *
+   * WHICH MAKES `db` PART OF THE CONTRACT: a caller passing `orgId` must hand
+   * in a handle scoped to that org. On the bare app pool the policy hides every
+   * row, "absence means enabled" answers, and the club's switch silently does
+   * nothing in production while working perfectly under the RLS-exempt owner
+   * every local run uses. The outbox drain did exactly that (`mayDeliver` in
+   * outbox.ts is the fix and the pattern).
+   */
+  if (input.orgId !== undefined) {
+    const [setting] = await db
+      .select({ enabled: orgMessagingSettings.enabled })
+      .from(orgMessagingSettings)
+      .where(
+        and(
+          eq(orgMessagingSettings.orgId, input.orgId),
+          eq(orgMessagingSettings.topic, input.scope),
+          eq(orgMessagingSettings.channel, input.channel),
+        ),
+      )
+      .limit(1);
+    if (setting !== undefined && !setting.enabled) {
+      return { send: false, reason: "org_disabled" };
+    }
+  }
+  if (input.category === "transactional") {
+    // The direct consequence of something the person did, and the DLT regime
+    // allows these to numbers on the DND registry. No opt-in required — only
+    // the absence of a STOP and of an explicit switch-off, both checked above.
+    return { send: true };
+  }
+  /*
+   * QUIET HOURS, and only for promotional.
+   *
+   * TRAI restricts promotional messaging to daytime hours; transactional is
+   * exempt, and rightly — somebody waiting to hear whether they got into a
+   * tournament should be told when the organizer decides, not the next morning.
+   *
+   * Refusing is the correct response for promotional because promotional is by
+   * definition not urgent. It would be the WRONG response for transactional:
+   * with no deferral queue for messages, "quiet hours" on a decision notice
+   * would mean the person is never told at all, which is worse than a text at
+   * an awkward time. Deferring transactional notices needs a scheduler this
+   * product does not have, and is named as such in the plan rather than faked.
+   *
+   * Inert today, like the promotional consent path beside it, because this
+   * product sends no promotional messages yet. It is here so that the day one
+   * ships it cannot go out at two in the morning.
+   */
+  if (!withinPromotionalHours(input.now ?? new Date())) {
+    return { send: false, reason: "quiet_hours" };
+  }
+  if (input.personId === undefined) {
+    // Promotional to a contact we cannot tie to a person is unsendable: there
+    // is nobody whose consent we could have recorded.
+    return { send: false, reason: "no_consent" };
+  }
+  const [latest] = await db
+    .select({ granted: consentRecords.granted })
+    .from(consentRecords)
+    .where(
+      and(
+        eq(consentRecords.personId, input.personId),
+        eq(consentRecords.purpose, `${input.channel}.promotional`),
+      ),
+    )
+    // DESCENDING. The table is append-only, so a withdrawal is a newer row
+    // rather than an edit — ascending order would read the original opt-in for
+    // ever and keep sending to someone who had already said stop.
+    .orderBy(desc(consentRecords.createdAt))
+    .limit(1);
+  return latest?.granted === true ? { send: true } : { send: false, reason: "no_consent" };
+}
+
+/** IST, always. The window is a rule about the recipient's clock, and this
+ *  product's recipients are in India — reading the SERVER's timezone would make
+ *  the same message legal or illegal depending on where it was deployed. */
+const PROMOTIONAL_OPENS_HOUR = 9;
+const PROMOTIONAL_CLOSES_HOUR = 21;
+const IST_OFFSET_MINUTES = 5 * 60 + 30;
+
+export function withinPromotionalHours(at: Date): boolean {
+  const istHour = Math.floor(
+    ((((at.getTime() / 60_000 + IST_OFFSET_MINUTES) % 1440) + 1440) % 1440) / 60,
+  );
+  return istHour >= PROMOTIONAL_OPENS_HOUR && istHour < PROMOTIONAL_CLOSES_HOUR;
+}
+
+/**
+ * Record what someone agreed to. Append-only — a withdrawal is a new row with
+ * `granted: false`, never an update, so "had they agreed when we sent it?"
+ * stays answerable.
+ */
+export async function recordConsent(
+  db: Db,
+  input: {
+    personId: string;
+    purpose: string;
+    granted: boolean;
+    source:
+      | "registration"
+      | "account"
+      | "sms_stop"
+      | "sms_start"
+      | "whatsapp_stop"
+      | "whatsapp_start"
+      | "import"
+      | "support"
+      | "login";
+    evidence?: Record<string, unknown>;
+    requestIp?: string | null;
+    userAgent?: string | null;
+  },
+): Promise<void> {
+  await db.insert(consentRecords).values({
+    id: newId(),
+    personId: input.personId,
+    purpose: input.purpose,
+    granted: input.granted,
+    source: input.source,
+    evidence: input.evidence ?? {},
+    requestIp: input.requestIp ?? null,
+    userAgent: input.userAgent ?? null,
+  });
+}
+
+/**
+ * Stop sending to a contact. Used by STOP handling, and by bounce and complaint
+ * webhooks — continuing to send to a hard bounce is how a sending domain dies.
+ */
+export async function suppress(
+  db: Db,
+  input: {
+    contact: string;
+    channel: "sms" | "email";
+    scope?: string;
+    reason: "stop" | "bounce" | "complaint" | "manual" | "unreachable";
+    note?: string;
+  },
+): Promise<void> {
+  await db.insert(suppressions).values({
+    id: newId(),
+    contact: input.contact,
+    channel: input.channel,
+    scope: input.scope ?? "global",
+    reason: input.reason,
+    note: input.note ?? null,
+  });
+}
+
+/**
+ * The topics a person can switch, in the order /account shows them — read from
+ * the catalogue, so a switch exists only for a topic some kind actually obeys.
+ */
+export const NOTIFICATION_TOPICS: readonly SwitchTopic[] = personTopics();
+
+/** Every topic's current answer for one person, defaulted where unset. */
+export async function preferencesFor(
+  db: Db,
+  personId: string,
+  channel: "sms" | "email" | "in-app",
+): Promise<Record<string, boolean>> {
+  const rows = await db
+    .select({ topic: notificationPreferences.topic, allowed: notificationPreferences.allowed })
+    .from(notificationPreferences)
+    .where(
+      and(
+        eq(notificationPreferences.personId, personId),
+        eq(notificationPreferences.channel, channel),
+      ),
+    );
+  const set = new Map(rows.map((row) => [row.topic, row.allowed]));
+  // Absent means ON for these, all of which are transactional. See `maySend`.
+  return Object.fromEntries(
+    NOTIFICATION_TOPICS.map(({ topic }) => [topic, set.get(topic) ?? true]),
+  );
+}
+
+/**
+ * Set one switch. Upserts, because this is a SETTING — the person's current
+ * answer, not a record of what they once said. The evidence of the change goes
+ * to `consent_records`, which is where evidence belongs.
+ */
+export async function setPreference(
+  db: Db,
+  input: {
+    personId: string;
+    topic: string;
+    channel: "sms" | "email" | "in-app";
+    allowed: boolean;
+  },
+): Promise<void> {
+  await db
+    .insert(notificationPreferences)
+    .values({
+      id: newId(),
+      personId: input.personId,
+      topic: input.topic,
+      channel: input.channel,
+      allowed: input.allowed,
+    })
+    .onConflictDoUpdate({
+      target: [
+        notificationPreferences.personId,
+        notificationPreferences.topic,
+        notificationPreferences.channel,
+      ],
+      set: { allowed: input.allowed, updatedAt: new Date() },
+    });
+  await recordConsent(db, {
+    personId: input.personId,
+    purpose: `${input.channel}.${input.topic}`,
+    granted: input.allowed,
+    source: "account",
+    evidence: { via: "account notification settings" },
+  });
+}
+
+/**
+ * The channels a club's switch covers — and, since the view was fixed, the
+ * channels it SHOWS.
+ *
+ * This said `["sms"]` while the writer wrote SMS and email and the gate
+ * honoured both, so the screen described a switch narrower than the one it
+ * pulled: an organizer who read "texts" had also stopped every email. One
+ * switch per topic now covers both rows, and the view reads both
+ * (`orgSwitchesFor`).
+ *
+ * WhatsApp is not a third row: it is the text row (catalogue `rowChannelOf`).
+ * A club that stops texts about auctions has stopped them in both apps, which
+ * is what "texts" means to the person holding the phone. In-app stays off this
+ * list — the person's own ledger is not a club's to silence.
+ */
+export const ORG_MESSAGING_CHANNELS = ORG_SWITCH_CHANNELS;
+
+/**
+ * One club's switches as the screen shows them: a topic is ON only when every
+ * row it covers is on. Absent rows are on. A topic whose SMS and email rows
+ * disagree (written before both were written together) shows OFF, because
+ * something is being withheld — and switching it on writes both, which heals
+ * it. Showing the SMS row alone was how the screen came to lie.
+ */
+export async function orgSwitchesFor(db: Db, orgId: string): Promise<Record<string, boolean>> {
+  const rows = await db
+    .select({
+      topic: orgMessagingSettings.topic,
+      channel: orgMessagingSettings.channel,
+      enabled: orgMessagingSettings.enabled,
+    })
+    .from(orgMessagingSettings)
+    .where(
+      and(
+        eq(orgMessagingSettings.orgId, orgId),
+        inArray(orgMessagingSettings.channel, [...ORG_SWITCH_CHANNELS]),
+      ),
+    );
+  return Object.fromEntries(
+    orgTopics().map(({ topic }) => [
+      topic,
+      rows.every((row) => row.topic !== topic || row.enabled),
+    ]),
+  );
+}
+
+/** Every topic's current answer for one club on ONE channel, defaulted to on where unset. */
+export async function orgMessagingSettingsFor(
+  db: Db,
+  orgId: string,
+  channel: "sms" | "email" | "in-app" = "sms",
+): Promise<Record<string, boolean>> {
+  const rows = await db
+    .select({ topic: orgMessagingSettings.topic, enabled: orgMessagingSettings.enabled })
+    .from(orgMessagingSettings)
+    .where(and(eq(orgMessagingSettings.orgId, orgId), eq(orgMessagingSettings.channel, channel)));
+  const set = new Map(rows.map((row) => [row.topic, row.enabled]));
+  return Object.fromEntries(orgTopics().map(({ topic }) => [topic, set.get(topic) ?? true]));
+}
+
+/**
+ * Set one club switch. Upserts — the club's current answer, not a record of
+ * what it once was. `updatedBy` keeps the change attributable without inventing
+ * a second audit stream.
+ */
+export async function setOrgMessagingSetting(
+  db: Db,
+  input: {
+    orgId: string;
+    topic: string;
+    channel: "sms" | "email" | "in-app";
+    enabled: boolean;
+    actorId: string;
+  },
+): Promise<void> {
+  await db
+    .insert(orgMessagingSettings)
+    .values({
+      id: newId(),
+      orgId: input.orgId,
+      topic: input.topic,
+      channel: input.channel,
+      enabled: input.enabled,
+      updatedBy: input.actorId,
+    })
+    .onConflictDoUpdate({
+      target: [
+        orgMessagingSettings.orgId,
+        orgMessagingSettings.topic,
+        orgMessagingSettings.channel,
+      ],
+      set: { enabled: input.enabled, updatedAt: new Date(), updatedBy: input.actorId },
+    });
+}
+
+/**
+ * Reverse a STOP (someone texts START). The rows stay and are marked lifted
+ * rather than deleted, so the history of what we were told, and when, survives.
+ */
+export async function liftSuppression(
+  db: Db,
+  input: { contact: string; channel: "sms" | "email"; at?: Date },
+): Promise<void> {
+  await db
+    .update(suppressions)
+    .set({ liftedAt: input.at ?? new Date() })
+    .where(
+      and(
+        eq(suppressions.contact, input.contact),
+        eq(suppressions.channel, input.channel),
+        isNull(suppressions.liftedAt),
+      ),
+    );
+}

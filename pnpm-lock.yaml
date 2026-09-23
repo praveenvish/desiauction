@@ -118,6 +118,9 @@ importers:
       '@desiauction/financial-operations':
         specifier: workspace:*
         version: link:../../packages/financial-operations
+      '@desiauction/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@sentry/node':
         specifier: ^10.15.0
         version: 10.65.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))
@@ -155,6 +158,9 @@ importers:
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@24.13.3)(jsdom@29.1.1)(terser@5.49.0)(tsx@4.23.0)
 
   apps/web:
     dependencies:
@@ -173,6 +179,9 @@ importers:
       '@desiauction/financial-operations':
         specifier: workspace:*
         version: link:../../packages/financial-operations
+      '@desiauction/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       '@desiauction/settlement':
         specifier: workspace:*
         version: link:../../packages/settlement
@@ -352,6 +361,31 @@ importers:
       '@desiauction/settlement':
         specifier: workspace:*
         version: link:../settlement
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.1)(postgres@3.4.9)
+    devDependencies:
+      '@desiauction/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@24.13.3)(jsdom@29.1.1)(terser@5.49.0)(tsx@4.23.0)
+
+  packages/messaging:
+    dependencies:
+      '@desiauction/db':
+        specifier: workspace:*
+        version: link:../db
+      '@desiauction/financial-operations':
+        specifier: workspace:*
+        version: link:../financial-operations
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@opentelemetry/api@1.9.1)(postgres@3.4.9)
