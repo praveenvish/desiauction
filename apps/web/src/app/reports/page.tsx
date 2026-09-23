@@ -20,7 +20,7 @@ import {
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
-import { compactINR, exactINR } from "../../lib/inr";
+import { compactFloorINR, compactINR, exactINR } from "../../lib/inr";
 import type { ReportTable } from "../../server/console/reports";
 import { reportsView } from "../../server/console/views";
 import { SeasonPicker } from "./season-picker";
@@ -342,7 +342,7 @@ export default async function ReportsPage({
                     value: `${String(used)}%`,
                     share: used / 100,
                     color: team.color,
-                    note: `· ${compactINR(Math.max(0, (team.purse ?? 0) - (team.spend ?? 0)))} left`,
+                    note: `· ${compactFloorINR(Math.max(0, (team.purse ?? 0) - (team.spend ?? 0)))} left`,
                   };
                 })}
               />

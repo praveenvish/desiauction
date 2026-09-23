@@ -18,7 +18,7 @@ import {
 import Link from "next/link";
 import { useCallback } from "react";
 
-import { compactINR, exactINR } from "../../../../lib/inr";
+import { compactFloorINR, compactINR, exactINR } from "../../../../lib/inr";
 import { roleLabeller } from "../../../../lib/role-label";
 import { adminAuctionWatch, type AuctionWatch } from "../../../../server/admin/live-watch";
 import { AuctionOverviewPanel } from "../../../seasons/[slug]/auction/auction-overview-panel";
@@ -286,7 +286,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                       {team.spent === undefined ? "—" : compactINR(team.spent)}
                     </td>
                     <td data-label="Left" className="admin-num admin-count">
-                      {team.remaining === undefined ? "—" : compactINR(team.remaining)}
+                      {team.remaining === undefined ? "—" : compactFloorINR(team.remaining)}
                     </td>
                     <td data-label="Top buy" className="admin-num admin-count">
                       {team.highest === null ? "—" : compactINR(team.highest)}

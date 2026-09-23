@@ -1,16 +1,11 @@
 "use client";
 
-import {
-  formatPaiseINR,
-  paise,
-  parseRupeesToPaise,
-  whatIf,
-  type PlanInput,
-} from "@desiauction/core";
+import { parseRupeesToPaise, whatIf, type PlanInput } from "@desiauction/core";
 import { Card, Field, Select } from "@desiauction/ui";
 import { useMemo, useState } from "react";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
+import { ledgerINR } from "../../../../../lib/inr";
 
 /**
  * WHAT IF (Phase 1.5). "What if I win this player for X?" — the same arithmetic
@@ -18,10 +13,6 @@ import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
  * amount, answered on the client from the fold the page already holds. No
  * server call, no state saved: a scratchpad, not a plan.
  */
-
-function money(value: number): string {
-  return formatPaiseINR(paise(value));
-}
 
 export function PlanWhatIf({ input, lots }: { input: PlanInput; lots: readonly PlanLotRow[] }) {
   const candidates = useMemo(
@@ -73,8 +64,8 @@ export function PlanWhatIf({ input, lots }: { input: PlanInput; lots: readonly P
       </div>
       {result !== null && chosen !== undefined ? (
         <p className="plan-note" data-testid="plan-what-if-result">
-          <span className="plan-line-money">{money(result.purseAfter)}</span> left ·{" "}
-          <span className="plan-line-money">{money(result.plannedExposureAfter)}</span> still
+          <span className="plan-line-money">{ledgerINR(result.purseAfter)}</span> left ·{" "}
+          <span className="plan-line-money">{ledgerINR(result.plannedExposureAfter)}</span> still
           planned
           {input.targets.some((t) => t.registrationId === chosen.registrationId)
             ? ` for ${String(Math.max(0, openTargets - 1))} other ${openTargets - 1 === 1 ? "target" : "targets"}`

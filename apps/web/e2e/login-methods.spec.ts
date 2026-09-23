@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { createDb, otpInbox } from "@desiauction/db";
 import { expect, test, type Page } from "@playwright/test";
 import { desc, eq } from "drizzle-orm";
+import { axeClean } from "./axe";
 
 /*
  * TWO DOORS, ONE OPEN AT A TIME — and neither asks for a password (C-24).
@@ -32,11 +33,6 @@ async function mailedCode(address: string): Promise<string> {
   } finally {
     await handle.sql.end({ timeout: 5 });
   }
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 test("the email door is one field and one button, and the mobile door is one link away", async ({

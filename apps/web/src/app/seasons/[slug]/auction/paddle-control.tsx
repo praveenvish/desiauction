@@ -10,7 +10,7 @@ import { Card } from "@desiauction/ui";
 import type { AuctionSnapshot, PlanState } from "@desiauction/core";
 
 import { PlanLine } from "./plan-line";
-import { TeamChip, type TeamIdentity } from "./purse-board";
+import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
 
 import type { AuctionRules } from "../../../../server/auction/live-summary";
 
@@ -136,7 +136,7 @@ export function PaddleControl({
       <div className="competition-head">
         <h2>Your paddle</h2>
         <span className="paddle-who">
-          <TeamChip team={myTeam} fallback={myPaddleNumber} />
+          <PurseTeamCrest team={myTeam} fallback={myPaddleNumber} />
           {myTeam?.name ?? myPaddleNumber}
         </span>
       </div>

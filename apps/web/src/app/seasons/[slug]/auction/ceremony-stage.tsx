@@ -231,7 +231,10 @@ export function CeremonyStage({
           above it, so the image says nothing a reader is not already told. */}
       {photo === null ? null : (
         <span className="ceremony-backdrop" aria-hidden="true">
-          <img src={photo} alt="" />
+          {/* Decoded off the main thread, so a large upload cannot stall the
+              SOLD beat; the intrinsic size only reserves a box — the CSS
+              fills the stage. */}
+          <img src={photo} alt="" width={640} height={640} decoding="async" />
         </span>
       )}
       {ceremony.phase === "sold" ? (

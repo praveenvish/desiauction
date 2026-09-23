@@ -4,6 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { eq, inArray } from "drizzle-orm";
 
 import { latestOtp, resetOtpBudget, withSignInLock } from "./otp";
+import { axeClean } from "./axe";
 
 // ADMIN OPERATIONS — the live board, the auction watch and the moderation desk,
 // through the browser.
@@ -47,11 +48,6 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await expect(page).not.toHaveURL(/\/login/);
   });
-}
-
-async function axeClean(page: Page, surface: string): Promise<void> {
-  const scan = await new AxeBuilder({ page }).analyze();
-  expect(scan.violations, `${surface}: ${JSON.stringify(scan.violations, null, 2)}`).toEqual([]);
 }
 
 test.beforeAll(async () => {

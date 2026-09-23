@@ -370,7 +370,17 @@ export function HeroBanner({
       data-testid={testId}
     >
       {image !== undefined && image !== null ? (
-        <img className={styles["hero-image"]} src={image} alt="" />
+        // Intrinsic size = the 1600 × 500 cover the upload flow asks for, so the
+        // browser reserves the right box before a (≤2048px, re-encoded) file
+        // arrives; the CSS still fills and crops it. Above the fold, so eager.
+        <img
+          className={styles["hero-image"]}
+          src={image}
+          alt=""
+          width={1600}
+          height={500}
+          decoding="async"
+        />
       ) : null}
       <span className={styles["hero-shade"]} aria-hidden />
       <div className={styles["hero-inner"]}>

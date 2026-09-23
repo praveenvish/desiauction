@@ -47,6 +47,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { roleLabeller } from "../../../lib/role-label";
+import { compactINR, exactINR } from "../../../lib/inr";
 
 import {
   advanceCompetitionAction,
@@ -163,25 +164,6 @@ function nextDestination(
     label: "Review settlement",
     title: "The season's books are being settled.",
   };
-}
-
-/**
- * Money the way the figures show it: crores and lakhs, because a purse reads
- * as "₹6.63 Cr" to everyone who runs one of these. Exact rupees stay on rows.
- */
-function compactINR(paise: number): string {
-  const rupees = paise / 100;
-  if (rupees >= 10_000_000) {
-    return `₹${(rupees / 10_000_000).toFixed(2)} Cr`;
-  }
-  if (rupees >= 100_000) {
-    return `₹${(rupees / 100_000).toFixed(2)} L`;
-  }
-  return `₹${rupees.toLocaleString("en-IN")}`;
-}
-
-function exactINR(paise: number): string {
-  return `₹${(paise / 100).toLocaleString("en-IN")}`;
 }
 
 const STEP_LABELS = ["Setup", "Teams", "Registration", "Auction", "Fixtures", "Settlement"];

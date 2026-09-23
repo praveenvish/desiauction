@@ -3,6 +3,7 @@
 import { formatPaiseINR, maxAffordableBid, paise } from "@desiauction/core";
 import { Card, paintOnFill } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
+import { CrestImage } from "../../../../components/team/crest-image";
 
 // THE PURSE BOARD — one treatment of "who can still play?", shared by every
 // live surface. It previously existed three times over: a bare list on
@@ -72,16 +73,23 @@ function initialsOf(team: TeamIdentity | undefined, fallback: string): string {
  * Decorative either way — every caller prints the team's name beside it, so an
  * alt text here would make a screen reader say the franchise twice.
  */
-export function TeamChip({ team, fallback }: { team: TeamIdentity | undefined; fallback: string }) {
+export function PurseTeamCrest({
+  team,
+  fallback,
+}: {
+  team: TeamIdentity | undefined;
+  fallback: string;
+}) {
   const crest = team?.logoUrl ?? null;
-  if (crest !== null && crest !== "") {
-    return <img className="purse-crest" src={crest} alt="" width={30} height={30} />;
-  }
-  return (
+  const chip = (
     <span className="purse-chip" style={paintOf(team)} aria-hidden>
       {initialsOf(team, fallback)}
     </span>
   );
+  if (crest === null || crest === "") {
+    return chip;
+  }
+  return <CrestImage className="purse-crest" src={crest} width={30} height={30} fallback={chip} />;
 }
 
 /**
@@ -415,7 +423,7 @@ export function PurseBoard({
               data-testid={`${rowTestIdPrefix}-${handle}`}
             >
               <div className="purse-head">
-                <TeamChip team={row.team} fallback={row.teamName} />
+                <PurseTeamCrest team={row.team} fallback={row.teamName} />
                 <span className="purse-team">{row.teamName}</span>
                 {row.activePaddles.length > 0 ? (
                   <span className="purse-paddles">{row.activePaddles.join(" · ")}</span>

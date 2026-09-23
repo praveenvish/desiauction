@@ -4,7 +4,6 @@ import { useMemo } from "react";
 
 import { lotSeed } from "../../../../../lib/player-seed";
 import { roleLabeller } from "../../../../../lib/role-label";
-import { formatPaiseINR, paise } from "@desiauction/core";
 import { GoldDrift, PlayerImage } from "@desiauction/ui";
 
 import { BrandLockup } from "../../../../../components/shell/brand";
@@ -13,6 +12,7 @@ import { useLiveFeed } from "../live-experience";
 import { useAuctionSocket } from "../use-auction-socket";
 
 import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-summary";
+import { ledgerINR } from "../../../../../lib/inr";
 
 // The broadcast overlay: ticker + lower-third + sponsor/watch cluster, ALL
 // derived from the read-only AuctionSnapshot. No command sender exists in this
@@ -21,10 +21,6 @@ import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-s
 // feed with the same burst as the cockpit and the stage. Fully decorative and
 // collapses under prefers-reduced-motion; nothing about the announced outcome
 // depends on motion.
-
-function money(amount: number): string {
-  return formatPaiseINR(paise(amount));
-}
 
 export function OverlayPanel({
   roles,
@@ -130,7 +126,7 @@ export function OverlayPanel({
                     <b>{entry.playerName ?? entry.lotNumber}</b>
                     {entry.teamName !== null ? <span>→ {entry.teamName}</span> : null}
                     {entry.soldPrice !== null ? (
-                      <span className="obs-ticker-price">{money(entry.soldPrice)}</span>
+                      <span className="obs-ticker-price">{ledgerINR(entry.soldPrice)}</span>
                     ) : null}
                   </span>
                 ))
@@ -194,7 +190,7 @@ export function OverlayPanel({
                       keeper" on air. The shared formatter is the one place
                       those labels are decided. */}
                   <span className="obs-lt-meta">
-                    {labelOf(lot.role)} · base {money(lot.basePrice)}
+                    {labelOf(lot.role)} · base {ledgerINR(lot.basePrice)}
                   </span>
                 </>
               ) : outcome !== null ? (
@@ -233,7 +229,7 @@ export function OverlayPanel({
                 {lot.currentBid !== null ? "Current bid" : "Opening"}
               </span>
               <span className="obs-lt-bid-amount">
-                {money(lot.currentBid?.amount ?? lot.nextMinimumBid)}
+                {ledgerINR(lot.currentBid?.amount ?? lot.nextMinimumBid)}
               </span>
               {lot.currentBid !== null ? (
                 <span className="obs-lt-leader">
@@ -255,7 +251,7 @@ export function OverlayPanel({
           ) : outcome !== null && outcome.kind === "sold" && outcome.amount !== null ? (
             <div className="obs-lt-bid">
               <span className="obs-lt-bid-label">Sold for</span>
-              <span className="obs-lt-bid-amount">{money(outcome.amount)}</span>
+              <span className="obs-lt-bid-amount">{ledgerINR(outcome.amount)}</span>
               {outcome.paddleNumber !== null ? (
                 <span className="obs-lt-leader">Paddle {outcome.paddleNumber}</span>
               ) : null}

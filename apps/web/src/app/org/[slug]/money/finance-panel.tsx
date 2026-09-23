@@ -1,6 +1,5 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
 import {
   Badge,
   Card,
@@ -13,6 +12,7 @@ import {
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useFilterQuery } from "../../../../lib/use-filter-query";
+import { ledgerINR } from "../../../../lib/inr";
 import { useMemo } from "react";
 
 import type { FinanceWorkspace } from "../../../../server/financial-operations/actions";
@@ -97,10 +97,6 @@ const EVENT_LABEL: Record<string, string> = {
   PeriodClosed: "Fiscal year sealed",
   PeriodReopened: "Fiscal year reopened",
 };
-
-function inr(value: number): string {
-  return formatPaiseINR(paise(value));
-}
 
 export function FinancePanel({ slug, workspace }: { slug: string; workspace: FinanceWorkspace }) {
   const pathname = usePathname();
@@ -221,14 +217,14 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
         <div className="stat-row">
           <Tile
             label="Receipted"
-            value={inr(totals.receiptedPaise)}
+            value={ledgerINR(totals.receiptedPaise)}
             id="stat-receipted"
             note={`${String(totals.receipts)} ${totals.receipts === 1 ? "receipt" : "receipts"}`}
           />
           {totals.invoices > 0 ? (
             <Tile
               label="Invoiced"
-              value={inr(totals.invoicedPaise)}
+              value={ledgerINR(totals.invoicedPaise)}
               id="stat-invoiced"
               note={`${String(totals.invoices)} ${totals.invoices === 1 ? "invoice" : "invoices"}`}
             />
@@ -435,7 +431,7 @@ function RegisterLine({ slug, row }: { slug: string; row: RegisterRow }) {
       <td data-label="Kind">{DOC_KIND_LABEL[row.kind] ?? row.kind}</td>
       <td data-label="Party">{row.partyLabel}</td>
       <td data-label="Amount" className="num">
-        <span title={`${String(row.amount)} paise`}>{inr(row.amount)}</span>
+        <span title={`${String(row.amount)} paise`}>{ledgerINR(row.amount)}</span>
       </td>
       <td data-label="Sealed digest">
         {/* The register lists what exists; the DETAIL page runs the live

@@ -24,6 +24,7 @@ import { rolesOf } from "../server/roles/roles";
 import { seasonRoleFor, type NavRoles, type SeasonRole } from "../components/shell/nav";
 import { myRegistrations } from "../server/competition/public";
 import { finopsOrgIds } from "../server/financial-operations/actions";
+import { requestLogger } from "../server/logger";
 import { settlementOrgIds } from "../server/settlement/actions";
 
 export const metadata: Metadata = {
@@ -99,13 +100,10 @@ export default async function RootLayout({
     session = await currentSession();
   } catch (error) {
     unstable_rethrow(error);
-    // `no-console` is on for apps/web because the app has no logger of its own
-    // and stray logs are noise. This one is the exact opposite: the degraded
-    // render is deliberately invisible to the visitor, so stderr is the only
-    // place a database outage can still announce itself. Silence here would
-    // turn a production incident into a mystery.
-    // eslint-disable-next-line no-console
-    console.error("[shell] session lookup failed; rendering the signed-out header", error);
+    // The degraded render is deliberately invisible to the visitor, so the log
+    // is the only place a database outage can still announce itself. Silence
+    // here would turn a production incident into a mystery.
+    (await requestLogger()).error({ err: error }, "shell.session_lookup_failed");
   }
   // PX-7: the Money tab is gated by `settlement.view`, so the shell needs the
   // person's settlement orgs. It is ONE grants read, expanded by settlement's
@@ -113,18 +111,63 @@ export default async function RootLayout({
   // PX-9 adds `isAdmin` to the same one-shot fan-out: the avatar menu's Platform
   // admin door is revealed by the SAME evaluation the surface gates on, so the
   // nav and the console can never disagree about who is staff.
-  const [orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, platform, roles] =
-    session !== null
-      ? await Promise.all([
+  //
+  // GUARDED LIKE THE SESSION READ, AND FOR THE SAME REASON. These seven reads
+  // run on every signed-in render of every route, so an unguarded blip in any
+  // one of them replaced the whole product — marketing pages included — with
+  // Next's unstyled default error (the root layout sits ABOVE `error.tsx`, so
+  // no boundary of ours can catch it). A failure now degrades to the
+  // signed-out shell the session guard already produces: the page still
+  // renders, and the next request tries again.
+  //
+  // The registrations read rides on `rolesOf` rather than behind the whole
+  // fan-out: it only runs for somebody who plays, and it is the one read here
+  // that has to wait for another's answer — so it waits for that one alone.
+  const signedOut = {
+    orgs: [] as Awaited<ReturnType<typeof myOrgs>>,
+    competitionsView_: null as Awaited<ReturnType<typeof competitionsView>> | null,
+    settlementOrgs: new Set<string>(),
+    financeOrgs: new Set<string>(),
+    latestEventAt: null as string | null,
+    platform: [] as Awaited<ReturnType<typeof platformDoorCapabilities>>,
+    roles: null as Awaited<ReturnType<typeof rolesOf>> | null,
+    registered: [] as Awaited<ReturnType<typeof myRegistrations>>,
+  };
+  let shell = signedOut;
+  if (session !== null) {
+    const personId = session.personId;
+    try {
+      const [orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, platform, lens] =
+        await Promise.all([
           myOrgs(),
           competitionsView(),
           settlementOrgIds().then((ids) => new Set(ids)),
           finopsOrgIds().then((ids) => new Set(ids)),
-          latestSecurityEventAt(session.personId).then((at) => at?.toISOString() ?? null),
+          latestSecurityEventAt(personId).then((at) => at?.toISOString() ?? null),
           platformDoorCapabilities(),
-          rolesOf(session.personId),
-        ])
-      : [[], null, new Set<string>(), new Set<string>(), null, [], null];
+          rolesOf(personId).then(async (roles) => ({
+            roles,
+            registered: roles.plays ? await myRegistrations(personId) : [],
+          })),
+        ]);
+      shell = {
+        orgs,
+        competitionsView_,
+        settlementOrgs,
+        financeOrgs,
+        latestEventAt,
+        platform,
+        roles: lens.roles,
+        registered: lens.registered,
+      };
+    } catch (error) {
+      unstable_rethrow(error);
+      (await requestLogger()).error({ err: error }, "shell.navigation_reads_failed");
+      session = null;
+    }
+  }
+  const { orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, platform, roles } =
+    shell;
   /*
    * WHAT THE MENU OFFERS THIS PERSON (RN-1). Facts in, menu out — `nav.ts`
    * decides the shape, this only translates `server/roles` into its vocabulary.
@@ -176,18 +219,14 @@ export default async function RootLayout({
    * (`canManage`, `canSettle`), so a team owner was handed six tabs and neither
    * "My plan" nor "My squad" was among them.
    *
-   * The registrations read is skipped entirely for somebody who does not play,
-   * and it is `cache`d with /home's, so a player pays for one query, not two.
+   * The registrations read (in the fan-out above) is skipped entirely for
+   * somebody who does not play.
    */
   const managedLevel = new Map((roles?.organizes ?? []).map((club) => [club.orgId, club.level]));
   const memberOrgIds = new Set((roles?.memberOf ?? []).map((club) => club.orgId));
   const conductedSlugs = new Set((roles?.conducts ?? []).map((season) => season.competitionSlug));
   const ownedSlugs = new Set((roles?.owns ?? []).map((team) => team.competitionSlug));
-  const registeredSlugs = new Set(
-    roles?.plays === true
-      ? (await myRegistrations(session?.personId ?? "")).map((row) => row.competitionSlug)
-      : [],
-  );
+  const registeredSlugs = new Set(shell.registered.map((row) => row.competitionSlug));
 
   const competitions = (competitionsView_?.competitions ?? []).map((competition) => ({
     slug: competition.slug,

@@ -646,7 +646,12 @@ export function RegistrationDashboardPanel({
               Reopen registration
             </Button>
           ) : null}
-          <AddPlayerDialog slug={slug} roles={desk.roles} rolesRequired={desk.rolesRequired} />
+          <AddPlayerDialog
+            slug={slug}
+            roles={desk.roles}
+            rolesRequired={desk.rolesRequired}
+            attributes={desk.attributes}
+          />
         </div>
       </div>
 
