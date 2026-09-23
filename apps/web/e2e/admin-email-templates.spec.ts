@@ -157,7 +157,9 @@ test("360px: the editor fits a phone, and passes axe", async ({ page }) => {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow, `${EDITOR} scrolls sideways at 360px`).toBeLessThanOrEqual(0);
-  await axeClean(page, EDITOR);
+  // The preview is the email itself, in a sandboxed frame — not this page's
+  // interface. Scanned into, it hung WebKit and bled its <h1> into the outline.
+  await axeClean(page, EDITOR, { exclude: ['[data-testid="template-preview-frame"]'] });
 });
 
 test("the editor is a 404 for anyone without platform.admin", async ({ page }) => {
