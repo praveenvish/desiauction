@@ -136,6 +136,8 @@ export interface ProviderTemplatesView {
   readonly whatsapp: readonly WhatsAppRow[];
   readonly sms: readonly SmsRow[];
   readonly recent: readonly TemplateChange[];
+  /** Every name Meta has APPROVED in at least one language, per the last sync. */
+  readonly approvedNames: readonly string[];
 }
 
 type EnvRecord = Readonly<Record<string, string | undefined>>;
@@ -332,6 +334,10 @@ export function buildTemplatesView(input: {
     whatsapp,
     sms,
     recent: recent.slice(0, RECENT),
+    approvedNames: [...status.byName.entries()]
+      .filter(([, rows]) => rows.some((r) => r.status.toUpperCase() === "APPROVED"))
+      .map(([name]) => name)
+      .sort(),
   };
 }
 
