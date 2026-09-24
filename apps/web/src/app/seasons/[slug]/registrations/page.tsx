@@ -61,7 +61,13 @@ export default async function RegistrationsPage({
               actually took the field, are one question with two answers. */}
           <PageIntro actions={<SiblingLink href={`/seasons/${slug}/lineups`} label="Lineups" />} />
           <RegistrationDashboardPanel
-            share={<ShareRegistration slug={slug} open={dashboard.registrationOpen} />}
+            share={
+              <ShareRegistration
+                slug={slug}
+                open={dashboard.registrationOpen}
+                seasonName={dashboard.competition.name}
+              />
+            }
             canReopen={
               dashboard.viewer.canManage === true &&
               dashboard.competition.status === "registration_closed" &&

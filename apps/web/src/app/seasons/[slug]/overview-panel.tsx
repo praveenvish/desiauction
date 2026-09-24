@@ -876,7 +876,7 @@ export function OverviewPanel({
                     : "Players enter through the registration link once you open registration."}
                 </p>
                 {view.viewer.canReview && status === "registration_open" ? (
-                  <ShareRegistration slug={slug} open />
+                  <ShareRegistration slug={slug} open seasonName={view.competition.name} />
                 ) : null}
                 {view.viewer.canReview && view.pendingPlayers > 0 ? (
                   <Link
