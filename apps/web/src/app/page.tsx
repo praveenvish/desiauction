@@ -7,13 +7,12 @@ import { env } from "../env";
 import { LANDING } from "../content/marketing";
 import { LiveTournaments } from "../components/marketing/live-tournaments";
 import { LandingVoices } from "../components/marketing/landing-voices";
-import { AuctionLab, HomeMotion } from "../components/marketing/guest-home";
+import { AuctionLab, HomeMotion, StickyCta } from "../components/marketing/guest-home";
 import {
   IconArrowRight,
   IconCalendar,
   IconCheck,
   IconGavel,
-  IconPlay,
   IconReceipt,
   IconTrophy,
   IconTv,
@@ -23,13 +22,14 @@ import styles from "./guest-home.module.css";
 import "./marketing.css";
 
 const description =
-  "Your sport. Your players. Your tournament. Bring registration, live player auctions, teams and fixtures together with DesiAuction. Free during beta.";
+  "Run a live player auction for your league: owners bid from their phones while the room watches the big screen. Registration, squads, fixtures and receipts in one place. Free during beta.";
+const title = "DesiAuction — Live player auctions for your league";
 export const metadata: Metadata = {
-  title: "DesiAuction — Great teams start here",
+  title,
   description,
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/` },
   openGraph: {
-    title: "DesiAuction — Great teams start here",
+    title,
     description,
     url: `${env.PUBLIC_BASE_URL}/`,
     type: "website",
@@ -41,11 +41,17 @@ const sports = SPORTS.map((sport) => ({
   role: sport.roles.values[0]?.label ?? "Player",
 }));
 
+/**
+ * One sign-up label on the page. The header keeps its short "Start free";
+ * every CTA inside the page says what the click starts.
+ */
+const SIGNUP = { href: "/login", label: "Create your tournament" } as const;
+
 export default function LandingPage() {
   return (
     <HomeMotion>
       <main className={styles.home} data-theme="floodlight">
-        <section className={styles.hero} aria-labelledby="hero-title">
+        <section id="hero" className={styles.hero} aria-labelledby="hero-title">
           <div className={styles.heroArt}>
             <Image
               src="/marketing/multisport-hero.webp"
@@ -59,61 +65,89 @@ export default function LandingPage() {
           <div className={styles.heroInner}>
             <div className={styles.heroCopy}>
               <p className={styles.eyebrow}>
-                <span className={styles.goldLine} /> EVERY SPORT. ONE STAGE.
+                <span className={styles.goldLine} /> GREAT TEAMS START HERE.
               </p>
+              {/* The headline names the product. "Great teams start here" set a
+                  mood a visitor had to decode; the one thing DesiAuction does
+                  that a spreadsheet does not is the live auction, so the h1
+                  says it and the brand line moves up to the eyebrow. */}
               <h1 id="hero-title">
-                Great teams
+                Your league&rsquo;s
                 <br />
-                <span>start here.</span>
+                <span>live auction.</span>
               </h1>
               <p className={styles.heroLead}>
-                Turn a group of players into a tournament
-                <br className={styles.desktopBreak} /> everyone wants to be part of.
+                Owners bid for players from their phones.
+                <br className={styles.desktopBreak} /> The whole room watches on the big screen.
               </p>
               <p className={styles.heroSub}>
-                Player registrations. Live auctions. Ready-to-play squads.
+                Registrations, squads, fixtures and receipts too.
                 <br className={styles.desktopBreak} /> One home for the game you love.
               </p>
               <div className={styles.actions}>
-                <Link className={styles.primary} href="/login">
-                  Create your tournament <IconArrowRight size={18} />
+                <Link className={styles.primary} href={SIGNUP.href} data-track="hero:signup">
+                  {SIGNUP.label} <IconArrowRight size={18} />
                 </Link>
-                <a className={styles.secondary} href="#playground">
-                  <IconPlay size={15} /> Try a live demo
+                {/* Scrolls to the auction card itself, not the section top:
+                    on a phone the sport picker sat between the click and the
+                    thing the button promised. */}
+                <a className={styles.secondary} href="#demo-auction" data-track="hero:mock">
+                  <IconGavel size={15} /> Try a mock auction
                 </a>
               </div>
               <p className={styles.microcopy}>
                 <IconCheck size={14} /> Free during beta <span>·</span> No card required
               </p>
-            </div>
-            <div className={styles.heroCaption}>
-              <span>THE GAME CHANGES.</span>
-              <strong>The passion stays.</strong>
-              <span className={styles.captionLine} />
+              {/* Many visitors arrive from a shared registration link: they
+                  are players looking for a tournament, not organizers. */}
+              <p className={styles.playerPath}>
+                Playing, not organizing?{" "}
+                <Link href="/c" data-track="hero:browse">
+                  Find a tournament <IconArrowRight size={14} />
+                </Link>
+              </p>
             </div>
           </div>
-          <div className={styles.heroFoot}>
-            <div>
-              <IconUsers size={20} />
-              <span>Bring your players</span>
-            </div>
-            <i aria-hidden="true" />
-            <div>
+          {/* WHAT A VISITOR CAN CHECK. This strip used to repeat the page's
+              three steps (they also sit under "How it works" below). It now
+              carries capabilities the platform verifiably has today — the
+              marketing no-fabrication rule applies: no counts, no customers. */}
+          <ul className={styles.heroFoot} aria-label="What you get">
+            <li>
               <IconGavel size={20} />
-              <span>Build your dream teams</span>
-            </div>
-            <i aria-hidden="true" />
-            <div>
+              <span>Owners bid from their phones</span>
+            </li>
+            <li>
+              <IconTv size={20} />
+              <span>Big-screen view for the room</span>
+            </li>
+            <li>
               <IconTrophy size={20} />
-              <span>Make it a tournament</span>
-            </div>
-            <a href="#playground" aria-label="Explore the sports and auction demo">
-              EXPLORE <span aria-hidden="true">↓</span>
-            </a>
-          </div>
+              <span>{sports.length} sports supported</span>
+            </li>
+            <li>
+              <IconCheck size={20} />
+              {/* "Free during beta" raises "and after?"; pricing answers it. */}
+              <Link href="/pricing" data-track="facts:pricing">
+                Beta tournaments stay free
+              </Link>
+            </li>
+          </ul>
         </section>
 
-        <AuctionLab sports={sports} />
+        <AuctionLab sports={sports} signupHref={SIGNUP.href} signupLabel={SIGNUP.label} />
+
+        {/* Proof sits right after the demo — the moment a visitor asks "is
+            anyone actually using this?". Both render nothing without data. */}
+        <Suspense fallback={null}>
+          <LiveTournaments />
+        </Suspense>
+
+        {/* FR-1: real, permitted quotes — absent until there is one, and absent
+            when the database is (same guard as the strip above). */}
+        <Suspense fallback={null}>
+          <LandingVoices />
+        </Suspense>
 
         <section id="features" className={styles.toolkit} aria-labelledby="toolkit-title">
           <div className={styles.container}>
@@ -121,9 +155,9 @@ export default function LandingPage() {
               <div>
                 <p className={styles.eyebrow}>BIG TOURNAMENT ENERGY. LESS ADMIN.</p>
                 <h2 id="toolkit-title">
-                  You bring the passion.
+                  Registration, squads,
                   <br />
-                  <span>We bring the playbook.</span>
+                  <span>fixtures and receipts.</span>
                 </h2>
               </div>
               <p>
@@ -298,9 +332,9 @@ export default function LandingPage() {
             <div className={styles.journeyIntro} data-reveal>
               <p className={styles.eyebrow}>FROM “LET’S PLAY” TO GAME DAY</p>
               <h2 id="journey-title">
-                A big idea.
+                Three steps from sign-up
                 <br />
-                <span>Three simple moves.</span>
+                <span>to auction night.</span>
               </h2>
               <Link className={styles.textLink} href="/help/getting-started">
                 Your getting-started guide <IconArrowRight size={17} />
@@ -337,16 +371,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <Suspense fallback={null}>
-          <LiveTournaments />
-        </Suspense>
-
-        {/* FR-1: real, permitted quotes — absent until there is one, and absent
-            when the database is (same guard as the strip above). */}
-        <Suspense fallback={null}>
-          <LandingVoices />
-        </Suspense>
-
         {/* TWO BANDS LEFT THIS PAGE (founder, 2026-09-19).
             The "₹0 / tournament" band restated the hero's own promise — the
             hero already says "Free during beta · No card required", which the
@@ -356,7 +380,7 @@ export default function LandingPage() {
             FAQ page. Both are one click away, from the header and from the
             footer, and the page a visitor lands on is shorter for it: on a
             phone it was eleven screens tall. */}
-        <section className={styles.finalCta} aria-labelledby="final-title">
+        <section id="final-cta" className={styles.finalCta} aria-labelledby="final-title">
           <p className={styles.eyebrow}>YOUR SPORT. YOUR PEOPLE. YOUR MOMENT.</p>
           <h2 id="final-title">
             Let the games <span>begin.</span>
@@ -374,15 +398,36 @@ export default function LandingPage() {
             lives and `content.test.ts` keeps checking the href resolves.
           */}
           <div className={styles.actions}>
-            <Link className={styles.primary} href="/login">
-              Create your tournament <IconArrowRight size={18} />
+            <Link className={styles.primary} href={SIGNUP.href} data-track="final:signup">
+              {SIGNUP.label} <IconArrowRight size={18} />
             </Link>
-            <Link className={styles.secondary} href={LANDING.beta.ctaSecondary.href}>
+            <Link
+              className={styles.secondary}
+              href={LANDING.beta.ctaSecondary.href}
+              data-track="final:demo"
+            >
               <IconCalendar size={15} /> {LANDING.beta.ctaSecondary.label}
             </Link>
           </div>
+          {/* The last doubts before signing up, answered with things the
+              platform verifiably does (the FAQ band left this page on purpose;
+              these are three facts, not a FAQ). No export claim: no screen
+              reaches the exporter yet. */}
+          <ul className={styles.reassure} aria-label="Before you start">
+            <li>
+              <IconCheck size={14} /> No app to install
+            </li>
+            <li>
+              <IconCheck size={14} /> Big screen from any browser
+            </li>
+            <li>
+              <IconCheck size={14} /> Every bid checked on the server
+            </li>
+          </ul>
           <p>Built for the people who bring people together.</p>
         </section>
+        {/* Inside <main> so it inherits the floodlight theme. */}
+        <StickyCta href={SIGNUP.href} label={SIGNUP.label} />
       </main>
     </HomeMotion>
   );

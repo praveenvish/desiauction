@@ -158,7 +158,7 @@ test("the pricing and landing CTAs lead to the demo", async ({ page }) => {
   );
 
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Watch it run with us" })).toHaveAttribute(
+  await expect(page.locator("main").getByRole("link", { name: "Book a demo" })).toHaveAttribute(
     "href",
     "/schedule-demo?from=landing",
   );
