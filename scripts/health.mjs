@@ -8,10 +8,7 @@ const sh = (cmd) => spawnSync(cmd, { shell: true, encoding: "utf8" }).status ===
 const http = (url) => sh(`curl -sf --max-time 3 ${url} > /dev/null`);
 
 const checks = [
-  [
-    "database (postgres:5433)",
-    () => sh("docker compose exec -T db pg_isready -U desiauction"),
-  ],
+  ["database (postgres:5433)", () => sh("docker compose exec -T db pg_isready -U desiauction")],
   ["storage  (minio:9000)", () => http("http://localhost:9000/minio/health/live")],
   ...(noApps
     ? []

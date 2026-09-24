@@ -137,10 +137,7 @@ export function TeamsPanel({
         <Card data-testid="roster-panel">
           <div className="teams-head">
             <h2>{selected.name} — roster</h2>
-            <ButtonLink
-              href={`/seasons/${slug}/registrations?team=${selected.id}`}
-              variant="ghost"
-            >
+            <ButtonLink href={`/seasons/${slug}/registrations?team=${selected.id}`} variant="ghost">
               Manage in Registrations
             </ButtonLink>
           </div>
@@ -187,8 +184,8 @@ export function TeamsPanel({
           )}
           <p className="competitions-hint">
             Team owners are invited from the{" "}
-            <Link href={`/seasons/${slug}/auction`}>Auction tab</Link> once the auction is
-            created — ownership is an auction-night grant, not a roster field.
+            <Link href={`/seasons/${slug}/auction`}>Auction tab</Link> once the auction is created —
+            ownership is an auction-night grant, not a roster field.
           </p>
         </Card>
       ) : null}

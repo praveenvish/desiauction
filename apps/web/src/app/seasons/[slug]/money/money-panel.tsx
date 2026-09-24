@@ -217,8 +217,7 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
             : settlementCase.basis === "fixed"
               ? "from fixed amounts set when the case opened"
               : "as nothing owed"}
-          .{" "}
-          <a href={`/seasons/${slug}/money/case/${settlementCase.caseId}`}>Open case review</a>
+          . <a href={`/seasons/${slug}/money/case/${settlementCase.caseId}`}>Open case review</a>
         </p>
       </Card>
 
@@ -580,10 +579,7 @@ function NextStep({
           on the case review, where it can be replayed and checked against the log.
         </p>
         <div className="money-row-actions" style={{ justifyContent: "flex-start" }}>
-          <ButtonLink
-            href={`/seasons/${slug}/money/case/${caseId}`}
-            data-testid="view-evidence"
-          >
+          <ButtonLink href={`/seasons/${slug}/money/case/${caseId}`} data-testid="view-evidence">
             View closure evidence
           </ButtonLink>
         </div>

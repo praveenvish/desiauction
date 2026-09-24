@@ -266,8 +266,8 @@ export function FixturesPanel({
         <Card data-testid="generate-panel">
           <h2>Generate fixtures</h2>
           <p className="competitions-hint">
-            Deterministic round robin over this season&apos;s teams — same inputs, same
-            schedule, every time. Generated fixtures land as drafts.
+            Deterministic round robin over this season&apos;s teams — same inputs, same schedule,
+            every time. Generated fixtures land as drafts.
           </p>
           <div className="date-row">
             <Select

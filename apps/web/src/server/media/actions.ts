@@ -36,8 +36,7 @@ export interface UploadRequestInput {
 }
 
 export type UploadRequestResult =
-  | { ok: true; uploadUrl: string; key: string }
-  | { ok: false; error: string };
+  { ok: true; uploadUrl: string; key: string } | { ok: false; error: string };
 
 export async function requestMediaUpload(input: UploadRequestInput): Promise<UploadRequestResult> {
   const session = await currentSession();

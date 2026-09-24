@@ -9,10 +9,7 @@ export function csvCell(value: string): string {
 }
 
 /** Serialize a header row + data rows into a CSV document. */
-export function toCsv(
-  header: readonly string[],
-  rows: readonly (readonly string[])[],
-): string {
+export function toCsv(header: readonly string[], rows: readonly (readonly string[])[]): string {
   const lines = rows.map((row) => row.map(csvCell).join(","));
   return [header.map(csvCell).join(","), ...lines].join("\n");
 }

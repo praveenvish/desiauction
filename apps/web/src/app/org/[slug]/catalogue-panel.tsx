@@ -85,8 +85,7 @@ export function CataloguePanel({ catalogue }: { catalogue: OrgCatalogue }) {
           <Link href={`/org/${org.slug}/t/${tournament.slug}`} className="cat-group-head">
             <span className="cat-group-name">{tournament.name}</span>
             <span className="cat-group-count">
-              {tournament.editions.length}{" "}
-              {tournament.editions.length === 1 ? "season" : "seasons"}
+              {tournament.editions.length} {tournament.editions.length === 1 ? "season" : "seasons"}
             </span>
           </Link>
           {tournament.editions.length === 0 ? (

@@ -210,9 +210,7 @@
         "auction_owner_invites_token_hash_unique": {
           "name": "auction_owner_invites_token_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
+          "columns": ["token_hash"]
         }
       },
       "policies": {},
@@ -645,9 +643,7 @@
         "competitions_slug_unique": {
           "name": "competitions_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -1767,9 +1763,7 @@
         "finops_profiles_org_id_unique": {
           "name": "finops_profiles_org_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "org_id"
-          ]
+          "columns": ["org_id"]
         }
       },
       "policies": {},
@@ -2456,9 +2450,7 @@
         "invites_token_hash_unique": {
           "name": "invites_token_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
+          "columns": ["token_hash"]
         }
       },
       "policies": {},
@@ -3014,9 +3006,7 @@
         "newsletter_subscribers_email_unique": {
           "name": "newsletter_subscribers_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -3052,10 +3042,7 @@
       "compositePrimaryKeys": {
         "org_members_org_id_person_id_pk": {
           "name": "org_members_org_id_person_id_pk",
-          "columns": [
-            "org_id",
-            "person_id"
-          ]
+          "columns": ["org_id", "person_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3106,9 +3093,7 @@
         "organizations_slug_unique": {
           "name": "organizations_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -3586,9 +3571,7 @@
         "passkey_credentials_credential_id_unique": {
           "name": "passkey_credentials_credential_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "credential_id"
-          ]
+          "columns": ["credential_id"]
         }
       },
       "policies": {},
@@ -3783,9 +3766,7 @@
         "people_phone_unique": {
           "name": "people_phone_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "phone"
-          ]
+          "columns": ["phone"]
         }
       },
       "policies": {},
@@ -4132,9 +4113,7 @@
         "sessions_token_hash_unique": {
           "name": "sessions_token_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
+          "columns": ["token_hash"]
         }
       },
       "policies": {},

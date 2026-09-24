@@ -117,12 +117,8 @@ describe("competition tabs", () => {
 
 describe("liveExit", () => {
   it("exits to the auction hub for members and to the front door for anonymous spectators", () => {
-    expect(liveExit("/seasons/mpl/auction/cockpit", true).href).toBe(
-      "/seasons/mpl/auction",
-    );
+    expect(liveExit("/seasons/mpl/auction/cockpit", true).href).toBe("/seasons/mpl/auction");
     expect(liveExit("/seasons/mpl/auction/spectate", false).href).toBe("/");
-    expect(liveExit("/seasons/mpl/auction/spectate", true).href).toBe(
-      "/seasons/mpl/auction",
-    );
+    expect(liveExit("/seasons/mpl/auction/spectate", true).href).toBe("/seasons/mpl/auction");
   });
 });

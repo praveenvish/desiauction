@@ -15,10 +15,7 @@ export default async function MoneyPage() {
   }
   return (
     <main>
-      <PageHeader
-        title="My money"
-        subtitle="Your purses, dues and receipts across every season."
-      />
+      <PageHeader title="My money" subtitle="Your purses, dues and receipts across every season." />
       <Card>
         <EmptyState
           headingLevel={2}

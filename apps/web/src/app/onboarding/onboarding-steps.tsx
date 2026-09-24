@@ -191,8 +191,8 @@ function DoneStep() {
   return (
     <div className="onboarding-form" data-testid="onboarding-done">
       <p className="onboarding-sub">
-        Your profile and organization are ready. The next stop is your home — seasons,
-        registrations and auction night all start there.
+        Your profile and organization are ready. The next stop is your home — seasons, registrations
+        and auction night all start there.
       </p>
       <ButtonLink href="/home">Go to Home</ButtonLink>
     </div>
