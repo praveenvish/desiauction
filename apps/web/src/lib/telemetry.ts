@@ -41,7 +41,13 @@ export type ProductEventName =
   // FR-1. Whether people find the door, and whether the screenshot survives to
   // the send. No payload says who, and none carries what they wrote.
   | "support.report_opened"
-  | "support.report_sent";
+  | "support.report_sent"
+  // The landing page funnel: which CTA was clicked (`source` names where on the
+  // page it sits, `target` what it opens) and how far a visitor gets in the mock
+  // auction. Without these no homepage change can be shown to have worked.
+  | "landing.cta_clicked"
+  | "landing.mock_bid_placed"
+  | "landing.mock_sold";
 
 export type TelemetryProps = Record<string, string | number | boolean>;
 

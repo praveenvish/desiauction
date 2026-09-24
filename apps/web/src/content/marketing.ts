@@ -377,7 +377,9 @@ export const LANDING = {
     // gives somebody who read the whole page nothing new to do. The people who
     // reach the bottom and have not signed up are the ones who want to be shown
     // it first, so that is what the last CTA on the page now offers.
-    ctaSecondary: { label: "Watch it run with us", href: "/schedule-demo?from=landing" },
+    // "Watch it run with us" read as a video; the footer already calls the same
+    // page "Book a demo", so the page now uses one name for one destination.
+    ctaSecondary: { label: "Book a demo", href: "/schedule-demo?from=landing" },
   },
 } as const;
 

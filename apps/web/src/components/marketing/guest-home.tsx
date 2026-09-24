@@ -2,11 +2,27 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconArrowRight, IconCheck, IconGavel, IconRefresh, IconTrophy } from "./icons";
+import { track } from "../../lib/telemetry";
 import styles from "../../app/guest-home.module.css";
 
 /** Content remains visible before hydration and when motion is disabled. */
 export function HomeMotion({ children }: { children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
+  // One delegated listener, so the server-rendered CTAs stay server-rendered:
+  // any link carrying data-track="source:target" reports its click.
+  useEffect(() => {
+    const node = root.current;
+    if (!node) return;
+    const onClick = (event: MouseEvent) => {
+      const link = (event.target as Element | null)?.closest<HTMLElement>("[data-track]");
+      const [source = "", target = ""] = (link?.dataset.track ?? "").split(":");
+      if (link) track("landing.cta_clicked", { source, target });
+    };
+    node.addEventListener("click", onClick);
+    return () => {
+      node.removeEventListener("click", onClick);
+    };
+  }, []);
   useEffect(() => {
     if (
       window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
@@ -38,25 +54,152 @@ export function HomeMotion({ children }: { children: ReactNode }) {
 type SportOption = { key: string; label: string; role: string };
 const money = (value: number) => `₹${value.toLocaleString("en-IN")}`;
 
-export function AuctionLab({ sports }: { sports: SportOption[] }) {
+/**
+ * THE DEMO NEEDS A RIVAL.
+ *
+ * It used to hand the visitor both paddles: every click bid for whichever team
+ * was not leading, so there was nobody to beat and the SOLD landed on a team the
+ * visitor never chose. Now the visitor owns Falcons and Voyagers bid back on
+ * their own, which is the one feeling a live auction sells.
+ *
+ * Phases: 0 opening · 1/3/5 Falcons lead (the visitor's three bids) · 2/4
+ * Voyagers counter · 5 also runs the gavel · 6 SOLD. The waits are pauses, not
+ * motion, so they stay under reduced motion.
+ */
+const OPENING = 20000;
+const STEP = 5000;
+const RIVAL_MS = 1100;
+const GAVEL_MS = 800;
+const SOLD_PHASE = 6;
+
+/**
+ * Shows the header CTA's job on phones, where the header folds "Start free"
+ * into the menu: once the hero has scrolled away there was no visible way to
+ * sign up for seven screens. Hidden again at the closing CTA so it never
+ * doubles it or sits over the footer.
+ */
+export function StickyCta({ href, label }: { href: string; label: string }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const hero = document.getElementById("hero");
+    const finale = document.getElementById("final-cta");
+    if (!hero || !finale) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const pastHero = hero.getBoundingClientRect().bottom < 0;
+      const beforeFinale = finale.getBoundingClientRect().top > window.innerHeight;
+      setVisible(pastHero && beforeFinale);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+  return (
+    <div className={styles.stickyCta} data-visible={visible}>
+      <Link
+        className={styles.primary}
+        href={href}
+        tabIndex={visible ? undefined : -1}
+        data-track="sticky:signup"
+      >
+        {label} <IconArrowRight size={18} />
+      </Link>
+    </div>
+  );
+}
+
+export function AuctionLab({
+  sports,
+  signupHref,
+  signupLabel,
+}: {
+  sports: SportOption[];
+  signupHref: string;
+  signupLabel: string;
+}) {
   const [selected, setSelected] = useState("football");
-  const [bid, setBid] = useState(0);
+  const [phase, setPhase] = useState(0);
+  const [gavel, setGavel] = useState<0 | 1 | 2>(0);
   const sport = sports.find((item) => item.key === selected) ?? sports[0];
-  const sold = bid === 3;
-  const amount = 20000 + bid * 5000;
-  const team = bid === 0 ? "Waiting for the first bid" : bid === 2 ? "Falcons" : "Voyagers";
+
+  useEffect(() => {
+    if (phase === 1 || phase === 3) {
+      const timer = window.setTimeout(() => {
+        setPhase(phase + 1);
+      }, RIVAL_MS);
+      return () => {
+        window.clearTimeout(timer);
+      };
+    }
+    if (phase === 5) {
+      const timers = [
+        window.setTimeout(() => {
+          setGavel(1);
+        }, GAVEL_MS),
+        window.setTimeout(() => {
+          setGavel(2);
+        }, GAVEL_MS * 2),
+        window.setTimeout(() => {
+          setPhase(SOLD_PHASE);
+          track("landing.mock_sold", { sport: selected });
+        }, GAVEL_MS * 3),
+      ];
+      return () => {
+        timers.forEach((timer) => {
+          window.clearTimeout(timer);
+        });
+      };
+    }
+    return undefined;
+  }, [phase, selected]);
+
+  const reset = () => {
+    setPhase(0);
+    setGavel(0);
+  };
+  const sold = phase === SOLD_PHASE;
+  const amount = OPENING + Math.min(phase, 5) * STEP;
+  const yourTurn = phase === 0 || phase === 2 || phase === 4;
+  const falconsLead = phase % 2 === 1 || sold;
+  const voyagersLead = phase === 2 || phase === 4;
+  const yourBids = Math.min(Math.ceil(phase / 2), 3);
+  const status = sold
+    ? "Sold to Falcons, your team"
+    : phase === 0
+      ? "Waiting for the first bid"
+      : phase === 5
+        ? gavel === 0
+          ? "Falcons lead. Any more bids?"
+          : gavel === 1
+            ? "Going once…"
+            : "Going twice…"
+        : voyagersLead
+          ? "Voyagers bid back. Your move."
+          : "Falcons lead. Voyagers are thinking…";
+  const waitingLabel =
+    phase === 5 ? (gavel === 2 ? "Going twice…" : "Going once…") : "Voyagers are bidding…";
+
   return (
     <section id="playground" className={styles.playground} aria-labelledby="sports-title">
       <div className={styles.container}>
         <div className={styles.sportsHeading} data-reveal>
           <div>
             <p className={styles.eyebrow}>DIFFERENT GAMES. SAME COMPETITIVE SPIRIT.</p>
-            <h2 id="sports-title">Your sport belongs here.</h2>
+            <h2 id="sports-title">From cricket to kabaddi to esports.</h2>
           </div>
           <p>
             <strong>{sports.length} sport formats.</strong>
             <br />
-            Pick yours. Get a feel for auction day.
+            Pick yours, then run a mock auction.
           </p>
         </div>
         <div
@@ -71,7 +214,7 @@ export function AuctionLab({ sports }: { sports: SportOption[] }) {
               aria-pressed={selected === item.key}
               onClick={() => {
                 setSelected(item.key);
-                setBid(0);
+                reset();
               }}
             >
               <SportGlyph sport={item.key} />
@@ -90,22 +233,20 @@ export function AuctionLab({ sports }: { sports: SportOption[] }) {
               <IconGavel size={16} /> THE AUCTION EXPERIENCE
             </p>
             <h2>
-              A little rivalry.
+              Bid against a rival owner.
               <br />
-              <span>A lot of possibility.</span>
+              <span>Win the player.</span>
             </h2>
-            <p>That one player. Two determined owners. A room waiting for the next bid.</p>
-            <p>Try it for yourself. Place three demo bids and see a new teammate join the squad.</p>
+            <p>
+              You own Falcons. Voyagers want the same player, and they bid back. Outbid them three
+              times and the gavel falls your way.
+            </p>
+            <p>On auction night, owners do this from their phones while the room watches.</p>
             <Link className={styles.textLink} href="/help/conducting-the-auction">
               See how a real auction works <IconArrowRight size={17} />
             </Link>
-            <div className={styles.demoHint}>
-              <span>01</span> Pick a sport <i />
-              <span>02</span> Place a bid <i />
-              <span>03</span> Make a team
-            </div>
           </div>
-          <div className={styles.auctionStage}>
+          <div id="demo-auction" className={styles.auctionStage}>
             <div className={styles.auctionBoard}>
               <div className={styles.boardTop}>
                 <span>
@@ -119,7 +260,7 @@ export function AuctionLab({ sports }: { sports: SportOption[] }) {
                 </div>
                 <div>
                   <span>PLAYER 007</span>
-                  <h3>Riya Mehta</h3>
+                  <h3>Praveen Vishnoi</h3>
                   <p>
                     {sport?.role} <span>·</span> {sport?.label}
                   </p>
@@ -129,9 +270,9 @@ export function AuctionLab({ sports }: { sports: SportOption[] }) {
                 </span>
               </div>
               <div className={styles.bidZone} aria-live="polite" aria-atomic="true">
-                <span>{sold ? "WINNING BID" : bid === 0 ? "OPENING PRICE" : "CURRENT BID"}</span>
-                <strong key={String(bid)}>{money(amount)}</strong>
-                <p>{sold ? "Sold to Voyagers" : team}</p>
+                <span>{sold ? "WINNING BID" : phase === 0 ? "OPENING PRICE" : "CURRENT BID"}</span>
+                <strong key={String(amount)}>{money(amount)}</strong>
+                <p>{status}</p>
                 {sold && (
                   <span className={styles.soldStamp}>
                     SOLD <IconCheck size={17} />
@@ -139,56 +280,77 @@ export function AuctionLab({ sports }: { sports: SportOption[] }) {
                 )}
               </div>
               <div className={styles.demoTeams}>
-                <div data-leading={bid === 2}>
+                <div data-leading={falconsLead}>
                   <span className={styles.teamBadge}>F</span>
                   <span>
-                    Falcons<small>{bid === 2 ? "Leading bid" : "Team owner"}</small>
-                  </span>
-                  {bid === 2 && <IconTrophy size={15} />}
-                </div>
-                <div data-leading={bid === 1 || sold}>
-                  <span className={styles.teamBadge}>V</span>
-                  <span>
-                    Voyagers
+                    Falcons
                     <small>
-                      {sold ? "Player signed" : bid === 1 ? "Leading bid" : "Team owner"}
+                      {sold ? "Player signed" : falconsLead ? "Leading · you" : "Your team"}
                     </small>
                   </span>
-                  {(bid === 1 || sold) && <IconTrophy size={15} />}
+                  {falconsLead && <IconTrophy size={15} />}
+                </div>
+                <div data-leading={voyagersLead}>
+                  <span className={styles.teamBadge}>V</span>
+                  <span>
+                    Voyagers<small>{voyagersLead ? "Leading bid" : "Rival owner"}</small>
+                  </span>
+                  {voyagersLead && <IconTrophy size={15} />}
                 </div>
               </div>
-              <button
-                type="button"
-                className={styles.bidButton}
-                onClick={() => {
-                  setBid((current) => (current >= 3 ? 0 : current + 1));
-                }}
-              >
-                {sold ? (
-                  <>
-                    <IconRefresh size={17} /> Try again
-                  </>
-                ) : (
-                  <>
-                    Place a demo bid{" "}
+              {sold ? (
+                <div className={styles.soldActions}>
+                  <Link
+                    className={styles.bidButton}
+                    href={signupHref}
+                    data-track="demo_sold:signup"
+                  >
+                    {signupLabel}
                     <span>
-                      {money(amount + 5000)} <IconArrowRight size={16} />
+                      Free <IconArrowRight size={16} />
                     </span>
-                  </>
-                )}
-              </button>
+                  </Link>
+                  <button type="button" className={styles.againButton} onClick={reset}>
+                    <IconRefresh size={15} /> Try again
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.bidButton}
+                  aria-disabled={!yourTurn}
+                  onClick={() => {
+                    if (!yourTurn) return;
+                    track("landing.mock_bid_placed", { bid: yourBids + 1, sport: selected });
+                    setPhase(phase + 1);
+                  }}
+                >
+                  {yourTurn ? (
+                    <>
+                      Bid for Falcons
+                      <span>
+                        {money(amount + STEP)} <IconArrowRight size={16} />
+                      </span>
+                    </>
+                  ) : (
+                    waitingLabel
+                  )}
+                </button>
+              )}
               <div className={styles.demoProgress}>
                 <div aria-hidden="true">
                   {[1, 2, 3].map((step) => (
-                    <i key={step} data-complete={bid >= step} />
+                    <i key={step} data-complete={yourBids >= step} />
                   ))}
                 </div>
-                <span>{sold ? "A new team begins." : `${String(bid)} of 3 demo bids`}</span>
+                <span>
+                  {sold
+                    ? "Your new teammate. Now picture your league."
+                    : `${String(yourBids)} of 3 bids`}
+                </span>
               </div>
             </div>
-            <p className={styles.demoDisclaimer}>
-              Fictional players & teams. No real bids or payments.
-            </p>
+            <p className={styles.demoDisclaimer}>Fictional teams. No real bids or payments.</p>
             <noscript>
               <p className={styles.demoDisclaimer}>
                 Enable JavaScript to try the interactive auction demo.
