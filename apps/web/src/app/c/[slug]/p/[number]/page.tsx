@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { roleLabelIn, sportPackFor, styleLabel } from "@desiauction/core";
+import { buildPlayerPoster, roleLabelIn, sportPackFor, styleLabel } from "@desiauction/core";
 import { Badge, ButtonLink, PlayerImage, IconArrowLeft } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -7,7 +7,8 @@ import { notFound } from "next/navigation";
 
 import { env } from "../../../../../env";
 import { preSignedWord, type PreSignedKind } from "../../../../../lib/pre-signed";
-import { publicPlayer } from "../../../../../server/competition/public";
+import { publicPlayer, publicPlayerPoster } from "../../../../../server/competition/public";
+import { linkCardAlt } from "../../../../seasons/[slug]/posters/poster-link";
 import {
   HeroFact,
   PageBody,
@@ -28,6 +29,7 @@ import "../../../directory.css";
  * async functions).
  */
 const playerView = cache(publicPlayer);
+const posterView = cache(publicPlayerPoster);
 
 // Public single-player profile (parity §Phase 2). The routable, link-shareable
 // surface behind the player OG card — the client showcase dialog is not
@@ -74,16 +76,43 @@ export async function generateMetadata({
   if (player === null) {
     return { title: "Player · DesiAuction" };
   }
-  const age = player.age !== null ? ` · ${String(player.age)} yrs` : "";
-  const description = `${roleLabelIn(sportPackFor(player.sport), player.role)}${age} · ${statusText(player)} · ${player.competitionName}`;
   const url = `${env.PUBLIC_BASE_URL}/c/${slug}/p/${number}`;
   // The image route's own `alt` export must be a static string, so every player
   // card in the product described itself as "Player card · DesiAuction" — a
   // blind recipient in a chat thread was handed a product name where the sighted
   // people in the group could see a person. `og:image:alt` is derived per
   // player, and it is what clients actually announce.
-  const imageAlt = `${player.name} — ${roleLabelIn(sportPackFor(player.sport), player.role)}, ${statusText(player)}, ${player.competitionName}`;
-  const images = [{ url: `${url}/opengraph-image`, width: 1200, height: 630, alt: imageAlt }];
+  //
+  // `?v=` is the card's version: WhatsApp keeps a preview for days, and without
+  // it a player shared while in the pool went on previewing that way after the
+  // hammer fell. The route ignores the parameter; the chat's cache does not.
+  const poster = await posterView(slug, number);
+  const model =
+    poster === null
+      ? null
+      : buildPlayerPoster({
+          ...poster.input,
+          photoUrl: null,
+          teamCrestUrl: null,
+          competitionLogoUrl: null,
+        });
+  const age = player.age !== null ? ` · ${String(player.age)} yrs` : "";
+  // The sale is the thing being shared, so the preview's text carries the price
+  // too (founder, 2026-09-24) — not only the image.
+  const verdict =
+    model?.outcome === "sold" && model.priceLabel !== null
+      ? `${statusText(player)} for ${model.priceLabel}`
+      : statusText(player);
+  const description = `${roleLabelIn(sportPackFor(player.sport), player.role)}${age} · ${verdict} · ${player.competitionName}`;
+  const imageAlt =
+    model !== null
+      ? linkCardAlt(model)
+      : `${player.name} — ${roleLabelIn(sportPackFor(player.sport), player.role)}, ${statusText(player)}, ${player.competitionName}`;
+  const imageUrl =
+    poster === null
+      ? `${url}/opengraph-image`
+      : `${url}/opengraph-image?v=${encodeURIComponent(poster.version)}`;
+  const images = [{ url: imageUrl, width: 1200, height: 630, alt: imageAlt }];
   return {
     title: `${player.name} · ${player.competitionName}`,
     description,

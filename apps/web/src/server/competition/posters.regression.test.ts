@@ -315,15 +315,22 @@ describe("POSTER ACCESS — the player, their own card and NOTHING else", () => 
     expect(picker.scope).toBe("mine");
   });
 
-  it("REFUSES a player whose night reached no verdict", async () => {
-    // The gate lets them in — it is their registration — and the source then
-    // refuses, because a poster asserts an outcome and "still in the queue" is
-    // not one. `posterReady` on /home mirrors this so the door is never offered.
+  it("gives a player still in the queue their IN THE POOL card — no price, no team", async () => {
+    // Before the hammer, the one true sentence is "in the pool, bid for me" —
+    // the card a player posts to bring bidders into the room. It carries the
+    // lot's opening price and nothing a verdict would: no sale price, no team.
+    // `posterReady` on /home mirrors this, so the door is offered now too.
     const gate = await posterGateFor(queued.personId, slug);
     expect("ok" in gate).toBe(false);
-    expect(
-      await playerPosterFor(queued.personId, slug, queued.registrationId, REQUEST),
-    ).toMatchObject({ ok: false, status: 404 });
+    const result = await playerPosterFor(queued.personId, slug, queued.registrationId, REQUEST);
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) {
+      return;
+    }
+    expect(result.input.outcome).toBe("pool");
+    expect(result.input.pricePaise).toBeNull();
+    expect(result.input.teamName).toBeNull();
+    expect(result.input.lotNumber).not.toBeNull();
   });
 });
 

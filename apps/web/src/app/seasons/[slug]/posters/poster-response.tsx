@@ -47,6 +47,7 @@ export async function posterResponse<TInput, TModel>(args: {
     brandMarkSrc: await posterBrandMark(),
     prices: args.forcePrices ?? query.prices,
     sponsor: query.sponsor,
+    shareUrl: source.shareUrl ?? null,
   };
   const model = args.build(source.input);
   // Without these the rupee sign rasterizes as an empty box — see poster-fonts.

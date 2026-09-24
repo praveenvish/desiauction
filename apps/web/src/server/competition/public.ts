@@ -7,6 +7,7 @@ import {
   paise,
   type MoneyUnit,
   type Paise,
+  type PlayerPosterInput,
 } from "@desiauction/core";
 import {
   auctionEvents,
@@ -14,6 +15,7 @@ import {
   competitions,
   lots,
   organizations,
+  paddles,
   people,
   registrations,
   teams,
@@ -26,6 +28,7 @@ import { teamsOf, type TeamSummary } from "./competitions";
 import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
+import { outcomeOf } from "./poster-outcome";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 import { containsPattern } from "../../lib/like-pattern";
 
@@ -577,6 +580,133 @@ export async function publicPlayerCard(
   };
 }
 
+/**
+ * What the public player LINK CARD needs beyond the public player: the verdict,
+ * the money, the buying team's colour and crest, and the shirt and lot numbers.
+ *
+ * Behind exactly the gates of `publicPlayerCard` (published season, approved
+ * player; the photo key only when consent is recorded and the player is not a
+ * minor) — it starts from that read and only adds to it. The price is public by
+ * the founder's decision (2026-09-24): the sale is the thing being shared.
+ *
+ * `version` changes whenever what the card says changes. It rides the
+ * `og:image` URL because WhatsApp keeps a link preview for days: without it, a
+ * player shared while in the pool went on previewing as "in the pool" after
+ * the hammer fell.
+ */
+export interface PublicPlayerPoster {
+  readonly input: Omit<PlayerPosterInput, "photoUrl" | "teamCrestUrl" | "competitionLogoUrl">;
+  readonly photoKey: string | null;
+  readonly teamCrestKey: string | null;
+  readonly logoKey: string | null;
+  readonly version: string;
+}
+
+export async function publicPlayerPoster(
+  slug: string,
+  number: string,
+): Promise<PublicPlayerPoster | null> {
+  const card = await publicPlayerCard(slug, number);
+  if (card === null) {
+    return null;
+  }
+  const { player } = card;
+  const [comp] = await systemDb
+    .select({
+      id: competitions.id,
+      logoKey: competitions.logoUrl,
+      // A points season's card prints "1,250 pts", never rupees (0091).
+      unit: competitions.auctionUnit,
+    })
+    .from(competitions)
+    .where(eq(competitions.slug, slug))
+    .limit(1);
+  const [reg] = await systemDb
+    .select({
+      jerseyNumber: registrations.jerseyNumber,
+      isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
+      isRetained: registrations.isRetained,
+      teamId: registrations.teamId,
+    })
+    .from(registrations)
+    .where(eq(registrations.id, player.registrationId))
+    .limit(1);
+  if (comp === undefined || reg === undefined) {
+    return null;
+  }
+  const [lot] = await systemDb
+    .select({
+      status: lots.status,
+      soldPrice: lots.soldPrice,
+      basePrice: lots.basePrice,
+      lotNumber: lots.lotNumber,
+      buyerTeamId: paddles.teamId,
+    })
+    .from(lots)
+    .innerJoin(auctions, eq(auctions.id, lots.auctionId))
+    .leftJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+    .where(
+      and(
+        eq(lots.registrationId, player.registrationId),
+        eq(auctions.competitionId, comp.id),
+        ne(auctions.status, "abandoned"),
+      ),
+    )
+    .limit(1);
+  const auctionStatus =
+    lot === undefined
+      ? ((
+          await systemDb
+            .select({ status: auctions.status })
+            .from(auctions)
+            .where(and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned")))
+            .limit(1)
+        )[0]?.status ?? null)
+      : null;
+  // A lot the room SOLD outranks every mark — the same rule as the poster.
+  const preSigned = lot?.status !== "sold" && isPreSigned(reg);
+  const outcome = outcomeOf(preSigned ? preSignedKind(reg) : null, lot?.status, auctionStatus);
+  if (outcome === null) {
+    return null;
+  }
+  const teamId = outcome === "pool" ? null : preSigned ? reg.teamId : (lot?.buyerTeamId ?? null);
+  const team =
+    teamId === null
+      ? undefined
+      : (
+          await systemDb
+            .select({ name: teams.name, colour: teams.primaryColor, logoKey: teams.logoUrl })
+            .from(teams)
+            .where(and(eq(teams.id, teamId), eq(teams.competitionId, comp.id)))
+            .limit(1)
+        )[0];
+  const pricePaise = outcome === "sold" ? (lot?.soldPrice ?? null) : null;
+  return {
+    input: {
+      playerName: player.name,
+      number: player.number,
+      role: player.role ?? "",
+      outcome,
+      pricePaise,
+      basePricePaise: outcome === "pool" ? (lot?.basePrice ?? null) : null,
+      lotNumber: lot?.lotNumber ?? null,
+      jerseyNumber: reg.jerseyNumber,
+      teamName: team?.name ?? null,
+      teamColor: team?.colour ?? null,
+      competitionName: player.competitionName,
+      unit: comp.unit,
+    },
+    photoKey: card.photoKey,
+    teamCrestKey: team?.logoKey ?? null,
+    logoKey: comp.logoKey,
+    // Short and opaque; only has to CHANGE when the card would.
+    version: [outcome, pricePaise ?? "", teamId ?? "", card.photoKey === null ? 0 : 1]
+      .join(".")
+      .replace(/[^a-z0-9.]/gi, ""),
+  };
+}
+
 export interface DirectoryEntry {
   name: string;
   slug: string;
@@ -887,11 +1017,12 @@ export interface MyRegistration {
   /**
    * Whether a card exists to be made of this registration.
    *
-   * A poster asserts a VERDICT, so `playerPosterSource` refuses to draw one
-   * until the auction has reached one — sold, unsold, retained or icon. This
-   * mirrors that rule so /home offers the link only where the route would
-   * answer with a picture, rather than offering every player a door into a 404
-   * from the day they sign up.
+   * The same rule `playerPosterSource` draws by (`outcomeOf`): a verdict once
+   * the auction has one, and before it, the "in the pool" card — the one a
+   * player posts to bring bidders into the room. Mirrored here so /home offers
+   * the link exactly where the route would answer with a picture: not to a
+   * pending registration, a withdrawn lot, or a finished auction that never
+   * reached them.
    */
   posterReady: boolean;
 }
@@ -919,6 +1050,7 @@ export const myRegistrations = cache(async function myRegistrations(
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
       lotStatus: lots.status,
+      auctionStatus: auctions.status,
     })
     .from(registrations)
     .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
@@ -955,7 +1087,11 @@ export const myRegistrations = cache(async function myRegistrations(
     open: row.competitionStatus === "registration_open",
     posterReady:
       row.status === "approved" &&
-      (isPreSigned(row) || row.lotStatus === "sold" || row.lotStatus === "unsold"),
+      outcomeOf(
+        row.lotStatus !== "sold" && isPreSigned(row) ? preSignedKind(row) : null,
+        row.lotStatus ?? undefined,
+        row.auctionStatus,
+      ) !== null,
   }));
 });
 
