@@ -869,6 +869,23 @@ p + .date-row {
   margin-bottom: var(--space-3);
 }
 
+.photo-match-thumb-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.photo-match-thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
 .import-paid {
   font-size: var(--text-sm-size);
   color: var(--text-primary);
