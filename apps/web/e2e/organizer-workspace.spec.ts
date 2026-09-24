@@ -80,11 +80,11 @@ test("founder demo: org → competition → approve → team roster → venue �
 
   // Competition with dates (lifecycle guard) → open registration.
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Workspace Cup ${STAMP}`);
+  await page.getByLabel("Season name").fill(`Workspace Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   competitionUrl = page.url();
   await page.getByTestId("advance-status").click();
@@ -100,7 +100,7 @@ test("founder demo: org → competition → approve → team roster → venue �
 
   // Team workspace: create two teams via the new tab.
   await page
-    .getByRole("navigation", { name: "Competition sections" })
+    .getByRole("navigation", { name: "Season sections" })
     .getByRole("link", { name: "Teams" })
     .click();
   await expect(page).toHaveURL(/\/teams$/);

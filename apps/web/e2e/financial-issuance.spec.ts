@@ -119,11 +119,11 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
 
   // --- Conduct an auction -----------------------------------------------------
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Issue Cup ${STAMP}`);
+  await page.getByLabel("Season name").fill(`Issue Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Nagpur");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   const slug = new URL(page.url()).pathname.split("/")[2] ?? "";
 

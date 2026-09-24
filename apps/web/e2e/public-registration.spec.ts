@@ -64,11 +64,11 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Monsoon Cup ${STAMP}`);
+  await page.getByLabel("Season name").fill(`Monsoon Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   competitionUrl = page.url();
   const slug = new URL(competitionUrl).pathname.split("/").pop() ?? "";
@@ -96,8 +96,8 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
 
   // A second, never-published draft competition stays structurally absent.
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Hidden Cup ${STAMP}`);
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByLabel("Season name").fill(`Hidden Cup ${STAMP}`);
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   privateSlugUrl = `/c/${new URL(page.url()).pathname.split("/").pop() ?? ""}`;
 

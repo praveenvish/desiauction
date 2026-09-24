@@ -34,9 +34,10 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
 }
 
 function rail(page: Page) {
-  // The nav model renders twice (rail ≥720px, bottom tabs below); scope to the
+  // The nav model renders twice from one source, under two landmarks: the rail
+  // ("Primary", ≥720px) and the bottom tabs ("Sections", below). Scope to the
   // visible one so assertions hold at any viewport.
-  return page.getByRole("navigation", { name: "Primary" }).locator("visible=true");
+  return page.getByRole("navigation", { name: /^(Primary|Sections)$/ }).locator("visible=true");
 }
 
 test("login lands on /home; the rail reaches every workspace; account is in the user menu", async ({
@@ -86,18 +87,18 @@ test("command palette navigates; breadcrumb + tabs appear inside a competition",
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org ${STAMP}`);
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Shell Cup ${STAMP}`);
+  await page.getByLabel("Season name").fill(`Shell Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-08-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
-  await expect(page).toHaveURL(/\/competitions\/shell-cup/);
+  await page.getByRole("button", { name: "Create season" }).click();
+  await expect(page).toHaveURL(/\/seasons\/shell-cup/);
 
   // Context bar: breadcrumb (org / competition) + section tabs.
   const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
   await expect(breadcrumb).toContainText(`Shell Org ${STAMP}`);
   await expect(breadcrumb).toContainText(`Shell Cup ${STAMP}`);
-  const tabs = page.getByRole("navigation", { name: "Competition sections" });
+  const tabs = page.getByRole("navigation", { name: "Season sections" });
   await tabs.getByRole("link", { name: "Registrations" }).click();
   await expect(page).toHaveURL(/\/registrations$/);
   await expect(breadcrumb).toContainText("Registrations");
@@ -119,17 +120,17 @@ test("command palette navigates; breadcrumb + tabs appear inside a competition",
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org B ${STAMP}`);
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Shell Cup B ${STAMP}`);
+  await page.getByLabel("Season name").fill(`Shell Cup B ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-09-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
-  await expect(page).toHaveURL(/\/competitions\/shell-cup-b/);
+  await page.getByRole("button", { name: "Create season" }).click();
+  await expect(page).toHaveURL(/\/seasons\/shell-cup-b/);
 
-  // Competition switcher: jump from Cup B back to the first cup.
-  await page.getByRole("button", { name: "Switch competition" }).click();
+  // Season switcher: jump from Cup B back to the first cup.
+  await page.getByRole("button", { name: "Switch season" }).click();
   await page.getByRole("menuitem", { name: new RegExp(`^Shell Cup ${STAMP}`) }).click();
-  await expect(page).toHaveURL(/\/competitions\/shell-cup-(?!b)/);
+  await expect(page).toHaveURL(/\/seasons\/shell-cup-(?!b)/);
 
   // Org switcher: multi-org users can jump straight to an org home.
   await page.getByRole("button", { name: "Switch organization" }).click();
@@ -144,7 +145,7 @@ test("mobile chrome: bottom tabs navigate and the drawer opens", async ({ browse
   try {
     await otpLogin(page, `85${STAMP}`);
     const tabs = rail(page).last();
-    await tabs.getByRole("link", { name: "Competitions" }).click();
+    await tabs.getByRole("link", { name: "Seasons" }).click();
     await expect(page).toHaveURL(/\/seasons/);
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
@@ -168,8 +169,10 @@ test("public shell wraps anonymous pages; console routes stay gated", async ({ p
 
 test("shell accessibility: /home and /help scan clean", async ({ page }) => {
   await otpLogin(page, `83${STAMP}`);
-  // Let the route content replace the loading skeleton before scanning.
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  // Let the route content replace the loading skeleton before scanning. The
+  // redesigned shell carries its own h1 in the top bar, so wait for the page's
+  // own greeting rather than "the" h1 — two are live once /home has rendered.
+  await expect(page.getByRole("heading", { level: 1, name: /^Good / })).toBeVisible();
   const homeScan = await new AxeBuilder({ page }).analyze();
   expect(homeScan.violations, JSON.stringify(homeScan.violations, null, 2)).toEqual([]);
   await page.goto("/help");

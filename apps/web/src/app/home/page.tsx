@@ -483,7 +483,10 @@ export default async function HomePage() {
                   ) : null}
                 </div>
                 {attention.length === 0 ? (
-                  <PanelEmpty icon={<Glyph d={G.check} />} text="All clear — nothing is waiting on you." />
+                  <PanelEmpty
+                    icon={<Glyph d={G.check} />}
+                    text="All clear — nothing is waiting on you."
+                  />
                 ) : (
                   <ul className="home-list">
                     {attention.map((row) => (
@@ -725,7 +728,9 @@ export default async function HomePage() {
                             className="home-event"
                           >
                             <span className="home-date">
-                              <b>{when !== null ? String(when.getDate()).padStart(2, "0") : "--"}</b>
+                              <b>
+                                {when !== null ? String(when.getDate()).padStart(2, "0") : "--"}
+                              </b>
                               <span>
                                 {when !== null
                                   ? when.toLocaleString("en-IN", { month: "short" }).toUpperCase()
@@ -816,7 +821,6 @@ export default async function HomePage() {
               </Card>
             </>
           ) : null}
-
         </>
       )}
     </main>

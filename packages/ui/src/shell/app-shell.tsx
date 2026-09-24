@@ -86,7 +86,10 @@ export function AppShell({
           ))}
         </NavigationGroup>
         {(navGroups ?? []).map((group) => (
-          <NavigationGroup key={group.key} {...(group.label !== undefined ? { label: group.label } : {})}>
+          <NavigationGroup
+            key={group.key}
+            {...(group.label !== undefined ? { label: group.label } : {})}
+          >
             {group.items.map((item) => (
               <NavigationItem key={item.key} item={item} linkComponent={Link} />
             ))}
@@ -100,9 +103,7 @@ export function AppShell({
         <header className={styles["topbar"]}>
           {/* The brand rides the top bar only on mobile, where the rail is hidden. */}
           <div className={styles["topbar-brand"]}>{brand}</div>
-          {pageTitle !== undefined ? (
-            <h1 className={styles["page-title"]}>{pageTitle}</h1>
-          ) : null}
+          {pageTitle !== undefined ? <h1 className={styles["page-title"]}>{pageTitle}</h1> : null}
           {search !== undefined ? <div className={styles["topbar-search"]}>{search}</div> : null}
           <div className={styles["top-actions"]}>{topActions}</div>
         </header>

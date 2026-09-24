@@ -75,7 +75,10 @@ function byNumber(a: string, b: string): number {
  * Filter by status + free-text, then sort. Stable, deterministic, and total:
  * unknown inputs fall back to number order. Returns a new array.
  */
-export function filterSortPlayers<T extends ShowcaseItem>(items: readonly T[], q: ShowcaseQuery): T[] {
+export function filterSortPlayers<T extends ShowcaseItem>(
+  items: readonly T[],
+  q: ShowcaseQuery,
+): T[] {
   const filtered = items.filter(
     (it) => (q.filter === "all" || it.status === q.filter) && matches(it, q.query.trim()),
   );

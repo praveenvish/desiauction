@@ -50,15 +50,20 @@ describe("squadsToCsv", () => {
 
   it("emits sold players grouped by team (A→Z, players by number); excludes available", () => {
     expect(squadsToCsv(roster)).toBe(
-      ["team,number,name,role", "Alpha,1,A,batter", "Alpha,2,B,all_rounder", "Zeta,3,C,bowler"].join(
-        "\n",
-      ),
+      [
+        "team,number,name,role",
+        "Alpha,1,A,batter",
+        "Alpha,2,B,all_rounder",
+        "Zeta,3,C,bowler",
+      ].join("\n"),
     );
   });
 
   it("emits just the header pre-auction (no sold players)", () => {
-    expect(squadsToCsv([{ number: "1", name: "A", role: "batter", status: "available", teamName: null }])).toBe(
-      "team,number,name,role",
-    );
+    expect(
+      squadsToCsv([
+        { number: "1", name: "A", role: "batter", status: "available", teamName: null },
+      ]),
+    ).toBe("team,number,name,role");
   });
 });

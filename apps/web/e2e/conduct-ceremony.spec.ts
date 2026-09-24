@@ -72,11 +72,11 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");
-  await organizer.getByLabel("Competition name").fill(`Ceremony Cup ${STAMP}`);
+  await organizer.getByLabel("Season name").fill(`Ceremony Cup ${STAMP}`);
   await organizer.getByLabel("Location").fill("Powai");
   await organizer.getByLabel("Starts on").fill("2026-08-01");
   await organizer.getByLabel("Ends on").fill("2026-09-15");
-  await organizer.getByRole("button", { name: "Create competition" }).click();
+  await organizer.getByRole("button", { name: "Create season" }).click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("draft");
   const slug = new URL(organizer.url()).pathname.split("/")[2] ?? "";
   for (const team of ["Arrows", "Blasters"]) {

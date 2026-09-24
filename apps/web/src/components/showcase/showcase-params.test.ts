@@ -4,7 +4,9 @@ import { parseShowcaseParams, serializeShowcaseParams } from "./showcase-params"
 
 describe("showcase URL params", () => {
   it("parses valid params and falls back for absent/invalid ones", () => {
-    expect(parseShowcaseParams(new URLSearchParams("view=squads&filter=sold&sort=name&q=amit"))).toEqual({
+    expect(
+      parseShowcaseParams(new URLSearchParams("view=squads&filter=sold&sort=name&q=amit")),
+    ).toEqual({
       view: "squads",
       filter: "sold",
       sort: "name",
@@ -29,7 +31,12 @@ describe("showcase URL params", () => {
   });
 
   it("round-trips (parse ∘ serialize is identity on valid state)", () => {
-    const state = { view: "squads" as const, filter: "available" as const, sort: "status" as const, query: "x" };
+    const state = {
+      view: "squads" as const,
+      filter: "available" as const,
+      sort: "status" as const,
+      query: "x",
+    };
     expect(parseShowcaseParams(new URLSearchParams(serializeShowcaseParams(state)))).toEqual(state);
   });
 });

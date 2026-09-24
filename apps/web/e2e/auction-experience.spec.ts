@@ -66,11 +66,11 @@ test("the full night: lobby → owners → bidding with notifications → public
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");
-  await organizer.getByLabel("Competition name").fill(`Night Cup ${STAMP}`);
+  await organizer.getByLabel("Season name").fill(`Night Cup ${STAMP}`);
   await organizer.getByLabel("Location").fill("Malad");
   await organizer.getByLabel("Starts on").fill("2026-08-01");
   await organizer.getByLabel("Ends on").fill("2026-09-15");
-  await organizer.getByRole("button", { name: "Create competition" }).click();
+  await organizer.getByRole("button", { name: "Create season" }).click();
   await expect(organizer.getByTestId("competition-status")).toHaveText("draft");
   slug = new URL(organizer.url()).pathname.split("/")[2] ?? "";
   liveUrl = `/seasons/${slug}/auction/live`;

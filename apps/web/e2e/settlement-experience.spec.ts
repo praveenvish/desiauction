@@ -103,11 +103,11 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   orgSlug = new URL(page.url()).pathname.split("/")[2] ?? "";
 
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Settle Cup ${STAMP}`);
+  await page.getByLabel("Season name").fill(`Settle Cup ${STAMP}`);
   await page.getByLabel("Location").fill("Thane");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-09-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   slug = new URL(page.url()).pathname.split("/")[2] ?? "";
 
@@ -163,7 +163,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   // --- The partition: an org OWNER has no money power until it is granted -----
   // The competition's Money TAB is ABSENT, not disabled — and the surface 404s.
   // (Scoped to the tab row: the rail's own "Money" is the personal one, always there.)
-  const tabRow = page.getByRole("navigation", { name: "Competition sections" });
+  const tabRow = page.getByRole("navigation", { name: "Season sections" });
   await page.goto(`/seasons/${slug}`);
   await expect(tabRow).toBeVisible();
   await expect(tabRow.getByRole("link", { name: "Money", exact: true })).toHaveCount(0);

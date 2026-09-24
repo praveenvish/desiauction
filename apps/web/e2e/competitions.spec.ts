@@ -53,11 +53,11 @@ test("the competition journey: create, open, team, register, approve", async ({
 
   // Create a competition with dates + location (so the lifecycle guard passes).
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`MPL ${STAMP}`);
+  await page.getByLabel("Season name").fill(`MPL ${STAMP}`);
   await page.getByLabel("Location").fill("Malad, Mumbai");
   await page.getByLabel("Starts on").fill("2026-08-01");
   await page.getByLabel("Ends on").fill("2026-08-15");
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-name")).toHaveText(`MPL ${STAMP}`);
   const competitionUrl = page.url();
 
@@ -108,8 +108,8 @@ test("registration is refused before intake opens", async ({ browser, page }) =>
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
-  await page.getByLabel("Competition name").fill(`Closed Cup ${stamp}`);
-  await page.getByRole("button", { name: "Create competition" }).click();
+  await page.getByLabel("Season name").fill(`Closed Cup ${stamp}`);
+  await page.getByRole("button", { name: "Create season" }).click();
   await expect(page.getByTestId("competition-status")).toHaveText("draft");
   const registerUrl = `${page.url()}/register`;
 

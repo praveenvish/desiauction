@@ -72,9 +72,9 @@ export function MoneyAuthorityPanel({
     <Card data-testid="money-authority">
       <h2>Money authority</h2>
       <p className="authority-hint">
-        Settlement is a separate trust from running the season. Being an owner here does not
-        let someone touch the books, and a settlement role does not let them run an auction — each
-        is granted on purpose, to a named person.
+        Settlement is a separate trust from running the season. Being an owner here does not let
+        someone touch the books, and a settlement role does not let them run an auction — each is
+        granted on purpose, to a named person.
       </p>
 
       {authority.grants.length === 0 ? (

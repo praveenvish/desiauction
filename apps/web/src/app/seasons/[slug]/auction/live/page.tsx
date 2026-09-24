@@ -23,10 +23,7 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
               <h1>{view.competition.name}</h1>
               <span className="date-row">
                 {view.viewer.canConduct ? (
-                  <ButtonLink
-                    href={`/seasons/${slug}/auction/cockpit`}
-                    data-testid="open-cockpit"
-                  >
+                  <ButtonLink href={`/seasons/${slug}/auction/cockpit`} data-testid="open-cockpit">
                     Cockpit
                   </ButtonLink>
                 ) : null}

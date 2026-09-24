@@ -26,6 +26,12 @@ export function SelfPhotoUploader({ slug, name }: { slug: string; name: string }
   }
 
   return (
-    <ImageUploader label="Your photo (optional)" name={name} size="xl" shape="round" onUpload={onUpload} />
+    <ImageUploader
+      label="Your photo (optional)"
+      name={name}
+      size="xl"
+      shape="round"
+      onUpload={onUpload}
+    />
   );
 }

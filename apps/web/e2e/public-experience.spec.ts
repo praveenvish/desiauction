@@ -69,10 +69,11 @@ test("founder demo: landing → discover → help → legal → register → sig
   await expect(page.getByRole("heading", { name: "Everything a tournament needs" })).toBeVisible();
   await axeClean(page, "/features");
 
-  // --- Discovers competitions ------------------------------------------------
-  await page.getByRole("link", { name: "Competitions" }).first().click();
+  // --- Discovers tournaments -------------------------------------------------
+  // The public surface says "tournament"; the organizer console says "season".
+  await page.getByRole("link", { name: "Tournaments" }).first().click();
   await expect(page).toHaveURL(/\/c$/);
-  await expect(page.getByRole("heading", { name: "Competitions", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tournaments", level: 1 })).toBeVisible();
 
   // --- Reads Help documentation ---------------------------------------------
   await page.getByRole("link", { name: "Help" }).first().click();
