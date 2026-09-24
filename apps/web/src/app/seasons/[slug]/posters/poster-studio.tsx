@@ -30,9 +30,9 @@ import {
   buildScene,
   loadCountFont,
   loadSprite,
-  pickRecordingType,
+  exportSceneVideo,
   playScene,
-  recordScene,
+  videoExportMode,
   type Scene,
 } from "./poster-motion";
 import { skinFor } from "./poster-skins";
@@ -415,8 +415,10 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
  * The animated preview, and the file it makes.
  *
  * The sprite is the same render as the poster (see `poster-motion.ts`), so the
- * film's last frame is the PNG. Recording is REAL TIME and stops in a hidden
- * tab, which is why the button says so instead of appearing to hang.
+ * film's last frame is the PNG. Where the browser can encode H.264 the file is
+ * an MP4 made frame by frame — seconds, and fine in a background tab; where it
+ * cannot, the old real-time recording, which says so instead of appearing to
+ * hang.
  */
 function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -424,7 +426,21 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [recording, setRecording] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // Asked once: whether this browser encodes H.264 is an async question.
+  const [mode, setMode] = useState<"mp4" | "recorder" | null | undefined>(undefined);
   const { unit } = useMoney();
+
+  useEffect(() => {
+    let live = true;
+    void videoExportMode(POSTER_SIZES[size].width, POSTER_SIZES[size].height).then((found) => {
+      if (live) {
+        setMode(found);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [size]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -460,7 +476,7 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
     };
   }, [src, unit]);
 
-  const canRecord = pickRecordingType() !== null;
+  const canRecord = mode === "mp4" || mode === "recorder";
 
   return (
     <div className="ps-motion">
@@ -508,7 +524,7 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
             }
             setProblem(null);
             setRecording(0);
-            void recordScene(scene, (fraction) => {
+            void exportSceneVideo(scene, (fraction) => {
               setRecording(Math.round(fraction * 100));
             })
               .then(({ blob, extension }) => {
@@ -520,7 +536,11 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
                 URL.revokeObjectURL(url);
               })
               .catch(() => {
-                setProblem("The browser stopped the recording. Keep this tab in front and retry.");
+                setProblem(
+                  mode === "mp4"
+                    ? "The video could not be made. Try again — the poster PNG works either way."
+                    : "The browser stopped the recording. Keep this tab in front and retry.",
+                );
               })
               .finally(() => {
                 setRecording(null);
@@ -529,12 +549,18 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
           data-testid="poster-record"
         >
           <IconDownload size={16} aria-hidden />
-          {recording === null ? "Download video" : `Recording ${String(recording)}%`}
+          {recording === null
+            ? "Download video"
+            : `${mode === "mp4" ? "Making video" : "Recording"} ${String(recording)}%`}
         </Button>
         <p className="st-note">
-          {canRecord
-            ? "Records in real time — keep this tab in front until it saves."
-            : "This browser cannot record video. The poster PNG works everywhere."}
+          {mode === undefined
+            ? " "
+            : mode === "mp4"
+              ? "An MP4 for WhatsApp Status — ready in a few seconds."
+              : mode === "recorder"
+                ? "Records in real time — keep this tab in front until it saves."
+                : "This browser cannot make video. The poster PNG works everywhere."}
         </p>
       </div>
     </div>

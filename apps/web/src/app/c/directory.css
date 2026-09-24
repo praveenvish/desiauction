@@ -966,50 +966,104 @@
 /* .squads-toolbar held the anonymous "Download squads (CSV)" button and has no
    markup left to style — see squads-view.tsx. */
 
-/* --- Share control on the public player page ---
-   Same shape as the organizer's .share-reg (seasons.css) but scoped to the
-   public surface: this page must not pull in the app-shell stylesheet for one
-   control. min-width is 180px, not 220px — this sits inside .mk-container at
-   320px, where 220 forces the row past the viewport. */
-.public-share {
+/* --- The share sheet on the public player page (share-player.tsx) ---
+   A phone surface first: the WhatsApp action is full width at 52px, the rest
+   are equal cells at a thumb's 44px, and nothing here pulls in the app-shell
+   stylesheet. */
+.share-sheet {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-sunken);
 }
 
-.public-share-label {
+.share-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.share-sheet-label {
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
 }
 
-.public-share-row {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  align-items: center;
+/* English | हिंदी — a two-cell switch, the pressed cell filled. */
+.share-sheet-lang {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface);
 }
 
-.public-share-input {
-  flex: 1;
-  min-width: 180px;
-  max-width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
+.share-sheet-lang > button {
+  min-height: 36px;
+  min-width: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+}
+
+.share-sheet-lang > button[aria-pressed="true"] {
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.share-sheet-lang > button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* What WhatsApp will send, shown before it is sent. */
+.share-sheet-preview {
+  margin: 0;
+  padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text-primary);
   font-size: var(--text-sm-size);
-  font-family: var(--font-mono, monospace);
+  line-height: var(--text-sm-line);
 }
 
-.public-share-input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+.share-sheet-primary,
+.share-sheet-wide {
+  width: 100%;
+  min-height: 52px;
+  box-sizing: border-box;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.share-sheet-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+  gap: var(--space-2);
+}
+
+.share-sheet-actions > button {
+  width: 100%;
+  min-height: 44px;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.share-sheet-note {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
 }
 
 /* --- RH-1b · Public surfaces on a phone ----------------------------------- */
@@ -1061,23 +1115,6 @@
     width: 100%;
     box-sizing: border-box;
   }
-
-  /* Copy / Share sit under the URL field they act on, at a thumb's size. */
-  .public-share-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
-  }
-
-  .public-share-row > .public-share-input {
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
-
-  .public-share-row > button {
-    min-height: 44px;
-    width: 100%;
-  }
 }
 
 /* PI-1: the player card's "Also played in" list — plain links, 44px targets. */
@@ -1104,4 +1141,124 @@
 .player-also-played a:hover {
   border-color: var(--border-interactive);
   color: var(--text-accent);
+}
+
+/* --- The public squad page (/c/[slug]/t/[team]) --------------------------- */
+
+/* The crest as a coin in the team's own colour — the page's one piece of art. */
+.team-page-crest {
+  display: grid;
+  place-items: center;
+  width: min(220px, 60vw);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 24%, rgb(255 255 255 / 0.4), transparent 42%),
+    radial-gradient(circle, var(--team) 58%, color-mix(in srgb, var(--team) 55%, #000) 100%);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.35),
+    inset 0 -14px 28px rgb(0 0 0 / 0.3),
+    0 30px 70px color-mix(in srgb, var(--team) 40%, transparent);
+  overflow: hidden;
+}
+
+.team-page-crest > img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+}
+
+.team-page-crest-mark {
+  font-size: clamp(48px, 12vw, 76px);
+  font-weight: var(--font-weight-bold, 700);
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+}
+
+.team-page-empty {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.team-page-squad {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: var(--space-2);
+}
+
+.team-page-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: inherit;
+  text-decoration: none;
+}
+
+.team-page-player:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+}
+
+.team-page-player:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.team-page-face {
+  flex-shrink: 0;
+}
+
+.team-page-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.team-page-who > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-heading);
+}
+
+.team-page-who > span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.team-page-price {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  font-weight: var(--font-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.team-page-signed {
+  font-style: italic;
+  color: var(--text-accent);
+}
+
+.team-page-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--text-on-accent, #070a0f);
+  font-size: 12px;
+  font-weight: 700;
 }

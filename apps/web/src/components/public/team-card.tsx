@@ -51,7 +51,7 @@ export function TeamCard({
 }: {
   team: TeamCardData;
   preview?: number;
-  href?: string;
+  href?: string | undefined;
 }) {
   const { name, color, crest, coachName, players } = team;
   const shown = players.slice(0, preview);

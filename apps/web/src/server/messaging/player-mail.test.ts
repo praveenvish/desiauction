@@ -56,7 +56,7 @@ describe("the sale", () => {
     expect(mail.text).toContain("3 times your base");
     expect(mail.text).toContain("most expensive buy of the night");
     expect(mail.text).toContain("Vikram Patel");
-    expect(mail.html).toContain("See your player card");
+    expect(mail.html).toContain("Share your player card");
   });
 
   it("sends a player with no public card to their season instead", async () => {
@@ -145,6 +145,63 @@ describe("the owner's night", () => {
     });
     expect(mail.text).toContain("Purse left: ₹1,99,00,000");
     expect(mail.text).toContain("6 short of the minimum of 8");
+  });
+
+  const owner = {
+    name: "Priya",
+    season: "MPL 2026",
+    teamName: "Cup Kings",
+    squad: sale.squad,
+    spent: "₹1,00,000",
+    purseLeft: "₹1,99,00,000",
+    squadSize: 2,
+    squadMin: 2,
+    squadMax: 15,
+    teamUrl: "https://desiauction.in/seasons/mpl/teams",
+  };
+
+  it("asks a public season's owner to share the squad, and the button opens its page", async () => {
+    const mail = await ownerSummaryMail({
+      ...owner,
+      shareUrl: "https://desiauction.in/c/mpl/t/cup-kings?ref=email",
+    });
+    expect(mail.text).toContain("Your squad card is ready.");
+    expect(mail.html).toContain("https://desiauction.in/c/mpl/t/cup-kings?ref=email");
+    expect(mail.html).toContain("Share your squad");
+    expect(mail.html).not.toContain("/seasons/mpl/teams");
+  });
+
+  it("keeps a private season's owner on the console, with no share line", async () => {
+    const mail = await ownerSummaryMail({ ...owner, shareUrl: null });
+    expect(mail.text).not.toContain("squad card is ready");
+    expect(mail.html).toContain("/seasons/mpl/teams");
+    expect(mail.html).toContain("Open your team");
+  });
+
+  it("says it in Hindi too", async () => {
+    const mail = await ownerSummaryMail(
+      { ...owner, shareUrl: "https://desiauction.in/c/mpl/t/cup-kings?ref=email" },
+      "hi",
+    );
+    expect(mail.text).toContain("आपकी टीम का कार्ड तैयार है");
+    expect(mail.html).toContain("अपनी टीम शेयर करें");
+  });
+});
+
+describe("the share nudge on a sale", () => {
+  it("offers a public card to share, in the reader's language", async () => {
+    const en = await soldMail(sale);
+    expect(en.text).toContain("Your player card is ready. Share it with your groups");
+    expect(en.html).toContain("Share your player card");
+    const hi = await soldMail(sale, "hi");
+    expect(hi.text).toContain("आपका प्लेयर कार्ड तैयार है");
+    expect(hi.html).toContain("अपना प्लेयर कार्ड शेयर करें");
+  });
+
+  it("says nothing about sharing when there is no public card (private season, or a minor)", async () => {
+    const mail = await soldMail({ ...sale, cardUrl: null });
+    expect(mail.text).not.toContain("player card is ready");
+    expect(mail.html).not.toContain("Share your player card");
   });
 });
 

@@ -1,4 +1,4 @@
-import { formatAmount, isMinor, paise } from "@desiauction/core";
+import { formatAmount, isMinor, paise, slugifyName } from "@desiauction/core";
 import {
   auctionOwnerInvites,
   auctions,
@@ -210,7 +210,8 @@ export async function auctionOutcomeMessages(
                 ? "You were the most expensive buy of the night"
                 : null,
             squad: squadOf(sale.teamId),
-            cardUrl: publicCard,
+            // `?ref=email`: the card's page counts where its visitors came from.
+            cardUrl: publicCard === null ? null : `${publicCard}?ref=email`,
           },
           language,
         )),
@@ -290,6 +291,10 @@ export async function auctionOutcomeMessages(
           squadMin: config.squadMin ?? 0,
           squadMax: config.squadMax ?? 0,
           teamUrl: `${env.PUBLIC_BASE_URL}/seasons/${context.slug}/teams`,
+          shareUrl:
+            context.visibility === "public"
+              ? `${env.PUBLIC_BASE_URL}/c/${context.slug}/t/${slugifyName(owner.teamName)}?ref=email`
+              : null,
         },
         ownerLanguages.get(owner.personId) ?? "en",
       )),

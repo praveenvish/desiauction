@@ -1,9 +1,14 @@
-import { buildPlayerShareCard } from "@desiauction/core";
+import { buildPlayerPoster, buildPlayerShareCard } from "@desiauction/core";
 import { initialsFor } from "@desiauction/ui";
 import { ImageResponse } from "next/og";
 
-import { inlineStoredImage } from "../../../../../server/competition/posters";
-import { publicPlayerCard } from "../../../../../server/competition/public";
+import { inlineStoredImage, posterBrandMark } from "../../../../../server/competition/posters";
+import { publicPlayerCard, publicPlayerPoster } from "../../../../../server/competition/public";
+import { posterFonts } from "../../../../seasons/[slug]/posters/poster-fonts";
+import {
+  LINK_CARD_SIZE,
+  renderPlayerLinkCard,
+} from "../../../../seasons/[slug]/posters/poster-link";
 import {
   SHARE_IMAGE_SIZE,
   renderPlayerShareCard,
@@ -11,13 +16,14 @@ import {
 } from "../../share-image-card";
 
 // Shareable single-player card (parity §Phase 2). The viral unit of a grassroots
-// auction: a player posts their own card — "I'm in the pool, bid for me". Reuses
-// the SAME consent + visibility gates as the showcase (`publicPlayer` → null →
-// neutral fallback, never leaked data), and the pure share-card view. The face
-// rides the card when the PUBLIC gate passes (consent recorded, not a minor):
-// `publicPlayerCard` hands over the stored key only then, and the bytes are
-// inlined because the rasterizer cannot fetch a relative path. No key, a WebP
-// or a missing object → the initials tile, as before.
+// auction: a player posts their own card — "I'm in the pool, bid for me", or
+// "sold for ₹12,500". It is the v3 poster laid landscape (`poster-link.tsx`),
+// behind the SAME consent + visibility gates as the showcase: `publicPlayerPoster`
+// starts from `publicPlayerCard` and only adds the verdict, the money and the
+// team, so a season that is not public, or a player who is not approved, still
+// gets the neutral fallback and never leaked data. The face rides the card only
+// when the public photo gate passes, inlined because the rasterizer cannot fetch
+// a relative path.
 
 export const runtime = "nodejs"; // publicPlayer reads Postgres — not edge-safe.
 // A withdrawn player 404s on their page immediately, and a season pulled
@@ -36,6 +42,30 @@ export default async function OpengraphImage({
   params: Promise<{ slug: string; number: string }>;
 }) {
   const { slug, number } = await params;
+  const poster = await publicPlayerPoster(slug, number);
+  if (poster !== null) {
+    const [photoUrl, teamCrestUrl, competitionLogoUrl, brandMarkSrc, fonts] = await Promise.all([
+      inlineStoredImage(poster.photoKey, 640),
+      inlineStoredImage(poster.teamCrestKey, 160),
+      inlineStoredImage(poster.logoKey, 160),
+      posterBrandMark(),
+      posterFonts(),
+    ]);
+    const model = buildPlayerPoster({
+      ...poster.input,
+      photoUrl,
+      teamCrestUrl,
+      competitionLogoUrl,
+    });
+    return new ImageResponse(renderPlayerLinkCard(model, { brandMarkSrc }), {
+      ...LINK_CARD_SIZE,
+      fonts,
+    });
+  }
+
+  // A published, approved player the auction has no verdict for (a withdrawn
+  // lot, a finished auction that never reached them): the plain card, which
+  // makes no claim about the night.
   const card = await publicPlayerCard(slug, number);
   if (card === null) {
     return new ImageResponse(renderShareFallback(), { ...size });

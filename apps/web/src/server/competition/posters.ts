@@ -13,8 +13,6 @@ import {
   type MoneyUnit,
   type PlayerPosterInput,
   type PosterKind,
-  type PosterMark,
-  type PosterOutcome,
   type PosterSize,
   type PosterTheme,
   type SeasonPosterInput,
@@ -40,13 +38,15 @@ import {
 } from "@desiauction/db";
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
+import { env } from "../../env";
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
 import { storage } from "../media";
 import { canCompetition } from "./authz";
 import { competitionForRegistration, resolveCompetition } from "./competitions";
-import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
+import { isPreSigned, preSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
+import { marksOf, outcomeOf } from "./poster-outcome";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
@@ -81,6 +81,12 @@ export interface PosterSource<T> {
   readonly showBranding: boolean;
   /** Filename used when the caller asked for a download. */
   readonly filename: string;
+  /**
+   * The public page the poster's QR code opens, or null when there is none to
+   * open — a season that is not published. A code that lands on a 404 is worse
+   * than no code.
+   */
+  readonly shareUrl?: string | null;
 }
 
 export type PosterResult<T> = PosterSource<T> | PosterRefusal;
@@ -126,6 +132,8 @@ interface Gate {
   readonly personId: string;
   readonly competition: { id: string; orgId: string; slug: string; name: string };
   readonly logoKey: string | null;
+  /** Published seasons have public pages a poster can point back to. */
+  readonly published: boolean;
   readonly showBranding: boolean;
   /** What the season's auction counts in — every price on a poster is in it. */
   readonly unit: MoneyUnit;
@@ -310,6 +318,7 @@ export async function posterGateFor(personId: string, slug: string): Promise<Gat
         tier: competitions.tier,
         logoKey: competitions.logoUrl,
         unit: competitions.auctionUnit,
+        visibility: competitions.visibility,
       })
       .from(competitions)
       .where(eq(competitions.id, competition.id))
@@ -319,6 +328,7 @@ export async function posterGateFor(personId: string, slug: string): Promise<Gat
     personId,
     competition,
     logoKey: row?.logoKey ?? null,
+    published: row?.visibility === "public",
     // An unreadable tier falls back to `free`, which is the branded behaviour.
     // Failing the other way would let one bad row silently strip the platform's
     // own mark off every poster a season produces.
@@ -464,6 +474,7 @@ async function playerPosterFrom(
           dateOfBirth: registrations.dateOfBirth,
           role: registrations.role,
           number: registrations.registrationNumber,
+          jerseyNumber: registrations.jerseyNumber,
           status: registrations.status,
           isIcon: registrations.isIcon,
           isCaptain: registrations.isCaptain,
@@ -490,6 +501,8 @@ async function playerPosterFrom(
         .select({
           status: lots.status,
           soldPrice: lots.soldPrice,
+          basePrice: lots.basePrice,
+          lotNumber: lots.lotNumber,
           buyerTeamId: paddles.teamId,
         })
         .from(lots)
@@ -523,7 +536,24 @@ async function playerPosterFrom(
                 .limit(1)
             )[0];
 
-      const outcome = outcomeOf(preSigned ? preSignedKind(row) : null, lot?.status);
+      // With no lot yet, whether the player is still IN an auction depends on
+      // the season's auction: one that has finished without them is not a pool.
+      const auctionStatus =
+        lot === undefined
+          ? ((
+              await db
+                .select({ status: auctions.status })
+                .from(auctions)
+                .where(
+                  and(
+                    eq(auctions.competitionId, gated.competition.id),
+                    ne(auctions.status, "abandoned"),
+                  ),
+                )
+                .limit(1)
+            )[0]?.status ?? null)
+          : null;
+      const outcome = outcomeOf(preSigned ? preSignedKind(row) : null, lot?.status, auctionStatus);
       if (outcome === null || row.playerName === null) {
         return null;
       }
@@ -564,7 +594,10 @@ async function playerPosterFrom(
         photoKey,
         outcome,
         pricePaise: outcome === "sold" ? (lot?.soldPrice ?? null) : null,
-        teamName: team?.name ?? null,
+        basePricePaise: outcome === "pool" ? (lot?.basePrice ?? null) : null,
+        lotNumber: lot?.lotNumber ?? null,
+        jerseyNumber: row.jerseyNumber,
+        teamName: outcome === "pool" ? null : (team?.name ?? null),
         teamCrestKey: team?.logoKey ?? null,
         teamColor: team?.colour ?? null,
       };
@@ -575,8 +608,7 @@ async function playerPosterFrom(
     return {
       ok: false,
       status: 404,
-      message:
-        "There is no poster for this player yet — a poster needs a settled outcome: sold, unsold, retained or icon.",
+      message: "There is no poster for this player — they are not in this season's auction.",
     };
   }
 
@@ -595,9 +627,16 @@ async function playerPosterFrom(
     ok: true,
     showBranding: gated.showBranding,
     filename: posterFilename(gated.competition.slug, read.playerName, request.size),
+    shareUrl:
+      gated.published && read.number !== ""
+        ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}/p/${encodeURIComponent(read.number)}?ref=qr`
+        : null,
     input: {
       playerName: read.playerName,
       number: read.number,
+      jerseyNumber: read.jerseyNumber,
+      lotNumber: read.lotNumber,
+      basePricePaise: read.basePricePaise,
       role: read.role,
       photoUrl,
       outcome: read.outcome,
@@ -612,25 +651,11 @@ async function playerPosterFrom(
   };
 }
 
-/**
- * A poster asserts a verdict, so there has to be one. A player still in the
- * queue has no outcome the auction has reached, and "UNSOLD" is not a neutral
- * default to fall back on — it is a claim about a night that has not finished.
- */
-function outcomeOf(
-  preSigned: PreSignedKind | null,
-  lotStatus: string | undefined,
-): PosterOutcome | null {
-  if (preSigned !== null) {
-    return preSigned;
-  }
-  if (lotStatus === "sold") {
-    return "sold";
-  }
-  if (lotStatus === "unsold") {
-    return "unsold";
-  }
-  return null;
+/** The season's public page — what a squad or season poster's QR code opens. */
+function seasonShareUrl(gated: Gate): string | null {
+  return gated.published
+    ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}?ref=qr`
+    : null;
 }
 
 // --- Team -------------------------------------------------------------------
@@ -745,6 +770,10 @@ async function teamPosterFrom(
   return {
     ok: true,
     showBranding: gated.showBranding,
+    // The squad's own page: a QR on a squad sheet should open that squad.
+    shareUrl: gated.published
+      ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}/t/${slugifyName(read.teamName)}?ref=qr`
+      : null,
     filename: posterFilename(gated.competition.slug, `${read.teamName} squad`, request.size),
     input: {
       teamName: read.teamName,
@@ -881,23 +910,6 @@ async function squadOf(
     members,
     spentPaise: bought.reduce((total, row) => total + (row.price ?? 0), 0),
   };
-}
-
-/** Every mark a pre-signed player wears — a player can be an icon AND captain. */
-function marksOf(row: { isIcon: boolean; isCaptain: boolean; isRetained: boolean }): PosterMark[] {
-  const marks: PosterMark[] = [];
-  if (row.isCaptain) {
-    marks.push("captain");
-  }
-  if (row.isIcon) {
-    marks.push("icon");
-  }
-  if (row.isRetained) {
-    marks.push("retained");
-  }
-  // `preSignedSql` selected this row, so at least one mark is always present;
-  // the fallback keeps a hand-edited row from rendering an unmarked "icon".
-  return marks.length > 0 ? marks : ["icon"];
 }
 
 /**
@@ -1040,6 +1052,7 @@ async function topBuysPosterFrom(
   return {
     ok: true,
     showBranding: gated.showBranding,
+    shareUrl: seasonShareUrl(gated),
     filename: posterFilename(gated.competition.slug, `top ${String(count)}`, request.size),
     input: {
       competitionName: gated.competition.name,
@@ -1142,6 +1155,7 @@ async function seasonPosterFrom(
   return {
     ok: true,
     showBranding: gated.showBranding,
+    shareUrl: seasonShareUrl(gated),
     filename: posterFilename(gated.competition.slug, "all squads", request.size),
     input: {
       competitionName: gated.competition.name,

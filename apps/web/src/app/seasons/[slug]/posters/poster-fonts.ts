@@ -23,16 +23,35 @@ import { join } from "node:path";
 export interface PosterFont {
   readonly name: string;
   readonly data: ArrayBuffer;
-  readonly weight: 400 | 600;
-  readonly style: "normal";
+  readonly weight: 400 | 600 | 700 | 800;
+  readonly style: "normal" | "italic";
 }
 
 const DIR = join(process.cwd(), "public", "fonts", "poster");
 
-const FACES: readonly { file: string; name: string; weight: 400 | 600 }[] = [
+/*
+ * The display faces. Satori reads no variable-font axes, so Archivo arrives as
+ * two STATIC instances cut from the variable font (width 70 / weight 800 for a
+ * surname and a shirt number; width 86 / weight 700 for money), subset to Latin
+ * plus ₹. Instrument Serif italic is the light first-name voice. All three are
+ * OFL — the licences sit beside them.
+ */
+export const DISPLAY = "Archivo Condensed";
+export const FIGURES = "Archivo SemiCondensed";
+export const SERIF = "Instrument Serif";
+
+const FACES: readonly {
+  file: string;
+  name: string;
+  weight: PosterFont["weight"];
+  style?: PosterFont["style"];
+}[] = [
   { file: "geist-sans-400.woff", name: "Geist Sans", weight: 400 },
   { file: "geist-sans-600.woff", name: "Geist Sans", weight: 600 },
   { file: "anek-devanagari-600.woff", name: "Anek Devanagari", weight: 600 },
+  { file: "archivo-condensed-800.woff", name: DISPLAY, weight: 800 },
+  { file: "archivo-semicondensed-700.woff", name: FIGURES, weight: 700 },
+  { file: "instrument-serif-italic.woff", name: SERIF, weight: 400, style: "italic" },
 ];
 
 let cached: Promise<PosterFont[]> | null = null;
@@ -48,7 +67,7 @@ async function load(): Promise<PosterFont[]> {
           // Satori receives only this font's bytes.
           data: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
           weight: face.weight,
-          style: "normal" as const,
+          style: face.style ?? ("normal" as const),
         };
       } catch {
         // A missing face is not worth failing a poster over — Satori will fall

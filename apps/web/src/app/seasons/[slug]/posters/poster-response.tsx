@@ -2,7 +2,7 @@ import { POSTER_SIZES, type PosterKind } from "@desiauction/core";
 import { ImageResponse } from "next/og";
 
 import { posterBrandMark, type PosterResult } from "../../../../server/competition/posters";
-import { renderSprite } from "./poster-card";
+import { renderSpriteBands } from "./poster-card";
 import type { PosterRenderOptions } from "./poster-kit";
 import { posterFonts } from "./poster-fonts";
 import { parsePosterQuery, posterHeaders, posterRefusal, type PosterQuery } from "./poster-request";
@@ -47,6 +47,7 @@ export async function posterResponse<TInput, TModel>(args: {
     brandMarkSrc: await posterBrandMark(),
     prices: args.forcePrices ?? query.prices,
     sponsor: query.sponsor,
+    shareUrl: source.shareUrl ?? null,
   };
   const model = args.build(source.input);
   // Without these the rupee sign rasterizes as an empty box — see poster-fonts.
@@ -60,12 +61,29 @@ export async function posterResponse<TInput, TModel>(args: {
     });
   }
 
-  const sprite = renderSprite(args.kind, (only) => args.draw(model, only), options);
+  // Each band is rasterized on its own canvas and the PNGs are stacked with
+  // sharp — see `renderSpriteBands` for why that is ~4x faster than one tall
+  // render. The client reads exactly the sprite it always did.
+  const sprite = renderSpriteBands(args.kind, (only) => args.draw(model, only), options);
+  const pngs: Buffer[] = [];
+  for (const band of sprite.bands) {
+    const image = new ImageResponse(band, { width: sprite.width, height: sprite.height, fonts });
+    pngs.push(Buffer.from(await image.arrayBuffer()));
+  }
+  const { default: sharp } = await import("sharp");
+  const stacked = await sharp({
+    create: {
+      width: sprite.width,
+      height: sprite.height * pngs.length,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(pngs.map((input, index) => ({ input, top: index * sprite.height, left: 0 })))
+    .png()
+    .toBuffer();
   const pricePaise = args.priceOf?.(source.input) ?? null;
-  return new ImageResponse(sprite.element, {
-    width: sprite.width,
-    height: sprite.height * sprite.layers.length,
-    fonts,
+  return new Response(new Uint8Array(stacked), {
     headers: posterHeaders(source.filename, false, {
       layers: sprite.layers,
       height: sprite.height,

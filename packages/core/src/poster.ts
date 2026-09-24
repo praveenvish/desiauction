@@ -117,8 +117,13 @@ export function normalizeHexColor(value: string | null | undefined): string | nu
  * `captain` is a pre-signed outcome like `icon` and `retained`: a captain the
  * team picked before the night never went to the block, so SOLD would be false
  * and there is no other verdict to print.
+ *
+ * `pool` is the one outcome that is not a verdict: an approved player whose
+ * lot has not come up yet. It is still a true sentence — "I am in the auction,
+ * bid for me" — and it is the card a player posts BEFORE the night, which is
+ * when a share can still bring a bidder into the room.
  */
-export type PosterOutcome = "sold" | "unsold" | "retained" | "icon" | "captain";
+export type PosterOutcome = "sold" | "unsold" | "retained" | "icon" | "captain" | "pool";
 
 export interface PlayerPosterInput {
   playerName: string;
@@ -138,6 +143,12 @@ export interface PlayerPosterInput {
   competitionLogoUrl: string | null;
   /** What the season's auction counts in: prices print as "₹…" or "… pts". */
   unit: MoneyUnit;
+  /** The shirt number the organizer assigned; drawn as the hero when present. */
+  jerseyNumber?: string | null;
+  /** The auction's lot number, once the player has one. */
+  lotNumber?: string | null;
+  /** Integer paise. Only a `pool` player's opening price is printed. */
+  basePricePaise?: number | null;
 }
 
 export interface PlayerPoster {
@@ -157,6 +168,19 @@ export interface PlayerPoster {
   teamColor: string | null;
   competitionName: string;
   competitionLogoUrl: string | null;
+  outcome: PosterOutcome;
+  /** The name in two voices: a light first name over a heavy surname. */
+  firstName: string | null;
+  lastName: string;
+  /**
+   * The big number behind the player: their shirt number, else null. Only a
+   * short run of digits qualifies — "07" is a shirt, "R67X349" is a receipt.
+   */
+  heroNumber: string | null;
+  /** "LOT 14", or null before the auction numbers its lots. */
+  lotLabel: string | null;
+  /** A `pool` player's opening price, formatted; null for every verdict. */
+  basePriceLabel: string | null;
 }
 
 const STAMP: Record<PosterOutcome, string> = {
@@ -165,7 +189,40 @@ const STAMP: Record<PosterOutcome, string> = {
   retained: "RETAINED",
   icon: "ICON",
   captain: "CAPTAIN",
+  pool: "IN THE POOL",
 };
+
+/**
+ * "Rohit Yadav" → { first: "Rohit", last: "Yadav" }; a single name is all
+ * surname. The split is on the LAST space: "Mohammed Azharuddin Khan" keeps
+ * "Mohammed Azharuddin" together as the light line.
+ */
+export function splitName(name: string): { first: string | null; last: string } {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter((part) => part !== "");
+  if (parts.length <= 1) {
+    return { first: null, last: parts[0] ?? name.trim() };
+  }
+  return { first: parts.slice(0, -1).join(" "), last: parts[parts.length - 1] ?? "" };
+}
+
+/**
+ * "L003" → "3", "14" → "14". Lot numbers are stored with a prefix and padding
+ * for sorting; a poster that says "LOT L003" is reading the database aloud.
+ */
+export function lotOf(lotNumber: string | null | undefined): string {
+  const trimmed = lotNumber?.trim() ?? "";
+  const digits = /^[A-Za-z]*0*(\d+)$/.exec(trimmed);
+  return digits?.[1] ?? trimmed;
+}
+
+/** A shirt number worth drawing three feet tall: one to three digits, nothing else. */
+export function heroNumberOf(jersey: string | null | undefined): string | null {
+  const trimmed = jersey?.trim() ?? "";
+  return /^\d{1,3}$/.test(trimmed) ? trimmed : null;
+}
 
 /** Names wrap badly on a poster long before they are truncated in a list. */
 function clamp(value: string, max: number): string {
@@ -217,19 +274,36 @@ export function buildPlayerPoster(input: PlayerPosterInput): PlayerPoster {
   const priceLabel =
     sold && input.pricePaise !== null ? formatAmount(paise(input.pricePaise), input.unit) : null;
   const outcomeLine =
-    input.teamName === null
-      ? input.outcome === "unsold"
-        ? "Unsold"
-        : null
-      : input.outcome === "retained"
-        ? `RETAINED BY ${clamp(input.teamName, 22).toUpperCase()}`
-        : input.outcome === "icon"
-          ? `ICON · ${clamp(input.teamName, 22).toUpperCase()}`
-          : input.outcome === "captain"
-            ? `CAPTAIN · ${clamp(input.teamName, 22).toUpperCase()}`
-            : `SOLD TO ${clamp(input.teamName, 22).toUpperCase()}`;
+    input.outcome === "pool"
+      ? null
+      : input.teamName === null
+        ? input.outcome === "unsold"
+          ? "Unsold"
+          : null
+        : input.outcome === "retained"
+          ? `RETAINED BY ${clamp(input.teamName, 22).toUpperCase()}`
+          : input.outcome === "icon"
+            ? `ICON · ${clamp(input.teamName, 22).toUpperCase()}`
+            : input.outcome === "captain"
+              ? `CAPTAIN · ${clamp(input.teamName, 22).toUpperCase()}`
+              : `SOLD TO ${clamp(input.teamName, 22).toUpperCase()}`;
+  const name = clamp(input.playerName, 22);
+  // Split the WHOLE name, then clamp each voice: clamping first turned
+  // "Venkataraghavan Subramaniam" into a surname of "Subra…". The renderer
+  // shrinks a long surname to fit; it cannot un-truncate one.
+  const split = splitName(input.playerName);
+  const first = split.first === null ? null : clamp(split.first, 24);
+  const last = clamp(split.last, 16);
+  const lot = lotOf(input.lotNumber);
+  const base = input.outcome === "pool" ? (input.basePricePaise ?? null) : null;
   return {
-    name: clamp(input.playerName, 22),
+    name,
+    outcome: input.outcome,
+    firstName: first,
+    lastName: last,
+    heroNumber: heroNumberOf(input.jerseyNumber),
+    lotLabel: lot === "" ? null : `LOT ${lot}`,
+    basePriceLabel: base === null || base <= 0 ? null : formatAmount(paise(base), input.unit),
     numberLabel: input.number === null || input.number.trim() === "" ? null : input.number.trim(),
     roleLine: roleLabel(input.role),
     photoUrl: input.photoUrl,
@@ -237,8 +311,10 @@ export function buildPlayerPoster(input: PlayerPosterInput): PlayerPoster {
     stamp: STAMP[input.outcome],
     priceLabel,
     outcomeLine,
-    teamName: input.teamName === null ? null : clamp(input.teamName, 24),
-    teamCrestUrl: input.teamCrestUrl,
+    // A pool player has no team yet, whatever a stale row says.
+    teamName:
+      input.outcome === "pool" || input.teamName === null ? null : clamp(input.teamName, 24),
+    teamCrestUrl: input.outcome === "pool" ? null : input.teamCrestUrl,
     teamColor: normalizeHexColor(input.teamColor),
     competitionName: clamp(input.competitionName, 34),
     competitionLogoUrl: input.competitionLogoUrl,
