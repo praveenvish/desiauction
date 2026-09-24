@@ -57,7 +57,7 @@ test("founder demo: landing → discover → help → legal → register → sig
   // The guest demo must be clearly distinguished from a real auction.
   await expect(page.getByText("INTERACTIVE DEMO", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Fictional players & teams. No real bids or payments."),
+    page.getByText("Fictional teams. No real bids or payments."),
   ).toBeVisible();
   await axeClean(page, "/");
 

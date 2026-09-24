@@ -260,7 +260,7 @@ export function AuctionLab({
                 </div>
                 <div>
                   <span>PLAYER 007</span>
-                  <h3>Riya Mehta</h3>
+                  <h3>Praveen Vishnoi</h3>
                   <p>
                     {sport?.role} <span>·</span> {sport?.label}
                   </p>
@@ -351,7 +351,7 @@ export function AuctionLab({
               </div>
             </div>
             <p className={styles.demoDisclaimer}>
-              Fictional players & teams. No real bids or payments.
+              Fictional teams. No real bids or payments.
             </p>
             <noscript>
               <p className={styles.demoDisclaimer}>
