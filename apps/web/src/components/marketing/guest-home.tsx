@@ -350,9 +350,7 @@ export function AuctionLab({
                 </span>
               </div>
             </div>
-            <p className={styles.demoDisclaimer}>
-              Fictional teams. No real bids or payments.
-            </p>
+            <p className={styles.demoDisclaimer}>Fictional teams. No real bids or payments.</p>
             <noscript>
               <p className={styles.demoDisclaimer}>
                 Enable JavaScript to try the interactive auction demo.
