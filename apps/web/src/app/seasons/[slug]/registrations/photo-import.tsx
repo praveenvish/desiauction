@@ -6,10 +6,20 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { runMediaUpload } from "../../../../components/media/run-media-upload";
+import {
+  downloadDriveFile,
+  pickDriveFiles,
+  preloadGoogle,
+  requestDriveToken,
+} from "../../../../lib/google-drive";
 import { expandPhotoFiles } from "../../../../lib/photo-files";
 import { shrinkImage } from "../../../../lib/shrink-image";
 import { attachMedia, requestMediaUpload } from "../../../../server/media/actions";
-import { photoTargetsAction } from "../../../../server/competition/actions";
+import {
+  drivePickerConfigAction,
+  photoTargetsAction,
+  type DrivePickerConfig,
+} from "../../../../server/competition/actions";
 
 // Client-side hints only — mirrors ImageUploader; the media actions re-validate.
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
@@ -31,7 +41,12 @@ interface Entry {
   detail?: string;
   /** Object URL for the thumbnail — revoked when the batch is cleared. */
   preview: string;
+  /** Fetched by the Drive link in this player's own row — an exact match. */
+  viaDrive?: boolean;
 }
+
+/** Drive downloads in flight at once — enough to be quick, few enough for club wifi. */
+const DRIVE_PARALLEL = 4;
 
 const RULE_LABEL = { number: "by reg. number", phone: "by phone", name: "by name" } as const;
 
@@ -61,7 +76,16 @@ function formatProblem(file: File): string | undefined {
  * single-photo upload. Each photo is shrunk in the browser first, so a phone
  * camera's 6 MB original no longer fails the 5 MB limit.
  */
-export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () => void }) {
+export function PhotoImportPanel({
+  slug,
+  onDone,
+  onStepAside,
+}: {
+  slug: string;
+  onDone: () => void;
+  /** Hide the (modal) import dialog while Google's Picker is on screen. */
+  onStepAside?: (aside: boolean) => void;
+}) {
   const router = useRouter();
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -72,6 +96,30 @@ export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () =>
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [over, setOver] = useState(false);
+  /* "Get photos from Google Drive": shown only when the Google project is
+     configured AND the season has players whose Form row linked a photo. */
+  const [drive, setDrive] = useState<DrivePickerConfig | null>(null);
+  const [linked, setLinked] = useState<PhotoTarget[]>([]);
+  const [driveStep, setDriveStep] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void Promise.all([drivePickerConfigAction(slug), photoTargetsAction(slug)]).then(
+      ([config, found]) => {
+        if (!live) {
+          return;
+        }
+        setDrive(config);
+        const withLinks = found.filter((target) => (target.driveId ?? null) !== null);
+        setLinked(withLinks);
+        if (config !== null && withLinks.length > 0) {
+          preloadGoogle();
+        }
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [slug]);
 
   // Thumbnails hold memory until revoked; a closed dialog must give it back.
   const previews = useRef<string[]>([]);
@@ -124,6 +172,108 @@ export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () =>
       }),
     );
     setProgress(0);
+  };
+
+  /**
+   * THE EXACT ROUTE. Each player's photo is fetched by the Drive link their own
+   * Form row carried, so the match is certain — no file names involved. The
+   * organizer signs in to Google, selects every photo Google shows (only this
+   * form's), and the review table fills with each face already on its player.
+   */
+  const fromDrive = async () => {
+    if (drive === null) {
+      return;
+    }
+    const byDriveId = new Map(
+      linked.flatMap((target) =>
+        target.driveId === undefined || target.driveId === null
+          ? []
+          : [[target.driveId, target] as const],
+      ),
+    );
+    try {
+      setDriveStep("Waiting for Google…");
+      const token = await requestDriveToken(drive.clientId);
+      setDriveStep("Choose the photos in the Google window…");
+      onStepAside?.(true);
+      let picked;
+      try {
+        picked = await pickDriveFiles(drive, token, [...byDriveId.keys()]);
+      } finally {
+        onStepAside?.(false);
+      }
+      if (picked.length === 0) {
+        setDriveStep(null);
+        return;
+      }
+      const found = await photoTargetsAction(slug);
+      // The last batch's thumbnails, released once this one is on screen.
+      const stale = previews.current;
+      previews.current = [];
+      const fresh = new Map(found.map((target) => [target.registrationId, target]));
+      const next: Entry[] = [];
+      const outside: string[] = [];
+      let done = 0;
+      const queue = [...picked];
+      const work = async () => {
+        for (let item = queue.shift(); item !== undefined; item = queue.shift()) {
+          const known = byDriveId.get(item.id);
+          const target = known === undefined ? undefined : fresh.get(known.registrationId);
+          if (target === undefined) {
+            outside.push(item.name);
+          } else {
+            try {
+              // Shrunk now rather than at upload: 110 camera originals held in
+              // memory for the review would be hundreds of megabytes.
+              const file = await shrinkImage(await downloadDriveFile(token, item));
+              const preview = URL.createObjectURL(file);
+              previews.current.push(preview);
+              const problem = formatProblem(file);
+              next.push({
+                file,
+                match: { file: file.name, ok: false, reason: "" },
+                manual: target,
+                viaDrive: true,
+                status: problem === undefined ? "ready" : "blocked",
+                ...(problem === undefined ? {} : { detail: problem }),
+                preview,
+              });
+            } catch (error) {
+              outside.push(
+                `${item.name} (${error instanceof Error ? error.message : "download failed"})`,
+              );
+            }
+          }
+          done++;
+          setDriveStep(
+            `Downloading photos from Google Drive… ${String(done)} of ${String(picked.length)}`,
+          );
+        }
+      };
+      await Promise.all(Array.from({ length: DRIVE_PARALLEL }, work));
+      stale.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      // The sheet's order, so the review reads like the organizer's roster.
+      const order = new Map(found.map((target, index) => [target.registrationId, index]));
+      next.sort(
+        (a, b) =>
+          (order.get(targetOf(a)?.registrationId ?? "") ?? 0) -
+          (order.get(targetOf(b)?.registrationId ?? "") ?? 0),
+      );
+      setTargets(found);
+      setSkipped(outside);
+      setEntries(next);
+      setProgress(0);
+      setDriveStep(null);
+    } catch (error) {
+      setDriveStep(null);
+      toast({
+        title:
+          error instanceof Error ? error.message : "Couldn't get the photos from Google Drive.",
+        tone: "danger",
+      });
+    }
   };
 
   const clearPreviews = () => {
@@ -248,6 +398,30 @@ export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () =>
 
   return (
     <div className="io-panel" data-testid="photo-import-panel">
+      {drive !== null && linked.length > 0 ? (
+        <div className="drive-photos" data-testid="drive-photos">
+          <p>
+            <strong>
+              {linked.length} player{linked.length === 1 ? "" : "s"} uploaded a photo in your Google
+              Form.
+            </strong>{" "}
+            Get them straight from Google Drive — each photo lands on the player whose form it came
+            with.
+          </p>
+          <Button
+            onClick={() => void fromDrive()}
+            loading={driveStep !== null}
+            disabled={uploading || driveStep !== null}
+            data-testid="drive-photos-btn"
+          >
+            Get photos from Google Drive
+          </Button>
+          <p className="dash-hint">
+            {driveStep ??
+              "Sign in with the Google account that owns the form (or one it's shared with), select all the photos Google shows, and press Select. We only see the photos you select."}
+          </p>
+        </div>
+      ) : null}
       <label
         htmlFor="photo-files"
         className={`csv-drop${over ? " csv-drop-over" : ""}`}
@@ -310,7 +484,7 @@ export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () =>
           </div>
           {skipped.length > 0 ? (
             <p className="dash-hint">
-              Not photos, left out: {skipped.slice(0, 5).join(" · ")}
+              Left out: {skipped.slice(0, 5).join(" · ")}
               {skipped.length > 5 ? ` and ${String(skipped.length - 5)} more` : ""}
             </p>
           ) : null}
@@ -340,7 +514,16 @@ export function PhotoImportPanel({ slug, onDone }: { slug: string; onDone: () =>
                         </span>
                       </td>
                       <td data-label="Player">
-                        {entry.match.ok && entry.manual === undefined ? (
+                        {entry.viaDrive === true && entry.manual !== undefined ? (
+                          <>
+                            {entry.manual.name ?? "Unnamed"}{" "}
+                            <span className="registration-phone">{entry.manual.number}</span>{" "}
+                            <Badge tone="success">by Drive link</Badge>
+                            {entry.manual.hasPhoto ? (
+                              <Badge tone="warning">replaces current photo</Badge>
+                            ) : null}
+                          </>
+                        ) : entry.match.ok && entry.manual === undefined ? (
                           <>
                             {entry.match.target.name ?? "Unnamed"}{" "}
                             <span className="registration-phone">{entry.match.target.number}</span>{" "}

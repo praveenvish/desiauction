@@ -638,6 +638,13 @@
       "when": 1791561600000,
       "tag": "0091_competition_auction_unit",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1791648000000,
+      "tag": "0092_registration_photo_drive_id",
+      "breakpoints": true
     }
   ]
 }

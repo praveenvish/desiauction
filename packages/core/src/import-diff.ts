@@ -50,6 +50,7 @@ export interface ExistingRegistration {
   jerseyNumber: string | null;
   tshirtSize: string | null;
   trouserSize: string | null;
+  photoDriveId: string | null;
   /**
    * The squad side, compared as NAMES on both sides.
    *
@@ -199,6 +200,12 @@ const COMPARABLE: readonly Comparable[] = [
     label: "Trouser size",
     fromFile: (r) => r.trouserSize,
     fromRecord: (e) => e.trouserSize,
+  },
+  {
+    field: "photoDriveId",
+    label: "Photo link",
+    fromFile: (r) => r.photoDriveId,
+    fromRecord: (e) => e.photoDriveId,
   },
   { field: "teamName", label: "Team", fromFile: (r) => r.teamName, fromRecord: (e) => e.teamName },
   {

@@ -55,6 +55,11 @@ export const IMPORT_FIELDS = [
   "is_icon",
   "is_captain",
   "is_retained",
+  // --- The Drive link a Google Form stores for an uploaded photo. Kept so the
+  // photo step can fetch each player's OWN file by its id: matching uploads by
+  // file name fails on real forms, because Google names each upload after the
+  // uploader's Google ACCOUNT, not the player.
+  "photo_link",
 ] as const;
 
 export type ImportField = (typeof IMPORT_FIELDS)[number];
@@ -84,6 +89,7 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   is_icon: "Icon?",
   is_captain: "Captain?",
   is_retained: "Retained?",
+  photo_link: "Photo (Google Drive link)",
 };
 
 /**
@@ -298,6 +304,20 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "keep",
     "carry forward",
     "last season",
+  ],
+  photo_link: [
+    "photo",
+    "photo link",
+    "player photo",
+    "your photo",
+    "upload photo",
+    "upload your photo",
+    "upload player photo",
+    "passport size photo",
+    "passport photo",
+    "profile photo",
+    "photograph",
+    "picture",
   ],
 };
 

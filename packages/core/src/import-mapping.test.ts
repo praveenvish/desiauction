@@ -8,7 +8,7 @@ import {
   sampleRow,
   signatureOf,
 } from "./import-mapping";
-import { editCsvRow, parseRegistrationRecords } from "./registration-csv";
+import { driveFileIdOf, editCsvRow, parseRegistrationRecords } from "./registration-csv";
 import { tokenizeCsv } from "./registration-csv";
 
 /*
@@ -379,5 +379,35 @@ describe("editCsvRow — fixing a row in place", () => {
   it("refuses the header and lines past the end", () => {
     expect(editCsvRow(FILE, 1, new Map([[0, "x"]]))).toBeNull();
     expect(editCsvRow(FILE, 9, new Map([[0, "x"]]))).toBeNull();
+  });
+});
+
+describe("photo_link — the Drive id a Form wrote for an upload", () => {
+  it("maps the Photo column and keeps the file id, not the URL", () => {
+    const csv = [
+      '"Name","Mobile","Player Type","Photo"',
+      '"Chen Singh","7506698281","Allrounder","https://drive.google.com/u/0/open?usp=forms_web&id=1ESy6C82DCx_MpjwLITsY2CyU6ssjXK3Z"',
+      '"Two Links","7506698282","Bowler","https://drive.google.com/open?id=1AAAAAAAAAAAA, https://drive.google.com/open?id=1BBBBBBBBBBBB"',
+      '"Shared","7506698283","Batsman","https://drive.google.com/file/d/1CCCCCCCCCCCCC/view?usp=sharing"',
+      '"No Link","7506698284","Batsman","will send on WhatsApp"',
+    ].join("\n");
+    const records = tokenizeCsv(csv);
+    const detected = detectMapping(records[0] ?? []);
+    expect(detected.columns[3]?.field).toBe("photo_link");
+    const result = parseRegistrationRecords(applyMapping(records, mappingOf(detected)), undefined, {
+      now: NOW,
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.photoDriveId)).toEqual([
+      "1ESy6C82DCx_MpjwLITsY2CyU6ssjXK3Z",
+      "1AAAAAAAAAAAA",
+      "1CCCCCCCCCCCCC",
+      null,
+    ]);
+  });
+
+  it("never reads a non-Google link as a Drive file", () => {
+    expect(driveFileIdOf("https://evil.example/open?id=1ESy6C82DCx_Mpjw")).toBeNull();
+    expect(driveFileIdOf("")).toBeNull();
   });
 });

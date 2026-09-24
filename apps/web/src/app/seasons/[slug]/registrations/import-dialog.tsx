@@ -71,6 +71,23 @@ export function ImportDialog({
   /* Off by default: a transaction ID is a claim until the desk checks it. */
   const [paidWhenReferenced, setPaidWhenReferenced] = useState(false);
   const [usingSaved, setUsingSaved] = useState(false);
+  /*
+   * STEPPING ASIDE FOR GOOGLE'S PICKER.
+   *
+   * This dialog is modal: the browser keeps it in the top layer and makes the
+   * rest of the page inert. Google's Picker is appended to the page, so it
+   * opened BEHIND the dialog and could not be clicked — the first real run sat
+   * on "Waiting for Google…" with the picker visible but dead underneath. While
+   * the picker is up the dialog closes itself (its contents stay mounted, so
+   * the photo step keeps its state) and reopens when the picker is done. The
+   * ref is read by the native close event, which fires after the state change.
+   */
+  const [steppedAside, setSteppedAside] = useState(false);
+  const steppedAsideRef = useRef(false);
+  const stepAside = (aside: boolean) => {
+    steppedAsideRef.current = aside;
+    setSteppedAside(aside);
+  };
   /** The full column table, open on demand or whenever it has a question. */
   const [reviewColumns, setReviewColumns] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -314,9 +331,11 @@ export function ImportDialog({
 
   return (
     <Dialog
-      open={open}
+      open={open && !steppedAside}
       onClose={() => {
-        onClose();
+        if (!steppedAsideRef.current) {
+          onClose();
+        }
       }}
       title="Import players & photos"
       size="wide"
@@ -644,6 +663,7 @@ export function ImportDialog({
             content: (
               <PhotoImportPanel
                 slug={slug}
+                onStepAside={stepAside}
                 onDone={() => {
                   onClose();
                 }}

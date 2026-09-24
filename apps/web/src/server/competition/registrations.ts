@@ -973,6 +973,8 @@ export async function photoTargetsOf(db: Db, competitionId: string): Promise<Pho
       // has a photo" would itself say something about who the number is.
       photoUrl: shownPhotoKey,
       photoConsentAt: shownPhotoConsentAt,
+      // The exact key for "get photos from Google Drive" (0092).
+      driveId: registrations.photoDriveId,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))

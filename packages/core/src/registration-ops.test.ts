@@ -122,6 +122,7 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
         jerseyNumber: null,
         tshirtSize: null,
         trouserSize: null,
+        photoDriveId: null,
         battingStyle: null,
         bowlingStyle: null,
         // The squad columns, absent from this file — and NULL, not false, which
@@ -147,6 +148,7 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
         jerseyNumber: null,
         tshirtSize: null,
         trouserSize: null,
+        photoDriveId: null,
         battingStyle: null,
         bowlingStyle: null,
         // The squad columns, absent from this file — and NULL, not false, which

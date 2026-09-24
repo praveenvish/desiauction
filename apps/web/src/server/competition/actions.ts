@@ -54,6 +54,7 @@ import { cache } from "react";
 import { auctionOf } from "@desiauction/auction";
 import { setMessageLanguage } from "@desiauction/messaging/language";
 import { recordConsent } from "../messaging/consent";
+import { env } from "../../env";
 import { logger } from "../logger";
 
 import { currentSession } from "../auth/actions";
@@ -2262,6 +2263,37 @@ export async function photoTargetsAction(slug: string): Promise<PhotoTarget[]> {
   return inCompetitionOrg(gate.personId, gate.competition, (db) =>
     photoTargetsOf(db, gate.competition.id),
   );
+}
+
+/** What the browser needs to open Google's picker — public values, or null when not set up. */
+export interface DrivePickerConfig {
+  clientId: string;
+  apiKey: string;
+  appId: string;
+}
+
+/**
+ * Review-gated only so a stranger cannot probe it; the values themselves are
+ * public (see `GOOGLE_PICKER_*` in env.ts).
+ */
+export async function drivePickerConfigAction(slug: string): Promise<DrivePickerConfig | null> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return null;
+  }
+  const { GOOGLE_PICKER_CLIENT_ID, GOOGLE_PICKER_API_KEY, GOOGLE_PICKER_APP_ID } = env;
+  if (
+    GOOGLE_PICKER_CLIENT_ID === undefined ||
+    GOOGLE_PICKER_API_KEY === undefined ||
+    GOOGLE_PICKER_APP_ID === undefined
+  ) {
+    return null;
+  }
+  return {
+    clientId: GOOGLE_PICKER_CLIENT_ID,
+    apiKey: GOOGLE_PICKER_API_KEY,
+    appId: GOOGLE_PICKER_APP_ID,
+  };
 }
 
 // --- CSV import (validate → preview → commit) + export -----------------------

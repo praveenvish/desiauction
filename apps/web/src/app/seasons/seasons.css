@@ -869,6 +869,27 @@ p + .date-row {
   margin-bottom: var(--space-3);
 }
 
+.drive-photos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.drive-photos p {
+  margin: 0;
+}
+
+.drive-photos strong {
+  color: var(--text-primary);
+}
+
 .photo-match-thumb-row {
   display: inline-flex;
   align-items: center;

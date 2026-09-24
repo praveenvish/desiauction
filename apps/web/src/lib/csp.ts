@@ -22,9 +22,24 @@
  *   connect-src  'self' + the engine's WebSocket origin + the bucket endpoint —
  *                the live room's socket, and presigned photo uploads, which go
  *                from the browser straight to storage.
+ *   Google, narrowly — "Get photos from Google Drive" signs in through
+ *                Google Identity Services and shows Google's Picker, which is a
+ *                docs.google.com FRAME; the photos are then fetched from the Drive
+ *                API. So: frame-src docs.google.com + accounts.google.com, and
+ *                connect-src accounts.google.com + www.googleapis.com. Nothing
+ *                wider (no *.google.com), and scripts still need no host entry:
+ *                Google's loaders are inserted by our own trusted bundle, which
+ *                'strict-dynamic' extends trust to.
  *   everything else 'self' or 'none' — except frame-ancestors, which stays in
  *                the static header (see the note in the directive list).
  */
+
+/** Google's sign-in (token popup + its helper frame). */
+const GOOGLE_SIGN_IN = "https://accounts.google.com";
+/** The Picker renders in a frame served from here. */
+const GOOGLE_PICKER = "https://docs.google.com";
+/** Where a picked file's bytes are downloaded from. */
+const GOOGLE_DRIVE_API = "https://www.googleapis.com";
 
 export interface CspInputs {
   readonly nonce: string;
@@ -90,6 +105,8 @@ export function buildContentSecurityPolicy(input: CspInputs): string {
         "'self'",
         engine,
         upload,
+        GOOGLE_SIGN_IN,
+        GOOGLE_DRIVE_API,
         // Fast refresh talks to the dev server over its own socket.
         input.development ? "ws:" : null,
       ]),
@@ -97,7 +114,7 @@ export function buildContentSecurityPolicy(input: CspInputs): string {
     ["media-src", ["'self'"]],
     ["worker-src", ["'self'", "blob:"]],
     ["manifest-src", ["'self'"]],
-    ["frame-src", ["'none'"]],
+    ["frame-src", [GOOGLE_PICKER, GOOGLE_SIGN_IN]],
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", ["'self'"]],

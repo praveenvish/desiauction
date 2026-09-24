@@ -42,6 +42,12 @@ export interface CsvRegistrationRow {
   tshirtSize: string | null;
   trouserSize: string | null;
   /**
+   * The Google Drive file id behind a Form's photo upload, when the file had a
+   * photo column. Not a photo — a pointer the photo step fetches by, so each
+   * picture lands on the player whose row linked it.
+   */
+  photoDriveId: string | null;
+  /**
    * THE SQUAD A FILE ALREADY KNOWS.
    *
    * A club's roster spreadsheet says which team a player belongs to and which
@@ -361,6 +367,24 @@ export function isNotApplicable(value: string): boolean {
   return NOT_APPLICABLE.has(key);
 }
 
+/**
+ * The Drive file id in a Google Form's upload link, or null.
+ *
+ * A Form writes "https://drive.google.com/open?id=ID" (sometimes with
+ * "/u/0/" and a usp parameter), and several links comma-separated when the
+ * question allowed more than one file — the first is the photo. A share link
+ * ("/file/d/ID/view") is accepted too. Anything else is not an error: a photo
+ * column is optional, and text in it is simply not a link we can fetch.
+ */
+export function driveFileIdOf(value: string): string | null {
+  const first = value.split(",")[0]?.trim() ?? "";
+  if (!/^https?:\/\/(drive|docs)\.google\.com\//i.test(first)) {
+    return null;
+  }
+  const match = /[?&]id=([\w-]{10,})/.exec(first) ?? /\/d\/([\w-]{10,})/.exec(first);
+  return match?.[1] ?? null;
+}
+
 /** Two spellings of one person's name: case and spacing are noise. */
 function sameName(a: string, b: string): boolean {
   const key = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -671,6 +695,7 @@ export function parseRegistrationRecords(
       jerseyNumber: capped("jersey_number", 10),
       tshirtSize: capped("tshirt_size", 20),
       trouserSize: capped("trouser_size", 20),
+      photoDriveId: driveFileIdOf(optional("photo_link")),
       teamName: teamRaw === "" ? null : teamRaw,
       isIcon: iconFlag.value,
       isCaptain: captainFlag.value,
