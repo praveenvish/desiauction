@@ -75,10 +75,12 @@ export async function auctionReady(
       pageSize: 100,
     });
     pool.push(
-      // Icon (marquee) players are pre-signed to their team and never enter the
-      // block — they are retained squad, not auction lots.
+      // Icon (marquee) and retained players are pre-signed to their team and
+      // never enter the block — they are squad, not auction lots. The same two
+      // flags drive preSignedPlayers (live-summary.ts), so a player is either
+      // a lot or a pre-signed squad member, never both.
       ...result.rows
-        .filter((row) => !row.isIcon)
+        .filter((row) => !row.isIcon && !row.isRetained)
         .map((row) => ({
           registrationId: row.id,
           personId: row.personId,
@@ -118,7 +120,8 @@ export async function auctionReady(
     {
       id: "pool_present",
       // Registrations calls this the auction pool, and it is not the same
-      // number as "approved" — icons are approved and never enter it.
+      // number as "approved" — icons and retained players are approved and
+      // never enter it.
       label: "The auction pool is non-empty",
       pass: pool.length >= 1,
       detail: `${String(pool.length)} player(s) in the auction pool`,

@@ -20,7 +20,7 @@ export interface TeamSquad {
   teamId: string;
   /** Auction wins plus pre-signed players — everyone who occupies a slot. */
   size: number;
-  /** Pre-signed (icon) players, already inside `size`. */
+  /** Pre-signed (icon or retained) players, already inside `size`. */
   preSigned: number;
 }
 
@@ -29,7 +29,7 @@ export async function squadSizes(db: Db, competitionId: string): Promise<Map<str
     .select({
       teamId: registrations.teamId,
       size: sql<number>`count(*)::int`,
-      preSigned: sql<number>`count(*) filter (where ${registrations.isIcon})::int`,
+      preSigned: sql<number>`count(*) filter (where ${registrations.isIcon} or ${registrations.isRetained})::int`,
     })
     .from(registrations)
     .where(

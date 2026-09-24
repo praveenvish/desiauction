@@ -562,6 +562,32 @@ describe("REGISTRATION OPS REGRESSION — operations contract", () => {
     ).toEqual({ ok: true });
   });
 
+  it("a retained player is pre-signed: out of the auction pool, counted like an icon", async () => {
+    // No ops path writes `is_retained` yet (import/backfill territory) — set it
+    // directly, the way any future writer would leave the row.
+    const kept = await seed(compId, org.id, "Kept From Last Season", "ret1", "approved");
+    await db
+      .update(registrationsTable)
+      .set({ isRetained: true })
+      .where(eq(registrationsTable.id, kept));
+
+    const stats = await registrationStats(db, compId);
+    expect(stats.retained).toBe(1);
+    // The identity the dashboard tile prints: approved = pool + icons +
+    // retained. A retained player who still counted into the pool is the DA-09
+    // split via the other flag — a lot on the block AND an already-signed
+    // squad member on /spectate at the same time.
+    expect(stats.auctionPool).toBe(stats.approved - stats.icons - stats.retained);
+
+    // The row carries the flag, so the pool projection can filter on it.
+    const page = await queryRegistrations(db, compId, {
+      search: "Kept From Last Season",
+      page: 1,
+      pageSize: 10,
+    });
+    expect(page.rows.map((row) => row.isRetained)).toEqual([true]);
+  });
+
   it("statistics reconcile with the actual rows", async () => {
     const stats = await registrationStats(db, compId);
     const rows = await db

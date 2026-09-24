@@ -176,6 +176,7 @@ interface ShowcaseRow {
   teamId: string | null;
   teamName: string | null;
   isIcon: boolean;
+  isRetained: boolean;
 }
 
 /**
@@ -184,11 +185,11 @@ interface ShowcaseRow {
  * Status was derived from `team_id` alone, so an APPROVED ICON with no team yet
  * was published as "Available" — on the page, in the <title>, in the meta
  * description and on the share card someone forwards to a WhatsApp group. It is
- * not available: `auctionReady` filters icons out of the pool
- * (`server/auction/auction-ready.ts`, `.filter((row) => !row.isIcon)`), so no
- * team can bid for them in any auction this platform will ever run. The icon
- * flag is checked FIRST because it is the fact that decides biddability; the
- * team assignment only decides which name to print.
+ * not available: `auctionReady` filters icons — and retained players, the same
+ * pre-signed rule — out of the pool (`server/auction/auction-ready.ts`), so no
+ * team can bid for them in any auction this platform will ever run. The
+ * pre-signed flags are checked FIRST because they are the fact that decides
+ * biddability; the team assignment only decides which name to print.
  */
 function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
   return {
@@ -199,7 +200,7 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date): ShowcasePlayer {
     battingStyle: r.battingStyle,
     bowlingStyle: r.bowlingStyle,
     photoUrl: r.photoConsentAt !== null && r.photoKey !== null ? storage.readUrl(r.photoKey) : null,
-    status: r.isIcon ? "retained" : r.teamId === null ? "available" : "sold",
+    status: r.isIcon || r.isRetained ? "retained" : r.teamId === null ? "available" : "sold",
     teamName: r.teamName,
   };
 }
@@ -271,6 +272,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
       teamId: registrations.teamId,
       teamName: teams.name,
       isIcon: registrations.isIcon,
+      isRetained: registrations.isRetained,
       // The pool size, carried on every row. `count(*) over ()` is evaluated
       // before LIMIT, so it counts the whole approved set — one query rather
       // than a second round trip, and there is no window in which the rows and
@@ -340,6 +342,7 @@ export async function publicPlayer(slug: string, number: string): Promise<Public
       teamId: registrations.teamId,
       teamName: teams.name,
       isIcon: registrations.isIcon,
+      isRetained: registrations.isRetained,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))

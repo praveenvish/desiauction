@@ -34,12 +34,12 @@ export function squadsOf(
   preSigned: PreSignedPlayer[],
   resolved: ResolvedLot[],
 ): { team: TeamIdentity; members: SquadMember[] }[] {
-  // A player who is BOTH pre-signed and auctioned must be counted once. That
-  // combination should be impossible — the pool projection excludes icons — but
-  // it excludes only `isIcon`, while the schema documents `isRetained` as
-  // excluded too, so a retained player currently reaches the block. Whichever
-  // way that inconsistency is settled, a squad board must never double-count a
-  // person, and the auction row wins because it is what actually happened.
+  // A player who is BOTH pre-signed and auctioned must be counted once. The
+  // pool projection excludes icons and retained players alike, so the
+  // combination cannot arise at creation — but a mark set AFTER the lots were
+  // prepared still produces it, because the pool is a snapshot. A squad board
+  // must never double-count a person, and the auction row wins because it is
+  // what actually happened.
   const auctionedRegistrations = new Set(
     resolved.flatMap((lot) =>
       lot.status === "sold" && lot.registrationId !== null ? [lot.registrationId] : [],
@@ -48,14 +48,13 @@ export function squadsOf(
   /**
    * The squad MARKERS for a player who went under the hammer anyway.
    *
-   * Above: a pre-signed player can reach the block, because the pool projection
-   * excludes `isIcon` only while the schema documents `isRetained` as excluded
-   * too. When that happens the auction row wins the row — it is what actually
-   * happened — and it used to win the badges with it, hardcoding every marker
-   * to false. So a franchise's CAPTAIN, bought in the room, appeared as an
-   * ordinary signing while the captain of the team beside them wore the badge.
-   * The registration is the same registration either way, so the marks are read
-   * back off it.
+   * Above: a pre-signed player can still reach the block when the mark landed
+   * after the pool snapshot. When that happens the auction row wins the row —
+   * it is what actually happened — and it used to win the badges with it,
+   * hardcoding every marker to false. So a franchise's CAPTAIN, bought in the
+   * room, appeared as an ordinary signing while the captain of the team beside
+   * them wore the badge. The registration is the same registration either way,
+   * so the marks are read back off it.
    */
   const marksByRegistration = new Map(preSigned.map((player) => [player.registrationId, player]));
   return teams.map((team) => {

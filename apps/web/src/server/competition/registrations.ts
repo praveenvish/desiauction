@@ -354,6 +354,10 @@ export interface RegistrationRow {
   teamName: string | null;
   // Icon (marquee) player: pre-assigned to their team, excluded from the auction.
   isIcon: boolean;
+  // Retained player: kept from a prior season — pre-signed and off the block
+  // by the same rule as an icon (schema `is_retained`; auction-ready.ts
+  // filters both out of the pool).
+  isRetained: boolean;
   // Team captain marker (display + team-sheet ordering).
   isCaptain: boolean;
   // Surfaced for the IP-4 AuctionReady pool (additive projection field, M-IP4-1).
@@ -421,13 +425,19 @@ export interface RegistrationStats {
    * DA-35: what auction night will actually contain. Two tabs of one console
    * disagreed — Registrations said "Approved 2" while the Auction tab's
    * readiness gate said "1 approved player(s)" — because an Icon is approved
-   * AND excluded from the block (auction-ready.ts filters `!row.isIcon`). This
-   * figure is computed from the same two facts the auction filters on, so the
-   * two screens can no longer drift apart.
+   * AND excluded from the block (auction-ready.ts filters icons and retained
+   * players alike). This figure is computed from the same facts the auction
+   * filters on, so the two screens can no longer drift apart.
    */
   auctionPool: number;
   /** Approved icons — pre-signed, never on the block. */
   icons: number;
+  /**
+   * Approved retained players — kept from a prior season, pre-signed and off
+   * the block by the same rule as icons. A row flagged both icon and retained
+   * counts as an icon here, the way the poster verdict labels it.
+   */
+  retained: number;
   /**
    * Approved icons with no team. An icon is only counted into a squad when
    * `registrations.team_id = paddle.team_id`, so a teamless icon is in NO
@@ -442,12 +452,18 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     .select({
       status: registrations.status,
       isIcon: registrations.isIcon,
+      isRetained: registrations.isRetained,
       hasTeam: sql<boolean>`${registrations.teamId} is not null`,
       count: sql<number>`count(*)::int`,
     })
     .from(registrations)
     .where(eq(registrations.competitionId, competitionId))
-    .groupBy(registrations.status, registrations.isIcon, sql`${registrations.teamId} is not null`);
+    .groupBy(
+      registrations.status,
+      registrations.isIcon,
+      registrations.isRetained,
+      sql`${registrations.teamId} is not null`,
+    );
   const stats: RegistrationStats = {
     total: 0,
     submitted: 0,
@@ -457,6 +473,7 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     withdrawn: 0,
     auctionPool: 0,
     icons: 0,
+    retained: 0,
     iconsWithoutTeam: 0,
   };
   for (const row of rows) {
@@ -472,6 +489,8 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
         if (!row.hasTeam) {
           stats.iconsWithoutTeam += row.count;
         }
+      } else if (row.isRetained) {
+        stats.retained += row.count;
       } else {
         stats.auctionPool += row.count;
       }
@@ -562,6 +581,7 @@ export async function queryRegistrations(
       teamId: registrations.teamId,
       teamName: teams.name,
       isIcon: registrations.isIcon,
+      isRetained: registrations.isRetained,
       isCaptain: registrations.isCaptain,
       basePriceBand: registrations.basePriceBand,
       rejectionReason: registrations.rejectionReason,

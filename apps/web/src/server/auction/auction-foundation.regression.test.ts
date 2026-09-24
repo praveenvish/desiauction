@@ -945,3 +945,91 @@ describe("AUCTION FOUNDATION — isolation", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("AUCTION FOUNDATION — retained players are pre-signed, not lots", () => {
+  /**
+   * The schema's rule for `is_retained` is the icon rule: pre-signed to their
+   * team, never on the block. The pool projection filtered only icons, so a
+   * retained player became a lot that could be bid on and sold — while
+   * /spectate, /board and /overlay simultaneously rendered them as an
+   * already-signed squad member (the DA-09 split, this time via the other
+   * flag). The pool, the readiness arithmetic and the engine's squad cap must
+   * all read the two flags the same way.
+   */
+  it("the pool excludes them; the engine counts them into the squad cap", async () => {
+    const cup = await createCompetition(db, org.id, owner, {
+      name: `Retention Cup ${RUN}`,
+      location: "Malad",
+      startsOn: "2026-12-01",
+      endsOn: "2026-12-20",
+    });
+    let current = must(await resolveCompetition(db, owner, cup.slug), "retention comp");
+    for (const to of ["setup", "registration_open", "registration_closed"] as const) {
+      expect((await advanceCompetition(db, current, owner, to)).ok).toBe(true);
+      current = must(await resolveCompetition(db, owner, cup.slug), "retention comp");
+    }
+    await seedApproved(cup.id, org.id, "Open Market", "kp1", "C");
+    await seedApproved(cup.id, org.id, "Second Lot", "kp2", "C");
+    const kept = await seedApproved(cup.id, org.id, "Kept Player", "kp3", "C");
+    const teamA = await createTeam(db, org.id, cup.id, owner, "Kept Kings");
+    const teamB = await createTeam(db, org.id, cup.id, owner, "Fresh Franchise");
+    if (!teamA.ok || !teamB.ok) {
+      throw new Error("retention team setup failed");
+    }
+    // No ops path writes `is_retained` yet — set it the way any future writer
+    // (import, backfill) would leave the row: flagged, team assigned.
+    await db
+      .update(registrationsTable)
+      .set({ isRetained: true, teamId: teamA.team.id })
+      .where(eq(registrationsTable.id, kept));
+
+    const ready = await auctionReady(db, current);
+    expect(ready.ok).toBe(true);
+    // The retained player is squad, not stock: absent from the pool...
+    expect(ready.pool.length).toBe(2);
+    expect(ready.pool.some((entry) => entry.registrationId === kept)).toBe(false);
+    // ...and already counted into the team sheet the feasibility screen shows.
+    const teamAIndex = ready.teams.findIndex((team) => team.id === teamA.team.id);
+    expect(ready.squadSizes[teamAIndex]).toBe(1);
+
+    // squadMax 1: the kept player already fills team A's only slot.
+    const config = { ...DEFAULT_AUCTION_CONFIG, squadMin: 1, squadMax: 1 };
+    expect((await createAuction(db, current, ready, owner, config)).ok).toBe(true);
+    let night = must(await auctionOf(db, cup.id), "retention auction");
+    // No lot was prepared for the retained registration.
+    const view = await auctionView(db, night);
+    expect(view.lots.length).toBe(2);
+    expect(view.lots.map((lot) => lot.playerName)).not.toContain("Kept Player");
+
+    const paddleA = await issuePaddle(db, night, owner, teamA.team.id, owner);
+    const paddleB = await issuePaddle(db, night, owner, teamB.team.id, owner);
+    if (!paddleA.ok || !paddleB.ok) {
+      throw new Error("retention paddle setup failed");
+    }
+    expect(await queueAllLots(db, night, owner)).toEqual({ applied: 2, skipped: 0 });
+    expect((await transitionAuction(db, night, owner, "open")).ok).toBe(true);
+    night = must(await auctionOf(db, cup.id), "live retention auction");
+    const lot = await lotByPlayer(night.id, "Open Market");
+    expect((await transitionLot(db, night, lot.id, owner, "open")).ok).toBe(true);
+
+    // Team A is FULL before its first bid: the retained player occupies the
+    // slot the way an icon does (DA-09). Counting only icons let this bid
+    // through, and the team finished on squadMax + 1.
+    expect(
+      await placeBid(db, night, owner, {
+        lotId: lot.id,
+        paddleId: paddleA.paddleId,
+        amountRaw: 1_000_000, // band C base
+        bidderAuthorized: true,
+      }),
+    ).toEqual({ ok: false, code: "SQUAD_FULL" });
+    // Team B's slot is genuinely empty; the same amount is accepted.
+    const accepted = await placeBid(db, night, owner, {
+      lotId: lot.id,
+      paddleId: paddleB.paddleId,
+      amountRaw: 1_000_000,
+      bidderAuthorized: true,
+    });
+    expect(accepted.ok).toBe(true);
+  });
+});

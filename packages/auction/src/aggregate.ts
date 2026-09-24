@@ -40,7 +40,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 // Input shapes (structural — web's CompetitionSummary and AuctionReadyProjection
 // satisfy them; the engine supplies them from its own reads). The package never
@@ -822,6 +822,8 @@ export async function placeBid(
   // squadMax like anyone else. Counting only auction wins let a team with an
   // icon finish on squadMax + 1 and every board render "16/15" — a fraction
   // above its own denominator, which is how you know the cap was not real.
+  // Retained players are pre-signed by the same rule (schema `is_retained`):
+  // the pool projection excludes both, so both must be counted back in here.
   const [preSignedRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(registrations)
@@ -829,7 +831,7 @@ export async function placeBid(
       and(
         eq(registrations.competitionId, auction.competitionId),
         eq(registrations.teamId, paddle.teamId),
-        eq(registrations.isIcon, true),
+        or(eq(registrations.isIcon, true), eq(registrations.isRetained, true)),
       ),
     );
   const squadSize = (purseRow?.squad ?? 0) + (preSignedRow?.count ?? 0);

@@ -559,8 +559,13 @@ export function RegistrationDashboardPanel({
           value={stats.auctionPool}
           testId="stat-auction-pool"
           hint={
-            stats.icons > 0
-              ? `${String(stats.approved)} approved − ${String(stats.icons)} icon${stats.icons === 1 ? "" : "s"}`
+            stats.icons + stats.retained > 0
+              ? `${String(stats.approved)} approved − ${[
+                  ...(stats.icons > 0
+                    ? [`${String(stats.icons)} icon${stats.icons === 1 ? "" : "s"}`]
+                    : []),
+                  ...(stats.retained > 0 ? [`${String(stats.retained)} retained`] : []),
+                ].join(" − ")}`
               : "Approved players who go to the block"
           }
         />
@@ -594,8 +599,8 @@ export function RegistrationDashboardPanel({
       </div>
       <p className="dash-hint" data-testid="pool-explainer">
         <strong>Auction pool</strong> is what the auction will actually contain: approved players
-        minus Icons. An Icon is pre-signed to their team and never goes to the block — the Auction
-        tab counts the pool the same way.
+        minus Icons and retained players. Both are pre-signed to their team and never go to the
+        block — the Auction tab counts the pool the same way.
       </p>
 
       {/* DA-35: the orphan. An Icon is only counted into a squad when their
