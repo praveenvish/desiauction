@@ -137,6 +137,64 @@ export default function LandingPage() {
 
         <AuctionLab sports={sports} signupHref={SIGNUP.href} signupLabel={SIGNUP.label} />
 
+        {/* THE REAL PRODUCT. Every other picture on this page is an
+            illustration or a simulation; these are screenshots of the platform
+            itself, captured from a practice auction run end to end on it
+            (fictional names — the caption says so). The only proof a product
+            with no public customers yet can honestly show is itself working. */}
+        <section className={styles.realProduct} aria-labelledby="real-title">
+          <div className={styles.container}>
+            <div className={styles.realHeading} data-reveal>
+              <p className={styles.eyebrow}>NOT A MOCKUP</p>
+              <h2 id="real-title">
+                This is auction night
+                <br />
+                <span>on DesiAuction.</span>
+              </h2>
+              <p>
+                Real screens from a practice auction on the platform. Owners bid from their phones,
+                the big screen keeps score, and every screen sees the gavel fall at the same moment.
+              </p>
+            </div>
+            <div className={styles.realGrid}>
+              <figure className={styles.realPhone} data-reveal>
+                <Image
+                  src="/marketing/product/owner-paddle-live.webp"
+                  alt="A team owner's phone during a live lot: the player on the block, a 28-second countdown, the current bid of ₹15,000 and a Raise to ₹20,000 button"
+                  width={560}
+                  height={1212}
+                  sizes="(max-width: 767px) 45vw, 260px"
+                />
+                <figcaption>The owner&rsquo;s phone. One tap to raise.</figcaption>
+              </figure>
+              <figure className={styles.realScreen} data-reveal>
+                <Image
+                  src="/marketing/product/big-screen-board.webp"
+                  alt="The big-screen board of a live auction: total spend, players sold, the most expensive signing and every team's remaining purse and squad"
+                  width={1600}
+                  height={900}
+                  sizes="(max-width: 767px) 100vw, 640px"
+                />
+                <figcaption>The big screen. Purses, squads and every sale, live.</figcaption>
+              </figure>
+              <figure className={styles.realPhone} data-reveal>
+                <Image
+                  src="/marketing/product/owner-paddle-sold.webp"
+                  alt="The same phone as the gavel falls: a SOLD stamp, the player signed for ₹30,000 to Falcons, and a notification reading You signed Zoya Khan"
+                  width={560}
+                  height={933}
+                  sizes="(max-width: 767px) 45vw, 260px"
+                />
+                <figcaption>SOLD. On every screen at once.</figcaption>
+              </figure>
+            </div>
+            <p className={styles.realNote}>
+              Screenshots from a practice auction run on DesiAuction. Players, teams and owners are
+              fictional.
+            </p>
+          </div>
+        </section>
+
         {/* Proof sits right after the demo — the moment a visitor asks "is
             anyone actually using this?". Both render nothing without data. */}
         <Suspense fallback={null}>
