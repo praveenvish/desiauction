@@ -645,6 +645,13 @@
       "when": 1791648000000,
       "tag": "0092_registration_photo_drive_id",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1791734400000,
+      "tag": "0093_competition_import_sheet",
+      "breakpoints": true
     }
   ]
 }

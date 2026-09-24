@@ -485,12 +485,112 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       { kind: "heading", level: 2, text: "Importing a roster" },
       {
         kind: "paragraph",
-        text: "Already have your players in a spreadsheet? Import them from CSV instead of collecting registrations one by one. The desk validates each row and tells you exactly which ones need fixing before it commits anything — no half-imports.",
+        text: "Already have your players in a spreadsheet? Import them from CSV instead of collecting registrations one by one. The desk validates each row and tells you exactly which ones need fixing before it commits anything — no half-imports. Running registration on a Google Form? See {0}.",
+        links: [{ text: "Import players from a Google Form", href: "/help/google-form-import" }],
       },
       {
         kind: "callout",
         tone: "warning",
         text: "You can keep registering and importing right up until you close registration. Once the auction is built from the approved list, keep the roster stable — late changes mean rebuilding lots.",
+      },
+      CONTACT_FOOTER,
+    ],
+  },
+  {
+    // NEW (2026-09-25). Written against the shipped import dialog: the Google
+    // Sheet connect + "Sync new players" (0093), the photo step that fetches by
+    // each row's Drive link (0092), the one-line column summary, "Fix here",
+    // and the messages the parser actually produces. Nothing here is planned.
+    slug: "google-form-import",
+    title: "Import players from a Google Form",
+    summary:
+      "Connect your form's Google Sheet once, then bring in new players — and their photos — with one click.",
+    category: "organizer",
+    readMinutes: 4,
+    blocks: [
+      {
+        kind: "paragraph",
+        text: "Most clubs collect registrations on a Google Form. You don't need to retype anyone or rename a single column: connect the form's responses sheet, check the preview, and import. Photos players uploaded to the form come in right after, each on the right player.",
+      },
+      { kind: "heading", level: 2, text: "Before you start" },
+      {
+        kind: "list",
+        items: [
+          {
+            text: "In Google Forms, open Responses → Link to Sheets, if your form isn't linked to a sheet already.",
+          },
+          {
+            text: "Use the Google account that owns the form — or one the form's sheet and photo folder are shared with.",
+          },
+          { text: "Your season's registration should be open (the Players tab → Import players)." },
+        ],
+      },
+      { kind: "heading", level: 2, text: "The first import" },
+      {
+        kind: "steps",
+        items: [
+          { text: "Go to your season's Players tab and press Import players." },
+          {
+            text: "Press Connect Google Sheet. A Google window opens: choose your account and allow access. DesiAuction can only open the files you pick in the next step — nothing else in your Drive.",
+          },
+          { text: "Pick your form's responses sheet." },
+          {
+            text: "Check the line that says which columns matched (for example Player's Name → Player name, Photo → Photo (Google Drive link)). If one is wrong, press Change column matching and fix it — we remember your choice for next time.",
+          },
+          {
+            text: "Read the preview: how many players are ready, and anything that needs fixing. Nothing is saved until you press Import.",
+          },
+          {
+            text: "Press Import. Google's photo picker then opens by itself, showing only your players' photos: select them all and press Select.",
+          },
+          { text: "Check the photos against the names and press Upload." },
+        ],
+      },
+      { kind: "heading", level: 2, text: "When more players register" },
+      {
+        kind: "paragraph",
+        text: "Open Import players and press Sync new players. We read your sheet again and show what changed — for example 3 new · 107 unchanged — so nobody is imported twice. Press Import, and the photo picker opens with only the new players' photos.",
+      },
+      { kind: "heading", level: 2, text: "What the messages mean" },
+      {
+        kind: "definitions",
+        items: [
+          {
+            term: "Submitted the form twice",
+            def: "Two rows share a name and phone number. Import the rest and skip the copy — and check the player wasn't charged twice.",
+          },
+          {
+            term: "Duplicate phone — same number as …",
+            def: "Two different people gave one number, often a family phone. Each player needs their own number: press Fix here and enter theirs.",
+          },
+          {
+            term: 'Invalid phone "9.87654E+09"',
+            def: "A spreadsheet program turned the number into a formula. Download or sync the sheet from Google again instead of re-saving it in Excel.",
+          },
+          {
+            term: "Values to place",
+            def: 'An answer we can\'t read on our own — say a role called "Batting Allrounder" or a price band called "Category 1". Choose what it means once; every row with that answer follows.',
+          },
+          {
+            term: "Needs fixing",
+            def: "Each problem names the player and the row of your sheet. Press Fix here to correct it in place, or import everyone else and come back to it.",
+          },
+        ],
+      },
+      {
+        kind: "callout",
+        tone: "info",
+        text: 'Got a transaction ID column? Tick "Mark new players who gave a transaction ID as paid" before importing — only once you\'ve checked the payments. Everyone else starts as fee pending.',
+      },
+      { kind: "heading", level: 2, text: "Prefer downloading?" },
+      {
+        kind: "paragraph",
+        text: "In Google Forms, open Responses → ⋮ → Download responses (.csv) and drop the .zip into Import players — no need to unzip it. For photos, use Get photos from Google Drive on the Photos tab, or drop the zip Google Drive gives you for the form's photo folder; anything we can't match, you pick the player for.",
+      },
+      {
+        kind: "callout",
+        tone: "success",
+        text: "Your data stays yours. We only see the sheet and photos you pick, the Google sign-in is never stored, and you can remove DesiAuction's access any time from the security settings of your Google account (under third-party apps and services).",
       },
       CONTACT_FOOTER,
     ],

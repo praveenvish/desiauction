@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { runMediaUpload } from "../../../../components/media/run-media-upload";
 import {
   downloadDriveFile,
+  hasFreshDriveToken,
   pickDriveFiles,
   preloadGoogle,
   requestDriveToken,
@@ -80,11 +81,20 @@ export function PhotoImportPanel({
   slug,
   onDone,
   onStepAside,
+  autoStart = false,
 }: {
   slug: string;
   onDone: () => void;
   /** Hide the (modal) import dialog while Google's Picker is on screen. */
   onStepAside?: (aside: boolean) => void;
+  /**
+   * Open the Drive picker as soon as this step appears — set right after a
+   * Sheet sync imported players, so their photos are the SAME sitting rather
+   * than a second job. Only acts while that sync's Google sign-in is fresh:
+   * the picker is part of the page, but a sign-in window is a pop-up, and a
+   * pop-up the person didn't click for is one the browser blocks.
+   */
+  autoStart?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -109,7 +119,11 @@ export function PhotoImportPanel({
           return;
         }
         setDrive(config);
-        const withLinks = found.filter((target) => (target.driveId ?? null) !== null);
+        // Only players still WITHOUT a photo: after a weekly sync this is the
+        // new arrivals, not the whole roster again.
+        const withLinks = found.filter(
+          (target) => (target.driveId ?? null) !== null && !target.hasPhoto,
+        );
         setLinked(withLinks);
         if (config !== null && withLinks.length > 0) {
           preloadGoogle();
@@ -180,12 +194,15 @@ export function PhotoImportPanel({
    * organizer signs in to Google, selects every photo Google shows (only this
    * form's), and the review table fills with each face already on its player.
    */
-  const fromDrive = async () => {
-    if (drive === null) {
+  const fromDrive = async (
+    config: DrivePickerConfig | null = drive,
+    wanted: readonly PhotoTarget[] = linked,
+  ): Promise<void> => {
+    if (config === null) {
       return;
     }
     const byDriveId = new Map(
-      linked.flatMap((target) =>
+      wanted.flatMap((target) =>
         target.driveId === undefined || target.driveId === null
           ? []
           : [[target.driveId, target] as const],
@@ -193,12 +210,12 @@ export function PhotoImportPanel({
     );
     try {
       setDriveStep("Waiting for Google…");
-      const token = await requestDriveToken(drive.clientId);
+      const token = await requestDriveToken(config.clientId);
       setDriveStep("Choose the photos in the Google window…");
       onStepAside?.(true);
       let picked;
       try {
-        picked = await pickDriveFiles(drive, token, [...byDriveId.keys()]);
+        picked = await pickDriveFiles(config, token, [...byDriveId.keys()]);
       } finally {
         onStepAside?.(false);
       }
@@ -382,6 +399,23 @@ export function PhotoImportPanel({
     }
   };
 
+  // The auto-start (see the prop): once, and only when the Drive option is
+  // loaded, has photos to offer, and the sync's sign-in is still fresh.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (
+      !autoStart ||
+      autoStarted.current ||
+      drive === null ||
+      linked.length === 0 ||
+      !hasFreshDriveToken()
+    ) {
+      return;
+    }
+    autoStarted.current = true;
+    void fromDrive(drive, linked);
+  });
+
   const ready = entries.filter((entry) => entry.status === "ready").length;
   const blocked = entries.filter((entry) => entry.status === "blocked").length;
   const unmatched = entries.filter(
@@ -402,8 +436,8 @@ export function PhotoImportPanel({
         <div className="drive-photos" data-testid="drive-photos">
           <p>
             <strong>
-              {linked.length} player{linked.length === 1 ? "" : "s"} uploaded a photo in your Google
-              Form.
+              {linked.length} player{linked.length === 1 ? "" : "s"} from your Google Form{" "}
+              {linked.length === 1 ? "has a" : "have a"} photo waiting in Google Drive.
             </strong>{" "}
             Get them straight from Google Drive — each photo lands on the player whose form it came
             with.
