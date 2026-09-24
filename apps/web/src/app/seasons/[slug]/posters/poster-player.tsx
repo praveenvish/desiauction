@@ -635,7 +635,8 @@ export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOpt
             lineHeight: 0.86,
             letterSpacing: -lastSize * 0.01,
             color: palette.heading,
-            textShadow: depth.dark ? "0 18px 50px rgba(0,0,0,0.55)" : "none",
+            // Left out on paper rather than "none" — see the stat tile in poster-kit.
+            ...(depth.dark ? { textShadow: "0 18px 50px rgba(0,0,0,0.55)" } : {}),
             ...vis(ctx, "hero"),
           }}
         >

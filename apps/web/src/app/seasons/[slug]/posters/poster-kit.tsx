@@ -769,9 +769,17 @@ export function Stat({
         padding: `0 ${String(Math.round(metrics.pad / 2))}px`,
         borderRadius: metrics.chipRadius,
         // Glass, like the player poster's result panel.
-        backgroundImage: shown(ctx, layer) ? depthFor(skin).glassFill : "none",
+        // Glass only in its own band. The effects are LEFT OUT elsewhere rather
+        // than set to "none": Satori rejects `backgroundImage: "none"` (the
+        // squad, top-buys and season films failed on it) and still builds a
+        // filter for `boxShadow: "none"`.
+        ...(shown(ctx, layer)
+          ? {
+              backgroundImage: depthFor(skin).glassFill,
+              boxShadow: depthFor(skin).glassShadow,
+            }
+          : {}),
         border: `1px solid ${shown(ctx, layer) ? depthFor(skin).glassBorder : "transparent"}`,
-        boxShadow: shown(ctx, layer) ? depthFor(skin).glassShadow : "none",
         ...vis(ctx, layer),
       }}
     >
