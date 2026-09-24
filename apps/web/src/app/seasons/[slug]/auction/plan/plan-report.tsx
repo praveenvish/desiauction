@@ -4,7 +4,7 @@ import { TARGET_PRIORITY_LABELS, type PlanReport, type ReportOutcome } from "@de
 import { Badge, Card, type BadgeTone } from "@desiauction/ui";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
-import { ledgerINR } from "../../../../../lib/inr";
+import { useMoney } from "../../../../../components/money-unit";
 
 /**
  * HOW THE NIGHT WENT (WR-1, Phase 1.5). Shown on the plan page once the auction
@@ -29,6 +29,7 @@ export function PlanReportCard({
   report: PlanReport;
   lotsByRegistration: Map<string, PlanLotRow>;
 }) {
+  const money = useMoney();
   const name = (registrationId: string) =>
     lotsByRegistration.get(registrationId)?.playerName ?? "A player";
   return (
@@ -42,14 +43,14 @@ export function PlanReportCard({
           <span className="stat-label">Targets signed</span>
         </div>
         <div className="stat-tile" data-testid="plan-report-paid">
-          <span className="stat-value">{ledgerINR(report.paidForTargets)}</span>
+          <span className="stat-value">{money.ledger(report.paidForTargets)}</span>
           <span className="stat-label">
-            Paid for them · planned {ledgerINR(report.plannedTotal)}
+            Paid for them · planned {money.ledger(report.plannedTotal)}
           </span>
         </div>
         <div className="stat-tile" data-testid="plan-report-over">
           <span className="stat-value">
-            {report.overMaxCount === 0 ? "—" : ledgerINR(report.overMaxTotal)}
+            {report.overMaxCount === 0 ? "—" : money.ledger(report.overMaxTotal)}
           </span>
           <span className="stat-label">
             {report.overMaxCount === 0
@@ -59,7 +60,7 @@ export function PlanReportCard({
         </div>
         <div className="stat-tile" data-testid="plan-report-outside">
           <span className="stat-value">
-            {report.outsidePlan.length === 0 ? "—" : ledgerINR(report.outsidePlanTotal)}
+            {report.outsidePlan.length === 0 ? "—" : money.ledger(report.outsidePlanTotal)}
           </span>
           <span className="stat-label">
             {report.outsidePlan.length === 0
@@ -84,15 +85,15 @@ export function PlanReportCard({
                   <span className="registration-name">{name(row.registrationId)}</span>
                   <span className="plan-sub">
                     {TARGET_PRIORITY_LABELS[row.priority]} ·{" "}
-                    {row.maxBid === null ? "no max" : `max ${ledgerINR(row.maxBid)}`}
+                    {row.maxBid === null ? "no max" : `max ${money.ledger(row.maxBid)}`}
                   </span>
                 </span>
                 <span className="plan-report-outcome">
                   <Badge tone={outcome.tone}>{outcome.label}</Badge>
                   {row.paid !== null ? (
                     <span className="plan-sub">
-                      {row.outcome === "won" ? "for" : "at"} {ledgerINR(row.paid)}
-                      {row.overBy !== null ? ` · ${ledgerINR(row.overBy)} past your max` : ""}
+                      {row.outcome === "won" ? "for" : "at"} {money.ledger(row.paid)}
+                      {row.overBy !== null ? ` · ${money.ledger(row.overBy)} past your max` : ""}
                     </span>
                   ) : null}
                 </span>
@@ -105,7 +106,7 @@ export function PlanReportCard({
         <p className="plan-hint" data-testid="plan-report-outside-list">
           Off-plan:{" "}
           {report.outsidePlan
-            .map((row) => `${name(row.registrationId)} (${ledgerINR(row.paid)})`)
+            .map((row) => `${name(row.registrationId)} (${money.ledger(row.paid)})`)
             .join(", ")}
         </p>
       ) : null}

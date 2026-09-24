@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
+import { commandRefusalMessage } from "@desiauction/core";
 import { Badge, Button, Card, Select, useToast, Dialog, Field, PlayerImage } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +38,7 @@ import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
 import { useHydrated } from "../../../../../lib/use-hydrated";
+import { useMoney } from "../../../../../components/money-unit";
 
 // THE AUCTION COCKPIT (M-IP4-3). The organizer's control room: open, pause,
 // resume, open ANY queued lot (order control = skip/bring-forward, doc 41),
@@ -67,6 +68,7 @@ function describeAcceptor(who: OwnerAcceptance): string {
 }
 
 export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }) {
+  const money = useMoney();
   const router = useRouter();
   const toast = useToast();
   // DA: the hook already computed `stale` and `offline`; the cockpit destructured
@@ -675,9 +677,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                       decorative
                     />
                     <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
-                    <span className="competitions-hint">
-                      base {formatPaiseINR(paise(entry.basePrice))}
-                    </span>
+                    <span className="competitions-hint">base {money.ledger(entry.basePrice)}</span>
                     <span className="queue-actions">
                       <Button
                         size="sm"
@@ -1127,7 +1127,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                   {undoTarget.amount !== null ? (
                     <>
                       {" "}
-                      for <strong>{formatPaiseINR(paise(undoTarget.amount))}</strong>
+                      for <strong>{money.ledger(undoTarget.amount)}</strong>
                     </>
                   ) : null}
                   {undoTarget.teamName !== null ? (

@@ -1,13 +1,13 @@
 "use client";
 
 import { roleLabeller } from "../../../../lib/role-label";
-import { formatPaiseINR, paise } from "@desiauction/core";
 import { PlayerImage, RollingNumber } from "@desiauction/ui";
 import { useMemo, useSyncExternalStore } from "react";
 
 import type { AuctionClock } from "./use-auction-socket";
 import type { LotMedia } from "../../../../server/auction/live-summary";
 import type { AuctionSnapshot } from "@desiauction/core";
+import { useMoney } from "../../../../components/money-unit";
 
 // THE LOT HERO — the one thing every live surface leads with: what is on the
 // block, how long is left, and what it is worth right now.
@@ -149,6 +149,7 @@ export function LotHero({
    */
   testId?: string;
 }) {
+  const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   const bid = lot.currentBid;
   const name = lot.playerName ?? "Unnamed";
@@ -206,7 +207,7 @@ export function LotHero({
             <h2 className="lot-hero-name">{name}</h2>
             <p className="lot-hero-meta">
               <span className="lot-hero-role">{labelOf(lot.role)}</span>
-              <span>Base {formatPaiseINR(paise(lot.basePrice))}</span>
+              <span>Base {money.ledger(lot.basePrice)}</span>
             </p>
           </div>
         </div>
@@ -242,11 +243,7 @@ export function LotHero({
             data-testid="leading-bid"
           >
             <RollingNumber
-              value={
-                bid === null
-                  ? formatPaiseINR(paise(lot.basePrice))
-                  : formatPaiseINR(paise(bid.amount))
-              }
+              value={bid === null ? money.ledger(lot.basePrice) : money.ledger(bid.amount)}
             />
           </p>
           {bid === null ? (

@@ -118,6 +118,7 @@ function feeHint(stats: RegistrationStats): string {
     parts.push(`${String(stats.fees.refunded)} refunded`);
   }
   if (stats.feeCollectedPaise > 0) {
+    // rupees-always: registration fees are real money in every season
     parts.push(`${formatPaiseINR(paise(stats.feeCollectedPaise))} in`);
   }
   return parts.length === 0 ? "Entry fees recorded at the desk" : parts.join(" · ");

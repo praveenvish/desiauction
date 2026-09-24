@@ -13,8 +13,9 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { compactFloorINR, compactINR } from "../../lib/inr";
+import { moneyFormat } from "../../lib/money";
 import { planView } from "../../server/auction/owner-plan-actions";
+import { seasonUnit } from "../../server/competition/season-unit";
 import type { OwnedTeam } from "../../server/roles/roles";
 import type { Tone } from "./home-parts";
 
@@ -49,7 +50,12 @@ function pct(part: number, whole: number): number {
 }
 
 export async function OwnerSection({ team }: { team: OwnedTeam }) {
-  const plan = await planView(team.competitionSlug, team.teamId);
+  const [plan, unit] = await Promise.all([
+    planView(team.competitionSlug, team.teamId),
+    seasonUnit(team.competitionSlug),
+  ]);
+  // The purse counts in the season's own unit — rupees or points (0091).
+  const money = moneyFormat(unit);
   const base = `/seasons/${team.competitionSlug}`;
   const live = team.auctionStatus === "live" || team.auctionStatus === "paused";
   const over = team.auctionStatus === "completed" || team.auctionStatus === "reconciled";
@@ -72,9 +78,9 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
           <StatCard
             icon={<IconWallet />}
             tone="gold"
-            value={compactFloorINR(plan.standing.purseRemaining)}
+            value={money.compactFloor(plan.standing.purseRemaining)}
             label="Purse left"
-            hint={`of ${compactINR(plan.rules.pursePerTeam)}`}
+            hint={`of ${money.compact(plan.rules.pursePerTeam)}`}
             progress={pct(plan.standing.purseRemaining, plan.rules.pursePerTeam)}
           />
           <StatCard
@@ -92,7 +98,7 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
             <StatCard
               icon={<IconRupee />}
               tone="green"
-              value={compactINR(plan.rules.pursePerTeam - plan.standing.purseRemaining)}
+              value={money.compact(plan.rules.pursePerTeam - plan.standing.purseRemaining)}
               label="Spent"
               hint="at the auction"
             />

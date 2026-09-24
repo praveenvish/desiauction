@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 
 import { roleLabeller } from "../../../../lib/role-label";
-import { formatPaiseINR, paise } from "@desiauction/core";
 import { Card, IconPlus, PlayerImage } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
@@ -15,6 +14,7 @@ import type {
   PreSignedPlayer,
   ResolvedLot,
 } from "../../../../server/auction/live-summary";
+import { useMoney } from "../../../../components/money-unit";
 
 // THE SQUAD BOARD — every franchise and who is actually in it.
 //
@@ -200,6 +200,7 @@ export function SquadBoard({
   showPurse?: boolean;
   note?: string | null;
 }) {
+  const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   const squads = squadsOf(teams, preSigned, resolved, lotMedia);
   const purseByTeam = new Map(
@@ -242,7 +243,7 @@ export function SquadBoard({
                 <p className="squad-team-purse">
                   {remaining === undefined || remaining === null
                     ? "\u2014"
-                    : `${formatPaiseINR(paise(remaining))} left`}
+                    : `${money.ledger(remaining)} left`}
                 </p>
               ) : null}
               {members.length === 0 ? (
@@ -268,7 +269,7 @@ export function SquadBoard({
                         {member.price === null ? (
                           <span className="squad-presigned">pre-signed</span>
                         ) : (
-                          formatPaiseINR(paise(member.price))
+                          money.ledger(member.price)
                         )}
                       </span>
                     </li>
@@ -304,6 +305,7 @@ export function PoolSummary({
   resolved: ResolvedLot[];
   preSigned: PreSignedPlayer[];
 }) {
+  const money = useMoney();
   const sold = resolved.filter((lot) => lot.status === "sold");
   const unsold = resolved.filter((lot) => lot.status === "unsold").length;
   const withdrawn = resolved.filter((lot) => lot.status === "withdrawn").length;
@@ -349,12 +351,12 @@ export function PoolSummary({
       </dl>
       <div className="pool-money">
         <span>
-          Total spend <strong>{formatPaiseINR(paise(spend))}</strong>
+          Total spend <strong>{money.ledger(spend)}</strong>
         </span>
         {top !== null ? (
           <span>
             Top buy <strong>{top.playerName ?? "Unnamed"}</strong>{" "}
-            {formatPaiseINR(paise(top.soldPrice ?? 0))}
+            {money.ledger(top.soldPrice ?? 0)}
           </span>
         ) : null}
       </div>

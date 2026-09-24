@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatPaiseINR, paise, type AuctionSnapshot, type AuctionStatus } from "@desiauction/core";
+import type { AuctionSnapshot, AuctionStatus } from "@desiauction/core";
 import { Badge, Card, IconArrowRight } from "@desiauction/ui";
 import { useEffect, useState } from "react";
 
@@ -31,6 +31,8 @@ import type {
   ResolvedLot,
 } from "../../../../../server/auction/live-summary";
 import { useHydrated } from "../../../../../lib/use-hydrated";
+import { useMoney } from "../../../../../components/money-unit";
+import type { MoneyFormat } from "../../../../../lib/money";
 
 // The spectator panel: the same lot hero, feed and purse board the owner room
 // reads, ALL derived from the broadcast AuctionSnapshot — minus every control.
@@ -59,11 +61,11 @@ interface RetainedBids {
  */
 type Outcome = NonNullable<AuctionSnapshot["lastOutcome"]>;
 
-function saleSentence(outcome: Outcome): string {
+function saleSentence(outcome: Outcome, money: MoneyFormat): string {
   const who = outcome.playerName ?? outcome.lotNumber;
   return outcome.kind === "sold"
     ? `Sold. ${who} to ${outcome.teamName ?? "the leading team"}${
-        outcome.amount === null ? "" : ` for ${formatPaiseINR(paise(outcome.amount))}`
+        outcome.amount === null ? "" : ` for ${money.ledger(outcome.amount)}`
       }.`
     : outcome.kind === "unsold"
       ? `${who} goes unsold.`
@@ -73,6 +75,7 @@ function saleSentence(outcome: Outcome): string {
 }
 
 function SaleAnnouncer({ snapshot }: { snapshot: AuctionSnapshot | null }) {
+  const money = useMoney();
   // Adjusted during render, so the alert fires in the same commit as the
   // SOLD card instead of one effect later.
   const [announced, setAnnounced] = useState<{ seq: number | null; message: string }>({
@@ -81,7 +84,7 @@ function SaleAnnouncer({ snapshot }: { snapshot: AuctionSnapshot | null }) {
   });
   const outcome = snapshot?.lastOutcome ?? null;
   if (outcome !== null && outcome.atSeq !== announced.seq) {
-    setAnnounced({ seq: outcome.atSeq, message: saleSentence(outcome) });
+    setAnnounced({ seq: outcome.atSeq, message: saleSentence(outcome, money) });
   }
   const message = announced.message;
 
@@ -113,10 +116,11 @@ const WATCHING: Record<AuctionStatus, string> = {
 
 /** The bids that decided the lot just resolved — kept, not wiped. */
 function ResolvedBidHeader({ outcome }: { outcome: NonNullable<AuctionSnapshot["lastOutcome"]> }) {
+  const money = useMoney();
   const parts = [
     outcome.kind.toUpperCase(),
     outcome.playerName ?? outcome.lotNumber,
-    outcome.amount === null ? null : formatPaiseINR(paise(outcome.amount)),
+    outcome.amount === null ? null : money.ledger(outcome.amount),
     outcome.teamName,
   ].filter((part): part is string => part !== null && part !== "");
   return (
@@ -165,6 +169,7 @@ export function SpectatePanel({
   orgName: string | null;
   location: string | null;
 }) {
+  const money = useMoney();
   const { snapshot, connection, remainingMs, ceremony, stale, offline, clock } =
     useAuctionSocket(wsUrl);
   useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
@@ -402,7 +407,7 @@ export function SpectatePanel({
                     <li key={entry.bidId}>
                       <Badge tone="neutral">{entry.paddleNumber}</Badge>
                       <span>{entry.teamName}</span>
-                      <span className="timeline-at">{formatPaiseINR(paise(entry.amount))}</span>
+                      <span className="timeline-at">{money.ledger(entry.amount)}</span>
                     </li>
                   ))}
                 </ol>

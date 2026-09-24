@@ -243,6 +243,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     status: edition.status as CompetitionSummary["status"],
     visibility: edition.visibility,
     entryCategory: edition.entryCategory,
+    auctionUnit: edition.auctionUnit,
     location: edition.location,
     startsOn: edition.startsOn,
     endsOn: edition.endsOn,

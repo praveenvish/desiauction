@@ -7,7 +7,7 @@ import {
   IconTrophy,
   IconUsers as IconUsersUi,
 } from "@desiauction/ui";
-import { entryCategoryLabel, formatPaiseINR, sportPackFor } from "@desiauction/core";
+import { entryCategoryLabel, formatAmount, sportPackFor } from "@desiauction/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -145,7 +145,8 @@ export default async function PublicCompetitionPage({
     ...(view.pursePerTeam !== null
       ? [
           {
-            value: formatPaiseINR(view.pursePerTeam),
+            // In the season's own unit (0091) — a points league shows "pts", never ₹.
+            value: formatAmount(view.pursePerTeam, view.auctionUnit),
             label: "Purse per team",
             icon: <IconTrophy width={18} height={18} />,
           },

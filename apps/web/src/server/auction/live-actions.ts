@@ -647,7 +647,11 @@ export async function submitAuctionCommand(
         personId: gate.personId,
         orgId: gate.competition.orgId,
         auctionId: gate.auction.id,
-        competition: { id: gate.competition.id, name: gate.competition.name },
+        competition: {
+          id: gate.competition.id,
+          name: gate.competition.name,
+          auctionUnit: gate.competition.auctionUnit,
+        },
       },
       send,
       (ack) => ack.accepted,

@@ -9,6 +9,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
+import type { MoneyUnit } from "@desiauction/core";
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 /**
@@ -62,8 +63,10 @@ export interface LiveAuctionRow {
     readonly unsold: number;
     readonly remaining: number;
   };
-  /** Paise across every sold lot. */
+  /** ×100 of `auctionUnit` across every sold lot — never summed across rows. */
   readonly moneyMoved: number;
+  /** The season's unit (0091): each room is formatted in its own. */
+  readonly auctionUnit: MoneyUnit;
   readonly bids: { readonly total: number; readonly lastFiveMinutes: number };
   readonly openedAtMs: number | null;
   readonly lastEventAtMs: number | null;
@@ -78,6 +81,7 @@ export interface EndedAuctionRow {
   readonly sold: number;
   readonly unsold: number;
   readonly moneyMoved: number;
+  readonly auctionUnit: MoneyUnit;
   readonly endedAtMs: number;
 }
 
@@ -127,6 +131,7 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
         lotsUnsold: sql<number>`(select count(*)::int from lots l where l.auction_id = auctions.id and l.status = 'unsold')`,
         lotsWithdrawn: sql<number>`(select count(*)::int from lots l where l.auction_id = auctions.id and l.status = 'withdrawn')`,
         moneyMoved: sql<number>`(select coalesce(sum(l.sold_price), 0)::bigint from lots l where l.auction_id = auctions.id and l.status = 'sold')`,
+        auctionUnit: competitions.auctionUnit,
         bidsTotal: sql<number>`(select count(*)::int from bids b where b.auction_id = auctions.id and b.status <> 'invalidated')`,
         bidsPulse: sql<number>`(select count(*)::int from bids b where b.auction_id = auctions.id and b.status <> 'invalidated' and b.placed_at_ms > ${pulseSince})`,
         openedAtMs: sql<
@@ -151,6 +156,7 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
         sold: sql<number>`(select count(*)::int from lots l where l.auction_id = auctions.id and l.status = 'sold')`,
         unsold: sql<number>`(select count(*)::int from lots l where l.auction_id = auctions.id and l.status = 'unsold')`,
         moneyMoved: sql<number>`(select coalesce(sum(l.sold_price), 0)::bigint from lots l where l.auction_id = auctions.id and l.status = 'sold')`,
+        auctionUnit: competitions.auctionUnit,
         endedAtMs: sql<number>`(select e.at_ms from auction_events e where e.auction_id = auctions.id order by e.seq desc limit 1)`,
       })
       .from(auctions)
@@ -194,6 +200,7 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
         remaining: Math.max(0, total - sold - unsold - num(row.lotsWithdrawn)),
       },
       moneyMoved: num(row.moneyMoved),
+      auctionUnit: row.auctionUnit,
       bids: { total: num(row.bidsTotal), lastFiveMinutes: num(row.bidsPulse) },
       openedAtMs: numOrNull(row.openedAtMs),
       lastEventAtMs,
@@ -218,6 +225,7 @@ export async function liveAuctionBoard(db: Db, nowMs: number): Promise<LiveBoard
         sold: num(row.sold),
         unsold: num(row.unsold),
         moneyMoved: num(row.moneyMoved),
+        auctionUnit: row.auctionUnit,
         endedAtMs: num(row.endedAtMs),
       }))
       .sort((a, b) => b.endedAtMs - a.endedAtMs),
@@ -238,6 +246,8 @@ export interface AuctionHeader {
   readonly seasonName: string;
   readonly seasonSlug: string;
   readonly sport: string;
+  /** The season's unit (0091) — what this room's purses and bids count in. */
+  readonly auctionUnit: MoneyUnit;
 }
 
 export async function auctionHeader(db: Db, auctionId: string): Promise<AuctionHeader | null> {
@@ -252,6 +262,7 @@ export async function auctionHeader(db: Db, auctionId: string): Promise<AuctionH
       seasonName: competitions.name,
       seasonSlug: competitions.slug,
       sport: competitions.sport,
+      auctionUnit: competitions.auctionUnit,
     })
     .from(auctions)
     .innerJoin(organizations, eq(organizations.id, auctions.orgId))

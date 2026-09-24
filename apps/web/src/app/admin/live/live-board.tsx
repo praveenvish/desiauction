@@ -19,7 +19,7 @@ import {
 import Link from "next/link";
 import { useCallback } from "react";
 
-import { compactINR } from "../../../lib/inr";
+import { moneyFormat } from "../../../lib/money";
 import type { EngineRoom, LiveBoardView } from "../../../server/admin/live-watch";
 import { adminLiveBoard } from "../../../server/admin/live-watch";
 import type { LiveAuctionRow, RoomState } from "../../../server/admin/live-views";
@@ -173,7 +173,8 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
                   </span>
                 </span>
                 <span className="admin-meta">
-                  {row.sold} sold · {row.unsold} unsold · {compactINR(row.moneyMoved)}
+                  {row.sold} sold · {row.unsold} unsold ·{" "}
+                  {moneyFormat(row.auctionUnit).compact(row.moneyMoved)}
                 </span>
               </li>
             ))}
@@ -290,7 +291,7 @@ function RoomRow({
         </div>
         <div>
           <dt>Spent</dt>
-          <dd>{compactINR(row.moneyMoved)}</dd>
+          <dd>{moneyFormat(row.auctionUnit).compact(row.moneyMoved)}</dd>
         </div>
         <div>
           <dt>Bids</dt>

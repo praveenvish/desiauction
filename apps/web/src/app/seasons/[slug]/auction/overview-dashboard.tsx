@@ -23,12 +23,12 @@ import {
 import type { AuctionDashboard } from "../../../../server/auction/actions";
 import type { AppointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { formatTime } from "../../../../lib/format-date";
-import { compactFloorINR, compactINR, exactINR } from "../../../../lib/inr";
 import { lotSeed } from "../../../../lib/player-seed";
 import { roleLabeller } from "../../../../lib/role-label";
 import { LotStatusPill, PaddleChip, eventLabel } from "./auction-bits";
 import { BroadcastLinks } from "./broadcast-links";
 import { ConnectionCheck, RulesCard } from "./live-experience";
+import { useMoney } from "../../../../components/money-unit";
 
 /*
  * THE OVERVIEW TAB AS A DASHBOARD (founder mockup 4).
@@ -68,6 +68,7 @@ export function OverviewDashboard({
   appointments: AppointmentsPanelView | null;
   idleHint: string;
 }) {
+  const money = useMoney();
   const { view, viewer, overview, ready, feasibility } = dashboard;
   if (view === null || overview === null) {
     return null;
@@ -132,11 +133,11 @@ export function OverviewDashboard({
             <>
               Money used{" "}
               <strong>{((moneyMoved / purseTotal) * 100).toFixed(1).replace(/\.0$/, "")}%</strong>
-              <span className="dash-money-sub"> · {compactINR(moneyMoved)}</span>
+              <span className="dash-money-sub"> · {money.compact(moneyMoved)}</span>
             </>
           ) : (
             <>
-              Money moved <strong>{compactINR(moneyMoved)}</strong>
+              Money moved <strong>{money.compact(moneyMoved)}</strong>
             </>
           )}
         </span>
@@ -175,14 +176,16 @@ export function OverviewDashboard({
             <span className="dash-who">
               <strong>{onBlock.playerName ?? "Unnamed"}</strong>
               <span>
-                {labelOf(onBlock.role)} · base {exactINR(onBlock.basePrice)}
+                {labelOf(onBlock.role)} · base {money.exact(onBlock.basePrice)}
               </span>
             </span>
           </div>
           <dl className="dash-block-bid">
             <div>
               <dt>Current bid</dt>
-              <dd>{onBlock.currentBid !== null ? exactINR(onBlock.currentBid) : "No bids yet"}</dd>
+              <dd>
+                {onBlock.currentBid !== null ? money.exact(onBlock.currentBid) : "No bids yet"}
+              </dd>
             </div>
             {onBlock.leadingTeamName !== null ? (
               <div>
@@ -253,7 +256,9 @@ export function OverviewDashboard({
                   <span />
                 )}
                 {paddle.remaining !== undefined ? (
-                  <span className="dash-purse-left">{compactFloorINR(paddle.remaining)} left</span>
+                  <span className="dash-purse-left">
+                    {money.compactFloor(paddle.remaining)} left
+                  </span>
                 ) : (
                   <span className="dash-purse-left">sealed</span>
                 )}
@@ -337,7 +342,7 @@ export function OverviewDashboard({
                   <strong>{paddle.teamName}</strong>
                   <span>
                     {paddle.committed !== undefined
-                      ? `committed ${exactINR(paddle.committed)}`
+                      ? `committed ${money.exact(paddle.committed)}`
                       : "purse sealed"}{" "}
                     · squad {paddle.squadSize}
                   </span>
@@ -497,14 +502,14 @@ export function OverviewDashboard({
                   </span>
                 </td>
                 <td className="dash-hide-sm dash-muted">{labelOf(lot.role)}</td>
-                <td className="dash-hide-sm dash-muted">{exactINR(lot.basePrice)}</td>
+                <td className="dash-hide-sm dash-muted">{money.exact(lot.basePrice)}</td>
                 <td>
                   <LotStatusPill status={lot.status} />
                 </td>
                 <td>
                   {lot.soldPrice !== null ? (
                     <span className="dash-result">
-                      <strong>{exactINR(lot.soldPrice)}</strong>
+                      <strong>{money.exact(lot.soldPrice)}</strong>
                       {lot.soldToPaddle !== null ? (
                         <PaddleChip
                           number={lot.soldToPaddle}

@@ -20,7 +20,8 @@ import {
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
-import { compactFloorINR, compactINR, exactINR } from "../../lib/inr";
+import { compactINR, exactINR } from "../../lib/inr";
+import { moneyFormat } from "../../lib/money";
 import type { ReportTable } from "../../server/console/reports";
 import { reportsView } from "../../server/console/views";
 import { SeasonPicker } from "./season-picker";
@@ -169,6 +170,8 @@ export default async function ReportsPage({
     tone,
   }));
   const auction = report.auction;
+  // Auction figures count in the season's unit (0091); fees stay rupees.
+  const unitMoney = moneyFormat(report.auctionUnit);
   const lotsDone = auction.sold + auction.unsold;
   const lotsAll = lotsDone + auction.remaining;
   const spendMax = Math.max(...report.teams.map((team) => team.spend ?? 0), 1);
@@ -213,6 +216,7 @@ export default async function ReportsPage({
           icon={<IconReceipt />}
           tone="green"
           value={
+            // rupees-always: registration fees are real money in every season
             fees.collectedPaise !== undefined ? compactINR(fees.collectedPaise) : count(fees.paid)
           }
           label={fees.collectedPaise !== undefined ? "Fees collected" : "Fees paid"}
@@ -230,7 +234,7 @@ export default async function ReportsPage({
         <StatCard
           icon={<IconWallet />}
           tone="purple"
-          value={auction.moneyMoved !== undefined ? compactINR(auction.moneyMoved) : "—"}
+          value={auction.moneyMoved !== undefined ? unitMoney.compact(auction.moneyMoved) : "—"}
           label="Auction spend"
           hint={
             auction.pursePct !== undefined && auction.pursePct !== null
@@ -262,7 +266,8 @@ export default async function ReportsPage({
           title="Fees"
           description={
             fees.collectedPaise !== undefined && fees.duePaise !== undefined
-              ? `${exactINR(fees.collectedPaise)} collected · ${exactINR(fees.duePaise)} still due`
+              ? // rupees-always: registration fees are real money in every season
+                `${exactINR(fees.collectedPaise)} collected · ${exactINR(fees.duePaise)} still due`
               : "Who has paid, by head count"
           }
           data-testid="report-fees"
@@ -299,7 +304,7 @@ export default async function ReportsPage({
                   ? {
                       key: team.teamId,
                       label: team.name,
-                      value: compactINR(team.spend),
+                      value: unitMoney.compact(team.spend),
                       share: team.spend / spendMax,
                       color: team.color,
                       note: `· ${count(team.squad)} players`,
@@ -323,7 +328,7 @@ export default async function ReportsPage({
             title="Purse utilisation"
             description={
               report.teams[0]?.purse !== undefined
-                ? `Purse per team ${exactINR(report.teams[0].purse)}`
+                ? `Purse per team ${unitMoney.exact(report.teams[0].purse)}`
                 : "No auction purse set yet"
             }
             data-testid="report-purse"
@@ -342,7 +347,7 @@ export default async function ReportsPage({
                     value: `${String(used)}%`,
                     share: used / 100,
                     color: team.color,
-                    note: `· ${compactFloorINR(Math.max(0, (team.purse ?? 0) - (team.spend ?? 0)))} left`,
+                    note: `· ${unitMoney.compactFloor(Math.max(0, (team.purse ?? 0) - (team.spend ?? 0)))} left`,
                   };
                 })}
               />
@@ -403,7 +408,7 @@ export default async function ReportsPage({
                         {[buy.role, buy.teamName].filter((part) => part !== null).join(" · ")}
                       </span>
                     </span>
-                    <span className="rp-buy-price">{compactINR(buy.price)}</span>
+                    <span className="rp-buy-price">{unitMoney.compact(buy.price)}</span>
                   </li>
                 ))}
               </ol>

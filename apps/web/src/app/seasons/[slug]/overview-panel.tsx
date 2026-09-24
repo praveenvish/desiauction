@@ -47,7 +47,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { roleLabeller } from "../../../lib/role-label";
-import { compactINR, exactINR } from "../../../lib/inr";
+import { useMoney } from "../../../components/money-unit";
+import { exactINR } from "../../../lib/inr";
 
 import {
   advanceCompetitionAction,
@@ -126,6 +127,7 @@ function nextDestination(
   slug: string,
   auctionStatus: string | null,
   canSettle: boolean,
+  points: boolean,
 ): { href: string; label: string; title: string } | { locked: true } {
   if (auctionStatus === null) {
     return {
@@ -149,6 +151,15 @@ function nextDestination(
         auctionStatus === "live" ? "The auction is live." : "The auction is paused mid-session.",
     };
   }
+  if (points) {
+    // A points season (0091) ends at the hammer: there is no money to settle,
+    // so the onward step is the squads the night produced.
+    return {
+      href: `/seasons/${slug}/teams`,
+      label: "See the squads",
+      title: "The auction is done. It was played for points — nothing to settle.",
+    };
+  }
   if (!canSettle) {
     return { locked: true };
   }
@@ -168,6 +179,11 @@ function nextDestination(
 
 const STEP_LABELS = ["Setup", "Teams", "Registration", "Auction", "Fixtures", "Settlement"];
 
+/** A points season (0091) has no Settlement rung — nothing is ever owed. */
+function stepLabels(view: SeasonOverviewView): readonly string[] {
+  return view.competition.auctionUnit === "points" ? STEP_LABELS.slice(0, 5) : STEP_LABELS;
+}
+
 /**
  * The six gates, every one of them derived from data this season actually
  * holds (DA-09): Fixtures reads the season's fixture count, Settlement reads
@@ -182,7 +198,9 @@ function clearedRungs(view: SeasonOverviewView): boolean[] {
     status === "registration_closed",
     view.auctionStatus === "completed" || view.auctionStatus === "reconciled",
     view.fixtureCount > 0,
-    view.settlement !== null && view.settlement.discharged,
+    ...(view.competition.auctionUnit === "points"
+      ? []
+      : [view.settlement !== null && view.settlement.discharged]),
   ];
 }
 
@@ -231,7 +249,7 @@ function secondaryAction(
   finished: boolean,
 ): { href: string; label: string } {
   if (finished) {
-    return view.viewer.canSeeMoney
+    return view.viewer.canSeeMoney && view.competition.auctionUnit === "inr"
       ? { href: `/seasons/${slug}/money`, label: "View results" }
       : { href: `/seasons/${slug}/teams`, label: "View squads" };
   }
@@ -324,14 +342,19 @@ export function OverviewPanel({
 
   const status = view.competition.status;
   const step = NEXT_STEP[status] ?? null;
-  const onward = nextDestination(slug, view.auctionStatus, view.viewer.canSettle);
+  const points = view.competition.auctionUnit === "points";
+  const money = useMoney();
+  const steps = stepLabels(view);
+  const onward = nextDestination(slug, view.auctionStatus, view.viewer.canSettle, points);
   const locked = "locked" in onward;
   const cleared = clearedRungs(view);
   const activeIndex = cleared.indexOf(false);
   const auctionDone = cleared[3] === true;
   // The enum has no `completed` value (that is a migration), but the fact is
   // derivable: the auction is over and the books are discharged.
-  const finished = auctionDone && view.settlement !== null && view.settlement.discharged;
+  // A points season is finished at the hammer: there are no books to discharge.
+  const finished =
+    auctionDone && (points || (view.settlement !== null && view.settlement.discharged));
   const missing = missingForRegistration(view.competition);
   const secondary = secondaryAction(view, slug, finished);
   const canPublish = view.publishBlockers.length === 0;
@@ -438,7 +461,7 @@ export function OverviewPanel({
     ? { tone: "green" as KitTone, icon: <IconTrophy /> }
     : (STATUS_PILL[status] ?? { tone: "neutral" as KitTone, icon: <IconCalendar /> });
 
-  const journey: JourneyStep[] = STEP_LABELS.map((label, index) => {
+  const journey: JourneyStep[] = steps.map((label, index) => {
     const state = cleared[index] === true ? "done" : index === activeIndex ? "current" : "upcoming";
     const href = stepHref(index, slug, view);
     return {
@@ -652,8 +675,10 @@ export function OverviewPanel({
         <VisuallyHidden>
           <p data-testid="lifecycle-summary">
             {activeIndex === -1
-              ? "All six steps complete"
-              : `Step ${String(activeIndex + 1)} of 6 · ${STEP_LABELS[activeIndex] ?? ""}`}
+              ? `All ${steps.length === 5 ? "five" : "six"} steps complete`
+              : `Step ${String(activeIndex + 1)} of ${String(steps.length)} · ${
+                  steps[activeIndex] ?? ""
+                }`}
           </p>
         </VisuallyHidden>
         <JourneyStepper steps={journey} linkComponent={Link} />
@@ -719,7 +744,7 @@ export function OverviewPanel({
           <StatCard
             icon={<IconWallet />}
             tone="amber"
-            value={compactINR(view.purseCommitted)}
+            value={money.compact(view.purseCommitted)}
             label="Purse committed"
             {...(view.pursePct !== undefined && view.pursePct !== null
               ? { hint: `${shareLabel(view.purseCommitted, view.pursePct)} of the total purse` }
@@ -808,7 +833,7 @@ export function OverviewPanel({
                         )}
                         {/* Before a hammer has fallen every team has spent ₹0, and
                           a column of "₹0" is furniture, not a reading. */}
-                        {spent ? <span>{exactINR(team.spend ?? 0)}</span> : null}
+                        {spent ? <span>{money.exact(team.spend ?? 0)}</span> : null}
                         {spent && pct !== null ? (
                           <span className="ov-team-pct">
                             {shareLabel(team.spend ?? 0, pct)}
@@ -1083,6 +1108,9 @@ export function OverviewPanel({
           open={settingsOpen}
           slug={slug}
           competition={view.competition}
+          // 0091: the unit is fixed once an auction exists (its purse was
+          // typed in it). The server refuses too; this only says so first.
+          unitLocked={view.auctionStatus !== null}
           onClose={() => {
             setSettingsOpen(false);
           }}
@@ -1111,6 +1139,9 @@ function retroLine(view: SeasonOverviewView): string {
   const settlement = view.settlement;
   if (!view.viewer.canSeeMoney) {
     return "This season is over: the auction is done.";
+  }
+  if (view.competition.auctionUnit === "points") {
+    return "This season is over: the auction is done. It was played for points, so there is nothing to settle.";
   }
   if (settlement === null) {
     return "This season is over: the auction is done. No settlement case has been opened for it yet.";
@@ -1164,12 +1195,14 @@ function Retrospective({
             {settlement.collected !== undefined ? (
               <div>
                 <dt>Collected</dt>
+                {/* rupees-always: the settlement books, which a points season never opens */}
                 <dd data-testid="retro-collected">{exactINR(settlement.collected)}</dd>
               </div>
             ) : null}
             {settlement.outstanding !== undefined ? (
               <div>
                 <dt>Outstanding</dt>
+                {/* rupees-always: the settlement books, which a points season never opens */}
                 <dd data-testid="retro-outstanding">{exactINR(settlement.outstanding)}</dd>
               </div>
             ) : null}
@@ -1200,12 +1233,14 @@ function SeasonSettingsDialog({
   open,
   slug,
   competition,
+  unitLocked,
   onClose,
   onSaved,
 }: {
   open: boolean;
   slug: string;
   competition: SeasonOverviewView["competition"];
+  unitLocked: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1214,6 +1249,7 @@ function SeasonSettingsDialog({
   const [startsOn, setStartsOn] = useState(competition.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(competition.endsOn ?? "");
   const [entryCategory, setEntryCategory] = useState<string>(competition.entryCategory);
+  const [auctionUnit, setAuctionUnit] = useState<string>(competition.auctionUnit);
   const [error, setError] = useState<{ field: DetailsField; message: string } | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -1228,6 +1264,7 @@ function SeasonSettingsDialog({
       startsOn,
       endsOn,
       entryCategory,
+      ...(unitLocked ? {} : { auctionUnit }),
     });
     setPending(false);
     if (result.ok) {
@@ -1318,6 +1355,28 @@ function SeasonSettingsDialog({
               {entryCategoryLabel(category)}
             </option>
           ))}
+        </Select>
+        {/* 0091: rupees or points. Decides how every purse and price reads,
+            and whether the season has books to settle at all. */}
+        <Select
+          label="Auction currency"
+          name="season-auction-unit"
+          value={auctionUnit}
+          disabled={unitLocked}
+          onChange={(event) => {
+            setAuctionUnit(event.target.value);
+          }}
+          help={
+            unitLocked
+              ? "Fixed — the auction was created in this currency."
+              : "Points: purses and bids are points and nothing is owed or settled."
+          }
+          data-testid="season-auction-unit"
+          {...errorFor("auctionUnit")}
+        >
+          {/* rupees-always: names the rupee unit itself */}
+          <option value="inr">Rupees (₹) — real money</option>
+          <option value="points">Points — no money changes hands</option>
         </Select>
       </div>
     </Dialog>

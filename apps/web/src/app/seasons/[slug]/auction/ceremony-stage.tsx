@@ -1,19 +1,14 @@
 "use client";
 
 import { roleLabeller } from "../../../../lib/role-label";
-import {
-  formatPaiseINR,
-  paise,
-  type AuctionSnapshot,
-  type CeremonyState,
-  type LotOutcomeKind,
-} from "@desiauction/core";
+import type { AuctionSnapshot, CeremonyState, LotOutcomeKind } from "@desiauction/core";
 import { GoldDrift, PlayerImage, SoldStamp, type StampSize } from "@desiauction/ui";
 import { useEffect, useMemo, useState } from "react";
 
 import { lotSeed } from "../../../../lib/player-seed";
 import type { TeamIdentity } from "./purse-board";
 import type { LotMedia, ResolvedLot } from "../../../../server/auction/live-summary";
+import { useMoney } from "../../../../components/money-unit";
 
 // The FLOODLIGHT ceremony stage (M-IP4-3). Presentation ONLY: renders the
 // deterministic ceremony phase derived from consecutive AuctionSnapshots.
@@ -126,6 +121,7 @@ export function CeremonyStage({
   resolved?: readonly ResolvedLot[];
   teams?: readonly TeamIdentity[];
 }) {
+  const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // "Waiting for the first snapshot…" told a guest, in the product's own
   // internals, that something they have no name for has not happened. Eight
@@ -284,7 +280,7 @@ export function CeremonyStage({
                   </span>
                   <b className="ceremony-showcase-name">{entry.playerName ?? entry.lotNumber}</b>
                   <span className="ceremony-showcase-price">
-                    {formatPaiseINR(paise(entry.soldPrice ?? 0))}
+                    {money.ledger(entry.soldPrice ?? 0)}
                   </span>
                   <span className="ceremony-showcase-team">{entry.teamName ?? "—"}</span>
                 </li>
@@ -318,18 +314,18 @@ export function CeremonyStage({
                 </span>{" "}
               </>
             )}
-            {lot.lotNumber} · {labelOf(lot.role)} · base {formatPaiseINR(paise(lot.basePrice))}
+            {lot.lotNumber} · {labelOf(lot.role)} · base {money.ledger(lot.basePrice)}
           </p>
           {lot.currentBid !== null ? (
             <p className="ceremony-bid" data-testid="ceremony-bid">
-              {formatPaiseINR(paise(lot.currentBid.amount))}
+              {money.ledger(lot.currentBid.amount)}
               <span className="ceremony-leader" data-testid="ceremony-leader">
                 {lot.currentBid.teamName} · {lot.currentBid.paddleNumber}
               </span>
             </p>
           ) : (
             <p className="ceremony-bid ceremony-bid-open">
-              Opening at {formatPaiseINR(paise(lot.nextMinimumBid))}
+              Opening at {money.ledger(lot.nextMinimumBid)}
             </p>
           )}
           {ceremony.phase === "paused" ? (
@@ -358,7 +354,7 @@ export function CeremonyStage({
           </h2>
           {outcome.amount !== null ? (
             <p className="ceremony-bid" data-testid="ceremony-bid">
-              {formatPaiseINR(paise(outcome.amount))}
+              {money.ledger(outcome.amount)}
               {outcome.kind === "sold" ? (
                 /* Beat three's second fact. "Sold to" is its own small line so
                    the franchise name below it can be set at display size — the

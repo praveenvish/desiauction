@@ -237,7 +237,9 @@ export default async function RootLayout({
     startsOn: competition.startsOn,
     orgName: competition.orgName,
     orgSlug: orgSlugById.get(competition.orgId) ?? "",
-    canSettle: settlementOrgs.has(competition.orgId),
+    // A points season (0091) has nothing to settle: no Money tab, no settle
+    // shortcut in search, whatever the person's grants in the club.
+    canSettle: settlementOrgs.has(competition.orgId) && competition.auctionUnit === "inr",
     seasonRole: seasonRoleFor({
       manages: managedLevel.get(competition.orgId) ?? null,
       conducts: conductedSlugs.has(competition.slug),

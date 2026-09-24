@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise, commandRefusalMessage } from "@desiauction/core";
+import { commandRefusalMessage } from "@desiauction/core";
 import {
   Badge,
   Button,
@@ -49,6 +49,7 @@ import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import "./live.css";
+import { useMoney } from "../../../../../components/money-unit";
 
 // The live client (M-IP4-2, rewired M-IP4-3). This component DECIDES NOTHING:
 // it renders the broadcast AuctionSnapshot (shared socket hook), sends
@@ -85,6 +86,7 @@ export function LivePanel({
   /** The doors to the other auction views, drawn in the room's bottom bar. */
   exits?: ReactNode;
 }) {
+  const money = useMoney();
   const router = useRouter();
   const toast = useToast();
   const { snapshot, connection, remainingMs, version, ceremony, drift, stale, offline, clock } =
@@ -299,7 +301,7 @@ export function LivePanel({
     if (prevLeaderRef.current === mine && leader !== null && leader !== mine) {
       const amount = snapshot.currentLot?.currentBid?.amount;
       toast({
-        title: `Outbid — ${snapshot.currentLot?.currentBid?.teamName ?? "another team"}${amount !== undefined ? ` at ${formatPaiseINR(paise(amount))}` : ""}`,
+        title: `Outbid — ${snapshot.currentLot?.currentBid?.teamName ?? "another team"}${amount !== undefined ? ` at ${money.ledger(amount)}` : ""}`,
         tone: "info",
       });
     }
@@ -313,11 +315,11 @@ export function LivePanel({
     ) {
       wonSeqRef.current = outcome.atSeq;
       toast({
-        title: `You signed ${outcome.playerName ?? outcome.lotNumber}${outcome.amount !== null ? ` for ${formatPaiseINR(paise(outcome.amount))}` : ""}!`,
+        title: `You signed ${outcome.playerName ?? outcome.lotNumber}${outcome.amount !== null ? ` for ${money.ledger(outcome.amount)}` : ""}!`,
         tone: "success",
       });
     }
-  }, [snapshot, myPaddle, toast]);
+  }, [snapshot, myPaddle, toast, money]);
 
   const lot = snapshot?.currentLot ?? null;
   const grantedTeams = view.teams.filter((team) => view.myGrantTeamIds.includes(team.id));
@@ -691,9 +693,7 @@ export function LivePanel({
                         <span className="paddle-chip-money">
                           {paddle.purseRemaining === null || paddle.committed === null
                             ? "purse sealed"
-                            : `purse ${formatPaiseINR(paise(paddle.purseRemaining))} · committed ${formatPaiseINR(
-                                paise(paddle.committed),
-                              )}`}
+                            : `purse ${money.ledger(paddle.purseRemaining)} · committed ${money.ledger(paddle.committed)}`}
                           {paddle.released ? " · released" : ""}
                         </span>
                       </>

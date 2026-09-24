@@ -24,7 +24,7 @@ import {
   SeasonCrest,
   type HeroFigure,
 } from "../../components/season-hero/season-hero";
-import { compactINR } from "../../lib/inr";
+import { moneyFormat } from "../../lib/money";
 import type { SeasonOverviewView } from "../../server/competition/actions";
 import type { CompetitionSummary } from "../../server/competition/competitions";
 import type { SeasonRow } from "../../server/competition/tournament-actions";
@@ -112,7 +112,7 @@ export function FeaturedSeason({
           {
             key: "purse",
             icon: <IconWallet />,
-            value: compactINR(overview.pursePerTeam),
+            value: moneyFormat(overview.competition.auctionUnit).compact(overview.pursePerTeam),
             label: "Purse per team",
           },
         ]

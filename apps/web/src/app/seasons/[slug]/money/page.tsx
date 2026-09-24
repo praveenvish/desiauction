@@ -1,6 +1,13 @@
-import { AnnouncerProvider, ButtonLink, IconFileCheck, ToastProvider } from "@desiauction/ui";
+import {
+  AnnouncerProvider,
+  ButtonLink,
+  EmptyState,
+  IconFileCheck,
+  ToastProvider,
+} from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
+import { seasonUnit } from "../../../../server/competition/season-unit";
 import { settlementConsole } from "../../../../server/settlement/actions";
 import { MoneyPanel } from "./money-panel";
 import "../../seasons.css";
@@ -20,9 +27,32 @@ export const metadata = { title: "Money · DesiAuction" };
  */
 export default async function MoneyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const view = await settlementConsole(slug);
+  const [view, unit] = await Promise.all([settlementConsole(slug), seasonUnit(slug)]);
   if (view === null) {
     notFound();
+  }
+  if (unit === "points") {
+    // A points season (0091) never has books: the tab is gone from its strip
+    // and every settlement command refuses. An old link or a bookmark lands
+    // here and is told why, rather than shown an empty console that invites
+    // opening a case.
+    return (
+      <main className="registrations-dash">
+        <div className="dash-stack money-stack">
+          <EmptyState
+            headingLevel={2}
+            title="Nothing to settle"
+            description="This is a points season — the purses and prices are points, and no money changes hands. Registration fees, if any, are kept on the Players tab."
+            action={
+              <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
+                See the squads
+              </ButtonLink>
+            }
+            data-testid="points-no-settlement"
+          />
+        </div>
+      </main>
+    );
   }
   return (
     /* The toast region is polite by design and queues. A REFUSED money command

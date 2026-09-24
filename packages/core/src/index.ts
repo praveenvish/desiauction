@@ -7,12 +7,16 @@ export {
   serializePaise,
   parsePaise,
   formatPaiseINR,
+  formatAmount,
+  formatPointsNumber,
+  isMoneyUnit,
+  MONEY_UNITS,
   isFeeStatus,
   parseFeeStatus,
   parseRupeesToPaise,
   FEE_STATUSES,
 } from "./money";
-export type { Paise, DeductResult, ParsePaiseResult, FeeStatus } from "./money";
+export type { Paise, DeductResult, ParsePaiseResult, FeeStatus, MoneyUnit } from "./money";
 export type { Clock } from "./clock";
 export { normalizePhone } from "./phone";
 export { scrub, scrubText, REDACTED } from "./scrub";
@@ -196,6 +200,9 @@ export {
   BID_MACHINE,
   AUCTION_EVENT_TYPES,
   DEFAULT_AUCTION_CONFIG,
+  DEFAULT_POINTS_AUCTION_CONFIG,
+  pointsSlabs,
+  defaultAuctionConfigFor,
 } from "./auction";
 export {
   buildAuctionSnapshot,

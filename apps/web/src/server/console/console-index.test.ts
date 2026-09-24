@@ -147,6 +147,7 @@ describe("merging per-club player slices", () => {
 
 describe("report CSV tables obey the money gate", () => {
   const base: SeasonReport = {
+    auctionUnit: "inr",
     registrations: {
       total: 3,
       submitted: 1,
@@ -189,5 +190,23 @@ describe("report CSV tables obey the money gate", () => {
     };
     expect(reportRows(withMoney, "teams")?.rows).toEqual([["Kings", "2", "4", "2500", "10000"]]);
     expect(reportRows(withMoney, "buys")?.rows).toEqual([]);
+    expect(reportRows(withMoney, "teams")?.header).toContain("spend_rupees");
+  });
+
+  it("a points league exports points columns, never rupees", () => {
+    const points: SeasonReport = {
+      ...base,
+      auctionUnit: "points",
+      teams: [{ teamId: "T1", name: "Kings", color: null, squad: 2, spend: 250_000 }],
+      topBuys: [],
+    };
+    expect(reportRows(points, "teams")?.header).toEqual([
+      "team",
+      "squad",
+      "squad_max",
+      "spend_points",
+      "purse_points",
+    ]);
+    expect(reportRows(points, "buys")?.header).toContain("price_points");
   });
 });

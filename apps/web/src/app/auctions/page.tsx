@@ -16,8 +16,13 @@ import {
 import Link from "next/link";
 
 import { compactINR } from "../../lib/inr";
+import { moneyFormat } from "../../lib/money";
 import type { AuctionNightStatus } from "../../server/console/auctions-index";
-import { auctionsIndexView, type AuctionCardView } from "../../server/console/views";
+import {
+  auctionsIndexView,
+  type AuctionCardView,
+  type AuctionsIndexView,
+} from "../../server/console/views";
 import { dateRange } from "../tournaments/season-card";
 import { NavButton } from "../players/nav-button";
 import "../players/players.css";
@@ -36,6 +41,25 @@ const STATUS: Record<AuctionNightStatus, { label: string; tone: KitTone }> = {
 
 function count(value: number): string {
   return value.toLocaleString("en-IN");
+}
+
+function nights(value: number): string {
+  return value === 1 ? "1 night" : `${count(value)} nights`;
+}
+
+/**
+ * What the spend tile covers. Rupees and points (0091) are never added: the
+ * figure is the rupee total, and a points league's spend rides alongside it
+ * (or is the figure, when every night this person runs counts in points).
+ */
+function spendHint(totals: AuctionsIndexView["totals"]): string {
+  const points =
+    totals.pointsSpend === undefined ? null : moneyFormat("points").compact(totals.pointsSpend);
+  if (totals.spend === undefined) {
+    return `Across ${nights(totals.pointsNights)} you run · points, not money`;
+  }
+  const base = `Across ${nights(totals.spendNights)} you run`;
+  return points === null ? base : `${base} · plus ${points} in points leagues`;
 }
 
 function AuctionCard({ card }: { card: AuctionCardView }) {
@@ -93,7 +117,7 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
             </span>
             {card.facts.moneyMoved !== undefined ? (
               <span className="ax-money" data-testid={`auction-money-${card.slug}`}>
-                {compactINR(card.facts.moneyMoved)} moved
+                {moneyFormat(card.auctionUnit).compact(card.facts.moneyMoved)} moved
               </span>
             ) : null}
           </div>
@@ -183,14 +207,19 @@ export default async function AuctionsPage() {
         <StatCard
           icon={<IconWallet />}
           tone="gold"
-          value={totals.spend !== undefined ? compactINR(totals.spend) : "—"}
+          value={
+            totals.spend !== undefined
+              ? // rupees-always: the total adds rupee nights only; points are shown apart
+                compactINR(totals.spend)
+              : totals.pointsSpend !== undefined
+                ? moneyFormat("points").compact(totals.pointsSpend)
+                : "—"
+          }
           label="Total spend"
           hint={
-            totals.spend === undefined
+            totals.spend === undefined && totals.pointsSpend === undefined
               ? "Shown to organizers and auctioneers"
-              : totals.spendNights === 1
-                ? "Across 1 night you run"
-                : `Across ${count(totals.spendNights)} nights you run`
+              : spendHint(totals)
           }
           testId="auctions-spend"
         />

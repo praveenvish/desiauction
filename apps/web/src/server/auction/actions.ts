@@ -7,6 +7,7 @@ import {
   AUCTION_MACHINE,
   BID_MACHINE,
   DEFAULT_AUCTION_CONFIG,
+  defaultAuctionConfigFor,
   LOT_MACHINE,
   extendOnBid,
   openLotTimer,
@@ -355,7 +356,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     // rival's remaining purse — least of all a team owner, whom
     // `acceptOwnerJoin` made a member of this very org.
     const money = conduct || manage;
-    const config = auction?.config ?? DEFAULT_AUCTION_CONFIG;
+    const config = auction?.config ?? defaultAuctionConfigFor(competition.auctionUnit);
     // WR-1: one feature read serves the owner's door and the conductor's switch.
     const myPlan =
       auction === null
@@ -449,9 +450,10 @@ export async function createAuctionAction(
   }
   let config: AuctionConfig;
   if (setup === undefined) {
-    config = DEFAULT_AUCTION_CONFIG;
+    config = defaultAuctionConfigFor(gate.competition.auctionUnit);
   } else {
-    const parsed = parseAuctionSetup(setup);
+    // The season's unit (0091): a points league types points, not rupees.
+    const parsed = parseAuctionSetup(setup, gate.competition.auctionUnit);
     if (!parsed.ok) {
       return {
         ok: false,
@@ -675,7 +677,11 @@ async function completeFromDashboard(
       personId: gate.personId,
       orgId: gate.competition.orgId,
       auctionId: auction.id,
-      competition: { id: gate.competition.id, name: gate.competition.name },
+      competition: {
+        id: gate.competition.id,
+        name: gate.competition.name,
+        auctionUnit: gate.competition.auctionUnit,
+      },
     },
     () => conductCommand(slug, "CompleteAuction", payload),
     (result) => result.ok,

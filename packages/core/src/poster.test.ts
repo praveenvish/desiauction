@@ -33,6 +33,7 @@ const PLAYER: PlayerPosterInput = {
   teamCrestUrl: "https://media.example/c.png",
   competitionName: "Bishnoi Sports Club Bangalore",
   competitionLogoUrl: null,
+  unit: "inr",
 };
 
 describe("player poster", () => {
@@ -41,6 +42,7 @@ describe("player poster", () => {
     expect(p.stamp).toBe("SOLD");
     expect(p.priceLabel).toBe("₹4,000");
     expect(p.outcomeLine).toBe("SOLD TO JHOOMAR 29");
+    expect(buildPlayerPoster({ ...PLAYER, unit: "points" }).priceLabel).toBe("4,000 pts");
     expect(p.numberLabel).toBe("236");
     // The role is the SHARED label, not the raw column — the live screens
     // rendered "all rounder" for years by string-replacing the underscore.
@@ -112,6 +114,7 @@ const TEAM: TeamPosterInput = {
   ],
   spentPaise: 2_500_000,
   pursePaise: 9_700_000,
+  unit: "inr",
 };
 
 describe("team poster", () => {
@@ -121,6 +124,10 @@ describe("team poster", () => {
     expect(t.squadLabel).toBe("3 players");
     expect(t.spentLabel).toBe("₹25,000");
     expect(t.remainingLabel).toBe("₹72,000");
+    const pts = buildTeamPoster({ ...TEAM, unit: "points" });
+    expect(pts.spentLabel).toBe("25,000 pts");
+    expect(pts.remainingLabel).toBe("72,000 pts");
+    expect(pts.rows[0]?.priceLabel).toBe("21,000 pts");
     // The captain leads the sheet, and carries the face the source sent.
     expect(t.rows[0]?.markerLabel).toBe("C");
     expect(t.rows[0]?.isCaptain).toBe(true);
@@ -309,6 +316,7 @@ describe("top buys poster", () => {
     const p = buildTopBuysPoster({
       competitionName: "BSCB-5",
       competitionLogoUrl: null,
+      unit: "inr",
       count: 3,
       buys: [
         BUY("Cheap", 100_000),
@@ -324,10 +332,22 @@ describe("top buys poster", () => {
     expect(p.title).toBe("TOP 3 BUYS");
   });
 
+  it("prints points, never rupees, in a points season", () => {
+    const p = buildTopBuysPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      unit: "points",
+      count: 3,
+      buys: [BUY("Top", 125_000)],
+    });
+    expect(p.rows[0]?.priceLabel).toBe("1,250 pts");
+  });
+
   it("titles what is ON the poster, not what was asked for", () => {
     const two = buildTopBuysPoster({
       competitionName: "BSCB-5",
       competitionLogoUrl: null,
+      unit: "inr",
       count: 10,
       buys: [BUY("One", 100_000), BUY("Two", 200_000)],
     });
@@ -336,6 +356,7 @@ describe("top buys poster", () => {
     const one = buildTopBuysPoster({
       competitionName: "BSCB-5",
       competitionLogoUrl: null,
+      unit: "inr",
       count: 5,
       buys: [BUY("One", 100_000)],
     });
@@ -348,6 +369,7 @@ describe("season poster", () => {
     const p = buildSeasonPoster({
       competitionName: "BSCB-5",
       competitionLogoUrl: null,
+      unit: "inr",
       squads: [
         {
           teamName: "Alpha XI",
@@ -371,5 +393,18 @@ describe("season poster", () => {
     expect(p.squads[0]?.rows[0]?.isCaptain).toBe(true);
     expect(p.squads[0]?.teamColor).toBe("#1F6F43");
     expect(p.squads[1]?.countLabel).toBe("1 player");
+  });
+
+  it("totals in points in a points season", () => {
+    const p = buildSeasonPoster({
+      competitionName: "BSCB-5",
+      competitionLogoUrl: null,
+      unit: "points",
+      squads: [
+        { teamName: "Alpha XI", teamCrestUrl: null, members: TEAM.members, spentPaise: 2_500_000 },
+      ],
+    });
+    expect(p.spentLabel).toBe("25,000 pts");
+    expect(p.squads[0]?.spentLabel).toBe("25,000 pts");
   });
 });

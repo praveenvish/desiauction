@@ -35,6 +35,7 @@ import { FormDialog } from "../../components/form-dialog";
 import { monogram } from "../../components/season-hero/season-hero";
 import { roleLabeller } from "../../lib/role-label";
 import { compactINR, ledgerINR } from "../../lib/inr";
+import { moneyFormat } from "../../lib/money";
 import { auctionDashboard } from "../../server/auction/actions";
 import { competitionsView, seasonOverviewView } from "../../server/competition/actions";
 import { competitionAllows } from "../../server/competition/authz";
@@ -620,7 +621,7 @@ export async function OrganizerHome({
                 <div>
                   <dt>Top bid</dt>
                   <dd className="home-live-bid">
-                    {ledgerINR(liveBoard.onBlock.currentBid)}
+                    {moneyFormat(liveRow.auctionUnit).ledger(liveBoard.onBlock.currentBid)}
                     {liveBoard.onBlock.leadingTeamName !== null ? (
                       <span className="home-live-team">
                         {" · "}
@@ -632,7 +633,7 @@ export async function OrganizerHome({
               ) : null}
               <div>
                 <dt>Spend</dt>
-                <dd>{compactINR(liveRow.spendPaise)}</dd>
+                <dd>{moneyFormat(liveRow.auctionUnit).compact(liveRow.spendPaise)}</dd>
               </div>
               <div>
                 <dt>Lots sold</dt>
@@ -744,7 +745,9 @@ export async function OrganizerHome({
             <StatCard
               icon={<IconWallet />}
               tone="amber"
-              value={compactINR(focusOverview.purseCommitted)}
+              value={moneyFormat(focusOverview.competition.auctionUnit).compact(
+                focusOverview.purseCommitted,
+              )}
               label="Purse committed"
               {...(focusOverview.pursePct != null
                 ? { hint: `${String(focusOverview.pursePct)}% of every purse` }
@@ -817,6 +820,7 @@ export async function OrganizerHome({
                       const badge = seasonBadge(row);
                       const facts = [
                         ...seasonFacts(row.slug),
+                        // rupees-always: the settlement books, which a points season never opens
                         ...(row.canSeeMoney ? [`${compactINR(row.collectedPaise)} collected`] : []),
                       ];
                       return (
@@ -874,7 +878,8 @@ export async function OrganizerHome({
                                 // out would hide the figure from the very
                                 // organizer it was for.
                                 ...(row.canSeeMoney
-                                  ? [`${compactINR(row.collectedPaise)} collected`]
+                                  ? // rupees-always: the settlement books, which a points season never opens
+                                    [`${compactINR(row.collectedPaise)} collected`]
                                   : []),
                               ]}
                             />
@@ -912,7 +917,9 @@ export async function OrganizerHome({
               {showChart ? (
                 <div className="home-chart-wrap">
                   {chartMax > 0 ? (
-                    <span className="home-chart-peak">Peak {compactINR(chartMax)}/day</span>
+                    <span className="home-chart-peak">
+                      Peak {/* rupees-always: settlement collections */ compactINR(chartMax)}/day
+                    </span>
                   ) : null}
                   <svg
                     className="home-chart"
@@ -974,6 +981,7 @@ export async function OrganizerHome({
                   <VisuallyHidden>
                     Collected per day this week:{" "}
                     {DAY_LABELS.map(
+                      // rupees-always: the settlement books, which a points season never opens
                       (label, index) => `${label} ${compactINR(dash.money.thisWeek[index] ?? 0)}`,
                     ).join(", ")}
                     .
@@ -982,12 +990,15 @@ export async function OrganizerHome({
               ) : null}
               <div className="home-money">
                 <MoneyCell href={dash.moneyHref} label="Collected" tone="remaining">
+                  {/* rupees-always: the settlement books, which a points season never opens */}
                   {ledgerINR(dash.money.collectedPaise)}
                 </MoneyCell>
                 <MoneyCell href={dash.moneyHref} label="Outstanding" tone="frozen">
+                  {/* rupees-always: the settlement books, which a points season never opens */}
                   {ledgerINR(dash.money.outstandingPaise)}
                 </MoneyCell>
                 <MoneyCell href={dash.moneyHref} label="Waived" tone="spent">
+                  {/* rupees-always: the settlement books, which a points season never opens */}
                   {ledgerINR(dash.money.waivedPaise)}
                 </MoneyCell>
               </div>
@@ -1046,8 +1057,8 @@ export async function OrganizerHome({
                           <span className="home-row-text">
                             <strong>{auction.competitionName}</strong>
                             <span>
-                              Spend {compactINR(auction.spendPaise)} · Lots {auction.lotsSold}/
-                              {auction.lotsTotal}
+                              Spend {moneyFormat(auction.auctionUnit).compact(auction.spendPaise)} ·
+                              Lots {auction.lotsSold}/{auction.lotsTotal}
                             </span>
                             <span className="home-progress" aria-hidden>
                               <i style={{ width: `${String(pct)}%` }} />

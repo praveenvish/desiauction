@@ -1,6 +1,5 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
 import {
   Button,
   ButtonLink,
@@ -35,7 +34,6 @@ import {
 import type { AppointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { formatTime } from "../../../../lib/format-date";
-import { exactINR } from "../../../../lib/inr";
 import { roleLabeller } from "../../../../lib/role-label";
 import { lotSeed } from "../../../../lib/player-seed";
 import { AbortDialog } from "./abort-dialog";
@@ -46,6 +44,7 @@ import { OverviewDashboard } from "./overview-dashboard";
 import { useHydrated } from "../../../../lib/use-hydrated";
 import "./hub.css";
 import "./dashboard.css";
+import { useMoney } from "../../../../components/money-unit";
 
 /*
  * THE AUCTION DESK, ONE SECTION AT A TIME.
@@ -120,6 +119,7 @@ export function AuctionPanel({
   /** Who else may run this room. */
   auctioneersSlot?: ReactNode;
 }) {
+  const money = useMoney();
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -381,7 +381,7 @@ export function AuctionPanel({
                 <span className="auc-lot-who">
                   <span className="auc-lot-name">{lot.playerName ?? "Unnamed"}</span>
                   <span className="auc-lot-meta">
-                    {labelOf(lot.role)} · base {formatPaiseINR(paise(lot.basePrice))}
+                    {labelOf(lot.role)} · base {money.ledger(lot.basePrice)}
                   </span>
                 </span>
                 <span className="auc-lot-status">
@@ -390,7 +390,7 @@ export function AuctionPanel({
                 <span className="auc-lot-result">
                   {lot.soldPrice !== null ? (
                     <>
-                      <strong>{formatPaiseINR(paise(lot.soldPrice))}</strong>
+                      <strong>{money.ledger(lot.soldPrice)}</strong>
                       {soldTo !== null && lot.soldToPaddle !== null ? (
                         <TeamChip color={colorOfPaddle.get(lot.soldToPaddle) ?? null}>
                           {soldTo}
@@ -486,7 +486,7 @@ export function AuctionPanel({
                     <span className="auc-pad-figures">
                       {paddle.committed !== undefined ? (
                         <span>
-                          <strong>{exactINR(paddle.committed)}</strong> spent
+                          <strong>{money.exact(paddle.committed)}</strong> spent
                         </span>
                       ) : null}
                       <span>

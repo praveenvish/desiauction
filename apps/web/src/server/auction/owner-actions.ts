@@ -13,6 +13,7 @@ import {
   people,
   teams,
 } from "@desiauction/db";
+import type { MoneyUnit } from "@desiauction/core";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { personLabel } from "../../lib/person-label";
@@ -139,6 +140,11 @@ export interface OwnerJoinPreview {
   auctionStatus: string;
   /** Paise. What they will be bidding with — the whole point of accepting. */
   pursePerTeam: number;
+  /**
+   * What the purse counts in (0091). A points league hands out points to build
+   * a squad with — nothing is owed — and the page must not say otherwise.
+   */
+  auctionUnit: MoneyUnit;
   squadMax: number;
   /** ISO — the invitee was never told the link had a deadline. */
   expiresAt: string;
@@ -191,6 +197,7 @@ async function resolveOwnerJoinLanding(
       teamName: teams.name,
       competitionName: competitions.name,
       competitionSlug: competitions.slug,
+      auctionUnit: competitions.auctionUnit,
       orgName: organizations.name,
     })
     .from(auctionOwnerInvites)
@@ -255,6 +262,7 @@ async function resolveOwnerJoinLanding(
       orgName: row.orgName,
       auctionStatus: row.auctionStatus,
       pursePerTeam: rules.pursePerTeam,
+      auctionUnit: row.auctionUnit,
       squadMax: rules.squadMax,
       expiresAt: row.expiresAt.toISOString(),
       invitedByName: inviter?.name ?? null,

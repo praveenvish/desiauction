@@ -11,6 +11,7 @@ import {
   tournaments,
   type Db,
 } from "@desiauction/db";
+import type { MoneyUnit } from "@desiauction/core";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { currentSession } from "../auth/actions";
@@ -58,7 +59,12 @@ export interface HomeAuctionRow {
    * withdrawn lot kept false for the rest of the night.
    */
   lotsRemaining: number;
+  /**
+   * ×100 of the season's unit — rupees or points (0091). Each row carries its
+   * own unit: this list spans seasons, and one may be a points league.
+   */
   spendPaise: number;
+  auctionUnit: MoneyUnit;
 }
 
 export interface HomeTopCompetition {
@@ -695,6 +701,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
         lotsSold: progress?.sold ?? 0,
         lotsRemaining: progress?.remaining ?? 0,
         spendPaise: progress?.spend ?? 0,
+        auctionUnit: competition?.auctionUnit ?? "inr",
       };
     })
     .sort((a, b) => (a.status === b.status ? 0 : a.status === "live" ? -1 : 1))

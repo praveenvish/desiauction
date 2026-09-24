@@ -10,6 +10,7 @@ import {
   slugifyName,
   TOP_BUY_COUNTS,
   type AuctionConfig,
+  type MoneyUnit,
   type PlayerPosterInput,
   type PosterKind,
   type PosterMark,
@@ -126,6 +127,8 @@ interface Gate {
   readonly competition: { id: string; orgId: string; slug: string; name: string };
   readonly logoKey: string | null;
   readonly showBranding: boolean;
+  /** What the season's auction counts in — every price on a poster is in it. */
+  readonly unit: MoneyUnit;
   readonly grant: PosterGrant;
 }
 
@@ -303,7 +306,11 @@ export async function posterGateFor(personId: string, slug: string): Promise<Gat
 
   const [row] = await withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>
     db
-      .select({ tier: competitions.tier, logoKey: competitions.logoUrl })
+      .select({
+        tier: competitions.tier,
+        logoKey: competitions.logoUrl,
+        unit: competitions.auctionUnit,
+      })
       .from(competitions)
       .where(eq(competitions.id, competition.id))
       .limit(1),
@@ -316,6 +323,7 @@ export async function posterGateFor(personId: string, slug: string): Promise<Gat
     // Failing the other way would let one bad row silently strip the platform's
     // own mark off every poster a season produces.
     showBranding: row !== undefined && isTier(row.tier) ? row.tier === "free" : true,
+    unit: row?.unit ?? "inr",
     grant: { organizer, ownRegistrationIds, ownTeamIds },
   };
 }
@@ -599,6 +607,7 @@ async function playerPosterFrom(
       teamColor: read.teamColor,
       competitionName: gated.competition.name,
       competitionLogoUrl,
+      unit: gated.unit,
     },
   };
 }
@@ -745,6 +754,7 @@ async function teamPosterFrom(
       coachName: read.coachName,
       competitionName: gated.competition.name,
       competitionLogoUrl,
+      unit: gated.unit,
       members,
       spentPaise: read.spentPaise,
       pursePaise: read.pursePaise,
@@ -1034,6 +1044,7 @@ async function topBuysPosterFrom(
     input: {
       competitionName: gated.competition.name,
       competitionLogoUrl,
+      unit: gated.unit,
       count,
       buys: read.map((row, index) => ({
         playerName: row.name ?? UNNAMED,
@@ -1135,6 +1146,7 @@ async function seasonPosterFrom(
     input: {
       competitionName: gated.competition.name,
       competitionLogoUrl,
+      unit: gated.unit,
       squads: read.franchises.map((team, index): SeasonSquadInput => ({
         teamName: team.name,
         teamShortName: team.shortName,

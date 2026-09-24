@@ -1,9 +1,10 @@
 "use client";
 
-import { formatPaiseINR, maxAffordableBid, paise } from "@desiauction/core";
+import { maxAffordableBid } from "@desiauction/core";
 import { Card, paintOnFill } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 import { CrestImage } from "../../../../components/team/crest-image";
+import { useMoney } from "../../../../components/money-unit";
 
 // THE PURSE BOARD — one treatment of "who can still play?", shared by every
 // live surface. It previously existed three times over: a bare list on
@@ -310,6 +311,7 @@ export function PurseBoard({
   rules?: { squadMin: number; minPossiblePrice: number } | null;
   squadSizes?: Readonly<Record<string, number>> | null;
 }) {
+  const money = useMoney();
   /**
    * THE ROWS EXIST BEFORE THE SOCKET DOES.
    *
@@ -442,7 +444,7 @@ export function PurseBoard({
                     ? "\u2014"
                     : row.purseRemaining === null
                       ? "sealed"
-                      : formatPaiseINR(paise(row.purseRemaining))}
+                      : money.ledger(row.purseRemaining)}
                 </span>
               </div>
               <div
@@ -453,7 +455,7 @@ export function PurseBoard({
                     ? `${row.teamName}: purse not known yet`
                     : row.total === null || row.committed === null
                       ? `${row.teamName}: purse sealed`
-                      : `${row.teamName}: ${formatPaiseINR(paise(row.committed))} spent of ${formatPaiseINR(paise(row.total))}`
+                      : `${row.teamName}: ${money.ledger(row.committed)} spent of ${money.ledger(row.total)}`
                 }
               >
                 <span
@@ -470,10 +472,10 @@ export function PurseBoard({
                       owner deciding whether to raise, and an abbreviation they
                       have to decode is the wrong thing to put next to money. */}
                   <span>
-                    Max bid <b>{formatPaiseINR(paise(ceiling))}</b>
+                    Max bid <b>{money.ledger(ceiling)}</b>
                   </span>
                   <span>
-                    Reserved <b>{formatPaiseINR(paise(reserved))}</b>
+                    Reserved <b>{money.ledger(reserved)}</b>
                   </span>
                 </p>
               )}

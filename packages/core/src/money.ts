@@ -78,6 +78,45 @@ export function formatPaiseINR(value: Paise): string {
   return remainder === 0 ? `₹${grouped}` : `₹${grouped}.${String(remainder).padStart(2, "0")}`;
 }
 
+/**
+ * WHAT A SEASON'S AUCTION COUNTS IN (0091).
+ *
+ * `inr` is real money: purses, bids and dues are rupees and may be settled.
+ * `points` is a points league — the room runs exactly the same, but the purse
+ * is a budget of points and nothing is ever owed, invoiced or paid for it.
+ *
+ * THE STORAGE SCALE IS THE SAME FOR BOTH: every amount is an integer of
+ * hundredths of the displayed unit. ₹1 is 100 paise; 1 point is stored as 100.
+ * So a points purse of 1,000 is `100000`, and every `/ 100` already written
+ * against a purse, a bid or a ladder stays correct. Only the words change.
+ */
+export const MONEY_UNITS = ["inr", "points"] as const;
+export type MoneyUnit = (typeof MONEY_UNITS)[number];
+
+export function isMoneyUnit(value: unknown): value is MoneyUnit {
+  return value === "inr" || value === "points";
+}
+
+/**
+ * An amount in its season's unit: "₹11,05,000" or "1,250 pts". Exact — for
+ * points the hundredths never arise (whole points are all the setup accepts),
+ * and if one ever did it is shown rather than dropped.
+ */
+export function formatAmount(value: Paise, unit: MoneyUnit): string {
+  if (unit === "inr") {
+    return formatPaiseINR(value);
+  }
+  return `${formatPointsNumber(value)} pts`;
+}
+
+/** The figure of a points amount, grouped, without its unit word. */
+export function formatPointsNumber(value: Paise): string {
+  const whole = Math.floor(value / 100);
+  const remainder = value % 100;
+  const grouped = groupIndian(String(whole));
+  return remainder === 0 ? grouped : `${grouped}.${String(remainder).padStart(2, "0")}`;
+}
+
 function groupIndian(digits: string): string {
   if (digits.length <= 3) {
     return digits;

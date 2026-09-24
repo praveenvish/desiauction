@@ -16,7 +16,7 @@
  * orchestrates; this module decides.
  */
 
-import { paise, type Paise } from "./money";
+import { paise, type MoneyUnit, type Paise } from "./money";
 
 // --- Auction lifecycle (doc 39: Scheduled → Live ⇄ Paused → Completed →
 // Reconciled, ↘ Abandoned). "Reconciled" is declared with its edge so the
@@ -651,6 +651,54 @@ export const DEFAULT_AUCTION_CONFIG: AuctionConfig = {
   basePriceDefault: paise(10_000 * 100),
   roleQuotas: {},
 };
+
+/**
+ * THE POINTS LADDER, SCALED TO THE PURSE (0091).
+ *
+ * The rupee slabs are written in rupees (+₹5k below ₹1L …) and mean nothing
+ * against a purse of 1,000 points — the first step alone would be 5,000. Points
+ * leagues also vary by orders of magnitude (100, 1,000, 1,00,000), so the
+ * ladder follows the purse instead of a fixed table: a "nice" step near 0.5%
+ * of the purse below a fifth of it, double that below half, five times above.
+ * A 1,000-point purse bids +5 / +10 / +25; a 1,00,000-point purse +500 /
+ * +1,000 / +2,500. Every step is a whole point.
+ */
+export function pointsSlabs(pursePerTeam: Paise): IncrementSlab[] {
+  const purse = Math.max(1, Math.floor(pursePerTeam / 100));
+  const unit = niceStep(purse / 200);
+  return [
+    { upTo: paise(Math.max(unit, niceStep(purse / 5)) * 100), step: paise(unit * 100) },
+    { upTo: paise(Math.max(unit * 2, niceStep(purse / 2)) * 100), step: paise(unit * 2 * 100) },
+    { upTo: null, step: paise(unit * 5 * 100) },
+  ].filter(
+    // Tiny purses collapse the first two ceilings together; keep them strictly
+    // rising so the slabs stay valid (isValidSlabs).
+    (slab, index, all) =>
+      index === 0 || slab.upTo === null || (all[index - 1]?.upTo ?? 0) < slab.upTo,
+  );
+}
+
+/** The largest 1 / 2 / 5 × 10ⁿ at or below `value`, never under 1. */
+function niceStep(value: number): number {
+  if (value < 1) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const leading = value / magnitude;
+  const nice = leading >= 5 ? 5 : leading >= 2 ? 2 : 1;
+  return nice * magnitude;
+}
+
+/** A points league's starting numbers: 1,000 points, bands 50 / 20 / 10. */
+export const DEFAULT_POINTS_AUCTION_CONFIG: AuctionConfig = {
+  ...DEFAULT_AUCTION_CONFIG,
+  pursePerTeam: paise(1_000 * 100),
+  slabs: pointsSlabs(paise(1_000 * 100)),
+  basePriceBands: { A: paise(50 * 100), B: paise(20 * 100), C: paise(10 * 100) },
+  basePriceDefault: paise(10 * 100),
+};
+
+export function defaultAuctionConfigFor(unit: MoneyUnit): AuctionConfig {
+  return unit === "points" ? DEFAULT_POINTS_AUCTION_CONFIG : DEFAULT_AUCTION_CONFIG;
+}
 
 export type ConfigValidation = { ok: true } | { ok: false; reason: string };
 
