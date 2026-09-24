@@ -2,6 +2,8 @@ import { monogramOf, type PosterKind, type PosterSize, type PosterTheme } from "
 import type { ReactNode } from "react";
 
 import { mix, withAlpha } from "./poster-color";
+import { FIGURES } from "./poster-fonts";
+import { hostOf, qrDataUri } from "./poster-qr";
 import {
   CHIP_TRACKING,
   HEADER_GAP,
@@ -15,6 +17,7 @@ import {
   type PosterMetrics,
 } from "./poster-layout";
 import { skinFor, type Skin } from "./poster-skins";
+import { depthFor } from "./poster-surface";
 
 /**
  * THE RASTERIZER BOUNDARY — the pieces every poster is built from.
@@ -80,6 +83,12 @@ export interface PosterRenderOptions {
   readonly sponsor: string | null;
   /** Set only while drawing a sprite: the one band that is visible. */
   readonly only?: MotionLayer;
+  /**
+   * The public page this poster points back to — drawn as a QR code, because a
+   * Status has no clickable link. Null for a season that is not public: a code
+   * that opens a 404 is worse than no code.
+   */
+  readonly shareUrl?: string | null;
 }
 
 export interface PosterContext {
@@ -296,6 +305,7 @@ export function Header({
           radius={Math.round(metrics.headerTile * 0.28)}
           fontSize={Math.round(metrics.headerTile * 0.4)}
           fit="contain"
+          round
         />
         <div
           style={{
@@ -400,6 +410,10 @@ export function Footer({ ctx }: { ctx: PosterContext }) {
   const { metrics, skin, options } = ctx;
   const { palette } = skin;
   const right = options.sponsor === null ? (options.showBranding ? "desiauction.in" : null) : null;
+  // A published season gets its way back: the code a phone can scan off a
+  // Status, beside the address a reader can type.
+  const share = options.sponsor === null ? (options.shareUrl ?? null) : null;
+  const qr = Math.round(metrics.footerHeight * 0.92);
   return (
     <div
       style={{
@@ -443,6 +457,58 @@ export function Footer({ ctx }: { ctx: PosterContext }) {
             {options.sponsor}
           </div>
         </div>
+      ) : share !== null ? (
+        <div style={{ display: "flex", alignItems: "center", gap: Math.round(qr * 0.2) }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: 4,
+              ...vis(ctx),
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                color: palette.muted,
+                fontSize: Math.round(metrics.footerUrlSize * 0.55),
+                letterSpacing: 3,
+              }}
+            >
+              SCAN TO OPEN
+            </div>
+            <div
+              style={{
+                display: "flex",
+                color: palette.body,
+                fontSize: Math.round(metrics.footerUrlSize * 0.8),
+                fontWeight: 600,
+              }}
+            >
+              {hostOf(share)}
+            </div>
+          </div>
+          {shown(ctx) ? (
+            <div
+              style={{
+                display: "flex",
+                width: qr,
+                height: qr,
+                padding: Math.round(qr * 0.08),
+                borderRadius: Math.round(qr * 0.14),
+                background: "#F4F2EC",
+              }}
+            >
+              <img
+                src={qrDataUri(share)}
+                width={qr - 2 * Math.round(qr * 0.08)}
+                height={qr - 2 * Math.round(qr * 0.08)}
+                alt=""
+              />
+            </div>
+          ) : null}
+        </div>
       ) : right === null ? null : (
         <div
           style={{
@@ -472,19 +538,18 @@ function Decor({ ctx }: { ctx: PosterContext }) {
   if (family === "matchday") {
     return (
       <div style={{ display: "flex", position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
-        {/* The band: the team's own colour, one stroke across the shoulder of
-            the poster. A rotated slab rather than a gradient, because a flat
-            edge is what a jersey stripe looks like. */}
+        {/* A spotlight on the jersey. The first family drew a rotated slab
+            here; the v3 redesign ("clean, no slabs") lights the team's colour
+            instead. Sized four radii wide — see `Backlight` for why. */}
         <div
           style={{
             display: "flex",
             position: "absolute",
-            top: -metrics.height * 0.2,
-            left: -metrics.width * 0.35,
-            width: metrics.width * 1.7,
-            height: metrics.height * 0.42,
-            background: palette.washInner,
-            transform: "rotate(-14deg)",
+            top: -metrics.width * 0.9,
+            left: -metrics.width * 0.5,
+            width: metrics.width * 2,
+            height: metrics.width * 2,
+            backgroundImage: `radial-gradient(circle at 50% 50%, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 35%)`,
           }}
         />
         <div
@@ -530,22 +595,25 @@ function Decor({ ctx }: { ctx: PosterContext }) {
       </div>
     );
   }
-  // Classic: the floodlight wash, plus a glow in the team's colour low on the
-  // frame — the one place a dark theme lets a franchise's colour speak.
+  // Classic: the floodlight wash, plus the team's colour as a light behind the
+  // top of the sheet, where the crest and the name stand. Laid in a square four
+  // radii wide and spent by 35% — Satori measures a radial to the far corner,
+  // and the old `closest-side` glow ended in a visible rectangle.
+  const radius = metrics.width * 0.5;
   return (
     <div style={{ display: "flex", position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
       <div
         style={{
           display: "flex",
           position: "absolute",
-          left: -metrics.width * 0.25,
-          top: metrics.height * 0.55,
-          width: metrics.width * 1.5,
-          height: metrics.height * 0.6,
-          background: `radial-gradient(closest-side, ${skin.team.glow}, ${withAlpha(
+          left: metrics.width * 0.3 - radius * 2,
+          top: metrics.pad + metrics.headerTile * 2 - radius * 2,
+          width: radius * 4,
+          height: radius * 4,
+          backgroundImage: `radial-gradient(circle at 50% 50%, ${skin.team.glow} 0%, ${withAlpha(
             palette.surface,
             0,
-          )})`,
+          )} 35%)`,
         }}
       />
     </div>
@@ -700,10 +768,18 @@ export function Stat({
         height: metrics.statHeight,
         padding: `0 ${String(Math.round(metrics.pad / 2))}px`,
         borderRadius: metrics.chipRadius,
-        background: shown(ctx, layer) ? skin.palette.panel : "transparent",
-        border: `${String(skin.rule)}px solid ${
-          shown(ctx, layer) ? skin.palette.border : "transparent"
-        }`,
+        // Glass, like the player poster's result panel.
+        // Glass only in its own band. The effects are LEFT OUT elsewhere rather
+        // than set to "none": Satori rejects `backgroundImage: "none"` (the
+        // squad, top-buys and season films failed on it) and still builds a
+        // filter for `boxShadow: "none"`.
+        ...(shown(ctx, layer)
+          ? {
+              backgroundImage: depthFor(skin).glassFill,
+              boxShadow: depthFor(skin).glassShadow,
+            }
+          : {}),
+        border: `1px solid ${shown(ctx, layer) ? depthFor(skin).glassBorder : "transparent"}`,
         ...vis(ctx, layer),
       }}
     >
@@ -718,7 +794,15 @@ export function Stat({
       >
         {label}
       </div>
-      <div style={{ display: "flex", color: tone, fontSize: metrics.statSize, fontWeight: 700 }}>
+      <div
+        style={{
+          display: "flex",
+          color: tone,
+          fontFamily: FIGURES,
+          fontSize: metrics.statSize,
+          fontWeight: 700,
+        }}
+      >
         {value}
       </div>
     </div>
@@ -766,6 +850,9 @@ export function TeamChip({
           fontSize: size,
           letterSpacing: 1,
           textTransform: "uppercase",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
       >
         {name}

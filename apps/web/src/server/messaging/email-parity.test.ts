@@ -87,6 +87,13 @@ function soldMail(facts: SoldFacts): ComposedMail {
         `${facts.teamName} bought you for ${facts.price} in the ${facts.season} auction${multiple}.`,
         bidStory(facts),
         ...(facts.highlight === null ? [] : [`${facts.highlight}.`]),
+        // Changed on purpose (share nudges, 2026-09-24): a public card is
+        // offered to SHARE on the night it was bought, not only to look at.
+        ...(facts.cardUrl === null
+          ? []
+          : [
+              "Your player card is ready. Share it with your groups or post it to your Status — the button below does both.",
+            ]),
       ],
       details: facts.squad.map((line) => [line.name, line.note] as const),
       after: [
@@ -95,7 +102,7 @@ function soldMail(facts: SoldFacts): ComposedMail {
       action:
         facts.cardUrl === null
           ? { label: "See your season", url: `${PUBLIC}/home` }
-          : { label: "See your player card", url: facts.cardUrl },
+          : { label: "Share your player card", url: facts.cardUrl },
       footnote: `You received this because you played in the ${facts.season} auction. Switch off "Auction updates" in your account to stop these.`,
       whatsappNudge: true,
     }),
@@ -237,6 +244,11 @@ function ownerSummaryMail(facts: OwnerSummaryFacts): ComposedMail {
       paragraphs: [
         `Hi ${facts.name},`,
         `The ${facts.season} auction is done. Here is the squad you built, with what you paid for each player.`,
+        // Changed on purpose (share nudges, 2026-09-24): a public season's
+        // owner is asked to share the squad page, and the button opens it.
+        ...(facts.shareUrl === undefined || facts.shareUrl === null
+          ? []
+          : ["Your squad card is ready. Send it to your team group or post it to your Status."]),
       ],
       details: [
         ...facts.squad.map((line) => [line.name, line.note] as const),
@@ -252,7 +264,10 @@ function ownerSummaryMail(facts: OwnerSummaryFacts): ComposedMail {
             `Your squad is ${String(facts.squadMin - facts.squadSize)} short of the minimum of ${String(facts.squadMin)}. Your organizer will tell you how the gap is filled.`,
           ]
         : [],
-      action: { label: "Open your team", url: facts.teamUrl },
+      action:
+        facts.shareUrl === undefined || facts.shareUrl === null
+          ? { label: "Open your team", url: facts.teamUrl }
+          : { label: "Share your squad", url: facts.shareUrl },
       footnote: `You received this because you own ${facts.teamName} in ${facts.season}.`,
     }),
   };
@@ -842,6 +857,20 @@ describe("the player's season renders exactly as before", () => {
   });
 
   const owners: OwnerSummaryFacts[] = [
+    // A public season: the owner is asked to share, and the button opens the squad page.
+    {
+      name: "Priya",
+      season: "MPL 2026",
+      teamName: "Cup Kings",
+      squad,
+      spent: "₹1,00,000",
+      purseLeft: "₹1,99,00,000",
+      squadSize: 2,
+      squadMin: 2,
+      squadMax: 15,
+      teamUrl: "https://desiauction.in/seasons/mpl/teams",
+      shareUrl: "https://desiauction.in/c/mpl/t/cup-kings?ref=email",
+    },
     {
       name: "Priya",
       season: "MPL 2026",

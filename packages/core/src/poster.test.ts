@@ -6,6 +6,7 @@ import {
   buildTeamPoster,
   buildTopBuysPoster,
   firstNameOf,
+  heroNumberOf,
   isPosterKind,
   isPosterSize,
   isPosterTheme,
@@ -16,6 +17,7 @@ import {
   POSTER_KINDS,
   POSTER_SIZES,
   shortNameOf,
+  splitName,
   type PlayerPosterInput,
   type TeamPosterInput,
   type TeamPosterMember,
@@ -406,5 +408,79 @@ describe("season poster", () => {
     });
     expect(p.spentLabel).toBe("25,000 pts");
     expect(p.squads[0]?.spentLabel).toBe("25,000 pts");
+  });
+});
+
+describe("player poster — the v3 name, number and pool", () => {
+  it("splits a name into a light first line and a heavy surname", () => {
+    expect(splitName("Rohit Yadav")).toEqual({ first: "Rohit", last: "Yadav" });
+    expect(splitName("Mohammed Azharuddin Khan")).toEqual({
+      first: "Mohammed Azharuddin",
+      last: "Khan",
+    });
+    expect(splitName("  Dhoni ")).toEqual({ first: null, last: "Dhoni" });
+  });
+
+  it("draws a shirt number as the hero, never a registration code", () => {
+    expect(heroNumberOf("7")).toBe("7");
+    expect(heroNumberOf(" 07 ")).toBe("07");
+    expect(heroNumberOf("R67X349")).toBeNull();
+    expect(heroNumberOf("1234")).toBeNull();
+    expect(heroNumberOf(null)).toBeNull();
+    expect(buildPlayerPoster({ ...PLAYER, jerseyNumber: "14" }).heroNumber).toBe("14");
+  });
+
+  it("labels the lot once the auction has numbered it", () => {
+    expect(buildPlayerPoster({ ...PLAYER, lotNumber: "14" }).lotLabel).toBe("LOT 14");
+    expect(buildPlayerPoster({ ...PLAYER, lotNumber: " " }).lotLabel).toBeNull();
+    // Stored "L003" is a sort key, not something to print.
+    expect(buildPlayerPoster({ ...PLAYER, lotNumber: "L003" }).lotLabel).toBe("LOT 3");
+    expect(buildPlayerPoster({ ...PLAYER, lotNumber: "L010" }).lotLabel).toBe("LOT 10");
+  });
+
+  /*
+   * A pool card is a true sentence about a night that has not happened. It
+   * carries the opening price and no team, whatever a stale row says — and no
+   * sale price, because nobody has paid one.
+   */
+  it("prints a pool player's base price and no team or sale", () => {
+    const p = buildPlayerPoster({
+      ...PLAYER,
+      outcome: "pool",
+      pricePaise: 400_000,
+      basePricePaise: 200_000,
+    });
+    expect(p.stamp).toBe("IN THE POOL");
+    expect(p.priceLabel).toBeNull();
+    expect(p.basePriceLabel).toBe("₹2,000");
+    expect(p.teamName).toBeNull();
+    expect(p.outcomeLine).toBeNull();
+  });
+
+  it("never prints a base price on a verdict", () => {
+    expect(buildPlayerPoster({ ...PLAYER, basePricePaise: 200_000 }).basePriceLabel).toBeNull();
+  });
+});
+
+describe("player poster — long names", () => {
+  it("keeps a long surname whole instead of cutting it mid-word", () => {
+    const p = buildPlayerPoster({ ...PLAYER, playerName: "Venkataraghavan Subramaniam" });
+    expect(p.firstName).toBe("Venkataraghavan");
+    expect(p.lastName).toBe("Subramaniam");
+  });
+});
+
+describe("player poster — a points season's pool card", () => {
+  it("prints the base price in points, never rupees", () => {
+    const p = buildPlayerPoster({
+      ...PLAYER,
+      unit: "points",
+      outcome: "pool",
+      pricePaise: null,
+      teamName: null,
+      basePricePaise: 5_000,
+    });
+    expect(p.basePriceLabel).toBe("50 pts");
+    expect(p.basePriceLabel).not.toContain("₹");
   });
 });

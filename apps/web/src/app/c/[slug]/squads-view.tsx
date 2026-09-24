@@ -24,6 +24,8 @@ export interface SquadTeam {
   primaryColor: string | null;
   logoUrl: string | null;
   coachName: string | null;
+  /** The team's own public page (`/c/[slug]/t/[team]`), built on the server. */
+  href?: string;
 }
 
 export function SquadsView({
@@ -44,7 +46,9 @@ export function SquadsView({
     const orphans = squads
       .filter((squad) => !teams.some((team) => team.name === squad.teamName))
       .map((squad) => ({
+        // No team row means no team page to link to.
         team: {
+          href: undefined,
           id: squad.teamName,
           name: squad.teamName,
           primaryColor: null,
@@ -69,6 +73,7 @@ export function SquadsView({
       {cards.map(({ team, players: squad }) => (
         <TeamCard
           key={team.id}
+          href={team.href}
           team={{
             id: team.id,
             name: team.name,

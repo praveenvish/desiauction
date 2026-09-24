@@ -1,6 +1,4 @@
-import { monogramOf } from "@desiauction/core";
 import type {
-  PlayerPoster,
   PosterKind,
   SeasonPoster,
   TeamPoster,
@@ -10,6 +8,8 @@ import type {
 import type { ReactElement } from "react";
 
 import { mix, withAlpha } from "./poster-color";
+import { DISPLAY, FIGURES } from "./poster-fonts";
+import { withoutHiddenEffects } from "./poster-strip";
 import {
   Footer,
   Frame,
@@ -27,13 +27,10 @@ import {
   type PosterRenderOptions,
 } from "./poster-kit";
 import {
-  OUTCOME_TRACKING,
   contentWidth,
   faceType,
-  fitCaps,
   fitHeadline,
   fitName,
-  fitPrice,
   fitRankRows,
   fitSeasonGrid,
   fitTiles,
@@ -59,187 +56,9 @@ import {
 
 // --- Player -----------------------------------------------------------------
 
-/**
- * The verdict row: the stamp and, when the outcome carries one, the price.
- *
- * The model has already decided there is no price on an unsold, retained or
- * icon player, so this never has to know why the second half is missing — it
- * only has to look deliberate when it is. The two halves are separate motion
- * bands: the stamp lands, then the price counts up to it.
- */
-function Verdict({
-  ctx,
-  stamp,
-  priceLabel,
-}: {
-  ctx: PosterContext;
-  stamp: string;
-  priceLabel: string | null;
-}) {
-  const { metrics, skin } = ctx;
-  const { palette } = skin;
-  const filledStamp = skin.accentOn === "stamp";
-  return (
-    <div
-      style={{
-        display: "flex",
-        width: "100%",
-        alignItems: "center",
-        justifyContent: priceLabel === null ? "center" : "space-between",
-        gap: 24,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          height: metrics.stampHeight,
-          padding: `0 ${String(metrics.stampPadX)}px`,
-          borderRadius: metrics.chipRadius,
-          background: filledStamp ? palette.accent : palette.panel,
-          border: filledStamp ? "none" : `3px solid ${palette.accent}`,
-          color: filledStamp ? palette.onAccent : palette.accent,
-          fontSize: metrics.stampSize,
-          fontWeight: 700,
-          letterSpacing: metrics.stampTracking,
-          ...vis(ctx, "stamp"),
-        }}
-      >
-        {stamp}
-      </div>
-      {priceLabel === null ? null : (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            height: filledStamp ? "auto" : metrics.stampHeight,
-            padding: filledStamp ? 0 : `0 ${String(metrics.stampPadX)}px`,
-            borderRadius: metrics.chipRadius,
-            background: filledStamp ? "transparent" : palette.accent,
-            color: filledStamp ? palette.accent : palette.onAccent,
-            fontSize: fitPrice(priceLabel, stamp, metrics),
-            fontWeight: 700,
-            ...vis(ctx, "price"),
-          }}
-        >
-          {priceLabel}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOptions) {
-  const ctx = contextFor(options, model.teamColor);
-  const { metrics, skin } = ctx;
-  const { palette } = skin;
-  /*
-   * The sentence beside the crest, and ONLY when there is a crest. With no team
-   * the model's line is "Unsold", which is the word already stamped six inches
-   * above it — the first render said UNSOLD twice, once in a slab and once in a
-   * whisper. A poster repeating itself reads as a template, not a design.
-   */
-  const caption = model.teamName === null ? null : (model.outcomeLine ?? model.teamName);
-  const priceLabel = options.prices ? model.priceLabel : null;
-  return (
-    <Frame ctx={ctx}>
-      <Header
-        ctx={ctx}
-        competitionName={model.competitionName}
-        competitionLogoUrl={model.competitionLogoUrl}
-        chip={model.numberLabel === null ? null : `#${model.numberLabel}`}
-      />
-
-      <Tile
-        ctx={ctx}
-        layer="hero"
-        src={model.photoUrl}
-        monogram={model.monogram}
-        width={metrics.photoWidth}
-        height={metrics.photoHeight}
-        radius={metrics.radius}
-        fontSize={metrics.photoMonogramSize}
-        ring={ringFor(ctx, model.teamColor)}
-        ringWidth={model.teamColor === null ? undefined : 6}
-      />
-
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-        <div
-          style={{
-            display: "flex",
-            color: palette.heading,
-            fontSize: fitHeadline(
-              model.name,
-              contentWidth(metrics),
-              metrics.nameMax,
-              metrics.nameMin,
-            ),
-            fontWeight: 700,
-            lineHeight: 1.05,
-            ...vis(ctx, "hero"),
-          }}
-        >
-          {model.name}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            color: palette.accentSoft,
-            fontSize: metrics.roleSize,
-            letterSpacing: 3,
-            textTransform: "uppercase",
-            ...vis(ctx, "hero"),
-          }}
-        >
-          {model.roleLine}
-        </div>
-      </div>
-
-      <Verdict ctx={ctx} stamp={model.stamp} priceLabel={priceLabel} />
-
-      {caption === null || model.teamName === null ? (
-        // No franchise and nothing to say about one. The row still exists so the
-        // frame's rhythm does not change between a sold poster and an unsold one.
-        <div style={{ display: "flex", height: metrics.crest }} />
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <Tile
-            ctx={ctx}
-            layer="stamp"
-            src={model.teamCrestUrl}
-            monogram={monogramOf(model.teamName)}
-            width={metrics.crest}
-            height={metrics.crest}
-            radius={Math.round(metrics.crest * 0.28)}
-            fontSize={metrics.crestMonogramSize}
-            fit="contain"
-            ring={ringFor(ctx, model.teamColor)}
-          />
-          <div
-            style={{
-              display: "flex",
-              color: palette.body,
-              fontSize: fitCaps(
-                caption,
-                contentWidth(metrics) - metrics.crest - 20,
-                metrics.outcomeSize,
-                Math.round(metrics.outcomeSize * 0.6),
-                OUTCOME_TRACKING,
-              ),
-              letterSpacing: OUTCOME_TRACKING,
-              textTransform: "uppercase",
-              ...vis(ctx, "stamp"),
-            }}
-          >
-            {caption}
-          </div>
-        </div>
-      )}
-
-      <Footer ctx={ctx} />
-    </Frame>
-  );
-}
+// The v3 player poster lives in its own module; the route and the studio keep
+// importing it from here, beside the other four kinds.
+export { renderPlayerPoster } from "./poster-player";
 
 // --- The squad's faces ------------------------------------------------------
 
@@ -513,15 +332,22 @@ function SquadHero({
         fit="contain"
         ring={ringFor(ctx, model.teamColor)}
         ringWidth={model.teamColor === null ? undefined : 5}
+        round
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div
           style={{
             display: "flex",
             color: palette.heading,
-            fontSize: fitHeadline(model.teamName, room, metrics.teamNameMax, metrics.teamNameMin),
-            fontWeight: 700,
-            lineHeight: 1.02,
+            // The v3 headline voice: the condensed heavy face, in capitals. It
+            // runs narrower than the sans the fit assumes, so the fit is safe.
+            fontFamily: DISPLAY,
+            fontSize: Math.round(
+              fitHeadline(model.teamName, room, metrics.teamNameMax, metrics.teamNameMin) * 1.12,
+            ),
+            fontWeight: 800,
+            lineHeight: 0.95,
+            textTransform: "uppercase",
             ...vis(ctx, "hero"),
           }}
         >
@@ -723,9 +549,16 @@ export function renderTopBuysPoster(model: TopBuysPoster, options: PosterRenderO
         {model.rows.map((row) => {
           const lead = row.rank === 1;
           const rankWidth = Math.round(fit.rankSize * 1.3);
-          const priceRoom = Math.round(contentWidth(metrics) * 0.3);
+          // The price claims what its own figures need (capped at 30% of the
+          // row), and the name gets exactly the rest: two paddings and three
+          // gaps of 1.6 insets each. The old sum under-counted both, so on a
+          // story the price slid over the team line.
+          const priceRoom = Math.min(
+            Math.round(contentWidth(metrics) * 0.3),
+            Math.round(row.priceLabel.length * fit.priceMax * 0.6),
+          );
           const nameRoom =
-            contentWidth(metrics) - rankWidth - fit.photo - priceRoom - 4 * inset - 40;
+            contentWidth(metrics) - rankWidth - fit.photo - priceRoom - Math.round(8 * inset);
           const name = fitName(row.name, row.shortName, nameRoom, fit.nameSize, 18);
           return (
             <div
@@ -778,6 +611,9 @@ export function renderTopBuysPoster(model: TopBuysPoster, options: PosterRenderO
                   display: "flex",
                   flexDirection: "column",
                   flexGrow: 1,
+                  flexShrink: 1,
+                  flexBasis: 0,
+                  minWidth: 0,
                   gap: 4,
                   overflow: "hidden",
                 }}
@@ -802,11 +638,15 @@ export function renderTopBuysPoster(model: TopBuysPoster, options: PosterRenderO
                   size={fit.metaSize}
                 />
               </div>
+              {/* A fixed claim on the row: the price never slides over the team. */}
               <div
                 style={{
                   display: "flex",
                   justifyContent: "flex-end",
+                  width: priceRoom,
+                  flexShrink: 0,
                   color: lead ? palette.accent : palette.money,
+                  fontFamily: FIGURES,
                   fontSize: fitHeadline(row.priceLabel, priceRoom, fit.priceMax, fit.priceMin),
                   fontWeight: 700,
                 }}
@@ -1021,49 +861,28 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
 // --- The motion sprite ------------------------------------------------------
 
 /**
- * THE SAME POSTER, TAKEN APART.
+ * THE SAME POSTER, TAKEN APART — one band per motion layer.
  *
- * One render, one gate, one audit row: the bands are stacked into a single tall
- * PNG and the studio's canvas composites them back with a reveal. Drawing each
- * band as its own request would multiply the audit trail for one act, and
- * animating a second, hand-written canvas copy of the design would be a preview
- * that can lie about the file people download.
+ * Still one request, one gate, one audit row: `posterResponse` draws the bands
+ * and stitches them into the single tall PNG the studio's canvas composites
+ * back with a reveal. They are drawn SEPARATELY because a blur's cost grows
+ * with the canvas it is drawn on — the same four bands took ~24 s as one
+ * 1080×7680 render and ~8.5 s as four 1080×1920 ones — and each band is drawn
+ * without the effects of the elements it hides (`withoutHiddenEffects`), which
+ * brought the four to ~5.8 s. A second, hand-written canvas copy of the design
+ * is still not an option: it would be a preview that can lie about the file.
  */
-export function renderSprite(
+export function renderSpriteBands(
   kind: PosterKind,
   draw: (options: PosterRenderOptions) => ReactElement,
   options: PosterRenderOptions,
-): { element: ReactElement; layers: readonly string[]; width: number; height: number } {
+): { bands: readonly ReactElement[]; layers: readonly string[]; width: number; height: number } {
   const metrics = metricsFor(options.size);
   const layers = MOTION_BANDS[kind];
   return {
     layers,
     width: metrics.width,
     height: metrics.height,
-    element: (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          width: metrics.width,
-          height: metrics.height * layers.length,
-          background: "transparent",
-        }}
-      >
-        {layers.map((layer) => (
-          <div
-            key={layer}
-            style={{
-              display: "flex",
-              width: metrics.width,
-              height: metrics.height,
-              overflow: "hidden",
-            }}
-          >
-            {draw({ ...options, only: layer })}
-          </div>
-        ))}
-      </div>
-    ),
+    bands: layers.map((layer) => withoutHiddenEffects(draw({ ...options, only: layer }))),
   };
 }

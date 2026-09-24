@@ -611,13 +611,19 @@ export function fitRankRows(count: number, height: number, metrics: PosterMetric
   const gap = Math.round(metrics.gap * 0.55);
   const maxRow = Math.round(metrics.width * 0.24);
   const rowHeight = Math.min(maxRow, Math.floor((height - gap * (n - 1)) / n));
-  const photo = rowHeight - 2 * Math.round(rowHeight * 0.1);
+  // A story's rows are tall, but the frame is no wider than a square's: a face
+  // and a rank that grow with the row height eat the name's width, so both are
+  // capped against the WIDTH instead.
+  const photo = Math.min(
+    rowHeight - 2 * Math.round(rowHeight * 0.1),
+    Math.round(metrics.width * 0.14),
+  );
   const nameSize = clampTo(rowHeight * 0.24, 20, 56);
   return {
     rowHeight,
     gap,
     photo,
-    rankSize: clampTo(rowHeight * 0.4, 26, 104),
+    rankSize: clampTo(rowHeight * 0.4, 26, Math.round(metrics.width * 0.075)),
     nameSize,
     metaSize: clampTo(nameSize * 0.62, 14, 30),
     priceMax: clampTo(rowHeight * 0.3, 22, 66),

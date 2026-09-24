@@ -125,6 +125,22 @@ function multipleNote(multiple: number | null, language: MessageLanguage): strin
   return ` — ${multiple >= 2 ? `${times} times` : "well above"} your base`;
 }
 
+/**
+ * The share nudges, in each reader's language — see `shareLine` in the
+ * templates. They say "Status", never "WhatsApp": the WhatsApp opt-in nudge
+ * (`applyWhatsAppNudge`) owns that word in a personal mail, and two different
+ * WhatsApp asks in one email would read as one confused one.
+ */
+const SHARE_CARD_LINE: Record<MessageLanguage, string> = {
+  en: "Your player card is ready. Share it with your groups or post it to your Status — the button below does both.",
+  hi: "आपका प्लेयर कार्ड तैयार है। इसे अपने ग्रुप्स में भेजें या अपने स्टेटस पर लगाएँ — नीचे का बटन दोनों करता है।",
+};
+
+const SHARE_SQUAD_LINE: Record<MessageLanguage, string> = {
+  en: "Your squad card is ready. Send it to your team group or post it to your Status.",
+  hi: "आपकी टीम का कार्ड तैयार है। इसे टीम ग्रुप में भेजें या अपने स्टेटस पर लगाएँ।",
+};
+
 export function soldMail(
   facts: SoldFacts,
   language: MessageLanguage = "en",
@@ -148,6 +164,10 @@ export function soldMail(
       multipleNote: multipleNote(facts.multiple, language),
       bidStory: bidStory(facts, language),
       highlight,
+      // The card is the thing worth forwarding, and the night it was bought is
+      // when it gets forwarded — so a public card is offered to share, not just
+      // to look at. No card, no line.
+      shareLine: facts.cardUrl === null ? "" : SHARE_CARD_LINE[language],
     },
     {
       details: facts.squad.map((line) => localLine(line, language)),
@@ -412,6 +432,12 @@ export interface OwnerSummaryFacts {
   readonly squadMin: number;
   readonly squadMax: number;
   readonly teamUrl: string;
+  /**
+   * The team's public squad page, with its share sheet — null when the season
+   * is not public. When present it is the email's one button, and the mail
+   * asks the owner to share it.
+   */
+  readonly shareUrl?: string | null;
 }
 
 export function ownerSummaryMail(
@@ -422,6 +448,7 @@ export function ownerSummaryMail(
   const size = String(facts.squadSize);
   const range = `${String(facts.squadMin)}–${String(facts.squadMax)}`;
   const hi = language === "hi";
+  const shareUrl = facts.shareUrl ?? null;
   return renderNotificationEmail(
     "auction.owner_summary",
     language,
@@ -434,6 +461,7 @@ export function ownerSummaryMail(
       purseLeft: facts.purseLeft,
       squadMin: String(facts.squadMin),
       shortBy: short ? String(facts.squadMin - facts.squadSize) : "",
+      shareLine: shareUrl === null ? "" : SHARE_SQUAD_LINE[language],
     },
     {
       details: [
@@ -442,7 +470,10 @@ export function ownerSummaryMail(
         [hi ? "बचा हुआ पर्स" : "Purse left", facts.purseLeft],
         [hi ? "टीम" : "Squad", hi ? `${range} में से ${size}` : `${size} of ${range}`],
       ],
-      action: { id: "team", url: facts.teamUrl },
+      // A public season's owner gets the squad page to share; a private one's,
+      // the console's teams page as before.
+      action:
+        shareUrl === null ? { id: "team", url: facts.teamUrl } : { id: "share", url: shareUrl },
     },
   );
 }

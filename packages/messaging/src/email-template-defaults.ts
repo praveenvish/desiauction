@@ -384,7 +384,7 @@ const SOLD: EmailTemplateSpec = {
     {
       id: "card",
       description:
-        "Their public player card — shown when the season is public and they are an adult.",
+        "Their public player card, with its share sheet — shown when the season is public and they are an adult.",
     },
     SEASON_ACTION,
   ],
@@ -416,6 +416,13 @@ const SOLD: EmailTemplateSpec = {
       "आप इस रात की सबसे महंगी खरीद रहे",
       { computed: true, whenEmpty: "drop" },
     ),
+    text(
+      "shareLine",
+      "The nudge to share the player card, when the card is public (a public season, an adult). Its paragraph is left out otherwise.",
+      "Your player card is ready. Share it with your groups or post it to your Status — the button below does both.",
+      "आपका प्लेयर कार्ड तैयार है। इसे अपने ग्रुप्स में भेजें या अपने स्टेटस पर लगाएँ — नीचे का बटन दोनों करता है।",
+      { computed: true, whenEmpty: "drop" },
+    ),
   ],
   locked: [],
   note: "The squad table under the paragraphs is written by the code, in the reader's language.",
@@ -430,11 +437,12 @@ const SOLD: EmailTemplateSpec = {
           "{{teamName}} bought you for {{price}} in the {{season}} auction{{multipleNote}}.",
           "{{bidStory}}",
           "{{highlight}}.",
+          "{{shareLine}}",
         ],
         after: [
           "That is your squad so far at {{teamName}}. Your organizer, {{orgName}}, will share fixtures next.",
         ],
-        actions: { card: "See your player card", season: SEE_SEASON.en },
+        actions: { card: "Share your player card", season: SEE_SEASON.en },
         footnote: `You received this because you played in the {{season}} auction. ${AUCTION_FOOTNOTE_SWITCH.en}`,
       }),
     ),
@@ -448,11 +456,12 @@ const SOLD: EmailTemplateSpec = {
           "{{season}} की नीलामी में {{teamName}} ने आपको {{price}} में खरीदा{{multipleNote}}।",
           "{{bidStory}}",
           "{{highlight}}।",
+          "{{shareLine}}",
         ],
         after: [
           "यह {{teamName}} में अब तक की आपकी टीम है। आपके आयोजक, {{orgName}}, आगे मैचों की जानकारी देंगे।",
         ],
-        actions: { card: "अपना प्लेयर कार्ड देखें", season: SEE_SEASON.hi },
+        actions: { card: "अपना प्लेयर कार्ड शेयर करें", season: SEE_SEASON.hi },
         footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में थे। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
       }),
     ),
@@ -509,7 +518,14 @@ const OWNER_SUMMARY: EmailTemplateSpec = {
   editableFields: LAYOUT_FIELDS,
   languages: ["en", "hi"],
   variants: DEFAULT_VARIANT,
-  actions: [{ id: "team", description: "The season's teams page." }],
+  actions: [
+    {
+      id: "share",
+      description:
+        "The team's public squad page, with its share sheet — used when the season is public.",
+    },
+    { id: "team", description: "The season's teams page — used when the season is private." },
+  ],
   variables: [
     NAME,
     SEASON,
@@ -525,6 +541,13 @@ const OWNER_SUMMARY: EmailTemplateSpec = {
       "1",
       { whenEmpty: "drop" },
     ),
+    text(
+      "shareLine",
+      "The nudge to share the squad card, when the season is public. Its paragraph is left out otherwise.",
+      "Your squad card is ready. Send it to your team group or post it to your Status.",
+      "आपकी टीम का कार्ड तैयार है। इसे टीम ग्रुप में भेजें या अपने स्टेटस पर लगाएँ।",
+      { computed: true, whenEmpty: "drop" },
+    ),
   ],
   locked: [],
   note: "The squad, spend and purse table is written by the code, in the reader's language.",
@@ -537,11 +560,12 @@ const OWNER_SUMMARY: EmailTemplateSpec = {
         paragraphs: [
           "Hi {{name}},",
           "The {{season}} auction is done. Here is the squad you built, with what you paid for each player.",
+          "{{shareLine}}",
         ],
         after: [
           "Your squad is {{shortBy}} short of the minimum of {{squadMin}}. Your organizer will tell you how the gap is filled.",
         ],
-        actions: { team: "Open your team" },
+        actions: { share: "Share your squad", team: "Open your team" },
         footnote: "You received this because you own {{teamName}} in {{season}}.",
       }),
     ),
@@ -553,11 +577,12 @@ const OWNER_SUMMARY: EmailTemplateSpec = {
         paragraphs: [
           "नमस्ते {{name}},",
           "{{season}} की नीलामी पूरी हो गई है। यह रही आपकी बनाई टीम, और हर खिलाड़ी के लिए आपने कितना दिया।",
+          "{{shareLine}}",
         ],
         after: [
           "आपकी टीम में कम से कम {{squadMin}} खिलाड़ी चाहिए, और अभी {{shortBy}} कम हैं। कमी कैसे पूरी होगी, यह आपके आयोजक बताएँगे।",
         ],
-        actions: { team: "अपनी टीम खोलें" },
+        actions: { share: "अपनी टीम शेयर करें", team: "अपनी टीम खोलें" },
         footnote: "आपको यह इसलिए मिला क्योंकि {{season}} में {{teamName}} आपकी टीम है।",
       }),
     ),
