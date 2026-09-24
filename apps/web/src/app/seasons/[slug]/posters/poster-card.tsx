@@ -9,6 +9,7 @@ import type { ReactElement } from "react";
 
 import { mix, withAlpha } from "./poster-color";
 import { DISPLAY, FIGURES } from "./poster-fonts";
+import { withoutHiddenEffects } from "./poster-strip";
 import {
   Footer,
   Frame,
@@ -860,49 +861,28 @@ export function renderSeasonPoster(model: SeasonPoster, options: PosterRenderOpt
 // --- The motion sprite ------------------------------------------------------
 
 /**
- * THE SAME POSTER, TAKEN APART.
+ * THE SAME POSTER, TAKEN APART — one band per motion layer.
  *
- * One render, one gate, one audit row: the bands are stacked into a single tall
- * PNG and the studio's canvas composites them back with a reveal. Drawing each
- * band as its own request would multiply the audit trail for one act, and
- * animating a second, hand-written canvas copy of the design would be a preview
- * that can lie about the file people download.
+ * Still one request, one gate, one audit row: `posterResponse` draws the bands
+ * and stitches them into the single tall PNG the studio's canvas composites
+ * back with a reveal. They are drawn SEPARATELY because a blur's cost grows
+ * with the canvas it is drawn on — the same four bands took ~24 s as one
+ * 1080×7680 render and ~8.5 s as four 1080×1920 ones — and each band is drawn
+ * without the effects of the elements it hides (`withoutHiddenEffects`), which
+ * brought the four to ~5.8 s. A second, hand-written canvas copy of the design
+ * is still not an option: it would be a preview that can lie about the file.
  */
-export function renderSprite(
+export function renderSpriteBands(
   kind: PosterKind,
   draw: (options: PosterRenderOptions) => ReactElement,
   options: PosterRenderOptions,
-): { element: ReactElement; layers: readonly string[]; width: number; height: number } {
+): { bands: readonly ReactElement[]; layers: readonly string[]; width: number; height: number } {
   const metrics = metricsFor(options.size);
   const layers = MOTION_BANDS[kind];
   return {
     layers,
     width: metrics.width,
     height: metrics.height,
-    element: (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          width: metrics.width,
-          height: metrics.height * layers.length,
-          background: "transparent",
-        }}
-      >
-        {layers.map((layer) => (
-          <div
-            key={layer}
-            style={{
-              display: "flex",
-              width: metrics.width,
-              height: metrics.height,
-              overflow: "hidden",
-            }}
-          >
-            {draw({ ...options, only: layer })}
-          </div>
-        ))}
-      </div>
-    ),
+    bands: layers.map((layer) => withoutHiddenEffects(draw({ ...options, only: layer }))),
   };
 }

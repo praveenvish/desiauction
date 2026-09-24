@@ -16,7 +16,8 @@ import { formatAmount, paise, type MoneyUnit } from "@desiauction/core";
  *  3. Render the poster ONCE, in bands, and animate the bands. That is this.
  *
  * The route draws the same poster once per motion band into one tall sprite
- * (`renderSprite` in `poster-card.tsx`), and this module composites the bands
+ * (`renderSpriteBands` in `poster-card.tsx`, stitched by `posterResponse`),
+ * and this module composites the bands
  * back together over time. The last frame is the poster, pixel for pixel,
  * because it IS the poster; there is no second renderer to drift.
  *
