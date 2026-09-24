@@ -314,3 +314,40 @@ for (const theme of ["daylight", "floodlight"] as const) {
     expect(helpScan.violations, JSON.stringify(helpScan.violations, null, 2)).toEqual([]);
   });
 }
+
+/*
+ * THE PAGE ANSWERS THE CLICK (page-load audit). A soft navigation marks the
+ * document `data-nav-pending` and the content region `aria-busy` until the next
+ * page commits — the client-side stand-in for a `loading.tsx`, which cannot sit
+ * above these gated pages. The server's answer is held back here so the pending
+ * window is long enough to observe; on a phone it is 0.5–0.7 s for real.
+ */
+test("a click marks the page busy until the next page arrives, then releases it", async ({
+  page,
+}) => {
+  await page.goto("/help");
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === "/pricing",
+    async (route) => {
+      if (route.request().headers()["rsc"] !== undefined) await held;
+      await route.continue();
+    },
+  );
+
+  const html = page.locator("html");
+  const content = page.locator("#main-content");
+  await page.getByRole("link", { name: "Pricing", exact: true }).first().click();
+  await expect(html).toHaveAttribute("data-nav-pending", "");
+  await expect(content).toHaveAttribute("aria-busy", "true");
+
+  release();
+  await expect(page).toHaveURL(/\/pricing$/);
+  await expect(html).not.toHaveAttribute("data-nav-pending");
+  await expect(content).not.toHaveAttribute("aria-busy");
+  // Back at full contrast on arrival — no fade-in for an accessibility scan to catch.
+  await expect(content).toHaveCSS("opacity", "1");
+});

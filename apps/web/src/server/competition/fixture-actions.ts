@@ -16,7 +16,7 @@ import { redirect } from "next/navigation";
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
 import { can } from "../orgs/authz";
-import { orgsFor, resolveTenant } from "../orgs/orgs";
+import { orgsFor } from "../orgs/orgs";
 import { acrossOrgs, asPerson } from "../tenant";
 import { resolveMemberCompetition } from "./resolve";
 import { canCompetition, requireCompetitionCapability } from "./authz";
@@ -90,6 +90,7 @@ import {
   type GroundOption,
   type VenueSummary,
 } from "./venues";
+import { tenantOfPerson } from "../request-cache";
 
 // Fixtures & venues internal RPC (M-IP3-3). The one gate pattern: session →
 // tenant → capability → aggregate. Routes never touch scheduling rules — every
@@ -178,9 +179,7 @@ export interface VenuesView {
 
 export async function venuesView(orgSlug: string): Promise<VenuesView | null> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return null;
   }
@@ -197,9 +196,7 @@ async function venueGate(
   orgSlug: string,
 ): Promise<{ ok: true; personId: string; orgId: string } | { ok: false; error: string }> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return { ok: false, error: "Not available." };
   }

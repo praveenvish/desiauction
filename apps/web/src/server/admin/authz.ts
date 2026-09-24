@@ -1,8 +1,4 @@
-import { withTenantDb } from "@desiauction/db";
-
 import { currentSession } from "../auth/actions";
-import { dbHandle } from "../db";
-import { grantsFor } from "../orgs/authz";
 import { recordAdminAccess, type AdminSurface } from "./access-log";
 import {
   hasPlatformCapability,
@@ -134,18 +130,19 @@ export async function heldPlatformCapabilities(): Promise<ReadonlySet<PlatformCa
   if (session === null) {
     return new Set();
   }
-  return withTenantDb(dbHandle, { personId: session.personId }, async (db) => {
-    const grants = await grantsFor(db, session.personId);
-    const held = new Set<PlatformCapability>();
-    for (const set of PLATFORM_CAPABILITY_SETS) {
-      for (const capability of platformCapabilitiesOf(set)) {
-        if (hasPlatformCapability(grants, capability)) {
-          held.add(capability);
-        }
+  // The request's one grants read (request-cache.ts), shared with the Money and
+  // Finance gates the root layout asks in the same render — this used to open a
+  // tenant transaction of its own for the same rows on every signed-in page.
+  const grants = await grantsOfPerson(session.personId);
+  const held = new Set<PlatformCapability>();
+  for (const set of PLATFORM_CAPABILITY_SETS) {
+    for (const capability of platformCapabilitiesOf(set)) {
+      if (hasPlatformCapability(grants, capability)) {
+        held.add(capability);
       }
     }
-    return held;
-  });
+  }
+  return held;
 }
 
 /** Nav-only: whether to reveal the Platform admin door. Same evaluation, no leak. */

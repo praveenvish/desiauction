@@ -4,6 +4,7 @@ export type { SemanticToken } from "./generated/tokens";
 
 export { Button, ButtonLink, buttonClassName } from "./primitives/button";
 export type { ButtonProps, ButtonLinkProps, ButtonVariant, ButtonSize } from "./primitives/button";
+export { LinkComponentProvider, isRouterHref, useLinkComponent } from "./primitives/link-context";
 export { Badge } from "./primitives/badge";
 export type { BadgeProps, BadgeTone } from "./primitives/badge";
 export { Card, cardClassName } from "./primitives/card";

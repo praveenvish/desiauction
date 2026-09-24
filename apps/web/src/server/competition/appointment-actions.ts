@@ -6,11 +6,11 @@ import { revalidatePath } from "next/cache";
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
 import { storage } from "../media";
-import { canCompetition } from "./authz";
 import { announceAppointments, appointmentsView, roleLabel, rolesLabel } from "./appointments";
 import { resolveMemberCompetition } from "./resolve";
 import { consentedPhotoUrl } from "./shown-name";
 import { sendSquadSheets, squadSheetsView, type SquadSheetsView } from "./squad-sheets";
+import { personCanCompetition } from "../request-cache";
 
 /**
  * Who may announce appointments and send squad sheets: whoever may set the
@@ -22,16 +22,10 @@ async function gate(slug: string) {
   if (session === null) return null;
   const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) return null;
-  const allowed = await withTenantDb(
-    dbHandle,
-    { personId: session.personId, orgId: competition.orgId },
-    (db) =>
-      canCompetition(
-        db,
-        session.personId,
-        { orgId: competition.orgId, competitionId: competition.id },
-        "team.manage",
-      ),
+  const allowed = await personCanCompetition(
+    session.personId,
+    { orgId: competition.orgId, competitionId: competition.id },
+    "team.manage",
   );
   return allowed ? { personId: session.personId, competition } : null;
 }

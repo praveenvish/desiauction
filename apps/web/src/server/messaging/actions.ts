@@ -10,14 +10,14 @@ import { db as appDb, dbHandle, systemDb } from "../db";
 import { parseWhatsAppLanguage, type WhatsAppLanguage } from "../../lib/whatsapp-consent";
 import { setWhatsappOptIn, whatsappOptedIn } from "./whatsapp";
 import { ForbiddenError, can, requireCapability } from "../orgs/authz";
-import { resolveTenant } from "../orgs/orgs";
 import { ORG_SWITCH_CHANNELS, PERSON_SWITCH_CHANNELS } from "./catalogue";
 import { orgSwitchesFor, preferencesFor, setOrgMessagingSetting, setPreference } from "./consent";
 import { orgSwitchTopics, personSwitchTopics, platformSwitches } from "./platform-switches";
+import { tenantOfPerson } from "../request-cache";
 
 /** Membership-checked slug → org, under person-only tenant context. */
 async function resolveTenantScoped(personId: string, slug: string) {
-  return withTenantDb(dbHandle, { personId }, (db) => resolveTenant(db, personId, slug));
+  return tenantOfPerson(personId, slug);
 }
 
 /**

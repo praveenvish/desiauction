@@ -1,5 +1,6 @@
 import { auditLog, newId, withTenantDb } from "@desiauction/db";
 import { and, desc, eq, notInArray, sql } from "drizzle-orm";
+import { cache } from "react";
 
 import { dbHandle } from "../db";
 import { hiddenInboxActions } from "../messaging/gate";
@@ -170,8 +171,14 @@ export async function countSecurityEvents(personId: string): Promise<number> {
  * PX-3 bell indicator: the newest person-scoped event's timestamp (one row).
  * Filtered exactly as the inbox is, or the bell would light for a notice the
  * inbox then refuses to show.
+ *
+ * `cache`d per render: the root layout asks on every signed-in page, and Next
+ * evaluates the root layout twice per request (once more for its not-found
+ * fallback) — this transaction ran twice on every page.
  */
-export async function latestSecurityEventAt(personId: string): Promise<Date | null> {
+export const latestSecurityEventAt = cache(async function latestSecurityEventAt(
+  personId: string,
+): Promise<Date | null> {
   const rows = await withTenantDb(dbHandle, { personId }, async (db) => {
     const hidden = await hiddenInboxActions(db, personId);
     return db
@@ -187,4 +194,4 @@ export async function latestSecurityEventAt(personId: string): Promise<Date | nu
       .limit(1);
   });
   return rows[0]?.at ?? null;
-}
+});

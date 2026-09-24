@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   EmptyState,
   IconBell,
@@ -141,7 +142,7 @@ function TemplateLine({ row, cell }: { row: GridRow; cell: GridCell }) {
         ? " · not approved"
         : "";
   return (
-    <a
+    <Link
       className="admin-meta ntc-template-link"
       href={`/admin/notifications/templates#tpl-${row.key}`}
       data-testid={`notify-template-${row.key}-${cell.channel}`}
@@ -151,7 +152,7 @@ function TemplateLine({ row, cell }: { row: GridRow; cell: GridCell }) {
         ? `${word}: none mapped`
         : `${word}: ${template.handle} (${SOURCE_LABEL[template.source]})${approval}`}
       <span className="admin-sr-only"> — manage templates for {row.label}</span>
-    </a>
+    </Link>
   );
 }
 

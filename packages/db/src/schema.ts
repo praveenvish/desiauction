@@ -1600,6 +1600,9 @@ export const auctionEvents = pgTable(
   (table) => [
     uniqueIndex("auction_events_auction_seq_uq").on(table.auctionId, table.seq),
     index("auction_events_auction_idx").on(table.auctionId),
+    // "When did this auction last move?" — max(at_ms) per auction, asked by the
+    // public directory's live test on every / and /c render (migration 0090).
+    index("auction_events_auction_at_idx").on(table.auctionId, table.atMs),
   ],
 );
 
@@ -1627,7 +1630,12 @@ export const auctionOwnerInvites = pgTable(
     revokedAt: ts("revoked_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (table) => [index("owner_invites_auction_idx").on(table.auctionId)],
+  (table) => [
+    index("owner_invites_auction_idx").on(table.auctionId),
+    // "Which teams does this person own?" — rolesOf, on every signed-in render
+    // (migration 0090).
+    index("owner_invites_accepted_by_idx").on(table.acceptedBy),
+  ],
 );
 
 export const paddleGrants = pgTable(

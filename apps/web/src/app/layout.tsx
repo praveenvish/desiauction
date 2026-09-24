@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 
 import { env } from "../env";
 import { ReportProblemProvider } from "../components/report-problem/report-problem";
+import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
@@ -266,37 +267,39 @@ export default async function RootLayout({
         />
         {/* Every shell, every route: a click is answered before the network is. */}
         <NavigationProgress />
-        <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
-          <ProductShell
-            session={
-              session !== null
-                ? {
-                    name: session.name,
-                    phone: session.phone,
-                    email: session.email,
-                    personId: session.personId,
-                  }
-                : null
-            }
-            orgs={orgs.map((org) => ({
-              slug: org.slug,
-              name: org.name,
-              canFinance: financeOrgs.has(org.id),
-              // Settlement and Finance are separate capability partitions, and
-              // the money tab strip spans both. Without this the strip was built
-              // from membership alone, so someone with neither key saw four tabs
-              // that all 404 for them.
-              canSettle: settlementOrgs.has(org.id),
-            }))}
-            competitions={competitions}
-            serverAction={action}
-            navRoles={navRoles}
-            latestEventAt={latestEventAt}
-            logout={logoutAction}
-          >
-            {children}
-          </ProductShell>
-        </ReportProblemProvider>
+        <AppLinkProvider>
+          <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
+            <ProductShell
+              session={
+                session !== null
+                  ? {
+                      name: session.name,
+                      phone: session.phone,
+                      email: session.email,
+                      personId: session.personId,
+                    }
+                  : null
+              }
+              orgs={orgs.map((org) => ({
+                slug: org.slug,
+                name: org.name,
+                canFinance: financeOrgs.has(org.id),
+                // Settlement and Finance are separate capability partitions, and
+                // the money tab strip spans both. Without this the strip was built
+                // from membership alone, so someone with neither key saw four tabs
+                // that all 404 for them.
+                canSettle: settlementOrgs.has(org.id),
+              }))}
+              competitions={competitions}
+              serverAction={action}
+              navRoles={navRoles}
+              latestEventAt={latestEventAt}
+              logout={logoutAction}
+            >
+              {children}
+            </ProductShell>
+          </ReportProblemProvider>
+        </AppLinkProvider>
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { isRouterHref } from "@desiauction/ui";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
@@ -20,6 +21,16 @@ import "./navigation-progress.css";
  * router waits, and completes when the URL actually changes. It watches the
  * document rather than wrapping `<Link>`, so every link in the product —
  * rail, tabs, cards, footer, plain anchors — is covered without touching them.
+ *
+ * THE PAGE ANSWERS TOO, not only the bar. On a phone a tab click waits
+ * 0.5–0.7 s for the server (measured, slow-4G profile) and a 3px bar at the top
+ * edge is easy to miss while the page you are looking at sits unchanged. So a
+ * click that will RENDER a page (an in-app route the router takes — not an
+ * export, a download or a file) marks the document `data-nav-pending`: the
+ * content region fades back after a short delay (fast clicks never flicker —
+ * see navigation-progress.css) and is `aria-busy` until the new page commits.
+ * This is the client-side stand-in for a `loading.tsx`, which cannot be used
+ * above these pages without turning their 404s into 200s.
  *
  * What it deliberately does NOT start for: modified clicks (new tab), other
  * origins, downloads, `target` other than _self, hash-only jumps on the same
@@ -74,6 +85,18 @@ function isNavigationClick(event: MouseEvent): URL | null {
   return url;
 }
 
+/**
+ * Mark the document while a page is on its way. An attribute on <html> rather
+ * than React state threaded into every shell: the shells live in
+ * `@desiauction/ui` and own their content region, and CSS can reach it from here.
+ */
+function setPending(pending: boolean): void {
+  document.documentElement.toggleAttribute("data-nav-pending", pending);
+  const content = document.getElementById("main-content");
+  if (pending) content?.setAttribute("aria-busy", "true");
+  else content?.removeAttribute("aria-busy");
+}
+
 function Bar() {
   const pathname = usePathname();
   const search = useSearchParams();
@@ -88,21 +111,24 @@ function Bar() {
 
   // Start on the click — in the capture phase, before `<Link>` takes it over.
   useEffect(() => {
-    function start(): void {
+    function start(renders: boolean): void {
+      setPending(renders);
       if (settle.current !== null) clearTimeout(settle.current);
       if (safety.current !== null) clearTimeout(safety.current);
       setPhase("loading");
       safety.current = setTimeout(() => {
         setPhase("idle");
+        setPending(false);
       }, SAFETY_MS);
     }
     function onClick(event: MouseEvent): void {
-      if (isNavigationClick(event) !== null) start();
+      const url = isNavigationClick(event);
+      if (url !== null) start(isRouterHref(url.pathname + url.search));
     }
     // Back/forward. Chrome also fires popstate for a same-page hash jump, which
     // loads nothing — so only a change of path or query counts.
     function onPopState(): void {
-      if (windowLocationKey() !== previous.current) start();
+      if (windowLocationKey() !== previous.current) start(true);
     }
     document.addEventListener("click", onClick, { capture: true });
     window.addEventListener("popstate", onPopState);
@@ -117,6 +143,7 @@ function Bar() {
     previous.current = location;
     if (safety.current !== null) clearTimeout(safety.current);
     setPhase((current) => (current === "loading" ? "done" : current));
+    setPending(false);
   }, [location]);
 
   // "done" plays the fill-and-fade, then the bar leaves the tree's layout.

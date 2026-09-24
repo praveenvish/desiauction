@@ -1,4 +1,4 @@
-import { sportPack } from "@desiauction/core";
+import { sportLabel } from "@desiauction/core/sport-labels";
 
 /* ===========================================================================
  * THE SEVEN NAVIGATION LAWS (RN-1)
@@ -759,8 +759,9 @@ export function careerTitle(pathname: string): string | null {
   if (match === null) {
     return null;
   }
-  const pack = sportPack(decodeURIComponent(match[1] ?? ""));
-  return pack === null ? null : `My ${pack.label.toLowerCase()}`;
+  // The label map, not `sportPack`: this module ships in every page's bundle.
+  const label = sportLabel(decodeURIComponent(match[1] ?? ""));
+  return label === null ? null : `My ${label.toLowerCase()}`;
 }
 
 /** The one labeled door out of a live surface (canon docs/16). */

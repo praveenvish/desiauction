@@ -35,6 +35,20 @@
     opacity var(--duration-slow) var(--ease-out) var(--duration-fast);
 }
 
+/*
+ * The page answers the click (see navigation-progress.tsx). The content region
+ * fades back only after --duration-fast, so a navigation that lands inside that
+ * window never flickers. It returns with NO transition: the new page must be
+ * at full contrast on its first frame, because an accessibility scan run right
+ * after a navigation reads whatever opacity the text has at that instant (see
+ * axe-scans-aria-hidden-contrast). Still interactive — a second click is fine.
+ * The live shell uses #live-content, so an auction room is never dimmed.
+ */
+html[data-nav-pending] #main-content {
+  opacity: 0.55;
+  transition: opacity var(--duration-base) var(--ease-out) var(--duration-fast);
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* Still there — the feedback is the point — but it does not travel. */
   .nav-progress[data-phase="loading"] {

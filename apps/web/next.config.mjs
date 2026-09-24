@@ -60,6 +60,18 @@ export default {
   poweredByHeader: false,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],
   /*
+   * BARREL IMPORTS, RESOLVED TO THE MODULE THAT WAS ASKED FOR.
+   *
+   * Every page imports `@desiauction/ui` through its one index, and every
+   * "use client" file behind that index became part of the page's client
+   * bundle — the landing page shipped the auction sound engine, RollingNumber
+   * and PlayerCard because it wanted a Button. Next rewrites
+   * `import { Button } from "@desiauction/ui"` to the file that defines Button.
+   */
+  experimental: {
+    optimizePackageImports: ["@desiauction/ui"],
+  },
+  /*
    * PINO RUNS FROM node_modules, NOT FROM A BUNDLE.
    *
    * In development the logger writes through a `pino-pretty` transport, and a

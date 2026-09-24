@@ -154,9 +154,15 @@ export async function withTenantDb<T>(
   fn: (db: Db) => Promise<T>,
 ): Promise<T> {
   return handle.db.transaction(async (tx) => {
-    await tx.execute(sql`select set_config('app.person_id', ${context.personId}, true)`);
-    if (context.orgId !== undefined) {
-      await tx.execute(sql`select set_config('app.org_id', ${context.orgId}, true)`);
+    // ONE round trip for the whole context. Every org-scoped transaction paid
+    // two here — on /org/[slug] that was 22 statements of a 104-query page.
+    // Same GUCs, same transaction-local scope (`true`); only the trip count moved.
+    if (context.orgId === undefined) {
+      await tx.execute(sql`select set_config('app.person_id', ${context.personId}, true)`);
+    } else {
+      await tx.execute(
+        sql`select set_config('app.person_id', ${context.personId}, true), set_config('app.org_id', ${context.orgId}, true)`,
+      );
     }
     // PgTransaction carries the full query-builder surface of Db; nested
     // db.transaction() calls become savepoints.

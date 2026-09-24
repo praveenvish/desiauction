@@ -3,6 +3,7 @@
 import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes } from "react";
 
 import styles from "./button.module.css";
+import { isRouterHref, useLinkComponent } from "./link-context";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -74,8 +75,16 @@ export const ButtonLink = forwardRef<HTMLAnchorElement, ButtonLinkProps>(functio
   { variant = "primary", size = "md", className, children, ...rest },
   ref,
 ) {
-  return (
-    <a ref={ref} className={buttonClassName({ variant, size }, className)} {...rest}>
+  // An in-app page goes through the app's router link (see link-context.tsx):
+  // a plain `<a>` here was a full page load for every CTA in the product.
+  const RouterLink = useLinkComponent();
+  const classes = buttonClassName({ variant, size }, className);
+  return isRouterHref(rest.href, rest) ? (
+    <RouterLink ref={ref} className={classes} {...rest}>
+      {children}
+    </RouterLink>
+  ) : (
+    <a ref={ref} className={classes} {...rest}>
       {children}
     </a>
   );
