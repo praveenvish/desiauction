@@ -33,6 +33,7 @@ function stored(overrides: Partial<ExistingRegistration> = {}): ExistingRegistra
     jerseyNumber: null,
     tshirtSize: null,
     trouserSize: null,
+    photoDriveId: null,
     teamName: null,
     isIcon: false,
     isCaptain: false,

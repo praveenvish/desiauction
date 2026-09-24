@@ -26,6 +26,12 @@ export interface PhotoTarget {
   phone: string | null;
   /** Already has a consented photo — matched, but flagged as a replacement. */
   hasPhoto: boolean;
+  /**
+   * The Drive file id a Google Form import recorded for this player's photo —
+   * the exact-match key for fetching from Drive. Absent for players who came
+   * any other way.
+   */
+  driveId?: string | null;
 }
 
 export type PhotoMatchRule = "number" | "phone" | "name";

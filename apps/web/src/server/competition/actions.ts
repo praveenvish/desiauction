@@ -54,6 +54,7 @@ import { cache } from "react";
 import { auctionOf } from "@desiauction/auction";
 import { setMessageLanguage } from "@desiauction/messaging/language";
 import { recordConsent } from "../messaging/consent";
+import { env } from "../../env";
 import { logger } from "../logger";
 
 import { currentSession } from "../auth/actions";
@@ -75,14 +76,18 @@ import {
   createCompetition,
   createTeam,
   holdBlocker,
+  importSheetOf,
+  markImportSheetSynced,
   publishBlockers,
   setCompetitionVisibility,
+  setImportSheet,
   setTeamCoach,
   updateTeamDetails,
   tournamentsOf,
   teamsOf,
   updateCompetitionDetails,
   type CompetitionSummary,
+  type ImportSheet,
   type PublishBlocker,
   type SeasonListing,
   type TeamSummary,
@@ -2264,6 +2269,74 @@ export async function photoTargetsAction(slug: string): Promise<PhotoTarget[]> {
   );
 }
 
+/** The season's connected Google Sheet (0093), for the import dialog. */
+export async function importSheetAction(slug: string): Promise<ImportSheet | null> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return null;
+  }
+  return inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    importSheetOf(db, gate.competition.id),
+  );
+}
+
+/**
+ * Connect the Sheet the organizer just picked in Google's picker, or
+ * disconnect with null. The id is checked for shape only — whether it opens is
+ * the organizer's own Google access, decided in their browser.
+ */
+export async function setImportSheetAction(
+  slug: string,
+  sheet: { id: string; name: string } | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  if (sheet !== null && !/^[\w-]{10,200}$/.test(sheet.id)) {
+    return { ok: false, error: "That doesn't look like a Google Sheet." };
+  }
+  const clean =
+    sheet === null
+      ? null
+      : { id: sheet.id, name: sheet.name.trim().slice(0, 200) || "Google Sheet" };
+  await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    setImportSheet(db, gate.competition, gate.personId, clean),
+  );
+  return { ok: true };
+}
+
+/** What the browser needs to open Google's picker — public values, or null when not set up. */
+export interface DrivePickerConfig {
+  clientId: string;
+  apiKey: string;
+  appId: string;
+}
+
+/**
+ * Review-gated only so a stranger cannot probe it; the values themselves are
+ * public (see `GOOGLE_PICKER_*` in env.ts).
+ */
+export async function drivePickerConfigAction(slug: string): Promise<DrivePickerConfig | null> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return null;
+  }
+  const { GOOGLE_PICKER_CLIENT_ID, GOOGLE_PICKER_API_KEY, GOOGLE_PICKER_APP_ID } = env;
+  if (
+    GOOGLE_PICKER_CLIENT_ID === undefined ||
+    GOOGLE_PICKER_API_KEY === undefined ||
+    GOOGLE_PICKER_APP_ID === undefined
+  ) {
+    return null;
+  }
+  return {
+    clientId: GOOGLE_PICKER_CLIENT_ID,
+    apiKey: GOOGLE_PICKER_API_KEY,
+    appId: GOOGLE_PICKER_APP_ID,
+  };
+}
+
 // --- CSV import (validate → preview → commit) + export -----------------------
 
 export interface ImportPreview {
@@ -2492,6 +2565,14 @@ export interface ImportShape {
   dateOrder?: DateOrder;
   /** How to treat a value the file and the record disagree about. */
   policy?: ImportPolicy;
+  /**
+   * Mark a row PAID when it carries a payment reference and says nothing about
+   * its fee status. A Google Form asks for a transaction ID, not "have you
+   * paid", so without this every one of 110 players who paid lands "pending"
+   * and the desk marks them one at a time. The organizer's explicit choice —
+   * never a default — because a reference is a claim until someone checks it.
+   */
+  paidWhenReferenced?: boolean;
 }
 
 /**
@@ -2550,7 +2631,7 @@ function parseUnderShape(
   shape: ImportShape | undefined,
 ): ReturnType<typeof parseRegistrationRecords> {
   const source = canonicalRecords(csv, shape);
-  return parseRegistrationRecords(source, bands, {
+  const parsed = parseRegistrationRecords(source, bands, {
     now: new Date(),
     knownTeams: teamNames,
     // Without this the file's roles were judged against CRICKET, so a football
@@ -2559,6 +2640,15 @@ function parseUnderShape(
     pack: sportPackFor(sport),
     ...(shape?.dateOrder !== undefined ? { dateOrder: shape.dateOrder } : {}),
   });
+  if (shape?.paidWhenReferenced !== true) {
+    return parsed;
+  }
+  return {
+    ...parsed,
+    rows: parsed.rows.map((row) =>
+      row.feeStatus === null && row.feeReference !== null ? { ...row, feeStatus: "paid" } : row,
+    ),
+  };
 }
 
 /** Validate only — no writes. The organizer previews errors before committing. */
@@ -2662,7 +2752,13 @@ export interface ImportCommitResult {
 export async function importCommitAction(
   slug: string,
   csv: string,
-  options?: { skipInvalid?: boolean; shape?: ImportShape; policy?: ImportPolicy },
+  options?: {
+    skipInvalid?: boolean;
+    shape?: ImportShape;
+    policy?: ImportPolicy;
+    /** Read from the season's connected Sheet — a landed import stamps "last synced". */
+    fromSheet?: boolean;
+  },
 ): Promise<ImportCommitResult> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
@@ -2747,6 +2843,11 @@ export async function importCommitAction(
   }
   if (result === "squad_locked") {
     return { ok: false, error: SQUAD_COLUMNS_LOCKED };
+  }
+  if (options?.fromSheet === true) {
+    await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+      markImportSheetSynced(db, gate.competition.id),
+    );
   }
   return {
     ok: true,

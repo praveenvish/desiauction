@@ -5,7 +5,7 @@ import {
   type ValueMaps,
 } from "./import-mapping";
 import { FEE_STATUSES, parseFeeStatus } from "./money";
-import { normalizeTeamName, parseCsvFlag } from "./registration-csv";
+import { isNotApplicable, normalizeTeamName, parseCsvFlag } from "./registration-csv";
 import { attributeSpec, parseAttributeIn, parseRoleIn, type SportPack } from "./sports";
 
 /**
@@ -114,7 +114,9 @@ function attribute(key: string): Closed {
     // cannot judge its values. Reporting every one of them as unplaceable would
     // bury the screen in rows no dropdown could fix.
     places: (value, { pack }) =>
-      attributeSpec(pack, key) === null || parseAttributeIn(pack, key, value) !== null,
+      attributeSpec(pack, key) === null ||
+      isNotApplicable(value) ||
+      parseAttributeIn(pack, key, value) !== null,
     options: ({ pack }) =>
       (attributeSpec(pack, key)?.options ?? []).map((option) => ({
         value: option.key,

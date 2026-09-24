@@ -42,6 +42,12 @@ export interface CsvRegistrationRow {
   tshirtSize: string | null;
   trouserSize: string | null;
   /**
+   * The Google Drive file id behind a Form's photo upload, when the file had a
+   * photo column. Not a photo — a pointer the photo step fetches by, so each
+   * picture lands on the player whose row linked it.
+   */
+  photoDriveId: string | null;
+  /**
    * THE SQUAD A FILE ALREADY KNOWS.
    *
    * A club's roster spreadsheet says which team a player belongs to and which
@@ -67,6 +73,18 @@ export interface CsvRegistrationRow {
 export interface CsvRowError {
   line: number;
   message: string;
+  /**
+   * The row's player name as written, when it has one. "Line 51" means nothing
+   * to an organizer looking at a list of people; the name is how they find the
+   * row in their own sheet, or fix it in place.
+   */
+  name?: string;
+  /**
+   * The canonical columns that failed (`phone`, `role`, `bowling_style`, …), so
+   * the import screen can offer an edit box for exactly those cells rather
+   * than asking the organizer to re-download the sheet.
+   */
+  fields?: string[];
 }
 
 export interface CsvParseResult {
@@ -135,7 +153,15 @@ export function validateNewPlayer(
   }
   const phone = normalizePhone(rawPhone);
   if (!phone.ok) {
-    errors.push({ field: "phone", message: `invalid phone "${rawPhone}"` });
+    // "9.87654E+09" is a number Excel reformatted on open-and-save; the digits
+    // are gone, so the only useful answer is where to get an untouched file.
+    const mangled = /^\d(\.\d+)?e\+?\d+$/i.test(rawPhone);
+    errors.push({
+      field: "phone",
+      message: mangled
+        ? `invalid phone "${rawPhone}" — a spreadsheet turned it into a number; download the CSV again from Google Sheets instead of re-saving it in Excel`
+        : `invalid phone "${rawPhone}"`,
+    });
   }
   // Read the way a registration form is filled in ("All Rounder", "Batsman"),
   // not as a bare enum match — the same contract the styles got, and for the
@@ -174,6 +200,53 @@ export function validateNewPlayer(
       basePriceBand: band === "" ? null : band,
     },
   };
+}
+
+/**
+ * Records back to CSV text, for an IMPORT the organizer is editing — not an
+ * export. Deliberately not `toCsv`: that one neutralizes formulas by prefixing
+ * a quote, which is right for a file opened in Excel and wrong here, where
+ * "+91 98765 43210" must come back as a phone rather than "'+91 98765 43210".
+ */
+export function recordsToCsv(records: readonly (readonly string[])[]): string {
+  return records
+    .map((record) =>
+      record
+        .map((cell) => (/[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell))
+        .join(","),
+    )
+    .join("\n");
+}
+
+/**
+ * Change cells of one row, addressed the way the parser reports it.
+ *
+ * `line` is the parser's line — 1-based, header is 1, counted AFTER blank
+ * lines are dropped — so the same filter is applied here, or a sheet with a
+ * blank row would have its fix land on the neighbour. `edits` maps a SOURCE
+ * column index to its new value. Returns null when the line does not exist.
+ */
+export function editCsvRow(
+  text: string,
+  line: number,
+  edits: ReadonlyMap<number, string>,
+): string | null {
+  const records = tokenizeCsv(text).filter(
+    (fields) => !(fields.length === 1 && fields[0]?.trim() === ""),
+  );
+  const record = records[line - 1];
+  if (line < 2 || record === undefined) {
+    return null;
+  }
+  const next = [...record];
+  for (const [column, value] of edits) {
+    while (next.length <= column) {
+      next.push("");
+    }
+    next[column] = value;
+  }
+  records[line - 1] = next;
+  return recordsToCsv(records);
 }
 
 /** Tokenize CSV text into records of fields. Deterministic; no locale. */
@@ -253,6 +326,69 @@ export function parseCsvFlag(value: string): boolean | null {
     return true;
   }
   return FALSE_WORDS.has(key) ? false : null;
+}
+
+/*
+ * A form's way of saying "this does not apply to me".
+ *
+ * A Google Form that asks every player for a bowling style offers "None" or
+ * "I don't bowl" to the batters, and those came back as unknown styles — and
+ * the value mapper can only offer real styles, so the organizer had no answer
+ * that would let a pure batter's row in. Read as blank instead: "did not say",
+ * which never erases a style already on file.
+ */
+const NOT_APPLICABLE = new Set([
+  "none",
+  "na",
+  "n a",
+  "nil",
+  "not applicable",
+  "no",
+  "-",
+  "dont bowl",
+  "do not bowl",
+  "i dont bowl",
+  "i do not bowl",
+  "not a bowler",
+  "doesnt bowl",
+  "does not bowl",
+  "dont bat",
+  "do not bat",
+]);
+
+/** True for a cell that answers a style question with "not me". */
+export function isNotApplicable(value: string): boolean {
+  const key = value
+    .trim()
+    .toLowerCase()
+    .replace(/['\u2019\u2018`]/g, "")
+    .replace(/[^\p{L}\p{N}-]+/gu, " ")
+    .trim();
+  return NOT_APPLICABLE.has(key);
+}
+
+/**
+ * The Drive file id in a Google Form's upload link, or null.
+ *
+ * A Form writes "https://drive.google.com/open?id=ID" (sometimes with
+ * "/u/0/" and a usp parameter), and several links comma-separated when the
+ * question allowed more than one file — the first is the photo. A share link
+ * ("/file/d/ID/view") is accepted too. Anything else is not an error: a photo
+ * column is optional, and text in it is simply not a link we can fetch.
+ */
+export function driveFileIdOf(value: string): string | null {
+  const first = value.split(",")[0]?.trim() ?? "";
+  if (!/^https?:\/\/(drive|docs)\.google\.com\//i.test(first)) {
+    return null;
+  }
+  const match = /[?&]id=([\w-]{10,})/.exec(first) ?? /\/d\/([\w-]{10,})/.exec(first);
+  return match?.[1] ?? null;
+}
+
+/** Two spellings of one person's name: case and spacing are noise. */
+function sameName(a: string, b: string): boolean {
+  const key = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+  return key(a) === key(b);
 }
 
 /** Comparable form of a team name: case, spacing and punctuation are noise. */
@@ -339,7 +475,7 @@ export function parseRegistrationRecords(
 
   const rows: CsvRegistrationRow[] = [];
   const errors: CsvRowError[] = [];
-  const seenPhones = new Map<string, number>();
+  const seenPhones = new Map<string, { line: number; name: string }>();
   /** Which line already claimed the armband for a team, by normalized name. */
   const captainByTeam = new Map<string, number>();
   const knownTeams =
@@ -358,8 +494,12 @@ export function parseRegistrationRecords(
     const optional = (column: string): string =>
       index[column] !== undefined ? (fields[index[column]] ?? "").trim() : "";
     const dateOfBirth = optional("date_of_birth");
-    const battingStyle = optional("batting_style");
-    const bowlingStyle = optional("bowling_style");
+    const styleOf = (column: string): string => {
+      const raw = optional(column);
+      return isNotApplicable(raw) ? "" : raw;
+    };
+    const battingStyle = styleOf("batting_style");
+    const bowlingStyle = styleOf("bowling_style");
 
     /*
      * THE TWO COLUMNS NOBODY CHECKED.
@@ -424,23 +564,36 @@ export function parseRegistrationRecords(
       pack,
     );
     const rowErrors = check.ok ? [] : check.errors.map((error) => error.message);
+    const failed = new Set<string>(
+      check.ok
+        ? []
+        : check.errors.map((error) =>
+            error.field === "basePriceBand" ? "base_price_band" : error.field,
+          ),
+    );
     if (battingStyle !== "" && parsedBatting === null) {
       rowErrors.push(`unknown batting style "${battingStyle}"`);
+      failed.add("batting_style");
     }
     if (bowlingStyle !== "" && parsedBowling === null) {
       rowErrors.push(`unknown bowling style "${bowlingStyle}"`);
+      failed.add("bowling_style");
     }
     if (dateOfBirth !== "" && parsedDob === null) {
       rowErrors.push(`unreadable date of birth "${dateOfBirth}" (use dd/mm/yyyy or yyyy-mm-dd)`);
+      failed.add("date_of_birth");
     }
     if (parsedDob !== null && now !== undefined && deriveAge(parsedDob, now) === null) {
       rowErrors.push(`date of birth "${dateOfBirth}" is in the future`);
+      failed.add("date_of_birth");
     }
     if (feeStatusRaw !== "" && parsedFeeStatus === null) {
       rowErrors.push(`unknown fee status "${feeStatusRaw}" (paid, pending, waived or refunded)`);
+      failed.add("fee_status");
     }
     if (parsedFee !== null && !parsedFee.ok) {
       rowErrors.push(`unreadable fee amount "${feeAmountRaw}"`);
+      failed.add("fee_amount");
     }
     for (const [column, read] of [
       ["is_icon", iconFlag],
@@ -449,6 +602,7 @@ export function parseRegistrationRecords(
     ] as const) {
       if (read.raw !== "" && read.value === null) {
         rowErrors.push(`unreadable ${column} "${read.raw}" (yes or no)`);
+        failed.add(column);
       }
     }
     // Icon AND Captain is a legal pair: both pre-sign the player to their team,
@@ -456,6 +610,7 @@ export function parseRegistrationRecords(
     // says what the dashboard can say.
     if (teamRaw !== "" && knownTeams !== undefined && !knownTeams.has(normalizeTeamName(teamRaw))) {
       rowErrors.push(`unknown team "${teamRaw}"`);
+      failed.add("team");
     }
     /*
      * TWO CAPTAINS, ONE TEAM — caught in the file rather than by the database.
@@ -472,6 +627,7 @@ export function parseRegistrationRecords(
       const prior = captainByTeam.get(key);
       if (prior !== undefined) {
         rowErrors.push(`a second captain for "${teamRaw}" (also line ${String(prior)})`);
+        failed.add("is_captain");
       } else {
         captainByTeam.set(key, line);
       }
@@ -482,15 +638,40 @@ export function parseRegistrationRecords(
     const phone = normalizePhone(rawPhone);
     if (phone.ok) {
       const prior = seenPhones.get(phone.phone);
-      if (prior !== undefined) {
-        rowErrors.push(`duplicate phone in file (also line ${String(prior)})`);
+      if (prior !== undefined && prior.name !== "" && sameName(prior.name, rawName)) {
+        /*
+         * THE SAME PERSON, TWICE. A Form accepts a second submission as happily
+         * as a first, and the first real export carried one: same number, the
+         * name differing only by a capital letter, and a different transaction
+         * ID each time. That is not a phone to correct — it is a copy to drop,
+         * and possibly a double payment to refund — so it says so, and offers
+         * no phone edit. Still refused rather than merged: which copy is right
+         * is the organizer's call.
+         */
+        rowErrors.push(
+          `submitted the form twice — same name and phone as row ${String(prior.line)}; skip this copy, and check they weren't charged twice`,
+        );
+      } else if (prior !== undefined) {
+        // Named, not numbered: two players sharing one family phone is the
+        // usual cause, and the organizer needs to know WHICH two.
+        rowErrors.push(
+          prior.name === ""
+            ? `duplicate phone in file (also line ${String(prior.line)})`
+            : `duplicate phone in file — same number as ${prior.name} (row ${String(prior.line)})`,
+        );
+        failed.add("phone");
       } else {
-        seenPhones.set(phone.phone, line);
+        seenPhones.set(phone.phone, { line, name: rawName });
       }
     }
 
     if (rowErrors.length > 0) {
-      errors.push({ line, message: rowErrors.join("; ") });
+      errors.push({
+        line,
+        message: rowErrors.join("; "),
+        ...(rawName === "" ? {} : { name: rawName }),
+        fields: [...failed],
+      });
       continue;
     }
     rows.push({
@@ -514,6 +695,7 @@ export function parseRegistrationRecords(
       jerseyNumber: capped("jersey_number", 10),
       tshirtSize: capped("tshirt_size", 20),
       trouserSize: capped("trouser_size", 20),
+      photoDriveId: driveFileIdOf(optional("photo_link")),
       teamName: teamRaw === "" ? null : teamRaw,
       isIcon: iconFlag.value,
       isCaptain: captainFlag.value,

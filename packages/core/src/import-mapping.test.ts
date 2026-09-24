@@ -8,7 +8,7 @@ import {
   sampleRow,
   signatureOf,
 } from "./import-mapping";
-import { parseRegistrationRecords } from "./registration-csv";
+import { driveFileIdOf, editCsvRow, parseRegistrationRecords } from "./registration-csv";
 import { tokenizeCsv } from "./registration-csv";
 
 /*
@@ -198,5 +198,216 @@ describe("sampleRow — what makes a mapping checkable at a glance", () => {
 
   it("returns blanks rather than throwing on a header-only file", () => {
     expect(sampleRow(tokenizeCsv("Player Name,Mobile"))).toEqual(["", ""]);
+  });
+});
+
+/*
+ * The wording of real cricket registration Forms. Each of these stopped an
+ * import before 2026-09-24: "Player's Name" matched nothing (the apostrophe
+ * normalises to "player s name"), so the file had no name column at all, and
+ * the style answers a Form offers ("Right", "Off Spin", "I don't bowl") were
+ * each refused row by row.
+ */
+describe("real cricket Form wording", () => {
+  it("maps a possessive name question, straight or curly apostrophe", () => {
+    for (const header of ["Player's Name", "Player’s Name"]) {
+      const detected = detectMapping(["Timestamp", header, "Mobile No", "Playing Role"]);
+      expect(detected.missing).toEqual([]);
+      expect(detected.columns[1]?.field).toBe("name");
+    }
+  });
+
+  it("maps the common question titles without a hand edit", () => {
+    const detected = detectMapping([
+      "Your Full Name",
+      "WhatsApp No",
+      "Specialization",
+      "Batsman Type",
+      "Bowler Type",
+      "Size of T-shirt",
+      "Preferred Jersey No.",
+      "Name to be printed on Jersey",
+      "Transaction ID / UTR",
+      "Entry Fee Paid?",
+    ]);
+    expect(detected.columns.map((column) => column.field)).toEqual([
+      "name",
+      "phone",
+      "role",
+      "batting_style",
+      "bowling_style",
+      "tshirt_size",
+      "jersey_number",
+      "jersey_name",
+      "fee_reference",
+      "fee_status",
+    ]);
+  });
+
+  it("imports Form-style style answers and reads 'not me' as blank", () => {
+    const csv = [
+      "Player's Name,Mobile Number,Playing Role,Batting Style,Bowling Style",
+      "Rohit Sharma,9876543210,Batsman,Right,I don't bowl",
+      "Axar Patel,9876543211,All Rounder,Left Handed,Slow Left Arm Orthodox",
+      "Kuldeep Yadav,9876543212,Bowler,RHB,Chinaman",
+      "Ravi Bishnoi,9876543213,Bowler,Right Hand,Leg Spin",
+      "Rishabh Pant,9876543214,Wicket Keeper,LHB,None",
+    ].join("\n");
+    const records = tokenizeCsv(csv);
+    const canonical = applyMapping(records, mappingOf(detectMapping(records[0] ?? [])));
+    const result = parseRegistrationRecords(canonical, undefined, { now: NOW });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => [row.battingStyle, row.bowlingStyle])).toEqual([
+      ["right_hand", null],
+      ["left_hand", "left_arm_orthodox"],
+      ["right_hand", "left_arm_chinaman"],
+      ["right_hand", "leg_break"],
+      ["left_hand", null],
+    ]);
+  });
+
+  it("still asks rather than guesses when a style has two meanings", () => {
+    const records = tokenizeCsv(
+      "Name,Phone,Role,Bowling Style\nAnil Kumble,9876543210,Bowler,Left Arm Spin",
+    );
+    const canonical = applyMapping(records, mappingOf(detectMapping(records[0] ?? [])));
+    const result = parseRegistrationRecords(canonical, undefined, { now: NOW });
+    expect(result.errors[0]?.message).toContain('unknown bowling style "Left Arm Spin"');
+  });
+
+  it("says why an Excel-mangled phone is unreadable", () => {
+    const result = parseRegistrationRecords(
+      tokenizeCsv("name,phone,role\nRohit Sharma,9.87654E+09,batter"),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors[0]?.message).toContain("download the CSV again from Google Sheets");
+  });
+});
+
+/*
+ * From a real club's export (2026-09-24): the Form decorated its role choices
+ * with emoji, and all 110 rows were refused as "invalid cricket role".
+ */
+describe("emoji-decorated Form choices", () => {
+  it("reads the choice under the emoji", () => {
+    const csv = [
+      '"Timestamp","Name","Father’s Name","Mobile","Player Type"',
+      '"2026/02/05 10:54:08 PM GMT+5:30","Rohit Sharma ","Gurunath Sharma","9876543210","⚔️ Allrounder"',
+      '"2026/02/05 10:55:08 PM GMT+5:30","Virat Kohli","Prem Kohli","9876543211","🏏 Batsman"',
+      '"2026/02/05 10:56:08 PM GMT+5:30","Jasprit Bumrah","Jasbir Bumrah","9876543212","🎯 Bowler"',
+      '"2026/02/05 10:57:08 PM GMT+5:30","Rishabh Pant","Rajendra Pant","9876543213","🧤 Wicketkeeper"',
+    ].join("\n");
+    const records = tokenizeCsv(csv);
+    const detected = detectMapping(records[0] ?? []);
+    expect(detected.missing).toEqual([]);
+    const canonical = applyMapping(records, mappingOf(detected));
+    const result = parseRegistrationRecords(canonical, undefined, { now: NOW });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.role)).toEqual([
+      "all_rounder",
+      "batter",
+      "bowler",
+      "wicket_keeper",
+    ]);
+    expect(result.rows[0]?.fatherName).toBe("Gurunath Sharma");
+  });
+});
+
+describe("errors an organizer can act on", () => {
+  it("names the player and the other player on a shared phone", () => {
+    const result = parseRegistrationRecords(
+      tokenizeCsv(
+        "name,phone,role\nDalpat Singh,9326997891,batter\nMahipal Singh,9326997891,bowler",
+      ),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors).toEqual([
+      {
+        line: 3,
+        name: "Mahipal Singh",
+        fields: ["phone"],
+        message: "duplicate phone in file — same number as Dalpat Singh (row 2)",
+      },
+    ]);
+  });
+
+  it("tells a double submission from two players sharing a phone", () => {
+    const result = parseRegistrationRecords(
+      tokenizeCsv(
+        "name,phone,role\nJitendra singh ,9326997891,batter\nJitendra  Singh,9326997891,batter",
+      ),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors[0]?.message).toContain("submitted the form twice");
+    // Nothing to edit: the fix is to skip the copy, not change a number.
+    expect(result.errors[0]?.fields).toEqual([]);
+  });
+
+  it("says which columns failed so the screen can offer those cells", () => {
+    const result = parseRegistrationRecords(
+      tokenizeCsv("name,phone,role,bowling_style\nRavi Kumar,12345,Batsman (Opener),Fast"),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors[0]?.fields).toEqual(["phone", "role", "bowling_style"]);
+  });
+});
+
+describe("editCsvRow — fixing a row in place", () => {
+  const FILE =
+    '"Name","Mobile","Player Type"\n"Rohit, R","9876543210","🏏 Batsman"\n\n"Virat","9876543210","Bowler"';
+
+  it("changes only the addressed cells, counting lines the way the parser does", () => {
+    // The blank line is dropped by the parser, so Virat is line 3, not 4.
+    const next = editCsvRow(FILE, 3, new Map([[1, "+91 98765 43211"]]));
+    expect(next).not.toBeNull();
+    const result = parseRegistrationRecords(
+      applyMapping(tokenizeCsv(next ?? ""), { name: 0, phone: 1, role: 2 }),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => [row.name, row.phone])).toEqual([
+      ["Rohit, R", "+919876543210"],
+      ["Virat", "+919876543211"],
+    ]);
+  });
+
+  it("refuses the header and lines past the end", () => {
+    expect(editCsvRow(FILE, 1, new Map([[0, "x"]]))).toBeNull();
+    expect(editCsvRow(FILE, 9, new Map([[0, "x"]]))).toBeNull();
+  });
+});
+
+describe("photo_link — the Drive id a Form wrote for an upload", () => {
+  it("maps the Photo column and keeps the file id, not the URL", () => {
+    const csv = [
+      '"Name","Mobile","Player Type","Photo"',
+      '"Chen Singh","7506698281","Allrounder","https://drive.google.com/u/0/open?usp=forms_web&id=1ESy6C82DCx_MpjwLITsY2CyU6ssjXK3Z"',
+      '"Two Links","7506698282","Bowler","https://drive.google.com/open?id=1AAAAAAAAAAAA, https://drive.google.com/open?id=1BBBBBBBBBBBB"',
+      '"Shared","7506698283","Batsman","https://drive.google.com/file/d/1CCCCCCCCCCCCC/view?usp=sharing"',
+      '"No Link","7506698284","Batsman","will send on WhatsApp"',
+    ].join("\n");
+    const records = tokenizeCsv(csv);
+    const detected = detectMapping(records[0] ?? []);
+    expect(detected.columns[3]?.field).toBe("photo_link");
+    const result = parseRegistrationRecords(applyMapping(records, mappingOf(detected)), undefined, {
+      now: NOW,
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.photoDriveId)).toEqual([
+      "1ESy6C82DCx_MpjwLITsY2CyU6ssjXK3Z",
+      "1AAAAAAAAAAAA",
+      "1CCCCCCCCCCCCC",
+      null,
+    ]);
+  });
+
+  it("never reads a non-Google link as a Drive file", () => {
+    expect(driveFileIdOf("https://evil.example/open?id=1ESy6C82DCx_Mpjw")).toBeNull();
+    expect(driveFileIdOf("")).toBeNull();
   });
 });

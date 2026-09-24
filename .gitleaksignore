@@ -1,0 +1,6 @@
+# The Google Picker API key briefly committed as a sample value in .env.example
+# (876ee9cb). It is a BROWSER key by design — the Picker runs in the page, so
+# every visitor can read it — and it is restricted in Google Cloud to the
+# Picker API and our own origins. The sample now carries placeholders; this
+# entry only stops the scanner re-flagging the historical commit.
+876ee9cb64d5120668f24ddbea23b0ef46be05f0:.env.example:gcp-api-key:88

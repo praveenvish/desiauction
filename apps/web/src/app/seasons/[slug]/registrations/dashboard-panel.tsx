@@ -634,7 +634,7 @@ export function RegistrationDashboardPanel({
             }}
           >
             <IconUpload size={18} className="icon-lead" aria-hidden />
-            Import CSV
+            Import players
           </Button>
           {canReopen ? (
             <Button

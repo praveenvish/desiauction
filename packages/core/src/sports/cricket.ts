@@ -22,7 +22,7 @@
  * values still come from one place.
  */
 
-import { optionsOf, termsOf, type TermDetail } from "./vocabulary";
+import { termsOf, type TermDetail } from "./vocabulary";
 import { DEFAULT_POINTS } from "../standings";
 import { ballsOf } from "./overs";
 import { netRate, summariseFields } from "./tiebreakers";
@@ -140,24 +140,97 @@ const ROLES: RoleVocabulary = {
   values: termsOf(CRICKET_ROLE_KEYS, ROLE_TERMS),
 };
 
-const BATTING_STYLE_LABELS: Record<CricketBattingStyle, string> = {
-  right_hand: "Right Hand Batsman",
-  left_hand: "Left Hand Batsman",
-  right_hand_opener: "Right Hand Opener",
-  left_hand_opener: "Left Hand Opener",
-  right_hand_middle_order: "Right Hand Middle Order",
-  left_hand_middle_order: "Left Hand Middle Order",
+/*
+ * The spellings a registration form's style question actually produces.
+ *
+ * Without these, only the exact label ("Right Hand Batsman") placed, so a
+ * Google Form offering "Right" / "Left" sent every row of a real cricket export
+ * to the value mapper. ONLY spellings with one meaning are listed: "Left Arm
+ * Spin" could be orthodox or chinaman and "Fast Medium" either pace band, so
+ * those still come back to the organizer rather than being guessed.
+ */
+const BATTING_STYLE_TERMS: Record<CricketBattingStyle, TermDetail> = {
+  right_hand: {
+    label: "Right Hand Batsman",
+    aliases: [
+      "right",
+      "right hand",
+      "right handed",
+      "right hander",
+      "right hand bat",
+      "right hand batter",
+      "right handed batsman",
+      "right handed batter",
+      "rhb",
+    ],
+  },
+  left_hand: {
+    label: "Left Hand Batsman",
+    aliases: [
+      "left",
+      "left hand",
+      "left handed",
+      "left hander",
+      "left hand bat",
+      "left hand batter",
+      "left handed batsman",
+      "left handed batter",
+      "lhb",
+    ],
+  },
+  right_hand_opener: { label: "Right Hand Opener", aliases: [] },
+  left_hand_opener: { label: "Left Hand Opener", aliases: [] },
+  right_hand_middle_order: { label: "Right Hand Middle Order", aliases: [] },
+  left_hand_middle_order: { label: "Left Hand Middle Order", aliases: [] },
 };
 
-const BOWLING_STYLE_LABELS: Record<CricketBowlingStyle, string> = {
-  right_arm_fast: "Right Arm Fast",
-  right_arm_medium: "Right Arm Medium",
-  left_arm_fast: "Left Arm Fast",
-  left_arm_medium: "Left Arm Medium",
-  off_break: "Off-Break",
-  leg_break: "Leg-Break",
-  left_arm_orthodox: "Left Arm Orthodox",
-  left_arm_chinaman: "Left Arm Chinaman",
+const BOWLING_STYLE_TERMS: Record<CricketBowlingStyle, TermDetail> = {
+  right_arm_fast: {
+    label: "Right Arm Fast",
+    aliases: ["right arm fast bowler", "right arm pace", "right arm pacer"],
+  },
+  right_arm_medium: {
+    label: "Right Arm Medium",
+    aliases: ["right arm medium pace", "right arm medium pacer"],
+  },
+  left_arm_fast: {
+    label: "Left Arm Fast",
+    aliases: ["left arm fast bowler", "left arm pace", "left arm pacer"],
+  },
+  left_arm_medium: {
+    label: "Left Arm Medium",
+    aliases: ["left arm medium pace", "left arm medium pacer"],
+  },
+  off_break: {
+    label: "Off-Break",
+    aliases: [
+      "off spin",
+      "off spinner",
+      "right arm off spin",
+      "right arm off break",
+      "right arm off spinner",
+      "offie",
+    ],
+  },
+  leg_break: {
+    label: "Leg-Break",
+    aliases: [
+      "leg spin",
+      "leg spinner",
+      "right arm leg spin",
+      "right arm leg break",
+      "right arm leg spinner",
+      "leggie",
+    ],
+  },
+  left_arm_orthodox: {
+    label: "Left Arm Orthodox",
+    aliases: ["slow left arm orthodox", "sla", "left arm orthodox spin", "left arm finger spin"],
+  },
+  left_arm_chinaman: {
+    label: "Left Arm Chinaman",
+    aliases: ["chinaman", "left arm wrist spin", "left arm unorthodox", "slow left arm chinaman"],
+  },
 };
 
 /**
@@ -175,14 +248,14 @@ const ATTRIBUTES: readonly AttributeSpec[] = [
     label: "Batting style",
     storage: { kind: "column", column: "batting_style" },
     headerAliases: ["batting style", "batting", "bats", "batting hand"],
-    options: optionsOf(CRICKET_BATTING_STYLE_KEYS, BATTING_STYLE_LABELS),
+    options: termsOf(CRICKET_BATTING_STYLE_KEYS, BATTING_STYLE_TERMS),
   },
   {
     key: "bowling_style",
     label: "Bowling style",
     storage: { kind: "column", column: "bowling_style" },
     headerAliases: ["bowling style", "bowling", "bowls", "bowling arm", "bowling type"],
-    options: optionsOf(CRICKET_BOWLING_STYLE_KEYS, BOWLING_STYLE_LABELS),
+    options: termsOf(CRICKET_BOWLING_STYLE_KEYS, BOWLING_STYLE_TERMS),
   },
 ];
 

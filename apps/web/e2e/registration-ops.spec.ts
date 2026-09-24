@@ -498,10 +498,16 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
     googleFormCsv({ withRetained: true }),
   );
 
-  // One press reads the headers, maps them and validates. The mapper renders
-  // beside the preview, so the translation is on screen before any commit.
+  // One press reads the headers, maps them and validates. Every column landed,
+  // so the mapping arrives as ONE sentence rather than a table to scroll past —
+  // still on screen before any commit, and the table is one click away.
   await page.getByTestId("import-preview-btn").click();
-  await expect(page.getByTestId("column-mapper")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("mapping-summary")).toContainText("Player Name → Player name", {
+    timeout: 20_000,
+  });
+  await expect(page.getByTestId("column-mapper")).toBeHidden();
+  await page.getByTestId("mapping-review").click();
+  await expect(page.getByTestId("column-mapper")).toBeVisible();
 
   // The guess is right, and the screen SHOWS it rather than asserting it: the
   // form's own question maps to our field, with its first value beside it.

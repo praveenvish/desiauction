@@ -765,6 +765,253 @@ p + .date-row {
   gap: var(--space-2);
 }
 
+/*
+ * THE FILE DROP. The whole zone is the file input's label, so a click anywhere
+ * opens the picker; the input itself is visually hidden but still focusable,
+ * and focus shows on the zone.
+ */
+.csv-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.csv-drop:hover,
+.csv-drop-over {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.csv-drop:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.csv-drop-done {
+  border-style: solid;
+  border-color: var(--success-base);
+}
+
+.csv-drop-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.csv-drop-icon {
+  color: var(--text-accent);
+}
+
+.csv-drop-done .csv-drop-icon {
+  color: var(--success-strong);
+}
+
+.csv-drop-title {
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.csv-drop-sub {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.csv-drop-link {
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mapping-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--success-base);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.mapping-summary p {
+  margin: 0;
+}
+
+.mapping-summary strong {
+  color: var(--text-primary);
+}
+
+.io-options summary {
+  cursor: pointer;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.io-options[open] summary {
+  margin-bottom: var(--space-3);
+}
+
+.drive-photos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.drive-photos p {
+  margin: 0;
+}
+
+.drive-photos strong {
+  color: var(--text-primary);
+}
+
+.photo-match-thumb-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.photo-match-thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.import-paid {
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+.import-diff-line {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.import-verdict {
+  margin: 0;
+  font-size: var(--text-base-size);
+  color: var(--text-primary);
+}
+
+.import-errors li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.import-error-who strong {
+  color: var(--text-primary);
+}
+
+.import-row-fix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.import-row-fix-input {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-interactive);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  min-width: 14rem;
+  max-width: 100%;
+}
+
+.import-tip {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/*
+ * THE COLUMN MAPPER HAS TO FIT THE DIALOG.
+ *
+ * A Google Form's first value is often a Drive link — one unbreakable 90-char
+ * word — and auto layout sized the table to it, so the "Goes to" dropdowns (the
+ * only column the organizer acts on) were cut off at the dialog's right edge
+ * while a long question title wrapped one word per line. Fixed layout gives
+ * the dropdown its own track, and the two text columns wrap anywhere.
+ */
+.mapping-table {
+  table-layout: fixed;
+}
+
+.mapping-table th:nth-child(1) {
+  width: 32%;
+}
+
+.mapping-table th:nth-child(3) {
+  width: 14rem;
+}
+
+.mapping-table td {
+  overflow-wrap: anywhere;
+}
+
+.mapping-select {
+  width: 100%;
+  max-width: 100%;
+}
+
+/*
+ * The registrations list's phone layout (flex rows that pack short cells side
+ * by side, further down this file) is written against every `.reg-table`, and
+ * it reached the import dialog's tables too: "Name" and "First value" shared a
+ * line while the next row stacked. These tables are field lists, one per line.
+ * The doubled class outranks that rule wherever it sits in the file.
+ */
+@media (max-width: 640px) {
+  .reg-table.import-table tbody tr {
+    display: block;
+  }
+
+  .reg-table.import-table td::before {
+    overflow-wrap: normal;
+    flex-shrink: 0;
+  }
+}
+
 .import-errors {
   margin: 0;
   padding-left: var(--space-5);
@@ -774,6 +1021,7 @@ p + .date-row {
 
 .csv-input {
   width: 100%;
+  box-sizing: border-box;
   font-family: var(--font-mono);
   font-size: var(--text-sm-size);
   padding: var(--space-3);
