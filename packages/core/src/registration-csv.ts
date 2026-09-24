@@ -135,7 +135,15 @@ export function validateNewPlayer(
   }
   const phone = normalizePhone(rawPhone);
   if (!phone.ok) {
-    errors.push({ field: "phone", message: `invalid phone "${rawPhone}"` });
+    // "9.87654E+09" is a number Excel reformatted on open-and-save; the digits
+    // are gone, so the only useful answer is where to get an untouched file.
+    const mangled = /^\d(\.\d+)?e\+?\d+$/i.test(rawPhone);
+    errors.push({
+      field: "phone",
+      message: mangled
+        ? `invalid phone "${rawPhone}" — a spreadsheet turned it into a number; download the CSV again from Google Sheets instead of re-saving it in Excel`
+        : `invalid phone "${rawPhone}"`,
+    });
   }
   // Read the way a registration form is filled in ("All Rounder", "Batsman"),
   // not as a bare enum match — the same contract the styles got, and for the
@@ -255,6 +263,45 @@ export function parseCsvFlag(value: string): boolean | null {
   return FALSE_WORDS.has(key) ? false : null;
 }
 
+/*
+ * A form's way of saying "this does not apply to me".
+ *
+ * A Google Form that asks every player for a bowling style offers "None" or
+ * "I don't bowl" to the batters, and those came back as unknown styles — and
+ * the value mapper can only offer real styles, so the organizer had no answer
+ * that would let a pure batter's row in. Read as blank instead: "did not say",
+ * which never erases a style already on file.
+ */
+const NOT_APPLICABLE = new Set([
+  "none",
+  "na",
+  "n a",
+  "nil",
+  "not applicable",
+  "no",
+  "-",
+  "dont bowl",
+  "do not bowl",
+  "i dont bowl",
+  "i do not bowl",
+  "not a bowler",
+  "doesnt bowl",
+  "does not bowl",
+  "dont bat",
+  "do not bat",
+]);
+
+/** True for a cell that answers a style question with "not me". */
+export function isNotApplicable(value: string): boolean {
+  const key = value
+    .trim()
+    .toLowerCase()
+    .replace(/['\u2019\u2018`]/g, "")
+    .replace(/[^\p{L}\p{N}-]+/gu, " ")
+    .trim();
+  return NOT_APPLICABLE.has(key);
+}
+
 /** Comparable form of a team name: case, spacing and punctuation are noise. */
 export function normalizeTeamName(value: string): string {
   return value
@@ -358,8 +405,12 @@ export function parseRegistrationRecords(
     const optional = (column: string): string =>
       index[column] !== undefined ? (fields[index[column]] ?? "").trim() : "";
     const dateOfBirth = optional("date_of_birth");
-    const battingStyle = optional("batting_style");
-    const bowlingStyle = optional("bowling_style");
+    const styleOf = (column: string): string => {
+      const raw = optional(column);
+      return isNotApplicable(raw) ? "" : raw;
+    };
+    const battingStyle = styleOf("batting_style");
+    const bowlingStyle = styleOf("bowling_style");
 
     /*
      * THE TWO COLUMNS NOBODY CHECKED.

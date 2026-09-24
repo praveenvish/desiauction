@@ -111,9 +111,15 @@ export function sportPackFor(key: string | null | undefined): SportPack {
  * Rounder", a spreadsheet writes "all-rounder", the database holds
  * "all_rounder", and all three are one answer. Carried over unchanged from
  * `player-profile.ts`, where it was called `normalizeStyleKey`.
+ *
+ * Emoji are noise too. Form builders decorate choices ("🏏 Batsman", "⚔️
+ * Allrounder"), and a real club export refused all 110 of its rows on exactly
+ * that. Only pictographs and their joiners/selectors go — combining marks
+ * stay, because a Devanagari matra is part of the word.
  */
 export function normalizeVocabularyKey(value: string): string {
   return value
+    .replace(/\p{Extended_Pictographic}|\u{FE0F}|\u{200D}|\u{20E3}/gu, "")
     .trim()
     .toLowerCase()
     .replace(/[\s\-_]+/g, "");

@@ -21,6 +21,7 @@ import {
   type ImportPreview,
   type ImportShape,
 } from "../../../../server/competition/actions";
+import { readCsvFile as readCsvText } from "../../../../lib/csv-file";
 import { ColumnMapper } from "./column-mapper";
 import { PhotoImportPanel } from "./photo-import";
 import { ValueMapper } from "./value-mapper";
@@ -78,15 +79,22 @@ export function ImportDialog({
     setUnplaced([]);
   };
 
+  // A Google Form download is `Form.csv.zip`; readCsvText opens either.
   const readCsvFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (csvRef.current) {
-        csvRef.current.value = typeof reader.result === "string" ? reader.result : "";
-      }
-      resetImport();
-    };
-    reader.readAsText(file);
+    readCsvText(file).then(
+      (text) => {
+        if (csvRef.current) {
+          csvRef.current.value = text;
+        }
+        resetImport();
+      },
+      (error: unknown) => {
+        toast({
+          title: error instanceof Error ? error.message : "Couldn't read that file.",
+          tone: "danger",
+        });
+      },
+    );
   };
 
   const shape = (): ImportShape => ({
@@ -263,8 +271,9 @@ export function ImportDialog({
               <div className="io-panel" data-testid="io-panel">
                 <label className="io-file" htmlFor="csv-input">
                   <span>
-                    Paste or choose a CSV — columns: name, phone, role, base_price_band · optional:
-                    date_of_birth, batting_style, bowling_style
+                    Paste or choose a CSV. A Google Form export works as it is — in the form,
+                    Responses → Download responses (.csv), then choose the downloaded zip. We match
+                    the columns and show you before anything is saved.
                   </span>
                 </label>
                 <textarea
@@ -279,8 +288,8 @@ export function ImportDialog({
                 <div className="io-row">
                   <input
                     type="file"
-                    accept=".csv,text/csv"
-                    aria-label="Choose a CSV file"
+                    accept=".csv,text/csv,.zip,application/zip"
+                    aria-label="Choose a CSV or Google Forms zip"
                     data-testid="import-file"
                     onChange={(event) => {
                       const file = event.target.files?.[0];
@@ -409,7 +418,7 @@ export function ImportDialog({
                     ) : null}
                     {preview.diff !== undefined && preview.diff.changes.length > 0 ? (
                       <div className="table-scroll">
-                        <table className="reg-table" data-testid="import-diff-table">
+                        <table className="reg-table import-table" data-testid="import-diff-table">
                           <thead>
                             <tr>
                               <th>Player</th>

@@ -124,6 +124,9 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "candidate name",
     "participant name",
     "your name",
+    "your full name",
+    "enter your name",
+    "enter your full name",
     "player",
   ],
   phone: [
@@ -138,6 +141,9 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "contact no",
     "whatsapp",
     "whatsapp number",
+    "whatsapp no",
+    "whatsapp mobile number",
+    "whatsapp contact number",
     "cell",
     "cell number",
   ],
@@ -152,6 +158,10 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "type",
     "speciality",
     "specialty",
+    "specialization",
+    "specialisation",
+    "player specialization",
+    "playing specialization",
   ],
   base_price_band: [
     "base price band",
@@ -171,7 +181,15 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "date of birth dd mm yyyy",
     "d o b",
   ],
-  batting_style: ["batting style", "batting", "bats", "batting hand", "which hand do you bat with"],
+  batting_style: [
+    "batting style",
+    "batting",
+    "bats",
+    "batting hand",
+    "which hand do you bat with",
+    "batsman type",
+    "batting type",
+  ],
   bowling_style: [
     "bowling style",
     "bowling",
@@ -179,6 +197,7 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "bowling type",
     "bowling arm",
     "what type of bowling do you bowl",
+    "bowler type",
   ],
   fee_status: [
     "fee status",
@@ -188,6 +207,8 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "payment done",
     "have you paid the entry fee",
     "fees paid",
+    "entry fee paid",
+    "registration fee paid",
     "payment",
   ],
   fee_amount: [
@@ -209,12 +230,41 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "txn id",
     "payment id",
     "reference no",
+    "transaction id utr",
+    "utr no",
+    "upi transaction id",
+    "upi reference",
+    "upi ref no",
   ],
   note: ["note", "notes", "remark", "remarks", "comment", "comments", "organizer note"],
   father_name: ["father name", "fathers name", "father s name", "guardian name", "parent name"],
-  jersey_name: ["jersey name", "name on jersey", "name on shirt", "tshirt name", "t shirt name"],
-  jersey_number: ["jersey number", "jersey no", "shirt number", "shirt no", "preferred number"],
-  tshirt_size: ["tshirt size", "t shirt size", "shirt size", "jersey size", "size"],
+  jersey_name: [
+    "jersey name",
+    "name on jersey",
+    "name on the jersey",
+    "name to be printed on jersey",
+    "name to print on jersey",
+    "name on shirt",
+    "tshirt name",
+    "t shirt name",
+  ],
+  jersey_number: [
+    "jersey number",
+    "jersey no",
+    "shirt number",
+    "shirt no",
+    "preferred number",
+    "preferred jersey number",
+    "preferred jersey no",
+  ],
+  tshirt_size: [
+    "tshirt size",
+    "t shirt size",
+    "shirt size",
+    "jersey size",
+    "size",
+    "size of t shirt",
+  ],
   trouser_size: ["trouser size", "trousers size", "pant size", "pants size", "lower size"],
   team: ["team", "team name", "squad", "franchise", "club", "team allotted", "allotted team"],
   /*
@@ -264,6 +314,7 @@ const KNOWN_NOISE: readonly string[] = [
   "submission time",
   "email address",
   "email",
+  "email id",
   "score",
   "id",
   "sr no",
@@ -293,6 +344,19 @@ const FIELD_BY_ALIAS: ReadonlyMap<string, ImportField> = new Map(
     ...HEADER_ALIASES[field].map((alias) => [normalizeHeader(alias), field] as const),
   ]),
 );
+
+/**
+ * "player s name" -> "players name".
+ *
+ * `normalizeHeader` turns an apostrophe into a space, so "Player's Name" — the
+ * single most common way a Form asks for a name — matched no alias, the file
+ * arrived with no name column, and the import stopped at step one. Applied to
+ * the LOOKUP only: `normalizeHeader` itself also keys saved mappings and value
+ * maps, and changing it would orphan every answer an organizer already gave.
+ */
+function joinPossessive(key: string): string {
+  return key.replace(/(\p{L}) s\b/gu, "$1s");
+}
 
 /** A source column and where (if anywhere) it goes. */
 export interface MappedColumn {
@@ -332,7 +396,7 @@ export function detectMapping(headers: readonly string[]): DetectedMapping {
   const claimed = new Map<ImportField, string[]>();
   const columns: MappedColumn[] = headers.map((header, index) => {
     const key = normalizeHeader(header);
-    const field = FIELD_BY_ALIAS.get(key);
+    const field = FIELD_BY_ALIAS.get(key) ?? FIELD_BY_ALIAS.get(joinPossessive(key));
     if (field === undefined) {
       return { index, header, field: null, noise: KNOWN_NOISE.includes(key) };
     }

@@ -200,3 +200,116 @@ describe("sampleRow — what makes a mapping checkable at a glance", () => {
     expect(sampleRow(tokenizeCsv("Player Name,Mobile"))).toEqual(["", ""]);
   });
 });
+
+/*
+ * The wording of real cricket registration Forms. Each of these stopped an
+ * import before 2026-09-24: "Player's Name" matched nothing (the apostrophe
+ * normalises to "player s name"), so the file had no name column at all, and
+ * the style answers a Form offers ("Right", "Off Spin", "I don't bowl") were
+ * each refused row by row.
+ */
+describe("real cricket Form wording", () => {
+  it("maps a possessive name question, straight or curly apostrophe", () => {
+    for (const header of ["Player's Name", "Player’s Name"]) {
+      const detected = detectMapping(["Timestamp", header, "Mobile No", "Playing Role"]);
+      expect(detected.missing).toEqual([]);
+      expect(detected.columns[1]?.field).toBe("name");
+    }
+  });
+
+  it("maps the common question titles without a hand edit", () => {
+    const detected = detectMapping([
+      "Your Full Name",
+      "WhatsApp No",
+      "Specialization",
+      "Batsman Type",
+      "Bowler Type",
+      "Size of T-shirt",
+      "Preferred Jersey No.",
+      "Name to be printed on Jersey",
+      "Transaction ID / UTR",
+      "Entry Fee Paid?",
+    ]);
+    expect(detected.columns.map((column) => column.field)).toEqual([
+      "name",
+      "phone",
+      "role",
+      "batting_style",
+      "bowling_style",
+      "tshirt_size",
+      "jersey_number",
+      "jersey_name",
+      "fee_reference",
+      "fee_status",
+    ]);
+  });
+
+  it("imports Form-style style answers and reads 'not me' as blank", () => {
+    const csv = [
+      "Player's Name,Mobile Number,Playing Role,Batting Style,Bowling Style",
+      "Rohit Sharma,9876543210,Batsman,Right,I don't bowl",
+      "Axar Patel,9876543211,All Rounder,Left Handed,Slow Left Arm Orthodox",
+      "Kuldeep Yadav,9876543212,Bowler,RHB,Chinaman",
+      "Ravi Bishnoi,9876543213,Bowler,Right Hand,Leg Spin",
+      "Rishabh Pant,9876543214,Wicket Keeper,LHB,None",
+    ].join("\n");
+    const records = tokenizeCsv(csv);
+    const canonical = applyMapping(records, mappingOf(detectMapping(records[0] ?? [])));
+    const result = parseRegistrationRecords(canonical, undefined, { now: NOW });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => [row.battingStyle, row.bowlingStyle])).toEqual([
+      ["right_hand", null],
+      ["left_hand", "left_arm_orthodox"],
+      ["right_hand", "left_arm_chinaman"],
+      ["right_hand", "leg_break"],
+      ["left_hand", null],
+    ]);
+  });
+
+  it("still asks rather than guesses when a style has two meanings", () => {
+    const records = tokenizeCsv(
+      "Name,Phone,Role,Bowling Style\nAnil Kumble,9876543210,Bowler,Left Arm Spin",
+    );
+    const canonical = applyMapping(records, mappingOf(detectMapping(records[0] ?? [])));
+    const result = parseRegistrationRecords(canonical, undefined, { now: NOW });
+    expect(result.errors[0]?.message).toContain('unknown bowling style "Left Arm Spin"');
+  });
+
+  it("says why an Excel-mangled phone is unreadable", () => {
+    const result = parseRegistrationRecords(
+      tokenizeCsv("name,phone,role\nRohit Sharma,9.87654E+09,batter"),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors[0]?.message).toContain("download the CSV again from Google Sheets");
+  });
+});
+
+/*
+ * From a real club's export (2026-09-24): the Form decorated its role choices
+ * with emoji, and all 110 rows were refused as "invalid cricket role".
+ */
+describe("emoji-decorated Form choices", () => {
+  it("reads the choice under the emoji", () => {
+    const csv = [
+      '"Timestamp","Name","Father’s Name","Mobile","Player Type"',
+      '"2026/02/05 10:54:08 PM GMT+5:30","Rohit Sharma ","Gurunath Sharma","9876543210","⚔️ Allrounder"',
+      '"2026/02/05 10:55:08 PM GMT+5:30","Virat Kohli","Prem Kohli","9876543211","🏏 Batsman"',
+      '"2026/02/05 10:56:08 PM GMT+5:30","Jasprit Bumrah","Jasbir Bumrah","9876543212","🎯 Bowler"',
+      '"2026/02/05 10:57:08 PM GMT+5:30","Rishabh Pant","Rajendra Pant","9876543213","🧤 Wicketkeeper"',
+    ].join("\n");
+    const records = tokenizeCsv(csv);
+    const detected = detectMapping(records[0] ?? []);
+    expect(detected.missing).toEqual([]);
+    const canonical = applyMapping(records, mappingOf(detected));
+    const result = parseRegistrationRecords(canonical, undefined, { now: NOW });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.role)).toEqual([
+      "all_rounder",
+      "batter",
+      "bowler",
+      "wicket_keeper",
+    ]);
+    expect(result.rows[0]?.fatherName).toBe("Gurunath Sharma");
+  });
+});
