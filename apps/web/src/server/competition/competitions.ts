@@ -574,6 +574,71 @@ export async function setCompetitionVisibility(
   });
 }
 
+/** The Google Sheet a season syncs registrations from (0093), if one is connected. */
+export interface ImportSheet {
+  id: string;
+  name: string;
+  syncedAt: Date | null;
+}
+
+export async function importSheetOf(db: Db, competitionId: string): Promise<ImportSheet | null> {
+  const [row] = await db
+    .select({
+      id: competitions.importSheetId,
+      name: competitions.importSheetName,
+      syncedAt: competitions.importSheetSyncedAt,
+    })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  if (row === undefined || row.id === null) {
+    return null;
+  }
+  return { id: row.id, name: row.name ?? "Google Sheet", syncedAt: row.syncedAt };
+}
+
+/**
+ * Connect (or, with null, disconnect) the season's Google Sheet. Audited: it
+ * names an outside place this season's player data is read from, which is the
+ * kind of fact someone later asks "who set that up?" about.
+ */
+export async function setImportSheet(
+  db: Db,
+  competition: CompetitionSummary,
+  personId: string,
+  sheet: { id: string; name: string } | null,
+): Promise<void> {
+  await db
+    .update(competitions)
+    .set({
+      importSheetId: sheet?.id ?? null,
+      importSheetName: sheet?.name ?? null,
+      importSheetSyncedAt: null,
+    })
+    .where(eq(competitions.id, competition.id));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: personId,
+    action:
+      sheet === null
+        ? "competition.import_sheet_disconnected"
+        : "competition.import_sheet_connected",
+    scopeType: "org",
+    scopeId: competition.orgId,
+    subject: competition.id,
+    meta:
+      sheet === null ? { slug: competition.slug } : { slug: competition.slug, sheet: sheet.name },
+  });
+}
+
+/** Stamp a sync that actually imported — the "last synced" the screen shows. */
+export async function markImportSheetSynced(db: Db, competitionId: string): Promise<void> {
+  await db
+    .update(competitions)
+    .set({ importSheetSyncedAt: new Date() })
+    .where(eq(competitions.id, competitionId));
+}
+
 export interface TeamSummary {
   id: string;
   name: string;

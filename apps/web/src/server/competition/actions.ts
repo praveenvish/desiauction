@@ -76,14 +76,18 @@ import {
   createCompetition,
   createTeam,
   holdBlocker,
+  importSheetOf,
+  markImportSheetSynced,
   publishBlockers,
   setCompetitionVisibility,
+  setImportSheet,
   setTeamCoach,
   updateTeamDetails,
   tournamentsOf,
   teamsOf,
   updateCompetitionDetails,
   type CompetitionSummary,
+  type ImportSheet,
   type PublishBlocker,
   type SeasonListing,
   type TeamSummary,
@@ -2265,6 +2269,43 @@ export async function photoTargetsAction(slug: string): Promise<PhotoTarget[]> {
   );
 }
 
+/** The season's connected Google Sheet (0093), for the import dialog. */
+export async function importSheetAction(slug: string): Promise<ImportSheet | null> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return null;
+  }
+  return inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    importSheetOf(db, gate.competition.id),
+  );
+}
+
+/**
+ * Connect the Sheet the organizer just picked in Google's picker, or
+ * disconnect with null. The id is checked for shape only — whether it opens is
+ * the organizer's own Google access, decided in their browser.
+ */
+export async function setImportSheetAction(
+  slug: string,
+  sheet: { id: string; name: string } | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const gate = await reviewGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  if (sheet !== null && !/^[\w-]{10,200}$/.test(sheet.id)) {
+    return { ok: false, error: "That doesn't look like a Google Sheet." };
+  }
+  const clean =
+    sheet === null
+      ? null
+      : { id: sheet.id, name: sheet.name.trim().slice(0, 200) || "Google Sheet" };
+  await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    setImportSheet(db, gate.competition, gate.personId, clean),
+  );
+  return { ok: true };
+}
+
 /** What the browser needs to open Google's picker — public values, or null when not set up. */
 export interface DrivePickerConfig {
   clientId: string;
@@ -2711,7 +2752,13 @@ export interface ImportCommitResult {
 export async function importCommitAction(
   slug: string,
   csv: string,
-  options?: { skipInvalid?: boolean; shape?: ImportShape; policy?: ImportPolicy },
+  options?: {
+    skipInvalid?: boolean;
+    shape?: ImportShape;
+    policy?: ImportPolicy;
+    /** Read from the season's connected Sheet — a landed import stamps "last synced". */
+    fromSheet?: boolean;
+  },
 ): Promise<ImportCommitResult> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
@@ -2796,6 +2843,11 @@ export async function importCommitAction(
   }
   if (result === "squad_locked") {
     return { ok: false, error: SQUAD_COLUMNS_LOCKED };
+  }
+  if (options?.fromSheet === true) {
+    await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+      markImportSheetSynced(db, gate.competition.id),
+    );
   }
   return {
     ok: true,

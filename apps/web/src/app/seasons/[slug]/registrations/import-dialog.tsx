@@ -14,15 +14,28 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import {
+  drivePickerConfigAction,
   importCommitAction,
+  importSheetAction,
   importInspectAction,
   importPreviewAction,
   saveImportMappingAction,
+  setImportSheetAction,
+  type DrivePickerConfig,
   type ImportInspection,
   type ImportPreview,
   type ImportShape,
 } from "../../../../server/competition/actions";
+import type { ImportSheet } from "../../../../server/competition/competitions";
 import { readCsvFile as readCsvText } from "../../../../lib/csv-file";
+import { formatDateTime } from "../../../../lib/format-date";
+import {
+  SheetAccessLost,
+  exportSheetCsv,
+  pickDriveSheet,
+  preloadGoogle,
+  requestDriveToken,
+} from "../../../../lib/google-drive";
 import { ColumnMapper, MappingSummary, mappingNeedsReview } from "./column-mapper";
 import { CsvDrop } from "./csv-drop";
 import { ImportErrors } from "./import-errors";
@@ -84,6 +97,55 @@ export function ImportDialog({
    */
   const [steppedAside, setSteppedAside] = useState(false);
   const steppedAsideRef = useRef(false);
+  const [tab, setTab] = useState("csv");
+  /** Remounts the photo step after an import, so it counts the new players. */
+  const [photosKey, setPhotosKey] = useState(0);
+  /** A sheet sync just imported players: the photo step opens its picker itself. */
+  const [photosAutoStart, setPhotosAutoStart] = useState(false);
+  /**
+   * Every way out of the dialog. The next open starts on Players (where Sync
+   * lives), and the photo step starts fresh — it counts who still needs a
+   * photo when it mounts, and a count from before an upload is a wrong one.
+   */
+  const close = () => {
+    setTab("csv");
+    setPhotosAutoStart(false);
+    setPhotosKey((key) => key + 1);
+    onClose();
+  };
+  /*
+   * THE CONNECTED GOOGLE SHEET (0093). Registration runs for weeks, and every
+   * new batch used to mean Forms → Download → drop the zip. With the form's
+   * responses sheet connected once, "Sync new players" reads it again through
+   * the same mapping, preview and diff — only the new rows are new.
+   */
+  const [drive, setDrive] = useState<DrivePickerConfig | null>(null);
+  const [sheet, setSheet] = useState<ImportSheet | null>(null);
+  const [sheetStep, setSheetStep] = useState<string | null>(null);
+  /** The text in the dialog came from the Sheet — a landed import stamps "last synced". */
+  const [fromSheet, setFromSheet] = useState(false);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    let live = true;
+    void Promise.all([drivePickerConfigAction(slug), importSheetAction(slug)]).then(
+      ([config, connected]) => {
+        if (!live) {
+          return;
+        }
+        setDrive(config);
+        setSheet(connected);
+        if (config !== null) {
+          // The sign-in pop-up must open inside the click — see preloadGoogle.
+          preloadGoogle();
+        }
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [open, slug]);
   const stepAside = (aside: boolean) => {
     steppedAsideRef.current = aside;
     setSteppedAside(aside);
@@ -151,6 +213,22 @@ export function ImportDialog({
     }
   };
 
+  /** Put a file's text in the dialog and start its preview. */
+  const loadText = (text: string, source: "file" | "sheet") => {
+    if (csvRef.current) {
+      csvRef.current.value = text;
+    }
+    setRowCount(
+      Math.max(
+        0,
+        tokenizeCsv(text).filter((row) => row.some((cell) => cell.trim() !== "")).length - 1,
+      ),
+    );
+    setFromSheet(source === "sheet");
+    resetImport();
+    void inspect(text);
+  };
+
   // A Google Form download is `Form.csv.zip`; readCsvText opens either. The
   // preview starts on its own — choosing the file IS the request to see it.
   const readCsvFile = (file: File) => {
@@ -158,17 +236,7 @@ export function ImportDialog({
     setRowCount(null);
     readCsvText(file).then(
       (text) => {
-        if (csvRef.current) {
-          csvRef.current.value = text;
-        }
-        setRowCount(
-          Math.max(
-            0,
-            tokenizeCsv(text).filter((row) => row.some((cell) => cell.trim() !== "")).length - 1,
-          ),
-        );
-        resetImport();
-        void inspect(text);
+        loadText(text, "file");
       },
       (error: unknown) => {
         setFileName(null);
@@ -178,6 +246,86 @@ export function ImportDialog({
         });
       },
     );
+  };
+
+  /**
+   * Read the connected Sheet (or the one just picked) and preview it. The
+   * Google sign-in comes FIRST, inside the click, so its pop-up is allowed.
+   */
+  const syncSheet = async (target: { id: string; name: string } | null = sheet) => {
+    if (drive === null || target === null) {
+      return;
+    }
+    try {
+      setSheetStep("Waiting for Google…");
+      const token = await requestDriveToken(drive.clientId);
+      setSheetStep("Reading your sheet…");
+      const csv = await exportSheetCsv(token, target.id);
+      setFileName(target.name);
+      loadText(csv, "sheet");
+      setSheetStep(null);
+    } catch (error) {
+      setSheetStep(null);
+      toast({
+        title:
+          error instanceof SheetAccessLost
+            ? `${error.message} Press "Change sheet" and pick it again.`
+            : error instanceof Error
+              ? error.message
+              : "Couldn't read the sheet.",
+        tone: "danger",
+      });
+    }
+  };
+
+  /** Pick the form's responses sheet in Google's picker, remember it, sync it. */
+  const connectSheet = async () => {
+    if (drive === null) {
+      return;
+    }
+    try {
+      setSheetStep("Waiting for Google…");
+      const token = await requestDriveToken(drive.clientId);
+      setSheetStep("Choose the sheet in the Google window…");
+      stepAside(true);
+      let picked;
+      try {
+        picked = await pickDriveSheet(drive, token);
+      } finally {
+        stepAside(false);
+      }
+      if (picked === null) {
+        setSheetStep(null);
+        return;
+      }
+      const saved = await setImportSheetAction(slug, { id: picked.id, name: picked.name });
+      if (!saved.ok) {
+        setSheetStep(null);
+        toast({ title: saved.error ?? "Couldn't connect that sheet.", tone: "danger" });
+        return;
+      }
+      setSheet({ id: picked.id, name: picked.name, syncedAt: null });
+      setSheetStep("Reading your sheet…");
+      const csv = await exportSheetCsv(token, picked.id);
+      setFileName(picked.name);
+      loadText(csv, "sheet");
+      setSheetStep(null);
+    } catch (error) {
+      stepAside(false);
+      setSheetStep(null);
+      toast({
+        title: error instanceof Error ? error.message : "Couldn't connect the sheet.",
+        tone: "danger",
+      });
+    }
+  };
+
+  const disconnectSheet = async () => {
+    const done = await setImportSheetAction(slug, null);
+    if (done.ok) {
+      setSheet(null);
+      setFromSheet(false);
+    }
   };
 
   const shape = (): ImportShape => ({
@@ -275,7 +423,11 @@ export function ImportDialog({
   const commitImport = async (skipInvalid = false) => {
     const text = csvRef.current?.value ?? "";
     setBusy(true);
-    const result = await importCommitAction(slug, text, { skipInvalid, shape: shape() });
+    const result = await importCommitAction(slug, text, {
+      skipInvalid,
+      shape: shape(),
+      fromSheet,
+    });
     // Remember the mapping only once the import it describes actually landed —
     // a mapping saved beside a failed import is a mapping nobody validated.
     if (result.ok && remember && inspection?.ok === true && Object.keys(mapping).length > 0) {
@@ -323,7 +475,19 @@ export function ImportDialog({
       if (csvRef.current) {
         csvRef.current.value = "";
       }
-      onClose();
+      setPhotosKey((key) => key + 1);
+      if (fromSheet) {
+        // "Last synced" moves, and new players' photos are one step away: go
+        // straight to it rather than closing on the organizer mid-routine.
+        setFromSheet(false);
+        void importSheetAction(slug).then(setSheet);
+        if ((result.imported ?? 0) > 0) {
+          setPhotosAutoStart(true);
+          setTab("photos");
+          return;
+        }
+      }
+      close();
     } else {
       toast({ title: result.error ?? "Import failed.", tone: "danger" });
     }
@@ -334,7 +498,7 @@ export function ImportDialog({
       open={open && !steppedAside}
       onClose={() => {
         if (!steppedAsideRef.current) {
-          onClose();
+          close();
         }
       }}
       title="Import players & photos"
@@ -343,7 +507,7 @@ export function ImportDialog({
         <Button
           variant="ghost"
           onClick={() => {
-            onClose();
+            close();
           }}
         >
           Close
@@ -358,12 +522,80 @@ export function ImportDialog({
       ) : null}
       <Tabs
         label="Import kind"
+        selectedId={tab}
+        onSelect={(id) => {
+          // A tab the organizer chose is theirs: no picker opening by itself.
+          setPhotosAutoStart(false);
+          setTab(id);
+        }}
         tabs={[
           {
             id: "csv",
             label: "Players",
             content: (
               <div className="io-panel" data-testid="io-panel">
+                {drive !== null ? (
+                  <div className="drive-photos" data-testid="sheet-sync">
+                    {sheet === null ? (
+                      <>
+                        <p>
+                          <strong>Registrations still coming in?</strong> Connect your form&apos;s
+                          Google Sheet once, then bring in new players with one click — no more
+                          downloads.
+                        </p>
+                        <Button
+                          onClick={() => void connectSheet()}
+                          loading={sheetStep !== null}
+                          disabled={sheetStep !== null}
+                          data-testid="sheet-connect"
+                        >
+                          Connect Google Sheet
+                        </Button>
+                        <p className="dash-hint">
+                          {sheetStep ??
+                            "In Google Forms, open Responses → Link to Sheets first if you haven't."}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          <strong>Google Sheet: {sheet.name}</strong>
+                          {" · "}
+                          {sheet.syncedAt === null
+                            ? "not synced yet"
+                            : `last synced ${formatDateTime(sheet.syncedAt)}`}
+                        </p>
+                        <div className="io-row">
+                          <Button
+                            onClick={() => void syncSheet()}
+                            loading={sheetStep !== null}
+                            disabled={sheetStep !== null}
+                            data-testid="sheet-sync-btn"
+                          >
+                            Sync new players
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void connectSheet()}
+                            disabled={sheetStep !== null}
+                          >
+                            Change sheet
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void disconnectSheet()}
+                            disabled={sheetStep !== null}
+                          >
+                            Disconnect
+                          </Button>
+                        </div>
+                        {sheetStep !== null ? <p className="dash-hint">{sheetStep}</p> : null}
+                      </>
+                    )}
+                  </div>
+                ) : null}
                 <CsvDrop fileName={fileName} rowCount={rowCount} onFile={readCsvFile} />
                 <p className="dash-hint" hidden={fileName !== null}>
                   In Google Forms, open <strong>Responses</strong> → <strong>⋮</strong> →{" "}
@@ -662,10 +894,12 @@ export function ImportDialog({
             label: "Photos",
             content: (
               <PhotoImportPanel
+                key={photosKey}
                 slug={slug}
+                autoStart={photosAutoStart}
                 onStepAside={stepAside}
                 onDone={() => {
-                  onClose();
+                  close();
                 }}
               />
             ),
