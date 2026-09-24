@@ -2,9 +2,11 @@
 
 import {
   Button,
+  ButtonLink,
   IconCheck,
   IconCopy,
   IconGlobe,
+  IconMessageCircle,
   IconSend,
   IconTile,
   useToast,
@@ -19,10 +21,28 @@ import { useOrigin } from "../../../../lib/use-hydrated";
  * via clipboard + the native share sheet (mobile). No new deps; QR is a separate
  * dependency decision.
  */
-export function ShareRegistration({ slug, open }: { slug: string; open: boolean }) {
+export function ShareRegistration({
+  slug,
+  open,
+  seasonName,
+}: {
+  slug: string;
+  open: boolean;
+  /** Named in the ready-made WhatsApp message, so it reads like the club sent it. */
+  seasonName?: string;
+}) {
   const toast = useToast();
   const origin = useOrigin();
   const url = origin === "" ? "" : `${origin}/seasons/${slug}/register`;
+  /*
+   * THE MESSAGE A CLUB ACTUALLY SENDS. Recruitment in this market happens in
+   * WhatsApp groups, and the bare link made every organizer write the same
+   * sentence by hand. Written ready to forward: what it is, the link, and what
+   * a player will need — the four things the registration form asks for — so
+   * nobody opens it without their photo to hand. `wa.me` opens the app on a
+   * phone and WhatsApp Web on a desktop.
+   */
+  const message = `🏏 Registrations are open${seasonName === undefined ? "" : ` for ${seasonName}`}! Register here: ${url} — takes a minute: your name, phone, playing role and a photo.`;
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -41,7 +61,7 @@ export function ShareRegistration({ slug, open }: { slug: string; open: boolean 
   async function share() {
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: "Register to play", url });
+        await navigator.share({ title: "Register to play", text: message, url });
       } catch {
         // user dismissed the share sheet — not an error
       }
@@ -98,6 +118,19 @@ export function ShareRegistration({ slug, open }: { slug: string; open: boolean 
             </>
           )}
         </Button>
+        {url === "" ? null : (
+          <ButtonLink
+            size="sm"
+            variant="secondary"
+            href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="share-registration-whatsapp"
+          >
+            <IconMessageCircle size={16} className="icon-lead" aria-hidden />
+            WhatsApp
+          </ButtonLink>
+        )}
         <Button size="sm" variant="ghost" onClick={() => void share()} disabled={url === ""}>
           <IconSend size={16} className="icon-lead" aria-hidden />
           Share
