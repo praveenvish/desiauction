@@ -1142,3 +1142,123 @@
   border-color: var(--border-interactive);
   color: var(--text-accent);
 }
+
+/* --- The public squad page (/c/[slug]/t/[team]) --------------------------- */
+
+/* The crest as a coin in the team's own colour — the page's one piece of art. */
+.team-page-crest {
+  display: grid;
+  place-items: center;
+  width: min(220px, 60vw);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 24%, rgb(255 255 255 / 0.4), transparent 42%),
+    radial-gradient(circle, var(--team) 58%, color-mix(in srgb, var(--team) 55%, #000) 100%);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.35),
+    inset 0 -14px 28px rgb(0 0 0 / 0.3),
+    0 30px 70px color-mix(in srgb, var(--team) 40%, transparent);
+  overflow: hidden;
+}
+
+.team-page-crest > img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+}
+
+.team-page-crest-mark {
+  font-size: clamp(48px, 12vw, 76px);
+  font-weight: var(--font-weight-bold, 700);
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+}
+
+.team-page-empty {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.team-page-squad {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: var(--space-2);
+}
+
+.team-page-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: inherit;
+  text-decoration: none;
+}
+
+.team-page-player:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+}
+
+.team-page-player:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.team-page-face {
+  flex-shrink: 0;
+}
+
+.team-page-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.team-page-who > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-heading);
+}
+
+.team-page-who > span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.team-page-price {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  font-weight: var(--font-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.team-page-signed {
+  font-style: italic;
+  color: var(--text-accent);
+}
+
+.team-page-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--text-on-accent, #070a0f);
+  font-size: 12px;
+  font-weight: 700;
+}

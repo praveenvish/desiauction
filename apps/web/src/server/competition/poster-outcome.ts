@@ -1,4 +1,4 @@
-import type { PosterOutcome } from "@desiauction/core";
+import type { PosterMark, PosterOutcome } from "@desiauction/core";
 
 import type { PreSignedKind } from "../../lib/pre-signed";
 
@@ -40,4 +40,25 @@ export function outcomeOf(
     return WAITING_LOTS.has(lotStatus) ? "pool" : null;
   }
   return auctionStatus !== null && FINISHED_AUCTIONS.has(auctionStatus) ? null : "pool";
+}
+
+/** Every mark a pre-signed player wears — a player can be an icon AND captain. */
+export function marksOf(row: {
+  isIcon: boolean;
+  isCaptain: boolean;
+  isRetained: boolean;
+}): PosterMark[] {
+  const marks: PosterMark[] = [];
+  if (row.isCaptain) {
+    marks.push("captain");
+  }
+  if (row.isIcon) {
+    marks.push("icon");
+  }
+  if (row.isRetained) {
+    marks.push("retained");
+  }
+  // `preSignedSql` selected this row, so at least one mark is always present;
+  // the fallback keeps a hand-edited row from rendering an unmarked "icon".
+  return marks.length > 0 ? marks : ["icon"];
 }

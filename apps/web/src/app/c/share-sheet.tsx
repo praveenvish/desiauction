@@ -11,13 +11,18 @@ import {
 } from "@desiauction/ui";
 import { useEffect, useRef, useState } from "react";
 
-import { useHydrated, usePageAddress } from "../../../../../lib/use-hydrated";
-import { whatsappHref, withRef, type ShareLanguage } from "../../../../../lib/share-message";
-import { track } from "../../../../../lib/telemetry";
-import { ownStatusPosterHref } from "./actions";
+import { useHydrated, usePageAddress } from "../../lib/use-hydrated";
+import { whatsappHref, withRef, type ShareLanguage } from "../../lib/share-message";
+import { track } from "../../lib/telemetry";
+import { ownPlayerStatusHref, ownTeamStatusHref } from "./share-actions";
+
+/** Which Status poster the sheet may offer, if the viewer is entitled to it. */
+export type StatusPoster =
+  | { readonly kind: "player"; readonly slug: string; readonly number: string }
+  | { readonly kind: "team"; readonly slug: string; readonly team: string };
 
 /**
- * THE SHARE SHEET — the one control this page exists for.
+ * THE SHARE SHEET — the one control a public player or team page exists for.
  *
  * The card is the viral unit of a grassroots auction: a player posts it to a
  * Status and forwards it to three groups. This page used to offer a URL in a
@@ -36,18 +41,19 @@ import { ownStatusPosterHref } from "./actions";
  * Every link carries `?ref=` for where it went, and every action records a
  * telemetry event with the card's state and nothing about who shared it.
  */
-export function SharePlayer({
-  playerName,
-  slug,
-  number,
+export function ShareSheet({
+  title,
+  surface,
   outcome,
   messages,
+  status,
 }: {
-  playerName: string;
-  slug: string;
-  number: string;
+  /** What the native share sheet calls it: a player's or a team's name. */
+  title: string;
+  surface: "player" | "team";
   outcome: string;
   messages: Record<ShareLanguage, string>;
+  status: StatusPoster;
 }) {
   const url = usePageAddress();
   const [language, setLanguage] = useState<ShareLanguage>("en");
@@ -62,11 +68,18 @@ export function SharePlayer({
   // the tap and `navigator.share` spends that gesture.
   const posterFile = useRef<File | null>(null);
   const message = messages[language];
-  const props = { surface: "player", outcome, lang: language };
+  const props = { surface, outcome, lang: language };
+  const { slug } = status;
+  const subject = status.kind === "player" ? status.number : status.team;
+  const fileName = `${slug}-${subject}-status.png`;
 
   useEffect(() => {
     let live = true;
-    void ownStatusPosterHref(slug, number).then((href) => {
+    const ask =
+      status.kind === "player"
+        ? ownPlayerStatusHref(status.slug, status.number)
+        : ownTeamStatusHref(status.slug, status.team);
+    void ask.then((href) => {
       if (!live || href === null) {
         return;
       }
@@ -75,7 +88,7 @@ export function SharePlayer({
         .then((response) => (response.ok ? response.blob() : null))
         .then((blob) => {
           if (live && blob !== null) {
-            posterFile.current = new File([blob], `${slug}-${number}-status.png`, {
+            posterFile.current = new File([blob], fileName, {
               type: "image/png",
             });
           }
@@ -87,7 +100,9 @@ export function SharePlayer({
     return () => {
       live = false;
     };
-  }, [slug, number]);
+    // `status` is a fresh object each render; its fields are what identify it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status.kind, status.slug, subject]);
 
   function say(text: string) {
     setNote(text);
@@ -111,7 +126,7 @@ export function SharePlayer({
   async function shareNative() {
     track("share.native_opened", props);
     try {
-      await navigator.share({ title: playerName, text: message, url: withRef(url, "share") });
+      await navigator.share({ title, text: message, url: withRef(url, "share") });
     } catch {
       // Dismissed — not an error.
     }
@@ -129,7 +144,7 @@ export function SharePlayer({
         if (!response.ok) {
           throw new Error(String(response.status));
         }
-        file = new File([await response.blob()], `${slug}-${number}-status.png`, {
+        file = new File([await response.blob()], fileName, {
           type: "image/png",
         });
         posterFile.current = file;
@@ -164,7 +179,11 @@ export function SharePlayer({
   const ready = url !== "";
 
   return (
-    <div className="share-sheet" data-testid="share-player" data-ready={ready ? "" : undefined}>
+    <div
+      className="share-sheet"
+      data-testid={`share-${surface}`}
+      data-ready={ready ? "" : undefined}
+    >
       <div className="share-sheet-head">
         <span className="share-sheet-label" id="share-message-label">
           Message

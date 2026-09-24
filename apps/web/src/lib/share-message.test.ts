@@ -1,7 +1,7 @@
 import { buildPlayerPoster, type PlayerPosterInput } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
-import { playerShareMessage, whatsappHref, withRef } from "./share-message";
+import { playerShareMessage, teamShareMessage, whatsappHref, withRef } from "./share-message";
 
 const SOLD: PlayerPosterInput = {
   playerName: "Rohit Yadav",
@@ -86,6 +86,38 @@ describe("share links", () => {
     expect(href.startsWith("https://wa.me/?text=")).toBe(true);
     expect(decodeURIComponent(href.slice("https://wa.me/?text=".length))).toBe(
       "Sold! ₹12,500\nhttps://x.in/c/a/p/1?ref=whatsapp",
+    );
+  });
+});
+
+describe("teamShareMessage", () => {
+  const facts = {
+    teamName: "Rajgarh Royals",
+    competitionName: "Vishnoi Premier League",
+    playerCount: 12,
+    spentLabel: "₹1,08,500",
+    topBuy: { name: "Sameer Khan", priceLabel: "₹25,000" },
+  };
+
+  it("says the squad, the spend and the top buy, in both languages", () => {
+    expect(teamShareMessage(facts, "en")).toBe(
+      "Rajgarh Royals: our squad for Vishnoi Premier League — 12 players, ₹1,08,500 spent. Top buy: Sameer Khan at ₹25,000.",
+    );
+    expect(teamShareMessage(facts, "hi")).toBe(
+      "Rajgarh Royals: Vishnoi Premier League के लिए हमारी टीम — 12 खिलाड़ी, ₹1,08,500 खर्च। सबसे बड़ी खरीद: Sameer Khan, ₹25,000।",
+    );
+  });
+
+  it("drops the money it does not have, and never says '1 players'", () => {
+    const signedOnly = { ...facts, playerCount: 1, spentLabel: null, topBuy: null };
+    expect(teamShareMessage(signedOnly, "en")).toBe(
+      "Rajgarh Royals: our squad for Vishnoi Premier League — 1 player.",
+    );
+  });
+
+  it("promises nothing for an empty squad", () => {
+    expect(teamShareMessage({ ...facts, playerCount: 0 }, "en")).toContain(
+      "announced after the auction",
     );
   });
 });

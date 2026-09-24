@@ -87,3 +87,32 @@ export function withRef(url: string, ref: ShareRef): string {
 export function whatsappHref(message: string, url: string): string {
   return `https://wa.me/?text=${encodeURIComponent(`${message}\n${url}`)}`;
 }
+
+/** What a squad's share says — the facts on its card, in its order. */
+export interface TeamShareFacts {
+  readonly teamName: string;
+  readonly competitionName: string;
+  readonly playerCount: number;
+  /** Formatted, or null when nothing was bought (a pre-signed-only squad). */
+  readonly spentLabel: string | null;
+  readonly topBuy: { readonly name: string; readonly priceLabel: string } | null;
+}
+
+export function teamShareMessage(facts: TeamShareFacts, language: ShareLanguage): string {
+  const { teamName: team, competitionName: season, playerCount: n } = facts;
+  if (n === 0) {
+    return language === "hi"
+      ? `${team} — ${season}। टीम नीलामी के बाद घोषित होगी।`
+      : `${team} — ${season}. The squad is announced after the auction.`;
+  }
+  const top = facts.topBuy;
+  if (language === "hi") {
+    const spent = facts.spentLabel === null ? "" : `, ${facts.spentLabel} खर्च`;
+    const lead = top === null ? "" : ` सबसे बड़ी खरीद: ${top.name}, ${top.priceLabel}।`;
+    return `${team}: ${season} के लिए हमारी टीम — ${String(n)} खिलाड़ी${spent}।${lead}`;
+  }
+  const spent = facts.spentLabel === null ? "" : `, ${facts.spentLabel} spent`;
+  const lead = top === null ? "" : ` Top buy: ${top.name} at ${top.priceLabel}.`;
+  const players = n === 1 ? "1 player" : `${String(n)} players`;
+  return `${team}: our squad for ${season} — ${players}${spent}.${lead}`;
+}

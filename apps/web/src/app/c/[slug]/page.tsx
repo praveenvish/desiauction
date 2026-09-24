@@ -13,7 +13,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { env } from "../../../env";
-import { publicCompetitionView, publicShowcase } from "../../../server/competition/public";
+import {
+  publicCompetitionView,
+  publicShowcase,
+  teamSlugOf,
+} from "../../../server/competition/public";
 import { serializeJsonLd } from "../../../server/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
 import {
@@ -346,6 +350,7 @@ export default async function PublicCompetitionPage({
                   primaryColor: team.primaryColor,
                   logoUrl: team.logoUrl,
                   coachName: team.coachName,
+                  href: `/c/${view.slug}/t/${teamSlugOf(team.name)}`,
                 }))}
               />
             )}

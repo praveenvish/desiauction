@@ -13,7 +13,6 @@ import {
   type MoneyUnit,
   type PlayerPosterInput,
   type PosterKind,
-  type PosterMark,
   type PosterSize,
   type PosterTheme,
   type SeasonPosterInput,
@@ -47,7 +46,7 @@ import { canCompetition } from "./authz";
 import { competitionForRegistration, resolveCompetition } from "./competitions";
 import { isPreSigned, preSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
-import { outcomeOf } from "./poster-outcome";
+import { marksOf, outcomeOf } from "./poster-outcome";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 
 /**
@@ -771,7 +770,10 @@ async function teamPosterFrom(
   return {
     ok: true,
     showBranding: gated.showBranding,
-    shareUrl: seasonShareUrl(gated),
+    // The squad's own page: a QR on a squad sheet should open that squad.
+    shareUrl: gated.published
+      ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}/t/${slugifyName(read.teamName)}?ref=qr`
+      : null,
     filename: posterFilename(gated.competition.slug, `${read.teamName} squad`, request.size),
     input: {
       teamName: read.teamName,
@@ -908,23 +910,6 @@ async function squadOf(
     members,
     spentPaise: bought.reduce((total, row) => total + (row.price ?? 0), 0),
   };
-}
-
-/** Every mark a pre-signed player wears — a player can be an icon AND captain. */
-function marksOf(row: { isIcon: boolean; isCaptain: boolean; isRetained: boolean }): PosterMark[] {
-  const marks: PosterMark[] = [];
-  if (row.isCaptain) {
-    marks.push("captain");
-  }
-  if (row.isIcon) {
-    marks.push("icon");
-  }
-  if (row.isRetained) {
-    marks.push("retained");
-  }
-  // `preSignedSql` selected this row, so at least one mark is always present;
-  // the fallback keeps a hand-edited row from rendering an unmarked "icon".
-  return marks.length > 0 ? marks : ["icon"];
 }
 
 /**

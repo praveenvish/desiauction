@@ -7,7 +7,11 @@ import { notFound } from "next/navigation";
 
 import { env } from "../../../../../env";
 import { preSignedWord, type PreSignedKind } from "../../../../../lib/pre-signed";
-import { publicPlayer, publicPlayerPoster } from "../../../../../server/competition/public";
+import {
+  publicPlayer,
+  publicPlayerPoster,
+  teamSlugOf,
+} from "../../../../../server/competition/public";
 import { linkCardAlt } from "../../../../seasons/[slug]/posters/poster-link";
 import {
   HeroFact,
@@ -18,7 +22,7 @@ import {
   type Stat,
 } from "../../../../../components/public/public-kit";
 import { playerShareMessage } from "../../../../../lib/share-message";
-import { SharePlayer } from "./share-player";
+import { ShareSheet } from "../../../share-sheet";
 import "../../../../marketing.css";
 import "../../../directory.css";
 
@@ -234,6 +238,17 @@ export default async function PlayerProfilePage({
                 Register for {player.competitionName}
               </ButtonLink>
             ) : null}
+            {/* A signed player's card leads to the squad they are part of. */}
+            {player.teamName !== null ? (
+              <ButtonLink
+                href={`/c/${slug}/t/${teamSlugOf(player.teamName)}`}
+                variant="secondary"
+                size="lg"
+                data-testid="player-team-link"
+              >
+                See the {player.teamName} squad
+              </ButtonLink>
+            ) : null}
             <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg">
               <IconArrowLeft size={18} /> Back to {player.competitionName}
             </ButtonLink>
@@ -270,12 +285,12 @@ export default async function PlayerProfilePage({
             been handed this card is looking. What stays here is the share
             control itself — the thing the player came back for. */}
         <PageSection headingId="share-heading" title="Share">
-          <SharePlayer
-            playerName={player.name}
-            slug={slug}
-            number={number}
+          <ShareSheet
+            title={player.name}
+            surface="player"
             outcome={shareModel?.outcome ?? "none"}
             messages={messages}
+            status={{ kind: "player", slug, number }}
           />
         </PageSection>
       </PageBody>

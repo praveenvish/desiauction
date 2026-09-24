@@ -7,7 +7,9 @@ import {
   paise,
   type MoneyUnit,
   type Paise,
+  slugifyName,
   type PlayerPosterInput,
+  type PosterMark,
 } from "@desiauction/core";
 import {
   auctionEvents,
@@ -28,7 +30,7 @@ import { teamsOf, type TeamSummary } from "./competitions";
 import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
-import { outcomeOf } from "./poster-outcome";
+import { marksOf, outcomeOf } from "./poster-outcome";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 import { containsPattern } from "../../lib/like-pattern";
 
@@ -704,6 +706,206 @@ export async function publicPlayerPoster(
     version: [outcome, pricePaise ?? "", teamId ?? "", card.photoKey === null ? 0 : 1]
       .join(".")
       .replace(/[^a-z0-9.]/gi, ""),
+  };
+}
+
+/**
+ * THE PUBLIC TEAM — one squad, as a page of its own (`/c/[slug]/t/[team]`).
+ *
+ * The season page shows a team as a card of names; this is the squad an owner
+ * forwards the morning after: every player, what each cost, what the team
+ * spent, and the season's purse it spent it from. Sale prices are public here
+ * by the founder's decision (2026-09-24) — the same decision the player card
+ * made; the season page's own team card still shows names only.
+ *
+ * Behind the same gates as every public read: a published season, approved
+ * registrations only, and a face only when consent is recorded and the player
+ * is not a minor (`publicPhotoKey`). The team is addressed by its name's slug,
+ * because a URL an owner reads aloud should say the team's name; names are
+ * unique within a season, and the first match wins on a slug collision.
+ */
+export interface PublicTeamMember {
+  registrationId: string;
+  number: string;
+  name: string;
+  role: string | null;
+  /** Integer paise, or null for a player signed before the auction. */
+  pricePaise: number | null;
+  marks: PosterMark[];
+  photoUrl: string | null;
+  /** Storage key behind `photoUrl`, for the image routes to inline. */
+  photoKey: string | null;
+}
+
+export interface PublicTeam {
+  competitionId: string;
+  competitionName: string;
+  competitionSlug: string;
+  sport: string;
+  competitionLogoKey: string | null;
+  team: {
+    id: string;
+    name: string;
+    slug: string;
+    shortName: string | null;
+    color: string | null;
+    crestKey: string | null;
+    crestUrl: string | null;
+    coachName: string | null;
+  };
+  members: PublicTeamMember[];
+  spentPaise: number;
+  /** The season's published purse per team, when the auction states one. */
+  pursePaise: number | null;
+  /** What the season's auction counts in (0091): "₹…" or "… pts". */
+  unit: MoneyUnit;
+  auctionStatus: string | null;
+}
+
+/** The address segment for a team: its name, as a slug. */
+export function teamSlugOf(name: string): string {
+  return slugifyName(name);
+}
+
+export async function publicTeam(slug: string, teamSlug: string): Promise<PublicTeam | null> {
+  const [comp] = await systemDb
+    .select({
+      id: competitions.id,
+      name: competitions.name,
+      sport: competitions.sport,
+      visibility: competitions.visibility,
+      logoKey: competitions.logoUrl,
+      unit: competitions.auctionUnit,
+    })
+    .from(competitions)
+    .where(eq(competitions.slug, slug))
+    .limit(1);
+  if (comp === undefined || comp.visibility !== "public") {
+    return null;
+  }
+  const teamRows = await systemDb
+    .select({
+      id: teams.id,
+      name: teams.name,
+      shortName: teams.shortName,
+      color: teams.primaryColor,
+      crestKey: teams.logoUrl,
+      coachName: teams.coachName,
+    })
+    .from(teams)
+    .where(eq(teams.competitionId, comp.id))
+    .orderBy(asc(teams.name));
+  const team = teamRows.find((row) => teamSlugOf(row.name) === teamSlug);
+  if (team === undefined) {
+    return null;
+  }
+  const [auction] = await systemDb
+    .select({ id: auctions.id, status: auctions.status, config: auctions.config })
+    .from(auctions)
+    .where(and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned")))
+    .limit(1);
+
+  const member = {
+    registrationId: registrations.id,
+    number: registrations.registrationNumber,
+    name: shownName,
+    role: registrations.role,
+    dateOfBirth: registrations.dateOfBirth,
+    photoKey: shownPhotoKey,
+    photoConsentAt: shownPhotoConsentAt,
+    isIcon: registrations.isIcon,
+    isCaptain: registrations.isCaptain,
+    isRetained: registrations.isRetained,
+  };
+  // Signed before the night, and not bought on it — the poster's own split.
+  const preSignedRows = await systemDb
+    .select(member)
+    .from(registrations)
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .where(
+      and(
+        eq(registrations.competitionId, comp.id),
+        eq(registrations.teamId, team.id),
+        eq(registrations.status, "approved"),
+        preSignedSql,
+        ...(auction === undefined
+          ? []
+          : [
+              sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
+            ]),
+      ),
+    )
+    .orderBy(asc(shownName));
+  const boughtRows =
+    auction === undefined
+      ? []
+      : await systemDb
+          .select({ ...member, price: lots.soldPrice })
+          .from(lots)
+          .innerJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+          .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+          .innerJoin(people, eq(people.id, registrations.personId))
+          .where(
+            and(
+              eq(lots.auctionId, auction.id),
+              eq(lots.status, "sold"),
+              eq(paddles.teamId, team.id),
+              eq(registrations.status, "approved"),
+            ),
+          )
+          .orderBy(desc(lots.soldPrice));
+
+  const now = new Date();
+  const photo = (row: {
+    dateOfBirth: string | null;
+    photoConsentAt: Date | null;
+    photoKey: string | null;
+  }) =>
+    mayPublishPhoto(row.dateOfBirth, now) && row.photoConsentAt !== null ? row.photoKey : null;
+  const toMember = (
+    row: (typeof preSignedRows)[number],
+    pricePaise: number | null,
+    rowMarks: PosterMark[],
+  ): PublicTeamMember => {
+    const key = photo(row);
+    return {
+      registrationId: row.registrationId,
+      number: row.number,
+      name: row.name ?? "Player",
+      role: row.role,
+      pricePaise,
+      marks: rowMarks,
+      photoKey: key,
+      photoUrl: key === null ? null : storage.readUrl(key),
+    };
+  };
+  const members = [
+    ...preSignedRows.map((row) => toMember(row, null, marksOf(row))),
+    ...boughtRows
+      .filter((row) => !preSignedRows.some((pre) => pre.registrationId === row.registrationId))
+      .map((row) => toMember(row, row.price, row.isCaptain ? ["captain"] : [])),
+  ];
+  return {
+    competitionId: comp.id,
+    competitionName: comp.name,
+    competitionSlug: slug,
+    sport: comp.sport,
+    competitionLogoKey: comp.logoKey,
+    team: {
+      id: team.id,
+      name: team.name,
+      slug: teamSlug,
+      shortName: team.shortName,
+      color: team.color,
+      crestKey: team.crestKey,
+      crestUrl: team.crestKey === null ? null : storage.readUrl(team.crestKey),
+      coachName: team.coachName,
+    },
+    members,
+    spentPaise: boughtRows.reduce((total, row) => total + (row.price ?? 0), 0),
+    pursePaise: publicAuctionRules(auction?.config).pursePerTeam,
+    unit: comp.unit,
+    auctionStatus: auction?.status ?? null,
   };
 }
 
