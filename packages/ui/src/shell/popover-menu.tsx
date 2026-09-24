@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type AnchorHTMLAttributes,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
+import { isRouterHref, useLinkComponent } from "../primitives/link-context";
 import styles from "./popover-menu.module.css";
 
 export interface PopoverMenuItem {
@@ -141,7 +151,7 @@ export function PopoverMenu({
             {items.map((item) => (
               <li key={item.key} role="none">
                 {item.href !== undefined ? (
-                  <a
+                  <MenuLink
                     role="menuitem"
                     href={item.href}
                     className={[styles["item"], item.danger === true ? styles["danger"] : ""]
@@ -152,7 +162,7 @@ export function PopoverMenu({
                     }}
                   >
                     {item.label}
-                  </a>
+                  </MenuLink>
                 ) : (
                   <button
                     role="menuitem"
@@ -176,3 +186,21 @@ export function PopoverMenu({
     </div>
   );
 }
+
+/** A menu item that navigates: the app's router link for in-app pages, `<a>` otherwise. */
+const MenuLink = forwardRef<
+  HTMLAnchorElement,
+  AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }
+>(function MenuLink({ href, children, ...rest }, ref) {
+  const RouterLink = useLinkComponent();
+  return isRouterHref(href) ? (
+    // eslint-disable-next-line react-hooks/static-components -- the context holds one module-level component (next/link), set once at the root; nothing is created per render.
+    <RouterLink ref={ref} href={href} {...rest}>
+      {children}
+    </RouterLink>
+  ) : (
+    <a ref={ref} href={href} {...rest}>
+      {children}
+    </a>
+  );
+});

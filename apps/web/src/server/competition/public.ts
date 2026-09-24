@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   deriveAge,
   describeAttributes,
@@ -888,8 +889,13 @@ export interface MyRegistration {
 }
 
 /** The person's registrations across every competition — the player lens.
- * Person-scoped cross-org listing on the system pool (PRP-1 documented class). */
-export async function myRegistrations(personId: string): Promise<MyRegistration[]> {
+ * Person-scoped cross-org listing on the system pool (PRP-1 documented class).
+ *
+ * Memoised per request with React `cache`: the root layout, /home and
+ * PlayerHome all ask for it in one render, and each used to run it again. */
+export const myRegistrations = cache(async function myRegistrations(
+  personId: string,
+): Promise<MyRegistration[]> {
   const rows = await systemDb
     .select({
       registrationId: registrations.id,
@@ -943,7 +949,7 @@ export async function myRegistrations(personId: string): Promise<MyRegistration[
       row.status === "approved" &&
       (isPreSigned(row) || row.lotStatus === "sold" || row.lotStatus === "unsold"),
   }));
-}
+});
 
 /** PX-6 fix: the sitemap carries EVERY published competition, not one page. */
 export async function publicCompetitionSlugs(limit = 5000): Promise<string[]> {

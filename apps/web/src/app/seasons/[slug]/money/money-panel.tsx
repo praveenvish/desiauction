@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Button,
   ButtonLink,
@@ -277,13 +278,13 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
               </dd>
             </div>
           </dl>
-          <a
+          <Link
             className="st-link mn-review-link"
             href={`/seasons/${slug}/money/case/${settlementCase.caseId}`}
           >
             Open the case review
             <IconArrowRight size={16} aria-hidden />
-          </a>
+          </Link>
         </div>
       </SectionCard>
 
