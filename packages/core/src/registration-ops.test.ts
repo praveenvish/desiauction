@@ -178,7 +178,11 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
     // Given them, a typo stops being a silent reprice to the default band.
     const checked = parseRegistrationCsv(csv, ["A", "B", "C"]);
     expect(checked.errors).toEqual([
-      { line: 2, message: 'unknown base price band "Z" (expected A, B, C)' },
+      expect.objectContaining({
+        line: 2,
+        message: 'unknown base price band "Z" (expected A, B, C)',
+        fields: ["base_price_band"],
+      }),
     ]);
     // The bad line is dropped and the good one survives — the COMMIT path is
     // what refuses the whole file, so the preview can show both halves.
@@ -278,6 +282,8 @@ describe("CSV import — playing styles are parsed, not silently dropped", () =>
     expect(result.errors).toEqual([
       {
         line: 2,
+        name: "Dee Four",
+        fields: ["batting_style", "bowling_style"],
         message: 'unknown batting style "Switch Hitter"; unknown bowling style "Doosra"',
       },
     ]);

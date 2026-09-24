@@ -67,6 +67,18 @@ export interface CsvRegistrationRow {
 export interface CsvRowError {
   line: number;
   message: string;
+  /**
+   * The row's player name as written, when it has one. "Line 51" means nothing
+   * to an organizer looking at a list of people; the name is how they find the
+   * row in their own sheet, or fix it in place.
+   */
+  name?: string;
+  /**
+   * The canonical columns that failed (`phone`, `role`, `bowling_style`, …), so
+   * the import screen can offer an edit box for exactly those cells rather
+   * than asking the organizer to re-download the sheet.
+   */
+  fields?: string[];
 }
 
 export interface CsvParseResult {
@@ -182,6 +194,53 @@ export function validateNewPlayer(
       basePriceBand: band === "" ? null : band,
     },
   };
+}
+
+/**
+ * Records back to CSV text, for an IMPORT the organizer is editing — not an
+ * export. Deliberately not `toCsv`: that one neutralizes formulas by prefixing
+ * a quote, which is right for a file opened in Excel and wrong here, where
+ * "+91 98765 43210" must come back as a phone rather than "'+91 98765 43210".
+ */
+export function recordsToCsv(records: readonly (readonly string[])[]): string {
+  return records
+    .map((record) =>
+      record
+        .map((cell) => (/[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell))
+        .join(","),
+    )
+    .join("\n");
+}
+
+/**
+ * Change cells of one row, addressed the way the parser reports it.
+ *
+ * `line` is the parser's line — 1-based, header is 1, counted AFTER blank
+ * lines are dropped — so the same filter is applied here, or a sheet with a
+ * blank row would have its fix land on the neighbour. `edits` maps a SOURCE
+ * column index to its new value. Returns null when the line does not exist.
+ */
+export function editCsvRow(
+  text: string,
+  line: number,
+  edits: ReadonlyMap<number, string>,
+): string | null {
+  const records = tokenizeCsv(text).filter(
+    (fields) => !(fields.length === 1 && fields[0]?.trim() === ""),
+  );
+  const record = records[line - 1];
+  if (line < 2 || record === undefined) {
+    return null;
+  }
+  const next = [...record];
+  for (const [column, value] of edits) {
+    while (next.length <= column) {
+      next.push("");
+    }
+    next[column] = value;
+  }
+  records[line - 1] = next;
+  return recordsToCsv(records);
 }
 
 /** Tokenize CSV text into records of fields. Deterministic; no locale. */
@@ -302,6 +361,12 @@ export function isNotApplicable(value: string): boolean {
   return NOT_APPLICABLE.has(key);
 }
 
+/** Two spellings of one person's name: case and spacing are noise. */
+function sameName(a: string, b: string): boolean {
+  const key = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+  return key(a) === key(b);
+}
+
 /** Comparable form of a team name: case, spacing and punctuation are noise. */
 export function normalizeTeamName(value: string): string {
   return value
@@ -386,7 +451,7 @@ export function parseRegistrationRecords(
 
   const rows: CsvRegistrationRow[] = [];
   const errors: CsvRowError[] = [];
-  const seenPhones = new Map<string, number>();
+  const seenPhones = new Map<string, { line: number; name: string }>();
   /** Which line already claimed the armband for a team, by normalized name. */
   const captainByTeam = new Map<string, number>();
   const knownTeams =
@@ -475,23 +540,36 @@ export function parseRegistrationRecords(
       pack,
     );
     const rowErrors = check.ok ? [] : check.errors.map((error) => error.message);
+    const failed = new Set<string>(
+      check.ok
+        ? []
+        : check.errors.map((error) =>
+            error.field === "basePriceBand" ? "base_price_band" : error.field,
+          ),
+    );
     if (battingStyle !== "" && parsedBatting === null) {
       rowErrors.push(`unknown batting style "${battingStyle}"`);
+      failed.add("batting_style");
     }
     if (bowlingStyle !== "" && parsedBowling === null) {
       rowErrors.push(`unknown bowling style "${bowlingStyle}"`);
+      failed.add("bowling_style");
     }
     if (dateOfBirth !== "" && parsedDob === null) {
       rowErrors.push(`unreadable date of birth "${dateOfBirth}" (use dd/mm/yyyy or yyyy-mm-dd)`);
+      failed.add("date_of_birth");
     }
     if (parsedDob !== null && now !== undefined && deriveAge(parsedDob, now) === null) {
       rowErrors.push(`date of birth "${dateOfBirth}" is in the future`);
+      failed.add("date_of_birth");
     }
     if (feeStatusRaw !== "" && parsedFeeStatus === null) {
       rowErrors.push(`unknown fee status "${feeStatusRaw}" (paid, pending, waived or refunded)`);
+      failed.add("fee_status");
     }
     if (parsedFee !== null && !parsedFee.ok) {
       rowErrors.push(`unreadable fee amount "${feeAmountRaw}"`);
+      failed.add("fee_amount");
     }
     for (const [column, read] of [
       ["is_icon", iconFlag],
@@ -500,6 +578,7 @@ export function parseRegistrationRecords(
     ] as const) {
       if (read.raw !== "" && read.value === null) {
         rowErrors.push(`unreadable ${column} "${read.raw}" (yes or no)`);
+        failed.add(column);
       }
     }
     // Icon AND Captain is a legal pair: both pre-sign the player to their team,
@@ -507,6 +586,7 @@ export function parseRegistrationRecords(
     // says what the dashboard can say.
     if (teamRaw !== "" && knownTeams !== undefined && !knownTeams.has(normalizeTeamName(teamRaw))) {
       rowErrors.push(`unknown team "${teamRaw}"`);
+      failed.add("team");
     }
     /*
      * TWO CAPTAINS, ONE TEAM — caught in the file rather than by the database.
@@ -523,6 +603,7 @@ export function parseRegistrationRecords(
       const prior = captainByTeam.get(key);
       if (prior !== undefined) {
         rowErrors.push(`a second captain for "${teamRaw}" (also line ${String(prior)})`);
+        failed.add("is_captain");
       } else {
         captainByTeam.set(key, line);
       }
@@ -533,15 +614,40 @@ export function parseRegistrationRecords(
     const phone = normalizePhone(rawPhone);
     if (phone.ok) {
       const prior = seenPhones.get(phone.phone);
-      if (prior !== undefined) {
-        rowErrors.push(`duplicate phone in file (also line ${String(prior)})`);
+      if (prior !== undefined && prior.name !== "" && sameName(prior.name, rawName)) {
+        /*
+         * THE SAME PERSON, TWICE. A Form accepts a second submission as happily
+         * as a first, and the first real export carried one: same number, the
+         * name differing only by a capital letter, and a different transaction
+         * ID each time. That is not a phone to correct — it is a copy to drop,
+         * and possibly a double payment to refund — so it says so, and offers
+         * no phone edit. Still refused rather than merged: which copy is right
+         * is the organizer's call.
+         */
+        rowErrors.push(
+          `submitted the form twice — same name and phone as row ${String(prior.line)}; skip this copy, and check they weren't charged twice`,
+        );
+      } else if (prior !== undefined) {
+        // Named, not numbered: two players sharing one family phone is the
+        // usual cause, and the organizer needs to know WHICH two.
+        rowErrors.push(
+          prior.name === ""
+            ? `duplicate phone in file (also line ${String(prior.line)})`
+            : `duplicate phone in file — same number as ${prior.name} (row ${String(prior.line)})`,
+        );
+        failed.add("phone");
       } else {
-        seenPhones.set(phone.phone, line);
+        seenPhones.set(phone.phone, { line, name: rawName });
       }
     }
 
     if (rowErrors.length > 0) {
-      errors.push({ line, message: rowErrors.join("; ") });
+      errors.push({
+        line,
+        message: rowErrors.join("; "),
+        ...(rawName === "" ? {} : { name: rawName }),
+        fields: [...failed],
+      });
       continue;
     }
     rows.push({

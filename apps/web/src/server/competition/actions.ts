@@ -2492,6 +2492,14 @@ export interface ImportShape {
   dateOrder?: DateOrder;
   /** How to treat a value the file and the record disagree about. */
   policy?: ImportPolicy;
+  /**
+   * Mark a row PAID when it carries a payment reference and says nothing about
+   * its fee status. A Google Form asks for a transaction ID, not "have you
+   * paid", so without this every one of 110 players who paid lands "pending"
+   * and the desk marks them one at a time. The organizer's explicit choice —
+   * never a default — because a reference is a claim until someone checks it.
+   */
+  paidWhenReferenced?: boolean;
 }
 
 /**
@@ -2550,7 +2558,7 @@ function parseUnderShape(
   shape: ImportShape | undefined,
 ): ReturnType<typeof parseRegistrationRecords> {
   const source = canonicalRecords(csv, shape);
-  return parseRegistrationRecords(source, bands, {
+  const parsed = parseRegistrationRecords(source, bands, {
     now: new Date(),
     knownTeams: teamNames,
     // Without this the file's roles were judged against CRICKET, so a football
@@ -2559,6 +2567,15 @@ function parseUnderShape(
     pack: sportPackFor(sport),
     ...(shape?.dateOrder !== undefined ? { dateOrder: shape.dateOrder } : {}),
   });
+  if (shape?.paidWhenReferenced !== true) {
+    return parsed;
+  }
+  return {
+    ...parsed,
+    rows: parsed.rows.map((row) =>
+      row.feeStatus === null && row.feeReference !== null ? { ...row, feeStatus: "paid" } : row,
+    ),
+  };
 }
 
 /** Validate only — no writes. The organizer previews errors before committing. */

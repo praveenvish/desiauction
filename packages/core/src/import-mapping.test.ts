@@ -8,7 +8,7 @@ import {
   sampleRow,
   signatureOf,
 } from "./import-mapping";
-import { parseRegistrationRecords } from "./registration-csv";
+import { editCsvRow, parseRegistrationRecords } from "./registration-csv";
 import { tokenizeCsv } from "./registration-csv";
 
 /*
@@ -311,5 +311,73 @@ describe("emoji-decorated Form choices", () => {
       "wicket_keeper",
     ]);
     expect(result.rows[0]?.fatherName).toBe("Gurunath Sharma");
+  });
+});
+
+describe("errors an organizer can act on", () => {
+  it("names the player and the other player on a shared phone", () => {
+    const result = parseRegistrationRecords(
+      tokenizeCsv(
+        "name,phone,role\nDalpat Singh,9326997891,batter\nMahipal Singh,9326997891,bowler",
+      ),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors).toEqual([
+      {
+        line: 3,
+        name: "Mahipal Singh",
+        fields: ["phone"],
+        message: "duplicate phone in file — same number as Dalpat Singh (row 2)",
+      },
+    ]);
+  });
+
+  it("tells a double submission from two players sharing a phone", () => {
+    const result = parseRegistrationRecords(
+      tokenizeCsv(
+        "name,phone,role\nJitendra singh ,9326997891,batter\nJitendra  Singh,9326997891,batter",
+      ),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors[0]?.message).toContain("submitted the form twice");
+    // Nothing to edit: the fix is to skip the copy, not change a number.
+    expect(result.errors[0]?.fields).toEqual([]);
+  });
+
+  it("says which columns failed so the screen can offer those cells", () => {
+    const result = parseRegistrationRecords(
+      tokenizeCsv("name,phone,role,bowling_style\nRavi Kumar,12345,Batsman (Opener),Fast"),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors[0]?.fields).toEqual(["phone", "role", "bowling_style"]);
+  });
+});
+
+describe("editCsvRow — fixing a row in place", () => {
+  const FILE =
+    '"Name","Mobile","Player Type"\n"Rohit, R","9876543210","🏏 Batsman"\n\n"Virat","9876543210","Bowler"';
+
+  it("changes only the addressed cells, counting lines the way the parser does", () => {
+    // The blank line is dropped by the parser, so Virat is line 3, not 4.
+    const next = editCsvRow(FILE, 3, new Map([[1, "+91 98765 43211"]]));
+    expect(next).not.toBeNull();
+    const result = parseRegistrationRecords(
+      applyMapping(tokenizeCsv(next ?? ""), { name: 0, phone: 1, role: 2 }),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => [row.name, row.phone])).toEqual([
+      ["Rohit, R", "+919876543210"],
+      ["Virat", "+919876543211"],
+    ]);
+  });
+
+  it("refuses the header and lines past the end", () => {
+    expect(editCsvRow(FILE, 1, new Map([[0, "x"]]))).toBeNull();
+    expect(editCsvRow(FILE, 9, new Map([[0, "x"]]))).toBeNull();
   });
 });
