@@ -7,8 +7,10 @@
  *
  * Needs the engine (:4000) and a web server (SHOWCASE_BASE, default :3070)
  * running against the local database; it creates a new club each run. The
- * homepage images in public/marketing/product/ came from board.png,
- * owner-paddle-live.png and owner-paddle-sold.png, resized to WebP.
+ * homepage images in public/marketing/product/ are board.png →
+ * auction-board.webp, owner-paddle-live.png → owner-phone-bidding.webp and
+ * owner-paddle-sold.png → owner-phone-sold.webp, resized with sharp. Give a
+ * refreshed image a NEW file name: the image optimizer and any CDN cache by URL.
  */
 import { chromium, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
@@ -20,7 +22,10 @@ mkdirSync(OUT, { recursive: true });
 const STAMP = String(Date.now()).slice(-7);
 
 const TEAMS = ["Falcons", "Voyagers", "Titans", "Strikers"];
+/** The player the homepage features: on the block, the fight and the SOLD. */
+const FEATURED = "Praveen Vishnoi";
 const PLAYERS: [string, string, string][] = [
+  [FEATURED, "all_rounder", "A"],
   ["Riya Mehta", "all_rounder", "A"],
   ["Aarav Shah", "batter", "A"],
   ["Kabir Nair", "bowler", "A"],
@@ -31,12 +36,12 @@ const PLAYERS: [string, string, string][] = [
   ["Dev Malhotra", "batter", "C"],
   ["Tara Menon", "bowler", "C"],
   ["Rohan Bhatt", "all_rounder", "C"],
-  ["Zoya Khan", "batter", "C"],
+  ["Ananya Gupta", "batter", "C"],
   ["Vihaan Joshi", "bowler", "C"],
-  ["Sana Qureshi", "wicket_keeper", "C"],
-  ["Aditya Kulkarni", "batter", "C"],
+  ["Sneha Kulkarni", "wicket_keeper", "C"],
+  ["Aditya Patil", "batter", "C"],
   ["Pooja Reddy", "all_rounder", "C"],
-  ["Farhan Ali", "bowler", "C"],
+  ["Siddharth Mishra", "bowler", "C"],
 ];
 
 const HIDE_DEV = `nextjs-portal, [data-nextjs-toast], #__next-build-watcher { display: none !important; }`;
@@ -208,7 +213,7 @@ try {
     joinUrls.push(((await org.getByTestId("owner-invite-url").textContent()) ?? "").trim());
   }
 
-  const OWNER_NAMES = ["Anil Verma", "Priya Sethi", "Karan Gill", "Nisha Rao"];
+  const OWNER_NAMES = ["Anil Verma", "Priya Sethi", "Karan Sharma", "Nisha Rao"];
   const owners: Page[] = [];
   for (let i = 0; i < TEAMS.length; i++) {
     const { page } = await newPage(browser, i === 0);
@@ -294,34 +299,43 @@ try {
   await stageCtx.addCookies(await org.context().cookies());
   const stage = await stageCtx.newPage();
 
-  // --- Lots: a few sold, bids from several owners ----------------------------
-  const bidPlan = [
-    [0, 1, 0, 2, 0], // lot 1: Falcons win after a fight — the hero moment
-    [1, 3, 1],
-    [2, 0, 2],
-    [3, 1, 3],
+  // --- Lots ------------------------------------------------------------------
+  // Lot order is shuffled, so the featured player's lot is found, not assumed.
+  // Their lot gets the bidding war (Falcons, the phone we screenshot, win it at
+  // the highest price of the night); every other lot is a short contest.
+  const FIGHT = [1, 0, 2, 0, 3, 0, 1, 0];
+  // The last bidder wins; the winners rotate so every team ends up with a squad.
+  // The last bidder wins: Voyagers, Titans, Strikers, Falcons, then around again.
+  const SHORT = [
+    [3, 1],
     [1, 2],
+    [2, 3],
+    [1, 0],
   ];
-  for (let lot = 0; lot < bidPlan.length; lot++) {
+  let sold = 0;
+  let featuredDone = false;
+  for (let lot = 0; lot < PLAYERS.length && (sold < 5 || !featuredDone); lot++) {
     await org.getByTestId("conduct-open-lot").click();
     for (const p of [org, ...owners]) {
       await expect(p.getByTestId("current-lot")).toBeVisible({ timeout: 30_000 });
     }
-    const plan = bidPlan[lot] as number[];
+    const featured = ((await org.getByTestId("current-lot").textContent()) ?? "").includes(
+      FEATURED,
+    );
+    const plan = featured ? FIGHT : (SHORT[sold % SHORT.length] as number[]);
     for (let b = 0; b < plan.length; b++) {
-      const who = owners[plan[b] as number] as Page;
-      await who.getByTestId("bid-next").click();
-      await expect(org.getByTestId("leading-team")).toContainText(
-        TEAMS[plan[b] as number] as string,
-        {
-          timeout: 30_000,
-        },
-      );
-      if (lot === bidPlan.length - 1 && b === plan.length - 1) {
-        // Mid-lot, live: the phone paddle, the stage and the organizer console.
+      const team = plan[b] as number;
+      await (owners[team] as Page).getByTestId("bid-next").click();
+      await expect(org.getByTestId("leading-team")).toContainText(TEAMS[team] as string, {
+        timeout: 30_000,
+      });
+      if (featured && b === plan.length - 2) {
+        // Mid-fight with a rival leading: the phone shows the raise button.
         await board.goto(`/seasons/${slug}/auction/board`);
         await stage.goto(`/seasons/${slug}/auction/spectate`);
-        await owners[0]!.bringToFront();
+        // Outbid toasts stack over the paddle; clear them so the raise shows.
+        const dismiss = (owners[0] as Page).getByRole("button", { name: /^Dismiss:/ });
+        while ((await dismiss.count()) > 0) await dismiss.first().click();
         await shot(owners[0] as Page, "owner-paddle-live");
         await shot(stage, "stage-live");
         await shot(org, "organizer-live");
@@ -329,9 +343,12 @@ try {
     }
     await holdClose(org);
     await expect(org.getByTestId("ceremony")).toBeVisible({ timeout: 30_000 });
-    if (lot === 0) {
+    if (featured) {
       await shot(owners[0] as Page, "owner-paddle-sold");
+      featuredDone = true;
     }
+    if (plan.length > 0) sold++;
+    console.log("lot", lot + 1, featured ? "FEATURED" : "", plan.length > 0 ? "sold" : "passed");
     await org.waitForTimeout(1500);
   }
 

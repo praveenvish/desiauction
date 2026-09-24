@@ -140,7 +140,7 @@ export default function LandingPage() {
         {/* THE REAL PRODUCT. Every other picture on this page is an
             illustration or a simulation; these are screenshots of the platform
             itself, captured from a practice auction run end to end on it
-            (fictional names — the caption says so). The only proof a product
+            (fictional names apart from the featured player — the caption says so). The only proof a product
             with no public customers yet can honestly show is itself working. */}
         <section className={styles.realProduct} aria-labelledby="real-title">
           <div className={styles.container}>
@@ -159,8 +159,8 @@ export default function LandingPage() {
             <div className={styles.realGrid}>
               <figure className={styles.realPhone} data-reveal>
                 <Image
-                  src="/marketing/product/owner-paddle-live.webp"
-                  alt="A team owner's phone during a live lot: the player on the block, a 28-second countdown, the current bid of ₹15,000 and a Raise to ₹20,000 button"
+                  src="/marketing/product/owner-phone-bidding.webp"
+                  alt="A team owner's phone during a live lot: Praveen Vishnoi on the block, a 23-second countdown, Voyagers leading at ₹80,000 and a Raise to ₹85,000 button"
                   width={560}
                   height={1212}
                   sizes="(max-width: 767px) 45vw, 260px"
@@ -169,8 +169,8 @@ export default function LandingPage() {
               </figure>
               <figure className={styles.realScreen} data-reveal>
                 <Image
-                  src="/marketing/product/big-screen-board.webp"
-                  alt="The big-screen board of a live auction: total spend, players sold, the most expensive signing and every team's remaining purse and squad"
+                  src="/marketing/product/auction-board.webp"
+                  alt="The big-screen board of a live auction: ₹4,15,000 spent on 13 players, Praveen Vishnoi the most expensive at ₹85,000, and each team's remaining purse and squad"
                   width={1600}
                   height={900}
                   sizes="(max-width: 767px) 100vw, 640px"
@@ -179,8 +179,8 @@ export default function LandingPage() {
               </figure>
               <figure className={styles.realPhone} data-reveal>
                 <Image
-                  src="/marketing/product/owner-paddle-sold.webp"
-                  alt="The same phone as the gavel falls: a SOLD stamp, the player signed for ₹30,000 to Falcons, and a notification reading You signed Zoya Khan"
+                  src="/marketing/product/owner-phone-sold.webp"
+                  alt="The same phone as the gavel falls: a SOLD stamp, Praveen Vishnoi signed to Falcons for ₹85,000, and a notification reading You signed Praveen Vishnoi"
                   width={560}
                   height={933}
                   sizes="(max-width: 767px) 45vw, 260px"
@@ -189,8 +189,8 @@ export default function LandingPage() {
               </figure>
             </div>
             <p className={styles.realNote}>
-              Screenshots from a practice auction run on DesiAuction. Players, teams and owners are
-              fictional.
+              Screenshots from a practice auction run on DesiAuction, with Praveen Vishnoi on the
+              block. The other players, teams and owners are fictional.
             </p>
           </div>
         </section>
