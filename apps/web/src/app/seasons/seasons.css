@@ -765,6 +765,54 @@ p + .date-row {
   gap: var(--space-2);
 }
 
+/*
+ * THE COLUMN MAPPER HAS TO FIT THE DIALOG.
+ *
+ * A Google Form's first value is often a Drive link — one unbreakable 90-char
+ * word — and auto layout sized the table to it, so the "Goes to" dropdowns (the
+ * only column the organizer acts on) were cut off at the dialog's right edge
+ * while a long question title wrapped one word per line. Fixed layout gives
+ * the dropdown its own track, and the two text columns wrap anywhere.
+ */
+.mapping-table {
+  table-layout: fixed;
+}
+
+.mapping-table th:nth-child(1) {
+  width: 32%;
+}
+
+.mapping-table th:nth-child(3) {
+  width: 14rem;
+}
+
+.mapping-table td {
+  overflow-wrap: anywhere;
+}
+
+.mapping-select {
+  width: 100%;
+  max-width: 100%;
+}
+
+/*
+ * The registrations list's phone layout (flex rows that pack short cells side
+ * by side, further down this file) is written against every `.reg-table`, and
+ * it reached the import dialog's tables too: "Name" and "First value" shared a
+ * line while the next row stacked. These tables are field lists, one per line.
+ * The doubled class outranks that rule wherever it sits in the file.
+ */
+@media (max-width: 640px) {
+  .reg-table.import-table tbody tr {
+    display: block;
+  }
+
+  .reg-table.import-table td::before {
+    overflow-wrap: normal;
+    flex-shrink: 0;
+  }
+}
+
 .import-errors {
   margin: 0;
   padding-left: var(--space-5);

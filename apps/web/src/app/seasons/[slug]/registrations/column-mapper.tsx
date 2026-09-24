@@ -80,7 +80,7 @@ export function ColumnMapper({
       ))}
 
       <div className="table-scroll">
-        <table className="reg-table" data-testid="mapping-table">
+        <table className="reg-table import-table mapping-table" data-testid="mapping-table">
           <thead>
             <tr>
               <th>Your column</th>
