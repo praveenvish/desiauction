@@ -932,6 +932,15 @@ export const competitions = pgTable(
     auctionUnit: text("auction_unit", { enum: ["inr", "points"] })
       .notNull()
       .default("inr"),
+    /*
+     * The Google Sheet this season's registrations keep arriving in (0093) —
+     * the Form's linked responses sheet, picked once by the organizer so
+     * "Sync new players" can read it again. A pointer: access stays with the
+     * organizer's own Google sign-in, and the rows are read in their browser.
+     */
+    importSheetId: text("import_sheet_id"),
+    importSheetName: text("import_sheet_name"),
+    importSheetSyncedAt: ts("import_sheet_synced_at"),
     // Storage KEY for the auction crest; signed at read time by the media port.
     logoUrl: text("logo_url"),
     // Storage KEY for the season's wide cover photo (0082) — the hero banner's

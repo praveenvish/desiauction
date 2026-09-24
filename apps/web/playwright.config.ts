@@ -228,6 +228,13 @@ export default defineConfig({
         // harness pins it; login-methods.spec.ts proves the email default
         // itself through `?method=email`.
         LOGIN_DEFAULT_METHOD: "phone",
+        // "Get photos from Google Drive" / "Sync new players" render only when
+        // these are set. google-drive-import.spec.ts replaces Google's scripts
+        // and the Drive API in the browser, so dummy values are all it needs —
+        // and a developer's real key is never used by the suite.
+        GOOGLE_PICKER_CLIENT_ID: "e2e-client.apps.googleusercontent.com",
+        GOOGLE_PICKER_API_KEY: "e2e-picker-key",
+        GOOGLE_PICKER_APP_ID: "1234567890",
         // `next start` boots with NODE_ENV=production, so apps/web's env guard
         // applies its PRODUCTION refinements and refuses to start on twelve of
         // them at once — a localhost PUBLIC_BASE_URL, OTP_PROVIDER=dev, no

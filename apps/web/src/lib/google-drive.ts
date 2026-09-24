@@ -37,6 +37,8 @@ const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
    pulling in two @types packages for a dozen calls. */
 interface TokenResponse {
   access_token?: string;
+  /** Seconds until the token lapses — about an hour. */
+  expires_in?: number;
   error?: string;
 }
 interface TokenClient {
@@ -69,7 +71,7 @@ interface GoogleGlobal {
       setMode: (mode: string) => unknown;
     };
     PickerBuilder: new () => PickerBuilder;
-    ViewId: { DOCS: string };
+    ViewId: { DOCS: string; SPREADSHEETS: string };
     DocsViewMode: { GRID: string };
     Feature: { MULTISELECT_ENABLED: string };
     Action: { PICKED: string; CANCEL: string };
@@ -136,8 +138,24 @@ export function preloadGoogle(): void {
   void loadScript(PICKER_SCRIPT).catch(() => undefined);
 }
 
+/*
+ * ONE SIGN-IN PER SITTING. A sync reads the sheet and then, straight away,
+ * asks for the new players' photos; a second Google window for the second
+ * half made one job feel like two. The token is kept IN THIS PAGE ONLY (never
+ * sent to us, gone on reload) and reused until a minute before it lapses.
+ */
+let held: { token: string; until: number } | null = null;
+
+/** A token from this sitting that still has time on it — no window needed. */
+export function hasFreshDriveToken(): boolean {
+  return held !== null && Date.now() < held.until;
+}
+
 /** Ask Google for a short-lived token that can read the files the person picks. */
 export async function requestDriveToken(clientId: string): Promise<string> {
+  if (held !== null && Date.now() < held.until) {
+    return held.token;
+  }
   // Already loaded (the normal case, see `preloadGoogle`): no await, so the
   // pop-up opens inside the click and is not blocked.
   if (googleGlobal()?.accounts === undefined) {
@@ -153,6 +171,10 @@ export async function requestDriveToken(clientId: string): Promise<string> {
       scope: DRIVE_FILE_SCOPE,
       callback: (response) => {
         if (response.access_token !== undefined) {
+          held = {
+            token: response.access_token,
+            until: Date.now() + Math.max(0, (response.expires_in ?? 3600) - 60) * 1000,
+          };
           resolve(response.access_token);
         } else {
           reject(new Error("Google didn't give access. Try again, and allow access when asked."));
@@ -223,6 +245,74 @@ export async function pickDriveFiles(
       .build()
       .setVisible(true);
   });
+}
+
+/**
+ * Pick ONE Google Sheet — the form's linked responses sheet. Resolves with it,
+ * or null when the person cancels. Picking is what grants this app access to
+ * that one file (drive.file), which lasts until they remove it in Google.
+ */
+export async function pickDriveSheet(
+  config: PickerConfig,
+  token: string,
+): Promise<PickedFile | null> {
+  await loadScript(PICKER_SCRIPT);
+  const gapi = (window as unknown as { gapi?: GapiGlobal }).gapi;
+  if (gapi === undefined) {
+    throw new Error("Google's file picker didn't load. Try again.");
+  }
+  await new Promise<void>((resolve) => {
+    gapi.load("picker", resolve);
+  });
+  const google = googleGlobal();
+  if (google === undefined) {
+    throw new Error("Google's file picker didn't load. Try again.");
+  }
+  const { picker } = google;
+  const view = new picker.DocsView(picker.ViewId.SPREADSHEETS);
+  view.setIncludeFolders(true);
+  return new Promise<PickedFile | null>((resolve) => {
+    new picker.PickerBuilder()
+      .addView(view)
+      .setOAuthToken(token)
+      .setDeveloperKey(config.apiKey)
+      .setAppId(config.appId)
+      .setTitle("Choose your form's responses sheet")
+      .setCallback((data) => {
+        if (data.action === picker.Action.PICKED) {
+          const doc = data.docs?.[0];
+          resolve(
+            doc === undefined ? null : { id: doc.id, name: doc.name, mimeType: doc.mimeType },
+          );
+        } else if (data.action === picker.Action.CANCEL) {
+          resolve(null);
+        }
+      })
+      .build()
+      .setVisible(true);
+  });
+}
+
+/**
+ * A connected Sheet's rows as CSV — Drive exports the FIRST tab, which for a
+ * Form's linked sheet is "Form responses 1". Throws `SheetAccessLost` when
+ * Google no longer lets this app open it (removed, or access withdrawn), so
+ * the screen can offer to pick it again rather than just failing.
+ */
+export class SheetAccessLost extends Error {}
+
+export async function exportSheetCsv(token: string, sheetId: string): Promise<string> {
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(sheetId)}/export?mimeType=text/csv`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+  if (response.status === 403 || response.status === 404) {
+    throw new SheetAccessLost("We can't open that sheet any more — choose it again.");
+  }
+  if (!response.ok) {
+    throw new Error("Couldn't read the sheet from Google. Try again.");
+  }
+  return response.text();
 }
 
 /** One picked file's bytes, as a File named the way Drive names it. */
