@@ -630,7 +630,7 @@ async function playerPosterFrom(
     filename: posterFilename(gated.competition.slug, read.playerName, request.size),
     shareUrl:
       gated.published && read.number !== ""
-        ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}/p/${encodeURIComponent(read.number)}`
+        ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}/p/${encodeURIComponent(read.number)}?ref=qr`
         : null,
     input: {
       playerName: read.playerName,
@@ -655,7 +655,7 @@ async function playerPosterFrom(
 /** The season's public page — what a squad or season poster's QR code opens. */
 function seasonShareUrl(gated: Gate): string | null {
   return gated.published
-    ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}`
+    ? `${env.PUBLIC_BASE_URL}/c/${encodeURIComponent(gated.competition.slug)}?ref=qr`
     : null;
 }
 

@@ -17,6 +17,7 @@ import {
   StatStrip,
   type Stat,
 } from "../../../../../components/public/public-kit";
+import { playerShareMessage } from "../../../../../lib/share-message";
 import { SharePlayer } from "./share-player";
 import "../../../../marketing.css";
 import "../../../directory.css";
@@ -133,14 +134,39 @@ export async function generateMetadata({
 
 export default async function PlayerProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string; number: string }>;
+  searchParams: Promise<{ ref?: string | string[] }>;
 }) {
   const { slug, number } = await params;
+  const { ref } = await searchParams;
   const player = await playerView(slug, number);
   if (player === null) {
     notFound();
   }
+  // A shared card's `?ref` rides on to registration, as it does from /c/[slug]:
+  // a stranger who came in from a Status and signs up is the number that shows
+  // whether the card works.
+  const refSuffix = typeof ref === "string" && ref !== "" ? `?ref=${encodeURIComponent(ref)}` : "";
+  // The words that travel with the link — the same sentence the card draws.
+  const poster = await posterView(slug, number);
+  const shareModel =
+    poster === null
+      ? null
+      : buildPlayerPoster({
+          ...poster.input,
+          photoUrl: null,
+          teamCrestUrl: null,
+          competitionLogoUrl: null,
+        });
+  const messages =
+    shareModel === null
+      ? {
+          en: `${player.name} — ${player.competitionName}`,
+          hi: `${player.name} — ${player.competitionName}`,
+        }
+      : { en: playerShareMessage(shareModel, "en"), hi: playerShareMessage(shareModel, "hi") };
   // Signed, not sold: a retained player is on a team sheet too, so the neutral
   // "already has a squad" treatment has to cover both.
   const signed = player.status !== "available";
@@ -201,7 +227,7 @@ export default async function PlayerProfilePage({
           <>
             {player.competitionOpen ? (
               <ButtonLink
-                href={`/seasons/${slug}/register`}
+                href={`/seasons/${slug}/register${refSuffix}`}
                 size="lg"
                 data-testid="player-join-cta"
               >
@@ -244,7 +270,13 @@ export default async function PlayerProfilePage({
             been handed this card is looking. What stays here is the share
             control itself — the thing the player came back for. */}
         <PageSection headingId="share-heading" title="Share">
-          <SharePlayer playerName={player.name} />
+          <SharePlayer
+            playerName={player.name}
+            slug={slug}
+            number={number}
+            outcome={shareModel?.outcome ?? "none"}
+            messages={messages}
+          />
         </PageSection>
       </PageBody>
     </main>

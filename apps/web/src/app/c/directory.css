@@ -966,50 +966,104 @@
 /* .squads-toolbar held the anonymous "Download squads (CSV)" button and has no
    markup left to style — see squads-view.tsx. */
 
-/* --- Share control on the public player page ---
-   Same shape as the organizer's .share-reg (seasons.css) but scoped to the
-   public surface: this page must not pull in the app-shell stylesheet for one
-   control. min-width is 180px, not 220px — this sits inside .mk-container at
-   320px, where 220 forces the row past the viewport. */
-.public-share {
+/* --- The share sheet on the public player page (share-player.tsx) ---
+   A phone surface first: the WhatsApp action is full width at 52px, the rest
+   are equal cells at a thumb's 44px, and nothing here pulls in the app-shell
+   stylesheet. */
+.share-sheet {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-sunken);
 }
 
-.public-share-label {
+.share-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.share-sheet-label {
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
 }
 
-.public-share-row {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  align-items: center;
+/* English | हिंदी — a two-cell switch, the pressed cell filled. */
+.share-sheet-lang {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface);
 }
 
-.public-share-input {
-  flex: 1;
-  min-width: 180px;
-  max-width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
+.share-sheet-lang > button {
+  min-height: 36px;
+  min-width: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  cursor: pointer;
+}
+
+.share-sheet-lang > button[aria-pressed="true"] {
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.share-sheet-lang > button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* What WhatsApp will send, shown before it is sent. */
+.share-sheet-preview {
+  margin: 0;
+  padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text-primary);
   font-size: var(--text-sm-size);
-  font-family: var(--font-mono, monospace);
+  line-height: var(--text-sm-line);
 }
 
-.public-share-input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+.share-sheet-primary,
+.share-sheet-wide {
+  width: 100%;
+  min-height: 52px;
+  box-sizing: border-box;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.share-sheet-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+  gap: var(--space-2);
+}
+
+.share-sheet-actions > button {
+  width: 100%;
+  min-height: 44px;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.share-sheet-note {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
 }
 
 /* --- RH-1b · Public surfaces on a phone ----------------------------------- */
@@ -1060,23 +1114,6 @@
     justify-content: center;
     width: 100%;
     box-sizing: border-box;
-  }
-
-  /* Copy / Share sit under the URL field they act on, at a thumb's size. */
-  .public-share-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
-  }
-
-  .public-share-row > .public-share-input {
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
-
-  .public-share-row > button {
-    min-height: 44px;
-    width: 100%;
   }
 }
 

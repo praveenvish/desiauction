@@ -582,23 +582,8 @@ export function renderPlayerPoster(model: PlayerPoster, options: PosterRenderOpt
         top={layout.header.top}
         left={layout.pad}
         width={contentWidth}
-        right={
-          model.lotLabel === null ? null : (
-            <div
-              style={{
-                display: "flex",
-                flexShrink: 0,
-                color: palette.muted,
-                fontSize: Math.round(layout.header.name * 0.72),
-                fontWeight: 600,
-                letterSpacing: 4,
-                ...vis(ctx),
-              }}
-            >
-              {model.lotLabel}
-            </div>
-          )
-        }
+        // The lot is said once, in the panel beside the verdict it belongs to.
+        right={null}
       />
 
       <div
