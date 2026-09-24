@@ -19,7 +19,7 @@ import { ForbiddenError } from "../orgs/authz";
 import { orgsFor } from "../orgs/orgs";
 import { acrossOrgs } from "../tenant";
 import { competitionsView } from "./actions";
-import { canCompetition, requireCompetitionCapability } from "./authz";
+import { canCompetition, competitionAllows, requireCompetitionCapability } from "./authz";
 import {
   byEditionDate,
   createTournament,
@@ -28,6 +28,7 @@ import {
   type CompetitionSummary,
 } from "./competitions";
 import { memberCompetitions, memberTournamentSeasons, resolveMemberTournament } from "./resolve";
+import { grantsOfPerson } from "../request-cache";
 
 /**
  * The tournament surface.
@@ -153,25 +154,14 @@ const capabilitiesOnce = cache(
   }> => {
     const session = await requireSession();
     const { orgs } = await competitionsView();
-    const answers = await Promise.all(
-      orgs.map(async (org) =>
-        withTenantDb(dbHandle, { personId: session.personId, orgId: org.id }, async (db) => ({
-          org,
-          create: await canCompetition(
-            db,
-            session.personId,
-            { orgId: org.id },
-            "competition.create",
-          ),
-          review: await canCompetition(
-            db,
-            session.personId,
-            { orgId: org.id },
-            "registration.review",
-          ),
-        })),
-      ),
-    );
+    // One grants read for every club, not a transaction per club: the same
+    // org-or-competition rule `canCompetition` applies, over this render's grants.
+    const held = await grantsOfPerson(session.personId);
+    const answers = orgs.map((org) => ({
+      org,
+      create: competitionAllows(held, { orgId: org.id }, "competition.create"),
+      review: competitionAllows(held, { orgId: org.id }, "registration.review"),
+    }));
     return {
       orgs,
       creatable: answers.filter((answer) => answer.create).map((answer) => answer.org),

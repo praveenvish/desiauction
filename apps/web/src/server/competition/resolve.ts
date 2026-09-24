@@ -2,6 +2,7 @@ import { orgMembers, tournaments } from "@desiauction/db";
 import { and, eq } from "drizzle-orm";
 
 import { systemDb } from "../db";
+import { sharedPerRender } from "../render-memo";
 import {
   competitionForRegistration,
   competitionsForPerson,
@@ -41,11 +42,17 @@ import { publicRegistrationFacts } from "./registrations";
  */
 
 /** Slug → season, for a MEMBER of the season's org. Null for anyone else. */
+// Shared per page render (render-memo.ts): a season page's sections each
+// resolve the same slug. A render never changes a season or a membership.
+const memberCompetitionShared = sharedPerRender<CompetitionSummary | null>();
+
 export function resolveMemberCompetition(
   personId: string,
   slug: string,
 ): Promise<CompetitionSummary | null> {
-  return resolveCompetition(systemDb, personId, slug);
+  return memberCompetitionShared([personId, slug], () =>
+    resolveCompetition(systemDb, personId, slug),
+  );
 }
 
 /**

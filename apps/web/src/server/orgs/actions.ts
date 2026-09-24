@@ -44,12 +44,11 @@ import {
   membersOf,
   orgsFor,
   removeMember,
-  resolveTenant,
   revokeGrants,
   type MemberRow,
   type OrgSummary,
 } from "./orgs";
-import { orgsOfPerson } from "../request-cache";
+import { orgsOfPerson, tenantOfPerson } from "../request-cache";
 
 // Org-scoped internal RPC (IP-2 D7). Every action resolves the tenant from
 // the slug, requires the capability, then acts — no other path exists.
@@ -71,7 +70,7 @@ async function requireSession() {
 
 /** Membership-checked slug → org under person-only tenant context. */
 async function resolveTenantScoped(personId: string, slug: string): Promise<OrgSummary | null> {
-  return withTenantDb(dbHandle, { personId }, (db) => resolveTenant(db, personId, slug));
+  return tenantOfPerson(personId, slug);
 }
 
 export async function myOrgs(): Promise<OrgSummary[]> {

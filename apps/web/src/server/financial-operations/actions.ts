@@ -28,7 +28,7 @@ import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
-import { membersOf, resolveTenant, type OrgSummary } from "../orgs/orgs";
+import { membersOf, type OrgSummary } from "../orgs/orgs";
 import { can } from "../orgs/authz";
 import { canFinops, finopsActor, issueFinopsGrant, revokeFinopsGrant } from "./authz";
 import { derivedId } from "../derived-id";
@@ -47,7 +47,7 @@ import {
   type ReconciliationView,
   type RegisterRow,
 } from "./views";
-import { grantsOfPerson } from "../request-cache";
+import { grantsOfPerson, tenantOfPerson } from "../request-cache";
 
 /**
  * PX-8 Financial Operations Workspace — the internal RPC surface (PX-1 F1/F2).
@@ -294,9 +294,7 @@ interface FinopsGate {
  */
 async function finopsGate(orgSlug: string): Promise<FinopsGate | null> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return null;
   }
@@ -361,9 +359,7 @@ export interface FinanceAuthorityView {
  */
 export async function financeAuthority(orgSlug: string): Promise<FinanceAuthorityView | null> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return null;
   }
@@ -409,9 +405,7 @@ export async function issueFinanceAuthorityAction(
   capabilitySet: string,
 ): Promise<FinopsResult> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return { ok: false, error: messageFor("not_authorized") };
   }
@@ -429,9 +423,7 @@ export async function revokeFinanceAuthorityAction(
   grantId: string,
 ): Promise<FinopsResult> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return { ok: false, error: messageFor("not_authorized") };
   }
@@ -751,9 +743,7 @@ async function command(
   ) => Promise<FinopsResult>,
 ): Promise<FinopsResult> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return { ok: false, error: messageFor("not_authorized") };
   }

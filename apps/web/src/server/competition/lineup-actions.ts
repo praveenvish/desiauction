@@ -7,7 +7,6 @@ import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
-import { canCompetition } from "./authz";
 import {
   lineupFixtures,
   lineupSides,
@@ -17,6 +16,7 @@ import {
 } from "./lineups";
 import { announceLineup, lineupAnnounceStates, type LineupAnnounceState } from "./lineup-announce";
 import { resolveMemberCompetition } from "./resolve";
+import { personCanCompetition } from "../request-cache";
 
 /**
  * Lineups are an organizer's record, gated on `fixture.manage` — the same key
@@ -43,11 +43,7 @@ async function gate(slug: string) {
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const allowed = await withTenantDb(
-    dbHandle,
-    { personId: session.personId, orgId: competition.orgId },
-    (db) => canCompetition(db, session.personId, scope, "fixture.manage"),
-  );
+  const allowed = await personCanCompetition(session.personId, scope, "fixture.manage");
   return allowed ? { personId: session.personId, competition } : null;
 }
 

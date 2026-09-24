@@ -1,12 +1,10 @@
 "use server";
 
-import { withTenantDb } from "@desiauction/db";
 import { revalidatePath } from "next/cache";
 
 import { currentSession } from "../auth/actions";
-import { canCompetition } from "../competition/authz";
 import { resolveMemberCompetition } from "../competition/resolve";
-import { dbHandle, systemDb } from "../db";
+import { systemDb } from "../db";
 import { reviewRequests, reviews } from "@desiauction/db";
 import { and, eq, sql } from "drizzle-orm";
 import {
@@ -22,6 +20,7 @@ import {
   type ReplyResult,
   type SeasonReviews,
 } from "./season";
+import { personCanCompetition } from "../request-cache";
 
 /**
  * A SEASON'S REVIEWS, FOR THE PEOPLE WHO RAN IT (FR-1 Phase 4).
@@ -46,16 +45,10 @@ async function gate(slug: string) {
   if (competition === null) {
     return null;
   }
-  const canManage = await withTenantDb(
-    dbHandle,
-    { personId: session.personId, orgId: competition.orgId },
-    (db) =>
-      canCompetition(
-        db,
-        session.personId,
-        { orgId: competition.orgId, competitionId: competition.id },
-        "competition.manage",
-      ),
+  const canManage = await personCanCompetition(
+    session.personId,
+    { orgId: competition.orgId, competitionId: competition.id },
+    "competition.manage",
   );
   return { personId: session.personId, competition, canManage };
 }

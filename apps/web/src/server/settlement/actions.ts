@@ -18,7 +18,7 @@ import { type CompetitionSummary } from "../competition/competitions";
 import { resolveMemberCompetition } from "../competition/resolve";
 import { dbHandle } from "../db";
 import { can } from "../orgs/authz";
-import { membersOf, resolveTenant, type OrgSummary } from "../orgs/orgs";
+import { membersOf, type OrgSummary } from "../orgs/orgs";
 import { parseRupees, RUPEE_PARSE_MESSAGES } from "./amount";
 import {
   canSettlement,
@@ -55,7 +55,7 @@ import {
   type Ack,
 } from "./writer";
 import { logger } from "../logger";
-import { grantsOfPerson } from "../request-cache";
+import { grantsOfPerson, tenantOfPerson } from "../request-cache";
 
 /**
  * PX-7 Settlement Experience — the internal RPC surface (PX-1 E1/E2).
@@ -420,9 +420,7 @@ export interface SettlementDashboard {
  */
 export async function settlementDeskGate(orgSlug: string): Promise<OrgSummary | null> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return null;
   }
@@ -436,9 +434,7 @@ export async function settlementDeskGate(orgSlug: string): Promise<OrgSummary | 
 
 export async function settlementDashboard(orgSlug: string): Promise<SettlementDashboard | null> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return null;
   }
@@ -483,9 +479,7 @@ export interface MoneyAuthorityView {
  */
 export async function moneyAuthority(orgSlug: string): Promise<MoneyAuthorityView | null> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return null;
   }
@@ -541,9 +535,7 @@ export async function issueMoneyAuthorityAction(
   capabilitySet: string,
 ): Promise<ActionResult> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return { ok: false, error: messageFor("not_authorized") };
   }
@@ -571,9 +563,7 @@ export async function revokeMoneyAuthorityAction(
   grantId: string,
 ): Promise<ActionResult> {
   const session = await requireSession();
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, orgSlug),
-  );
+  const org = await tenantOfPerson(session.personId, orgSlug);
   if (org === null) {
     return { ok: false, error: messageFor("not_authorized") };
   }

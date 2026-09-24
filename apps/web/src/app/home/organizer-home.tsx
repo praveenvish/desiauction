@@ -27,6 +27,7 @@ import {
   VisuallyHidden,
   type JourneyStep,
 } from "@desiauction/ui";
+import type { GrantLike } from "@desiauction/core";
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 
@@ -35,13 +36,11 @@ import { monogram } from "../../components/season-hero/season-hero";
 import { roleLabeller } from "../../lib/role-label";
 import { compactINR, ledgerINR } from "../../lib/inr";
 import { auctionDashboard } from "../../server/auction/actions";
-import {
-  competitionsView,
-  registrationDashboard,
-  seasonOverviewView,
-} from "../../server/competition/actions";
+import { competitionsView, seasonOverviewView } from "../../server/competition/actions";
+import { competitionAllows } from "../../server/competition/authz";
 import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { homeDashboard } from "../../server/home/dashboard";
+import { grantsOfPerson } from "../../server/request-cache";
 import { rolesOf } from "../../server/roles/roles";
 import type { HomeDashboardData } from "../../server/home/dashboard";
 import { CreateOrgForm } from "../orgs/create-org-form";
@@ -100,18 +99,25 @@ const ATTENTION_SCAN_LIMIT = 8;
  * per-season team and registration counts already came back with the dashboard.
  */
 async function attentionFor(
-  competition: { id: string; slug: string; name: string; status: string },
+  competition: { id: string; orgId: string; slug: string; name: string; status: string },
   dash: HomeDashboardData,
+  held: readonly GrantLike[],
 ): Promise<AttentionRow | null> {
   if (competition.status === "registration_open") {
-    const dashboard = await registrationDashboard(competition.slug, {});
-    // DA-35: `stats` is now absent for a viewer who cannot review — the same
-    // condition `canReview` already expressed, now carried by the type.
-    const stats = dashboard?.stats;
-    if (stats !== undefined && stats.submitted > 0) {
+    // The count came back with the dashboard's grouped read, and the reviewer
+    // check is the desk's own rule over this render's grants — this used to
+    // load the season's whole registrations dashboard for one number. Only a
+    // reviewer is told there is reviewing to do (DA-35's partition, unchanged).
+    const canReview = competitionAllows(
+      held,
+      { orgId: competition.orgId, competitionId: competition.id },
+      "registration.review",
+    );
+    const submitted = dash.counts[competition.id]?.submitted ?? 0;
+    if (canReview && submitted > 0) {
       return {
         key: `reg-${competition.id}`,
-        label: `${String(stats.submitted)} registration${stats.submitted === 1 ? "" : "s"} to review`,
+        label: `${String(submitted)} registration${submitted === 1 ? "" : "s"} to review`,
         detail: competition.name,
         href: `/seasons/${competition.slug}/registrations`,
       };
@@ -288,7 +294,9 @@ export async function OrganizerHome({
       ? Promise.resolve(null)
       : auctionDashboard(liveRow.competitionSlug).then((board) => board?.overview ?? null),
     focus === undefined ? Promise.resolve(null) : seasonOverviewView(focus.slug),
-    Promise.all(scanned.map((competition) => attentionFor(competition, dash))),
+    grantsOfPerson(personId).then((held) =>
+      Promise.all(scanned.map((competition) => attentionFor(competition, dash, held))),
+    ),
   ]);
   const attention = scannedRows.filter((row): row is AttentionRow => row !== null);
   const unscanned = view.competitions.length - scanned.length;

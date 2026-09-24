@@ -12,7 +12,8 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
-import { resolveTenant, type OrgSummary } from "./orgs";
+import { type OrgSummary } from "./orgs";
+import { tenantOfPerson } from "../request-cache";
 
 /**
  * The organizer's catalogue: an org, the tournaments it runs, and the editions
@@ -163,9 +164,7 @@ export async function orgCatalogue(slug: string): Promise<OrgCatalogue | null> {
   }
   // Resolution runs under person context — membership is proved on the
   // org_members arm before the org id is ever set (PRP-1 §1).
-  const org = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
-    resolveTenant(db, session.personId, slug),
-  );
+  const org = await tenantOfPerson(session.personId, slug);
   if (org === null) {
     return null;
   }

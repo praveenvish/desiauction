@@ -153,6 +153,13 @@ export interface HomeStages {
 export interface HomeCompetitionCounts {
   teams: number;
   registrations: number;
+  /**
+   * Registrations waiting on a reviewer — status `submitted`, exactly as the
+   * registrations desk's `stats.submitted` counts it. Carried here so /home's
+   * "Needs attention" scan can read it instead of loading each season's whole
+   * registrations dashboard (≈10 queries a season) for this one number.
+   */
+  submitted: number;
 }
 
 export interface HomeDashboardData {
@@ -583,12 +590,16 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
   // competition, and the portfolio-wide approved count.
   const registrationsBy = new Map<string, number>();
   const approvedBy = new Map<string, number>();
+  const submittedBy = new Map<string, number>();
   let approvedRegistrations = 0;
   for (const row of registrationRows) {
     registrationsBy.set(
       row.competitionId,
       (registrationsBy.get(row.competitionId) ?? 0) + row.count,
     );
+    if (row.status === "submitted") {
+      submittedBy.set(row.competitionId, (submittedBy.get(row.competitionId) ?? 0) + row.count);
+    }
     if (row.status === "approved") {
       approvedBy.set(row.competitionId, (approvedBy.get(row.competitionId) ?? 0) + row.count);
       approvedRegistrations += row.count;
@@ -782,6 +793,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     counts[competition.id] = {
       teams: teamsBy.get(competition.id) ?? 0,
       registrations: registrationsBy.get(competition.id) ?? 0,
+      submitted: submittedBy.get(competition.id) ?? 0,
     };
   }
 

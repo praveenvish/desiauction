@@ -1,4 +1,4 @@
-import { hasCapability, type Capability } from "@desiauction/core";
+import { hasCapability, type Capability, type GrantLike } from "@desiauction/core";
 import type { Db } from "@desiauction/db";
 
 import { logAuthzRefused } from "../logger";
@@ -21,7 +21,15 @@ export async function canCompetition(
   scope: CompetitionScope,
   capability: Capability,
 ): Promise<boolean> {
-  const held = await grantsFor(db, personId);
+  return competitionAllows(await grantsFor(db, personId), scope, capability);
+}
+
+/** The same org-OR-competition rule over grants the caller already holds. */
+export function competitionAllows(
+  held: readonly GrantLike[],
+  scope: CompetitionScope,
+  capability: Capability,
+): boolean {
   if (hasCapability(held, { scopeType: "org", scopeId: scope.orgId }, capability)) {
     return true;
   }

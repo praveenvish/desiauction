@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 import { currentSession } from "../auth/actions";
 import { resolveMemberCompetition } from "../competition/resolve";
 import { dbHandle } from "../db";
-import { can } from "../orgs/authz";
 import {
   assignAuctioneer,
   auctioneerCandidates,
@@ -14,6 +13,7 @@ import {
   removeAuctioneer,
   type AuctioneerRow,
 } from "./auctioneers";
+import { personCan } from "../request-cache";
 
 /**
  * Who may appoint an auctioneer: whoever may issue grants in the club
@@ -25,11 +25,10 @@ async function gate(slug: string) {
   if (session === null) return null;
   const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) return null;
-  const allowed = await withTenantDb(
-    dbHandle,
-    { personId: session.personId, orgId: competition.orgId },
-    (db) =>
-      can(db, session.personId, { scopeType: "org", scopeId: competition.orgId }, "grant.issue"),
+  const allowed = await personCan(
+    session.personId,
+    { scopeType: "org", scopeId: competition.orgId },
+    "grant.issue",
   );
   return allowed ? { personId: session.personId, competition } : null;
 }

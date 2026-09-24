@@ -9,6 +9,7 @@ import {
   type Db,
 } from "@desiauction/db";
 import { aliasedTable, and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { sharedPerRender } from "../render-memo";
 
 // Organizations + membership (IP-2_DESIGN §4). Membership records belonging;
 // grants carry permission — the two are deliberately separate (C-8).
@@ -62,7 +63,15 @@ export async function createOrg(
   return { id: orgId, name: trimmed, slug };
 }
 
-export async function orgsFor(db: Db, personId: string): Promise<OrgSummary[]> {
+// Shared per page render (render-memo.ts), like `resolveTenant` below: the
+// shell's club list and the pages' own club lists asked separately.
+const orgsShared = sharedPerRender<OrgSummary[]>();
+
+export function orgsFor(db: Db, personId: string): Promise<OrgSummary[]> {
+  return orgsShared([personId], () => readOrgs(db, personId));
+}
+
+async function readOrgs(db: Db, personId: string): Promise<OrgSummary[]> {
   return db
     .select({ id: organizations.id, name: organizations.name, slug: organizations.slug })
     .from(orgMembers)
@@ -73,12 +82,19 @@ export async function orgsFor(db: Db, personId: string): Promise<OrgSummary[]> {
 /**
  * Deterministic tenant resolution (M-IP2-3): URL slug → org, membership
  * required. Non-members get null — indistinguishable from a missing org.
+ *
+ * Shared per page render (render-memo.ts): /org/[slug] resolved the same slug
+ * seven times, each in a transaction of its own. Memberships only change in
+ * actions, and every caller resolves under person context (membership is
+ * proved before an org id is ever set — PRP-1 §1), so one answer serves all.
  */
-export async function resolveTenant(
-  db: Db,
-  personId: string,
-  slug: string,
-): Promise<OrgSummary | null> {
+const tenantShared = sharedPerRender<OrgSummary | null>();
+
+export function resolveTenant(db: Db, personId: string, slug: string): Promise<OrgSummary | null> {
+  return tenantShared([personId, slug], () => readTenant(db, personId, slug));
+}
+
+async function readTenant(db: Db, personId: string, slug: string): Promise<OrgSummary | null> {
   const [row] = await db
     .select({ id: organizations.id, name: organizations.name, slug: organizations.slug })
     .from(organizations)
@@ -122,7 +138,16 @@ export interface MemberRow {
 
 const granter = aliasedTable(people, "granter");
 
-export async function membersOf(db: Db, orgId: string): Promise<MemberRow[]> {
+// Shared per page render (render-memo.ts): /org/[slug]'s members panel, money
+// desk and finance desk each list the same roster. One render has one viewer,
+// so the org is the whole key; roles only change in actions.
+const membersShared = sharedPerRender<MemberRow[]>();
+
+export function membersOf(db: Db, orgId: string): Promise<MemberRow[]> {
+  return membersShared([orgId], () => readMembers(db, orgId));
+}
+
+async function readMembers(db: Db, orgId: string): Promise<MemberRow[]> {
   const rows = await db
     .select({
       personId: orgMembers.personId,
