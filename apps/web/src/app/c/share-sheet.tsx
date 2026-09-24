@@ -1,5 +1,6 @@
 "use client";
 
+import type { MoneyUnit } from "@desiauction/core";
 import {
   Button,
   ButtonLink,
@@ -7,6 +8,7 @@ import {
   IconCopy,
   IconMessageCircle,
   IconPhone,
+  IconPlay,
   IconSend,
 } from "@desiauction/ui";
 import { useEffect, useRef, useState } from "react";
@@ -47,6 +49,7 @@ export function ShareSheet({
   outcome,
   messages,
   status,
+  unit,
 }: {
   /** What the native share sheet calls it: a player's or a team's name. */
   title: string;
@@ -54,6 +57,8 @@ export function ShareSheet({
   outcome: string;
   messages: Record<ShareLanguage, string>;
   status: StatusPoster;
+  /** The season's unit, so the film's counting price reads "₹…" or "… pts". */
+  unit: MoneyUnit;
 }) {
   const url = usePageAddress();
   const [language, setLanguage] = useState<ShareLanguage>("en");
@@ -67,6 +72,16 @@ export function ShareSheet({
   // sheet inside the gesture that asked for it, and a two-second fetch between
   // the tap and `navigator.share` spends that gesture.
   const posterFile = useRef<File | null>(null);
+  // The animated Status: offered only where this browser can encode an MP4
+  // (WebCodecs H.264 — Chrome, Edge, Safari), made on the first tap and shared
+  // on the second, because encoding takes a second and a phone only opens its
+  // share sheet inside the tap that asked for it.
+  const [canVideo, setCanVideo] = useState(false);
+  // null: idle · "prepare": the server is drawing the film's layers (the long
+  // part) · a number: the browser is encoding, in percent.
+  const [making, setMaking] = useState<number | "prepare" | null>(null);
+  const videoFile = useRef<File | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
   const message = messages[language];
   const props = { surface, outcome, lang: language };
   const { slug } = status;
@@ -84,6 +99,16 @@ export function ShareSheet({
         return;
       }
       setPosterHref(href);
+      void import("../seasons/[slug]/posters/poster-motion")
+        .then((motion) => motion.videoExportMode(1080, 1920))
+        .then((mode) => {
+          if (live && mode === "mp4") {
+            setCanVideo(true);
+          }
+        })
+        .catch(() => {
+          // No video here; the image is offered either way.
+        });
       void fetch(href)
         .then((response) => (response.ok ? response.blob() : null))
         .then((blob) => {
@@ -176,6 +201,58 @@ export function ShareSheet({
     }
   }
 
+  async function makeVideo() {
+    if (posterHref === null) {
+      return;
+    }
+    setMaking("prepare");
+    try {
+      const motion = await import("../seasons/[slug]/posters/poster-motion");
+      await motion.loadCountFont();
+      const sprite = await motion.loadSprite(`${posterHref}&motion=1`);
+      const scene = motion.buildScene(sprite, unit);
+      const blob = await motion.encodeSceneMp4(scene, (fraction) => {
+        setMaking(Math.round(fraction * 100));
+      });
+      videoFile.current = new File([blob], fileName.replace(/\.png$/, ".mp4"), {
+        type: "video/mp4",
+      });
+      setVideoReady(true);
+      track("share.video_made", props);
+      say("Your video is ready — tap Share video.");
+    } catch {
+      say("Couldn't make the video just now. The image works either way.");
+    } finally {
+      setMaking(null);
+    }
+  }
+
+  async function shareVideo() {
+    const file = videoFile.current;
+    if (file === null) {
+      return;
+    }
+    if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text: `${message}\n${withRef(url, "status")}` });
+        track("share.video_shared", props);
+      } catch {
+        // Dismissed.
+      }
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = file.name;
+    anchor.click();
+    window.setTimeout(() => {
+      URL.revokeObjectURL(objectUrl);
+    }, 10_000);
+    track("share.video_saved", props);
+    say("Saved. Open WhatsApp → Status → pick the video.");
+  }
+
   const ready = url !== "";
 
   return (
@@ -246,6 +323,26 @@ export function ShareSheet({
           data-testid="share-status"
         >
           <IconPhone size={20} /> Post to Status
+        </Button>
+      )}
+
+      {posterHref === null || !canVideo ? null : (
+        <Button
+          variant="secondary"
+          size="lg"
+          className="share-sheet-wide"
+          onClick={() => void (videoReady ? shareVideo() : makeVideo())}
+          loading={making !== null}
+          data-testid="share-video"
+        >
+          <IconPlay size={20} />{" "}
+          {making === "prepare"
+            ? "Preparing your video…"
+            : making !== null
+              ? `Making video ${String(making)}%`
+              : videoReady
+                ? "Share Status video"
+                : "Make a Status video"}
         </Button>
       )}
 

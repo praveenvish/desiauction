@@ -223,6 +223,7 @@ export default async function PublicTeamPage({
               facts.playerCount === 0 ? "empty" : facts.spentLabel === null ? "signed" : "bought"
             }
             messages={messages}
+            unit={team.unit}
             status={{ kind: "team", slug, team: teamSlug }}
           />
         </PageSection>

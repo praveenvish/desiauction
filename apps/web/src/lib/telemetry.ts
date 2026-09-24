@@ -54,7 +54,10 @@ export type ProductEventName =
   | "share.status_shared"
   | "share.status_saved"
   | "share.link_copied"
-  | "share.native_opened";
+  | "share.native_opened"
+  | "share.video_made"
+  | "share.video_shared"
+  | "share.video_saved";
 
 export type TelemetryProps = Record<string, string | number | boolean>;
 

@@ -290,6 +290,7 @@ export default async function PlayerProfilePage({
             surface="player"
             outcome={shareModel?.outcome ?? "none"}
             messages={messages}
+            unit={poster?.input.unit ?? "inr"}
             status={{ kind: "player", slug, number }}
           />
         </PageSection>

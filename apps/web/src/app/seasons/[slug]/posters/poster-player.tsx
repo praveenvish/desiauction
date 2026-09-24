@@ -15,7 +15,7 @@ import {
   type Depth,
 } from "./poster-depth";
 import { DISPLAY, FIGURES, SERIF } from "./poster-fonts";
-import { contextFor, vis, type PosterContext, type PosterRenderOptions } from "./poster-kit";
+import { contextFor, shown, vis, type PosterContext, type PosterRenderOptions } from "./poster-kit";
 
 /**
  * THE PLAYER POSTER, v3.
@@ -386,7 +386,9 @@ export function ResultPanel({
             gap: Math.round(p.coin * 0.3),
             marginTop: Math.round(p.padY * 0.75),
             paddingTop: Math.round(p.padY * 0.7),
-            borderTop: `1px solid ${depth.hairline}`,
+            // The rule belongs to the panel: drawn with it, not on the ground
+            // before it — the first frame of the film showed it floating alone.
+            borderTop: `1px solid ${shown(ctx, "stamp") ? depth.hairline : "transparent"}`,
           }}
         >
           <Coin
@@ -430,7 +432,9 @@ export function ResultPanel({
             gap: Math.round(p.team * 0.45),
             marginTop: Math.round(p.padY * 0.75),
             paddingTop: Math.round(p.padY * 0.7),
-            borderTop: `1px solid ${depth.hairline}`,
+            // The rule belongs to the panel: drawn with it, not on the ground
+            // before it — the first frame of the film showed it floating alone.
+            borderTop: `1px solid ${shown(ctx, "stamp") ? depth.hairline : "transparent"}`,
           }}
         >
           <div

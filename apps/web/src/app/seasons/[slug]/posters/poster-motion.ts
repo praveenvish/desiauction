@@ -321,11 +321,14 @@ function progress(now: number, start: number, length: number): number {
 
 let countFont: Promise<void> | null = null;
 
-/** The poster's own face, so the counting price matches the one it lands on. */
+/**
+ * The poster's own figure face — the v3 price is Archivo SemiCondensed — so the
+ * counting number crossfades into the rendered one without changing font.
+ */
 export async function loadCountFont(): Promise<void> {
   countFont ??= (async () => {
     try {
-      const face = new FontFace("PosterCount", "url(/fonts/poster/geist-sans-600.woff)");
+      const face = new FontFace("PosterCount", "url(/fonts/poster/archivo-semicondensed-700.woff)");
       await face.load();
       document.fonts.add(face);
     } catch {
@@ -604,4 +607,144 @@ export async function recordScene(
     track.stop();
   });
   return { blob: new Blob(chunks, { type: type.mimeType }), extension: type.extension };
+}
+
+// --- MP4, frame by frame ----------------------------------------------------
+
+/**
+ * THE STATUS FILE: H.264 IN MP4, ENCODED FRAME BY FRAME.
+ *
+ * `recordScene` samples a canvas in real time through MediaRecorder, which
+ * gives whatever container the browser prefers — WebM on Firefox and older
+ * Chrome, which WhatsApp on an iPhone will not take as a Status — takes the
+ * full six seconds, stalls in a hidden tab and drops frames under load.
+ *
+ * WebCodecs removes all four: each frame is drawn by `drawFrame` at an exact
+ * time, handed to the browser's own H.264 encoder, and packed into an MP4 with
+ * `mp4-muxer` (MIT, loaded only when a film is made). Faster than real time,
+ * frame-exact, visible or not, and the one format every phone plays.
+ *
+ * Level 4.0 fits a 1080×1920 Status (8,160 macroblocks against 8,192). High
+ * profile first, then Main, then Baseline — whichever this browser encodes.
+ */
+const FPS = 30;
+const H264_CODECS = ["avc1.640028", "avc1.4d0028", "avc1.42e028"] as const;
+
+export async function h264ConfigFor(
+  width: number,
+  height: number,
+): Promise<VideoEncoderConfig | null> {
+  if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") {
+    return null;
+  }
+  for (const codec of H264_CODECS) {
+    const config: VideoEncoderConfig = {
+      codec,
+      width,
+      height,
+      bitrate: 8_000_000,
+      framerate: FPS,
+      avc: { format: "avc" },
+    };
+    try {
+      const support = await VideoEncoder.isConfigSupported(config);
+      if (support.supported === true) {
+        return config;
+      }
+    } catch {
+      // A codec string this browser does not know — try the next profile.
+    }
+  }
+  return null;
+}
+
+/** How this browser will make the film: an MP4 encode, a live recording, or neither. */
+export async function videoExportMode(
+  width: number,
+  height: number,
+): Promise<"mp4" | "recorder" | null> {
+  if ((await h264ConfigFor(width, height)) !== null) {
+    return "mp4";
+  }
+  return pickRecordingType() === null ? null : "recorder";
+}
+
+/** Encode the film as H.264 MP4, frame by frame. Throws when the browser cannot. */
+export async function encodeSceneMp4(
+  scene: Scene,
+  onProgress?: (fraction: number) => void,
+): Promise<Blob> {
+  const config = await h264ConfigFor(scene.width, scene.height);
+  if (config === null) {
+    throw new Error("This browser cannot encode H.264.");
+  }
+  const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
+  const target = new ArrayBufferTarget();
+  const muxer = new Muxer({
+    target,
+    video: { codec: "avc", width: scene.width, height: scene.height, frameRate: FPS },
+    // The index at the front, so a phone starts playing before the file ends.
+    fastStart: "in-memory",
+  });
+  let failure: unknown = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => {
+      muxer.addVideoChunk(chunk, meta);
+    },
+    error: (error) => {
+      failure = error;
+    },
+  });
+  encoder.configure(config);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = scene.width;
+  canvas.height = scene.height;
+  const ctx = canvas.getContext("2d");
+  if (ctx === null) {
+    throw new Error("This browser cannot draw the film.");
+  }
+  // The film, then one still second on the finished poster: a Status that
+  // ends the instant the price lands reads as cut off.
+  const frames = Math.ceil((scene.duration + 1) * FPS);
+  const step = 1_000_000 / FPS;
+  for (let index = 0; index < frames; index += 1) {
+    if (failure !== null) {
+      break;
+    }
+    drawFrame(ctx, scene, Math.min(index / FPS, scene.duration));
+    const frame = new VideoFrame(canvas, {
+      timestamp: Math.round(index * step),
+      duration: Math.round(step),
+    });
+    // A keyframe every two seconds keeps a scrubbed Status sharp.
+    encoder.encode(frame, { keyFrame: index % (FPS * 2) === 0 });
+    frame.close();
+    // Let the encoder drain rather than queue a whole film in memory.
+    while (encoder.encodeQueueSize > 8) {
+      await new Promise((resolve) => setTimeout(resolve, 4));
+    }
+    onProgress?.((index + 1) / frames);
+  }
+  await encoder.flush();
+  encoder.close();
+  if (failure !== null) {
+    throw failure instanceof Error ? failure : new Error("The encoder stopped.");
+  }
+  muxer.finalize();
+  return new Blob([target.buffer], { type: "video/mp4" });
+}
+
+/**
+ * The film as a file: MP4 frame by frame where the browser can encode H.264,
+ * else the real-time recording `recordScene` has always made.
+ */
+export async function exportSceneVideo(
+  scene: Scene,
+  onProgress?: (fraction: number) => void,
+): Promise<{ blob: Blob; extension: string }> {
+  if ((await h264ConfigFor(scene.width, scene.height)) !== null) {
+    return { blob: await encodeSceneMp4(scene, onProgress), extension: "mp4" };
+  }
+  return recordScene(scene, onProgress);
 }
