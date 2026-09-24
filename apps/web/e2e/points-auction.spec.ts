@@ -219,9 +219,16 @@ test("a points season runs the whole night in points and owes nothing", async ({
   await expect(organizer.getByRole("link", { name: "Open settlement" })).toHaveCount(0);
   await expect(organizer.getByRole("link", { name: "Money", exact: true })).toHaveCount(0);
 
-  // An old link to the books is told why, not shown an empty console.
+  // No door to the books: this organizer holds no money authority (the
+  // capability partition), so the address is absent as it is on any season —
+  // and nothing on it could open a case. A holder of the grant is told why
+  // instead (`points-no-settlement`); the server refuses every command either way.
   await organizer.goto(`/seasons/${slug}/money`);
-  await expect(organizer.getByTestId("points-no-settlement")).toBeVisible(COLD);
+  await expect(
+    organizer
+      .getByTestId("points-no-settlement")
+      .or(organizer.getByRole("heading", { name: "This page doesn't exist" })),
+  ).toBeVisible(COLD);
   await expect(organizer.getByTestId("open-case")).toHaveCount(0);
 
   await organizer.goto(`${seasonUrl}/teams`);
