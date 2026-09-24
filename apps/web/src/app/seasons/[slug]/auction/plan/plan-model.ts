@@ -8,6 +8,7 @@ import {
 } from "@desiauction/core";
 import type { BadgeTone } from "@desiauction/ui";
 
+import type { MoneyFormat } from "../../../../../lib/money";
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
 import type { PlanMutationResult } from "../../../../../server/auction/owner-plan-actions";
 
@@ -111,16 +112,22 @@ export function fitBadge(fit: PlanFit): { tone: BadgeTone; label: string } {
   }
 }
 
+/** "Enter a whole rupee amount" — or points, in a points season. No full stop. */
+export function wholeAmountHint(money: MoneyFormat): string {
+  return money.unit === "points" ? "Enter a whole number of points" : "Enter a whole rupee amount";
+}
+
 type Refusal = Extract<PlanMutationResult, { ok: false }>["reason"];
 
 /** What went wrong, in the owner's words. Never the rule's name. */
 export function refusalMessage(
   reason: Refusal,
   context: { basePrice?: string; purse?: string },
+  money: MoneyFormat,
 ): string {
   switch (reason) {
     case "invalid_max":
-      return "Enter a whole rupee amount, or leave it empty for no cap.";
+      return `${wholeAmountHint(money)}, or leave it empty for no cap.`;
     case "below_base":
       return `The max can't be below this player's base price${
         context.basePrice === undefined ? "" : ` (${context.basePrice})`

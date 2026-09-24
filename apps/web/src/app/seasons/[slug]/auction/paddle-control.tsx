@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  formatPaiseINR,
   maxAffordableBid,
   nextMinimumBid as snapshotNextMinimumBid,
   paise,
@@ -13,6 +12,7 @@ import { PlanLine } from "./plan-line";
 import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
 
 import type { AuctionRules } from "../../../../server/auction/live-summary";
+import { useMoney } from "../../../../components/money-unit";
 
 // YOUR PADDLE — the bidder's one control. The raise is a single large button
 // carrying its own amount, because the owner is watching the room and the
@@ -50,6 +50,7 @@ export function PaddleControl({
   plan?: PlanState | null;
   planNames?: (registrationId: string) => string;
 }) {
+  const money = useMoney();
   const paiseSlabs = rules.slabs.map((slab) => ({
     upTo: slab.upTo === null ? null : paise(slab.upTo),
     step: paise(slab.step),
@@ -127,7 +128,7 @@ export function PaddleControl({
         : tooDear
           ? ceiling === 0
             ? "Your purse can't cover another signing at this price."
-            : `Beyond your purse. The most you can bid is ${formatPaiseINR(paise(ceiling))}.`
+            : `Beyond your purse. The most you can bid is ${money.ledger(ceiling)}.`
           : null;
   const bidsDisabled = disabled || blocked !== null;
 
@@ -171,7 +172,7 @@ export function PaddleControl({
         >
           <span className="paddle-raise-label">Raise to</span>
           <span className="paddle-raise-amount">
-            {raise === undefined ? "—" : formatPaiseINR(paise(raise))}
+            {raise === undefined ? "—" : money.ledger(raise)}
           </span>
         </button>
         <div className="paddle-jump">
@@ -189,7 +190,7 @@ export function PaddleControl({
                 disabled={bidsDisabled || (ceiling !== null && amount > ceiling)}
                 title={
                   ceiling !== null && amount > ceiling && blocked === null
-                    ? `Beyond your purse — the most you can bid is ${formatPaiseINR(paise(ceiling))}.`
+                    ? `Beyond your purse — the most you can bid is ${money.ledger(ceiling)}.`
                     : (blocked ?? undefined)
                 }
                 onClick={() => {
@@ -197,7 +198,7 @@ export function PaddleControl({
                 }}
                 data-testid={`bid-jump-${String(amount)}`}
               >
-                {formatPaiseINR(paise(amount))}
+                {money.ledger(amount)}
               </button>
             ))}
           </div>
@@ -216,13 +217,13 @@ export function PaddleControl({
           <div>
             <dt>Purse left</dt>
             <dd className="paddle-stat-remaining" data-testid="paddle-purse">
-              {paddle.purseRemaining === null ? "—" : formatPaiseINR(paise(paddle.purseRemaining))}
+              {paddle.purseRemaining === null ? "—" : money.ledger(paddle.purseRemaining)}
             </dd>
           </div>
           <div>
             <dt>Committed</dt>
             <dd data-testid="paddle-committed">
-              {paddle.committed === null ? "—" : formatPaiseINR(paise(paddle.committed))}
+              {paddle.committed === null ? "—" : money.ledger(paddle.committed)}
             </dd>
           </div>
           <div>

@@ -921,6 +921,17 @@ export const competitions = pgTable(
     entryCategory: text("entry_category", { enum: ["open", "men", "women", "mixed"] })
       .notNull()
       .default("open"),
+    /**
+     * WHAT THIS SEASON'S AUCTION COUNTS IN (0091) — `inr` (real rupees, which
+     * may be settled) or `points` (a points league: nothing is ever owed).
+     * Both store amounts ×100, so every amount column below means the same
+     * scale either way; only formatting and the money surfaces read this.
+     * Chosen at season creation; FIXED once the season has an auction, because
+     * the purse and base prices were typed in this unit.
+     */
+    auctionUnit: text("auction_unit", { enum: ["inr", "points"] })
+      .notNull()
+      .default("inr"),
     // Storage KEY for the auction crest; signed at read time by the media port.
     logoUrl: text("logo_url"),
     // Storage KEY for the season's wide cover photo (0082) — the hero banner's

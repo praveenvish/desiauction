@@ -10,6 +10,7 @@ import {
   teams,
   tournaments,
 } from "@desiauction/db";
+import type { MoneyUnit } from "@desiauction/core";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -54,6 +55,8 @@ export interface CareerSeason {
   isCaptain: boolean;
   isViceCaptain: boolean;
   jerseyNumber: string | null;
+  /** What this season's sold price counts in (0091) — rupees or points. */
+  auctionUnit: MoneyUnit;
   /** How the auction concluded for this person, if one did. */
   auction:
     { kind: PreSignedKind } | { kind: "sold"; soldPrice: number } | { kind: "unsold" } | null;
@@ -65,7 +68,14 @@ export interface PlayerCareer {
     seasons: number;
     teams: number;
     soldCount: number;
+    /**
+     * The dearest RUPEE sale; only when there is none, the dearest points
+     * sale (0091). Points and rupees are never compared — 10,000 pts is not
+     * a bigger price than ₹5,000.
+     */
     highestPrice: number | null;
+    /** What `highestPrice` counts in. */
+    highestUnit: MoneyUnit;
   };
 }
 
@@ -94,6 +104,7 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
       teamFranchiseId: teams.franchiseId,
       lotStatus: lots.status,
       soldPrice: lots.soldPrice,
+      auctionUnit: competitions.auctionUnit,
     })
     .from(registrations)
     .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
@@ -137,6 +148,7 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
     isCaptain: row.isCaptain,
     isViceCaptain: row.isViceCaptain,
     jerseyNumber: row.jerseyNumber,
+    auctionUnit: row.auctionUnit,
     // The sale first: a captain named after the night was bought, and that
     // is the fact their career records. Otherwise the pre-signed word.
     auction:
@@ -149,9 +161,14 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
             : null,
   }));
 
-  const soldPrices = seasons
-    .map((season) => (season.auction?.kind === "sold" ? season.auction.soldPrice : null))
-    .filter((price): price is number => price !== null);
+  const soldPrices = (unit?: MoneyUnit) =>
+    seasons
+      .filter((season) => unit === undefined || season.auctionUnit === unit)
+      .map((season) => (season.auction?.kind === "sold" ? season.auction.soldPrice : null))
+      .filter((price): price is number => price !== null);
+  const rupeeSales = soldPrices("inr");
+  const highestUnit: MoneyUnit = rupeeSales.length > 0 ? "inr" : "points";
+  const highestSales = rupeeSales.length > 0 ? rupeeSales : soldPrices("points");
 
   // P6: the same franchise across seasons is ONE team; unlinked teams fall
   // back to org·name, which is what a clone-by-name meant before franchises.
@@ -166,8 +183,9 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
     totals: {
       seasons: seasons.length,
       teams: teamIdentities.size,
-      soldCount: soldPrices.length,
-      highestPrice: soldPrices.length > 0 ? Math.max(...soldPrices) : null,
+      soldCount: soldPrices().length,
+      highestPrice: highestSales.length > 0 ? Math.max(...highestSales) : null,
+      highestUnit: highestSales.length > 0 ? highestUnit : "inr",
     },
   };
 }

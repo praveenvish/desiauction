@@ -1,3 +1,4 @@
+import type { MoneyUnit } from "@desiauction/core";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
@@ -175,6 +176,8 @@ export interface AuctionCardView {
   endsOn: string | null;
   location: string | null;
   facts: AuctionFacts;
+  /** What `facts.moneyMoved` counts in (0091) — each card its own season's. */
+  auctionUnit: MoneyUnit;
   /** What this person is here: "Organizer", "Auctioneer", "Team owner · X", "Member". */
   roleLabel: string;
   links: AuctionLink[];
@@ -186,10 +189,16 @@ export interface AuctionsIndexView {
     upcoming: number;
     live: number;
     completed: number;
-    /** Paise over the nights this person may see money for; absent if none. */
+    /**
+     * Paise over the RUPEE nights this person may see money for; absent if
+     * none. Points leagues (0091) never fold in — 1,000 pts is not ₹1,000.
+     */
     spend?: number;
     /** How many nights the spend covers. */
     spendNights: number;
+    /** The same over points nights, ×100 of a point; absent if none. */
+    pointsSpend?: number;
+    pointsNights: number;
   };
 }
 
@@ -228,6 +237,7 @@ export async function auctionsIndexView(): Promise<AuctionsIndexView> {
       endsOn: season.endsOn,
       location: season.location,
       facts: fact,
+      auctionUnit: season.auctionUnit,
       roleLabel: manage
         ? "Organizer"
         : conduct
@@ -241,7 +251,10 @@ export async function auctionsIndexView(): Promise<AuctionsIndexView> {
   // Live first, then what is coming, then what is done.
   const rank = { live: 0, paused: 0, scheduled: 1, none: 2, completed: 3, settled: 3 } as const;
   cards.sort((a, b) => rank[a.facts.status] - rank[b.facts.status]);
-  const withMoney = cards.filter((card) => card.facts.moneyMoved !== undefined);
+  const seen = cards.filter((card) => card.facts.moneyMoved !== undefined);
+  // Summed per unit: a points league's spend is not money and never joins a rupee total.
+  const withMoney = seen.filter((card) => card.auctionUnit === "inr");
+  const withPoints = seen.filter((card) => card.auctionUnit === "points");
   return {
     cards,
     totals: {
@@ -255,6 +268,10 @@ export async function auctionsIndexView(): Promise<AuctionsIndexView> {
         ? { spend: withMoney.reduce((sum, card) => sum + (card.facts.moneyMoved ?? 0), 0) }
         : {}),
       spendNights: withMoney.length,
+      ...(withPoints.length > 0
+        ? { pointsSpend: withPoints.reduce((sum, card) => sum + (card.facts.moneyMoved ?? 0), 0) }
+        : {}),
+      pointsNights: withPoints.length,
     },
   };
 }

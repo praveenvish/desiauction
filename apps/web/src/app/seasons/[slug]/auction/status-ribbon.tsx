@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise, type AuctionSnapshot } from "@desiauction/core";
+import type { AuctionSnapshot } from "@desiauction/core";
 import { Badge, PlayerImage } from "@desiauction/ui";
 
 import { SoundToggle } from "../../../../components/shell/sound-toggle";
@@ -8,6 +8,7 @@ import { lotSeed } from "../../../../lib/player-seed";
 import type { LotMedia } from "../../../../server/auction/live-summary";
 
 import type { ConnectionState } from "./use-auction-socket";
+import { useMoney } from "../../../../components/money-unit";
 
 // The live status ribbon (M-IP4-3): the persistent operational strip every
 // auction surface wears. Pure presentation of the broadcast snapshot plus the
@@ -96,6 +97,7 @@ export function StatusRibbon({
   offline?: boolean;
   lotMedia?: Readonly<Record<string, LotMedia>>;
 }) {
+  const money = useMoney();
   const lot = snapshot?.currentLot ?? null;
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
   const version = snapshot?.version ?? 0;
@@ -149,7 +151,7 @@ export function StatusRibbon({
       {lot?.currentBid != null ? (
         <span className="ribbon-cell" data-testid="ribbon-bid">
           <RibbonGap />
-          <strong>{formatPaiseINR(paise(lot.currentBid.amount))}</strong>
+          <strong>{money.ledger(lot.currentBid.amount)}</strong>
           <RibbonGap />
           <span>{lot.currentBid.teamName}</span>
         </span>

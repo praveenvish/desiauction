@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise, type AuctionSnapshot, type PlanState } from "@desiauction/core";
+import type { AuctionSnapshot, PlanState } from "@desiauction/core";
 import {
   Badge,
   ButtonLink,
@@ -24,6 +24,8 @@ import {
 } from "@desiauction/ui";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { useMoney } from "../../../../components/money-unit";
+import type { MoneyFormat } from "../../../../lib/money";
 import { lotSeed } from "../../../../lib/player-seed";
 import type { AuctionRules, LotMedia, ResolvedLot } from "../../../../server/auction/live-summary";
 import { fitBadge } from "./plan/plan-model";
@@ -121,7 +123,11 @@ export interface FeedState extends LiveFeed {
  * no-op; status changes and recoveries are compared against what the feed
  * last saw rather than against the previous render.
  */
-export function foldSnapshot(feed: FeedState, snapshot: AuctionSnapshot): FeedState {
+export function foldSnapshot(
+  feed: FeedState,
+  snapshot: AuctionSnapshot,
+  money: MoneyFormat,
+): FeedState {
   let { resolved, events, seenSeqs } = feed;
   const outcome = snapshot.lastOutcome;
   if (outcome !== null && !feed.seenSeqs.has(outcome.atSeq)) {
@@ -167,7 +173,7 @@ export function foldSnapshot(feed: FeedState, snapshot: AuctionSnapshot): FeedSt
                 : kind === "reopened"
                   ? `${outcome.playerName ?? outcome.lotNumber} — reopened (undo)`
                   : `${outcome.playerName ?? outcome.lotNumber} — withdrawn`,
-        detail: outcome.amount !== null ? formatPaiseINR(paise(outcome.amount)) : null,
+        detail: outcome.amount !== null ? money.ledger(outcome.amount) : null,
         subject: { lotId: outcome.lotId, playerName: outcome.playerName },
       },
       ...events,
@@ -231,6 +237,7 @@ export function foldSnapshot(feed: FeedState, snapshot: AuctionSnapshot): FeedSt
  * which painted every new snapshot once with a stale timeline and then again.
  */
 export function useLiveFeed(initial: ResolvedLot[], snapshot: AuctionSnapshot | null): LiveFeed {
+  const money = useMoney();
   const [feed, setFeed] = useState<FeedState>(() => ({
     resolved: initial,
     events: [],
@@ -240,7 +247,7 @@ export function useLiveFeed(initial: ResolvedLot[], snapshot: AuctionSnapshot | 
     recoveries: 0,
   }));
   if (snapshot !== null && snapshot !== feed.folded) {
-    setFeed(foldSnapshot(feed, snapshot));
+    setFeed(foldSnapshot(feed, snapshot, money));
   }
   return { resolved: feed.resolved, events: feed.events };
 }
@@ -322,6 +329,7 @@ export function BidFeedList({
   teamColors: ReadonlyMap<string, string | null>;
   testId?: string;
 }) {
+  const money = useMoney();
   const newestFirst = [...bids].reverse();
   return (
     <ol className="bid-feed-list" data-testid={testId}>
@@ -338,7 +346,7 @@ export function BidFeedList({
               </>
             ) : null}
           </span>
-          <span className="bid-feed-amount">{formatPaiseINR(paise(entry.amount))}</span>
+          <span className="bid-feed-amount">{money.ledger(entry.amount)}</span>
         </li>
       ))}
     </ol>
@@ -433,6 +441,7 @@ export function MyTeamCard({
   /** Faces for the squad list, keyed by lot id. */
   lotMedia?: MediaByLot;
 }) {
+  const money = useMoney();
   const paddle = snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddleNumber) ?? null;
   const fit = plan === null ? null : fitBadge(plan.budget.fit);
   const squad = feed.resolved.filter(
@@ -463,13 +472,13 @@ export function MyTeamCard({
               redaction, not because a bidder is ever denied their own purse. */}
           <div className="my-team-stat" data-testid="my-purse">
             <span className="my-team-value">
-              {paddle.purseRemaining === null ? "—" : formatPaiseINR(paise(paddle.purseRemaining))}
+              {paddle.purseRemaining === null ? "—" : money.ledger(paddle.purseRemaining)}
             </span>
             <span className="my-team-label">Purse remaining</span>
           </div>
           <div className="my-team-stat" data-testid="my-spent">
             <span className="my-team-value">
-              {paddle.committed === null ? "—" : formatPaiseINR(paise(paddle.committed))}
+              {paddle.committed === null ? "—" : money.ledger(paddle.committed)}
             </span>
             <span className="my-team-label">Committed</span>
           </div>
@@ -483,8 +492,8 @@ export function MyTeamCard({
             <div className="my-team-stat" data-testid="my-plan-headroom" data-fit={plan.budget.fit}>
               <span className="my-team-value">
                 {plan.budget.headroom < 0
-                  ? `−${formatPaiseINR(paise(-plan.budget.headroom))}`
-                  : formatPaiseINR(paise(plan.budget.headroom))}
+                  ? `−${money.ledger(-plan.budget.headroom)}`
+                  : money.ledger(plan.budget.headroom)}
               </span>
               <span className="my-team-label">Plan headroom</span>
               <Badge tone={fit.tone} className="plan-tile-badge">
@@ -524,7 +533,7 @@ export function MyTeamCard({
               />
               <span className="registration-name">{lot.playerName ?? "Unnamed"}</span>
               <span className="registration-phone">
-                {lot.soldPrice !== null ? formatPaiseINR(paise(lot.soldPrice)) : ""}
+                {lot.soldPrice !== null ? money.ledger(lot.soldPrice) : ""}
               </span>
             </li>
           ))}
@@ -562,6 +571,7 @@ export function AuctionSummaryCard({
   /** Team id → the team's own colour, for the spend bars. */
   teamColors?: Readonly<Record<string, string | null>>;
 }) {
+  const money = useMoney();
   const sold = feed.resolved.filter((lot) => lot.status === "sold");
   const unsold = feed.resolved.filter((lot) => lot.status === "unsold");
   const topSale = sold.reduce<ResolvedLot | null>(
@@ -587,7 +597,7 @@ export function AuctionSummaryCard({
           <p>
             {viewerTeamName !== null
               ? `Congratulations, ${viewerTeamName} — your squad is set.`
-              : "The auction is complete — every rupee accounted for."}
+              : `The auction is complete — every ${money.unit === "points" ? "point" : "rupee"} accounted for.`}
           </p>
         </div>
         <p className="wrap-tag" aria-hidden>
@@ -612,7 +622,7 @@ export function AuctionSummaryCard({
         <StatCard
           icon={<IconWallet />}
           tone="green"
-          value={formatPaiseINR(paise(totalSpent))}
+          value={money.ledger(totalSpent)}
           label="Total spent"
           testId="summary-spent"
         />
@@ -620,7 +630,7 @@ export function AuctionSummaryCard({
           <StatCard
             icon={<IconCrown />}
             tone="gold"
-            value={topSale.soldPrice !== null ? formatPaiseINR(paise(topSale.soldPrice)) : "—"}
+            value={topSale.soldPrice !== null ? money.ledger(topSale.soldPrice) : "—"}
             label={`Top sale — ${topSale.playerName ?? topSale.lotNumber}`}
             testId="summary-top"
           />
@@ -658,8 +668,8 @@ export function AuctionSummaryCard({
                       "purse sealed"
                     ) : (
                       <>
-                        <strong>{formatPaiseINR(paise(paddle.committed))}</strong>
-                        <span> · left {formatPaiseINR(paise(paddle.purseRemaining))}</span>
+                        <strong>{money.ledger(paddle.committed)}</strong>
+                        <span> · left {money.ledger(paddle.purseRemaining)}</span>
                       </>
                     )}
                   </span>
@@ -727,6 +737,7 @@ export function UpNext({
   /** Faces for the queue, keyed by lot id. */
   lotMedia?: MediaByLot;
 }) {
+  const money = useMoney();
   const queue = snapshot?.queue ?? [];
   if (queue.length === 0) {
     return null;
@@ -751,7 +762,7 @@ export function UpNext({
             />
             <span className="up-next-name">{entry.playerName ?? entry.lotNumber}</span>
             <span className="up-next-role">{entry.role.replace(/_/g, " ")}</span>
-            <span className="up-next-base">base {formatPaiseINR(paise(entry.basePrice))}</span>
+            <span className="up-next-base">base {money.ledger(entry.basePrice)}</span>
           </li>
         ))}
       </ol>
@@ -778,6 +789,7 @@ export function RulesCard({
   /** A header link ("Room & settings →") where the card sits on a dashboard. */
   action?: ReactNode;
 }) {
+  const money = useMoney();
   return (
     <SectionCard
       icon={<IconFile />}
@@ -790,7 +802,7 @@ export function RulesCard({
         {rules.pursePerTeam !== undefined ? (
           <div>
             <dt>Purse per team</dt>
-            <dd>{formatPaiseINR(paise(rules.pursePerTeam))}</dd>
+            <dd>{money.ledger(rules.pursePerTeam)}</dd>
           </div>
         ) : null}
         <div>
@@ -810,8 +822,8 @@ export function RulesCard({
           <dd>
             {rules.slabs.map((slab) => (
               <span key={`${String(slab.step)}-${String(slab.upTo)}`} className="rules-slab">
-                {formatPaiseINR(paise(slab.step))}
-                {slab.upTo !== null ? ` up to ${formatPaiseINR(paise(slab.upTo))}` : " beyond"}
+                {money.ledger(slab.step)}
+                {slab.upTo !== null ? ` up to ${money.ledger(slab.upTo)}` : " beyond"}
               </span>
             ))}
           </dd>

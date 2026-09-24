@@ -15,7 +15,7 @@
  * anyway, because Satori cannot resolve a CSS variable.
  */
 
-import { formatPaiseINR, paise } from "./money";
+import { formatAmount, paise, type MoneyUnit } from "./money";
 import { roleLabel } from "./player-profile";
 
 /**
@@ -136,6 +136,8 @@ export interface PlayerPosterInput {
   teamColor?: string | null;
   competitionName: string;
   competitionLogoUrl: string | null;
+  /** What the season's auction counts in: prices print as "₹…" or "… pts". */
+  unit: MoneyUnit;
 }
 
 export interface PlayerPoster {
@@ -213,7 +215,7 @@ export function monogramOf(name: string): string {
 export function buildPlayerPoster(input: PlayerPosterInput): PlayerPoster {
   const sold = input.outcome === "sold" && input.pricePaise !== null;
   const priceLabel =
-    sold && input.pricePaise !== null ? formatPaiseINR(paise(input.pricePaise)) : null;
+    sold && input.pricePaise !== null ? formatAmount(paise(input.pricePaise), input.unit) : null;
   const outcomeLine =
     input.teamName === null
       ? input.outcome === "unsold"
@@ -296,6 +298,8 @@ export interface TeamPosterInput {
   spentPaise: number;
   /** Integer paise the franchise started with. */
   pursePaise: number;
+  /** What the season's auction counts in: prices print as "₹…" or "… pts". */
+  unit: MoneyUnit;
 }
 
 export interface TeamPosterRow {
@@ -350,7 +354,7 @@ function rankOf(member: TeamPosterMember): number {
   return member.marks.includes("retained") ? 2 : 3;
 }
 
-function rowOf(member: TeamPosterMember): TeamPosterRow {
+function rowOf(member: TeamPosterMember, unit: MoneyUnit): TeamPosterRow {
   const marks = MARK_ORDER.filter((mark) => member.marks.includes(mark));
   // A table row has room for one word; ICON is the one people look for, and
   // "C" beside a price is the captain the room bought.
@@ -361,7 +365,7 @@ function rowOf(member: TeamPosterMember): TeamPosterRow {
     firstName: firstNameOf(member.name),
     monogram: monogramOf(member.name),
     roleLine: roleLabel(member.role),
-    priceLabel: member.pricePaise === null ? null : formatPaiseINR(paise(member.pricePaise)),
+    priceLabel: member.pricePaise === null ? null : formatAmount(paise(member.pricePaise), unit),
     markerLabel: primary === null ? null : BADGE[primary],
     badges: marks.map((mark) => BADGE[mark]),
     isCaptain: marks.includes("captain"),
@@ -400,10 +404,10 @@ export function buildTeamPoster(input: TeamPosterInput): TeamPoster {
     captainName: captain === undefined ? null : clamp(captain.name, 24),
     competitionName: clamp(input.competitionName, 34),
     competitionLogoUrl: input.competitionLogoUrl,
-    rows: ordered.map(rowOf),
+    rows: ordered.map((member) => rowOf(member, input.unit)),
     squadLabel: `${String(input.members.length)} player${input.members.length === 1 ? "" : "s"}`,
-    spentLabel: formatPaiseINR(paise(input.spentPaise)),
-    remainingLabel: formatPaiseINR(paise(remaining)),
+    spentLabel: formatAmount(paise(input.spentPaise), input.unit),
+    remainingLabel: formatAmount(paise(remaining), input.unit),
   };
 }
 
@@ -425,6 +429,8 @@ export interface TopBuysPosterInput {
   competitionLogoUrl: string | null;
   buys: readonly TopBuyInput[];
   count: TopBuyCount;
+  /** What the season's auction counts in: prices print as "₹…" or "… pts". */
+  unit: MoneyUnit;
 }
 
 export interface TopBuyRow {
@@ -473,7 +479,7 @@ export function buildTopBuysPoster(input: TopBuysPosterInput): TopBuysPoster {
       shortName: shortNameOf(buy.playerName),
       monogram: monogramOf(buy.playerName),
       roleLine: roleLabel(buy.role),
-      priceLabel: formatPaiseINR(paise(buy.pricePaise)),
+      priceLabel: formatAmount(paise(buy.pricePaise), input.unit),
       teamName: clamp(buy.teamName, 22),
       teamMonogram: monogramOf(buy.teamName),
       teamColor: normalizeHexColor(buy.teamColor),
@@ -505,6 +511,8 @@ export interface SeasonPosterInput {
   competitionName: string;
   competitionLogoUrl: string | null;
   squads: readonly SeasonSquadInput[];
+  /** What the season's auction counts in: prices print as "₹…" or "… pts". */
+  unit: MoneyUnit;
 }
 
 export interface SeasonSquad {
@@ -550,6 +558,7 @@ export function buildSeasonPoster(input: SeasonPosterInput): SeasonPoster {
       members: squad.members,
       spentPaise: squad.spentPaise,
       pursePaise: squad.spentPaise,
+      unit: input.unit,
     });
     return {
       teamName: clamp(squad.teamName, 20),
@@ -569,7 +578,7 @@ export function buildSeasonPoster(input: SeasonPosterInput): SeasonPoster {
     competitionLogoUrl: input.competitionLogoUrl,
     chip: teamsLabel,
     countLine: `${String(players)} player${players === 1 ? "" : "s"} · ${teamsLabel}`,
-    spentLabel: formatPaiseINR(paise(spent)),
+    spentLabel: formatAmount(paise(spent), input.unit),
     squads,
     largestSquad: squads.reduce((max, squad) => Math.max(max, squad.rows.length), 0),
   };

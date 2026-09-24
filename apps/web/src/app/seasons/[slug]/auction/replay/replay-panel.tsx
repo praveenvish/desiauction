@@ -2,8 +2,6 @@
 
 import {
   buildAuctionSnapshot,
-  formatPaiseINR,
-  paise,
   replayAuction,
   serializeSnapshot,
   type AuctionSnapshot,
@@ -16,6 +14,7 @@ import type { ReplayViewerData } from "../../../../../server/auction/conduct-act
 import { formatTime } from "../../../../../lib/format-date";
 import { lotSeed } from "../../../../../lib/player-seed";
 import { useHydrated } from "../../../../../lib/use-hydrated";
+import { useMoney } from "../../../../../components/money-unit";
 
 // THE REPLAY VIEWER (M-IP4-3). The founder scrubs through the immutable event
 // log; every frame is core's pure fold of events[0..n] — the EXACT reducer the
@@ -166,6 +165,7 @@ function ReplayFrame({
   snapshot: AuctionSnapshot;
   lotMedia: ReplayViewerData["lotMedia"];
 }) {
+  const money = useMoney();
   return (
     <div className="cockpit-grid">
       <Card data-testid="replay-frame">
@@ -196,7 +196,7 @@ function ReplayFrame({
             </div>
             <p data-testid="replay-leading">
               {snapshot.currentLot.currentBid !== null
-                ? `Leading: ${formatPaiseINR(paise(snapshot.currentLot.currentBid.amount))} — ${snapshot.currentLot.currentBid.teamName}`
+                ? `Leading: ${money.ledger(snapshot.currentLot.currentBid.amount)} — ${snapshot.currentLot.currentBid.teamName}`
                 : "No bids yet"}
             </p>
             <ol className="timeline">
@@ -204,7 +204,7 @@ function ReplayFrame({
                 <li key={entry.bidId}>
                   <Badge tone="neutral">{entry.paddleNumber}</Badge>
                   <span>{entry.teamName}</span>
-                  <span className="timeline-at">{formatPaiseINR(paise(entry.amount))}</span>
+                  <span className="timeline-at">{money.ledger(entry.amount)}</span>
                 </li>
               ))}
             </ol>
@@ -223,7 +223,7 @@ function ReplayFrame({
               {snapshot.lastOutcome.kind.toUpperCase()} — {snapshot.lastOutcome.lotNumber}{" "}
               {snapshot.lastOutcome.playerName ?? ""}
               {snapshot.lastOutcome.amount !== null
-                ? ` at ${formatPaiseINR(paise(snapshot.lastOutcome.amount))}`
+                ? ` at ${money.ledger(snapshot.lastOutcome.amount)}`
                 : ""}
             </p>
           </div>
@@ -241,7 +241,7 @@ function ReplayFrame({
               <span className="registration-phone">
                 {paddle.purseRemaining === null
                   ? "purse sealed"
-                  : `${formatPaiseINR(paise(paddle.purseRemaining))} left`}
+                  : `${money.ledger(paddle.purseRemaining)} left`}
               </span>
             </li>
           ))}

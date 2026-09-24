@@ -92,6 +92,20 @@ export function CreateCompetitionForm({
         <input type="hidden" name="sport" value={sports[0]?.key ?? ""} />
       ) : null}
 
+      {/* 0091: what the auction counts in. Points leagues run the same room,
+          but their purses are points and nothing is ever owed or settled.
+          Changeable under Season details until the auction is created. */}
+      <Select
+        label="Auction currency"
+        name="auctionUnit"
+        defaultValue="inr"
+        help="Points: purses and bids are points — no money changes hands."
+        data-testid="create-auction-unit"
+      >
+        {/* rupees-always: names the rupee unit itself */}
+        <option value="inr">Rupees (₹) — real money</option>
+        <option value="points">Points — no money changes hands</option>
+      </Select>
       <Field label="Location" name="location" placeholder="Malad, Mumbai" />
       <div className="date-row">
         <Field label="Starts on" name="startsOn" type="date" />

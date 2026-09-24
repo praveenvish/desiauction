@@ -28,6 +28,7 @@ import {
   type PlayerField,
   type RegistrationEvent,
   type RegistrationStatus,
+  isMoneyUnit,
   parseRoleIn,
   sportPackFor,
   splitAttributeWrite,
@@ -254,6 +255,13 @@ export async function createCompetitionAction(
   const endsOn = formString(formData, "endsOn");
   const tournamentId = formString(formData, "tournamentId");
   const sport = formString(formData, "sport");
+  // 0091: rupees or points. Absent (older forms) is rupees; anything else is
+  // refused rather than guessed — the unit decides whether money is owed.
+  const unitRaw = formString(formData, "auctionUnit");
+  if (unitRaw !== "" && !isMoneyUnit(unitRaw)) {
+    return { error: "Choose rupees or points for the auction.", field: "form" };
+  }
+  const auctionUnit = isMoneyUnit(unitRaw) ? unitRaw : "inr";
   // Membership + capability: only an owner/staff of THIS org may create in it.
   const memberships = await withTenantDb(dbHandle, { personId: session.personId }, (db) =>
     orgsFor(db, session.personId),
@@ -302,6 +310,7 @@ export async function createCompetitionAction(
           startsOn,
           endsOn,
           sport,
+          auctionUnit,
           ...(tournamentId !== "" ? { tournamentId } : {}),
         });
       },
@@ -423,7 +432,13 @@ export async function seasonOverviewView(slug: string): Promise<SeasonOverviewVi
       // whole auction — org owner, `competition.manage`, no settlement grant —
       // was handed the page's primary call to action at the end of the night
       // and taken to "LOST BALL · This page doesn't exist".
-      viewer: { canManage, canReview, canSeeMoney, canSettle },
+      // A points season (0091) has no desk to open, whatever the grants say.
+      viewer: {
+        canManage,
+        canReview,
+        canSeeMoney,
+        canSettle: canSettle && competition.auctionUnit === "inr",
+      },
       publishBlockers:
         hold === null
           ? publishBlockers(competition)
@@ -624,7 +639,7 @@ export async function setCompetitionVisibilityAction(
   return { ok: true };
 }
 
-export type DetailsField = "name" | "startsOn" | "endsOn" | "location" | "form";
+export type DetailsField = "name" | "startsOn" | "endsOn" | "location" | "auctionUnit" | "form";
 
 /**
  * DA-11: give a season's name, dates and location a way to change.
@@ -642,6 +657,8 @@ export async function updateCompetitionDetailsAction(
     endsOn: string;
     /** PI-1: "" leaves the category as it stands (older callers omit it). */
     entryCategory?: string;
+    /** 0091: "" or absent leaves the unit as it stands. */
+    auctionUnit?: string;
   },
 ): Promise<{ ok: boolean; error?: string; field?: DetailsField }> {
   const session = await requireSession();
@@ -665,8 +682,13 @@ export async function updateCompetitionDetailsAction(
   if (category !== "" && !isEntryCategory(category)) {
     return { ok: false, error: "Pick one of the listed categories.", field: "form" };
   }
+  const unit = input.auctionUnit ?? "";
+  if (unit !== "" && !isMoneyUnit(unit)) {
+    return { ok: false, error: "Choose rupees or points for the auction.", field: "form" };
+  }
   const result = await inCompetitionOrg(session.personId, competition, (db) =>
     updateCompetitionDetails(db, competition, session.personId, {
+      ...(isMoneyUnit(unit) ? { auctionUnit: unit } : {}),
       name: input.name,
       location: input.location.trim() === "" ? null : input.location.trim(),
       startsOn: input.startsOn === "" ? null : input.startsOn,
@@ -675,9 +697,22 @@ export async function updateCompetitionDetailsAction(
     }),
   );
   if (!result.ok) {
-    return result.reason === "invalid_name"
-      ? { ok: false, error: "Give the season a name of at least 3 characters.", field: "name" }
-      : { ok: false, error: "The end date falls before the start date.", field: "endsOn" };
+    switch (result.reason) {
+      case "invalid_name":
+        return {
+          ok: false,
+          error: "Give the season a name of at least 3 characters.",
+          field: "name",
+        };
+      case "unit_locked":
+        return {
+          ok: false,
+          error: "The auction has been created in this unit — rupees or points can't change now.",
+          field: "auctionUnit",
+        };
+      default:
+        return { ok: false, error: "The end date falls before the start date.", field: "endsOn" };
+    }
   }
   return { ok: true };
 }

@@ -18,7 +18,7 @@ import {
 import Link from "next/link";
 import { useCallback } from "react";
 
-import { compactFloorINR, compactINR, exactINR } from "../../../../lib/inr";
+import { moneyFormat } from "../../../../lib/money";
 import { roleLabeller } from "../../../../lib/role-label";
 import { adminAuctionWatch, type AuctionWatch } from "../../../../server/admin/live-watch";
 import { AuctionOverviewPanel } from "../../../seasons/[slug]/auction/auction-overview-panel";
@@ -79,6 +79,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
   // Polls while the room is open, and stops by itself the moment it closes.
   const { data, failed, revoked } = usePolled(initial, fetcher, REFRESH_MS, isRunning);
   const { header, overview, pulse, engine } = data;
+  // This room's own unit (0091): the admin tree has no season layout above it.
+  const money = moneyFormat(header.auctionUnit);
   const stillRunning = isRunning(data);
   const labelOf = roleLabeller(overview.roles);
 
@@ -179,12 +181,16 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             icon={<IconRupee />}
             tone="green"
             label="Average sale"
-            value={averageSale === null ? "—" : compactINR(averageSale)}
+            value={averageSale === null ? "—" : money.compact(averageSale)}
           />
         </StatGrid>
       </div>
 
-      <AuctionOverviewPanel overview={overview} idleHint="No lot is under the hammer right now." />
+      <AuctionOverviewPanel
+        overview={overview}
+        unit={header.auctionUnit}
+        idleHint="No lot is under the hammer right now."
+      />
 
       {engine !== null ? <EngineCard engine={engine} /> : null}
 
@@ -230,7 +236,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                       </span>
                     </td>
                     <td data-label="Bid" className="admin-num admin-count">
-                      {exactINR(bid.amount)}
+                      {money.exact(bid.amount)}
                     </td>
                   </tr>
                 ))}
@@ -283,13 +289,13 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                       {team.players}
                     </td>
                     <td data-label="Spent" className="admin-num admin-count">
-                      {team.spent === undefined ? "—" : compactINR(team.spent)}
+                      {team.spent === undefined ? "—" : money.compact(team.spent)}
                     </td>
                     <td data-label="Left" className="admin-num admin-count">
-                      {team.remaining === undefined ? "—" : compactFloorINR(team.remaining)}
+                      {team.remaining === undefined ? "—" : money.compactFloor(team.remaining)}
                     </td>
                     <td data-label="Top buy" className="admin-num admin-count">
-                      {team.highest === null ? "—" : compactINR(team.highest)}
+                      {team.highest === null ? "—" : money.compact(team.highest)}
                     </td>
                   </tr>
                 ))}
@@ -352,10 +358,10 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                       </Pill>
                     </td>
                     <td data-label="Base" className="admin-num admin-count">
-                      {compactINR(lot.basePrice)}
+                      {money.compact(lot.basePrice)}
                     </td>
                     <td data-label="Final" className="admin-num admin-count">
-                      {lot.soldPrice === null ? "—" : compactINR(lot.soldPrice)}
+                      {lot.soldPrice === null ? "—" : money.compact(lot.soldPrice)}
                     </td>
                     <td data-label="Paddle">{lot.paddleNumber ?? "—"}</td>
                   </tr>

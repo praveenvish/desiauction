@@ -4,7 +4,8 @@ import { Button, Field, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { compactINR, exactINR } from "../../../../../lib/inr";
+import { useMoney } from "../../../../../components/money-unit";
+import type { MoneyFormat } from "../../../../../lib/money";
 import { createAuctionAction, type AuctionDashboard } from "../../../../../server/auction/actions";
 import {
   squadFeasibility,
@@ -12,21 +13,33 @@ import {
 } from "../../../../../server/auction/auction-setup";
 
 /**
- * The figure a rupee field holds, read back in grouped rupees ("₹2,00,00,000 ·
- * ₹2 Cr"). A purse typed as 20000000 is one missing zero from a tenth of the
- * league it meant; the read-back is how an organizer sees that before it
- * locks. Nothing for a value the server would refuse anyway.
+ * The figure a money field holds, read back in its season's unit ("₹2,00,00,000
+ * · ₹2 Cr", or "1,000 pts"). A purse typed as 20000000 is one missing zero from
+ * a tenth of the league it meant; the read-back is how an organizer sees that
+ * before it locks. Nothing for a value the server would refuse anyway.
  */
-function rupeeReadBack(value: string): { help: string } | Record<string, never> {
+function amountReadBack(
+  value: string,
+  money: MoneyFormat,
+): { help: string } | Record<string, never> {
   const trimmed = value.trim();
   if (!/^\d+$/.test(trimmed)) return {};
-  const inPaise = Number(trimmed) * 100;
-  if (!Number.isSafeInteger(inPaise)) return {};
-  return {
-    help:
-      inPaise >= 10_000_000 ? `${exactINR(inPaise)} · ${compactINR(inPaise)}` : exactINR(inPaise),
-  };
+  const stored = Number(trimmed) * 100;
+  if (!Number.isSafeInteger(stored)) return {};
+  const exact = money.exact(stored);
+  const compact = money.compact(stored);
+  return { help: compact !== exact ? `${exact} · ${compact}` : exact };
 }
+
+/**
+ * The numbers the form starts from, in the season's unit (0091). A points
+ * league starts at 1,000 a team with bands of 50 / 20 / 10 — the rupee
+ * defaults read as points would be twenty million.
+ */
+const STARTING = {
+  inr: { purse: "20000000", base: "10000", bands: { A: "50000", B: "25000", C: "10000" } },
+  points: { purse: "1000", base: "10", bands: { A: "50", B: "20", C: "10" } },
+} as const;
 
 /**
  * RULES OF THE NIGHT (DA-05). These are the numbers a league negotiates; they
@@ -38,17 +51,15 @@ export function RulesStep({ slug, dashboard }: { slug: string; dashboard: Auctio
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  const [purse, setPurse] = useState("20000000");
+  const money = useMoney();
+  const starting = STARTING[money.unit];
+  const [purse, setPurse] = useState<string>(starting.purse);
   const [squadMin, setSquadMin] = useState("8");
   const [squadMax, setSquadMax] = useState("15");
   const [timer, setTimer] = useState("30");
   const [extension, setExtension] = useState("15");
-  const [baseDefault, setBaseDefault] = useState("10000");
-  const [bands, setBands] = useState<Record<string, string>>({
-    A: "50000",
-    B: "25000",
-    C: "10000",
-  });
+  const [baseDefault, setBaseDefault] = useState<string>(starting.base);
+  const [bands, setBands] = useState<Record<string, string>>({ ...starting.bands });
   const [fieldErrors, setFieldErrors] = useState<AuctionSetupFieldErrors>({});
   const [acceptShortSquads, setAcceptShortSquads] = useState(false);
 
@@ -88,11 +99,11 @@ export function RulesStep({ slug, dashboard }: { slug: string; dashboard: Auctio
     <div className="auction-setup as-rules" data-testid="auction-setup">
       <div className="as-rules-grid">
         <Field
-          label="Purse per team (₹)"
+          label={`Purse per team (${money.label})`}
           name="pursePerTeam"
           inputMode="numeric"
           value={purse}
-          {...rupeeReadBack(purse)}
+          {...amountReadBack(purse, money)}
           error={fieldErrors["pursePerTeam"]}
           onChange={(event) => {
             setPurse(event.target.value);
@@ -139,11 +150,11 @@ export function RulesStep({ slug, dashboard }: { slug: string; dashboard: Auctio
           }}
         />
         <Field
-          label="Default base price (₹)"
+          label={`Default base price (${money.label})`}
           name="basePriceDefault"
           inputMode="numeric"
           value={baseDefault}
-          {...rupeeReadBack(baseDefault)}
+          {...amountReadBack(baseDefault, money)}
           error={fieldErrors["basePriceDefault"]}
           onChange={(event) => {
             setBaseDefault(event.target.value);
@@ -152,7 +163,7 @@ export function RulesStep({ slug, dashboard }: { slug: string; dashboard: Auctio
         {(["A", "B", "C"] as const).map((label) => (
           <Field
             key={label}
-            label={`Band ${label} base price (₹)`}
+            label={`Band ${label} base price (${money.label})`}
             name={`band${label}`}
             inputMode="numeric"
             value={bands[label]}

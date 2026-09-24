@@ -1,6 +1,7 @@
+import type { MoneyUnit } from "@desiauction/core";
 import { Card, PlayerImage } from "@desiauction/ui";
 
-import { compactFloorINR, compactINR, exactINR } from "../../../../lib/inr";
+import { moneyFormat } from "../../../../lib/money";
 import { roleLabeller } from "../../../../lib/role-label";
 import type { AuctionOverview } from "../../../../server/auction/auction-overview";
 
@@ -16,11 +17,18 @@ import type { AuctionOverview } from "../../../../server/auction/auction-overvie
 export function AuctionOverviewPanel({
   overview,
   idleHint = "No lot is under the hammer. Open the cockpit to put the next one up.",
+  unit = "inr",
 }: {
   overview: AuctionOverview;
   /** What an empty block says — the organizer is told where to act; an observer is not. */
   idleHint?: string;
+  /**
+   * What the season counts in (0091). A prop, not `useMoney()`: this panel is
+   * mounted by /admin, outside any season's provider.
+   */
+  unit?: MoneyUnit;
 }) {
+  const money = moneyFormat(unit);
   const { counts, totalLots, moneyMoved, paddles, onBlock } = overview;
   const labelOf = roleLabeller(overview.roles);
   const pct = (n: number) => (totalLots > 0 ? (n / totalLots) * 100 : 0);
@@ -61,7 +69,7 @@ export function AuctionOverviewPanel({
             <span className="auc-key is-block" /> On block {counts.onBlock}
             <span className="auc-key is-unsold" /> Unsold {counts.unsold}
           </span>
-          <span className="auc-money">Money moved · {compactINR(moneyMoved)}</span>
+          <span className="auc-money">Money moved · {money.compact(moneyMoved)}</span>
         </div>
         {counts.queued === 0 && counts.prepared > 0 ? (
           <p className="competitions-hint" data-testid="nothing-queued-hint">
@@ -97,7 +105,7 @@ export function AuctionOverviewPanel({
                 <span className="roster-person">
                   <span className="roster-name">{onBlock.playerName ?? "Unnamed"}</span>
                   <span className="competitions-hint">
-                    {labelOf(onBlock.role)} · base {exactINR(onBlock.basePrice)}
+                    {labelOf(onBlock.role)} · base {money.exact(onBlock.basePrice)}
                   </span>
                 </span>
               </div>
@@ -105,7 +113,7 @@ export function AuctionOverviewPanel({
                 <div>
                   <span className="team-card-money-lbl">Current bid</span>
                   <span className="auc-bid-value">
-                    {onBlock.currentBid !== null ? exactINR(onBlock.currentBid) : "No bids yet"}
+                    {onBlock.currentBid !== null ? money.exact(onBlock.currentBid) : "No bids yet"}
                   </span>
                 </div>
                 {onBlock.leadingTeamName !== null ? (
@@ -156,7 +164,7 @@ export function AuctionOverviewPanel({
                         not dimmed — it was never sent. */}
                     {paddle.remaining !== undefined ? (
                       <span className="auc-paddle-left">
-                        {compactFloorINR(paddle.remaining)} left
+                        {money.compactFloor(paddle.remaining)} left
                       </span>
                     ) : null}
                   </span>

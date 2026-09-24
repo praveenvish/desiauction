@@ -1,4 +1,4 @@
-import { roleOptions } from "@desiauction/core";
+import { roleOptions, type MoneyUnit } from "@desiauction/core";
 import { auctions, people, registrations, type Db } from "@desiauction/db";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
@@ -43,6 +43,11 @@ export interface ReportBuy {
 }
 
 export interface SeasonReport {
+  /**
+   * What auction spend, purses and buys count in (0091). Fees are real rupees
+   * in every season; only the auction's figures follow this.
+   */
+  auctionUnit: MoneyUnit;
   registrations: {
     total: number;
     submitted: number;
@@ -163,6 +168,7 @@ export async function seasonReportIn(
   }
 
   return {
+    auctionUnit: competition.auctionUnit,
     registrations: {
       total: stats.total,
       submitted: stats.submitted,
@@ -235,11 +241,13 @@ export function reportRows(
       ).map(text),
     };
   }
+  // A points league's spend is points, never rupees — the column says which.
+  const unit = report.auctionUnit === "points" ? "points" : "rupees";
   if (table === "teams") {
     // The spend table IS money: without sight there is nothing to export.
     if (report.teams.some((team) => team.spend === undefined)) return null;
     return {
-      header: ["team", "squad", "squad_max", "spend_rupees", "purse_rupees"],
+      header: ["team", "squad", "squad_max", `spend_${unit}`, `purse_${unit}`],
       rows: report.teams.map((team) =>
         text([
           team.name,
@@ -253,7 +261,7 @@ export function reportRows(
   }
   if (report.topBuys === undefined) return null;
   return {
-    header: ["player", "role", "team", "price_rupees"],
+    header: ["player", "role", "team", `price_${unit}`],
     rows: report.topBuys.map((buy) =>
       text([buy.playerName ?? "", buy.role ?? "", buy.teamName ?? "", buy.price / 100]),
     ),

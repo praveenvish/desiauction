@@ -1,4 +1,4 @@
-import { formatPaiseINR, isMinor, paise } from "@desiauction/core";
+import { formatAmount, isMinor, paise } from "@desiauction/core";
 import {
   auctionOwnerInvites,
   auctions,
@@ -67,6 +67,7 @@ export async function auctionOutcomeMessages(
       visibility: competitions.visibility,
       orgId: competitions.orgId,
       orgName: organizations.name,
+      unit: competitions.auctionUnit,
       config: auctions.config,
     })
     .from(auctions)
@@ -78,6 +79,9 @@ export async function auctionOutcomeMessages(
     return { mails: [], texts: [] };
   }
   const config = context.config as { pursePerTeam?: number; squadMin?: number; squadMax?: number };
+  // Every amount in the season's own unit (0091): a points league's player was
+  // "bought for 750 pts", never for rupees nobody paid.
+  const amount = (value: number): string => formatAmount(paise(value), context.unit);
 
   const sales: SaleRow[] = await db
     .select({
@@ -154,7 +158,7 @@ export async function auctionOutcomeMessages(
           row.isViceCaptain ? "Vice-captain" : null,
           row.isIcon ? "Icon" : null,
           row.isRetained ? "Retained" : null,
-          price === undefined ? null : formatPaiseINR(paise(price)),
+          price === undefined ? null : amount(price),
         ].filter((tag): tag is string => tag !== null);
         return { name: row.name ?? "Player", note: tags.join(" · ") || "Signed" };
       });
@@ -194,8 +198,8 @@ export async function auctionOutcomeMessages(
             season: context.season,
             orgName: context.orgName,
             teamName: sale.teamName,
-            price: formatPaiseINR(paise(soldPrice)),
-            basePrice: formatPaiseINR(paise(sale.basePrice)),
+            price: amount(soldPrice),
+            basePrice: amount(sale.basePrice),
             multiple: sale.basePrice > 0 ? soldPrice / sale.basePrice : null,
             bidders: story.bidders.includes(sale.teamName)
               ? story.bidders
@@ -225,7 +229,7 @@ export async function auctionOutcomeMessages(
             : `${publicCard}/opengraph-image`,
         slots: {
           team: smsFit(sale.teamName),
-          price: smsPrice(formatPaiseINR(paise(soldPrice))),
+          price: smsPrice(amount(soldPrice)),
           competition: smsSeasonName(context.season),
         },
       });
@@ -280,8 +284,8 @@ export async function auctionOutcomeMessages(
           season: context.season,
           teamName: owner.teamName,
           squad,
-          spent: formatPaiseINR(paise(spent)),
-          purseLeft: formatPaiseINR(paise(Math.max(purse - spent, 0))),
+          spent: amount(spent),
+          purseLeft: amount(Math.max(purse - spent, 0)),
           squadSize: squad.length,
           squadMin: config.squadMin ?? 0,
           squadMax: config.squadMax ?? 0,

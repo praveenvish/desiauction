@@ -56,6 +56,7 @@ import {
 } from "./writer";
 import { logger } from "../logger";
 import { grantsOfPerson, tenantOfPerson } from "../request-cache";
+import { POINTS_SEASON_REFUSAL } from "./points-season";
 
 /**
  * PX-7 Settlement Experience — the internal RPC surface (PX-1 E1/E2).
@@ -602,6 +603,14 @@ async function command(
   const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return { ok: false, error: messageFor("not_authorized") };
+  }
+  // A POINTS SEASON OWES NOTHING (0091). Its purses and prices are points, so
+  // a case opened over its auction would turn a points budget into rupee dues
+  // — and every later command (payment, refund, waiver, close) would act on a
+  // debt that never existed. Refused here, before the writer, for every
+  // command at once: hiding the Money tab is not what stops it.
+  if (competition.auctionUnit === "points") {
+    return { ok: false, error: POINTS_SEASON_REFUSAL };
   }
   const result = await withTenantDb(
     dbHandle,

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatAmount, paise, type MoneyUnit } from "@desiauction/core";
 
 /**
  * THE ANIMATED POSTER.
@@ -83,6 +83,8 @@ export interface Scene {
   readonly bands: readonly Band[];
   readonly ground: string;
   readonly pricePaise: number | null;
+  /** The season's unit — the count-up reads "₹…" or "… pts" like the band it lands on. */
+  readonly unit: MoneyUnit;
   readonly duration: number;
 }
 
@@ -252,7 +254,7 @@ function timing(name: string, index: number, items: number): { start: number; le
   return { start: 0.4 + index * 0.3, length: 0.5 };
 }
 
-export function buildScene(sprite: Sprite): Scene {
+export function buildScene(sprite: Sprite, unit: MoneyUnit): Scene {
   const { width, height, facts } = sprite;
   const bands: Band[] = facts.layers.map((name, index) => {
     const canvas = document.createElement("canvas");
@@ -287,6 +289,7 @@ export function buildScene(sprite: Sprite): Scene {
     bands,
     ground,
     pricePaise: facts.pricePaise ?? null,
+    unit,
     // A beat to look at the finished poster before the loop (or the file) ends.
     duration: last + 1.4,
   };
@@ -437,8 +440,8 @@ export function drawFrame(target: CanvasRenderingContext2D, scene: Scene, now: n
       const settle = progress(now, start + length * 0.8, length * 0.2);
       if (scene.pricePaise !== null && rect !== undefined && settle < 1) {
         /*
-         * Whole RUPEES on the way up. A fraction of the target is a number of
-         * paise, and `formatPaiseINR` prints those honestly — so the counter
+         * Whole RUPEES (or points) on the way up. A fraction of the target is a number of
+         * paise, and `formatAmount` prints those honestly — so the counter
          * spent a second reading "₹59,854.56", which is not a price anybody
          * ever bid. The final frame is the exact stored value either way,
          * because the rendered band takes over before the film ends.
@@ -452,7 +455,11 @@ export function drawFrame(target: CanvasRenderingContext2D, scene: Scene, now: n
         target.font = `700 ${String(size)}px PosterCount, sans-serif`;
         target.textAlign = "right";
         target.textBaseline = "alphabetic";
-        target.fillText(formatPaiseINR(paise(value)), rect.x + rect.w, rect.y + rect.h * 0.96);
+        target.fillText(
+          formatAmount(paise(value), scene.unit),
+          rect.x + rect.w,
+          rect.y + rect.h * 0.96,
+        );
         target.restore();
       }
       target.save();

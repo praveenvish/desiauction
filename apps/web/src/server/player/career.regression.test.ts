@@ -278,6 +278,7 @@ describe("playerCareer (PI-1)", () => {
       teams: 1,
       soldCount: 1,
       highestPrice: SOLD_PRICE,
+      highestUnit: "inr",
     });
   });
 

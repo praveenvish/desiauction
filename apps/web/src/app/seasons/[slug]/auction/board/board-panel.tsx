@@ -16,7 +16,7 @@ import { SoundToggle } from "../../../../../components/shell/sound-toggle";
 import { CrestImage } from "../../../../../components/team/crest-image";
 
 import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-summary";
-import { ledgerINR } from "../../../../../lib/inr";
+import { useMoney } from "../../../../../components/money-unit";
 
 // The public live board: the lot on the block, standings, headline economy
 // tiles and recent sales, ALL derived from the read-only AuctionSnapshot. No
@@ -139,6 +139,7 @@ export function BoardPanel({
    */
   lotMedia: Record<string, LotMedia>;
 }) {
+  const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // DA-20: the board read `connection !== "open"` and ignored `stale`/`offline`
   // entirely, so six seconds offline left the projector byte-identical to the
@@ -266,8 +267,8 @@ export function BoardPanel({
       : lot !== null
         ? `On the block: ${lot.playerName ?? lot.lotNumber}. ${
             lot.currentBid === null
-              ? `Opening at ${ledgerINR(lot.nextMinimumBid)}.`
-              : `${ledgerINR(lot.currentBid.amount)} to ${lot.currentBid.teamName}.`
+              ? `Opening at ${money.ledger(lot.nextMinimumBid)}.`
+              : `${money.ledger(lot.currentBid.amount)} to ${lot.currentBid.teamName}.`
           }`
         : snapshot.lastOutcome !== null
           ? // Never the raw engine enum: "Amit Verma: held." is not English.
@@ -276,7 +277,7 @@ export function BoardPanel({
             }${
               snapshot.lastOutcome.amount === null
                 ? ""
-                : ` at ${ledgerINR(snapshot.lastOutcome.amount)}`
+                : ` at ${money.ledger(snapshot.lastOutcome.amount)}`
             }. ${outcomeMeta(snapshot.lastOutcome)}.`
           : "";
 
@@ -422,7 +423,7 @@ export function BoardPanel({
                 keeper" to a room of two hundred people. The shared formatter
                 is the one place those labels are decided. */}
             <p className="board-block-meta">
-              {labelOf(lot.role)} · base {ledgerINR(lot.basePrice)}
+              {labelOf(lot.role)} · base {money.ledger(lot.basePrice)}
             </p>
           </div>
           <div className="board-block-money">
@@ -430,7 +431,7 @@ export function BoardPanel({
               {lot.currentBid !== null ? "Current bid" : "Opening at"}
             </span>
             <span className="board-block-amount" data-testid="board-block-amount">
-              {ledgerINR(lot.currentBid?.amount ?? lot.nextMinimumBid)}
+              {money.ledger(lot.currentBid?.amount ?? lot.nextMinimumBid)}
             </span>
             <span className="board-block-leader" data-testid="board-block-leader">
               {lot.currentBid !== null ? lot.currentBid.teamName : "No bids yet"}
@@ -497,7 +498,7 @@ export function BoardPanel({
                 totalSpend === null ? "board-tile-value board-tile-muted" : "board-tile-value"
               }
             >
-              {totalSpend === null ? "sealed" : ledgerINR(totalSpend)}
+              {totalSpend === null ? "sealed" : money.ledger(totalSpend)}
             </span>
           </div>
           <div className="board-tile">
@@ -525,7 +526,7 @@ export function BoardPanel({
                   />
                 </span>
                 <span className="board-tile-value board-tile-top">
-                  {ledgerINR(topBuy.soldPrice)}
+                  {money.ledger(topBuy.soldPrice)}
                   <span className="board-tile-note">
                     {topBuy.playerName ?? topBuy.lotNumber}
                     {topBuy.teamName !== null ? ` · ${topBuy.teamName}` : ""}
@@ -570,7 +571,7 @@ export function BoardPanel({
                       ? "—"
                       : team.purseRemaining === null
                         ? "sealed"
-                        : ledgerINR(team.purseRemaining)}
+                        : money.ledger(team.purseRemaining)}
                   </span>
                   <span className="board-purse-label">purse remaining</span>
                 </div>
@@ -609,7 +610,7 @@ export function BoardPanel({
                       ? "—"
                       : team.committed === null
                         ? "sealed"
-                        : ledgerINR(team.committed)}
+                        : money.ledger(team.committed)}
                   </dd>
                 </div>
                 <div>
@@ -652,7 +653,7 @@ export function BoardPanel({
                   {lotRow.teamName ?? "—"}
                 </span>
                 <span className="board-recent-price">
-                  {lotRow.soldPrice !== null ? ledgerINR(lotRow.soldPrice) : "—"}
+                  {lotRow.soldPrice !== null ? money.ledger(lotRow.soldPrice) : "—"}
                 </span>
               </li>
             ))}

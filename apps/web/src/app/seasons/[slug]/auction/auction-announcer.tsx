@@ -1,7 +1,10 @@
 "use client";
 
-import { formatPaiseINR, paise, type AuctionSnapshot, type CeremonyState } from "@desiauction/core";
+import type { AuctionSnapshot, CeremonyState } from "@desiauction/core";
 import { useState } from "react";
+
+import { useMoney } from "../../../../components/money-unit";
+import type { MoneyFormat } from "../../../../lib/money";
 
 // THE ANNOUNCER — the auction night as spoken word.
 //
@@ -22,8 +25,8 @@ import { useState } from "react";
 /** Seconds at which the clock is worth interrupting for. Descending. */
 const THRESHOLDS = [30, 10] as const;
 
-function moneyOf(amount: number | null): string {
-  return amount === null ? "" : formatPaiseINR(paise(amount));
+function moneyOf(amount: number | null, money: MoneyFormat): string {
+  return amount === null ? "" : money.ledger(amount);
 }
 
 /**
@@ -32,13 +35,17 @@ function moneyOf(amount: number | null): string {
  * countdown was banned for being. (The leading bid is already announced by the
  * status ribbon, which is a live region and carries it.)
  */
-function ceremonyLine(ceremony: CeremonyState, snapshot: AuctionSnapshot): string | null {
+export function ceremonyLine(
+  ceremony: CeremonyState,
+  snapshot: AuctionSnapshot,
+  money: MoneyFormat,
+): string | null {
   const outcome = snapshot.lastOutcome;
   const lot = snapshot.currentLot;
   const who = outcome?.playerName ?? outcome?.lotNumber ?? "the lot";
   switch (ceremony.phase) {
     case "sold":
-      return `Sold. ${who} to ${outcome?.teamName ?? "an unnamed team"} for ${moneyOf(outcome?.amount ?? null)}.`;
+      return `Sold. ${who} to ${outcome?.teamName ?? "an unnamed team"} for ${moneyOf(outcome?.amount ?? null, money)}.`;
     case "unsold":
       return `Unsold. ${who} drew no bid.`;
     case "withdrawn":
@@ -56,7 +63,7 @@ function ceremonyLine(ceremony: CeremonyState, snapshot: AuctionSnapshot): strin
     case "opening":
       return lot === null
         ? null
-        : `On the block: ${lot.playerName ?? lot.lotNumber}, ${lot.role.replace(/_/g, " ")}, base ${formatPaiseINR(paise(lot.basePrice))}.`;
+        : `On the block: ${lot.playerName ?? lot.lotNumber}, ${lot.role.replace(/_/g, " ")}, base ${money.ledger(lot.basePrice)}.`;
     case "extension":
       return "Time extended — a bid landed in the final seconds.";
     default:
@@ -152,9 +159,10 @@ export function AuctionAnnouncer({
   // is spoken in the same commit that shows it. They used to be effects that
   // set state after the commit, which painted every moment twice — once
   // silent, once announced — and needed refs to remember what was spoken.
+  const money = useMoney();
   const [spoken, setSpoken] = useState<SpokenMoment>({ key: null, moment: null });
   if (snapshot !== null && ceremony.key !== spoken.key) {
-    const text = ceremonyLine(ceremony, snapshot);
+    const text = ceremonyLine(ceremony, snapshot, money);
     setSpoken({
       key: ceremony.key,
       moment: text === null ? spoken.moment : { key: ceremony.key, text },

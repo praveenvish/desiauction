@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatAmount, formatPaiseINR, paise } from "@desiauction/core";
 import { Button, ButtonLink, Card } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
@@ -138,8 +138,20 @@ function ValidOwnerInvite({ preview, token }: { preview: OwnerJoinPreview; token
           <h2 id="owner-join-disclosure-title">What you&apos;re accepting</h2>
           <ul>
             <li data-weight="strong" data-testid="owner-join-purse">
-              {formatPaiseINR(paise(preview.pursePerTeam))} purse to bid with — you owe what you
-              spend
+              {/* A points league (0091) bids with points, not money: say so, and
+                  never tell its owners they owe anything. */}
+              {preview.auctionUnit === "points" ? (
+                <>
+                  A purse of {formatAmount(paise(preview.pursePerTeam), "points")} to build your
+                  squad — points, not money: nothing is owed
+                </>
+              ) : (
+                <>
+                  {/* rupees-always: the rupee half of the unit switch above */}
+                  {formatPaiseINR(paise(preview.pursePerTeam))} purse to bid with — you owe what you
+                  spend
+                </>
+              )}
             </li>
             <li>A squad of up to {preview.squadMax} players</li>
             <li>You also become a member of {preview.orgName} — the club running this season</li>

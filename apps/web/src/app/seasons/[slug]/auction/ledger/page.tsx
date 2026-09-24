@@ -1,9 +1,10 @@
-import { formatPaiseINR, paise } from "@desiauction/core";
 import { ButtonLink, PlayerImage } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { ledgerView } from "../../../../../server/auction/conduct-actions";
 import { formatTime } from "../../../../../lib/format-date";
+import { moneyFormat } from "../../../../../lib/money";
+import { seasonUnit } from "../../../../../server/competition/season-unit";
 import "../../../seasons.css";
 import "../auction.css";
 
@@ -40,6 +41,7 @@ export default async function LedgerPage({
   if (view === null) {
     notFound();
   }
+  const money = moneyFormat(await seasonUnit(slug));
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
@@ -105,9 +107,7 @@ export default async function LedgerPage({
                       "—"
                     )}
                   </td>
-                  <td data-label="Bid">
-                    {row.amount !== null ? formatPaiseINR(paise(row.amount)) : "—"}
-                  </td>
+                  <td data-label="Bid">{row.amount !== null ? money.ledger(row.amount) : "—"}</td>
                   <td data-label="Result" className={resultClass(row.result)}>
                     {row.result}
                   </td>

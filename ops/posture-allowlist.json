@@ -98,6 +98,10 @@
       "class": "by-design",
       "reason": "Public directory and season pages for unauthenticated visitors. Gated on visibility, not on tenancy."
     },
+    "apps/web/src/server/competition/season-unit.ts": {
+      "class": "by-design",
+      "reason": "0091. Reads one formatting word (competitions.auction_unit: inr | points) by slug for the season layout, which sits above public children (/spectate, /overlay, /board, /register) no tenant gate can wrap. Returns no season data; every page under it keeps its own gate."
+    },
     "apps/web/src/server/competition/resolve.ts": {
       "class": "by-design",
       "reason": "THE pre-tenant season resolver (PA-1R Phase 3.4, final readiness Phase 1). A console request knows only a slug, or spans every club a person belongs to, before any org can be named, and competitions/tournaments are org-only under RLS. Each function answers one pre-tenant question: membership-gated reads carry the org_members join in the same SQL statement; public reads return only what the public season page shows. Everything after resolution runs inside withTenantDb in the caller. This file replaced eight modules that had each done this themselves and then kept reading money, rosters and auctions on the bypass pool."

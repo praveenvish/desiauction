@@ -12,7 +12,7 @@ import { useLiveFeed } from "../live-experience";
 import { useAuctionSocket } from "../use-auction-socket";
 
 import type { LotMedia, ResolvedLot } from "../../../../../server/auction/live-summary";
-import { ledgerINR } from "../../../../../lib/inr";
+import { useMoney } from "../../../../../components/money-unit";
 
 // The broadcast overlay: ticker + lower-third + sponsor/watch cluster, ALL
 // derived from the read-only AuctionSnapshot. No command sender exists in this
@@ -47,6 +47,7 @@ export function OverlayPanel({
    */
   lotMedia: Record<string, LotMedia>;
 }) {
+  const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // DA-20: this read `connection !== "open"` and ignored `stale`/`offline`
   // outright, so a device that went offline mid-auction kept broadcasting a
@@ -126,7 +127,7 @@ export function OverlayPanel({
                     <b>{entry.playerName ?? entry.lotNumber}</b>
                     {entry.teamName !== null ? <span>→ {entry.teamName}</span> : null}
                     {entry.soldPrice !== null ? (
-                      <span className="obs-ticker-price">{ledgerINR(entry.soldPrice)}</span>
+                      <span className="obs-ticker-price">{money.ledger(entry.soldPrice)}</span>
                     ) : null}
                   </span>
                 ))
@@ -190,7 +191,7 @@ export function OverlayPanel({
                       keeper" on air. The shared formatter is the one place
                       those labels are decided. */}
                   <span className="obs-lt-meta">
-                    {labelOf(lot.role)} · base {ledgerINR(lot.basePrice)}
+                    {labelOf(lot.role)} · base {money.ledger(lot.basePrice)}
                   </span>
                 </>
               ) : outcome !== null ? (
@@ -229,7 +230,7 @@ export function OverlayPanel({
                 {lot.currentBid !== null ? "Current bid" : "Opening"}
               </span>
               <span className="obs-lt-bid-amount">
-                {ledgerINR(lot.currentBid?.amount ?? lot.nextMinimumBid)}
+                {money.ledger(lot.currentBid?.amount ?? lot.nextMinimumBid)}
               </span>
               {lot.currentBid !== null ? (
                 <span className="obs-lt-leader">
@@ -251,7 +252,7 @@ export function OverlayPanel({
           ) : outcome !== null && outcome.kind === "sold" && outcome.amount !== null ? (
             <div className="obs-lt-bid">
               <span className="obs-lt-bid-label">Sold for</span>
-              <span className="obs-lt-bid-amount">{ledgerINR(outcome.amount)}</span>
+              <span className="obs-lt-bid-amount">{money.ledger(outcome.amount)}</span>
               {outcome.paddleNumber !== null ? (
                 <span className="obs-lt-leader">Paddle {outcome.paddleNumber}</span>
               ) : null}

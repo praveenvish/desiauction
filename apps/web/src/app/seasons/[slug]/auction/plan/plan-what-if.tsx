@@ -5,7 +5,8 @@ import { Card, Field, Select } from "@desiauction/ui";
 import { useMemo, useState } from "react";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
-import { ledgerINR } from "../../../../../lib/inr";
+import { useMoney } from "../../../../../components/money-unit";
+import { wholeAmountHint } from "./plan-model";
 
 /**
  * WHAT IF (Phase 1.5). "What if I win this player for X?" — the same arithmetic
@@ -15,6 +16,7 @@ import { ledgerINR } from "../../../../../lib/inr";
  */
 
 export function PlanWhatIf({ input, lots }: { input: PlanInput; lots: readonly PlanLotRow[] }) {
+  const money = useMoney();
   const candidates = useMemo(
     () => lots.filter((lot) => lot.status !== "sold" && lot.status !== "withdrawn"),
     [lots],
@@ -50,7 +52,7 @@ export function PlanWhatIf({ input, lots }: { input: PlanInput; lots: readonly P
           ))}
         </Select>
         <Field
-          label="for (₹)"
+          label={`for (${money.label})`}
           inputMode="numeric"
           autoComplete="off"
           placeholder={chosen === undefined ? "" : String(chosen.basePrice / 100)}
@@ -58,14 +60,14 @@ export function PlanWhatIf({ input, lots }: { input: PlanInput; lots: readonly P
           onChange={(event) => {
             setRupees(event.target.value);
           }}
-          {...(parsed !== null && !parsed.ok ? { error: "Enter a whole rupee amount." } : {})}
+          {...(parsed !== null && !parsed.ok ? { error: `${wholeAmountHint(money)}.` } : {})}
           data-testid="plan-what-if-amount"
         />
       </div>
       {result !== null && chosen !== undefined ? (
         <p className="plan-note" data-testid="plan-what-if-result">
-          <span className="plan-line-money">{ledgerINR(result.purseAfter)}</span> left ·{" "}
-          <span className="plan-line-money">{ledgerINR(result.plannedExposureAfter)}</span> still
+          <span className="plan-line-money">{money.ledger(result.purseAfter)}</span> left ·{" "}
+          <span className="plan-line-money">{money.ledger(result.plannedExposureAfter)}</span> still
           planned
           {input.targets.some((t) => t.registrationId === chosen.registrationId)
             ? ` for ${String(Math.max(0, openTargets - 1))} other ${openTargets - 1 === 1 ? "target" : "targets"}`

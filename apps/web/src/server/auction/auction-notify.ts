@@ -1,4 +1,4 @@
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatAmount, paise, type MoneyUnit } from "@desiauction/core";
 import {
   auctions,
   lots,
@@ -48,7 +48,7 @@ interface Outcome {
 async function outcomesOf(
   db: Db,
   auctionId: string,
-  competition: { id: string; name: string },
+  competition: { id: string; name: string; auctionUnit: MoneyUnit },
 ): Promise<Outcome[]> {
   const rows = await db
     .select({
@@ -86,7 +86,8 @@ async function outcomesOf(
             competitionId: competition.id,
             competition: competition.name,
             team: row.teamName,
-            price: formatPaiseINR(paise(row.soldPrice)),
+            // In the season's own unit (0091): "₹75,000" or "750 pts".
+            price: formatAmount(paise(row.soldPrice), competition.auctionUnit),
           },
         },
       ];
@@ -113,7 +114,7 @@ export async function announceAuctionOutcomes(input: {
   personId: string;
   orgId: string;
   auctionId: string;
-  competition: { id: string; name: string };
+  competition: { id: string; name: string; auctionUnit: MoneyUnit };
 }): Promise<number> {
   let sent = 0;
   try {
@@ -179,7 +180,7 @@ export async function completeAuctionOnce<T>(
     personId: string;
     orgId: string;
     auctionId: string;
-    competition: { id: string; name: string };
+    competition: { id: string; name: string; auctionUnit: MoneyUnit };
   },
   send: () => Promise<T>,
   accepted: (result: T) => boolean,

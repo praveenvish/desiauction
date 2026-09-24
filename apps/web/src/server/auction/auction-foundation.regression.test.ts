@@ -493,7 +493,7 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
       personId: owner,
       orgId: org.id,
       auctionId: auction.id,
-      competition: { id: comp.id, name: comp.name },
+      competition: { id: comp.id, name: comp.name, auctionUnit: comp.auctionUnit },
     });
     expect(sent).toBeGreaterThan(0);
 
@@ -560,7 +560,7 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
       personId: owner,
       orgId: org.id,
       auctionId: auction.id,
-      competition: { id: comp.id, name: comp.name },
+      competition: { id: comp.id, name: comp.name, auctionUnit: comp.auctionUnit },
     };
     const before = await soldRows();
     const [row] = await db

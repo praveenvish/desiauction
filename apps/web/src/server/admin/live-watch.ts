@@ -166,6 +166,7 @@ export async function adminAuctionWatch(auctionId: string): Promise<AuctionWatch
       seasonName: header.seasonName,
       seasonSlug: header.seasonSlug,
       sport: header.sport,
+      auctionUnit: header.auctionUnit,
     },
     overview,
     pulse,

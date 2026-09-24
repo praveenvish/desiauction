@@ -8,8 +8,10 @@ import {
   validateName,
   type CompetitionStatus,
   type EntryCategory,
+  type MoneyUnit,
 } from "@desiauction/core";
 import {
+  auctions,
   auditLog,
   competitions,
   franchises,
@@ -86,6 +88,8 @@ export interface CompetitionSummary {
   visibility: "private" | "public";
   // PI-1: the organizer-declared entry category (open | men | women | mixed).
   entryCategory: EntryCategory;
+  /** 0091: rupees or points — how every amount reads, and whether money is owed. */
+  auctionUnit: MoneyUnit;
   location: string | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -105,6 +109,8 @@ export interface NewCompetition {
   location?: string;
   startsOn?: string;
   endsOn?: string;
+  /** 0091: absent takes the column default, rupees. */
+  auctionUnit?: MoneyUnit;
 }
 
 export async function createCompetition(
@@ -126,6 +132,7 @@ export async function createCompetition(
     name: valid.value,
     slug,
     sport: input.sport,
+    ...(input.auctionUnit !== undefined ? { auctionUnit: input.auctionUnit } : {}),
     ...(input.tournamentId !== undefined ? { tournamentId: input.tournamentId } : {}),
     ...(input.location !== undefined && input.location !== "" ? { location: input.location } : {}),
     ...(input.startsOn !== undefined && input.startsOn !== "" ? { startsOn: input.startsOn } : {}),
@@ -144,7 +151,7 @@ export async function createCompetition(
     scopeType: "org",
     scopeId: orgId,
     subject: id,
-    meta: { name: valid.value, slug },
+    meta: { name: valid.value, slug, auctionUnit: input.auctionUnit ?? "inr" },
   });
   return {
     id,
@@ -155,6 +162,7 @@ export async function createCompetition(
     slug,
     status: "draft",
     entryCategory: "open",
+    auctionUnit: input.auctionUnit ?? "inr",
     visibility: "private",
     location: input.location ?? null,
     startsOn: input.startsOn ?? null,
@@ -191,6 +199,7 @@ export async function competitionsForPerson(db: Db, personId: string): Promise<S
       status: competitions.status,
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
+      auctionUnit: competitions.auctionUnit,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -228,6 +237,7 @@ export async function competitionsOfTournament(
       status: competitions.status,
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
+      auctionUnit: competitions.auctionUnit,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -301,6 +311,7 @@ export async function resolveCompetition(
       status: competitions.status,
       visibility: competitions.visibility,
       entryCategory: competitions.entryCategory,
+      auctionUnit: competitions.auctionUnit,
       location: competitions.location,
       startsOn: competitions.startsOn,
       endsOn: competitions.endsOn,
@@ -453,11 +464,31 @@ export interface CompetitionDetails {
   endsOn: string | null;
   /** PI-1: who the season is for. Absent = leave it as it stands. */
   entryCategory?: EntryCategory;
+  /** 0091: rupees or points. Absent = leave it; refused once an auction exists. */
+  auctionUnit?: MoneyUnit;
 }
 
 export type UpdateDetailsResult =
   | { ok: true; competition: CompetitionSummary }
-  | { ok: false; reason: "invalid_name" | "reversed_dates" };
+  | { ok: false; reason: "invalid_name" | "reversed_dates" | "unit_locked" };
+
+/**
+ * IS THE SEASON'S UNIT STILL OPEN TO CHANGE? (0091)
+ *
+ * Only until an auction row exists. The auction's purse, bands and ladder were
+ * typed and stored in this unit and lock at creation; flipping the word under
+ * them would re-read ₹2,00,00,000 as 2 crore points. Stricter than the roster
+ * lock (`status !== "scheduled"`) on purpose — a scheduled auction's numbers
+ * are already fixed.
+ */
+export async function auctionUnitLocked(db: Db, competitionId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: auctions.id })
+    .from(auctions)
+    .where(eq(auctions.competitionId, competitionId))
+    .limit(1);
+  return row !== undefined;
+}
 
 /**
  * DA-11: the season's own identity — its name, its dates, its location — was
@@ -481,6 +512,11 @@ export async function updateCompetitionDetails(
   if (input.startsOn !== null && input.endsOn !== null && input.endsOn < input.startsOn) {
     return { ok: false, reason: "reversed_dates" };
   }
+  const unitChanges =
+    input.auctionUnit !== undefined && input.auctionUnit !== competition.auctionUnit;
+  if (unitChanges && (await auctionUnitLocked(db, competition.id))) {
+    return { ok: false, reason: "unit_locked" };
+  }
   const next = {
     name: valid.value,
     location: input.location,
@@ -489,6 +525,7 @@ export async function updateCompetitionDetails(
     // PI-1: the category rides the same audited details write — declaring who
     // a season is for is exactly as consequential as renaming it.
     entryCategory: input.entryCategory ?? competition.entryCategory,
+    auctionUnit: input.auctionUnit ?? competition.auctionUnit,
   };
   await db.update(competitions).set(next).where(eq(competitions.id, competition.id));
   await db.insert(auditLog).values({
@@ -505,6 +542,7 @@ export async function updateCompetitionDetails(
         startsOn: competition.startsOn,
         endsOn: competition.endsOn,
         entryCategory: competition.entryCategory,
+        auctionUnit: competition.auctionUnit,
       },
       to: next,
     },

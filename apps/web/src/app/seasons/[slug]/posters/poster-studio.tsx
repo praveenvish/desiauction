@@ -24,6 +24,7 @@ import {
 } from "@desiauction/ui";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import { useMoney } from "../../../../components/money-unit";
 import { withViewTransition } from "../../../../lib/view-transition";
 import {
   buildScene,
@@ -423,6 +424,7 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [recording, setRecording] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const { unit } = useMoney();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -434,7 +436,7 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
         if (controller.signal.aborted) {
           return;
         }
-        const scene = buildScene(sprite);
+        const scene = buildScene(sprite, unit);
         sceneRef.current = scene;
         const canvas = canvasRef.current;
         if (canvas === null) {
@@ -456,7 +458,7 @@ function MotionPanel({ src, size }: { src: string; size: PosterSize }) {
       controller.abort();
       player?.stop();
     };
-  }, [src]);
+  }, [src, unit]);
 
   const canRecord = pickRecordingType() !== null;
 

@@ -1,6 +1,13 @@
+import type { AuctionSnapshot } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
-import { advanceClockLadder, CLOCK_LADDER_START, type ClockLadder } from "./auction-announcer";
+import { moneyFormat } from "../../../../lib/money";
+import {
+  advanceClockLadder,
+  ceremonyLine,
+  CLOCK_LADDER_START,
+  type ClockLadder,
+} from "./auction-announcer";
 
 /** Feeds a lot's clock through the ladder, returning every call it makes. */
 function run(ticks: [string | null, number | null][]): (string | null)[] {
@@ -63,5 +70,24 @@ describe("the clock announcer's ladder", () => {
         ["a", 24_000],
       ]),
     ).toEqual(["30 seconds left.", null]);
+  });
+});
+
+describe("the ceremony announcer's sentence", () => {
+  const sold = {
+    lastOutcome: { playerName: "Asha", lotNumber: "1", teamName: "Falcons", amount: 125_000 },
+    currentLot: null,
+  } as unknown as AuctionSnapshot;
+
+  it("speaks the sale price in rupees for a rupee season", () => {
+    expect(ceremonyLine({ phase: "sold", key: "k" }, sold, moneyFormat("inr"))).toBe(
+      "Sold. Asha to Falcons for ₹1,250.",
+    );
+  });
+
+  it("speaks points, never rupees, for a points season", () => {
+    const line = ceremonyLine({ phase: "sold", key: "k" }, sold, moneyFormat("points"));
+    expect(line).toBe("Sold. Asha to Falcons for 1,250 pts.");
+    expect(line).not.toContain("₹");
   });
 });

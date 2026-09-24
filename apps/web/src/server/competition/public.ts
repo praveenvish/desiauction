@@ -5,6 +5,7 @@ import {
   isMinor,
   mayPublishPhoto,
   paise,
+  type MoneyUnit,
   type Paise,
 } from "@desiauction/core";
 import {
@@ -108,6 +109,11 @@ export interface PublicCompetitionView {
    * nothing rather than showing a default nobody chose.
    */
   pursePerTeam: Paise | null;
+  /**
+   * What the purse counts in (0091): a points league's "1,000 pts" is a
+   * budget to build a squad with, not money anyone owes.
+   */
+  auctionUnit: MoneyUnit;
   /** The squad size owners are bidding towards (`squadMax`). */
   squadSize: number | null;
   teams: TeamSummary[];
@@ -171,6 +177,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       logoKey: competitions.logoUrl,
       coverKey: competitions.coverUrl,
       sport: competitions.sport,
+      auctionUnit: competitions.auctionUnit,
     })
     .from(competitions)
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
@@ -213,6 +220,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     coverUrl: row.coverKey === null ? null : storage.readUrl(row.coverKey),
     auctionStatus: auctionRows[0]?.status ?? null,
     ...publicAuctionRules(auctionRows[0]?.config),
+    auctionUnit: row.auctionUnit,
     teams,
     fixtures: fixtures.rows.map(toPublicFixture),
     // Carried so the page can say "showing 500 of 640" rather than presenting a

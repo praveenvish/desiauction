@@ -926,6 +926,7 @@ function FeeTab({ slug, row, mutate }: { slug: string; row: Row; mutate: Mutate 
         />
         <div className="pd-grid">
           <TextSetting
+            // rupees-always: a registration fee is real money in every season
             label="Amount (₹)"
             value={row.feeAmountPaise === null ? "" : String(row.feeAmountPaise / 100)}
             inputMode="decimal"
@@ -944,6 +945,7 @@ function FeeTab({ slug, row, mutate }: { slug: string; row: Row; mutate: Mutate 
         </div>
         {row.feeStatus === "paid" && row.feeAmountPaise !== null ? (
           <p className="pd-setting-hint" data-testid="details-fee">
+            {/* rupees-always: a registration fee is real money in every season */}
             Paid {formatPaiseINR(paise(row.feeAmountPaise))}
             {row.feeReference !== null && row.feeReference !== "" ? ` · ${row.feeReference}` : ""}
           </p>

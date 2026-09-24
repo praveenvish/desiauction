@@ -1,4 +1,11 @@
-import { DEFAULT_AUCTION_CONFIG, paise, type AuctionConfig } from "@desiauction/core";
+import {
+  defaultAuctionConfigFor,
+  formatAmount,
+  paise,
+  pointsSlabs,
+  type AuctionConfig,
+  type MoneyUnit,
+} from "@desiauction/core";
 
 /**
  * THE SETUP CONTRACT: the numbers a league negotiates, parsed once and refused
@@ -37,27 +44,41 @@ export type AuctionSetupResult =
 
 const WHOLE_NUMBER = /^\d+$/;
 
-/** Rupee limits are generous but finite: nothing here should accept 99999. */
-const LIMITS = {
-  pursePerTeam: { min: 1_000, max: 1_000_000_000, unit: "₹" },
-  basePriceDefault: { min: 100, max: 1_000_000_000, unit: "₹" },
-  band: { min: 100, max: 1_000_000_000, unit: "₹" },
-  squadMin: { min: 1, max: 30, unit: "" },
-  squadMax: { min: 1, max: 30, unit: "" },
-  timerSeconds: { min: 5, max: 600, unit: "" },
-  extensionSeconds: { min: 1, max: 300, unit: "" },
-} as const;
+/**
+ * Limits are generous but finite: nothing here should accept 99999. Money
+ * bounds are in the season's own unit (whole rupees, or whole points) — a
+ * points league of 100 is ordinary, a rupee purse of ₹100 is a typo.
+ */
+const MONEY_LIMITS: Record<MoneyUnit, { purse: Bound; price: Bound }> = {
+  inr: {
+    purse: { min: 1_000, max: 1_000_000_000, money: true },
+    price: { min: 100, max: 1_000_000_000, money: true },
+  },
+  points: {
+    purse: { min: 10, max: 100_000_000, money: true },
+    price: { min: 1, max: 100_000_000, money: true },
+  },
+};
 
-function amount(unit: string, value: number): string {
-  return unit === "₹" ? `₹${value.toLocaleString("en-IN")}` : String(value);
+function limitsFor(unit: MoneyUnit) {
+  return {
+    pursePerTeam: MONEY_LIMITS[unit].purse,
+    basePriceDefault: MONEY_LIMITS[unit].price,
+    band: MONEY_LIMITS[unit].price,
+    squadMin: { min: 1, max: 30, money: false },
+    squadMax: { min: 1, max: 30, money: false },
+    timerSeconds: { min: 5, max: 600, money: false },
+    extensionSeconds: { min: 1, max: 300, money: false },
+  } as const;
 }
 
-type Bound = { min: number; max: number; unit: string };
+type Bound = { min: number; max: number; money: boolean };
 
 function parseWhole(
   raw: string | undefined,
   label: string,
   bound: Bound,
+  unit: MoneyUnit,
 ): { ok: true; value: number } | { ok: false; error: string } {
   const trimmed = (raw ?? "").trim();
   if (trimmed === "") {
@@ -73,11 +94,13 @@ function parseWhole(
   if (!Number.isSafeInteger(value)) {
     return { ok: false, error: `${label} is too large.` };
   }
+  const shown = (whole: number): string =>
+    bound.money ? formatAmount(paise(whole * 100), unit) : String(whole);
   if (value < bound.min) {
-    return { ok: false, error: `${label} must be at least ${amount(bound.unit, bound.min)}.` };
+    return { ok: false, error: `${label} must be at least ${shown(bound.min)}.` };
   }
   if (value > bound.max) {
-    return { ok: false, error: `${label} can't be more than ${amount(bound.unit, bound.max)}.` };
+    return { ok: false, error: `${label} can't be more than ${shown(bound.max)}.` };
   }
   return { ok: true, value };
 }
@@ -85,16 +108,25 @@ function parseWhole(
 /**
  * Parse the whole form. Every failure is reported against the field that owns
  * it, and a single bad field never silently changes another.
+ *
+ * `unit` is the season's (0091): the organizer types whole rupees or whole
+ * points, and both are stored ×100 — the same scale — so nothing downstream
+ * needs to know which it was.
  */
-export function parseAuctionSetup(input: AuctionSetupInput): AuctionSetupResult {
+export function parseAuctionSetup(
+  input: AuctionSetupInput,
+  unit: MoneyUnit = "inr",
+): AuctionSetupResult {
   const fieldErrors: AuctionSetupFieldErrors = {};
+  const LIMITS = limitsFor(unit);
+  const defaults = defaultAuctionConfigFor(unit);
   const take = (
     key: keyof typeof LIMITS,
     name: string,
     label: string,
     raw: string | undefined,
   ): number | null => {
-    const parsed = parseWhole(raw, label, LIMITS[key]);
+    const parsed = parseWhole(raw, label, LIMITS[key], unit);
     if (!parsed.ok) {
       fieldErrors[name] = parsed.error;
       return null;
@@ -137,7 +169,7 @@ export function parseAuctionSetup(input: AuctionSetupInput): AuctionSetupResult 
     if (rawValue.trim() === "") {
       continue;
     }
-    const parsed = parseWhole(rawValue, `Band ${label} base price`, LIMITS.band);
+    const parsed = parseWhole(rawValue, `Band ${label} base price`, LIMITS.band, unit);
     if (!parsed.ok) {
       fieldErrors[name] = parsed.error;
       continue;
@@ -153,22 +185,25 @@ export function parseAuctionSetup(input: AuctionSetupInput): AuctionSetupResult 
     return { ok: false, fieldErrors };
   }
   // Every value is proven above; the assertions are the parse's own postcondition.
+  const pursePerTeam = paise((purse ?? 0) * 100);
   return {
     ok: true,
     config: {
-      ...DEFAULT_AUCTION_CONFIG,
-      pursePerTeam: paise((purse ?? 0) * 100),
-      squadMin: squadMin ?? DEFAULT_AUCTION_CONFIG.squadMin,
-      squadMax: squadMax ?? DEFAULT_AUCTION_CONFIG.squadMax,
+      ...defaults,
+      pursePerTeam,
+      // The rupee ladder is a fixed table; a points ladder follows the purse.
+      slabs: unit === "points" ? pointsSlabs(pursePerTeam) : defaults.slabs,
+      squadMin: squadMin ?? defaults.squadMin,
+      squadMax: squadMax ?? defaults.squadMax,
       timer: {
-        initialSeconds: timerSeconds ?? DEFAULT_AUCTION_CONFIG.timer.initialSeconds,
-        extensionSeconds: extensionSeconds ?? DEFAULT_AUCTION_CONFIG.timer.extensionSeconds,
+        initialSeconds: timerSeconds ?? defaults.timer.initialSeconds,
+        extensionSeconds: extensionSeconds ?? defaults.timer.extensionSeconds,
       },
       basePriceBands:
         Object.keys(bands).length === 0
           ? {}
           : Object.fromEntries(
-              Object.entries(bands).map(([label, rupees]) => [label, paise(rupees * 100)]),
+              Object.entries(bands).map(([label, whole]) => [label, paise(whole * 100)]),
             ),
       basePriceDefault: paise((basePriceDefault ?? 0) * 100),
     },

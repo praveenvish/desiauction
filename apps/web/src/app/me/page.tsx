@@ -23,7 +23,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { HeroChip, HeroStatus } from "../../components/season-hero/season-hero";
-import { compactINR } from "../../lib/inr";
+import { moneyFormat } from "../../lib/money";
 import { currentSession } from "../../server/auth/actions";
 import {
   playerCareer,
@@ -230,7 +230,7 @@ export default async function MySportsPage({
               ? career.totals.soldCount > 0
                 ? `Sold ${String(career.totals.soldCount)}×`
                 : "No sale yet"
-              : `Sold ${String(career.totals.soldCount)}× · top ${compactINR(career.totals.highestPrice)}`
+              : `Sold ${String(career.totals.soldCount)}× · top ${moneyFormat(career.totals.highestUnit).compact(career.totals.highestPrice)}`
           }
         />
       </StatGrid>
@@ -300,7 +300,7 @@ export default async function MySportsPage({
                         season={season}
                         eyebrow={`${pack.label} · ${seasonYear(season.startsOn)}`}
                         subline={season.orgName}
-                        money={compactINR}
+                        money={(amount, unit) => moneyFormat(unit).compact(amount)}
                       />
                     </li>
                   );

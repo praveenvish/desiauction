@@ -34,10 +34,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 
 import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
+import { useMoney } from "../../../../components/money-unit";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { CrestImage } from "../../../../components/team/crest-image";
 import { formatPhone } from "../../../../lib/format-phone";
-import { compactINR, exactINR } from "../../../../lib/inr";
 import { setTeamCoachAction, updateTeamAction } from "../../../../server/competition/actions";
 import type { TeamsWorkspaceView } from "../../../../server/competition/actions";
 import type { TeamCard } from "../../../../server/competition/team-workspace";
@@ -82,6 +82,7 @@ export function TeamsPanel({
 /* --- The franchise grid ---------------------------------------------------- */
 
 function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
+  const money = useMoney();
   const [query, setQuery] = useState("");
   const locked = view.rulesSource?.locked ?? false;
 
@@ -112,7 +113,7 @@ function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
           <p className="tm-lede-rules" data-testid="purse-provenance">
             {view.purseTotal > 0 ? (
               <>
-                Purse {compactINR(view.purseTotal)} per team
+                Purse {money.compact(view.purseTotal)} per team
                 {view.squadMax !== undefined && view.squadMax !== null
                   ? `, squad of ${String(view.squadMax)}`
                   : ""}{" "}
@@ -231,6 +232,7 @@ function teamPaint(color: string | null): CSSProperties | undefined {
 }
 
 function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
+  const money = useMoney();
   const remaining =
     team.purseTotal !== undefined && team.spent !== undefined
       ? Math.max(0, team.purseTotal - team.spent)
@@ -287,13 +289,13 @@ function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
         <dl className="tm-card-money">
           <div>
             <dt>Spent</dt>
-            <dd className="tm-num">{exactINR(team.spent)}</dd>
+            <dd className="tm-num">{money.exact(team.spent)}</dd>
           </div>
           <div>
             <dt>Remaining</dt>
             <dd className="tm-num" data-tone={remaining === 0 ? "out" : "left"}>
               {/* DA-24: no auction yet means no purse yet — "₹0" read as broke. */}
-              {remaining !== null && (team.purseTotal ?? 0) > 0 ? exactINR(remaining) : "—"}
+              {remaining !== null && (team.purseTotal ?? 0) > 0 ? money.exact(remaining) : "—"}
             </dd>
           </div>
         </dl>
@@ -309,7 +311,7 @@ function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
                 {team.topBuyName}
               </span>
               {team.topBuyPrice !== undefined && team.topBuyPrice !== null ? (
-                <span className="tm-num tm-topbuy-price">{exactINR(team.topBuyPrice)}</span>
+                <span className="tm-num tm-topbuy-price">{money.exact(team.topBuyPrice)}</span>
               ) : null}
             </>
           ) : (
@@ -343,6 +345,7 @@ function RosterDetail({
   team: TeamCard;
   view: TeamsWorkspaceView;
 }) {
+  const money = useMoney();
   const [exportOpen, setExportOpen] = useState(false);
   const [sheetId, setSheetId] = useState<string | null>(null);
   const closeSheet = useCallback(() => {
@@ -516,7 +519,7 @@ function RosterDetail({
                       {view.viewer.canSeeMoney ? (
                         <td className="tm-roster-price tm-num" data-label="Buy price">
                           {row.buyPrice !== undefined && row.buyPrice !== null
-                            ? exactINR(row.buyPrice)
+                            ? money.exact(row.buyPrice)
                             : row.isCaptain || row.isIcon || row.isRetained
                               ? "Pre-signed"
                               : "—"}
@@ -599,13 +602,13 @@ function RosterDetail({
           <StatCard
             icon={<IconWallet />}
             tone="gold"
-            value={exactINR(team.spent)}
+            value={money.exact(team.spent)}
             label="Purse spent"
           />
           <StatCard
-            icon={<IconRupee />}
+            icon={money.unit === "points" ? <IconWallet /> : <IconRupee />}
             tone="green"
-            value={remaining !== null && (team.purseTotal ?? 0) > 0 ? exactINR(remaining) : "—"}
+            value={remaining !== null && (team.purseTotal ?? 0) > 0 ? money.exact(remaining) : "—"}
             label="Remaining"
           />
           <StatCard
@@ -625,7 +628,7 @@ function RosterDetail({
             value={<span className="tm-stat-name">{team.topBuyName ?? "—"}</span>}
             label="Top buy"
             {...(team.topBuyPrice !== undefined && team.topBuyPrice !== null
-              ? { hint: exactINR(team.topBuyPrice) }
+              ? { hint: money.exact(team.topBuyPrice) }
               : {})}
           />
         </StatGrid>

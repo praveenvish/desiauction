@@ -1,4 +1,4 @@
-import { formatPaiseINR, paise, roleLabelIn, sportPack } from "@desiauction/core";
+import { formatAmount, paise, roleLabelIn, sportPack, type MoneyUnit } from "@desiauction/core";
 import {
   EmptyState,
   HeroBanner,
@@ -51,7 +51,8 @@ export async function generateMetadata({ params }: { params: Promise<{ sport: st
  * opens with content.
  */
 
-const money = (value: number): string => formatPaiseINR(paise(value));
+// Each season in its own unit (0091) — a points league's price is not rupees.
+const money = (value: number, unit: MoneyUnit): string => formatAmount(paise(value), unit);
 
 export default async function MySportPage({ params }: { params: Promise<{ sport: string }> }) {
   const pack = sportPack((await params).sport);
@@ -154,7 +155,11 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             <StatCard
               icon={<IconRupee />}
               tone="green"
-              value={career.totals.highestPrice !== null ? money(career.totals.highestPrice) : "—"}
+              value={
+                career.totals.highestPrice !== null
+                  ? money(career.totals.highestPrice, career.totals.highestUnit)
+                  : "—"
+              }
               label="Highest price"
             />
           </StatGrid>

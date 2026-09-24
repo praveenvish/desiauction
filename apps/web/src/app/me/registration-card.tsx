@@ -1,4 +1,5 @@
 import { Pill, TeamChip, type KitTone } from "@desiauction/ui";
+import type { MoneyUnit } from "@desiauction/core";
 import Link from "next/link";
 
 import type { CareerSeason } from "../../server/player/career";
@@ -22,7 +23,7 @@ const ENTRY: Record<string, { label: string; tone: KitTone }> = {
  *  one, the registration's until then. */
 export function verdictOf(
   season: CareerSeason,
-  money: (paise: number) => string,
+  money: (paise: number, unit: MoneyUnit) => string,
 ): { label: string; tone: KitTone } {
   const outcome = season.auction;
   if (outcome === null) {
@@ -31,7 +32,7 @@ export function verdictOf(
       : (ENTRY[season.status] ?? { label: season.status, tone: "neutral" });
   }
   if (outcome.kind === "sold") {
-    return { label: `Sold · ${money(outcome.soldPrice)}`, tone: "gold" };
+    return { label: `Sold · ${money(outcome.soldPrice, season.auctionUnit)}`, tone: "gold" };
   }
   if (outcome.kind === "unsold") return { label: "Unsold", tone: "neutral" };
   if (outcome.kind === "icon") return { label: "Icon player", tone: "purple" };
@@ -51,7 +52,8 @@ export function RegistrationCard({
   eyebrow: string;
   /** Under the name — the club, and whatever else the page adds. */
   subline: string;
-  money: (paise: number) => string;
+  /** Formats a sold price in its season's unit — rupees or points (0091). */
+  money: (paise: number, unit: MoneyUnit) => string;
 }) {
   const verdict = verdictOf(season, money);
   return (

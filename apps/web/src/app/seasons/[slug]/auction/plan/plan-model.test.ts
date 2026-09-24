@@ -5,7 +5,15 @@ import type { TargetState } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
-import { groupByPriority, roleFacts, rupeesFromPaise, searchPool } from "./plan-model";
+import { moneyFormat } from "../../../../../lib/money";
+import {
+  groupByPriority,
+  refusalMessage,
+  roleFacts,
+  rupeesFromPaise,
+  searchPool,
+  wholeAmountHint,
+} from "./plan-model";
 
 /** This suite's fixtures are cricket, so the season's roles are cricket's. */
 const CRICKET_ROLES = sportPackFor("cricket").roles.values.map((value) => value.key);
@@ -172,5 +180,18 @@ describe("roleFacts", () => {
     expect(facts.squad).toContainEqual({ role: "goalkeeper", count: 1 });
     expect(facts.squad).toContainEqual({ role: "defender", count: 1 });
     expect(facts.remaining).toContainEqual({ role: "forward", count: 1 });
+  });
+});
+
+describe("the amount hint follows the season's unit", () => {
+  it("asks for rupees in a rupee season and points in a points season", () => {
+    expect(wholeAmountHint(moneyFormat("inr"))).toBe("Enter a whole rupee amount");
+    expect(wholeAmountHint(moneyFormat("points"))).toBe("Enter a whole number of points");
+    expect(refusalMessage("invalid_max", {}, moneyFormat("inr"))).toBe(
+      "Enter a whole rupee amount, or leave it empty for no cap.",
+    );
+    expect(refusalMessage("invalid_max", {}, moneyFormat("points"))).toBe(
+      "Enter a whole number of points, or leave it empty for no cap.",
+    );
   });
 });
