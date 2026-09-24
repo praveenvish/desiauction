@@ -191,6 +191,17 @@ const envSchema = z.object({
    */
   EMAIL_REPLY_TO: z.email().optional(),
   /**
+   * "Get photos from Google Drive" (Google Picker + drive.file). All three are
+   * PUBLIC by design — they sit in the page, and the key is locked to our
+   * origins and the Picker API in Google Cloud — so they are served to the
+   * browser as-is. Unset hides the button; the photo tab still takes files.
+   * The APP_ID is the Cloud project NUMBER, which drive.file requires so the
+   * files picked are granted to this app.
+   */
+  GOOGLE_PICKER_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_PICKER_API_KEY: z.string().min(1).optional(),
+  GOOGLE_PICKER_APP_ID: z.string().regex(/^\d+$/).optional(),
+  /**
    * Shared secret on the provider delivery-report webhook. Unset closes the
    * endpoint with a 404 — an open callback would let a stranger mark documents
    * delivered, which is worse than never learning they were.

@@ -239,6 +239,8 @@ export async function executeErasure(input: {
         .set({
           dateOfBirth: null,
           fatherName: null,
+          // Where their Form photo sits in the club's Drive (0092).
+          photoDriveId: null,
           jerseyName: null,
           jerseyNumber: null,
           tshirtSize: null,

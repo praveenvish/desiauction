@@ -86,6 +86,7 @@ export async function existingForImport(
       jerseyNumber: registrations.jerseyNumber,
       tshirtSize: registrations.tshirtSize,
       trouserSize: registrations.trouserSize,
+      photoDriveId: registrations.photoDriveId,
       // The diff compares NAMES on both sides, so the stored side joins the
       // team in rather than making a pure module resolve a ULID.
       teamName: teams.name,
@@ -208,6 +209,9 @@ function deskFields(row: CsvRegistrationRow): Record<string, unknown> {
   }
   if (row.trouserSize !== null) {
     out["trouserSize"] = row.trouserSize;
+  }
+  if (row.photoDriveId !== null) {
+    out["photoDriveId"] = row.photoDriveId;
   }
   return out;
 }

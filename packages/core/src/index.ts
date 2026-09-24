@@ -71,8 +71,12 @@ export type {
   NameResult,
 } from "./competition";
 export {
+  driveFileIdOf,
+  editCsvRow,
+  isNotApplicable,
   normalizeTeamName,
   parseCsvFlag,
+  recordsToCsv,
   parseRegistrationCsv,
   parseRegistrationRecords,
   tokenizeCsv,

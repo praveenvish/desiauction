@@ -1078,6 +1078,9 @@ export const registrations = pgTable(
     battingStyle: text("batting_style"),
     bowlingStyle: text("bowling_style"),
     fatherName: text("father_name"),
+    // The Drive file id a Google Form import linked for this entry's photo
+    // (0092) — a pointer the photo step fetches by, never a photo itself.
+    photoDriveId: text("photo_drive_id"),
     // Kit block — optional; only organizers who order jerseys populate it.
     jerseyName: text("jersey_name"),
     jerseyNumber: text("jersey_number"),

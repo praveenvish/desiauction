@@ -33,6 +33,15 @@ describe("the script policy", () => {
       "'self'",
       "wss://engine.desiauction.in",
       "https://s3.desiauction.in",
+      // "Get photos from Google Drive": the token exchange and the download.
+      "https://accounts.google.com",
+      "https://www.googleapis.com",
+    ]);
+    // The Picker and Google's sign-in helper are the ONLY frames, and nothing
+    // wildcarded — a frame from any other origin stays refused.
+    expect(directive(policy, "frame-src")).toEqual([
+      "https://docs.google.com",
+      "https://accounts.google.com",
     ]);
     expect(directive(policy, "img-src")).toEqual([
       "'self'",
