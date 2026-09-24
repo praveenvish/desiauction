@@ -125,7 +125,19 @@ export function TournamentCard({
         {coverUrl == null || coverUrl === "" ? (
           <SportBanner sport={sport} seed={slug} />
         ) : (
-          <Image className="tc-cover" src={coverUrl} alt="" width={800} height={320} />
+          <Image
+            className="tc-cover"
+            src={coverUrl}
+            alt=""
+            width={800}
+            height={320}
+            // The card's rendered width, per `.tc-grid` (columns of ≥290px) inside
+            // the public page's 5vw gutters: ~90vw on a phone, ~45vw on a tablet,
+            // ~420px at most on a desktop. Without it the srcset offered only
+            // 828w and 1920w, so every high-density phone fetched the 1920px
+            // cover (156 KB) for a 369px card.
+            sizes="(max-width: 660px) 90vw, (max-width: 1000px) 45vw, 420px"
+          />
         )}
         <span
           className="tc-status"

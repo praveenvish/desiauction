@@ -112,7 +112,7 @@
       "$type": "fontFamily"
     },
     "text": {
-      "$value": "\"Geist Sans\", \"Noto Sans Devanagari\", sans-serif",
+      "$value": "\"Geist Sans\", \"Geist Sans Fallback\", \"Noto Sans Devanagari\", sans-serif",
       "$type": "fontFamily"
     },
     "mono": { "$value": "\"Geist Mono\", ui-monospace, monospace", "$type": "fontFamily" },

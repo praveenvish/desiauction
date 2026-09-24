@@ -24,3 +24,29 @@
   font-style: normal;
   font-display: swap;
 }
+
+/*
+ * GEIST'S STAND-IN, SIZED TO MATCH IT (page-load audit).
+ *
+ * Text paints first in the system sans and redraws when Geist arrives. The
+ * plain fallback set narrower and shorter than Geist, so the redraw was
+ * LARGER — and a larger redraw is a new Largest Contentful Paint. On a cold
+ * phone load of /c the intro paragraph painted at ~0.85 s and was re-counted
+ * at ~2.35 s when the font landed, 0.15 s under the 2.5 s "good" line.
+ *
+ * These overrides make the local sans occupy Geist's box: measured from the
+ * vendored Geist 400 latin file against Arial (hhea metrics, and the average
+ * advance width weighted by English letter frequency — next/font's method).
+ * size-adjust = 106.56%, ascent 920/1000, descent 220/1000, line gap
+ * 100/1000, each divided by that size-adjust. Arial first; Roboto (Android)
+ * and Helvetica share its proportions closely enough to borrow the numbers.
+ * Regenerate if Geist is ever upgraded.
+ */
+@font-face {
+  font-family: "Geist Sans Fallback";
+  src: local("Arial"), local("ArialMT"), local("Roboto"), local("Helvetica Neue");
+  size-adjust: 106.56%;
+  ascent-override: 86.33%;
+  descent-override: 20.64%;
+  line-gap-override: 9.38%;
+}
