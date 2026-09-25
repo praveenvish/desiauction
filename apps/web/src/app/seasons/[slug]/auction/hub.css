@@ -17,6 +17,26 @@
   text-transform: capitalize;
 }
 
+/* ONE BAND, NOT THREE (wow pass). On a laptop the status pill and the page
+   actions ride on the right end of the section tabs' row instead of taking a
+   60px row of their own above them. The tabs use the left ~460px; the head
+   is pinned into the empty right end of the same 44px strip. */
+@media (min-width: 1024px) {
+  .dash-stack:has(> .auc-head) {
+    position: relative;
+  }
+
+  .dash-stack > .auc-head {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    min-height: 44px;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+}
+
 .auc-head-actions .date-row {
   display: flex;
   flex-wrap: wrap;

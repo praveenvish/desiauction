@@ -158,19 +158,21 @@ export function AccountHero({
             ) : null}
           </div>
         </div>
-        <ul className="acct-id-facts" aria-label="Your account at a glance">
-          {facts.map((fact) => (
-            <li key={fact.key}>
-              <span className="acct-id-fact-icon" aria-hidden>
-                {fact.icon}
-              </span>
-              <span className="acct-id-fact-text">
-                <span className="acct-id-fact-value">{fact.value}</span>
-                <span className="acct-id-fact-label">{fact.label}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        {facts.length === 0 ? null : (
+          <ul className="acct-id-facts" aria-label="Your account at a glance">
+            {facts.map((fact) => (
+              <li key={fact.key}>
+                <span className="acct-id-fact-icon" aria-hidden>
+                  {fact.icon}
+                </span>
+                <span className="acct-id-fact-text">
+                  <span className="acct-id-fact-value">{fact.value}</span>
+                  <span className="acct-id-fact-label">{fact.label}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="acct-id-foot">
           <p className="acct-id-note">
             {/* "Arrives with your FIRST registration" was said to people who had

@@ -528,7 +528,7 @@ export function BoardPanel({
                 totalSpend === null ? "board-tile-value board-tile-muted" : "board-tile-value"
               }
             >
-              {totalSpend === null ? "—" : money.ledger(totalSpend)}
+              {totalSpend === null ? "—" : <TileMoney text={money.ledger(totalSpend)} />}
             </span>
           </div>
           <div className="board-tile">
@@ -558,7 +558,9 @@ export function BoardPanel({
                   />
                 </span>
                 <span className="board-tile-value board-tile-top">
-                  {money.ledger(topBuy.soldPrice)}
+                  <span>
+                    <TileMoney text={money.ledger(topBuy.soldPrice)} />
+                  </span>
                   <span className="board-tile-note">
                     {topBuy.playerName ?? topBuy.lotNumber}
                     {topBuy.teamName !== null ? ` · ${topBuy.teamName}` : ""}
@@ -691,5 +693,23 @@ export function BoardPanel({
         </section>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A headline figure whose unit never wraps alone: "1,74,500 pts" at 64px
+ * broke to a second line holding just "pts", doubling the tile. The unit is
+ * set as a small suffix; a rupee figure (prefix symbol) passes through.
+ */
+function TileMoney({ text }: { text: string }) {
+  const match = /^(.*?)\s?(pts)$/.exec(text);
+  if (match === null) {
+    return <>{text}</>;
+  }
+  return (
+    <>
+      {match[1]}
+      <small className="board-tile-unit">{match[2]}</small>
+    </>
   );
 }

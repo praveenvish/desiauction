@@ -241,6 +241,7 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
                     key={value}
                     className="ps-swatch"
                     data-active={value === theme ? "true" : undefined}
+                    title={THEME_LABEL[value].hint}
                   >
                     <input
                       type="radio"

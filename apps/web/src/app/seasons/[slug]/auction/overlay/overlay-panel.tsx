@@ -66,6 +66,13 @@ export function OverlayPanel({
   // The ticker: the auction's sold history, newest last. Falls back to a title
   // card before the first sale so the strip is never empty on air.
   const sold = feed.resolved.filter((entry) => entry.status === "sold");
+  // NEWEST FIRST, and after the night the headlines. The strip used to run
+  // oldest-first, so the frame on air (and the whole strip under reduced
+  // motion) opened on lot 1 — "SOLD Chirag Mehta" an hour after the hammer.
+  const ticker = finished
+    ? [...sold].sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0)).slice(0, 3)
+    : [...sold].reverse().slice(0, 12);
+  const tickerTag = finished ? "Top buy" : "Sold";
   const watchLabel = watchUrl.replace(/^https?:\/\//, "");
 
   // Which lower-third to show: the live lot, else the last outcome, else "up next".
@@ -124,10 +131,10 @@ export function OverlayPanel({
         </span>
         <div className="obs-ticker-track">
           <div className="obs-ticker-move">
-            {sold.length > 0
-              ? [...sold, ...sold].map((entry, index) => (
+            {ticker.length > 0
+              ? [...ticker, ...ticker].map((entry, index) => (
                   <span className="obs-ticker-item" key={`${entry.lotId}-${String(index)}`}>
-                    <span className="obs-ticker-tag">Sold</span>
+                    <span className="obs-ticker-tag">{tickerTag}</span>
                     <PlayerImage
                       name={entry.playerName ?? entry.lotNumber}
                       seed={entry.registrationId ?? lotSeed(entry.lotId, lotMedia)}

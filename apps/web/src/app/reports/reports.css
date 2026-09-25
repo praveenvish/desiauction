@@ -1,24 +1,21 @@
 /* /reports — one season, summed up. CSS bars only; tokens only; both themes. */
 
 .rp-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  min-height: 40px;
 }
 
 .rp-scope {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
   margin: 0;
   min-width: 0;
 }
 
 .rp-scope-name {
   color: var(--text-heading);
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
+  font-size: var(--text-md-size);
   font-weight: var(--font-weight-semibold);
   overflow-wrap: anywhere;
 }
@@ -38,8 +35,33 @@
   font-size: var(--text-sm-size);
 }
 
+.rp-picker-label {
+  font-weight: var(--font-weight-semibold);
+}
+
 .rp-picker .px-select {
   min-width: 0;
+  height: 36px;
+}
+
+.rp-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.rp-open:hover {
+  text-decoration: underline;
+}
+
+.rp-zero {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
 }
 
 /* ---- bars ---- */
@@ -220,5 +242,12 @@
 
   .rp-picker .px-select {
     flex: 1;
+  }
+}
+
+/* Three tiles in a two-column phone grid left an orphan half-tile. */
+@media (max-width: 719px) {
+  [data-testid="reports-stats"] > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }

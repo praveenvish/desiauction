@@ -1,8 +1,6 @@
 import {
   ButtonLink,
-  IconChart,
   IconGavel,
-  IconImage,
   IconPlay,
   IconUser,
   Pill,
@@ -138,38 +136,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                       My plan
                     </ButtonLink>
                   ) : null}
-                  {/* The replay is conduct-gated (`replayViewerData` 404s for
-                    anyone else), so a team owner was offered a dead door. */}
-                  {(status === "completed" || status === "reconciled") &&
-                  dashboard.viewer.canConduct ? (
-                    <ButtonLink
-                      href={`/seasons/${slug}/auction/replay`}
-                      variant="secondary"
-                      size="sm"
-                      data-testid="open-replay"
-                    >
-                      <IconChart size={16} />
-                      Review the night
-                    </ButtonLink>
-                  ) : null}
-                  {/* The poster studio had the same problem the board and the
-                    overlay had: a finished surface with no door. It belongs
-                    here, beside "Review the night" — the squads are final, and
-                    the hour after the hammer is the only hour anyone wants to
-                    post them. Gated on `registration.review`, which is what the
-                    studio itself checks. */}
-                  {(status === "completed" || status === "reconciled") &&
-                  dashboard.viewer.canPoster ? (
-                    <ButtonLink
-                      href={`/seasons/${slug}/posters`}
-                      variant="secondary"
-                      size="sm"
-                      data-testid="open-posters"
-                    >
-                      <IconImage size={16} />
-                      Share results
-                    </ButtonLink>
-                  ) : null}
+                  {/* "Review the night" and "Share results" used to sit here AND
+                    in the After-the-auction card below, gated identically — so a
+                    finished night showed each door twice. The card (with its
+                    icons, notes and the pending dot) is now their one home. */}
                 </span>
               </div>
             </header>

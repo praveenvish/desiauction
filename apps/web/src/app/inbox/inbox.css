@@ -1,11 +1,13 @@
 /* /inbox — one flush card, notices grouped by day, a tinted tile per kind.
    Tokens only; daylight + floodlight. */
 
+/* Left-aligned in the console column like every other console page — it
+   used to float centred at 960px. */
 .inbox {
   box-sizing: border-box;
   width: 100%;
   max-width: 960px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .inbox-settings {
@@ -53,12 +55,12 @@
   flex-direction: column;
 }
 
+/* A day is a quiet small-caps label, not a grey band. */
 .inbox-day-title {
   margin: 0;
-  padding: var(--space-2) var(--space-5);
-  background: var(--surface-sunken);
+  padding: var(--space-4) var(--space-5) var(--space-1);
+  background: none;
   border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-family: var(--font-text);
   font-size: var(--text-xs-size);
@@ -181,4 +183,21 @@
 .inbox-row[data-unread="true"] .inbox-when,
 .inbox-row[data-unread="true"] .inbox-subject {
   color: var(--text-secondary);
+}
+
+/* Phone: the settings door is a gear, not a row of its own in the header. */
+@media (max-width: 719px) {
+  .inbox-settings {
+    justify-content: center;
+    min-width: 44px;
+  }
+
+  .inbox-settings-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }

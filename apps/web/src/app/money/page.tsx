@@ -1,5 +1,12 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { Card, EmptyState, VisuallyHidden } from "@desiauction/ui";
+import {
+  ButtonLink,
+  Card,
+  EmptyState,
+  IconReceipt,
+  IconTile,
+  VisuallyHidden,
+} from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../server/auth/actions";
@@ -7,6 +14,7 @@ import { myDocuments } from "../../server/financial-operations/my-documents";
 import { formatDateTime } from "../../lib/format-date";
 import { DOC_KIND_LABEL } from "../../server/financial-operations/register";
 import "../seasons/[slug]/money/money.css";
+import "./my-money.css";
 
 export const metadata = { title: "My money · DesiAuction" };
 
@@ -31,15 +39,26 @@ export default async function MoneyPage() {
 
   return (
     <main>
-      <Card>
-        <h2>Your receipts</h2>
-        {documents.length === 0 ? (
+      {documents.length === 0 ? (
+        /* A designed empty state, not an h2 over a sentence over 700px of
+           white. It says who this page is for and where a club's own money
+           lives instead. */
+        <section className="my-money-empty" data-testid="my-money-empty">
+          <IconTile icon={<IconReceipt weight="duotone" />} tone="gold" />
           <EmptyState
-            headingLevel={3}
-            title="Nothing issued to you yet"
-            description="When you own a team in an auction and a payment is recorded, the receipt for it appears here."
+            headingLevel={2}
+            title="No receipts yet"
+            description="When you own a team and a club records your payment, its receipt lands here. Running a season? Its fees and settlement live on that season's Money tab."
+            action={
+              <ButtonLink href="/tournaments" variant="secondary" size="sm">
+                Go to your tournaments
+              </ButtonLink>
+            }
           />
-        ) : (
+        </section>
+      ) : (
+        <Card>
+          <h2>Your receipts</h2>
           <>
             <p className="section-note">
               Every document a club has issued to a team you bid for. These are the sealed records —
@@ -97,8 +116,8 @@ export default async function MoneyPage() {
               issued it.
             </p>
           </>
-        )}
-      </Card>
+        </Card>
+      )}
     </main>
   );
 }

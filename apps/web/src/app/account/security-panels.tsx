@@ -32,8 +32,15 @@ import {
 import { formatDate, formatDateTime } from "../../lib/format-date";
 import { isKnownEvent, labelForEvent } from "../../lib/inbox-events";
 
-/** How many sessions and events render before "Show more". */
+/** How many more sessions and events each "Show more" adds. */
 const PAGE = 10;
+/**
+ * What renders first: this device and the three most recent others, and the
+ * last five security events. Ten of each ran the account page to ~700px of
+ * devices before anything else.
+ */
+const FIRST_SESSIONS = 4;
+const FIRST_EVENTS = 5;
 
 type Pending =
   | { kind: "revoke-session"; session: SessionView }
@@ -47,8 +54,8 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
   const [deviceName, setDeviceName] = useState("");
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [sessionsShown, setSessionsShown] = useState(PAGE);
-  const [eventsShown, setEventsShown] = useState(PAGE);
+  const [sessionsShown, setSessionsShown] = useState(FIRST_SESSIONS);
+  const [eventsShown, setEventsShown] = useState(FIRST_EVENTS);
   const [pending, setPending] = useState<Pending | null>(null);
   const [renameTo, setRenameTo] = useState("");
   const [dialogError, setDialogError] = useState<string | null>(null);

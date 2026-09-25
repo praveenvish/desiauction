@@ -158,7 +158,19 @@
 .board-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  align-items: start;
   gap: 14px;
+}
+/* The unit rides as a suffix so the figure never wraps (see TileMoney). */
+.board-tile-value {
+  white-space: nowrap;
+}
+.board-tile-unit {
+  margin-left: 0.2em;
+  font-size: 0.45em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
 }
 .board-tile {
   display: flex;
@@ -201,7 +213,10 @@
   width: clamp(56px, 4.6vw, 96px);
   height: clamp(56px, 4.6vw, 96px);
 }
+/* The top buy shares its tile with a face, so its figure steps down a size
+   to keep the unit inside the tile. */
 .board-tile-top {
+  font-size: clamp(var(--text-2xl-size), 2.6vw, var(--display-sm-size));
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -209,6 +224,7 @@
   color: var(--ceremony-gold);
 }
 .board-tile-note {
+  white-space: normal;
   font-size: var(--text-xl-size);
   font-weight: 600;
   color: var(--text-secondary);
@@ -291,9 +307,11 @@
   height: 30px;
   padding: 0 8px;
   border-radius: var(--radius-full, 999px);
-  background: color-mix(in srgb, var(--live) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--live) 40%, transparent);
-  color: var(--live);
+  /* Neutral, not "live" green: three green pills read as three winners. The
+     crest carries the team's colour. */
+  background: color-mix(in srgb, var(--surface-raised) 60%, transparent);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -388,6 +406,10 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Flush with the grid's left edge — the UA list inset pushed it 40px in. */
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .board-recent-list li {
   display: grid;
@@ -739,6 +761,19 @@
 }
 
 @media (max-width: 560px) {
+  /* 2×2 headline tiles on a phone, not four full-width slabs (~560px). */
+  .board-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .board-tile {
+    padding: 14px;
+  }
+  .board-tile:last-child {
+    grid-column: 1 / -1;
+  }
+  .board-tile-value {
+    font-size: var(--text-2xl-size);
+  }
   /* On a phone the brand leads the page (lockup left, sound right) and the
      progress follows the title, rather than a right-aligned column under it. */
   .board-head-side {

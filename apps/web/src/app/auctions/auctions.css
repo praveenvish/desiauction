@@ -1,12 +1,85 @@
 /* /auctions — one card per auction night. Tokens only; both themes. */
 
+/* The page's one-line summary (it replaced four stat tiles). */
+.ax-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ax-summary-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ax-summary-item svg {
+  color: var(--text-muted);
+}
+
+.ax-summary-item strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ax-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 25%, transparent);
+}
+
 .ax-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
-  gap: var(--space-5);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  gap: var(--space-4);
+}
+
+/* One night on the page: it takes the row, laid out wide, instead of a
+   half-width card beside 580px of nothing. */
+@media (min-width: 900px) {
+  .ax-grid:has(> .ax-card:only-child) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ax-card:only-child {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-areas:
+      "head progress"
+      "meta progress"
+      "foot foot";
+    column-gap: var(--space-8);
+  }
+
+  .ax-card:only-child > .ax-head {
+    grid-area: head;
+  }
+
+  .ax-card:only-child > .ax-meta {
+    grid-area: meta;
+  }
+
+  .ax-card:only-child > .ax-progress,
+  .ax-card:only-child > .ax-note {
+    grid-area: progress;
+    align-self: center;
+  }
+
+  .ax-card:only-child > .ax-foot {
+    grid-area: foot;
+  }
 }
 
 .ax-card {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -159,10 +232,7 @@
 
 .ax-role {
   color: var(--text-muted);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: var(--text-sm-size);
 }
 
 .ax-links {

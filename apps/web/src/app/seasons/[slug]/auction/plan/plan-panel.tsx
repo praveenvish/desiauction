@@ -43,7 +43,7 @@ import {
   rupeesFromPaise,
   searchPool,
 } from "./plan-model";
-import { PlanReportCard } from "./plan-report";
+import { NoPlanReport, PlanReportCard } from "./plan-report";
 import { PlanWhatIf } from "./plan-what-if";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { useMoney } from "../../../../../components/money-unit";
@@ -267,6 +267,8 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
 
   const status = STATUS_BADGE[view.auctionStatus];
   const fit = fitBadge(state.budget.fit);
+  /** A finished night this team never planned for: one designed state, no zero tiles. */
+  const noPlan = view.readOnly && targets.length === 0;
   const recover = state.suggestions.find((s) => s.kind === "recover");
   const overSlots = state.suggestions.find((s) => s.kind === "over_slots");
   const unaffordable = state.suggestions.filter((s) => s.kind === "unaffordable");
@@ -307,23 +309,25 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
         ) : null}
       </header>
 
-      <div className="stat-row plan-stats">
-        <div className="stat-tile" data-testid="plan-purse">
-          <span className="stat-value">{money.ledger(state.budget.purseRemaining)}</span>
-          <span className="stat-label">Purse remaining</span>
+      {noPlan ? null : (
+        <div className="stat-row plan-stats">
+          <div className="stat-tile" data-testid="plan-purse">
+            <span className="stat-value">{money.ledger(state.budget.purseRemaining)}</span>
+            <span className="stat-label">Purse remaining</span>
+          </div>
+          <div className="stat-tile" data-testid="plan-exposure">
+            <span className="stat-value">{money.ledger(state.budget.plannedExposure)}</span>
+            <span className="stat-label">
+              Planned for {state.budget.openTargets}{" "}
+              {state.budget.openTargets === 1 ? "target" : "targets"}
+            </span>
+          </div>
+          <div className="stat-tile" data-testid="plan-headroom">
+            <span className="stat-value">{signedMoney(state.budget.headroom, money)}</span>
+            <span className="stat-label">Headroom</span>
+          </div>
         </div>
-        <div className="stat-tile" data-testid="plan-exposure">
-          <span className="stat-value">{money.ledger(state.budget.plannedExposure)}</span>
-          <span className="stat-label">
-            Planned for {state.budget.openTargets}{" "}
-            {state.budget.openTargets === 1 ? "target" : "targets"}
-          </span>
-        </div>
-        <div className="stat-tile" data-testid="plan-headroom">
-          <span className="stat-value">{signedMoney(state.budget.headroom, money)}</span>
-          <span className="stat-label">Headroom</span>
-        </div>
-      </div>
+      )}
 
       {/* Phase 1.5: two counts, stated. Which roles a squad NEEDS stays the owner's
           call — this line never says "you need". */}
@@ -383,7 +387,19 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
       )}
 
       {view.report !== undefined ? (
-        <PlanReportCard report={view.report} lotsByRegistration={lotsByRegistration} />
+        noPlan ? (
+          <NoPlanReport
+            report={view.report}
+            lotsByRegistration={lotsByRegistration}
+            labelOf={labelOf}
+          />
+        ) : (
+          <PlanReportCard
+            report={view.report}
+            lotsByRegistration={lotsByRegistration}
+            labelOf={labelOf}
+          />
+        )
       ) : null}
 
       {view.readOnly ? null : (
@@ -435,7 +451,7 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
 
       {view.readOnly ? null : <PlanWhatIf input={planInput} lots={view.lots} />}
 
-      {targets.length === 0 ? (
+      {noPlan && view.report !== undefined ? null : targets.length === 0 ? (
         <EmptyState
           title="No targets yet"
           description={

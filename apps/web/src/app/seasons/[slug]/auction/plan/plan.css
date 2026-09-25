@@ -301,3 +301,58 @@
     grid-template-columns: minmax(0, 1.6fr) minmax(140px, 1fr);
   }
 }
+
+/* --- what the team bought (wow pass): a list, not a comma paragraph -------- */
+.plan-bought-title {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.plan-bought {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-bought-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.plan-bought-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.plan-bought-role {
+  white-space: nowrap;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.plan-bought-price {
+  min-width: 6rem;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.plan-noplan {
+  display: grid;
+  gap: var(--space-2);
+}
