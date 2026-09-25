@@ -149,6 +149,7 @@ server.addHook("onClose", (_instance, done) => {
 // not a correctness fix.) server.close() fires the onClose hook that clears the
 // timers; then flush Sentry and exit 0 so the platform records a clean stop.
 let shuttingDown = false;
+const SHUTDOWN_DEADLINE_MS = 8_000;
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     if (shuttingDown) {
@@ -156,6 +157,17 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
     }
     shuttingDown = true;
     logger.info({ signal }, "shutting down — draining connections");
+    // Whatever happens in the drain, the lease goes back and the process
+    // ends: a writer that neither serves nor exits blocks its replacement.
+    setTimeout(() => {
+      logger.warn({ signal }, "shutdown deadline reached — releasing the lease and exiting");
+      void lease
+        .release()
+        .catch(() => undefined)
+        .finally(() => {
+          process.exit(0);
+        });
+    }, SHUTDOWN_DEADLINE_MS).unref();
     void server
       .close()
       .catch((error: unknown) => {

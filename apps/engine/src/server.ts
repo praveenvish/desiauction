@@ -41,6 +41,9 @@ export interface ServerDeps {
  * leaked ticket stops working within two windows) with no wire-format change —
  * the URL still carries a single hex string. MIN-2 remediation.
  */
+/** How long live sockets get to say goodbye on shutdown before they are cut. */
+const CLOSE_GRACE_MS = 2_000;
+
 export const TICKET_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -493,6 +496,25 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
       deps.logger.warn({ err: error, target: request.url }, "malformed upgrade request — refused");
       socket.destroy();
     }
+  });
+
+  // ws 8 stopped disconnecting clients in close(), and the HTTP server's
+  // close waits for every one of them — on auction night, never: a deploy's
+  // SIGTERM hung with the single-writer lease held, and the replacement
+  // engine refused to start. BEFORE the server closes (preClose; onClose runs
+  // after it), tell every client we are going away — 1001, and the room
+  // reconnects to the replacement — and cut anyone still attached shortly after.
+  server.addHook("preClose", (done) => {
+    for (const client of wss.clients) {
+      client.close(1001, "engine restarting");
+    }
+    const cut = setTimeout(() => {
+      for (const client of wss.clients) {
+        client.terminate();
+      }
+    }, CLOSE_GRACE_MS);
+    cut.unref();
+    done();
   });
 
   server.addHook("onClose", (_instance, done) => {
