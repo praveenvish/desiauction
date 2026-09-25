@@ -4,6 +4,7 @@ import { emailVerifications, newId, people, type Db } from "@desiauction/db";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import { boundSubject, codeDigest } from "./code-digest";
+import { normalizeEmail } from "./email-address";
 import { DEFAULT_GLOBAL_PER_HOUR } from "./otp";
 
 /**
@@ -39,30 +40,9 @@ const MAX_PER_HOUR = 5;
 const MAX_PER_HOUR_PER_IP = 20;
 const MAX_ATTEMPTS = 5;
 
-/**
- * Deliberately permissive, and that is the point: the code decides.
- *
- * An address that passes a strict regex is not more likely to be the person's
- * own, and every strict pattern rejects mail that works — plus addressing,
- * long TLDs, unicode domains. The only real test of an address is whether a
- * message sent to it comes back, so this rejects the shapes that cannot be an
- * address at all and lets the mailbox answer the rest.
- */
-export function normalizeEmail(raw: string): string | null {
-  const trimmed = raw.trim().toLowerCase();
-  if (trimmed.length < 3 || trimmed.length > 254 || /\s/.test(trimmed)) {
-    return null;
-  }
-  const at = trimmed.indexOf("@");
-  if (at <= 0 || at !== trimmed.lastIndexOf("@") || at === trimmed.length - 1) {
-    return null;
-  }
-  const domain = trimmed.slice(at + 1);
-  if (!domain.includes(".") || domain.startsWith(".") || domain.endsWith(".")) {
-    return null;
-  }
-  return trimmed;
-}
+// Kept exported from here for the existing callers; the rule lives in its own
+// leaf module so an out-of-band script can use it without the sign-in stack.
+export { normalizeEmail };
 
 export type EmailVerificationRequest =
   | { ok: true; email: string; code: string }
