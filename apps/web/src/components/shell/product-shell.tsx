@@ -39,6 +39,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
+import { AdminSectionNav } from "../../app/admin/admin-section-nav";
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { LEGAL_IDENTITY, legalIdentityPublished } from "../../content/company";
 import { inboxSeenKey } from "../../lib/inbox-events";
@@ -49,7 +50,6 @@ import { BrandMark, BrandWordmark } from "./brand";
 import {
   adminSectionsFor,
   PUBLIC_DESTINATIONS,
-  activeAdminTab,
   activeOrgMoneyTab,
   activeSeasonTab,
   seasonTabs,
@@ -959,18 +959,9 @@ export function ProductShell({
     // 404, so chrome would frame nothing.
     // Only the sections this operator holds a key to (RN-1 Phase 5). The pages
     // still 404 on a direct URL for anyone else — that is the real boundary.
+    // The strip folds the desks into a grouped "More" (AdminSectionNav).
     const sections = adminSectionsFor(navRoles?.platform ?? []);
-    tabsNode =
-      sections.length > 0 ? (
-        <SubNavTabs
-          label="Administration sections"
-          linkComponent={Link}
-          tabs={sections.map((section) => ({
-            ...section,
-            active: section.key === activeAdminTab(pathname),
-          }))}
-        />
-      ) : null;
+    tabsNode = sections.length > 0 ? <AdminSectionNav sections={sections} /> : null;
   } else if (competitionMatch !== null) {
     const slug = competitionMatch[1] as string;
     const competition = competitions.find((entry) => entry.slug === slug);

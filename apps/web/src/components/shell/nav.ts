@@ -403,6 +403,70 @@ export function adminSectionsFor(held: readonly PlatformDoorCapability[]): Admin
   });
 }
 
+/**
+ * HOW THE ADMIN STRIP FITS (wow pass, 2026-09-25).
+ *
+ * Sixteen sections do not fit one rail at 1440: "Messaging" clipped and
+ * "Notifications" sat off-screen, so on every notifications page NO tab looked
+ * active. The strip now shows the platform + people sections inline and folds
+ * the desks and comms into a "More" menu, grouped. The section you are on is
+ * ALWAYS drawn inline — pinned after the primaries when it lives in the menu —
+ * so the active state can never be hidden. An operator who holds only a few
+ * desks sees them all inline; the menu appears only when there is overflow.
+ */
+const ADMIN_PRIMARY_KEYS: ReadonlySet<string> = new Set([
+  "overview",
+  "live",
+  "health",
+  "audit",
+  "orgs",
+  "users",
+]);
+
+/** Inline when an operator holds this many sections or fewer. */
+const ADMIN_INLINE_MAX = 7;
+
+const ADMIN_MENU_GROUPS: readonly { label: string; keys: readonly string[] }[] = [
+  { label: "Trust & safety", keys: ["moderation", "erasure", "reports"] },
+  { label: "Growth", keys: ["passes", "demos", "reviews", "newsletter"] },
+  { label: "Comms", keys: ["messaging", "notifications"] },
+];
+
+export interface AdminNavLayout {
+  /** Drawn inline, in order. */
+  inline: AdminSection[];
+  /** The active section when it lives in the menu — drawn inline after `inline`. */
+  pinned: AdminSection | null;
+  /** The folded sections, grouped. Empty when everything fits inline. */
+  more: { label: string; items: AdminSection[] }[];
+}
+
+export function adminNavLayout(
+  sections: readonly AdminSection[],
+  activeKey: string,
+): AdminNavLayout {
+  if (sections.length <= ADMIN_INLINE_MAX) {
+    return { inline: [...sections], pinned: null, more: [] };
+  }
+  const inline = sections.filter((section) => ADMIN_PRIMARY_KEYS.has(section.key));
+  const folded = sections.filter((section) => !ADMIN_PRIMARY_KEYS.has(section.key));
+  const more = ADMIN_MENU_GROUPS.map((group) => ({
+    label: group.label,
+    items: folded.filter((section) => group.keys.includes(section.key)),
+  }));
+  // A section no group names still has to be reachable.
+  const named = new Set(ADMIN_MENU_GROUPS.flatMap((group) => group.keys));
+  const stray = folded.filter((section) => !named.has(section.key));
+  if (stray.length > 0) {
+    more.push({ label: "Other", items: stray });
+  }
+  return {
+    inline,
+    pinned: folded.find((section) => section.key === activeKey) ?? null,
+    more: more.filter((group) => group.items.length > 0),
+  };
+}
+
 export function activeAdminTab(pathname: string): string {
   // An auction is reached from the live board, so it lights the board's tab.
   if (pathname.startsWith("/admin/live") || pathname.startsWith("/admin/auctions")) {
@@ -499,6 +563,9 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/^\/admin\/notifications\/suppressions$/, "Suppressions"],
   [/^\/admin\/notifications\/analytics$/, "Delivery analytics"],
   [/^\/admin\/notifications\/[^/]+\/email$/, "Email wording"],
+  // Was missing: the page titled itself "Platform admin" under a "Platform
+  // admin" crumb — the same defect Messaging had, one level down.
+  [/^\/admin\/notifications\/templates$/, "Message templates"],
   [/^\/admin\/notifications$/, "Notifications"],
   [/^\/admin\/passes$/, "Passes"],
   // Longest-first: availability must not be labelled "Demos".
