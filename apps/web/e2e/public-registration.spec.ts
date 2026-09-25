@@ -225,7 +225,9 @@ test("player journey: discover → multi-step register with draft recovery → t
     // The player dashboard carries it too.
     await player.goto("/home");
     await expect(player.getByTestId("home-registrations")).toContainText(`Monsoon Cup ${STAMP}`);
-    await expect(player.getByTestId("home-registrations")).toContainText("submitted");
+    // /home says where the season stands in /me's words (verdictOf), not the
+    // raw registration status.
+    await expect(player.getByTestId("home-reg-verdict")).toHaveText("Waiting for approval");
   });
 
   // Organizer approves from the registration workspace.
@@ -242,7 +244,7 @@ test("player journey: discover → multi-step register with draft recovery → t
     await expect(player.getByTestId("my-registration-status")).toHaveText("approved");
     await expect(player.getByTestId("registration-status")).toContainText("player pool");
     await player.goto("/home");
-    await expect(player.getByTestId("home-registrations")).toContainText("approved");
+    await expect(player.getByTestId("home-reg-verdict")).toHaveText("In the pool");
   });
 });
 

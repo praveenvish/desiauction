@@ -17,6 +17,7 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
+import { myRegistrations } from "../competition/public";
 import { personSeasonsInOrg, playerCareer, playerUpcomingMatches } from "./career";
 
 /**
@@ -306,5 +307,21 @@ describe("playerCareer (PI-1)", () => {
   it("carries the team colour on a season for its chip", async () => {
     const career = await playerCareer(personId);
     expect(career.seasons.find((s) => s.competitionName === "CPL 1")?.teamColor).toBe("#123456");
+  });
+
+  it("/home's myRegistrations tells the same verdict as the career — price, team, colour", async () => {
+    // /home used to show a sold player only their registration's "approved";
+    // it now reads the verdict from here, so it must agree with /me — and be
+    // held to the same abandoned-auction guard (one row, the real price).
+    const rows = await myRegistrations(personId);
+    expect(rows).toHaveLength(2);
+    const sold = rows.find((row) => row.competitionName === "CPL 1");
+    expect(sold?.auction).toEqual({ kind: "sold", soldPrice: SOLD_PRICE });
+    expect(sold?.auctionUnit).toBe("inr");
+    expect(sold?.teamName).toBe("Career Strikers");
+    expect(sold?.teamColor).toBe("#123456");
+    const withdrawn = rows.find((row) => row.competitionName === "Career One-Off");
+    expect(withdrawn?.auction).toBeNull();
+    expect(withdrawn?.teamName).toBeNull();
   });
 });

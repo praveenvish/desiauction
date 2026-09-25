@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { dbHandle } from "../db";
 import { hiddenInboxActions } from "../messaging/gate";
+import { inboxExclusions } from "./inbox-filter";
 
 // Security events ride the append-only audit substrate (IP-2_DESIGN D8) with
 // person scope — one ledger, one query surface, no parallel event store.
@@ -130,7 +131,9 @@ export async function listSecurityEvents(
 }
 
 /**
- * THE INBOX: the same ledger, minus the notifications this person switched off
+ * THE INBOX: the same ledger, minus the routine sign-in rows (inbox-filter.ts
+ * `ACCOUNT_ONLY_ACTIONS` — they are the person's own doing, and they pushed
+ * "You were sold" off the list) and the notifications this person switched off
  * for the app (gate.ts `hiddenInboxActions`).
  *
  * Filtered HERE, at read, and nowhere near the write. The row is the audit
@@ -146,10 +149,7 @@ export async function listInboxEvents(personId: string, limit = 10): Promise<Sec
       .select({ action: auditLog.action, at: auditLog.at, meta: auditLog.meta })
       .from(auditLog)
       .where(
-        and(
-          eq(auditLog.scopeId, personId),
-          hidden.length === 0 ? undefined : notInArray(auditLog.action, hidden),
-        ),
+        and(eq(auditLog.scopeId, personId), notInArray(auditLog.action, inboxExclusions(hidden))),
       )
       .orderBy(desc(auditLog.at))
       .limit(limit);
@@ -185,10 +185,7 @@ export const latestSecurityEventAt = cache(async function latestSecurityEventAt(
       .select({ at: auditLog.at })
       .from(auditLog)
       .where(
-        and(
-          eq(auditLog.scopeId, personId),
-          hidden.length === 0 ? undefined : notInArray(auditLog.action, hidden),
-        ),
+        and(eq(auditLog.scopeId, personId), notInArray(auditLog.action, inboxExclusions(hidden))),
       )
       .orderBy(desc(auditLog.at))
       .limit(1);

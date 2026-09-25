@@ -30,6 +30,24 @@
   border-radius: var(--radius-sm);
 }
 
+/* The one line that says where the sign-ins went (see page.tsx). */
+.inbox-foot {
+  margin: var(--space-3) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.inbox-foot a {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.inbox-foot a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 .inbox-list {
   display: flex;
   flex-direction: column;

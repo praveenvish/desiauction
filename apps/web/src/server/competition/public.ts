@@ -1227,6 +1227,21 @@ export interface MyRegistration {
    * reached them.
    */
   posterReady: boolean;
+  /**
+   * What the night decided for this person, in the same shape /me reads
+   * (`CareerSeason.auction`) so /home can say it with the same words — "Sold ·
+   * 50,000 pts" — instead of the registration's bare "approved", which was all
+   * a sold player's home told them. The sale wins over a pre-signed mark, as it
+   * does on the career page.
+   */
+  auction:
+    { kind: PreSignedKind } | { kind: "sold"; soldPrice: number } | { kind: "unsold" } | null;
+  /** What `auction.soldPrice` counts in (0091) — rupees or points. */
+  auctionUnit: MoneyUnit;
+  /** The team this person plays for — sold to, or named captain/icon of. */
+  teamName: string | null;
+  /** That team's own colour, for its chip; null when the club set none. */
+  teamColor: string | null;
 }
 
 /** The person's registrations across every competition — the player lens.
@@ -1252,12 +1267,20 @@ export const myRegistrations = cache(async function myRegistrations(
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
       lotStatus: lots.status,
+      soldPrice: lots.soldPrice,
       auctionStatus: auctions.status,
+      auctionUnit: competitions.auctionUnit,
+      teamName: teams.name,
+      teamColor: teams.primaryColor,
     })
     .from(registrations)
     .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .innerJoin(people, eq(people.id, registrations.personId))
+    // The registration's own team: the completed auction writes the buyer here
+    // (and a captain/icon is placed here before it), so it is the one answer
+    // to "whose am I?" — the same join the career page makes.
+    .leftJoin(teams, eq(teams.id, registrations.teamId))
     /*
      * The lot is joined THROUGH its auction and only the one that counts.
      * Migration 0029 permits at most one non-abandoned auction per competition
@@ -1294,6 +1317,17 @@ export const myRegistrations = cache(async function myRegistrations(
         row.lotStatus ?? undefined,
         row.auctionStatus,
       ) !== null,
+    auctionUnit: row.auctionUnit,
+    teamName: row.teamName,
+    teamColor: row.teamColor,
+    auction:
+      row.lotStatus === "sold" && row.soldPrice !== null
+        ? { kind: "sold", soldPrice: row.soldPrice }
+        : isPreSigned(row)
+          ? { kind: preSignedKind(row) ?? "icon" }
+          : row.lotStatus === "unsold"
+            ? { kind: "unsold" }
+            : null,
   }));
 });
 

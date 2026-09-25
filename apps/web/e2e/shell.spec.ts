@@ -54,7 +54,7 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
   // New-account home: the shell's one h1 greets the name onboarding just
   // collected — "Welcome to DesiAuction" is the /onboarding page's own
   // heading, not /home's.
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Shell Tester");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(", Shell");
 
   /*
    * THE MENU IS BUILT FROM WHAT THIS PERSON DOES (RN-1).

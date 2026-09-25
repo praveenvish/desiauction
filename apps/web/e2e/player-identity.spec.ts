@@ -48,7 +48,7 @@ test("the cricket profile saves, counts, and frames the career page", async ({ p
   // (Asserted on the way in: it is login furniture, not account furniture.)
 
   await page.goto("/account");
-  await expect(page.getByTestId("profile-completion")).toContainText("Profile 1/8 complete");
+  await expect(page.getByTestId("profile-completion")).toContainText("Profile 1 of 8");
 
   /*
    * TWO SAVES, because Phase 3 split one form into two facts. Date of birth and
@@ -85,7 +85,7 @@ test("the cricket profile saves, counts, and frames the career page", async ({ p
 
   // name + role + dob + city = 4 of 8; gender deliberately never counts. The
   // role now reaches the checklist from the cricket panel, which is the point.
-  await expect(page.getByTestId("profile-completion")).toContainText("Profile 4/8 complete");
+  await expect(page.getByTestId("profile-completion")).toContainText("Profile 4 of 8");
 
   await page.goto("/me/cricket");
   await expect(page.getByTestId("career-header")).toContainText("Asha Player");

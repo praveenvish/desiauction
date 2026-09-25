@@ -331,45 +331,56 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
         <span>
           <span className="plan-roles-label">Squad</span> {roleLine(roles.squad)}
         </span>
+        {/* After the hammer there is nothing still to come: whoever is left in
+            the pool went unsold, and saying "Still to come" of them invited an
+            owner to wait for players the night had already passed over. */}
         <span>
-          <span className="plan-roles-label">Still to come</span> {roleLine(roles.remaining)}
+          <span className="plan-roles-label">
+            {view.readOnly ? "Went unsold" : "Still to come"}
+          </span>{" "}
+          {roleLine(roles.remaining)}
         </span>
       </p>
 
-      <div className="plan-fit" data-testid="plan-fit" data-fit={state.budget.fit}>
-        <Badge tone={fit.tone}>{fit.label}</Badge>
-        {recover?.kind === "recover" ? (
-          <p className="plan-note">
-            To fit, the plan needs {money.ledger(recover.amount)} less.{" "}
-            {recover.candidates.length > 0 ? (
-              <>
-                Lowest priority first:{" "}
-                {recover.candidates
-                  .map(
-                    (c) =>
-                      `${nameOf(lotsByRegistration.get(c.registrationId), "a player")} (${money.ledger(c.plannedAmount)})`,
-                  )
-                  .join(", ")}
-                .
-              </>
-            ) : null}
-          </p>
-        ) : null}
-        {overSlots?.kind === "over_slots" ? (
-          <p className="plan-note">
-            {overSlots.excess} more open {overSlots.excess === 1 ? "target" : "targets"} than squad
-            places ({view.planRules.squadMax} max).
-          </p>
-        ) : null}
-        {unaffordable.map((s) => (
-          <p className="plan-note" key={s.registrationId}>
-            {nameOf(lotsByRegistration.get(s.registrationId), "A player")} is planned at{" "}
-            {money.ledger(s.plannedAmount)}, above what you could bid right now (
-            {money.ledger(s.maxAffordable)}
-            ).
-          </p>
-        ))}
-      </div>
+      {/* "Plan fits your purse" is advice for a night still to be bid; over a
+          finished auction it is a verdict on nothing. The report below says
+          how the plan actually went. */}
+      {view.readOnly ? null : (
+        <div className="plan-fit" data-testid="plan-fit" data-fit={state.budget.fit}>
+          <Badge tone={fit.tone}>{fit.label}</Badge>
+          {recover?.kind === "recover" ? (
+            <p className="plan-note">
+              To fit, the plan needs {money.ledger(recover.amount)} less.{" "}
+              {recover.candidates.length > 0 ? (
+                <>
+                  Lowest priority first:{" "}
+                  {recover.candidates
+                    .map(
+                      (c) =>
+                        `${nameOf(lotsByRegistration.get(c.registrationId), "a player")} (${money.ledger(c.plannedAmount)})`,
+                    )
+                    .join(", ")}
+                  .
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          {overSlots?.kind === "over_slots" ? (
+            <p className="plan-note">
+              {overSlots.excess} more open {overSlots.excess === 1 ? "target" : "targets"} than
+              squad places ({view.planRules.squadMax} max).
+            </p>
+          ) : null}
+          {unaffordable.map((s) => (
+            <p className="plan-note" key={s.registrationId}>
+              {nameOf(lotsByRegistration.get(s.registrationId), "A player")} is planned at{" "}
+              {money.ledger(s.plannedAmount)}, above what you could bid right now (
+              {money.ledger(s.maxAffordable)}
+              ).
+            </p>
+          ))}
+        </div>
+      )}
 
       {view.report !== undefined ? (
         <PlanReportCard report={view.report} lotsByRegistration={lotsByRegistration} />

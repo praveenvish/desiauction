@@ -85,7 +85,7 @@ export default async function InboxPage() {
         title="All notifications"
         description={
           events.length === 0
-            ? "Registration decisions, auction results and account activity land here."
+            ? "Registration decisions, auction results and account alerts land here."
             : `${String(events.length)} ${events.length === 1 ? "notice" : "notices"} · newest first · marked read as you open this page`
         }
         action={
@@ -125,6 +125,16 @@ export default async function InboxPage() {
           />
         )}
       </SectionCard>
+      {/* Where the sign-ins went: routine sign-ins and code requests are kept
+          off this list (server/auth/inbox-filter.ts) and live in the account's
+          security log — said here, so they do not seem lost. */}
+      <p className="inbox-foot">
+        Sign-ins and sign-in codes are in{" "}
+        <Link href="/account#activity" data-testid="inbox-signins-link">
+          Account → Security activity
+        </Link>
+        .
+      </p>
     </main>
   );
 }
