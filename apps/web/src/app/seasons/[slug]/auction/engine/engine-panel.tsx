@@ -2,7 +2,18 @@
 
 import type { EngineDiagnostics } from "@desiauction/contracts";
 import { commandRefusalMessage } from "@desiauction/core";
-import { Badge, Button, Card, Dialog, useToast } from "@desiauction/ui";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  Dialog,
+  IconAlert,
+  IconGavel,
+  IconRefresh,
+  IconShieldCheck,
+  useToast,
+} from "@desiauction/ui";
 import { useCallback, useEffect, useState } from "react";
 
 import { engineDiagnosticsAction } from "../../../../../server/auction/conduct-actions";
@@ -112,10 +123,33 @@ export function EnginePanel({ slug }: { slug: string }) {
       data-testid="engine-panel"
       data-hydrated={hydrated ? "true" : "false"}
     >
-      <Card data-testid="recovery-status">
-        <div className="competition-head">
-          <h2>Engine health</h2>
-          <span className="date-row">
+      {/* THE ORGANIZER'S ANSWER, first and alone: is the engine all right?
+          Seventeen mono tiles used to BE the page ("1047861 ms Engine drift"
+          read like an alarm on a healthy engine). They are still here, behind
+          "Technical diagnostics", for whoever is asked to look. */}
+      <Card data-testid="recovery-status" className="engine-health">
+        <span
+          className="engine-health-tile"
+          data-tone={unreachable || (diagnostics !== null && !healthy) ? "danger" : "ok"}
+          aria-hidden
+        >
+          {unreachable || (diagnostics !== null && !healthy) ? (
+            <IconAlert size={24} weight="duotone" />
+          ) : (
+            <IconShieldCheck size={24} weight="duotone" />
+          )}
+        </span>
+        <div className="engine-health-body">
+          <div className="engine-health-title">
+            <h2>
+              {unreachable
+                ? "We can't reach the engine"
+                : diagnostics === null
+                  ? "Checking the engine…"
+                  : healthy
+                    ? "The engine is healthy"
+                    : "The engine needs attention"}
+            </h2>
             {unreachable ? (
               <Badge tone="danger" data-testid="engine-unreachable">
                 engine unreachable
@@ -125,160 +159,189 @@ export function EnginePanel({ slug }: { slug: string }) {
                 {healthy ? "healthy" : "attention required"}
               </Badge>
             ) : null}
-            <Button
-              variant="secondary"
-              size="sm"
-              // One click used to pause a live room with no warning. It asks first.
-              onClick={() => {
-                setConfirmOpen(true);
-              }}
-              loading={busy}
-              disabled={finished}
-              data-testid="engine-recover"
-            >
-              Recover engine
-            </Button>
-          </span>
+          </div>
+          {diagnostics?.halted != null ? (
+            <p className="competitions-hint diag-fail" data-testid="engine-halted">
+              HALTED FAIL-CLOSED: {diagnostics.halted}
+            </p>
+          ) : (
+            <p className="competitions-hint">
+              {diagnostics !== null
+                ? `${String(diagnostics.eventCount)} events on the record, every one verified · ${String(diagnostics.connectedClients)} ${diagnostics.connectedClients === 1 ? "screen" : "screens"} connected${refreshMs !== null ? " · checked just now" : ""}.`
+                : unreachable
+                  ? "The engine isn't answering. The live room stays read-only until it does; this page checks again on its own."
+                  : "Reading the engine's own account of the room…"}
+            </p>
+          )}
+          <p className="engine-health-explain">
+            {finished
+              ? "The auction is over, so there is nothing to recover."
+              : "If the room ever looks stuck, Recover rebuilds it from the record. The room pauses for a few seconds."}
+          </p>
         </div>
-        {diagnostics?.halted != null ? (
-          <p className="competitions-hint diag-fail" data-testid="engine-halted">
-            HALTED FAIL-CLOSED: {diagnostics.halted}
-          </p>
-        ) : (
-          <p className="competitions-hint">
-            Fail-closed discipline: a lying snapshot is never served. Recovery replays the immutable
-            log and heals row projections from it.
-          </p>
-        )}
+        <div className="engine-health-actions">
+          <Button
+            variant="secondary"
+            size="sm"
+            // One click used to pause a live room with no warning. It asks first.
+            onClick={() => {
+              setConfirmOpen(true);
+            }}
+            loading={busy}
+            disabled={finished}
+            data-testid="engine-recover"
+          >
+            <IconRefresh size={16} />
+            Recover engine
+          </Button>
+          <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="ghost" size="sm">
+            <IconGavel size={16} />
+            Cockpit
+          </ButtonLink>
+        </div>
       </Card>
 
       {diagnostics !== null ? (
-        <>
-          <Card data-testid="recovery-dashboard">
-            <h2>Recovery dashboard</h2>
-            <div className="diag-grid">
-              <Tile
-                label="Snapshot version"
-                value={String(diagnostics.version)}
-                testId="diag-version"
-              />
-              <Tile
-                label="Event sequence"
-                value={String(diagnostics.eventCount)}
-                testId="diag-events"
-              />
-              <Tile
-                label="Replay (fold + verify)"
-                value={ms(diagnostics.lastReplayMs)}
-                testId="diag-replay"
-              />
-              <Tile
-                label="Recovery duration"
-                value={diagnostics.lastRecoveryMs > 0 ? ms(diagnostics.lastRecoveryMs) : "—"}
-                testId="diag-recovery"
-              />
-              <Tile
-                label="Queue depth"
-                value={String(diagnostics.queueDepth)}
-                testId="diag-queue"
-              />
-              <Tile
-                label="Recovery status"
-                value={diagnostics.halted === null ? "verified" : "halted"}
-                tone={diagnostics.halted === null ? "ok" : "fail"}
-                testId="diag-recovery-status"
-              />
-              <Tile
-                label="Watchdog"
-                value={diagnostics.watchdog.stalled ? "stalled" : "ticking"}
-                tone={diagnostics.watchdog.stalled ? "fail" : "ok"}
-                testId="diag-watchdog"
-              />
-              <Tile
-                label="Connected clients"
-                value={String(diagnostics.connectedClients)}
-                testId="diag-clients"
-              />
-              <Tile
-                label="WS heartbeat age"
-                value={
-                  diagnostics.wsHeartbeatAgeMs === 0
-                    ? "—"
-                    : `${(diagnostics.wsHeartbeatAgeMs / 1000).toFixed(1)} s`
-                }
-                testId="diag-heartbeat"
-              />
-              <Tile
-                label="Projection status"
-                value={
-                  diagnostics.halted?.startsWith("projection_mismatch") === true
-                    ? "diverged"
-                    : "verified"
-                }
-                tone={
-                  diagnostics.halted?.startsWith("projection_mismatch") === true ? "fail" : "ok"
-                }
-                testId="diag-projection"
-              />
-              <Tile
-                label="Recoveries"
-                value={String(diagnostics.recoveries)}
-                testId="diag-recoveries"
-              />
-            </div>
-          </Card>
-
-          <Card data-testid="diagnostics-card">
-            <h2>Diagnostics</h2>
-            <div className="diag-grid">
-              <Tile
-                label="Commands processed"
-                value={`${String(diagnostics.processed)} (${String(diagnostics.rejected)} rejected)`}
-                testId="diag-processed"
-              />
-              <Tile
-                label="Throughput"
-                value={`${diagnostics.commandsPerMinute.toFixed(1)}/min`}
-                testId="diag-throughput"
-              />
-              <Tile label="Avg processing" value={ms(diagnostics.avgProcessMs)} testId="diag-avg" />
-              <Tile label="Max processing" value={ms(diagnostics.maxProcessMs)} testId="diag-max" />
-              <Tile
-                label="Broadcast latency"
-                value={ms(diagnostics.lastBroadcastLatencyMs)}
-                testId="diag-broadcast"
-              />
-              <Tile
-                label="Engine drift (tick)"
-                value={`${String(diagnostics.watchdog.tickDriftMs)} ms`}
-                testId="diag-drift"
-              />
-              <Tile
-                label="Diagnostics refresh"
-                value={refreshMs !== null ? ms(refreshMs) : "—"}
-                testId="diag-refresh"
-              />
-            </div>
-            <div className="diag-grid">
-              <div className="diag-tile">
-                <span className="diag-value diag-hash" data-testid="diag-snapshot-hash">
-                  {diagnostics.snapshotHash.slice(0, 16)}…
-                </span>
-                <span className="diag-label">Snapshot hash (sha-256 of broadcast bytes)</span>
+        <details className="engine-details">
+          <summary>
+            Technical diagnostics
+            <span className="engine-details-hint">replay, queue, hashes, watchdog</span>
+          </summary>
+          <div className="engine-details-body">
+            <section data-testid="recovery-dashboard" className="engine-group">
+              <h3>Recovery</h3>
+              <div className="diag-grid">
+                <Tile
+                  label="Snapshot version"
+                  value={String(diagnostics.version)}
+                  testId="diag-version"
+                />
+                <Tile
+                  label="Event sequence"
+                  value={String(diagnostics.eventCount)}
+                  testId="diag-events"
+                />
+                <Tile
+                  label="Replay (fold + verify)"
+                  value={ms(diagnostics.lastReplayMs)}
+                  testId="diag-replay"
+                />
+                <Tile
+                  label="Recovery duration"
+                  value={diagnostics.lastRecoveryMs > 0 ? ms(diagnostics.lastRecoveryMs) : "—"}
+                  testId="diag-recovery"
+                />
+                <Tile
+                  label="Queue depth"
+                  value={String(diagnostics.queueDepth)}
+                  testId="diag-queue"
+                />
+                <Tile
+                  label="Recoveries"
+                  value={String(diagnostics.recoveries)}
+                  testId="diag-recoveries"
+                />
               </div>
-              <div className="diag-tile">
-                <span className="diag-value diag-hash" data-testid="diag-projection-hash">
-                  {diagnostics.projectionHash.slice(0, 16)}…
-                </span>
-                <span className="diag-label">Projection hash (sha-256 of the fold)</span>
+            </section>
+            <section className="engine-group">
+              <h3>Integrity</h3>
+              <div className="diag-grid">
+                <Tile
+                  label="Recovery status"
+                  value={diagnostics.halted === null ? "verified" : "halted"}
+                  tone={diagnostics.halted === null ? "ok" : "fail"}
+                  testId="diag-recovery-status"
+                />
+                <Tile
+                  label="Projection status"
+                  value={
+                    diagnostics.halted?.startsWith("projection_mismatch") === true
+                      ? "diverged"
+                      : "verified"
+                  }
+                  tone={
+                    diagnostics.halted?.startsWith("projection_mismatch") === true ? "fail" : "ok"
+                  }
+                  testId="diag-projection"
+                />
+                <Tile
+                  label="Watchdog"
+                  value={diagnostics.watchdog.stalled ? "stalled" : "ticking"}
+                  tone={diagnostics.watchdog.stalled ? "fail" : "ok"}
+                  testId="diag-watchdog"
+                />
               </div>
-            </div>
-          </Card>
-        </>
-      ) : !unreachable ? (
-        <Card>
-          <p className="competitions-hint">Loading diagnostics…</p>
-        </Card>
+              <dl className="engine-hashes" data-testid="diagnostics-card">
+                <div>
+                  <dt>Snapshot hash</dt>
+                  <dd className="diag-hash" data-testid="diag-snapshot-hash">
+                    {diagnostics.snapshotHash.slice(0, 16)}…
+                  </dd>
+                </div>
+                <div>
+                  <dt>Projection hash</dt>
+                  <dd className="diag-hash" data-testid="diag-projection-hash">
+                    {diagnostics.projectionHash.slice(0, 16)}…
+                  </dd>
+                </div>
+              </dl>
+            </section>
+            <section className="engine-group">
+              <h3>Throughput</h3>
+              <div className="diag-grid">
+                <Tile
+                  label="Commands processed"
+                  value={`${String(diagnostics.processed)} (${String(diagnostics.rejected)} rejected)`}
+                  testId="diag-processed"
+                />
+                <Tile
+                  label="Throughput"
+                  value={`${diagnostics.commandsPerMinute.toFixed(1)}/min`}
+                  testId="diag-throughput"
+                />
+                <Tile
+                  label="Avg processing"
+                  value={ms(diagnostics.avgProcessMs)}
+                  testId="diag-avg"
+                />
+                <Tile
+                  label="Max processing"
+                  value={ms(diagnostics.maxProcessMs)}
+                  testId="diag-max"
+                />
+                <Tile
+                  label="Broadcast latency"
+                  value={ms(diagnostics.lastBroadcastLatencyMs)}
+                  testId="diag-broadcast"
+                />
+                <Tile
+                  label="Engine drift (tick)"
+                  value={`${String(diagnostics.watchdog.tickDriftMs)} ms`}
+                  testId="diag-drift"
+                />
+                <Tile
+                  label="Connected clients"
+                  value={String(diagnostics.connectedClients)}
+                  testId="diag-clients"
+                />
+                <Tile
+                  label="WS heartbeat age"
+                  value={
+                    diagnostics.wsHeartbeatAgeMs === 0
+                      ? "—"
+                      : `${(diagnostics.wsHeartbeatAgeMs / 1000).toFixed(1)} s`
+                  }
+                  testId="diag-heartbeat"
+                />
+                <Tile
+                  label="Diagnostics refresh"
+                  value={refreshMs !== null ? ms(refreshMs) : "—"}
+                  testId="diag-refresh"
+                />
+              </div>
+            </section>
+          </div>
+        </details>
       ) : null}
       <Dialog
         open={confirmOpen}
