@@ -21,6 +21,7 @@ import { useCallback } from "react";
 import { moneyFormat } from "../../../../lib/money";
 import { roleLabeller } from "../../../../lib/role-label";
 import { adminAuctionWatch, type AuctionWatch } from "../../../../server/admin/live-watch";
+import { eventLabel } from "../../../seasons/[slug]/auction/auction-bits";
 import { AuctionOverviewPanel } from "../../../seasons/[slug]/auction/auction-overview-panel";
 import { LiveFreshness } from "../../live-freshness";
 import { ageLabel, istClock, istTime, istWhen, usePolled } from "../../use-polled";
@@ -190,6 +191,11 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         overview={overview}
         unit={header.auctionUnit}
         idleHint="No lot is under the hammer right now."
+        finished={
+          header.status === "completed" ||
+          header.status === "reconciled" ||
+          header.status === "abandoned"
+        }
       />
 
       {engine !== null ? <EngineCard engine={engine} /> : null}
@@ -387,7 +393,12 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             {overview.events.map((event) => (
               <li key={event.seq}>
                 <span>
-                  <span className="admin-action">{event.type}</span>
+                  {/* The engine's own names ("AuctionClosed") read as code on
+                      a page people run the night from. The hub already speaks
+                      them as words; the raw type stays on hover. */}
+                  <span className="admin-action" title={event.type}>
+                    {eventLabel(event.type)}
+                  </span>
                   <span className="admin-meta"> #{event.seq}</span>
                 </span>
                 <span className="admin-when">{istTime(event.atMs)}</span>

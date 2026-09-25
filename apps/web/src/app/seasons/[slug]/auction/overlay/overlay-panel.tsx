@@ -78,7 +78,9 @@ export function OverlayPanel({
       ? "paused"
       : lot !== null
         ? "live"
-        : (outcome?.kind ?? "idle");
+        : finished
+          ? "sold"
+          : (outcome?.kind ?? "idle");
   const nextUp = snapshot !== null && snapshot.queue.length > 0 ? snapshot.queue[0] : null;
 
   // WHOSE FACE THE LOWER THIRD IS CARRYING. One subject, resolved ONCE — the lot
@@ -90,7 +92,17 @@ export function OverlayPanel({
   // `lotMedia` is keyed by lot id, the one key the socket's lot and the
   // server-rendered media have in common — the lot NUMBER is a queue position
   // and the registration number is the player's own identity.
-  const facing = lot ?? outcome ?? nextUp ?? null;
+  // A finished night has no one subject. The lower third used to hold the LAST
+  // outcome forever — "UNSOLD · Ritesh Yadav — back in the pool" going to air
+  // as the closing frame, for a player who is not going back anywhere.
+  const facing = finished ? null : (lot ?? outcome ?? nextUp ?? null);
+  const topBuy = sold.reduce<(typeof sold)[number] | null>(
+    (best, entry) =>
+      entry.soldPrice !== null && (best === null || entry.soldPrice > (best.soldPrice ?? 0))
+        ? entry
+        : best,
+    null,
+  );
   const face = facing === null ? null : (lotMedia[facing.lotId] ?? null);
   const facePhoto = face?.photoUrl ?? null;
   const faceNumber = face?.number ?? null;
@@ -181,7 +193,20 @@ export function OverlayPanel({
               </figure>
             ) : null}
             <div className="obs-lt-main">
-              {lot !== null ? (
+              {finished ? (
+                <>
+                  <span className="obs-lt-eyebrow">
+                    {status === "abandoned" ? "Auction ended" : "Auction complete"}
+                  </span>
+                  <span className="obs-lt-name">{auctionName}</span>
+                  <span className="obs-lt-meta">
+                    {String(sold.length)} sold
+                    {topBuy !== null && topBuy.soldPrice !== null
+                      ? ` · Top buy ${topBuy.playerName ?? topBuy.lotNumber} ${money.ledger(topBuy.soldPrice)}`
+                      : ""}
+                  </span>
+                </>
+              ) : lot !== null ? (
                 <>
                   <span className="obs-lt-eyebrow">
                     {paused ? "Paused" : "On the block"} · {lot.lotNumber}
@@ -249,7 +274,10 @@ export function OverlayPanel({
                 </span>
               )}
             </div>
-          ) : outcome !== null && outcome.kind === "sold" && outcome.amount !== null ? (
+          ) : !finished &&
+            outcome !== null &&
+            outcome.kind === "sold" &&
+            outcome.amount !== null ? (
             <div className="obs-lt-bid">
               <span className="obs-lt-bid-label">Sold for</span>
               <span className="obs-lt-bid-amount">{money.ledger(outcome.amount)}</span>
@@ -281,7 +309,9 @@ export function OverlayPanel({
             </div>
           ) : null}
           <div className="obs-watch">
-            <span className="obs-watch-label">Watch live</span>
+            {/* The public page is still the destination once the night is
+                over — but there is nothing live left to watch there. */}
+            <span className="obs-watch-label">{finished ? "Full results" : "Watch live"}</span>
             <span className="obs-watch-url">{watchLabel}</span>
           </div>
         </div>

@@ -33,6 +33,7 @@ import {
 import type { LiveBoard } from "../../server/admin/live-views";
 import type { PlatformOverview } from "../../server/admin/views";
 import { ReadOnlyNotice, RelativeTime, statusPillTone } from "./admin-ui";
+import { groupAttention } from "./attention-groups";
 
 function pct(rate: number): number {
   return Math.round(rate * 100);
@@ -63,6 +64,7 @@ export function OverviewPanel({
   desks: { items: readonly DeskItem[]; desks: number };
 }) {
   const { totals, runnerVerdict, followers, attention, recent, liveAuctions } = overview;
+  const attentionGroups = groupAttention(attention);
   return (
     <>
       <ReadOnlyNotice />
@@ -83,6 +85,10 @@ export function OverviewPanel({
           value={formatCount(totals.competitions)}
           label="Seasons"
           hint="Across every club"
+          // The one tile without a door. Seasons are listed per club, and the
+          // organizations directory is where an administrator reaches them.
+          href="/admin/orgs"
+          linkComponent={Link}
         />
         <StatCard
           icon={<IconUser />}
@@ -130,24 +136,31 @@ export function OverviewPanel({
               />
             ) : (
               <ul className="adm-rows" data-testid="admin-attention">
-                {attention.map((row, index) => (
-                  <li key={`${row.kind}-${String(index)}`} className="adm-row">
+                {attentionGroups.groups.map((group) => (
+                  <li key={group.kind} className="adm-row">
                     <span className="adm-row-dot" data-tone="red" aria-hidden />
                     <span className="adm-row-main">
-                      <span className="adm-row-title">{row.subject}</span>
-                      <span className="adm-row-sub adm-mono">
-                        {row.kind}
-                        {row.orgName !== null ? ` · ${row.orgName}` : ""}
-                      </span>
+                      <span className="adm-row-title">{group.title}</span>
+                      <span className="adm-row-sub adm-mono">{group.sub}</span>
                     </span>
-                    {row.href !== null ? (
-                      <Link href={row.href} className="adm-link">
-                        Inspect
+                    {group.href !== null ? (
+                      <Link href={group.href} className="adm-link">
+                        {group.linkLabel}
                         <IconArrowRight size={14} aria-hidden />
                       </Link>
                     ) : null}
                   </li>
                 ))}
+                {attentionGroups.more > 0 ? (
+                  <li className="adm-row" data-testid="admin-attention-more">
+                    <span className="adm-row-main">
+                      <span className="adm-row-sub">
+                        and {attentionGroups.more} more{" "}
+                        {attentionGroups.more === 1 ? "problem" : "problems"}
+                      </span>
+                    </span>
+                  </li>
+                ) : null}
               </ul>
             )}
           </SectionCard>
