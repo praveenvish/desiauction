@@ -18,6 +18,7 @@ export function AuctionOverviewPanel({
   overview,
   idleHint = "No lot is under the hammer. Open the cockpit to put the next one up.",
   unit = "inr",
+  finished = false,
 }: {
   overview: AuctionOverview;
   /** What an empty block says — the organizer is told where to act; an observer is not. */
@@ -27,11 +28,24 @@ export function AuctionOverviewPanel({
    * mounted by /admin, outside any season's provider.
    */
   unit?: MoneyUnit;
+  /**
+   * The auction is over (completed, reconciled or abandoned). A finished night
+   * has nothing on the block and nothing queued, so the block card — "Nothing
+   * on the block — no lot is under the hammer right now" — and the zero counts
+   * stop being information.
+   */
+  finished?: boolean;
 }) {
   const money = moneyFormat(unit);
   const { counts, totalLots, moneyMoved, paddles, onBlock } = overview;
   const labelOf = roleLabeller(overview.roles);
   const pct = (n: number) => (totalLots > 0 ? (n / totalLots) * 100 : 0);
+  /* Points are spent, not moved — and "1.75 L pts" reads as lakhs of rupees
+     at a glance, so a points season gets the exact figure. */
+  const spent =
+    unit === "points"
+      ? `Points spent · ${money.exact(moneyMoved)}`
+      : `Money moved · ${money.compact(moneyMoved)}`;
 
   return (
     <>
@@ -45,8 +59,16 @@ export function AuctionOverviewPanel({
               prepared" is for, and calling them queued is how this card came
               to claim 14 queued while the door said none. */}
           <span className="competitions-hint" data-testid="auction-progress-counts">
-            {counts.sold} sold · {counts.onBlock} on block · {counts.queued} queued ·{" "}
-            {counts.prepared} prepared · {counts.unsold} unsold
+            {finished ? (
+              <>
+                {counts.sold} sold · {counts.unsold} unsold
+              </>
+            ) : (
+              <>
+                {counts.sold} sold · {counts.onBlock} on block · {counts.queued} queued ·{" "}
+                {counts.prepared} prepared · {counts.unsold} unsold
+              </>
+            )}
           </span>
         </div>
         <span className="auc-progress" aria-hidden>
@@ -66,12 +88,16 @@ export function AuctionOverviewPanel({
         <div className="auc-progress-foot">
           <span className="auc-legend">
             <span className="auc-key is-sold" /> Sold {counts.sold}
-            <span className="auc-key is-block" /> On block {counts.onBlock}
+            {finished ? null : (
+              <>
+                <span className="auc-key is-block" /> On block {counts.onBlock}
+              </>
+            )}
             <span className="auc-key is-unsold" /> Unsold {counts.unsold}
           </span>
-          <span className="auc-money">Money moved · {money.compact(moneyMoved)}</span>
+          <span className="auc-money">{spent}</span>
         </div>
-        {counts.queued === 0 && counts.prepared > 0 ? (
+        {counts.queued === 0 && counts.prepared > 0 && !finished ? (
           <p className="competitions-hint" data-testid="nothing-queued-hint">
             Nothing is queued yet. {counts.prepared} prepared lot
             {counts.prepared === 1 ? " is" : "s are"} waiting for “Queue all prepared” — the auction
@@ -81,58 +107,62 @@ export function AuctionOverviewPanel({
       </Card>
 
       <div className="auc-split">
-        <Card data-testid="on-block-card">
-          <div className="teams-head">
-            <div className="teams-head-title">
-              <h2 className="auc-block-title">
-                {onBlock !== null ? "● On the block now" : "Nothing on the block"}
-              </h2>
-            </div>
-          </div>
-          {onBlock === null ? (
-            <p className="competitions-hint">{idleHint}</p>
-          ) : (
-            <>
-              <div className="auc-block-player">
-                <PlayerImage
-                  name={onBlock.playerName ?? "Unnamed"}
-                  seed={onBlock.registrationId}
-                  src={onBlock.photoUrl}
-                  size="md"
-                  shape="round"
-                  decorative
-                />
-                <span className="roster-person">
-                  <span className="roster-name">{onBlock.playerName ?? "Unnamed"}</span>
-                  <span className="competitions-hint">
-                    {labelOf(onBlock.role)} · base {money.exact(onBlock.basePrice)}
-                  </span>
-                </span>
+        {finished ? null : (
+          <Card data-testid="on-block-card">
+            <div className="teams-head">
+              <div className="teams-head-title">
+                <h2 className="auc-block-title">
+                  {onBlock !== null ? "● On the block now" : "Nothing on the block"}
+                </h2>
               </div>
-              <div className="auc-bid">
-                <div>
-                  <span className="team-card-money-lbl">Current bid</span>
-                  <span className="auc-bid-value">
-                    {onBlock.currentBid !== null ? money.exact(onBlock.currentBid) : "No bids yet"}
+            </div>
+            {onBlock === null ? (
+              <p className="competitions-hint">{idleHint}</p>
+            ) : (
+              <>
+                <div className="auc-block-player">
+                  <PlayerImage
+                    name={onBlock.playerName ?? "Unnamed"}
+                    seed={onBlock.registrationId}
+                    src={onBlock.photoUrl}
+                    size="md"
+                    shape="round"
+                    decorative
+                  />
+                  <span className="roster-person">
+                    <span className="roster-name">{onBlock.playerName ?? "Unnamed"}</span>
+                    <span className="competitions-hint">
+                      {labelOf(onBlock.role)} · base {money.exact(onBlock.basePrice)}
+                    </span>
                   </span>
                 </div>
-                {onBlock.leadingTeamName !== null ? (
-                  <div className="auc-bid-leader">
-                    <span className="team-card-money-lbl">Leading</span>
-                    <span className="fx-team">
-                      <span
-                        className="fx-dot"
-                        style={{ background: onBlock.leadingColor ?? "var(--accent)" }}
-                        aria-hidden
-                      />
-                      {onBlock.leadingTeamName}
+                <div className="auc-bid">
+                  <div>
+                    <span className="team-card-money-lbl">Current bid</span>
+                    <span className="auc-bid-value">
+                      {onBlock.currentBid !== null
+                        ? money.exact(onBlock.currentBid)
+                        : "No bids yet"}
                     </span>
                   </div>
-                ) : null}
-              </div>
-            </>
-          )}
-        </Card>
+                  {onBlock.leadingTeamName !== null ? (
+                    <div className="auc-bid-leader">
+                      <span className="team-card-money-lbl">Leading</span>
+                      <span className="fx-team">
+                        <span
+                          className="fx-dot"
+                          style={{ background: onBlock.leadingColor ?? "var(--accent)" }}
+                          aria-hidden
+                        />
+                        {onBlock.leadingTeamName}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            )}
+          </Card>
+        )}
 
         <Card data-testid="purse-burndown">
           <div className="teams-head">

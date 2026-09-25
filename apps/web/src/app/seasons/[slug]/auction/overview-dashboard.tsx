@@ -86,13 +86,24 @@ export function OverviewDashboard({
   const purseTotal = paddles.every((row) => row.purseTotal !== undefined)
     ? paddles.reduce((sum, row) => sum + (row.purseTotal ?? 0), 0)
     : null;
+  /* Once the hammer is down for good, "0 on block · 0 queued · 0 prepared"
+     and a legend of three zeros are not progress — they are noise between the
+     two numbers the night ended on. A finished auction states Sold and Unsold. */
   const segments = [
     { key: "sold", label: "Sold", n: counts.sold },
-    { key: "block", label: "On block", n: counts.onBlock },
-    { key: "queued", label: "Queued", n: counts.queued },
-    { key: "prepared", label: "Prepared", n: counts.prepared },
+    ...(terminal
+      ? []
+      : [
+          { key: "block", label: "On block", n: counts.onBlock },
+          { key: "queued", label: "Queued", n: counts.queued },
+          { key: "prepared", label: "Prepared", n: counts.prepared },
+        ]),
     { key: "unsold", label: "Unsold", n: counts.unsold },
   ];
+  /* A points season has no money to "move" — it spends a purse of points. The
+     compact form ("1.75 L pts") also read as lakhs of rupees at a glance, so a
+     points season gets the exact figure ("1,74,500 pts") and its own words. */
+  const points = money.unit === "points";
 
   /* ---- Auction progress ---------------------------------------------------- */
   const progress = (
@@ -102,8 +113,16 @@ export function OverviewDashboard({
       data-testid="auction-progress-summary"
       action={
         <span className="auc-card-meta" data-testid="auction-progress-counts">
-          {counts.sold} sold · {counts.onBlock} on block · {counts.queued} queued ·{" "}
-          {counts.prepared} prepared · {counts.unsold} unsold
+          {terminal ? (
+            <>
+              {counts.sold} sold · {counts.unsold} unsold
+            </>
+          ) : (
+            <>
+              {counts.sold} sold · {counts.onBlock} on block · {counts.queued} queued ·{" "}
+              {counts.prepared} prepared · {counts.unsold} unsold
+            </>
+          )}
         </span>
       }
     >
@@ -131,9 +150,16 @@ export function OverviewDashboard({
         <span className="dash-money">
           {purseTotal !== null && purseTotal > 0 ? (
             <>
-              Money used{" "}
+              {points ? "Purse used" : "Money used"}{" "}
               <strong>{((moneyMoved / purseTotal) * 100).toFixed(1).replace(/\.0$/, "")}%</strong>
-              <span className="dash-money-sub"> · {money.compact(moneyMoved)}</span>
+              <span className="dash-money-sub">
+                {" "}
+                · {points ? money.exact(moneyMoved) : money.compact(moneyMoved)}
+              </span>
+            </>
+          ) : points ? (
+            <>
+              Points spent <strong>{money.exact(moneyMoved)}</strong>
             </>
           ) : (
             <>
@@ -560,11 +586,90 @@ export function OverviewDashboard({
     </SectionCard>
   );
 
+  /* ---- After the auction ---------------------------------------------------
+   * A finished auction used to open on its setup page: "Ready to open", "Your
+   * connection", owner plans and "Pool against squads — 7 to spare", all of
+   * them questions the night has already answered. What an organizer wants the
+   * hour after the hammer is the follow-through, so it sits right under the
+   * result. Each door is gated on what its page itself checks (nav law 3):
+   * posters on `canPoster`, replay and ledger on conducting (both 404
+   * otherwise), Teams on the appointment authority. */
+  const settled = status === "completed" || status === "reconciled";
+  const afterDoors: { key: string; href: string; label: string; note: string }[] = [];
+  if (settled && viewer.canPoster) {
+    afterDoors.push({
+      key: "posters",
+      href: `/seasons/${slug}/posters`,
+      label: "Share result posters",
+      note: "A poster for every signing and every squad, ready for WhatsApp.",
+    });
+  }
+  if (settled && appointments !== null) {
+    afterDoors.push({
+      key: "squad-sheets",
+      href: `/seasons/${slug}/teams`,
+      label: "Send squad sheets",
+      note: "Every player gets their squad, captain and first match.",
+    });
+    afterDoors.push({
+      key: "appointments",
+      href: `/seasons/${slug}/teams`,
+      label: "Announce captains & icons",
+      note:
+        appointments.pending.length > 0
+          ? `${String(appointments.pending.length)} named but not told yet.`
+          : appointments.told > 0
+            ? `Everyone named has been told (${String(appointments.told)}).`
+            : "Name captains and icons on a team's roster, then announce them.",
+    });
+  }
+  if (settled && viewer.canConduct) {
+    afterDoors.push({
+      key: "replay",
+      href: `/seasons/${slug}/auction/replay`,
+      label: "Review the night",
+      note: "Step through every lot, bid and hammer in order.",
+    });
+    afterDoors.push({
+      key: "ledger",
+      href: `/seasons/${slug}/auction/ledger`,
+      label: "Open the ledger",
+      note: "The full record — every sale, every bid, who and when.",
+    });
+  }
+  const afterCard =
+    afterDoors.length > 0 ? (
+      <SectionCard
+        icon={<IconFlag />}
+        tone="green"
+        title="After the auction"
+        description="The squads are final. Here is what is left to do."
+        data-testid="after-auction-card"
+      >
+        <ul className="dash-after">
+          {afterDoors.map((door) => (
+            <li key={door.key}>
+              <a
+                className="dash-after-link"
+                href={door.href}
+                data-testid={`after-auction-${door.key}`}
+              >
+                <strong>{door.label}</strong>
+                <span>{door.note}</span>
+                <IconArrowRight size={16} />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    ) : null;
+
   const showScreens = viewer.canConduct && status !== "abandoned";
 
   return (
     <div className="dash" data-testid="auction-dashboard">
       {progress}
+      {terminal ? afterCard : null}
       <CardGrid>
         {blockCard}
         {purseCard}
@@ -578,14 +683,20 @@ export function OverviewDashboard({
           />
         ) : null}
       </CardGrid>
-      <CardGrid>
-        {dashboard.wsUrl !== null ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
-        {readyCard}
-      </CardGrid>
-      {plansCard}
+      {/* Readiness, this device's link to the room and the owners' plans are
+          all questions about a night still to come. */}
+      {terminal ? null : (
+        <CardGrid>
+          {dashboard.wsUrl !== null ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
+          {readyCard}
+        </CardGrid>
+      )}
+      {terminal ? null : plansCard}
       <CardGrid>
         {paddlesCard}
-        {appointmentsCard}
+        {/* Once the night is settled the After-the-auction card carries this
+            door with its count; a second card of the same name would repeat it. */}
+        {terminal && afterCard !== null ? null : appointmentsCard}
       </CardGrid>
       {queueCard}
       {logCard}

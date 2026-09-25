@@ -15,6 +15,7 @@ import { formatTime } from "../../../../../lib/format-date";
 import { lotSeed } from "../../../../../lib/player-seed";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { useMoney } from "../../../../../components/money-unit";
+import { eventLabel } from "../auction-bits";
 
 // THE REPLAY VIEWER (M-IP4-3). The founder scrubs through the immutable event
 // log; every frame is core's pure fold of events[0..n] — the EXACT reducer the
@@ -106,23 +107,27 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
             }}
             data-testid="replay-slider"
           />
-          {/* HYDRATION. `foldMs` comes from performance.now() inside the useMemo
-              above, which runs on the server AND on the client — two different
-              numbers for the same render, which is a hydration mismatch and made
-              React throw away and rebuild this subtree on every load. The
-              component already tracks `hydrated` for exactly this; the timing
-              readout simply was not behind it. It is a diagnostic, so waiting a
-              tick for it costs nothing. */}
-          {frame.ok && hydrated ? (
-            <span className="competitions-hint" data-testid="replay-fold-time">
-              rebuilt in {frame.foldMs.toFixed(1)} ms
-            </span>
-          ) : null}
         </div>
-        <p className="competitions-hint" data-testid="replay-event">
-          {event !== undefined
-            ? `#${String(event.seq)} · ${event.type} · ${formatTime(event.atMs)}`
-            : "Before the first event — the initial scheduled state."}
+        {/* HYDRATION. `foldMs` comes from performance.now() inside the useMemo
+            above, which runs on the server AND on the client — two different
+            numbers for the same render, which is a hydration mismatch. So the
+            timing waits for `hydrated`. It is a diagnostic, and "rebuilt in
+            0.8 ms" sat in the page as if it mattered to anyone reviewing the
+            night; it now lives on hover. The event type is spoken in words
+            ("Auction closed"), with the engine's own name on hover too. */}
+        <p
+          className="competitions-hint"
+          data-testid="replay-event"
+          title={frame.ok && hydrated ? `Rebuilt in ${frame.foldMs.toFixed(1)} ms` : undefined}
+        >
+          {event !== undefined ? (
+            <>
+              #{String(event.seq)} · <span title={event.type}>{eventLabel(event.type)}</span> ·{" "}
+              {formatTime(event.atMs)}
+            </>
+          ) : (
+            "Before the first event — the initial scheduled state."
+          )}
         </p>
         {converged !== null ? (
           <p data-testid="replay-convergence">

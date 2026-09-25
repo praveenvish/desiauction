@@ -138,7 +138,10 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                       My plan
                     </ButtonLink>
                   ) : null}
-                  {status === "completed" || status === "reconciled" ? (
+                  {/* The replay is conduct-gated (`replayViewerData` 404s for
+                    anyone else), so a team owner was offered a dead door. */}
+                  {(status === "completed" || status === "reconciled") &&
+                  dashboard.viewer.canConduct ? (
                     <ButtonLink
                       href={`/seasons/${slug}/auction/replay`}
                       variant="secondary"
