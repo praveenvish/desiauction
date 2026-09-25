@@ -54,7 +54,7 @@ function CompareCell({ value }: { value: string | boolean }) {
   }
   return value ? (
     <>
-      <IconCheck className="mk-compare-yes" width={20} height={20} />
+      <IconCheck className="mk-compare-yes" size={20} />
       <span className="visually-hidden">Included</span>
     </>
   ) : (
@@ -84,7 +84,7 @@ function CompareCell({ value }: { value: string | boolean }) {
  */
 export default function PricingPage() {
   return (
-    <main className="mk">
+    <main className="mk mk-pricing-page">
       <section className="mk-band">
         <div className="mk-container">
           <div className="mk-band-head mk-band-head--center mk-center">
@@ -100,8 +100,8 @@ export default function PricingPage() {
               needs ("stay free forever") buried thirty words in. The promise
               now leads at display weight and the mechanics follow it. */}
           <div className="mk-promise">
-            <span className="mk-promise-icon">
-              <IconSpark />
+            <span className="mk-promise-icon" aria-hidden>
+              <IconSpark weight="duotone" />
             </span>
             <div className="mk-promise-copy">
               <p className="mk-promise-headline">{PRICING.betaHeadline}</p>
@@ -133,7 +133,7 @@ export default function PricingPage() {
                         published price puts a sentence there, which at display
                         scale dwarfs the tiers that do quote a number. */}
                     <span
-                      className={`mk-tier-amount${/\d/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
+                      className={`mk-tier-amount${/\d|^Free$/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
                     >
                       {tier.price}
                     </span>
@@ -161,6 +161,20 @@ export default function PricingPage() {
             })}
           </div>
 
+          {/* The load-bearing sentence of the pricing model, directly under the
+              tiers it explains — a slim accent row, not a third slab. */}
+          <section className="mk-pledge" aria-labelledby="pricing-pledge">
+            <span className="mk-pledge-icon" aria-hidden>
+              <IconShieldCheck weight="duotone" />
+            </span>
+            <div>
+              <h2 id="pricing-pledge" className="mk-pledge-title">
+                {PRICING.trustLine}
+              </h2>
+              <p className="mk-pledge-note">{PRICING.trustLineNote}</p>
+            </div>
+          </section>
+
           {/* Three cards are three pitches; a table is one decision. The wrapper
               scrolls on its own rather than pushing the document sideways, and
               carries tabindex because a scroll region a mouse can reach has to
@@ -183,7 +197,10 @@ export default function PricingPage() {
                   <tr key={row.label}>
                     <th scope="row">{row.label}</th>
                     {row.cells.map((cell, index) => (
-                      <td key={PRICING.tiers[index]?.name ?? String(index)}>
+                      <td
+                        key={PRICING.tiers[index]?.name ?? String(index)}
+                        data-tier={PRICING.tiers[index]?.name}
+                      >
                         <CompareCell value={cell} />
                       </td>
                     ))}
@@ -194,7 +211,7 @@ export default function PricingPage() {
                 <tr className="mk-compare-price">
                   <th scope="row">Price</th>
                   {PRICING.tiers.map((tier) => (
-                    <td key={tier.name}>
+                    <td key={tier.name} data-tier={tier.name}>
                       {tier.price}
                       <span className="mk-compare-cadence">{tier.cadence}</span>
                     </td>
@@ -203,70 +220,48 @@ export default function PricingPage() {
               </tbody>
             </table>
           </div>
-          {/* Phone-only (CSS-gated): at rest the wrapper shows one column and a
-              clipped sliver of the next, and nothing else said the other tiers
-              were there to swipe to. */}
-          <p className="mk-compare-hint" aria-hidden>
-            Swipe sideways to compare tiers.
-          </p>
           <p className="mk-compare-note">{PRICING.comparison.note}</p>
 
-          {/* Was a 26px caption line wedged between the tier grid and the FAQ —
-              the load-bearing sentence of the entire pricing model, set smaller
-              than the copy around it. It is a block now, and it answers the
-              question the table above has just raised. */}
-          <section className="mk-pledge" aria-labelledby="pricing-pledge">
-            <span className="mk-pledge-icon">
-              <IconShieldCheck />
-            </span>
-            <div>
-              <h2 id="pricing-pledge" className="mk-pledge-title">
-                {PRICING.trustLine}
-              </h2>
-              <p className="mk-pledge-note">{PRICING.trustLineNote}</p>
-            </div>
-          </section>
+          <div className="mk-pricing-more">
+            <section className="mk-procure" aria-labelledby="pricing-procurement">
+              <div className="mk-procure-head">
+                <p className="mk-kicker">{PRICING.procurement.kicker}</p>
+                <h2 id="pricing-procurement" className="mk-pricing-h">
+                  {PRICING.procurement.h2}
+                </h2>
+                <p className="mk-procure-intro">{PRICING.procurement.intro}</p>
+              </div>
+              <ul className="mk-procure-list">
+                {PRICING.procurement.points.map((point) => (
+                  <li key={point.title}>
+                    <IconFileCheck weight="duotone" />
+                    <h3>{point.title}</h3>
+                    <p>{point.body}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
 
-          <section className="mk-procure" aria-labelledby="pricing-procurement">
-            <div className="mk-procure-head">
-              <p className="mk-kicker">{PRICING.procurement.kicker}</p>
-              <h2 id="pricing-procurement" className="mk-h2">
-                {PRICING.procurement.h2}
-              </h2>
-              <p className="mk-lead">{PRICING.procurement.intro}</p>
-            </div>
-            <ul className="mk-procure-list">
-              {PRICING.procurement.points.map((point) => (
-                <li key={point.title}>
-                  <IconFileCheck />
-                  <h3>{point.title}</h3>
-                  <p>{point.body}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="mk-faq" aria-labelledby="pricing-faq">
-            <div className="mk-band-head mk-band-head--center mk-center">
-              <h2 id="pricing-faq" className="mk-h2">
+            <section className="mk-faq" aria-labelledby="pricing-faq">
+              <h2 id="pricing-faq" className="mk-pricing-h">
                 Questions
               </h2>
-            </div>
-            {PRICING.faqs.map((faq) => (
-              <details key={faq.question} className="mk-faq-item">
-                <summary>{faq.question}</summary>
-                <p>{faq.answer}</p>
-                {faq.link === undefined ? null : (
-                  <p className="mk-faq-link">
-                    <Link href={faq.link.href}>
-                      {faq.link.label}
-                      <IconArrowRight width={16} height={16} />
-                    </Link>
-                  </p>
-                )}
-              </details>
-            ))}
-          </section>
+              {PRICING.faqs.map((faq) => (
+                <details key={faq.question} className="mk-faq-item">
+                  <summary>{faq.question}</summary>
+                  <p>{faq.answer}</p>
+                  {faq.link === undefined ? null : (
+                    <p className="mk-faq-link">
+                      <Link href={faq.link.href}>
+                        {faq.link.label}
+                        <IconArrowRight size={16} />
+                      </Link>
+                    </p>
+                  )}
+                </details>
+              ))}
+            </section>
+          </div>
         </div>
       </section>
 
@@ -296,7 +291,7 @@ export default function PricingPage() {
             <div className="mk-cta-actions">
               <ButtonLink href={PRICING.closing.ctaPrimary.href} variant="primary" size="lg">
                 {PRICING.closing.ctaPrimary.label}
-                <IconArrowRight width={18} height={18} />
+                <IconArrowRight size={20} />
               </ButtonLink>
               <ButtonLink href={PRICING.closing.ctaSecondary.href} variant="secondary" size="lg">
                 {PRICING.closing.ctaSecondary.label}

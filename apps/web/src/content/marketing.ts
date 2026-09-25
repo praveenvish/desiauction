@@ -518,8 +518,11 @@ export const PRICING = {
     },
     {
       name: "Pro Pass",
-      price: "Published at GA",
-      cadence: "per tournament",
+      // No price exists yet, and the slot is the page's most important
+      // number: it says what is TRUE today (free) rather than a placeholder
+      // ("Published at GA") that read as an unfinished page.
+      price: "Free",
+      cadence: "in beta · a per-tournament price at launch",
       limits: "Up to 16 teams and 400 players",
       highlights: [
         "Everything in Free",
@@ -531,8 +534,8 @@ export const PRICING = {
     },
     {
       name: "Association",
-      price: "Published at GA",
-      cadence: "bundle",
+      price: "Free",
+      cadence: "in beta · a season bundle at launch",
       limits: "Multiple tournaments across a season",
       highlights: [
         "Everything in Pro Pass",
