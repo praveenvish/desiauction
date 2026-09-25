@@ -24,11 +24,12 @@ export default async function TeamsAction({
   if (sp.team !== undefined && view.teams.some((team) => team.id === sp.team)) {
     return null;
   }
-  return (
-    <AddTeam
-      slug={slug}
-      taken={view.teams.map((team) => team.color)}
-      locked={view.rulesSource?.locked ?? false}
-    />
-  );
+  // Absent, not disabled (nav.ts LAW 3): once the auction has left `scheduled`
+  // the team set is locked for good, and a gold "Add team" that cannot be
+  // pressed — full-width on a phone — was the loudest thing on the page. The
+  // lock notice on the page says why there is no button.
+  if (view.rulesSource?.locked === true) {
+    return null;
+  }
+  return <AddTeam slug={slug} taken={view.teams.map((team) => team.color)} locked={false} />;
 }

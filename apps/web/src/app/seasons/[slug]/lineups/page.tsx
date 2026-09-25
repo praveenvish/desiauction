@@ -73,11 +73,13 @@ export default async function LineupsPage({
             Tick who took the field. Each player&apos;s profile counts it as a match played.
           </p>
           <div className="st-actions">
-            {/* Registrations shares this tab (RN-1 "Players"). */}
-            <SiblingLink href={`/seasons/${slug}/registrations`} label="Registrations" />
+            {/* Registrations shares this tab (RN-1 "Players"). The buttons use
+                the TAB's names — a button saying "Registrations" under a tab
+                saying "Players" reads as two different places. */}
+            <SiblingLink href={`/seasons/${slug}/registrations`} label="Players" />
             <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary" size="sm">
               <IconList size={16} aria-hidden />
-              Fixtures
+              Schedule
             </ButtonLink>
           </div>
         </div>
@@ -95,7 +97,7 @@ export default async function LineupsPage({
               </p>
               <div className="st-empty-actions">
                 <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
-                  Go to fixtures
+                  Go to schedule
                 </ButtonLink>
               </div>
             </div>
