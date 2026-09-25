@@ -1,5 +1,12 @@
 import { cache } from "react";
-import { buildPlayerPoster, roleLabelIn, sportPackFor, styleLabel } from "@desiauction/core";
+import {
+  buildPlayerPoster,
+  formatAmount,
+  paise,
+  roleLabelIn,
+  sportPackFor,
+  styleLabel,
+} from "@desiauction/core";
 import { Badge, ButtonLink, PlayerImage, IconArrowLeft } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -181,9 +188,26 @@ export default async function PlayerProfilePage({
     player.age !== null
       ? `${roleLabelIn(sportPackFor(player.sport), player.role)} · ${String(player.age)} yrs`
       : roleLabelIn(sportPackFor(player.sport), player.role);
-  /** The detail rows, as a strip of figures rather than a two-column table. */
+  /**
+   * The detail rows, as a strip of figures rather than a two-column table.
+   *
+   * The strip used to open with Number and close with Status — both already
+   * in the hero, a few centimetres above — while the one figure a shared card
+   * is shared FOR, the sale price, appeared nowhere on the page. Team and price
+   * lead now; the number and the status stay in the hero where they were.
+   */
+  const pricePaise = poster?.input.outcome === "sold" ? poster.input.pricePaise : null;
   const facts: Stat[] = [
-    { value: player.number, label: "Number" },
+    ...(player.teamName !== null ? [{ value: player.teamName, label: "Team" }] : []),
+    ...(pricePaise !== null && poster !== null
+      ? [
+          {
+            // In the season's own unit (0091): a points league reads "pts".
+            value: formatAmount(paise(pricePaise), poster.input.unit),
+            label: "Sold for",
+          },
+        ]
+      : []),
     { value: roleLabelIn(sportPackFor(player.sport), player.role), label: "Role" },
     ...(player.age !== null ? [{ value: `${String(player.age)} yrs`, label: "Age" }] : []),
     ...(batting !== null ? [{ value: batting, label: "Batting" }] : []),
@@ -191,7 +215,6 @@ export default async function PlayerProfilePage({
     // Whatever else this season's sport asks about, already labelled by its
     // pack — see `describeAttributes`. Empty for cricket.
     ...player.attributes.map((attribute) => ({ value: attribute.value, label: attribute.label })),
-    { value: status, label: "Status", aside: true },
   ];
 
   return (

@@ -183,7 +183,7 @@ export default async function DirectoryPage({
         }
         lede={DIRECTORY_DESCRIPTION}
         art={<SportMontage />}
-        script="Different Sports One Platform"
+        script="Different sports. One platform."
         actions={
           <form className="public-controls" action="/c" method="get">
             <div className="public-search">
@@ -317,8 +317,10 @@ export default async function DirectoryPage({
                 {countLabel}
               </p>
               <p className="public-helper">
-                Anyone can watch. Registering takes a mobile number, your name and playing role —
-                about a minute.
+                {/* Email sign-in is the default (LOGIN_DEFAULT_METHOD), so a
+                    helper naming only a mobile number undersold who can join. */}
+                Anyone can watch. Registering takes an email or mobile number, your name and playing
+                role — about a minute.
               </p>
             </div>
             <TournamentGrid testId="directory-list">

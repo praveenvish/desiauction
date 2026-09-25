@@ -246,6 +246,20 @@ export function SpectatePanel({
       : null;
   const bids = liveBids ?? heldBids;
 
+  const squadBoard = (
+    <div className="stage-hide">
+      <SquadBoard
+        roles={roles}
+        teams={teams}
+        lotMedia={lotMedia}
+        preSigned={preSigned}
+        resolved={feed.resolved}
+        snapshot={snapshot}
+        squadMax={rules.squadMax}
+      />
+    </div>
+  );
+
   return (
     <div
       className={`competitions-stack${stage ? " stage-mode" : ""}`}
@@ -364,105 +378,132 @@ export function SpectatePanel({
         </div>
       ) : null}
 
+      {/* AFTER THE NIGHT, THE SQUADS ARE THE ANSWER. A finished auction kept
+          the live room's layout: an empty "Bid feed" card leading the page and
+          a timeline holding whatever single outcome this socket happened to
+          see (one random "passes for now"), with the squads — the thing every
+          visitor after the auction came for — at the very bottom. Once it is
+          over, the squads sit straight under the summary and the live-only
+          cards stand down. */}
+      {finished ? squadBoard : null}
+
       <div className="live-grid stage-hide">
-        <div className="live-col">
-          <Card data-testid="spectate-history">
-            <div className="competition-head">
-              <h2>Bid feed</h2>
-              {connection === "open" && status === "live" ? (
-                <span className="live-pulse" aria-hidden />
-              ) : null}
+        {finished ? (
+          <>
+            <div className="live-col">
+              {/* No purse board after the night: every row read "sealed" (the
+                  engine keeps owners' headroom from guests), and the squads
+                  above already say what each team spent. */}
+              <UpNext snapshot={snapshot} lotMedia={lotMedia} />
+              <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={preSigned} />
             </div>
-            {/* A log region, permanently mounted (a screen reader only tracks
-                regions that existed at load), so bids are heard as they land
-                rather than discovered afterwards. The role goes on the wrapper,
-                never on the <ol> — `role="log"` there replaces the list's own
-                role and orphans every <li> under it. */}
-            <div role="log" aria-live="polite" aria-label="Bid feed, newest first">
-              {heldBids !== null && outcome !== null ? (
-                <ResolvedBidHeader outcome={outcome} />
-              ) : null}
-              {bids === null ? (
-                <p className="competitions-hint" data-testid="spectate-feed-empty">
-                  {lot !== null
-                    ? "Bids will appear here the moment they land."
-                    : finished
-                      ? // There is no next player. Promising one under a
-                        // COMPLETED ribbon is the same lie the ceremony used to
-                        // tell in 44px type.
-                        "The auction is over — every lot is settled."
-                      : // "The next player is coming up" rendered 400px from
-                        // "REMAINING 0" and "2/2 lots · 0 in queue": the guard
-                        // asked whether the AUCTION was over, not whether there
-                        // was anyone left to sell.
-                        (snapshot?.queue.length ?? 0) > 0
-                        ? "That lot is done. The next player is coming up."
-                        : (snapshot?.lotsResolved ?? 0) > 0
-                          ? "That was the last player in the queue."
-                          : "Bids appear here once a lot opens."}
-                </p>
-              ) : (
-                <ol className="timeline">
-                  {[...bids].reverse().map((entry) => (
-                    <li key={entry.bidId}>
-                      <Badge tone="neutral">{entry.paddleNumber}</Badge>
-                      <span>{entry.teamName}</span>
-                      <span className="timeline-at">{money.ledger(entry.amount)}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
+            <div className="live-col">
+              {/* Same reason as the live room and the cockpit: the component renders
+                its own connecting state, so guarding it here would move everything
+                below when the socket answers. */}
+              <span data-testid="spectate-progress">
+                <AuctionProgress snapshot={snapshot} />
+              </span>
+              {/* The rules were already on the wire and read only for the lot window.
+                "Why did that stop at ₹5L?" is answerable from here. */}
+              <RulesCard rules={rules} />
             </div>
-          </Card>
+          </>
+        ) : (
+          <>
+            <div className="live-col">
+              <Card data-testid="spectate-history">
+                <div className="competition-head">
+                  <h2>Bid feed</h2>
+                  {connection === "open" && status === "live" ? (
+                    <span className="live-pulse" aria-hidden />
+                  ) : null}
+                </div>
+                {/* A log region, permanently mounted (a screen reader only tracks
+                  regions that existed at load), so bids are heard as they land
+                  rather than discovered afterwards. The role goes on the wrapper,
+                  never on the <ol> — `role="log"` there replaces the list's own
+                  role and orphans every <li> under it. */}
+                <div role="log" aria-live="polite" aria-label="Bid feed, newest first">
+                  {heldBids !== null && outcome !== null ? (
+                    <ResolvedBidHeader outcome={outcome} />
+                  ) : null}
+                  {bids === null ? (
+                    <p className="competitions-hint" data-testid="spectate-feed-empty">
+                      {/* No "the auction is over" branch: a finished auction
+                          never renders this card (see above). */}
+                      {lot !== null
+                        ? "Bids will appear here the moment they land."
+                        : // "The next player is coming up" rendered 400px from
+                          // "REMAINING 0" and "2/2 lots · 0 in queue": the guard
+                          // asked whether the AUCTION was over, not whether there
+                          // was anyone left to sell.
+                          (snapshot?.queue.length ?? 0) > 0
+                          ? "That lot is done. The next player is coming up."
+                          : (snapshot?.lotsResolved ?? 0) > 0
+                            ? "That was the last player in the queue."
+                            : "Bids appear here once a lot opens."}
+                    </p>
+                  ) : (
+                    <ol className="timeline">
+                      {[...bids].reverse().map((entry) => (
+                        <li key={entry.bidId}>
+                          <Badge tone="neutral">{entry.paddleNumber}</Badge>
+                          <span>{entry.teamName}</span>
+                          <span className="timeline-at">{money.ledger(entry.amount)}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              </Card>
 
-          <AuctionTimeline
-            feed={feed}
-            lotMedia={lotMedia}
-            teamColors={new Map(teams.map((team) => [team.name, team.primaryColor]))}
-          />
-        </div>
+              <AuctionTimeline
+                feed={feed}
+                lotMedia={lotMedia}
+                teamColors={new Map(teams.map((team) => [team.name, team.primaryColor]))}
+              />
+            </div>
 
-        <div className="live-col">
-          {/* Same board the owner and the auctioneer read, minus anything that
-              could act on it. `spectate-purses` stays the handle the suite uses. */}
-          <div data-testid="spectate-purses">
-            <PurseBoard
-              snapshot={snapshot}
-              teams={teams}
-              heading="Teams"
-              rowTestIdPrefix="spectate-team"
-              rules={rules}
-              squadSizes={squadSizesOf(teams, preSigned, feed.resolved)}
-            />
-          </div>
-          <UpNext snapshot={snapshot} lotMedia={lotMedia} />
-          <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={preSigned} />
-          {/* Same reason as the live room and the cockpit: the component renders
-              its own connecting state, so guarding it here would move everything
-              below when the socket answers. */}
-          <span data-testid="spectate-progress">
-            <AuctionProgress snapshot={snapshot} />
-          </span>
-          {/* The rules were already on the wire and read only for the lot window.
-              "Why did that stop at ₹5L?" is answerable from here. */}
-          <RulesCard rules={rules} />
-        </div>
+            <div className="live-col">
+              {/* Same board the owner and the auctioneer read, minus anything that
+                could act on it. `spectate-purses` stays the handle the suite uses. */}
+              <div data-testid="spectate-purses">
+                <PurseBoard
+                  snapshot={snapshot}
+                  teams={teams}
+                  heading="Teams"
+                  rowTestIdPrefix="spectate-team"
+                  rules={rules}
+                  squadSizes={squadSizesOf(teams, preSigned, feed.resolved)}
+                />
+              </div>
+              <UpNext snapshot={snapshot} lotMedia={lotMedia} />
+              <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={preSigned} />
+              {/* Same reason as the live room and the cockpit: the component renders
+                its own connecting state, so guarding it here would move everything
+                below when the socket answers. */}
+              <span data-testid="spectate-progress">
+                <AuctionProgress snapshot={snapshot} />
+              </span>
+              {/* The rules were already on the wire and read only for the lot window.
+                "Why did that stop at ₹5L?" is answerable from here. */}
+              <RulesCard rules={rules} />
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="stage-hide">
-        <SquadBoard
-          roles={roles}
-          teams={teams}
-          lotMedia={lotMedia}
-          preSigned={preSigned}
-          resolved={feed.resolved}
-          snapshot={snapshot}
-          squadMax={rules.squadMax}
-        />
-      </div>
+      {finished ? null : squadBoard}
 
       <p className="spectate-footer stage-hide" data-testid="spectate-footer">
-        <span>This auction is running on DesiAuction. Yours can too.</span>
+        {/* Past tense once it is over: "is running" under a finished
+            auction told the visitor something was still happening. */}
+        <span>
+          {finished
+            ? "This auction ran on DesiAuction. Yours can too."
+            : "This auction is running on DesiAuction. Yours can too."}
+        </span>
         <Link href="/" data-testid="spectate-footer-cta">
           Run your own auction
           <IconArrowRight size={16} className="icon-trail" />

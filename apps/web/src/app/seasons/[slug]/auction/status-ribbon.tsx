@@ -102,6 +102,8 @@ export function StatusRibbon({
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
   const version = snapshot?.version ?? 0;
   const live = connection === "open" && !offline;
+  const finished =
+    snapshot?.auctionStatus === "completed" || snapshot?.auctionStatus === "reconciled";
   return (
     // `role="status"` makes the whole strip a polite live region, which is what
     // a spectator needs — the lot, the leading bid and the transport state are
@@ -180,10 +182,16 @@ export function StatusRibbon({
             {health.label}
           </Badge>
         ) : null}
-        <Badge tone={live ? "neutral" : "warning"} data-testid="ribbon-network">
-          {live ? <span className="ribbon-network-dot" aria-hidden /> : null}
-          {connectionLabel(connection, offline)}
-        </Badge>
+        {/* A finished auction has no feed to be live on: the green "LIVE FEED"
+            pill sat beside "completed" on every share of a finished night. The
+            socket still answers (late joiners fold the history from it); the
+            chrome just stops advertising it. */}
+        {finished ? null : (
+          <Badge tone={live ? "neutral" : "warning"} data-testid="ribbon-network">
+            {live ? <span className="ribbon-network-dot" aria-hidden /> : null}
+            {connectionLabel(connection, offline)}
+          </Badge>
+        )}
         {/* Sound is a room feature and this strip is the room's one piece of
             chrome, so the switch lives here on every live surface. Off by
             default; the click that turns it on is what unlocks the browser. */}

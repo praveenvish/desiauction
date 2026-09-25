@@ -1163,6 +1163,15 @@
   overflow: hidden;
 }
 
+/* On a phone the coin was a 220px block above the squad name — most of the
+   first screen spent on a badge. Smaller, and set to the text's left edge. */
+@media (width <= 640px) {
+  .team-page-crest {
+    width: 96px;
+    margin-inline: 0;
+  }
+}
+
 .team-page-crest > img {
   width: 72%;
   height: 72%;
@@ -1189,6 +1198,22 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: var(--space-2);
+}
+
+/* Three columns at most below a wide desktop: four 280px cards on a 1280px
+   laptop left each name about 120px once the face and the price took theirs. */
+@media (width <= 1280px) {
+  .team-page-squad {
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  }
+}
+
+/* The ghost "Back to …" button's side padding (space-8 at lg) pushed its
+   arrow a button's width in from the hero text above it. Trimmed and pulled
+   back so the arrow lines up with the title; the hover wash still has room. */
+.public-page .team-page-back {
+  padding-inline: var(--space-2);
+  margin-inline-start: calc(-1 * var(--space-2));
 }
 
 .team-page-player {
@@ -1224,10 +1249,16 @@
   flex: 1;
 }
 
+/* Two lines, not one: at four columns on a laptop "Siddharth Kulkarni"
+   became "Siddharth Ku…". A name is the row's whole point; it may wrap once
+   before it is clipped. */
 .team-page-who > strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   color: var(--text-heading);
 }
 

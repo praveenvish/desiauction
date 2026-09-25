@@ -112,6 +112,8 @@ export function BoardPanel({
   watchUrl,
   teamIdentities,
   lotMedia,
+  pursePerTeam = null,
+  preSignedByTeam = {},
 }: {
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
@@ -138,6 +140,14 @@ export function BoardPanel({
    * the branded mark is the normal case, not the error case.
    */
   lotMedia: Record<string, LotMedia>;
+  /** The season's published purse (the locked rules), for "purse remaining". */
+  pursePerTeam?: number | null;
+  /**
+   * Players each team signed BEFORE the night (captain, icon, retained), by
+   * team id. They never have a lot, so a squad counted from sales alone read
+   * "Squad 10" on the wall while every other page said 12.
+   */
+  preSignedByTeam?: Record<string, number>;
 }) {
   const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
@@ -152,23 +162,35 @@ export function BoardPanel({
   const unsoldCount = feed.resolved.filter((entry) => entry.status === "unsold").length;
   // Money the viewer may not see arrives as null (the engine redacts per
   // audience — P1-6). A total over a redacted board would be a wrong number
-  // presented confidently, so it sums only what this viewer was actually sent.
-  // Money the viewer may not see arrives as null (the engine redacts per
-  // audience — P1-6). A total over a redacted board would be a wrong number
   // presented confidently, so it sums only what this viewer was actually sent —
   // and when it was sent NOTHING, which is every anonymous watcher of this
-  // page, the answer is "sealed", not "₹0". The projector used to read
-  // "TOTAL SPEND ₹0" beside "PLAYERS SOLD 78" and "MOST EXPENSIVE ₹60,000".
+  // page, it is never "₹0": the projector once read "TOTAL SPEND ₹0" beside
+  // "PLAYERS SOLD 78" and "MOST EXPENSIVE ₹60,000".
   const visibleCommitted =
     snapshot === null
       ? []
       : snapshot.paddles
           .map((paddle) => paddle.committed)
           .filter((value): value is number => value !== null);
+  // SEALED IS FOR BIDS, NOT FOR HAMMER PRICES. Every sold price is already
+  // on this wall ("Most expensive", "Recent sales") and on the public team
+  // page, so a total the engine did not send is still a sum the room can do —
+  // and the projector after the night read "Total spend: sealed" beside the
+  // prices that make it up. When the committed figures are withheld, add up
+  // the sales instead.
+  const soldSum = (lotsSold: readonly ResolvedLot[]): number =>
+    lotsSold.reduce((sum, entry) => sum + (entry.soldPrice ?? 0), 0);
   const totalSpend =
-    snapshot === null || visibleCommitted.length === 0
+    snapshot === null
       ? null
-      : visibleCommitted.reduce((sum, value) => sum + value, 0);
+      : visibleCommitted.length === 0
+        ? soldSum(soldLots)
+        : visibleCommitted.reduce((sum, value) => sum + value, 0);
+  // Remaining purse is derived only once the night is over: mid-auction it
+  // is the owners' live headroom, which the engine seals from this audience
+  // (P1-6), and deriving it here would undo that on a projector.
+  const finished =
+    snapshot?.auctionStatus === "completed" || snapshot?.auctionStatus === "reconciled";
   const topBuy = soldLots.reduce<ResolvedLot | null>(
     (best, lot) => ((lot.soldPrice ?? 0) > (best?.soldPrice ?? -1) ? lot : best),
     null,
@@ -211,17 +233,25 @@ export function BoardPanel({
           activePaddles: [],
           leading: false,
           squad: 0,
+          bought: 0,
         }))
         .sort((a, b) => a.teamName.localeCompare(b.teamName))
     : teamPurseRows(snapshot, teamIdentities)
-        .map((row) => ({
-          ...row,
-          squad: soldLots.filter((lot) => lot.teamName === row.teamName).length,
-        }))
-        .sort(
-          (a, b) =>
-            (b.committed ?? -1) - (a.committed ?? -1) || a.teamName.localeCompare(b.teamName),
-        );
+        .map((row) => {
+          const bought = soldLots.filter((lot) => lot.teamName === row.teamName);
+          const committed = row.committed ?? soldSum(bought);
+          return {
+            ...row,
+            committed,
+            purseRemaining:
+              row.purseRemaining ??
+              (finished && pursePerTeam !== null ? Math.max(0, pursePerTeam - committed) : null),
+            // Pre-signed players are on the squad too — see `preSignedByTeam`.
+            squad: bought.length + (preSignedByTeam[row.teamId] ?? 0),
+            bought: bought.length,
+          };
+        })
+        .sort((a, b) => b.committed - a.committed || a.teamName.localeCompare(b.teamName));
 
   // A projector is ONE frame, so the board has to spend its height rather than
   // overflow it. When a player is under the hammer the room is watching the
@@ -498,7 +528,7 @@ export function BoardPanel({
                 totalSpend === null ? "board-tile-value board-tile-muted" : "board-tile-value"
               }
             >
-              {totalSpend === null ? "sealed" : money.ledger(totalSpend)}
+              {totalSpend === null ? "—" : money.ledger(totalSpend)}
             </span>
           </div>
           <div className="board-tile">
@@ -506,7 +536,9 @@ export function BoardPanel({
             <span className="board-tile-value">{soldLots.length}</span>
           </div>
           <div className="board-tile">
-            <span className="board-tile-label">Unsold</span>
+            {/* "Passed", the public word (content/help.ts): "unsold" reads as
+                a verdict on the player, on a wall the player may be watching. */}
+            <span className="board-tile-label">Passed</span>
             <span className="board-tile-value">{unsoldCount}</span>
           </div>
           <div className="board-tile">
@@ -579,7 +611,7 @@ export function BoardPanel({
                   a row of faces ringed in its colours — the part of the
                   standings a room actually talks about. It shares the purse's
                   row, so it costs the one-frame projector no height. */}
-                {!connecting && team.squad > 0 ? (
+                {!connecting && team.bought > 0 ? (
                   <ul className="board-team-faces" aria-label={`${team.teamName} squad`}>
                     {soldLots
                       .filter((entry) => entry.teamName === team.teamName)
@@ -596,8 +628,8 @@ export function BoardPanel({
                           />
                         </li>
                       ))}
-                    {team.squad > SQUAD_FACES ? (
-                      <li className="board-team-faces-more">+{team.squad - SQUAD_FACES}</li>
+                    {team.bought > SQUAD_FACES ? (
+                      <li className="board-team-faces-more">+{team.bought - SQUAD_FACES}</li>
                     ) : null}
                   </ul>
                 ) : null}
@@ -606,11 +638,9 @@ export function BoardPanel({
                 <div>
                   <dt>Spent</dt>
                   <dd>
-                    {connecting
-                      ? "—"
-                      : team.committed === null
-                        ? "sealed"
-                        : money.ledger(team.committed)}
+                    {/* Never sealed now: when the engine withholds it, it is the
+                        sum of this team's hammer prices (see `soldSum`). */}
+                    {connecting ? "—" : money.ledger(team.committed)}
                   </dd>
                 </div>
                 <div>

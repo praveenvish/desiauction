@@ -775,7 +775,10 @@ export function liveExit(pathname: string, hasSession: boolean): { href: string;
   // there, and there is where the rest of this tournament is). Sending them to
   // "/" was an exit that landed them somewhere they had never been.
   if (match.segment === "spectate" && !hasSession) {
-    return { href: `/c/${match.slug}`, label: "Leave auction" };
+    // …and the door says where it goes: "Leave auction" on a finished night
+    // read as walking out of something still running. The season's name is
+    // not known from a pathname, so the label names the place, not the season.
+    return { href: `/c/${match.slug}`, label: "Back to the season" };
   }
   return { href: `/seasons/${match.slug}/auction`, label: "Leave auction" };
 }

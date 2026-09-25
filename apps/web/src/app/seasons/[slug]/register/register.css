@@ -1015,6 +1015,13 @@
   }
 }
 
+/* The closed door's two ways out, side by side, wrapping on a phone. */
+.reg-closed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .reg-status-foot {
   padding-top: var(--space-3);
   border-top: 1px solid var(--border-subtle);

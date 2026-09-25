@@ -169,6 +169,12 @@
   white-space: nowrap;
 }
 
+/* A role is a word, not a code: the body face, not the mono one. */
+.team-card-role {
+  font-family: inherit;
+  font-size: var(--text-sm-size);
+}
+
 .team-card-more,
 .team-card-empty {
   padding: var(--space-2);

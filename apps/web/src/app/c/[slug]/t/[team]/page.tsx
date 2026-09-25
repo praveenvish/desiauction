@@ -146,11 +146,15 @@ export default async function PublicTeamPage({
         }
         eyebrow={<Link href={`/c/${slug}`}>{team.competitionName}</Link>}
         title={team.team.name}
+        /* "Our squad" spoke as the team, on a page anyone can land on from a
+           forwarded link; the season's name says whose squad it is. */
         lede={
-          team.team.coachName === null ? "Our squad" : `Our squad · Coach ${team.team.coachName}`
+          team.team.coachName === null
+            ? `${team.competitionName} squad`
+            : `${team.competitionName} squad · Coach ${team.team.coachName}`
         }
         actions={
-          <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg">
+          <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg" className="team-page-back">
             <IconArrowLeft size={18} /> Back to {team.competitionName}
           </ButtonLink>
         }

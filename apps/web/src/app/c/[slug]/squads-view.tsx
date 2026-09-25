@@ -28,12 +28,34 @@ export interface SquadTeam {
   href?: string;
 }
 
+/**
+ * WHO A CARD LEADS WITH. The card previews four players, and it took them in
+ * registration-number order — so a squad's marquee buy was usually behind
+ * "+8 more" while the four who registered first stood in for the team. The
+ * captain and the icon lead (they are who a team is known by), then the room's
+ * purchases most expensive first, then anyone else by name.
+ */
+const MARK_ORDER: Record<string, number> = { captain: 0, icon: 1, retained: 2 };
+
+function squadOrder(a: ShowcasePlayer, b: ShowcasePlayer): number {
+  const markA = a.preSignedAs === null ? 3 : (MARK_ORDER[a.preSignedAs] ?? 3);
+  const markB = b.preSignedAs === null ? 3 : (MARK_ORDER[b.preSignedAs] ?? 3);
+  return (
+    markA - markB ||
+    (b.soldPrice ?? -1) - (a.soldPrice ?? -1) ||
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+}
+
 export function SquadsView({
   players,
   teams,
+  roleLabel,
 }: {
   players: ShowcasePlayer[];
   teams: readonly SquadTeam[];
+  /** The SEASON's role words — see `ShowcaseGrid`. */
+  roleLabel: (role: string | null) => string;
 }) {
   const squads = useMemo(() => groupSquads(players), [players]);
 
@@ -92,9 +114,12 @@ export function SquadsView({
                   fallback={teamCardInitials(team.name)}
                 />
               ),
-            players: squad.map((player) => ({
+            players: [...squad].sort(squadOrder).map((player) => ({
               name: player.name,
               number: player.number,
+              // The playing role, not "#R3D8ZHA": the registration number is an
+              // internal handle, and a squad sheet is read by what people play.
+              role: roleLabel(player.role),
               preSigned: player.status === "retained",
               photo: (
                 <PlayerImage

@@ -204,6 +204,20 @@
   align-self: end;
 }
 
+/* ON A PHONE THE HERO IS THE TEXT. The sport's stock illustration and the
+   handwritten "Play Bid Belong" stacked under the copy took ~700px before the
+   first number on /c/[slug]. Both are decoration (aria-hidden); a page's OWN
+   art — a player's portrait, a team's crest — carries meaning and stays. */
+@media (max-width: 640px) {
+  .pk-hero-art[data-placeholder] {
+    display: none;
+  }
+
+  .pk-script {
+    display: none;
+  }
+}
+
 /* ------------------------------------------------------------------- art -- */
 
 .pk-sport-art {
@@ -365,6 +379,21 @@
     padding-left: 0;
     border-top: 1px solid var(--border-subtle);
     padding-top: var(--space-4);
+  }
+}
+
+/* Two figures a row on a phone, not one: `auto-fit` at 150px gave a 343px
+   strip a single column, so four counts became four full-width rows. The
+   caption cell still takes a row of its own. */
+@media (max-width: 640px) {
+  .pk-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .pk-stat[data-aside] {
+    grid-column: 1 / -1;
   }
 }
 
