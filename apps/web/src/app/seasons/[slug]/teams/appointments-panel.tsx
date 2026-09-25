@@ -3,15 +3,12 @@
 import {
   Button,
   Dialog,
-  IconMail,
   IconMegaphone,
   IconSend,
   Pill,
   PlayerImage,
   SectionCard,
-  TeamChip,
   useToast,
-  type KitTone,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -20,14 +17,6 @@ import {
   announceAppointmentsAction,
   type AppointmentsPanelView,
 } from "../../../../server/competition/appointment-actions";
-
-/** The mockup's role colours: an icon is amber, a captain blue. */
-const ROLE_TONE: Record<string, KitTone> = {
-  captain: "blue",
-  vice_captain: "blue",
-  icon: "amber",
-  retained: "purple",
-};
 
 /**
  * ANNOUNCE CAPTAINS & ICONS.
@@ -70,7 +59,7 @@ export function AppointmentsPanel({ slug, view }: { slug: string; view: Appointm
         data-testid="appointments-panel"
         flush
         icon={<IconMegaphone />}
-        tone="amber"
+        concept="players"
         title="Announce captains & icons"
         description={
           count === 0 ? (
@@ -90,60 +79,86 @@ export function AppointmentsPanel({ slug, view }: { slug: string; view: Appointm
         }
       >
         {view.rows.length > 0 ? (
-          <div className="table-scroll tm-announce-scroll">
-            <table className="tm-announce" data-testid="appointments-pending">
-              <thead>
-                <tr>
-                  <th className="tm-announce-num">#</th>
-                  <th>Player</th>
-                  <th>Role</th>
-                  <th>Team</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {view.rows.map((row, index) => (
-                  <tr
-                    key={`${row.registrationId}-${row.team}`}
-                    data-told={row.told ? "true" : undefined}
-                  >
-                    <td className="tm-announce-num">{index + 1}</td>
-                    <td>
-                      <span className="tm-announce-player">
-                        <PlayerImage
-                          name={row.name}
-                          seed={row.registrationId}
-                          src={row.photoUrl}
-                          size="xs"
-                          shape="round"
-                          {...(row.teamColor !== null ? { teamColor: row.teamColor } : {})}
-                          decorative
-                        />
-                        <span className="registration-name">{row.name}</span>
-                      </span>
-                    </td>
-                    <td data-label="Role">
-                      <span className="tm-announce-roles">
-                        {row.roles.map((role) => (
-                          <Pill key={role.key} tone={ROLE_TONE[role.key] ?? "neutral"}>
-                            {role.label}
-                          </Pill>
-                        ))}
-                      </span>
-                    </td>
-                    <td data-label="Team">
-                      <TeamChip color={row.teamColor}>{row.team}</TeamChip>
-                    </td>
-                    <td data-label="Status">
-                      <Pill tone={row.told ? "green" : "amber"} dot>
-                        {row.told ? "Told" : "Pending"}
-                      </Pill>
-                    </td>
-                  </tr>
+          /* The names fold behind one line — a face stack and "Review the
+             list" — so the teams stay above the fold (the table was ~450px). */
+          <details className="tm-announce-review">
+            <summary className="tm-announce-summary">
+              <span className="tm-face-stack" aria-hidden>
+                {view.rows.slice(0, 6).map((row) => (
+                  <PlayerImage
+                    key={`${row.registrationId}-${row.team}-face`}
+                    name={row.name}
+                    seed={row.registrationId}
+                    src={row.photoUrl}
+                    size="xs"
+                    shape="round"
+                    decorative
+                  />
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </span>
+              <span className="tm-announce-summary-text">Review the list ({view.rows.length})</span>
+            </summary>
+            <div className="table-scroll tm-announce-scroll">
+              <table className="tm-announce" data-testid="appointments-pending">
+                <thead>
+                  <tr>
+                    <th className="tm-announce-num">#</th>
+                    <th>Player</th>
+                    <th>Role</th>
+                    <th>Team</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {view.rows.map((row, index) => (
+                    <tr
+                      key={`${row.registrationId}-${row.team}`}
+                      data-told={row.told ? "true" : undefined}
+                    >
+                      <td className="tm-announce-num">{index + 1}</td>
+                      <td>
+                        <span className="tm-announce-player">
+                          <PlayerImage
+                            name={row.name}
+                            seed={row.registrationId}
+                            src={row.photoUrl}
+                            size="xs"
+                            shape="round"
+                            {...(row.teamColor !== null ? { teamColor: row.teamColor } : {})}
+                            decorative
+                          />
+                          <span className="registration-name">{row.name}</span>
+                        </span>
+                      </td>
+                      <td data-label="Role">
+                        {/* Role as words, team as a dot — one pill per row (status). */}
+                        <span className="tm-announce-roles">
+                          {row.roles.map((role) => role.label).join(" · ")}
+                        </span>
+                      </td>
+                      <td data-label="Team">
+                        <span
+                          className="tm-team-dot"
+                          style={
+                            row.teamColor !== null
+                              ? { ["--team" as string]: row.teamColor }
+                              : undefined
+                          }
+                        >
+                          {row.team}
+                        </span>
+                      </td>
+                      <td data-label="Status">
+                        <Pill tone={row.told ? "green" : "amber"} dot>
+                          {row.told ? "Told" : "Pending"}
+                        </Pill>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
         ) : null}
         {count > 0 ? (
           <div className="tm-announce-foot">
@@ -157,10 +172,6 @@ export function AppointmentsPanel({ slug, view }: { slug: string; view: Appointm
               <IconSend size={18} className="icon-lead" aria-hidden />
               Announce to {people}
             </Button>
-            <p className="tm-foot-note" data-tone="info">
-              <IconMail size={18} aria-hidden />
-              Players will receive an inbox message and an email notification.
-            </p>
           </div>
         ) : null}
       </SectionCard>

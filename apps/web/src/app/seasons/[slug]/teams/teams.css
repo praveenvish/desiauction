@@ -24,18 +24,30 @@
 
 /* The shell's page head ends with a gap sized for a card; the lede belongs to
    the title, so it closes most of it. */
+/* ONE ROW (wow pass): the count, the purse and its provenance, and the lock
+   as a pill — it was two lines of lede and a full-width 48px notice. */
 .tm-lede {
-  margin-top: calc(-1 * var(--space-5));
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
 }
 
 .tm-lede p {
   margin: 0;
-  font-size: var(--text-base-size);
-  line-height: var(--text-base-line);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
   color: var(--text-secondary);
+}
+
+.tm-lede .tm-lede-count {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-lock {
+  display: inline-flex;
+  margin-inline-start: auto;
 }
 
 .tm-lede .tm-lede-rules {
@@ -58,8 +70,8 @@
 }
 
 @media (max-width: 719px) {
-  .tm-lede {
-    margin-top: calc(-1 * var(--space-3));
+  .tm-lock {
+    margin-inline-start: 0;
   }
 }
 
@@ -104,7 +116,9 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  /* auto-fit: three teams share the row instead of leaving a fourth, empty
+     track; 280px keeps "Mumbai Mavericks" on one line beside its count. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: var(--space-4);
 }
 
@@ -821,5 +835,87 @@
 
   .tm-grid .tm-card:has(.team-card-cover:hover) {
     transform: none;
+  }
+}
+
+/* ---- Announce: the names fold behind a face stack ---- */
+.tm-announce-review {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tm-announce-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.tm-announce-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tm-announce-summary:hover .tm-announce-summary-text {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tm-announce-summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.tm-face-stack {
+  display: inline-flex;
+}
+
+.tm-face-stack > * {
+  box-shadow: 0 0 0 2px var(--surface-raised);
+  border-radius: var(--radius-full);
+}
+
+.tm-face-stack > * + * {
+  margin-inline-start: -8px;
+}
+
+.tm-announce-roles {
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+.tm-team-dot {
+  --team: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.tm-team-dot::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--team);
+}
+
+.tm-tell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .tm-tell:has(> [data-testid="appointments-panel"]):has(> [data-testid="squad-sheets-panel"]) {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   }
 }

@@ -72,7 +72,7 @@
    single-competition and register surfaces that share this stylesheet. */
 .competitions .competitions-stack {
   max-width: 1280px;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .seasons-section {
@@ -88,17 +88,10 @@
 }
 
 .competition-link {
+  display: block;
   text-decoration: none;
   color: inherit;
   border-radius: var(--radius-lg);
-  transition:
-    transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out);
-}
-
-.competition-link:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-2);
 }
 
 .competition-link:focus-visible {
@@ -106,21 +99,19 @@
   outline-offset: 2px;
 }
 
-/* The gold hairline appears on hover only: at rest the grid is calm, and the
-   accent marks the one card the pointer is on. */
-.competition-link:hover .season-card {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+/* The card inside is the shared interactive Card (a surface at rest, the
+   da-lift recipe on hover) — the season card is a target, not a section. */
+.competition-link > * {
+  height: 100%;
 }
 
 .season-card {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   height: 100%;
-  padding: var(--space-5);
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  transition: border-color var(--duration-fast) var(--ease-out);
+  padding: var(--space-4) var(--space-5);
 }
 
 .season-card-top {
@@ -145,19 +136,20 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-6);
-  margin: var(--space-4) 0 0;
-  padding-top: var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border-subtle);
 }
 
 .season-card-meta div {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
 .season-card-meta dt {
+  display: inline-flex;
   font-size: var(--text-xs-size);
   line-height: var(--text-xs-line);
   letter-spacing: 0.06em;
@@ -343,7 +335,7 @@ p + .date-row {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 /* A flex item defaults to min-width:auto, so a card wrapping a wide table grew

@@ -1,13 +1,11 @@
 import { addDays } from "@desiauction/core";
 import {
-  ButtonLink,
   IconArrowLeft,
   IconArrowRight,
   IconCalendar,
   IconClock,
-  IconList,
-  IconMatch,
   SectionCard,
+  SegmentedTabs,
   TeamChip,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -17,6 +15,7 @@ import { formatWallDate, formatWallTime } from "../../../../../lib/format-date";
 import { calendarView } from "../../../../../server/competition/fixture-actions";
 import type { FixtureSnapshot } from "../../../../../server/competition/fixtures";
 import { FixtureStatusPill } from "../../_tabs/fixture-status";
+import { ScheduleViews } from "../../sibling-link";
 import "../../../seasons.css";
 import "../../_tabs/tabs.css";
 import "../fixtures.css";
@@ -27,6 +26,7 @@ export const metadata = { title: "Fixture calendar · DesiAuction" };
 // and upcoming fixtures. Navigation is plain links — no client scheduling logic.
 
 const VIEW_TITLE = { day: "Day", week: "Week", timeline: "Season timeline" } as const;
+const VIEW_LABEL = { day: "Day", week: "Week", timeline: "Timeline" } as const;
 
 /** One match on a day: when, who, where, and where it stands. */
 function FixtureLine({ fixture, withDate }: { fixture: FixtureSnapshot; withDate: boolean }) {
@@ -117,21 +117,21 @@ export default async function CalendarPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <div className="st-head">
+        {/* ONE ROW: the Schedule views, the range, the date — every control
+            on the same 36px rung (it was 46 / 38 / 32). */}
+        <div className="st-head cal-head">
           <div className="cal-left">
-            <nav className="cal-views" aria-label="Calendar view">
-              {(["day", "week", "timeline"] as const).map((name) => (
-                <Link
-                  key={name}
-                  href={href({ view: name })}
-                  className="cal-view"
-                  data-testid={`view-${name}`}
-                  aria-current={view.view === name ? "page" : undefined}
-                >
-                  {name}
-                </Link>
-              ))}
-            </nav>
+            <ScheduleViews slug={slug} active="calendar" />
+            <SegmentedTabs
+              label="Calendar view"
+              items={(["day", "week", "timeline"] as const).map((name) => ({
+                key: name,
+                label: VIEW_LABEL[name],
+                href: href({ view: name }),
+                active: view.view === name,
+                testId: `view-${name}`,
+              }))}
+            />
             {view.view !== "timeline" ? (
               <span className="cal-pager">
                 <Link
@@ -155,16 +155,6 @@ export default async function CalendarPage({
                 </Link>
               </span>
             ) : null}
-          </div>
-          <div className="st-actions">
-            <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary" size="sm">
-              <IconList size={16} aria-hidden />
-              Fixture list
-            </ButtonLink>
-            <ButtonLink href={`/seasons/${slug}/fixtures/match-day`} variant="secondary" size="sm">
-              <IconMatch size={16} aria-hidden />
-              Match day
-            </ButtonLink>
           </div>
         </div>
 

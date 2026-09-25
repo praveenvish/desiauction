@@ -5,29 +5,25 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 /* --- hero ----------------------------------------------------------------- */
-/* The club's identity strip: one white card, like every other surface. */
+/* The club's identity: a slim row under the identity bar (crest, role, age,
+   handle, the one action) — no card of its own, the name is the bar's h1. */
 .od-hero {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   flex-wrap: wrap;
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
 }
 
 .od-monogram {
   flex: none;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-lg);
   background: linear-gradient(150deg, var(--accent-lift), var(--accent));
   color: var(--text-on-accent);
@@ -89,7 +85,7 @@
 .od-overview {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 /* --- about banner --------------------------------------------------------- */
@@ -109,6 +105,26 @@
 
 .od-about-body {
   min-width: 0;
+}
+
+/* No description yet: one quiet line with its ghost action, not a band. */
+.od-about[data-empty="true"] {
+  align-items: center;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-left-width: 1px;
+  border-style: dashed;
+  background: transparent;
+}
+
+.od-about[data-empty="true"] .od-about-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+}
+
+.od-about[data-empty="true"] .od-about-kicker {
+  margin: 0;
 }
 
 .od-about-kicker {
@@ -937,4 +953,10 @@
     width: auto;
     margin-left: auto;
   }
+}
+
+.od-activity-text .home-feed-times {
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
 }

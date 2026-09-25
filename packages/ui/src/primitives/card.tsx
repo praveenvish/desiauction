@@ -31,6 +31,8 @@ export function cardClassName(
     styles[padding],
     styles[elevation],
     interactive ? styles["interactive"] : undefined,
+    // The shared card recipe (motion.css): lift, gold rim, gold top edge.
+    interactive ? "da-lift" : undefined,
     extra,
   ]
     .filter(Boolean)

@@ -1,6 +1,14 @@
-import type { ElementType, HTMLAttributes, ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  type ElementType,
+  type HTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 import { IconChevronRight } from "../icons/icons";
+import { KitFigure } from "./console-kit-figure";
 import styles from "./console-kit.module.css";
 
 /**
@@ -14,26 +22,89 @@ import styles from "./console-kit.module.css";
 
 export type KitTone = "gold" | "green" | "blue" | "amber" | "purple" | "red" | "neutral";
 
+/**
+ * ONE CONCEPT, ONE COLOUR (wow pass, 2026-09-25). Tones used to be picked per
+ * call site, so Teams was green on /home and red on the season overview, and
+ * seven tints rotated with no meaning. A tile, card or figure that names a
+ * concept passes `concept` instead of `tone`, and the colour comes from here —
+ * so the same idea reads the same colour on every screen.
+ */
+export type KitConcept =
+  | "season"
+  | "tournament"
+  | "club"
+  | "teams"
+  | "players"
+  | "money"
+  | "auction"
+  | "fixtures"
+  | "venue"
+  | "results"
+  | "alert"
+  | "done"
+  | "activity"
+  | "neutral";
+
+export const CONCEPT_TONE: Record<KitConcept, KitTone> = {
+  season: "gold",
+  tournament: "gold",
+  club: "gold",
+  teams: "blue",
+  players: "green",
+  money: "gold",
+  auction: "purple",
+  fixtures: "amber",
+  venue: "amber",
+  results: "amber",
+  alert: "red",
+  done: "green",
+  activity: "neutral",
+  neutral: "neutral",
+};
+
+/** The tone a concept stands for, else the explicit tone, else the fallback. */
+export function kitTone(
+  concept: KitConcept | undefined,
+  tone: KitTone | undefined,
+  fallback: KitTone = "gold",
+): KitTone {
+  return concept !== undefined ? CONCEPT_TONE[concept] : (tone ?? fallback);
+}
+
 type DataAttrs = { [key: `data-${string}`]: string | undefined };
+
+/** Tile icons draw Phosphor's duotone weight unless the caller chose one. */
+function duotone(icon: ReactNode): ReactNode {
+  if (!isValidElement(icon)) {
+    return icon;
+  }
+  const props = icon.props as { weight?: string };
+  if (props.weight !== undefined || typeof icon.type === "string") {
+    return icon;
+  }
+  return cloneElement(icon as ReactElement<{ weight?: string }>, { weight: "duotone" });
+}
 
 /* ---- Icon tile ------------------------------------------------------------ */
 
 export interface IconTileProps {
   icon: ReactNode;
   tone?: KitTone;
+  /** Wins over `tone`: the colour this concept always wears. */
+  concept?: KitConcept;
   size?: "sm" | "md" | "lg";
 }
 
 /** A rounded square of tint with an icon in it — decorative, never the name. */
-export function IconTile({ icon, tone = "gold", size = "md" }: IconTileProps) {
+export function IconTile({ icon, tone, concept, size = "md" }: IconTileProps) {
   return (
     <span
       className={`${styles["tile"] ?? ""} ${styles["toned"] ?? ""}`}
-      data-tone={tone}
+      data-tone={kitTone(concept, tone)}
       data-size={size}
       aria-hidden
     >
-      {icon}
+      {duotone(icon)}
     </span>
   );
 }
@@ -44,6 +115,8 @@ export interface SectionCardProps extends Omit<HTMLAttributes<HTMLElement>, "tit
   title: ReactNode;
   icon?: ReactNode;
   tone?: KitTone;
+  /** Wins over `tone` for the header tile. */
+  concept?: KitConcept;
   description?: ReactNode;
   /** Right side of the header: a "View all →" link, a settings button. */
   action?: ReactNode;
@@ -51,17 +124,28 @@ export interface SectionCardProps extends Omit<HTMLAttributes<HTMLElement>, "tit
   headingLevel?: 2 | 3;
   /** Drop the body padding — for a table that runs edge to edge. */
   flush?: boolean;
+  /**
+   * "feature": 20px padding for a page's lead card. "default": 16px (the
+   * console density). The header can also be visually hidden with
+   * `hideHeader` when an EmptyState inside says the same thing.
+   */
+  size?: "default" | "feature";
+  /** Keep the title for assistive tech only (the body names the card). */
+  hideHeader?: boolean;
   children?: ReactNode;
 }
 
 export function SectionCard({
   title,
   icon,
-  tone = "gold",
+  tone,
+  concept,
   description,
   action,
   headingLevel = 2,
   flush = false,
+  size = "default",
+  hideHeader = false,
   children,
   className,
   ...rest
@@ -71,10 +155,13 @@ export function SectionCard({
     <section
       className={[styles["card"], className ?? ""].filter(Boolean).join(" ")}
       data-flush={flush ? "true" : undefined}
+      data-size={size === "feature" ? "feature" : undefined}
       {...rest}
     >
-      <header className={styles["card-head"]}>
-        {icon !== undefined ? <IconTile icon={icon} tone={tone} size="sm" /> : null}
+      <header className={styles["card-head"]} data-hidden={hideHeader ? "true" : undefined}>
+        {icon !== undefined ? (
+          <IconTile icon={icon} tone={kitTone(concept, tone)} size="sm" />
+        ) : null}
         <div className={styles["card-titles"]}>
           <Heading className={styles["card-title"]}>{title}</Heading>
           {description !== undefined ? <p className={styles["card-desc"]}>{description}</p> : null}
@@ -91,7 +178,15 @@ export function SectionCard({
 export interface StatCardProps {
   icon: ReactNode;
   tone?: KitTone;
+  /** Wins over `tone`: the colour this concept always wears. */
+  concept?: KitConcept;
   value: ReactNode;
+  /**
+   * Roll the figure's digits in from zero on first paint and on every change
+   * (an odometer — transform only, still under reduced motion). Only for a
+   * plain string or number value; a ReactNode value is drawn as given.
+   */
+  rolling?: boolean;
   label: ReactNode;
   hint?: ReactNode;
   /** 0–100: a thin bar under the figure. */
@@ -108,8 +203,10 @@ export interface StatCardProps {
 
 export function StatCard({
   icon,
-  tone = "gold",
+  tone: toneProp,
+  concept,
   value,
+  rolling = false,
   label,
   hint,
   progress,
@@ -119,11 +216,18 @@ export function StatCard({
   linkComponent: Link = "a",
   testId,
 }: StatCardProps) {
+  const tone = kitTone(concept, toneProp);
+  const figure =
+    rolling && (typeof value === "string" || typeof value === "number") ? (
+      <KitFigure value={String(value)} />
+    ) : (
+      value
+    );
   const body = (
     <>
-      <IconTile icon={icon} tone={tone} size="lg" />
+      <IconTile icon={icon} tone={tone} size="md" />
       <span className={styles["stat-text"]}>
-        <span className={styles["stat-value"]}>{value}</span>
+        <span className={styles["stat-value"]}>{figure}</span>
         <span className={styles["stat-label"]}>{label}</span>
         {hint !== undefined ? <span className={styles["stat-hint"]}>{hint}</span> : null}
         {progress !== undefined ? (
@@ -144,10 +248,14 @@ export function StatCard({
   };
   if (href !== undefined) {
     return (
-      <Link href={href} className={`${styles["stat"] ?? ""} ${styles["toned"] ?? ""}`} {...attrs}>
+      <Link
+        href={href}
+        className={`${styles["stat"] ?? ""} ${styles["toned"] ?? ""} da-lift`}
+        {...attrs}
+      >
         {body}
         <span className={styles["stat-chevron"]} aria-hidden>
-          <IconChevronRight size={18} />
+          <IconChevronRight size={16} />
         </span>
       </Link>
     );
@@ -156,7 +264,7 @@ export function StatCard({
     return (
       <button
         type="button"
-        className={`${styles["stat"] ?? ""} ${styles["toned"] ?? ""}`}
+        className={`${styles["stat"] ?? ""} ${styles["toned"] ?? ""} da-lift`}
         aria-pressed={active}
         onClick={onSelect}
         {...attrs}
@@ -172,10 +280,13 @@ export function StatCard({
   );
 }
 
-/** A responsive row of stat cards (4 across on a laptop, 2 on a phone). */
+/**
+ * A responsive row of stat cards (4 across on a laptop, 2 on a phone), and
+ * they settle in one after another on first paint (`.da-stagger`).
+ */
 export function StatGrid({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <div className={styles["stat-grid"]} data-testid={testId}>
+    <div className={`${styles["stat-grid"] ?? ""} da-stagger`} data-testid={testId}>
       {children}
     </div>
   );
@@ -218,6 +329,7 @@ export function Notice({ tone = "warning", icon, title, children, action, testId
 
 export interface PillProps {
   tone?: KitTone;
+  concept?: KitConcept;
   children: ReactNode;
   /** A leading dot (status). */
   dot?: boolean;
@@ -225,11 +337,11 @@ export interface PillProps {
   testId?: string;
 }
 
-export function Pill({ tone = "neutral", children, dot = false, icon, testId }: PillProps) {
+export function Pill({ tone, concept, children, dot = false, icon, testId }: PillProps) {
   return (
     <span
       className={`${styles["pill"] ?? ""} ${styles["toned"] ?? ""}`}
-      data-tone={tone}
+      data-tone={kitTone(concept, tone, "neutral")}
       data-testid={testId}
     >
       {dot ? <span className={styles["pill-dot"]} aria-hidden /> : null}
@@ -271,13 +383,26 @@ export function JourneyStepper({
   steps,
   label = "Season progress",
   linkComponent: Link = "a",
+  variant = "strip",
 }: {
   steps: JourneyStep[];
   label?: string;
   linkComponent?: ElementType;
+  /**
+   * "strip": its own card under a page head. "rail": slim and transparent,
+   * for the bottom edge of a HeroBanner (pass it as the hero's `footer`).
+   * On a phone both collapse to marks plus the one step that matters —
+   * "Step 4 of 5 · Fixtures" — so nothing clips mid-word.
+   */
+  variant?: "strip" | "rail";
 }) {
+  // The step a phone spells out: the current one, else the last one done.
+  let focus = steps.findIndex((step) => step.state === "current");
+  if (focus === -1) {
+    focus = steps.reduce((last, step, index) => (step.state === "done" ? index : last), 0);
+  }
   return (
-    <ol className={styles["journey"]} aria-label={label}>
+    <ol className={styles["journey"]} aria-label={label} data-variant={variant}>
       {steps.map((step, index) => {
         const inner = (
           <>
@@ -302,6 +427,11 @@ export function JourneyStepper({
               {step.hint !== undefined ? (
                 <span className={styles["journey-hint"]}>{step.hint}</span>
               ) : null}
+              {index === focus ? (
+                <span className={styles["journey-count"]}>
+                  Step {index + 1} of {steps.length}
+                </span>
+              ) : null}
             </span>
           </>
         );
@@ -310,6 +440,7 @@ export function JourneyStepper({
             key={step.key}
             className={styles["journey-step"]}
             data-state={step.state}
+            data-focus={index === focus ? "true" : undefined}
             aria-current={step.state === "current" ? "step" : undefined}
           >
             {step.href !== undefined ? (
@@ -346,6 +477,10 @@ export interface HeroBannerProps {
    * or figures) or "start" (top right, for a club chip and a menu).
    */
   sideAlign?: "start" | "end";
+  /** Along the bottom edge: a `JourneyStepper variant="rail"`, a stat strip. */
+  footer?: ReactNode;
+  /** "compact": ~120px, for a tournament or club head rather than a season. */
+  size?: "default" | "compact";
   testId?: string;
 }
 
@@ -359,6 +494,8 @@ export function HeroBanner({
   aside,
   headingLevel = 2,
   sideAlign = "end",
+  footer,
+  size = "default",
   testId,
 }: HeroBannerProps) {
   const Heading: ElementType = headingLevel === 1 ? "h1" : "h2";
@@ -367,6 +504,7 @@ export function HeroBanner({
       className={styles["hero"]}
       data-has-image={image !== undefined && image !== null ? "true" : undefined}
       data-side-align={sideAlign}
+      data-size={size === "compact" ? "compact" : undefined}
       data-testid={testId}
     >
       {image !== undefined && image !== null ? (
@@ -405,6 +543,7 @@ export function HeroBanner({
           </div>
         ) : null}
       </div>
+      {footer !== undefined ? <div className={styles["hero-footer"]}>{footer}</div> : null}
     </section>
   );
 }
@@ -417,7 +556,7 @@ export function CardGrid({
   weight = "even",
 }: {
   children: ReactNode;
-  weight?: "even" | "wide-left" | "wide-right";
+  weight?: "even" | "wide-left" | "wide-right" | "golden";
 }) {
   return (
     <div className={styles["card-grid"]} data-weight={weight}>

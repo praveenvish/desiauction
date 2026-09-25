@@ -125,7 +125,7 @@ export function SeasonCard({
   const badge = seasonStatusBadge(season.status, season.settlement, season.counts?.auctionDone);
   return (
     <Link href={`/seasons/${season.slug}`} className="competition-link">
-      <Card padding="none">
+      <Card padding="none" interactive>
         <article className="season-card">
           <div className="season-card-top">
             {/* "Which edition am I running?" is the question this page exists to
@@ -146,7 +146,7 @@ export function SeasonCard({
               {when !== null ? (
                 <div>
                   <dt>
-                    <IconCalendar width={14} height={14} aria-hidden />
+                    <IconCalendar size={16} aria-hidden />
                     <VisuallyHidden>When</VisuallyHidden>
                   </dt>
                   <dd>{when}</dd>
@@ -155,7 +155,7 @@ export function SeasonCard({
               {season.location !== null ? (
                 <div>
                   <dt>
-                    <IconPin width={14} height={14} aria-hidden />
+                    <IconPin size={16} aria-hidden />
                     <VisuallyHidden>Where</VisuallyHidden>
                   </dt>
                   <dd>{season.location}</dd>

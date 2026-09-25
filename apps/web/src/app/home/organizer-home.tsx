@@ -50,7 +50,7 @@ import { CreateTournamentForm } from "../tournaments/create-tournament-form";
 import { dateRange } from "../tournaments/season-card";
 import { seasonJourney } from "../tournaments/season-journey";
 import { ClubHero } from "./club-hero";
-import { activityLabel, activityStyle, ago } from "./home-activity";
+import { activityLabel, activityStyle, ago, groupActivity } from "./home-activity";
 import { seasonBadge } from "./home-parts";
 import { HomeShortcuts } from "./home-shortcuts";
 import type { NextStep } from "./next-step";
@@ -85,6 +85,8 @@ interface AttentionRow {
   label: string;
   detail: string;
   href: string;
+  /** The button's words, when the destination alone would name the wrong act. */
+  verb?: string;
 }
 
 const ATTENTION_SCAN_LIMIT = 8;
@@ -150,6 +152,7 @@ async function attentionFor(
           label: "Announce captains & icons",
           detail: `${competition.name} · ${String(appointments.pending.length)} not told yet`,
           href: `/seasons/${competition.slug}/teams`,
+          verb: "Announce now",
         });
       }
       if (counts.fixtures === 0) {
@@ -158,6 +161,7 @@ async function attentionFor(
           label: "Squads are set — schedule the matches",
           detail: competition.name,
           href: `/seasons/${competition.slug}/fixtures`,
+          verb: "Schedule matches",
         });
       }
       return rows;
@@ -562,7 +566,7 @@ export async function OrganizerHome({
       data-testid="attention-queue"
       className="home-attention"
       icon={<IconAlert />}
-      tone={attentionCount > 0 ? "red" : "green"}
+      concept={attentionCount > 0 ? "alert" : "done"}
       title="Needs attention"
       action={
         attentionCount > 0 ? (
@@ -582,7 +586,7 @@ export async function OrganizerHome({
           {restAttention.map((row) => (
             <li key={row.key}>
               <Link href={row.href} className="home-row-link">
-                <IconTile icon={<IconBolt />} tone="amber" size="sm" />
+                <IconTile icon={<IconBolt />} concept="alert" size="sm" />
                 <span className="home-row-text">
                   <strong>{row.label}</strong>
                   <span>{row.detail}</span>
@@ -595,7 +599,7 @@ export async function OrganizerHome({
       ) : null}
       {nextStep === null && restAttention.length === 0 ? (
         <div className="home-clear">
-          <IconTile icon={<IconCheckCircle />} tone="green" size="lg" />
+          <IconTile icon={<IconCheckCircle />} concept="done" size="lg" />
           <span className="home-row-text">
             <strong>All clear — nothing is waiting on you.</strong>
             <span>You&apos;re all caught up.</span>
@@ -706,7 +710,9 @@ export async function OrganizerHome({
         </section>
       ) : null}
 
-      {/* ---- the club hero, its road and its four figures ---- */}
+      {/* ---- the club hero with its road along the bottom edge, then its
+           four figures. The journey used to be a strip of its own under the
+           hero, repeating the hero's own status (~86px). ---- */}
       {focusOverview !== null ? (
         <ClubHero
           overview={focusOverview}
@@ -719,49 +725,55 @@ export async function OrganizerHome({
             slug: competition.slug,
             name: competition.name,
           }))}
-        />
-      ) : null}
-
-      {journey !== null ? (
-        <div className="home-journey">
-          <JourneyStepper
-            label={`${focusOverview?.competition.name ?? "Season"} progress`}
-            linkComponent={Link}
-            steps={journey.map((step): JourneyStep => {
-              const href = journeyHref[step.key];
-              // Zero is left unsaid: a "0" beside a completed step reads as a fault.
-              const many = view.competitions.length > 1 && (stageCount[step.key] ?? 0) > 0;
-              const item: JourneyStep = {
-                key: step.key,
-                label: (
-                  <>
-                    {step.label}
-                    {many ? (
-                      <span className="home-journey-count">
-                        {stageCount[step.key] ?? 0}
-                        <VisuallyHidden>
-                          {" "}
-                          of your seasons {(stageCount[step.key] ?? 0) === 1 ? "is" : "are"} here
-                        </VisuallyHidden>
-                      </span>
-                    ) : null}
-                  </>
+          {...(journey !== null
+            ? {
+                footer: (
+                  <JourneyStepper
+                    variant="rail"
+                    label={`${focusOverview.competition.name} progress`}
+                    linkComponent={Link}
+                    steps={journey.map((step): JourneyStep => {
+                      const href = journeyHref[step.key];
+                      // Zero is left unsaid: a "0" beside a completed step reads as a fault.
+                      const many = view.competitions.length > 1 && (stageCount[step.key] ?? 0) > 0;
+                      const item: JourneyStep = {
+                        key: step.key,
+                        label: (
+                          <>
+                            {step.label}
+                            {many ? (
+                              <span className="home-journey-count">
+                                {stageCount[step.key] ?? 0}
+                                <VisuallyHidden>
+                                  {" "}
+                                  of your seasons {(stageCount[step.key] ?? 0) === 1
+                                    ? "is"
+                                    : "are"}{" "}
+                                  here
+                                </VisuallyHidden>
+                              </span>
+                            ) : null}
+                          </>
+                        ),
+                        state: step.state,
+                        hint: step.hint,
+                        icon: journeyIcon[step.key],
+                      };
+                      return href === undefined ? item : { ...item, href };
+                    })}
+                  />
                 ),
-                state: step.state,
-                hint: step.hint,
-                icon: journeyIcon[step.key],
-              };
-              return href === undefined ? item : { ...item, href };
-            })}
-          />
-        </div>
+              }
+            : {})}
+        />
       ) : null}
 
       {focusOverview !== null ? (
         <StatGrid testId="home-figures">
           <StatCard
             icon={<IconUsers />}
-            tone="green"
+            concept="teams"
+            rolling
             value={focusOverview.teamCount.toLocaleString("en-IN")}
             label="Teams"
             href={`${focusBase}/teams`}
@@ -769,7 +781,8 @@ export async function OrganizerHome({
           />
           <StatCard
             icon={<IconUser />}
-            tone="blue"
+            concept="players"
+            rolling
             value={focusOverview.approvedPlayers.toLocaleString("en-IN")}
             label="Players"
             hint={
@@ -785,7 +798,8 @@ export async function OrganizerHome({
           {focusOverview.purseCommitted !== undefined ? (
             <StatCard
               icon={<IconWallet />}
-              tone="amber"
+              concept="money"
+              rolling
               value={cardAmount(
                 focusOverview.competition.auctionUnit,
                 focusOverview.purseCommitted,
@@ -800,7 +814,8 @@ export async function OrganizerHome({
           ) : (
             <StatCard
               icon={<IconCalendar />}
-              tone="amber"
+              concept="fixtures"
+              rolling
               value={focusOverview.fixtureCount.toLocaleString("en-IN")}
               label="Fixtures"
               href={`${focusBase}/fixtures`}
@@ -809,7 +824,8 @@ export async function OrganizerHome({
           )}
           <StatCard
             icon={<IconGavel />}
-            tone="purple"
+            concept="auction"
+            rolling
             value={`${String(focusOverview.lotsSold)}/${String(focusOverview.lotsTotal)}`}
             label="Lots sold"
             hint={focusOverview.lotsTotal === 0 ? "No lots yet" : `${String(lotsPct)}%`}
@@ -820,7 +836,7 @@ export async function OrganizerHome({
         </StatGrid>
       ) : null}
 
-      <CardGrid weight="wide-left">
+      <CardGrid weight="golden">
         {/* ================= LEFT ================= */}
         <div className="home-col">
           {!laddering ? attentionCard : null}
@@ -829,7 +845,7 @@ export async function OrganizerHome({
             <SectionCard
               flush
               icon={<IconTrophy />}
-              tone="gold"
+              concept="season"
               title="Top seasons"
               action={
                 <Link href="/tournaments?view=seasons" className="home-more">
@@ -939,7 +955,7 @@ export async function OrganizerHome({
           {showMoney ? (
             <SectionCard
               icon={<IconRupee />}
-              tone="blue"
+              concept="money"
               title="Money overview"
               action={
                 showChart ? (
@@ -1055,7 +1071,7 @@ export async function OrganizerHome({
           {showAuctions ? (
             <SectionCard
               icon={<IconGavel />}
-              tone="gold"
+              concept="auction"
               title="Active auctions"
               action={
                 // The cross-season auctions index, which this card is a slice
@@ -1138,7 +1154,7 @@ export async function OrganizerHome({
           ) : null}
 
           {showEvents ? (
-            <SectionCard icon={<IconCalendar />} tone="blue" title="Upcoming events">
+            <SectionCard icon={<IconCalendar />} concept="fixtures" title="Upcoming events">
               {schedule.length === 0 ? (
                 <PanelEmpty
                   icon={<IconCalendar />}
@@ -1185,7 +1201,7 @@ export async function OrganizerHome({
           {showActivity ? (
             <SectionCard
               icon={<IconBolt />}
-              tone="purple"
+              concept="activity"
               title="Recent activity"
               action={
                 <Link href="/inbox" className="home-more">
@@ -1195,7 +1211,7 @@ export async function OrganizerHome({
               }
             >
               <ul className="home-list">
-                {dash.activity.map((row) => {
+                {groupActivity(dash.activity).map(({ row, times }) => {
                   const style = activityStyle(row.action);
                   return (
                     <li key={row.id} className="home-feed">
@@ -1205,6 +1221,7 @@ export async function OrganizerHome({
                           {row.action === "finops.summary"
                             ? `${String(row.count)} finance ${row.count === 1 ? "update" : "updates"}`
                             : activityLabel(row.action)}
+                          {times > 1 ? <span className="home-feed-times"> ×{times}</span> : null}
                         </strong>
                         {/* Which season the event belongs to — six anonymous
                               "Paddle granted" lines answer nothing without it. */}

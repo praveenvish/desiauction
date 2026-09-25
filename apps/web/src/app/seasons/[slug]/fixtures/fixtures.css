@@ -704,3 +704,55 @@
     padding-inline: var(--space-4);
   }
 }
+
+/* ---- One control rung (wow pass) -------------------------------------------
+   The Schedule views, the calendar range and the date stepper share the
+   segmented control's 40px height and sunken track, so the row reads as one
+   instrument instead of three button sizes. */
+.cal-head .cal-left {
+  gap: var(--space-2) var(--space-3);
+}
+
+.cal-head .cal-pager {
+  box-sizing: border-box;
+  height: 40px;
+  padding: 3px;
+  gap: var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.cal-head .cal-pager strong {
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-head .cal-step {
+  width: 32px;
+  height: 32px;
+  border-color: transparent;
+  border-radius: 9px;
+  background: transparent;
+}
+
+.cal-head .cal-step:hover {
+  background: var(--surface-raised);
+}
+
+/* The schedule list's head: views, what is here, the one action. */
+.st-head.fx-head {
+  justify-content: flex-start;
+}
+
+.st-head.fx-head > .st-actions {
+  margin-inline-start: auto;
+}
+
+@media (max-width: 719px) {
+  .st-head.fx-head > .st-head-lede {
+    flex-basis: 100%;
+    order: 3;
+  }
+}

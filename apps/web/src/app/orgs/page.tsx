@@ -125,12 +125,12 @@ export default async function OrgsPage({
         {/* One card per club (founder mockups): the crest, the name and the
             reader's standing, then the three figures that say how big it is.
             The create affordance is the last card of the same grid. */}
-        <div className="org-cards" data-testid="orgs-list">
+        <div className="org-cards da-stagger" data-testid="orgs-list">
           {orgs.map((org) => (
             <Link
               key={org.id}
               href={`/org/${org.slug}`}
-              className="org-card"
+              className="org-card da-lift"
               // Named for where it GOES; the figures inside are decoration for
               // assistive technology (the old row read as one long sentence).
               aria-label={`${org.name} — you are ${org.role === "Owner" ? "an owner" : `a ${org.role.toLowerCase()}`}`}

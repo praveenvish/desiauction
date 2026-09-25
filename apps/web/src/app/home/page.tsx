@@ -176,7 +176,7 @@ async function HomeBody({
   const team = currentTeam(roles);
   const nextStepFor = (input: {
     managedLive: { competitionSlug: string; competitionName: string } | null;
-    attention: { label: string; detail: string; href: string }[];
+    attention: { label: string; detail: string; href: string; verb?: string }[];
   }): NextStep | null =>
     chooseNextStep({
       ownedTeam: team,

@@ -231,7 +231,7 @@ export function TournamentsBrowser({
         <div className="tg-toolbar">
           <div className="tg-search">
             <span className="tg-search-icon" aria-hidden>
-              <IconSearch width={18} height={18} />
+              <IconSearch size={16} />
             </span>
             <input
               type="search"
@@ -300,7 +300,7 @@ export function TournamentsBrowser({
                 }}
                 data-testid="tg-view-list"
               >
-                <IconList width={18} height={18} />
+                <IconList size={16} />
                 <VisuallyHidden>List</VisuallyHidden>
               </button>
               <button
@@ -312,7 +312,7 @@ export function TournamentsBrowser({
                 }}
                 data-testid="tg-view-grid"
               >
-                <IconGrid width={18} height={18} />
+                <IconGrid size={16} />
                 <VisuallyHidden>Grid</VisuallyHidden>
               </button>
             </div>
@@ -333,10 +333,10 @@ export function TournamentsBrowser({
         {flat
           ? filtering
             ? `Showing ${String(shownSeasons)} of ${String(totalSeasons)} seasons. The summary above counts everything.`
-            : `Showing all ${String(totalSeasons)} seasons.`
+            : `${String(totalSeasons)} ${totalSeasons === 1 ? "season" : "seasons"}`
           : filtering
             ? `Showing ${String(visible.length)} of ${String(groups.length)} ${groups.length === 1 ? "group" : "groups"} · ${String(shownSeasons)} of ${String(totalSeasons)} seasons. The summary above counts everything.`
-            : `Showing all ${String(groups.length)} ${groups.length === 1 ? "group" : "groups"} · ${String(totalSeasons)} seasons.`}
+            : `${String(groups.length)} ${groups.length === 1 ? "tournament" : "tournaments"} · ${String(totalSeasons)} ${totalSeasons === 1 ? "season" : "seasons"}`}
       </p>
 
       {flat ? (

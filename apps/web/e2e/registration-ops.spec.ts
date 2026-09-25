@@ -160,8 +160,9 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   // which is a different axis from triage status.
   await feesTile.click();
   await expect(page.getByTestId("page-indicator")).toContainText("5 total");
-  // `exact`: the tile's own aria-label is "Filter: Fees paid", so a loose
-  // match resolves to the tile AND the select.
+  // The fee select lives in the toolbar's Filters menu (a <details>): open it.
+  // `exact`: "Fee" alone, not the fees fact on the lede.
+  await page.getByTestId("filters-menu").locator("summary").click();
   await page.getByLabel("Fee", { exact: true }).selectOption("pending");
   await expect(page.getByTestId("page-indicator")).toContainText("3 total");
   await page.getByLabel("Fee", { exact: true }).selectOption("");
@@ -218,8 +219,8 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await page.getByTestId("sheet-close").click();
   await expect(page.getByTestId("player-sheet")).toHaveCount(0);
 
-  // Filter to approved and confirm the table only shows approved rows.
-  await page.getByLabel("Status").selectOption("approved");
+  // Filter to approved (the status tab) and confirm only approved rows show.
+  await page.getByTestId("stat-approved").click();
   await expect(page.getByTestId("page-indicator")).toContainText("8 total");
 
   // Search narrows deterministically.

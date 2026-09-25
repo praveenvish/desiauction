@@ -1,5 +1,4 @@
 import {
-  ButtonLink,
   HeroBanner,
   IconArrowRight,
   IconCalendar,
@@ -12,7 +11,6 @@ import {
   IconWallet,
   JourneyStepper,
   type JourneyStep,
-  Pill,
   PopoverMenu,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -169,95 +167,82 @@ export function FeaturedSeason({
 
   return (
     <section className="tg-feature" aria-label="Featured season" data-testid="tg-featured">
-      <div className="tg-feature-top">
-        <HeroBanner
-          image={coverOf(season)}
-          crest={<SeasonCrest name={season.name} logoUrl={overview?.logoUrl ?? null} />}
-          // The chip and the menu ride the eyebrow row, right-aligned, so the
-          // banner's main column keeps its full width for the four figures.
-          eyebrow={
-            <div className="sh-eyebrow-row">
-              <HeroStatus live={live}>{live ? "Auction live" : badge.label}</HeroStatus>
-              <span className="sh-eyebrow-actions">
-                {season.orgName !== "" ? <HeroChip>{season.orgName}</HeroChip> : null}
-                <PopoverMenu
-                  label={`${season.name} actions`}
-                  trigger={<IconKebab width={18} height={18} />}
-                  triggerClassName="sh-ghost-trigger"
-                  items={menu}
-                />
-              </span>
-            </div>
-          }
-          title={season.name}
-          meta={[
-            ...(when !== null
-              ? [
-                  <>
-                    <IconCalendar />
-                    {when}
-                  </>,
-                ]
-              : []),
-            ...(season.location !== null
-              ? [
-                  <>
-                    <IconPin />
-                    {season.location}
-                  </>,
-                ]
-              : []),
-            <HeroFigures key="figures" figures={figures} label={`${season.name} at a glance`} />,
-          ]}
-        />
-
-        <div className="tg-feature-side">
-          {season.running ? (
-            <Pill tone="green" dot>
-              Now running
-            </Pill>
-          ) : (
-            <Pill tone="neutral">Latest season</Pill>
-          )}
-          {/* Not a heading: the banner beside it already is one, with this name. */}
-          <p className="tg-feature-name">{season.name}</p>
-          <p className="tg-feature-sub">{tournamentName ?? "One-off season"}</p>
-          {when !== null || season.location !== null ? (
-            <p className="tg-feature-when">
-              {[when, season.location].filter((part) => part !== null).join(" · ")}
-            </p>
-          ) : null}
-          <div className="tg-feature-actions">
-            <ButtonLink href={base} variant="secondary" size="touch">
-              Open season
-              <IconArrowRight size={16} className="icon-trail" />
-            </ButtonLink>
+      {/* One floodlit banner: the season, its figures, the way in, and its road
+          along the bottom edge. The white side panel beside it said the name,
+          dates and "Open season" a second time, and the stepper under it was a
+          third band. */}
+      <HeroBanner
+        image={coverOf(season)}
+        crest={<SeasonCrest name={season.name} logoUrl={overview?.logoUrl ?? null} />}
+        sideAlign="start"
+        eyebrow={
+          <div className="sh-eyebrow-row">
+            <HeroStatus live={live}>{live ? "Auction live" : badge.label}</HeroStatus>
+            {season.running ? <HeroChip>Now running</HeroChip> : null}
+          </div>
+        }
+        title={season.name}
+        meta={[
+          <>
+            {season.orgName !== "" ? season.orgName : null}
+            {season.orgName !== "" && tournamentName !== null ? " · " : null}
+            {tournamentName ?? (season.orgName === "" ? "One-off season" : null)}
+          </>,
+          ...(when !== null
+            ? [
+                <>
+                  <IconCalendar />
+                  {when}
+                </>,
+              ]
+            : []),
+          ...(season.location !== null
+            ? [
+                <>
+                  <IconPin />
+                  {season.location}
+                </>,
+              ]
+            : []),
+          <HeroFigures key="figures" figures={figures} label={`${season.name} at a glance`} />,
+        ]}
+        actions={
+          <>
             {isPublic ? (
-              <ButtonLink href={`/c/${season.slug}`} variant="ghost" size="touch">
+              <Link href={`/c/${season.slug}`} className="sh-ghost">
                 <IconGlobe size={16} />
                 Public page
-              </ButtonLink>
+              </Link>
             ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="tg-feature-steps">
-        <JourneyStepper
-          label={`${season.name} progress`}
-          linkComponent={Link}
-          steps={steps.map((step): JourneyStep => {
-            const href = stepHref[step.key];
-            const item: JourneyStep = {
-              key: step.key,
-              label: step.label,
-              state: step.state,
-              hint: step.hint,
-            };
-            return href === undefined ? item : { ...item, href };
-          })}
-        />
-      </div>
+            <Link href={base} className="sh-ghost tg-feature-open">
+              Open season
+              <IconArrowRight size={16} />
+            </Link>
+            <PopoverMenu
+              label={`${season.name} actions`}
+              trigger={<IconKebab size={16} />}
+              triggerClassName="sh-ghost-trigger"
+              items={menu}
+            />
+          </>
+        }
+        footer={
+          <JourneyStepper
+            variant="rail"
+            label={`${season.name} progress`}
+            linkComponent={Link}
+            steps={steps.map((step): JourneyStep => {
+              const href = stepHref[step.key];
+              const item: JourneyStep = {
+                key: step.key,
+                label: step.label,
+                state: step.state,
+              };
+              return href === undefined ? item : { ...item, href };
+            })}
+          />
+        }
+      />
     </section>
   );
 }
