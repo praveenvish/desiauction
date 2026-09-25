@@ -1,7 +1,6 @@
 import {
   CardGrid,
   EmptyState,
-  IconArrowRight,
   IconCheckCircle,
   IconClock,
   IconCog,
@@ -12,7 +11,6 @@ import {
   StatCard,
   StatGrid,
 } from "@desiauction/ui";
-import Link from "next/link";
 
 import { formatCount, waitedFor } from "../../../server/admin/format";
 import type { OrgHealthRow, PlatformHealth } from "../../../server/admin/views";
@@ -198,16 +196,10 @@ function OrgHealth({ org }: { org: OrgHealthRow }) {
     <SectionCard
       icon={<IconLedger />}
       title={org.orgName}
-      // Named, not promised: `platform:admin` carries no finops capability, so
-      // this door opens only for someone who also holds one on THIS
-      // organization. Saying so beats a 404.
-      description="The finance console needs finops permissions on this organization."
-      action={
-        <Link href={`/org/${org.orgSlug}/money`} className="admin-card-link">
-          Finance console
-          <IconArrowRight size={16} className="icon-trail" />
-        </Link>
-      }
+      // No "Finance console" door. `platform:admin` carries no finops
+      // capability, so /org/<slug>/money 404s for the one person this page is
+      // built for — a link on every card to a page its reader cannot open
+      // (nav law 3). A caption apologising for it was still a dead link.
       data-testid={`admin-health-${org.orgSlug}`}
     >
       <dl className="admin-kv">

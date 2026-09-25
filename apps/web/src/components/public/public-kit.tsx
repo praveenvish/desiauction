@@ -83,7 +83,14 @@ export function PageHero({
           {actions === undefined ? null : <div className="pk-hero-actions">{actions}</div>}
         </div>
         {hasArt ? (
-          <div className="pk-hero-art" aria-hidden>
+          <div
+            className="pk-hero-art"
+            aria-hidden
+            // Marks the sport's stock picture, as opposed to art the page
+            // chose (a portrait, a crest): only the stock one may stand down on
+            // a phone — see public-kit.css.
+            data-placeholder={art === undefined ? "" : undefined}
+          >
             {art ?? <SportWatermark sport={sport ?? "cricket"} />}
             {script === undefined ? null : <ScriptTag>{script}</ScriptTag>}
           </div>

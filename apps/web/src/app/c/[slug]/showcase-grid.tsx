@@ -151,7 +151,7 @@ export function ShowcaseGrid({
       </div>
 
       {view === "squads" ? (
-        <SquadsView players={players} teams={teams} />
+        <SquadsView players={players} teams={teams} roleLabel={labelOf} />
       ) : (
         <>
           <div className="showcase-controls">

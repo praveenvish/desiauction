@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 import { PageTitle } from "../../components/shell/page-title";
 import { currentSession } from "../../server/auth/actions";
-import { myRegistrations } from "../../server/competition/public";
+import { myRegistrations, type MyRegistration } from "../../server/competition/public";
 import { currentTeam, rolesOf, type PersonRoles } from "../../server/roles/roles";
 import { AuctioneerHome } from "./auctioneer-home";
 import { greetingFor } from "./home-parts";
@@ -75,7 +75,7 @@ export default async function HomePage({
  * The founder's "they should know exactly what they have". Roles in the same
  * precedence order as the menu, so the sentence and the rail agree.
  */
-function identityLine(roles: PersonRoles, entries: number): string {
+function identityLine(roles: PersonRoles, entries: readonly MyRegistration[]): string {
   const parts: string[] = [];
   if (roles.organizes.length > 0) {
     const club = roles.organizes[0];
@@ -100,13 +100,29 @@ function identityLine(roles: PersonRoles, entries: number): string {
         : `Auctioneer · ${String(roles.conducts.length)} nights`,
     );
   }
-  if (roles.plays && entries > 0) {
-    parts.push(`${String(entries)} season${entries === 1 ? "" : "s"} played`);
+  if (roles.plays && entries.length > 0) {
+    /*
+     * "1 season played" was said to somebody with no matches at all — being
+     * registered (or even sold) is not having played. What a player HAS is a
+     * team: the newest season that placed them names it; until one does, the
+     * count is of seasons entered, with no verb that claims more.
+     */
+    const placed = entries.findLast((entry) => entry.teamName !== null);
+    parts.push(
+      placed?.teamName != null
+        ? `Player · ${placed.teamName}`
+        : `${String(entries.length)} season${entries.length === 1 ? "" : "s"}`,
+    );
   }
   if (parts.length === 0 && roles.memberOf.length > 0) {
     parts.push(`Member of ${roles.memberOf.map((club) => club.name).join(", ")}`);
   }
   return parts.join(" · ") || "Welcome";
+}
+
+/** "Aarav Sharma" → "Aarav". A one-word name is its own first name. */
+function firstNameOf(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name;
 }
 
 async function HomeBody({
@@ -148,7 +164,7 @@ async function HomeBody({
    * Read only for the line under the greeting, and only when this person plays.
    * It is `cache`d and PlayerHome asks for it too, so the two share one query.
    */
-  const entries = roles.plays ? (await myRegistrations(personId)).length : 0;
+  const entries = roles.plays ? await myRegistrations(personId) : [];
 
   /*
    * THE ONE THING TO DO NEXT, chosen across every role at once — which is why
@@ -191,7 +207,13 @@ async function HomeBody({
 
   return (
     <>
-      <PageTitle title={greetingFor(new Date(), name)} subtitle={identityLine(roles, entries)} />
+      {/* The first name only: "Good afternoon, Aarav Sharma" ran out of room on
+          a phone and the h1 truncated to "Good afternoon, A…" — a greeting
+          that cut the person's own name off. */}
+      <PageTitle
+        title={greetingFor(new Date(), firstNameOf(name))}
+        subtitle={identityLine(roles, entries)}
+      />
       {/* Said once, when the menu actually changed under them (RN-1 §3.6). */}
       <RoleChangeNotice held={heldRoles} />
       {standaloneStep !== null ? <NextStepBanner step={standaloneStep} /> : null}

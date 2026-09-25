@@ -83,7 +83,8 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
-  await expect(page.getByTestId("stat-total")).toContainText("0");
+  // An empty schedule shows no tiles of zeroes — they arrive with the first match.
+  await expect(page.getByTestId("stat-total")).toHaveCount(0);
   await page.getByLabel("Start date").fill("2026-08-01");
   // Fixed kickoffs, so the schedule below is the one the assertions expect.
   await page.getByRole("radio", { name: "My own kickoff times" }).check();
@@ -171,7 +172,10 @@ test("fixtures dashboard and venues page: axe zero violations", async ({ page })
   await page.getByLabel("Season name").filter({ visible: true }).fill(`Axe Fix Cup ${STAMP}`);
   await page.getByRole("button", { name: "Create season" }).click();
   await page.getByTestId("open-fixtures").click();
-  await expect(page.getByTestId("stat-row")).toBeVisible({ timeout: 30_000 });
+  // The stat row is empty on an empty schedule; it still carries the hydration mark.
+  await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
+    timeout: 30_000,
+  });
   const fixturesScan = await new AxeBuilder({ page }).analyze();
   expect(fixturesScan.violations, JSON.stringify(fixturesScan.violations, null, 2)).toEqual([]);
 });

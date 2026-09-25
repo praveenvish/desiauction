@@ -1,5 +1,7 @@
 import { ButtonLink, ErrorState } from "@desiauction/ui";
 
+import { PageTitleHidden } from "../../components/shell/page-title";
+
 /**
  * Admin-scoped 404. The Demos tab is ALWAYS visible by design (the tab strip
  * must not leak which grants the viewer holds), so an administrator without
@@ -12,6 +14,11 @@ import { ButtonLink, ErrorState } from "@desiauction/ui";
 export default function AdminNotFound() {
   return (
     <main>
+      {/* The identity bar derives its title from the URL, so a 404 under
+          /admin/moderation still said "Moderation" over this page — naming the
+          very desk the copy below is careful not to confirm. The body's h1 is
+          the only heading, as on the root 404. */}
+      <PageTitleHidden />
       <ErrorState
         headingLevel={1}
         title="Nothing to show here"

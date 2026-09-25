@@ -8,6 +8,7 @@ import { CreatedToast } from "./created-toast";
 import { OverviewPanel } from "./overview-panel";
 import { SeasonPassCard } from "./season-pass";
 import "../seasons.css";
+import "./_tabs/tabs.css";
 import "./overview.css";
 
 export const metadata = { title: "Season · DesiAuction" };
@@ -39,8 +40,13 @@ export default async function CompetitionHomePage({
             view={view}
             slug={slug}
             // What the season's pass covers, and how close it is — visible at 2
-            // of 4 teams, not only at the refusal.
-            {...(pass === null ? {} : { pass: <SeasonPassCard slug={slug} pass={pass} /> })}
+            // of 4 teams, not only at the refusal. The pass is the club's
+            // commercial arrangement, so it is shown only to the people who run
+            // the season: a team owner was being shown "Season pass ·
+            // Association" on a season they merely bid in.
+            {...(pass === null || !view.viewer.canManage
+              ? {}
+              : { pass: <SeasonPassCard slug={slug} pass={pass} /> })}
           />
         </div>
       </main>

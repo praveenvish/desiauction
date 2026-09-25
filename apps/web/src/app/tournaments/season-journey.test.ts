@@ -73,4 +73,32 @@ describe("a season's road, derived", () => {
       "setup:current",
     );
   });
+
+  it("a points season ends in its matches, not in books it never has", () => {
+    const steps = seasonJourney(
+      {
+        ...BASE,
+        status: "registration_closed",
+        teams: 3,
+        auctionStatus: "completed",
+        auctionUnit: "points",
+        fixtures: 0,
+      },
+      { withTeams: false },
+    );
+    expect(steps.map((step) => step.key)).toEqual(["setup", "registration", "auction", "fixtures"]);
+    expect(steps[3]).toMatchObject({ state: "current", hint: "Not scheduled", label: "Fixtures" });
+    const scheduled = seasonJourney(
+      {
+        ...BASE,
+        status: "registration_closed",
+        teams: 3,
+        auctionStatus: "completed",
+        auctionUnit: "points",
+        fixtures: 6,
+      },
+      { withTeams: true },
+    );
+    expect(scheduled.at(-1)).toMatchObject({ key: "fixtures", state: "done", hint: "6 matches" });
+  });
 });

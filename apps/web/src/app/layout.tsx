@@ -187,6 +187,8 @@ export default async function RootLayout({
       ? null
       : {
           organizes: roles.organizes.length > 0,
+          // The Clubs item is offered only past one club (nav.ts).
+          clubs: roles.organizes.length,
           // EVERY team, not `currentTeam()`'s one: an owner with teams in two
           // seasons used to lose one of them to that reduction without a trace.
           teams: roles.owns.map((team) => ({
@@ -194,6 +196,8 @@ export default async function RootLayout({
             seasonSlug: team.competitionSlug,
             seasonName: team.competitionName,
             live: isLive(team.auctionStatus),
+            // "My team" opens this team's squad, not the all-teams grid.
+            teamId: team.teamId,
           })),
           conducts: roles.conducts.map((season) => ({
             label: season.competitionName,
@@ -227,6 +231,13 @@ export default async function RootLayout({
   const memberOrgIds = new Set((roles?.memberOf ?? []).map((club) => club.orgId));
   const conductedSlugs = new Set((roles?.conducts ?? []).map((season) => season.competitionSlug));
   const ownedSlugs = new Set((roles?.owns ?? []).map((team) => team.competitionSlug));
+  // First owned team per season: an owner holds one team in a season.
+  const ownTeamBySlug = new Map<string, string>();
+  for (const team of roles?.owns ?? []) {
+    if (!ownTeamBySlug.has(team.competitionSlug)) {
+      ownTeamBySlug.set(team.competitionSlug, team.teamId);
+    }
+  }
   const registeredSlugs = new Set(shell.registered.map((row) => row.competitionSlug));
 
   const competitions = (competitionsView_?.competitions ?? []).map((competition) => ({
@@ -240,6 +251,9 @@ export default async function RootLayout({
     // A points season (0091) has nothing to settle: no Money tab, no settle
     // shortcut in search, whatever the person's grants in the club.
     canSettle: settlementOrgs.has(competition.orgId) && competition.auctionUnit === "inr",
+    ...(ownTeamBySlug.has(competition.slug)
+      ? { ownTeamId: ownTeamBySlug.get(competition.slug) as string }
+      : {}),
     seasonRole: seasonRoleFor({
       manages: managedLevel.get(competition.orgId) ?? null,
       conducts: conductedSlugs.has(competition.slug),

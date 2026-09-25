@@ -64,6 +64,54 @@ const STATUS_COPY: Record<
 
 type StageState = "done" | "current" | "upcoming";
 
+/**
+ * WHAT THE AUCTION DID WITH THIS PLAYER, already put into words by the page.
+ *
+ * The registration row stays `approved` for life, so a player the room had
+ * SOLD came back to this page and read "You're in the player pool — on auction
+ * day, team owners bid to sign you", next to a button to withdraw from a squad
+ * they were already on. The page now hands the outcome over (see
+ * `myAuctionOutcome`), and an outcome outranks the status copy whenever there
+ * is one.
+ */
+export type SignedOutcome = "sold" | "captain" | "icon" | "retained";
+
+export interface AuctionResult {
+  outcome: SignedOutcome | "passed";
+  teamName: string | null;
+  /** The squad's page — the public team page, or /me for a private season. */
+  squadHref: string;
+  /** The price in the season's own unit ("50,000 pts"), sold only. */
+  priceLabel: string | null;
+  /** Who runs the season — the person to ask about dropping out now. */
+  orgName: string;
+}
+
+const SIGNED_BADGE: Record<SignedOutcome, string> = {
+  sold: "Sold",
+  captain: "Captain",
+  icon: "Icon",
+  retained: "Retained",
+};
+
+const SIGNED_AS: Record<Exclude<SignedOutcome, "sold">, string> = {
+  captain: "as captain",
+  icon: "as an icon player",
+  retained: "as a retained player",
+};
+
+function signedBody(result: AuctionResult, season: string, team: string): string {
+  if (result.outcome === "sold") {
+    return result.priceLabel === null
+      ? `Signed at the ${season} auction.`
+      : `Sold for ${result.priceLabel} at the ${season} auction.`;
+  }
+  if (result.outcome === "passed") {
+    return "";
+  }
+  return `Joined ${team} ${SIGNED_AS[result.outcome]} before the auction.`;
+}
+
 /** The three stages a registration moves through, where the status has them. */
 function stagesFor(status: string): { label: string; state: StageState }[] | null {
   switch (status) {
@@ -105,6 +153,8 @@ export interface RegistrationStatusProps {
   rejectionReason: string | null;
   /** Rendered by the wizard the moment the server accepted the submission. */
   justSubmitted?: boolean;
+  /** The auction's verdict on this player, once there is one. */
+  auction?: AuctionResult | null;
 }
 
 export function RegistrationStatus({
@@ -118,13 +168,56 @@ export function RegistrationStatus({
   roleLabel,
   rejectionReason,
   justSubmitted = false,
+  auction = null,
 }: RegistrationStatusProps) {
-  const copy = STATUS_COPY[status];
-  const stages = stagesFor(status);
+  // Only an APPROVED player went under the hammer; anything else keeps the
+  // status copy whatever a stale lot row might say.
+  const result = status === "approved" ? auction : null;
+  const signed = result !== null && result.outcome !== "passed" && result.teamName !== null;
+  const passed = result?.outcome === "passed";
+  const statusCopy = STATUS_COPY[status];
+  const copy =
+    result === null || (!signed && !passed)
+      ? statusCopy
+      : signed
+        ? {
+            title: () => `You're in ${result.teamName ?? ""}`,
+            body: signedBody(result, competitionName, result.teamName ?? ""),
+            tone: "success" as BadgeTone,
+          }
+        : {
+            title: () => "The auction is done",
+            body: "The auction is done — you weren't picked this time. It happens to good players every season, and there's always another tournament.",
+            tone: "neutral" as BadgeTone,
+          };
+  const badge =
+    result !== null && signed
+      ? SIGNED_BADGE[result.outcome as SignedOutcome]
+      : passed
+        ? "Auction done"
+        : status;
+  const stages =
+    result !== null && (signed || passed)
+      ? [
+          { label: "Registered", state: "done" as const },
+          { label: "Approved", state: "done" as const },
+          {
+            label: signed ? SIGNED_BADGE[result.outcome as SignedOutcome] : "Auction day",
+            state: "done" as const,
+          },
+        ]
+      : stagesFor(status);
   const facts = [roleLabel, number === null ? null : `Registration ${number}`].filter(
     (part): part is string => part !== null && part !== "",
   );
-  const canWithdraw = status === "submitted" || status === "waitlisted" || status === "approved";
+  // Once the auction has spoken, withdrawing is not a button: a signed player
+  // leaving a squad is a conversation with the club (a squad place, and in a
+  // money season a purse, are at stake), and a player the night passed over
+  // has nothing left in play to withdraw from.
+  const canWithdraw =
+    !signed &&
+    !passed &&
+    (status === "submitted" || status === "waitlisted" || status === "approved");
 
   return (
     <Card className="reg-status" data-testid="registration-status" elevation="floating">
@@ -141,7 +234,7 @@ export function RegistrationStatus({
             data-testid="my-registration-status"
             className="reg-status-badge"
           >
-            {status}
+            {badge}
           </Badge>
           {/* DA-31: after a submit the page kept its scroll position and the
               confirmation landed out of view. Focus moves to the heading, which
@@ -205,7 +298,7 @@ export function RegistrationStatus({
           <p className="reg-status-public-head">Your public player page is live</p>
           <p className="register-hint">
             Name, number, role, age and styles if given, your photo, and later your team — never
-            your mobile number. Withdraw below to take it down.
+            your mobile number.{canWithdraw ? " Withdraw below to take it down." : ""}
           </p>
           <Link className="reg-status-public-url" href={`/c/${slug}/p/${number}`}>
             /c/{slug}/p/{number}
@@ -214,13 +307,50 @@ export function RegistrationStatus({
         </div>
       ) : null}
 
+      {signed ? (
+        <div className="reg-status-actions" data-testid="my-auction-result">
+          <ButtonLink href={result.squadHref} size="touch" data-testid="see-my-squad">
+            See your squad
+          </ButtonLink>
+          {/* The share lives on the public player page (its card, its sheet);
+              a private season has no public page, so there is nothing to share. */}
+          {listed && number !== null ? (
+            <ButtonLink
+              href={`/c/${slug}/p/${number}#share-heading`}
+              size="touch"
+              variant="secondary"
+              data-testid="share-my-card"
+            >
+              Share my card
+            </ButtonLink>
+          ) : null}
+        </div>
+      ) : null}
+
+      {passed ? (
+        <div className="reg-status-actions" data-testid="my-auction-result">
+          <ButtonLink href="/c" size="touch" data-testid="find-tournaments">
+            Find another tournament
+          </ButtonLink>
+        </div>
+      ) : null}
+
       <div className="reg-status-actions">
         {listed ? (
-          <ButtonLink href={`/c/${slug}`} size="touch" data-testid="view-season">
+          <ButtonLink
+            href={`/c/${slug}`}
+            size="touch"
+            variant={signed || passed ? "secondary" : "primary"}
+            data-testid="view-season"
+          >
             View season page
           </ButtonLink>
         ) : null}
-        <ButtonLink href="/home" size="touch" variant={listed ? "secondary" : "primary"}>
+        <ButtonLink
+          href="/home"
+          size="touch"
+          variant={listed || signed || passed ? "secondary" : "primary"}
+        >
           Go to Home
         </ButtonLink>
         {listed ? <ShareSeason path={`/c/${slug}`} title={competitionName} /> : null}
@@ -230,6 +360,10 @@ export function RegistrationStatus({
         <div className="reg-status-foot">
           <WithdrawRegistration slug={slug} />
         </div>
+      ) : signed ? (
+        <p className="reg-status-foot register-hint" data-testid="drop-out-contact">
+          Need to drop out? Contact {result.orgName}.
+        </p>
       ) : null}
     </Card>
   );

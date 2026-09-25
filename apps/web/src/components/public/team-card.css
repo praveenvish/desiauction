@@ -132,7 +132,7 @@
   object-fit: cover;
 }
 
-/* A person's name wraps rather than being cut: "Praveen Vis…" is worse than
+/* A person's name wraps rather than being cut: "Aniket Saw…" is worse than
    two lines, and a squad list is exactly where people look for their own. */
 .team-card-player-name {
   min-width: 0;
@@ -167,6 +167,12 @@
   font-size: 0.75rem;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+/* A role is a word, not a code: the body face, not the mono one. */
+.team-card-role {
+  font-family: inherit;
+  font-size: var(--text-sm-size);
 }
 
 .team-card-more,

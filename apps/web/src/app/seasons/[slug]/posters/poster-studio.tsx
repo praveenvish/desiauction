@@ -326,7 +326,7 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
             onChange={(event) => {
               setSponsorDraft(event.target.value);
             }}
-            placeholder="Sharma Motors"
+            placeholder="e.g. Sharma Motors"
             maxLength={44}
             data-testid="poster-sponsor"
           />

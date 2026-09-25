@@ -10,6 +10,7 @@ import {
 } from "@desiauction/core";
 import { auctionEvents, auctions, type Db } from "@desiauction/db";
 import { pino } from "pino";
+import { WebSocket } from "ws";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AuctionEngine } from "./engine-core.js";
@@ -163,6 +164,42 @@ describe("engine transport", () => {
     // Still alive and still serving after every one of them.
     const response = await built.server.inject({ method: "GET", url: "/healthz" });
     expect(response.statusCode).toBe(200);
+  });
+
+  // A deploy sends SIGTERM mid-auction. ws 8's close() no longer disconnects
+  // clients and its callback waits for every one of them to leave — so with a
+  // spectator (or the venue board) attached, close() never finished, the
+  // single-writer lease was never handed back, and the replacement engine
+  // refused to start. Closing must say goodbye and finish.
+  it("closes promptly with live sockets attached, telling them it is going away", async () => {
+    built = makeServer(true);
+    await built.server.listen({ port: 0, host: "127.0.0.1" });
+    const { port } = built.server.server.address() as AddressInfo;
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${String(port)}/ws?auction=a1&ticket=${wsTicket("a1", "test-secret-123")}`,
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.once("open", () => {
+        resolve();
+      });
+      ws.once("error", reject);
+    });
+    const closeCode = new Promise<number>((resolve) => {
+      ws.once("close", (code) => {
+        resolve(code);
+      });
+    });
+    const closed = await Promise.race([
+      built.server.close().then(() => "closed"),
+      new Promise((resolve) => {
+        setTimeout(() => {
+          resolve("hung");
+        }, 4000);
+      }),
+    ]);
+    built = undefined;
+    expect(closed).toBe("closed");
+    expect(await closeCode).toBe(1001);
   });
 
   it("an unticketed /ws upgrade is refused", async () => {

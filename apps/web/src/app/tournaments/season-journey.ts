@@ -21,10 +21,20 @@ export interface SeasonJourneyInput {
   auctionStatus: string | null;
   /** The settlement case's own word, or null before one is opened. */
   settlement: string | null;
+  /**
+   * What the auction counts in (0091). A POINTS season has no books, so its
+   * last step is the matches, not Settlement — it used to show "Settlement ·
+   * Pending" with a rupee mark on a season where nothing will ever be owed, and
+   * no Fixtures step at all. Absent reads as rupees, like every season before
+   * the unit existed.
+   */
+  auctionUnit?: "inr" | "points";
+  /** Fixtures on the books — the points season's last step. */
+  fixtures?: number;
 }
 
 export interface SeasonJourneyStep {
-  key: "setup" | "teams" | "registration" | "auction" | "settlement";
+  key: "setup" | "teams" | "registration" | "auction" | "fixtures" | "settlement";
   label: string;
   state: JourneyState;
   hint: string;
@@ -68,7 +78,9 @@ export function seasonJourney(
       label: options.withTeams ? "Auction" : "Auction night",
       done: auctionDone,
     },
-    { key: "settlement", label: "Settlement", done: settlementDone },
+    input.auctionUnit === "points"
+      ? { key: "fixtures" as const, label: "Fixtures", done: (input.fixtures ?? 0) > 0 }
+      : { key: "settlement" as const, label: "Settlement", done: settlementDone },
   ];
   const current = facts.findIndex((fact) => !fact.done);
   return facts.map((fact, index) => {
@@ -102,6 +114,10 @@ function hintFor(
       if (input.auctionStatus !== null && AUCTION_LIVE.has(input.auctionStatus)) return "Live";
       if (input.auctionStatus === "scheduled") return "Scheduled";
       return state === "current" ? "Ready to set up" : "Pending";
+    case "fixtures": {
+      const count = input.fixtures ?? 0;
+      return count > 0 ? `${String(count)} match${count === 1 ? "" : "es"}` : "Not scheduled";
+    }
     case "settlement":
       if (state === "done") return "Settled";
       return input.settlement !== null ? "Collecting" : "Pending";

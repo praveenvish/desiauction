@@ -34,6 +34,9 @@ export interface SeasonTeamSpend {
   name: string;
   /** The team's own colour, for the dot and the spend bar. */
   color: string | null;
+  /** Short name and crest, so the row draws the same TeamCrest as every other tab. */
+  shortName: string | null;
+  logoUrl: string | null;
   /**
    * Paise committed to signed players. ABSENT — not null, not hidden in CSS —
    * for a viewer without money sight (DA-13); the key never reaches the wire.
@@ -101,6 +104,13 @@ export interface SeasonOverview {
   teamCount: number;
   /** Fixtures scheduled for this season — the fifth lifecycle rung, derived. */
   fixtureCount: number;
+  /**
+   * Fixtures still to be played — neither completed nor cancelled. A season is
+   * only OVER when this reaches zero with at least one fixture on the books: a
+   * points season used to call itself "complete" the moment the hammer fell,
+   * while its own step bar said Fixtures was next and not one match existed.
+   */
+  fixturesOpen: number;
   /** Paise committed across every team; 0 before the auction runs. Money-gated. */
   purseCommitted?: number;
   /** 0–100, or null when no auction (and so no purse) is configured. Money-gated. */
@@ -170,7 +180,10 @@ export async function seasonOverview(
       .where(eq(auctions.competitionId, competition.id))
       .limit(1),
     db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({
+        count: sql<number>`count(*)::int`,
+        open: sql<number>`count(*) filter (where ${fixtures.status} not in ('completed', 'cancelled'))::int`,
+      })
       .from(fixtures)
       .where(eq(fixtures.competitionId, competition.id)),
     seasonSettlement(db, competition.id, options.money),
@@ -188,6 +201,7 @@ export async function seasonOverview(
     pendingPlayers: stats.submitted,
     teamCount: teams.length,
     fixtureCount: fixtureRows[0]?.count ?? 0,
+    fixturesOpen: fixtureRows[0]?.open ?? 0,
     settlement,
     poolByRole: roleRows
       .map((row) => ({ role: row.role, count: row.count }))
@@ -210,6 +224,8 @@ export async function seasonOverview(
         teamId: team.id,
         name: team.name,
         color: team.primaryColor,
+        shortName: team.shortName,
+        logoUrl: team.logoUrl,
         squad: 0,
         ...(options.money ? { spend: 0, squadMax: null } : {}),
       })),
@@ -270,6 +286,8 @@ export async function seasonOverview(
           teamId: team.id,
           name: team.name,
           color: team.primaryColor,
+          shortName: team.shortName,
+          logoUrl: team.logoUrl,
           squad: entry?.squad ?? 0,
           ...(options.money
             ? { spend: entry?.spend ?? 0, squadMax: rules.squadMax, purse: rules.pursePerTeam }

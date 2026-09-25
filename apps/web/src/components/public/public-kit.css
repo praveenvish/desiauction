@@ -102,6 +102,23 @@
   color: var(--text-accent);
 }
 
+/* The article pages put their way back ("← All help", "← All legal documents")
+   in the eyebrow slot. Nothing styled it, so it rendered as the browser's
+   default visited-purple underlined link on the floodlit band. It takes the
+   eyebrow's colour and only underlines when pointed at. */
+.pk-eyebrow a,
+.article-back {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.article-back:hover {
+  text-decoration: underline;
+}
+
 .pk-hero-title {
   margin: 0;
   font-family: var(--font-display);
@@ -185,6 +202,20 @@
 .pk-hero-script-alone {
   justify-self: end;
   align-self: end;
+}
+
+/* ON A PHONE THE HERO IS THE TEXT. The sport's stock illustration and the
+   handwritten "Play Bid Belong" stacked under the copy took ~700px before the
+   first number on /c/[slug]. Both are decoration (aria-hidden); a page's OWN
+   art — a player's portrait, a team's crest — carries meaning and stays. */
+@media (max-width: 640px) {
+  .pk-hero-art[data-placeholder] {
+    display: none;
+  }
+
+  .pk-script {
+    display: none;
+  }
 }
 
 /* ------------------------------------------------------------------- art -- */
@@ -348,6 +379,21 @@
     padding-left: 0;
     border-top: 1px solid var(--border-subtle);
     padding-top: var(--space-4);
+  }
+}
+
+/* Two figures a row on a phone, not one: `auto-fit` at 150px gave a 343px
+   strip a single column, so four counts became four full-width rows. The
+   caption cell still takes a row of its own. */
+@media (max-width: 640px) {
+  .pk-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .pk-stat[data-aside] {
+    grid-column: 1 / -1;
   }
 }
 
@@ -587,4 +633,13 @@
 .player-portrait > * {
   width: 100%;
   height: 100%;
+}
+
+/* On a phone the decorative sport strip on the content pages (/help, /about,
+   /search) cost ~140px above the first line a reader came for. It is
+   aria-hidden ornament, so the phone simply goes without it. */
+@media (max-width: 639px) {
+  .content-page .pk-hero-art {
+    display: none;
+  }
 }

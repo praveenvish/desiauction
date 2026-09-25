@@ -198,6 +198,18 @@ export function RegistrationDashboardPanel({
   const roster = useRoster(page.rows);
   const mutate = useMutate(roster);
   const rows = roster.rows;
+  /*
+   * DOES THIS SEASON TAKE ENTRY FEES AT ALL? Nothing in the schema says so, so
+   * it is read from the desk's own record: any payment, waiver or refund, any
+   * money collected, or any amount written against a row. A free league has
+   * none of those, and used to show every player an amber "Not paid" and a
+   * "Fees paid 0" tile — forty-three unpaid bills for a fee that does not
+   * exist. With no fee on record the column reads "—" and the tile is absent.
+   */
+  const feesInUse =
+    stats.fees.paid + stats.fees.waived + stats.fees.refunded > 0 ||
+    stats.feeCollectedPaise > 0 ||
+    rows.some((row) => row.feeAmountPaise !== null);
 
   const [selected, setSelected] = useState<Map<string, Picked>>(new Map());
   const [bulkBusy, setBulkBusy] = useState<TriageAction | "select" | null>(null);
@@ -791,18 +803,20 @@ export function RegistrationDashboardPanel({
           testId="stat-auction-pool"
           hint={poolHint(stats)}
         />
-        <StatTile
-          icon={<IconWallet />}
-          tone="green"
-          label="Fees paid"
-          value={stats.fees.paid}
-          testId="stat-fees-paid"
-          active={filters.fee === "paid"}
-          onSelect={() => {
-            changeFilter({ fee: filters.fee === "paid" ? "" : "paid" });
-          }}
-          hint={feeHint(stats)}
-        />
+        {feesInUse ? (
+          <StatTile
+            icon={<IconWallet />}
+            tone="green"
+            label="Fees paid"
+            value={stats.fees.paid}
+            testId="stat-fees-paid"
+            active={filters.fee === "paid"}
+            onSelect={() => {
+              changeFilter({ fee: filters.fee === "paid" ? "" : "paid" });
+            }}
+            hint={feeHint(stats)}
+          />
+        ) : null}
         <StatTile
           icon={<IconClock />}
           tone="amber"
@@ -1096,6 +1110,8 @@ export function RegistrationDashboardPanel({
                     categoryFlagged={categoryFlags[row.id] !== undefined}
                     roleLabel={labelOf(desk.roles, row.role)}
                     teamColor={teamColorOf.get(row.teamId ?? "") ?? null}
+                    feesInUse={feesInUse}
+                    auctionDone={desk.auctionDone}
                     onToggle={() => {
                       toggle(row);
                     }}
@@ -1640,6 +1656,8 @@ function PlayerRow({
   categoryFlagged,
   roleLabel,
   teamColor,
+  feesInUse,
+  auctionDone,
   onToggle,
   onOpen,
   onApprove,
@@ -1654,6 +1672,10 @@ function PlayerRow({
   categoryFlagged: boolean;
   roleLabel: string;
   teamColor: string | null;
+  /** The season records fees at all — otherwise the cell is a dash. */
+  feesInUse: boolean;
+  /** The auction has run, so an approved player with no team is unsold. */
+  auctionDone: boolean;
   onToggle: () => void;
   onOpen: () => void;
   onApprove: () => void;
@@ -1740,7 +1762,9 @@ function PlayerRow({
           {row.teamName !== null ? (
             <TeamChip color={teamColor}>{row.teamName}</TeamChip>
           ) : (
-            <span className="pd-quiet">—</span>
+            <span className="pd-quiet">
+              {auctionDone && row.status === "approved" ? "Unsold" : "—"}
+            </span>
           )}
         </span>
         <span className="pd-marks-inline">
@@ -1792,9 +1816,15 @@ function PlayerRow({
         ) : null}
       </td>
       <td className="pd-col-fee">
-        <Pill tone={FEE_PILL[row.feeStatus]} testId={`fee-${row.personId}`}>
-          {FEE_LABEL[row.feeStatus]}
-        </Pill>
+        {feesInUse ? (
+          <Pill tone={FEE_PILL[row.feeStatus]} testId={`fee-${row.personId}`}>
+            {FEE_LABEL[row.feeStatus]}
+          </Pill>
+        ) : (
+          <span className="pd-quiet" data-testid={`fee-${row.personId}`}>
+            —<VisuallyHidden> no entry fee recorded</VisuallyHidden>
+          </span>
+        )}
       </td>
       <td className="pd-col-date">
         <time dateTime={row.createdAt}>{formatDate(row.createdAt)}</time>

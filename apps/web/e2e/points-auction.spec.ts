@@ -181,7 +181,9 @@ test("a points season runs the whole night in points and owes nothing", async ({
   // --- The room bids in points ------------------------------------------------
   await organizer.getByTestId("open-live").click();
   await expect(organizer.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", COLD);
-  await expect(organizer.getByTestId("connection-state")).toHaveText("open", { timeout: 20_000 });
+  await expect(organizer.getByTestId("connection-state")).toHaveText("Connected", {
+    timeout: 20_000,
+  });
   await organizer.getByTestId("conduct-open-lot").click();
   const [bidderA, bidderB] = owners.map((owner) => owner.page) as [Page, Page];
   for (const page of [organizer, bidderA, bidderB]) {
@@ -212,11 +214,16 @@ test("a points season runs the whole night in points and owes nothing", async ({
   await completeAuction(organizer, "cockpit-complete");
   await leaveCockpit(organizer, slug);
 
+  // Not "Season complete": a points season has no books, but its squads still
+  // have matches to play, so the onward step is the schedule.
   await organizer.goto(seasonUrl);
-  await expect(organizer.getByTestId("season-completed")).toContainText(
+  await expect(organizer.getByTestId("next-step")).toContainText(
     "played for points, so there is nothing to settle",
     COLD,
   );
+  await expect(organizer.getByTestId("next-step")).toContainText("Squads are set");
+  await expect(organizer.getByTestId("season-completed")).toHaveCount(0);
+  await expect(organizer.getByTestId("competition-status")).toHaveText("auction done");
   await expect(organizer.getByRole("link", { name: "Open settlement" })).toHaveCount(0);
   await expect(organizer.getByRole("link", { name: "Money", exact: true })).toHaveCount(0);
 

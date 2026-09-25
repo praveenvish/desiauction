@@ -8,8 +8,8 @@
  * count) was three sections apart from its players.
  *
  * The card is the team: colours at the head, the first few players in it, and
- * a way to see the rest. It shows names and numbers only. Sale prices, purses
- * and phone numbers are not in the read model it is given.
+ * a way to see the rest. It shows names and playing roles. Purses and phone
+ * numbers are not in the read model it is given.
  */
 import { IconStar } from "@desiauction/ui";
 import Link from "next/link";
@@ -23,6 +23,11 @@ export interface TeamCardPlayer {
   number: string;
   /** Pre-signed before the auction (icon or captain). */
   preSigned?: boolean;
+  /**
+   * The playing role in the season's words ("Batter"). Shown in the row's
+   * trailing slot in place of the registration number when given.
+   */
+  role?: string;
   photo?: ReactNode;
 }
 
@@ -98,7 +103,13 @@ export function TeamCard({
                   <span className="team-card-sr">Pre-signed</span>
                 </span>
               ) : null}
-              <span className="team-card-number">#{player.number}</span>
+              {player.role !== undefined ? (
+                player.role === "" ? null : (
+                  <span className="team-card-number team-card-role">{player.role}</span>
+                )
+              ) : (
+                <span className="team-card-number">#{player.number}</span>
+              )}
             </li>
           ))}
           {rest > 0 ? (

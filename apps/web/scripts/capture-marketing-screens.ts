@@ -8,8 +8,8 @@
  * Needs the engine (:4000) and a web server (SHOWCASE_BASE, default :3070)
  * running against the local database; it creates a new club each run. The
  * homepage images in public/marketing/product/ are board.png →
- * auction-board.webp, owner-paddle-live.png → owner-phone-bidding.webp and
- * owner-paddle-sold.png → owner-phone-sold.webp, resized with sharp. Give a
+ * auction-board-v2.webp, owner-paddle-live.png → owner-phone-bidding-v2.webp and
+ * owner-paddle-sold.png → owner-phone-sold-v2.webp (top-cropped), resized with sharp. Give a
  * refreshed image a NEW file name: the image optimizer and any CDN cache by URL.
  */
 import { chromium, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
@@ -23,7 +23,7 @@ const STAMP = String(Date.now()).slice(-7);
 
 const TEAMS = ["Falcons", "Voyagers", "Titans", "Strikers"];
 /** The player the homepage features: on the block, the fight and the SOLD. */
-const FEATURED = "Praveen Vishnoi";
+const FEATURED = "Aniket Sawant";
 const PLAYERS: [string, string, string][] = [
   [FEATURED, "all_rounder", "A"],
   ["Riya Mehta", "all_rounder", "A"],
@@ -109,8 +109,8 @@ try {
   await login(org, `86${STAMP}0`, "Vikram Desai");
   await org.goto("/orgs");
   await org.getByTestId("new-org").click();
-  await org.getByLabel("Organization name").filter({ visible: true }).fill("Sunday Smashers Club");
-  await org.getByRole("button", { name: "Create organization" }).click();
+  await org.getByLabel("Club name").filter({ visible: true }).fill("Sunday Smashers Club");
+  await org.getByRole("button", { name: "Create club" }).click();
   await expect(org.getByTestId("org-name")).toBeVisible();
 
   await org.goto("/seasons");
@@ -166,16 +166,17 @@ try {
   });
   // The only change to a real screen: the local host in the share-link box
   // reads as the production domain.
-  await org.evaluate(() => {
+  await org.evaluate((base) => {
+    const host = new URL(base).host;
     for (const el of Array.from(document.querySelectorAll("input, code, span, p, div"))) {
-      if (el.children.length === 0 && el.textContent?.includes("localhost:3070")) {
-        el.textContent = el.textContent.replace("http://localhost:3070", "https://desiauction.in");
+      if (el.children.length === 0 && el.textContent?.includes(host)) {
+        el.textContent = el.textContent.replace(base, "https://desiauction.in");
       }
-      if (el instanceof HTMLInputElement && el.value.includes("localhost:3070")) {
-        el.value = el.value.replace("http://localhost:3070", "https://desiauction.in");
+      if (el instanceof HTMLInputElement && el.value.includes(host)) {
+        el.value = el.value.replace(base, "https://desiauction.in");
       }
     }
-  });
+  }, BASE);
   await shot(org, "registrations-desk");
 
   await org.goto(`/seasons/${slug}`);
@@ -274,7 +275,7 @@ try {
   await expect(org.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 60_000,
   });
-  await expect(org.getByTestId("connection-state")).toHaveText("open", { timeout: 30_000 });
+  await expect(org.getByTestId("connection-state")).toHaveText("Connected", { timeout: 30_000 });
 
   // Big screen: the public board, full HD.
   const boardCtx = await browser.newContext({

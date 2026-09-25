@@ -162,14 +162,15 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
   {
     slug: "signing-in",
     title: "Signing in, passkeys and account safety",
-    summary: "Phone-first sign-in, adding a passkey, and keeping your account secure.",
+    summary:
+      "Email or mobile number + one-time code, then add a passkey — and keeping your account secure.",
     category: "getting-started",
     readMinutes: 3,
     blocks: [
-      { kind: "heading", level: 2, text: "Signing in with your phone" },
+      { kind: "heading", level: 2, text: "Signing in with a one-time code" },
       {
         kind: "paragraph",
-        text: "DesiAuction signs you in with your mobile number — no email, no password. Enter your 10-digit Indian number, and we send a 6-digit code by SMS. Enter the code and you're in. The first time, we ask your name; it appears on team sheets and the auction stage.",
+        text: "DesiAuction signs you in with your email address or mobile number and a one-time code — no password. Enter your email or your 10-digit Indian number, and we send a 6-digit code to it. Enter the code and you're in; after that, add a passkey so the next sign-in is a single tap. The first time, we ask your name; it appears on team sheets and the auction stage.",
       },
       {
         kind: "callout",
@@ -1055,7 +1056,7 @@ export const FAQS: readonly FaqItem[] = [
   {
     question: "Do players need an email address?",
     answer:
-      "No. Sign-in is by Indian mobile number and a one-time code. No email is required anywhere.",
+      "No. You sign in with your email or mobile number and a one-time code — there's no password to remember.",
   },
   {
     question: "How much does it cost?",

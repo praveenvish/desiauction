@@ -8,6 +8,7 @@ import {
   IconRupee,
   IconTrophy,
   IconUsers,
+  IconWallet,
   PlayerImage,
   SectionCard,
   StatCard,
@@ -114,7 +115,7 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             className="sh-ghost"
           >
             {completeness.done < completeness.total
-              ? `Profile ${String(completeness.done)}/${String(completeness.total)} — finish it`
+              ? `Profile ${String(completeness.done)} of ${String(completeness.total)} — finish it`
               : "All my sports"}
             <IconArrowRight size={14} />
           </Link>
@@ -153,7 +154,9 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
               label="Times sold"
             />
             <StatCard
-              icon={<IconRupee />}
+              // ₹ only over a rupee price: "Highest price 50,000 pts" beside a
+              // rupee sign read as money to a points-league player (0091).
+              icon={career.totals.highestUnit === "inr" ? <IconRupee /> : <IconWallet />}
               tone="green"
               value={
                 career.totals.highestPrice !== null

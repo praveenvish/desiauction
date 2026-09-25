@@ -48,7 +48,7 @@ export default function ErrorPage({
               <ButtonLink href="/home" variant="secondary">
                 Go home
               </ButtonLink>
-              <ButtonLink href="/contact" variant="ghost">
+              <ButtonLink href="/support" variant="ghost">
                 Contact support
               </ButtonLink>
             </>

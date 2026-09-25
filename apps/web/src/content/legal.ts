@@ -110,7 +110,10 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
       { kind: "heading", level: 2, text: "Your account" },
       {
         kind: "paragraph",
-        text: "An account is a verified Indian mobile number. You are responsible for the activity under your number and for keeping access to it. Do not share your sign-in codes with anyone.",
+        // Email sign-in shipped (and is the default method), so an account is no
+        // longer only a phone number. Legal should review this wording before
+        // the next published revision of the Terms.
+        text: "An account is a verified email address or Indian mobile number. You are responsible for activity under it and for keeping access to it. Do not share your sign-in codes with anyone.",
       },
       { kind: "heading", level: 2, text: "Organizer responsibilities" },
       {

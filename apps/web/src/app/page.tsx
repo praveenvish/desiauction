@@ -160,8 +160,8 @@ export default function LandingPage() {
             <div className={styles.realGrid}>
               <figure className={styles.realPhone} data-reveal>
                 <Image
-                  src="/marketing/product/owner-phone-bidding.webp"
-                  alt="A team owner's phone during a live lot: Praveen Vishnoi on the block, a 23-second countdown, Voyagers leading at ₹80,000 and a Raise to ₹85,000 button"
+                  src="/marketing/product/owner-phone-bidding-v2.webp"
+                  alt="A team owner's phone during a live lot: Aniket Sawant on the block, a 26-second countdown, Voyagers leading at ₹80,000 and a Raise to ₹85,000 button"
                   width={560}
                   height={1212}
                   sizes="(max-width: 767px) 45vw, 260px"
@@ -170,8 +170,8 @@ export default function LandingPage() {
               </figure>
               <figure className={styles.realScreen} data-reveal>
                 <Image
-                  src="/marketing/product/auction-board.webp"
-                  alt="The big-screen board of a live auction: ₹4,15,000 spent on 13 players, Praveen Vishnoi the most expensive at ₹85,000, and each team's remaining purse and squad"
+                  src="/marketing/product/auction-board-v2.webp"
+                  alt="The big-screen board of a live auction: ₹1,60,000 spent on 5 players, Aniket Sawant the most expensive at ₹85,000, and each team's remaining purse and squad"
                   width={1600}
                   height={900}
                   sizes="(max-width: 767px) 100vw, 640px"
@@ -180,8 +180,8 @@ export default function LandingPage() {
               </figure>
               <figure className={styles.realPhone} data-reveal>
                 <Image
-                  src="/marketing/product/owner-phone-sold.webp"
-                  alt="The same phone as the gavel falls: a SOLD stamp, Praveen Vishnoi signed to Falcons for ₹85,000, and a notification reading You signed Praveen Vishnoi"
+                  src="/marketing/product/owner-phone-sold-v2.webp"
+                  alt="The same phone as the gavel falls: a SOLD stamp, Aniket Sawant signed to Falcons for ₹85,000, and a notification reading You signed Aniket Sawant"
                   width={560}
                   height={933}
                   sizes="(max-width: 767px) 45vw, 260px"
@@ -190,8 +190,7 @@ export default function LandingPage() {
               </figure>
             </div>
             <p className={styles.realNote}>
-              Screenshots from a practice auction run on DesiAuction, with Praveen Vishnoi on the
-              block. The other players, teams and owners are fictional.
+              Screenshots from a practice auction on DesiAuction. Teams and owners are fictional.
             </p>
           </div>
         </section>
@@ -391,7 +390,9 @@ export default function LandingPage() {
             <div className={styles.journeyIntro} data-reveal>
               <p className={styles.eyebrow}>FROM “LET’S PLAY” TO GAME DAY</p>
               <h2 id="journey-title">
-                Three steps from sign-up
+                {/* "from sign-up" hyphen-broke across three lines at phone widths;
+                    the shorter line keeps the two-line rhythm everywhere. */}
+                Three steps
                 <br />
                 <span>to auction night.</span>
               </h2>

@@ -239,11 +239,20 @@ export function SquadBoard({
                   below moved. `showPurse` still decides whether this viewer is
                   entitled to see purses; that is a permission and stays a
                   branch. Not knowing a number yet is not a permission. */}
+              {/* SEALED IS NOT A DASH. When the engine withholds a purse from
+                  this viewer (every guest on /spectate), the line showed a lone
+                  "—" under every squad. What the team SPENT is the sum of the
+                  prices printed on the rows below it, so that is what the line
+                  says; only a line still waiting for the socket stays a dash. */}
               {showPurse ? (
                 <p className="squad-team-purse">
-                  {remaining === undefined || remaining === null
-                    ? "\u2014"
-                    : `${money.ledger(remaining)} left`}
+                  {remaining !== undefined && remaining !== null
+                    ? `${money.ledger(remaining)} left`
+                    : snapshot === null
+                      ? "\u2014"
+                      : `${money.ledger(
+                          members.reduce((sum, member) => sum + (member.price ?? 0), 0),
+                        )} spent`}
                 </p>
               ) : null}
               {members.length === 0 ? (
@@ -327,7 +336,7 @@ export function PoolSummary({
           </dd>
         </div>
         <div>
-          <dt>Unsold</dt>
+          <dt>Passed</dt>
           <dd className="pool-unsold" data-testid="pool-unsold">
             {unsold}
           </dd>

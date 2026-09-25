@@ -266,6 +266,16 @@ a.wordmark:hover .wordmark-glyph {
     line-height: var(--text-xl-line);
   }
 
+  /* One line was too few on a phone: "Good afternoon, Arjun" and most season
+     names read "Good afternoon, A…". Two lines, still capped. */
+  .topbar .page-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
+
   /* The action gets its own full-width row — in the page head, and in the
      top bar, where it goes LAST so the icons keep the first row. */
   .page-action {

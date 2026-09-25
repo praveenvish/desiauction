@@ -602,14 +602,18 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                 ) : null}
               </div>
 
-              {/* v1.1 G1: shortcuts are discoverable, not folklore. */}
-              <p className="cockpit-keys" id="cockpit-gavel-hint" data-testid="cockpit-shortcuts">
-                {COCKPIT_SHORTCUTS.map((shortcut) => (
-                  <span key={shortcut.keys}>
-                    <kbd>{shortcut.keys}</kbd> {shortcut.label}
-                  </span>
-                ))}
-              </p>
+              {/* v1.1 G1: shortcuts are discoverable, not folklore. And
+                  absent once the night is over: key hints for opening lots
+                  sat directly above "Nothing here can be opened". */}
+              {finished ? null : (
+                <p className="cockpit-keys" id="cockpit-gavel-hint" data-testid="cockpit-shortcuts">
+                  {COCKPIT_SHORTCUTS.map((shortcut) => (
+                    <span key={shortcut.keys}>
+                      <kbd>{shortcut.keys}</kbd> {shortcut.label}
+                    </span>
+                  ))}
+                </p>
+              )}
 
               {finished ? (
                 <p className="competitions-hint" data-testid="cockpit-finished">
@@ -686,7 +690,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             {lot === null || lot.bidHistory.length === 0 ? (
               <p className="competitions-hint" data-testid="cockpit-bid-feed-empty">
                 {lot === null
-                  ? "Open a lot and the bidding shows up here."
+                  ? finished
+                    ? "The auction is over — every bid is in the ledger."
+                    : "Open a lot and the bidding shows up here."
                   : "Awaiting the first paddle…"}
               </p>
             ) : (
@@ -763,32 +769,42 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             )}
             {needsResolution.length > 0 ? (
               <>
-                <h2>Needs resolution</h2>
-                <p className="competitions-hint" data-testid="frozen-lot-hint">
-                  A frozen lot has a clock that is stopped, not running — including one you have
-                  just undone. Requeue it and it goes back to the top of the queue for you to open
-                  deliberately.
-                </p>
-                {/* The second way out, and until now there was no first one for
-                    half these lots. Requeue is refused when the auction's unsold
-                    policy is "final", or when the lot has used its rounds — and
-                    Requeue was the only button here. A frozen lot with a
-                    mistaken bid on it could then be neither passed (it has
-                    money on it) nor requeued, and a frozen lot blocks completing
-                    the auction, so the night could not end without making the
-                    sale the conductor froze the lot to avoid. */}
-                <p className="competitions-hint" data-testid="frozen-lot-withdraw-hint">
-                  If Requeue is refused — this auction is set to one round, or the lot has used them
-                  — <strong>Withdraw</strong> takes the player out of the auction for good and voids
-                  any bid standing on the lot. It cannot be undone, and it is the only way to close
-                  an auction that has a frozen lot on it.
-                </p>
+                {/* A finished auction resolves nothing. The block used to
+                    keep its live-night heading, two paragraphs on freezing and
+                    withdrawing, and a disabled Requeue on every row — seven
+                    dead buttons under a card that said nothing can be undone.
+                    What is left is a plain list of who went unsold. */}
                 {finished ? (
-                  <p className="competitions-hint" data-testid="resolve-blocked">
-                    This auction has ended. These lots stay as they finished — the ledger and the
-                    replay are the record now.
-                  </p>
-                ) : null}
+                  <h2 data-testid="resolve-finished-heading">
+                    {needsResolution.every((entry) => entry.status === "unsold")
+                      ? "Unsold"
+                      : "Not sold"}{" "}
+                    ({needsResolution.length})
+                  </h2>
+                ) : (
+                  <>
+                    <h2>Needs resolution</h2>
+                    <p className="competitions-hint" data-testid="frozen-lot-hint">
+                      A frozen lot has a clock that is stopped, not running — including one you have
+                      just undone. Requeue it and it goes back to the top of the queue for you to
+                      open deliberately.
+                    </p>
+                    {/* The second way out, and until now there was no first one for
+                        half these lots. Requeue is refused when the auction's unsold
+                        policy is "final", or when the lot has used its rounds — and
+                        Requeue was the only button here. A frozen lot with a
+                        mistaken bid on it could then be neither passed (it has
+                        money on it) nor requeued, and a frozen lot blocks completing
+                        the auction, so the night could not end without making the
+                        sale the conductor froze the lot to avoid. */}
+                    <p className="competitions-hint" data-testid="frozen-lot-withdraw-hint">
+                      If Requeue is refused — this auction is set to one round, or the lot has used
+                      them — <strong>Withdraw</strong> takes the player out of the auction for good
+                      and voids any bid standing on the lot. It cannot be undone, and it is the only
+                      way to close an auction that has a frozen lot on it.
+                    </p>
+                  </>
+                )}
                 {!finished && unsoldToRequeue(needsResolution).length > 1 ? (
                   <div className="cockpit-actions">
                     <Button
@@ -820,53 +836,55 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                       />
                       <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
                       <span className="competitions-hint">{entry.status}</span>
-                      <span className="queue-actions">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() =>
-                            void send(
-                              `requeue-${entry.id}`,
-                              "RequeueLot",
-                              { lotId: entry.id },
-                              `${entry.lotNumber} requeued`,
-                            )
-                          }
-                          loading={pending === `requeue-${entry.id}`}
-                          /* `finished` for the same reason "Invite owner"
-                               carries it: the control was offered on a
-                               completed auction, directly under a banner
-                               saying nothing here can be opened or undone, and
-                               clicking it did NOTHING AT ALL. The engine
-                               refuses the command — the record is safe — but
-                               the refusal never reached the screen, so the
-                               conductor's only evidence was a button that did
-                               not respond. */
-                          disabled={stale || finished}
-                          data-testid={`requeue-${entry.lotNumber}`}
-                        >
-                          Requeue
-                        </Button>
-                        {entry.status === "frozen" ? (
+                      {finished ? null : (
+                        <span className="queue-actions">
                           <Button
                             size="sm"
-                            variant="ghost"
+                            variant="secondary"
                             onClick={() =>
                               void send(
-                                `withdraw-${entry.id}`,
-                                "WithdrawLot",
+                                `requeue-${entry.id}`,
+                                "RequeueLot",
                                 { lotId: entry.id },
-                                `${entry.lotNumber} withdrawn`,
+                                `${entry.lotNumber} requeued`,
                               )
                             }
-                            loading={pending === `withdraw-${entry.id}`}
+                            loading={pending === `requeue-${entry.id}`}
+                            /* `finished` for the same reason "Invite owner"
+                                 carries it: the control was offered on a
+                                 completed auction, directly under a banner
+                                 saying nothing here can be opened or undone, and
+                                 clicking it did NOTHING AT ALL. The engine
+                                 refuses the command — the record is safe — but
+                                 the refusal never reached the screen, so the
+                                 conductor's only evidence was a button that did
+                                 not respond. */
                             disabled={stale || finished}
-                            data-testid={`withdraw-frozen-${entry.lotNumber}`}
+                            data-testid={`requeue-${entry.lotNumber}`}
                           >
-                            Withdraw
+                            Requeue
                           </Button>
-                        ) : null}
-                      </span>
+                          {entry.status === "frozen" ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                void send(
+                                  `withdraw-${entry.id}`,
+                                  "WithdrawLot",
+                                  { lotId: entry.id },
+                                  `${entry.lotNumber} withdrawn`,
+                                )
+                              }
+                              loading={pending === `withdraw-${entry.id}`}
+                              disabled={stale || finished}
+                              data-testid={`withdraw-frozen-${entry.lotNumber}`}
+                            >
+                              Withdraw
+                            </Button>
+                          ) : null}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ol>

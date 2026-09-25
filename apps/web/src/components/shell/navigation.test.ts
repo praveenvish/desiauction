@@ -99,11 +99,32 @@ describe("the rail is the union of what is yours (RN-1 §3.2)", () => {
     expect(keys({ ...NOBODY, organizes: true })).toEqual([
       "home",
       "tournaments",
+      "players",
+      "auctions",
+      "reports",
+    ]);
+  });
+
+  it("Clubs is offered only to somebody who runs more than one", () => {
+    // One club is a list of one: it is reached from every season's trail and
+    // from Tournaments, and it was the sixth item of an organizer's rail.
+    expect(keys({ ...NOBODY, organizes: true, clubs: 1 })).not.toContain("orgs");
+    expect(keys({ ...NOBODY, organizes: true, clubs: 2 })).toEqual([
+      "home",
+      "tournaments",
       "orgs",
       "players",
       "auctions",
       "reports",
     ]);
+  });
+
+  it("with no Clubs item, the club's pages light Tournaments", () => {
+    const model = navigationFor({
+      roles: { ...NOBODY, organizes: true, clubs: 1 },
+      pathname: "/org/malad-cc/venues",
+    });
+    expect(model.rail.find((item) => item.active)?.key).toBe("tournaments");
   });
 
   it("Money returns only for the people who have books (DA-18 reversed, narrowly)", () => {
@@ -114,7 +135,7 @@ describe("the rail is the union of what is yours (RN-1 §3.2)", () => {
   it("an organizer who owns a team is offered both — the union, not a mode", () => {
     expect(
       keys({ ...NOBODY, organizes: true, teams: [scope("Demo Panthers", "demo-pl")] }),
-    ).toEqual(["home", "team", "tournaments", "orgs", "players", "auctions", "reports"]);
+    ).toEqual(["home", "team", "tournaments", "players", "auctions", "reports"]);
   });
 
   it("membership is not a role: there is no field for it and no door from it", () => {
@@ -201,6 +222,7 @@ describe("several teams collapse into a popover, never into silence", () => {
 describe("exactly one item is ever active", () => {
   const busy: NavRoles = {
     organizes: true,
+    clubs: 2,
     plays: true,
     hasBooks: true,
     teams: [scope("Demo Panthers", "demo-pl")],
@@ -394,6 +416,24 @@ describe("the season's tabs, by role", () => {
     expect(labels("auctioneer", true)).not.toContain("Money");
   });
 
+  it("an owner's My team opens their own squad when the season knows it", () => {
+    const tabs = seasonTabs("demo-pl", "owner", { ownTeamId: "01TEAM" });
+    expect(tabs[0]?.href).toBe("/seasons/demo-pl/teams?team=01TEAM");
+    // The query is not part of the path it claims: /teams still lights it.
+    expect(activeSeasonTab("/seasons/demo-pl/teams", "demo-pl", tabs)).toBe("my-team");
+  });
+
+  it("the rail's My team opens the owner's squad too", () => {
+    const owner: NavRoles = {
+      ...NOBODY,
+      teams: [{ ...scope("Demo Panthers", "demo-pl"), teamId: "01TEAM" }],
+    };
+    const model = navigationFor({ roles: owner, pathname: "/seasons/demo-pl/teams" });
+    const team = model.rail.find((item) => item.key === "team");
+    expect(team?.href).toBe("/seasons/demo-pl/teams?team=01TEAM");
+    expect(team?.active).toBe(true);
+  });
+
   it("a team owner finally gets the two surfaces they came for", () => {
     expect(labels("owner")).toEqual(["My team", "My plan", "Auction room", "Table"]);
     expect(seasonTabs("demo-pl", "owner").map((tab) => tab.href)).toEqual([
@@ -462,12 +502,17 @@ describe("the phone's bar can read every label (LAW 4)", () => {
   });
 
   it("product vocabulary is not abbreviated — only shortened to a word we already say", () => {
-    const organizer = navigationFor({ roles: { ...NOBODY, organizes: true }, pathname: "/home" });
+    const organizer = navigationFor({
+      roles: { ...NOBODY, organizes: true, clubs: 2 },
+      pathname: "/home",
+    });
     const byKey = new Map(organizer.rail.map((item) => [item.key, item]));
     // "Tournaments" survives intact: it is the word the whole product uses.
     expect(byKey.get("tournaments")?.shortLabel).toBe("Tournaments");
-    // "Clubs" is /home's own setup-ladder word for an organization.
+    // "Clubs" is /home's own setup-ladder word for an organization — on the
+    // laptop rail as well as the phone's bar now.
     expect(byKey.get("orgs")?.shortLabel).toBe("Clubs");
+    expect(byKey.get("orgs")?.label).toBe("Clubs");
   });
 });
 

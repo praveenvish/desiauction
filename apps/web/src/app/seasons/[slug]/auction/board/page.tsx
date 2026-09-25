@@ -46,6 +46,11 @@ export default async function BoardPage({ params }: { params: Promise<{ slug: st
         watchUrl={`${env.PUBLIC_BASE_URL}/c/${slug}`.replace(/^https?:\/\//, "")}
         teamIdentities={view.teams}
         lotMedia={view.lotMedia}
+        pursePerTeam={view.rules.pursePerTeam}
+        preSignedByTeam={view.preSigned.reduce<Record<string, number>>((counts, player) => {
+          counts[player.teamId] = (counts[player.teamId] ?? 0) + 1;
+          return counts;
+        }, {})}
       />
     </main>
   );

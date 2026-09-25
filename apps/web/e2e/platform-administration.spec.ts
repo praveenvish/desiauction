@@ -94,8 +94,13 @@ test("founder demo: sign in → platform health → find an org → inspect → 
   await expect(page).toHaveURL(/\/admin\/orgs\/[^/]+$/);
   await expect(page.getByTestId("admin-org-competitions")).toBeVisible();
   // The seed's two competitions: the journey playground and the settled exemplar.
-  await expect(page.getByRole("link", { name: /Demo Premier League/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Demo Cup/ })).toBeVisible();
+  // A season name is a link only where this admin can actually go — the public
+  // page or the auction watch; the member workspace would 404 — so the names
+  // are asserted as text, not as links.
+  const orgCompetitions = page.getByTestId("admin-org-competitions");
+  await expect(orgCompetitions.getByText(/Demo Premier League/)).toBeVisible();
+  await expect(orgCompetitions.getByText(/Demo Cup/)).toBeVisible();
+  await expect(orgCompetitions.locator('a[href^="/seasons/"]')).toHaveCount(0);
   await axeClean(page, "/admin/orgs/[slug]");
 
   // --- Views user grants -----------------------------------------------------
@@ -142,12 +147,9 @@ test("founder demo: sign in → platform health → find an org → inspect → 
   await expect(orgHealth.getByText("Certification")).toBeVisible();
   await axeClean(page, "/admin/health");
 
-  // --- Navigates to affected resources ---------------------------------------
-  await page
-    .getByRole("link", { name: /Finance console/ })
-    .first()
-    .click();
-  await expect(page).toHaveURL(/\/org\/[^/]+\/money$/);
+  // No card offers the finance console: `platform:admin` holds no finops
+  // capability, so that door 404'd for exactly this reader.
+  await expect(orgHealth.getByRole("link", { name: /Finance console/ })).toHaveCount(0);
 
   // --- No operational writes -------------------------------------------------
   // Administration's surfaces offer search and navigation. The only submits are

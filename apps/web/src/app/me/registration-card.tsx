@@ -19,10 +19,14 @@ const ENTRY: Record<string, { label: string; tone: KitTone }> = {
   draft: { label: "Not submitted", tone: "neutral" },
 };
 
+/** The four facts a verdict is made from — a career season has them, and so
+ *  does /home's `MyRegistration`, which is why this is not `CareerSeason`. */
+export type VerdictFacts = Pick<CareerSeason, "auction" | "auctionUnit" | "status" | "teamName">;
+
 /** Where a season stands for this person: the auction's word once there is
  *  one, the registration's until then. */
 export function verdictOf(
-  season: CareerSeason,
+  season: VerdictFacts,
   money: (paise: number, unit: MoneyUnit) => string,
 ): { label: string; tone: KitTone } {
   const outcome = season.auction;

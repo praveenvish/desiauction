@@ -63,7 +63,8 @@ test("founder journey: OTP → one question → home; orgs are born on /orgs, no
 
   // Straight home — greeted by name. No org toll at the entrance.
   await expect(page).toHaveURL(/\/home/);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Asha Rao");
+  // The first name only — a full name truncated the h1 on a phone.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(", Asha");
 
   // A named account revisiting /onboarding is simply sent home.
   await page.goto("/onboarding");
@@ -84,19 +85,23 @@ test("player-shaped users reach home directly; completion meter and notification
   await expect(page).toHaveURL(/\/home/);
   // "Welcome to DesiAuction" is the /onboarding page's own heading (see
   // shell.spec.ts) — /home's h1 is the time-of-day greeting by name.
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Vikram Iyer");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(", Vikram");
 
   // Profile completion: name yes, passkey no → 1/2.
   await page.goto("/account");
   // PI-1: the checklist grew from 2 items to the 8 the product actually uses;
   // a fresh onboarded account has exactly its name.
-  await expect(page.getByTestId("profile-completion")).toContainText("Profile 1/8 complete");
+  await expect(page.getByTestId("profile-completion")).toContainText("Profile 1 of 8");
   await expect(page.getByTestId("account-name")).toHaveText("Vikram Iyer");
 
-  // Bell shows unread; inbox lists the real sign-in event; read-state settles.
+  // Bell shows unread; inbox lists the real event; read-state settles. The
+  // sign-in itself is NOT an inbox notice (inbox-filter.ts) — it lives under
+  // Account → Security activity — so a fresh account's notice is its name.
   await expect(page.getByTestId("shell-bell")).toHaveAttribute("data-unread", "true");
   await page.getByTestId("shell-bell").click();
-  await expect(page.getByTestId("inbox-list")).toContainText("Signed in with a one-time code");
+  await expect(page.getByTestId("inbox-list")).toContainText("Name added to your profile");
+  await expect(page.getByTestId("inbox-list")).not.toContainText("Signed in");
+  await expect(page.getByTestId("inbox-list")).not.toContainText("Sign-in code requested");
   const firstRow = page.getByTestId("inbox-row").first();
   await expect(firstRow).toHaveAttribute("data-unread", "true");
   await page.reload();
@@ -289,7 +294,7 @@ test("sessions persist across reloads; a cleared session gates and returns via n
   await expect(page).toHaveURL(/\/home/);
 
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Persistent Pat");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(", Persistent");
 
   // Session gone (expiry equivalent): console gates, then next returns exactly.
   await page.context().clearCookies();

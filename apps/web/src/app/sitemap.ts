@@ -38,7 +38,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/help/faq`, changeFrequency: "monthly" },
     { url: `${base}/legal`, changeFrequency: "monthly" },
     { url: `${base}/support`, changeFrequency: "monthly" },
-    { url: `${base}/contact`, changeFrequency: "monthly" },
     { url: `${base}/releases`, changeFrequency: "monthly" },
     ...HELP_CATEGORIES.map((category) => ({
       url: `${base}/help/category/${category.slug}`,

@@ -44,6 +44,23 @@ function fixOf(id: string, base: string): { href: string; label: string } {
   }
 }
 
+/** A season status in words — the gate's own detail is the raw enum. */
+const STATUS_WORDS: Record<string, string> = {
+  draft: "The season is still a draft",
+  setup: "The season is in setup",
+  registration_open: "Registration is open",
+  registration_closed: "Registration is closed",
+};
+
+/**
+ * The gate's detail, readable. The projection reports the intake gate as
+ * "competition is registration closed" — the enum with its underscores taken
+ * out, which is a log line, not a sentence. Every other detail already reads.
+ */
+function checkDetail(check: { id: string; detail: string }, status: string): string {
+  return check.id === "intake_closed" ? (STATUS_WORDS[status] ?? check.detail) : check.detail;
+}
+
 export default async function ReadinessPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const view = await competitionView(slug);
@@ -76,8 +93,17 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
    * to answer "can I start?", the summary and the detail disagreed and nothing
    * reconciled them. The verdict now carries the caveat it was hiding.
    */
-  const runningShort = auction !== null && !auction.feasibility.ok;
-  const firstBlocked = checks.find((check) => !check.pass);
+  /*
+   * AFTER THE HAMMER THIS PAGE IS A RECORD, NOT A CHECKLIST. It used to keep
+   * asking "can I start?" of an auction that had already run: a green "Ready
+   * for auction", a gold "Open auction setup", and a pool-vs-squads row that
+   * compared what was LEFT of the pool with squads that were already full —
+   * "7 players for 3 squads of at least 12 (0 needed) — 7 to spare".
+   */
+  const auctionStatus = auction?.view?.auction.status ?? null;
+  const auctionOver = auctionStatus === "completed" || auctionStatus === "reconciled";
+  const runningShort = auction !== null && !auction.feasibility.ok && !auctionOver;
+  const firstBlocked = auctionOver ? undefined : checks.find((check) => !check.pass);
 
   return (
     <main className="registrations-dash">
@@ -87,7 +113,11 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
             Every row links to the screen that changes it. Pass or fail comes from the
             platform&apos;s own auction-readiness checks.
           </p>
-          {auction !== null && blockers === 0 ? (
+          {auctionOver ? (
+            <Pill tone="green" dot testId="readiness-verdict">
+              Auction completed
+            </Pill>
+          ) : auction !== null && blockers === 0 ? (
             <Pill tone={runningShort ? "amber" : "green"} dot testId="readiness-verdict">
               {runningShort ? "Ready — but running short" : "Ready for auction"}
             </Pill>
@@ -126,12 +156,12 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                     <strong>{check.label}</strong>
                     <span className="st-note">
                       <span className="st-sr">{check.pass ? "Pass: " : "Blocked: "}</span>
-                      {check.detail}
+                      {checkDetail(check, view.competition.status)}
                     </span>
                   </span>
                   {/* A blocked gate names where it is cleared — the page's own
                       promise, which the three gates were the only rows to break. */}
-                  {!check.pass ? (
+                  {!check.pass && !auctionOver ? (
                     <Link className="st-link" href={fixOf(check.id, base).href}>
                       {fixOf(check.id, base).label}
                     </Link>
@@ -142,23 +172,26 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
               ))}
               {/* The sum that decides whether the night can end normally.
                   Deliberately not counted as a blocker: a league may knowingly
-                  run short, but it must not find out at closing time. */}
-              <li
-                data-pass={auction.feasibility.ok}
-                data-soft="true"
-                data-testid="check-squads_fillable"
-              >
-                <span className="rd-mark" aria-hidden>
-                  <IconCheck size={14} />
-                </span>
-                <span className="rd-text">
-                  <strong>Pool against squads</strong>
-                  <span className="st-note">{auction.feasibility.headline}</span>
-                </span>
-                <Pill tone={auction.feasibility.ok ? "green" : "amber"}>
-                  {auction.feasibility.ok ? "Fits" : "Short"}
-                </Pill>
-              </li>
+                  run short, but it must not find out at closing time. Absent
+                  once the night is over — there is nothing left to fit. */}
+              {auctionOver ? null : (
+                <li
+                  data-pass={auction.feasibility.ok}
+                  data-soft="true"
+                  data-testid="check-squads_fillable"
+                >
+                  <span className="rd-mark" aria-hidden>
+                    <IconCheck size={14} />
+                  </span>
+                  <span className="rd-text">
+                    <strong>Pool against squads</strong>
+                    <span className="st-note">{auction.feasibility.headline}</span>
+                  </span>
+                  <Pill tone={auction.feasibility.ok ? "green" : "amber"}>
+                    {auction.feasibility.ok ? "Fits" : "Short"}
+                  </Pill>
+                </li>
+              )}
               <li data-pass={auction.view !== null}>
                 <span className="rd-mark" aria-hidden>
                   <IconCheck size={14} />
@@ -166,11 +199,15 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                 <span className="rd-text">
                   <strong>Auction</strong>
                   <span className="st-note">
-                    {auction.view !== null ? "Created" : "Not created yet"}
+                    {auctionOver
+                      ? "Completed"
+                      : auction.view !== null
+                        ? "Created"
+                        : "Not created yet"}
                   </span>
                 </span>
                 <Link className="st-link" href={`${base}/auction`}>
-                  Open auction setup
+                  {auctionOver ? "See results" : "Open auction setup"}
                 </Link>
               </li>
             </ul>
@@ -191,10 +228,14 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
               tone="gold"
               title="Season lifecycle"
               detail="Where the season is in its steps"
-              pill={(() => {
-                const words = view.competition.status.replace(/_/g, " ");
-                return words.charAt(0).toUpperCase() + words.slice(1);
-              })()}
+              pill={
+                auctionOver
+                  ? "Auction done"
+                  : (() => {
+                      const words = view.competition.status.replace(/_/g, " ");
+                      return words.charAt(0).toUpperCase() + words.slice(1);
+                    })()
+              }
               pillTone="blue"
               href={base}
               link="Manage on Overview"
@@ -281,6 +322,12 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
           {/* ONE next step. While a gate is blocked, creating the auction is not
               it — the first blocker's fix is, so that is the ink button and the
               auction is the secondary one. */}
+          {auctionOver ? (
+            // Nothing is left to get ready, so the way back is the one action.
+            <ButtonLink href={base} size="touch" data-testid="readiness-back">
+              Back to overview
+            </ButtonLink>
+          ) : null}
           {firstBlocked !== undefined ? (
             <ButtonLink
               href={fixOf(firstBlocked.id, base).href}
@@ -290,18 +337,26 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
               {fixOf(firstBlocked.id, base).label}
             </ButtonLink>
           ) : null}
-          <ButtonLink
-            href={`${base}/auction`}
-            size="touch"
-            {...(firstBlocked !== undefined ? { variant: "secondary" as const } : {})}
-          >
-            {auction !== null && auction.view !== null
-              ? "Open auction setup"
-              : "Create the auction"}
-          </ButtonLink>
-          <ButtonLink href={base} variant="secondary" size="touch">
-            Back to overview
-          </ButtonLink>
+          {auctionOver ? (
+            <ButtonLink href={`${base}/auction`} variant="secondary" size="touch">
+              See the results
+            </ButtonLink>
+          ) : (
+            <>
+              <ButtonLink
+                href={`${base}/auction`}
+                size="touch"
+                {...(firstBlocked !== undefined ? { variant: "secondary" as const } : {})}
+              >
+                {auction !== null && auction.view !== null
+                  ? "Open auction setup"
+                  : "Create the auction"}
+              </ButtonLink>
+              <ButtonLink href={base} variant="secondary" size="touch">
+                Back to overview
+              </ButtonLink>
+            </>
+          )}
         </div>
       </div>
     </main>

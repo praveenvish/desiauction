@@ -7,7 +7,7 @@ import {
   IconTrophy,
   IconUsers as IconUsersUi,
 } from "@desiauction/ui";
-import { entryCategoryLabel, formatAmount, sportPackFor } from "@desiauction/core";
+import { entryCategoryLabel, formatAmount, paise, sportPackFor } from "@desiauction/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -16,6 +16,7 @@ import { env } from "../../../env";
 import {
   publicCompetitionView,
   publicShowcase,
+  publicTopBuys,
   teamSlugOf,
 } from "../../../server/competition/public";
 import { serializeJsonLd } from "../../../server/seo/json-ld";
@@ -107,6 +108,12 @@ export default async function PublicCompetitionPage({
   if (view === null) {
     notFound();
   }
+  // THE NIGHT IS OVER. The badge said "Registration closed" the morning after
+  // the auction — true, and the least interesting thing about the season —
+  // while its own share card already said "Auction complete", and nothing on
+  // the page led to the results. Same finished set the share card uses.
+  const auctionDone = view.auctionStatus === "completed" || view.auctionStatus === "reconciled";
+  const topBuys = auctionDone ? await publicTopBuys(view.slug) : [];
   // The directory (`/c`) badges a mid-auction tournament "Live now", promises
   // "No account needed" and links straight to the spectate stage. This page knew
   // only open/closed, so a guest who clicked one of those cards through to here
@@ -124,8 +131,10 @@ export default async function PublicCompetitionPage({
    * they agree.
    *
    * Purse and squad size are the season's published RULES (founder,
-   * 2026-09-19). No amount that belongs to a person appears here: not a sold
-   * price, not a bid, not what an owner has left.
+   * 2026-09-19). No live amount appears in this strip: not a bid, not what an
+   * owner has left. Sold PRICES are public (founder, 2026-09-24 — the team
+   * page, the player card and the spectate summary all print them), and after
+   * the auction they get a row of their own below: "Top buys".
    */
   const stats: Stat[] = [
     ...(view.teams.length > 0
@@ -194,7 +203,11 @@ export default async function PublicCompetitionPage({
           <>
             {live ? <Badge tone="live">Live now</Badge> : null}
             <Badge tone={view.open ? "success" : "neutral"} data-testid="public-reg-status">
-              {view.open ? "Registration open" : "Registration closed"}
+              {view.open
+                ? "Registration open"
+                : auctionDone
+                  ? "Auction complete"
+                  : "Registration closed"}
             </Badge>
           </>
         }
@@ -247,8 +260,24 @@ export default async function PublicCompetitionPage({
                 closed tournament or a finished one — which is most of the
                 lifecycle, and includes every link people keep forwarding after
                 the night is over. */}
+            {/* After the night, the results lead: the spectate page is the
+                summary, the squads and every price, for anyone. */}
+            {auctionDone ? (
+              <ButtonLink
+                href={`/seasons/${view.slug}/auction/spectate`}
+                size="lg"
+                data-testid="public-results-cta"
+              >
+                See the auction results
+              </ButtonLink>
+            ) : null}
             {!live && !view.open && pool !== null && pool.total > 0 ? (
-              <ButtonLink href="#players-heading" size="lg" data-testid="public-squads-cta">
+              <ButtonLink
+                href="#players-heading"
+                size="lg"
+                variant={auctionDone ? "secondary" : "primary"}
+                data-testid="public-squads-cta"
+              >
                 See the squads
               </ButtonLink>
             ) : null}
@@ -276,6 +305,32 @@ export default async function PublicCompetitionPage({
       <PageBody>
         {stats.length > 0 ? <StatStrip label={`${view.name} at a glance`} stats={stats} /> : null}
 
+        {/* TOP BUYS — the three sales the season will be remembered by, each
+            leading to that player's page. Only once the auction is done, and
+            in the season's own unit (a points league never reads "₹"). */}
+        {topBuys.length > 0 ? (
+          <PageSection headingId="top-buys-heading" title="Top buys">
+            <ol className="public-top-buys" data-testid="public-top-buys">
+              {topBuys.map((buy, index) => (
+                <li key={buy.registrationId} className="public-top-buy">
+                  <span className="public-top-buy-rank" aria-hidden>
+                    {index + 1}
+                  </span>
+                  <Link className="public-top-buy-name" href={`/c/${view.slug}/p/${buy.number}`}>
+                    {buy.name}
+                  </Link>
+                  <span className="public-top-buy-price">
+                    {formatAmount(paise(buy.pricePaise), view.auctionUnit)}
+                  </span>
+                  {buy.teamName !== null ? (
+                    <span className="public-top-buy-team">{buy.teamName}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </PageSection>
+        ) : null}
+
         {/* Instructions for a door that is shut are not instructions, they are a
             trap: this block was unconditional, so a guest on a closed
             tournament was walked through signing in and submitting a
@@ -284,10 +339,10 @@ export default async function PublicCompetitionPage({
         {view.open ? (
           <PageSection headingId="how-it-works" title="How registration works">
             <p className="public-hint">
-              Sign in with your mobile number, tell us your name and playing role, and submit. The
-              organizer reviews every registration — you can check your status here any time.
-              Approved players enter the player pool for the auction, where team owners bid to build
-              their squads.
+              Sign in with your email or mobile number, tell us your name and playing role, and
+              submit. The organizer reviews every registration — you can check your status here any
+              time. Approved players enter the player pool for the auction, where team owners bid to
+              build their squads.
             </p>
           </PageSection>
         ) : null}
@@ -396,7 +451,7 @@ export default async function PublicCompetitionPage({
 
         <PageSection headingId="contact-heading" title="Questions?">
           <p className="public-hint">
-            This competition is run by {view.orgName} — reach them through whoever shared this page
+            This tournament is run by {view.orgName} — reach them through whoever shared this page
             with you. For anything about the DesiAuction platform itself, see{" "}
             <Link href="/help">Help</Link>.
           </p>

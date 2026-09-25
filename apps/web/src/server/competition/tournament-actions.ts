@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  auctions,
   fixtures,
   registrations,
   settlementCases,
@@ -68,6 +69,13 @@ export interface SeasonCounts {
   matches: number;
   /** Registrations awaiting an organizer decision — the only actionable one. */
   pending: number;
+  /**
+   * The season's auction has been run (completed or reconciled). The
+   * competition status stops at `registration_closed`, so without this a
+   * season whose squads were already picked badged "Reg closed" beside an
+   * overview that called it done.
+   */
+  auctionDone?: boolean;
 }
 
 const NO_COUNTS: SeasonCounts = { teams: 0, matches: 0, pending: 0 };
@@ -269,6 +277,15 @@ async function countsFor(
         ),
       )
       .groupBy(registrations.competitionId),
+    doneRows: await db
+      .select({ competitionId: auctions.competitionId })
+      .from(auctions)
+      .where(
+        and(
+          inArray(auctions.competitionId, competitionIds),
+          inArray(auctions.status, ["completed", "reconciled"]),
+        ),
+      ),
   }));
   const teamRows = slices.flatMap((slice) => slice.teamRows);
   const fixtureRows = slices.flatMap((slice) => slice.fixtureRows);
@@ -290,6 +307,9 @@ async function countsFor(
   }
   for (const row of pendingRows) {
     read(row.competitionId).pending = row.count;
+  }
+  for (const row of slices.flatMap((slice) => slice.doneRows)) {
+    read(row.competitionId).auctionDone = true;
   }
   return counts;
 }
@@ -426,9 +446,7 @@ export async function tournamentHeader(slug: string): Promise<TournamentHeader |
  * itself: a non-member (or anyone POSTing the action id with an arbitrary
  * tournament ULID) gets an empty list, never another tenant's private seasons.
  */
-export async function tournamentSeasons(
-  tournamentId: string,
-): Promise<(CompetitionSummary & { orgName: string; running: boolean })[]> {
+export async function tournamentSeasons(tournamentId: string): Promise<SeasonRow[]> {
   const session = await currentSession();
   if (session === null) {
     return [];
@@ -436,10 +454,21 @@ export async function tournamentSeasons(
   // Empty for a non-member or an unknown id — the membership check is in the
   // same SQL as the tournament lookup, before any edition is read.
   const seasons = await memberTournamentSeasons(session.personId, tournamentId);
+  // The same badge facts /tournaments reads (books, auction), so a season card
+  // here cannot say "Registration closed" about a season whose squads are
+  // already picked while the index one click back says "Auction done".
+  const orgIds = [...new Set(seasons.map((season) => season.orgId))];
+  const seasonIds = seasons.map((season) => season.id);
+  const [counts, settlementBy] = await Promise.all([
+    countsFor(session.personId, orgIds, seasonIds),
+    settlementStatusFor(session.personId, orgIds, seasonIds),
+  ]);
   const today = isoToday();
   return byEditionDate(seasons).map((season) => ({
     ...season,
+    counts: counts.get(season.id) ?? NO_COUNTS,
     running: isRunningNow(season, today),
+    settlement: settlementBy.get(season.id) ?? null,
   }));
 }
 

@@ -101,8 +101,13 @@ describe("pageIdentity", () => {
     for (const [pathname, title] of [
       ["/home", "Home"],
       ["/tournaments", "Tournaments"],
-      ["/orgs", "Organizations"],
+      ["/orgs", "Clubs"],
       ["/money", "Money"],
+      // The three cross-season indexes drew an empty h1 until activeRailKey
+      // learned their paths.
+      ["/players", "Players"],
+      ["/auctions", "Auctions"],
+      ["/reports", "Reports"],
       ["/inbox", "Notifications"],
       ["/account", "Account"],
     ] as const) {
@@ -148,12 +153,13 @@ describe("pageIdentity", () => {
 
   it("names the org on its home and the desk on each money surface", () => {
     expect(pageIdentity("/org/malad-cc", ctx)).toEqual({
-      crumbs: [{ label: "Organizations", href: "/orgs" }],
+      crumbs: [{ label: "Clubs", href: "/orgs" }],
       title: "Malad CC",
     });
-    expect(trail("/org/malad-cc/money/deliveries")).toEqual(["Organizations", "Malad CC"]);
+    expect(trail("/org/malad-cc/money/deliveries")).toEqual(["Clubs", "Malad CC"]);
     expect(pageIdentity("/org/malad-cc/money/deliveries", ctx).title).toBe("Deliveries");
     expect(pageIdentity("/org/malad-cc/venues", ctx).title).toBe("Venues");
+    expect(pageIdentity("/seasons/mpl/posters", ctx).title).toBe("Posters");
     // Page data the shell does not hold — a true label the page then overrides.
     expect(pageIdentity("/org/malad-cc/t/bpl", ctx).title).toBe("Tournament");
   });

@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   description: PRICING.sub,
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/pricing` },
   openGraph: {
-    title: "Simple, public pricing · DesiAuction",
+    title: "Pricing — free while we're in beta · DesiAuction",
     description: PRICING.sub,
     url: `${env.PUBLIC_BASE_URL}/pricing`,
     type: "website",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Simple, public pricing · DesiAuction",
+    title: "Pricing — free while we're in beta · DesiAuction",
     description: PRICING.sub,
   },
 };
@@ -244,12 +244,6 @@ export default function PricingPage() {
                 </li>
               ))}
             </ul>
-            <div className="mk-procure-gap">
-              <p>{PRICING.procurement.gap}</p>
-              <ButtonLink href={PRICING.procurement.cta.href} variant="secondary">
-                {PRICING.procurement.cta.label}
-              </ButtonLink>
-            </div>
           </section>
 
           <section className="mk-faq" aria-labelledby="pricing-faq">

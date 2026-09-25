@@ -54,12 +54,19 @@ export const OUTCOME_TITLE: Record<LotOutcomeKind, string> = {
  * Demo Premier League Auction" and telling the audience nothing about what had
  * just happened to him.
  */
-export function outcomeMeta(outcome: NonNullable<AuctionSnapshot["lastOutcome"]>): string {
+export function outcomeMeta(
+  outcome: NonNullable<AuctionSnapshot["lastOutcome"]>,
+  /**
+   * The auction is over. "Back in the pool" is a promise of another round, and
+   * once the night has ended there is none: an unsold player is simply unsold.
+   */
+  finished = false,
+): string {
   switch (outcome.kind) {
     case "sold":
       return outcome.teamName === null ? "Sold" : `to ${outcome.teamName}`;
     case "unsold":
-      return "No bids — back in the pool";
+      return finished ? "No bids — unsold" : "No bids — back in the pool";
     case "withdrawn":
       return "Withdrawn from the auction";
     case "held":
@@ -385,7 +392,7 @@ export function CeremonyStage({
             {/* The buyer is already named in display type above on a sale;
                 repeating "to Strikers" here said it twice. The queue position
                 is the fact that line has left to give. */}
-            {outcome.kind === "sold" ? outcome.lotNumber : outcomeMeta(outcome)}
+            {outcome.kind === "sold" ? outcome.lotNumber : outcomeMeta(outcome, finished)}
           </p>
         </div>
       ) : (

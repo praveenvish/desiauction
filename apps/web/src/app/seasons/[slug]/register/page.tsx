@@ -1,6 +1,8 @@
 import {
   attributeOptions,
   entryCategoryLabel,
+  formatAmount,
+  paise,
   isRejectionReason,
   roleLabelIn,
   sportPackFor,
@@ -17,14 +19,14 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
+import { cache, type ReactNode } from "react";
 
 import { env } from "../../../../env";
 import { currentSession } from "../../../../server/auth/actions";
 import { ownPhotoUrl, playerProfileFor, sportProfileFor } from "../../../../server/player/profile";
 import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
 import { notificationSettings } from "../../../../server/messaging/actions";
-import { publicCompetitionView } from "../../../../server/competition/public";
+import { myAuctionOutcome, publicCompetitionView } from "../../../../server/competition/public";
 import { SHARE_IMAGE_SIZE } from "../../../c/[slug]/share-image-card";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
 import { dateRange } from "../../../tournaments/season-card";
@@ -47,13 +49,75 @@ import "./register.css";
  * card image rather than rendering a second one. Not indexed either way —
  * the canonical page for a season is `/c/<slug>`.
  */
+/** Metadata and the closed door both read it; one query per request. */
+const seasonView = cache(publicCompetitionView);
+
+const FINISHED_AUCTION = new Set(["completed", "reconciled"]);
+
+/**
+ * THE CLOSED DOOR, WITH SOMEWHERE TO GO.
+ *
+ * "Registration for TPL 2026 is not open right now" was the whole page for a
+ * visitor who followed an old WhatsApp link the morning after the auction —
+ * true, and a dead end: "right now" even hinted it might reopen. When the
+ * auction is done the page says so, and offers the two things that visitor can
+ * still do: see how the squads came out, or find a tournament that IS open.
+ * The squads link needs the public season page; `view` is null otherwise.
+ */
+async function ClosedNotice({
+  slug,
+  season,
+  listed,
+}: {
+  slug: string;
+  season: string;
+  listed: boolean;
+}) {
+  const view = await seasonView(slug);
+  const done = view !== null && FINISHED_AUCTION.has(view.auctionStatus ?? "");
+  if (done) {
+    return (
+      <>
+        <p role="alert" data-testid="registration-closed">
+          Registration for <strong>{season}</strong> is closed — the auction is done and the squads
+          are set.
+        </p>
+        <p className="register-hint reg-closed-actions">
+          <ButtonLink href={`/c/${slug}#players-heading`} data-testid="registration-closed-squads">
+            See the squads
+          </ButtonLink>
+          <ButtonLink href="/c" variant="secondary">
+            Find a tournament that&apos;s open
+          </ButtonLink>
+        </p>
+      </>
+    );
+  }
+  return (
+    <>
+      <p role="alert" data-testid="registration-closed">
+        Registration for <strong>{season}</strong> is not open right now.
+      </p>
+      {/* Only published seasons HAVE a season page; offering it for an
+          unpublished one sends the player to a 404. */}
+      {listed ? (
+        <p className="register-hint">
+          <ButtonLink href={`/c/${slug}`} variant="ghost">
+            Back to the season page
+          </ButtonLink>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const view = await publicCompetitionView(slug);
+  const view = await seasonView(slug);
   if (view === null) {
     return { title: "Register · DesiAuction", robots: { index: false, follow: false } };
   }
@@ -215,14 +279,8 @@ export default async function RegisterPage({
               </p>
             </>
           ) : (
-            <>
-              <p role="alert" data-testid="registration-closed">
-                Registration for <strong>{preview.competitionName}</strong> is not open right now.
-              </p>
-              <ButtonLink href={`/c/${slug}`} variant="ghost">
-                Back to the season page
-              </ButtonLink>
-            </>
+            // A preview exists only for a published season, so it is listed.
+            <ClosedNotice slug={slug} season={preview.competitionName} listed />
           )}
         </Card>
       </RegisterFrame>
@@ -247,6 +305,27 @@ export default async function RegisterPage({
 
   if (landing.mine !== null) {
     const mine = landing.mine;
+    // Only an approved player can have been in the room.
+    const outcome =
+      mine.status === "approved" ? await myAuctionOutcome(slug, session.personId) : null;
+    const auction =
+      outcome === null || outcome.outcome === "pool"
+        ? null
+        : {
+            outcome: outcome.outcome,
+            teamName: outcome.teamName,
+            // The public team page exists only for a published season; a
+            // private season's player finds their squad on their own page.
+            squadHref:
+              landing.listed && outcome.teamSlug !== null
+                ? `/c/${slug}/t/${outcome.teamSlug}`
+                : "/me",
+            priceLabel:
+              outcome.pricePaise === null
+                ? null
+                : formatAmount(paise(outcome.pricePaise), outcome.unit),
+            orgName: outcome.orgName,
+          };
     return (
       <RegisterFrame season={landing.competitionName} meta={meta}>
         <RegistrationStatus
@@ -258,6 +337,7 @@ export default async function RegisterPage({
           name={session.name ?? ""}
           photoUrl={photoUrl}
           roleLabel={mine.role === null ? null : roleLabelIn(pack, mine.role)}
+          auction={auction}
           // NEVER THE RAW COLUMN. The organizer's words must not reach the
           // player (invariant 6); a value outside the closed enum gets a
           // generic sentence that cannot leak.
@@ -277,18 +357,7 @@ export default async function RegisterPage({
     return (
       <RegisterFrame season={landing.competitionName} meta={meta}>
         <Card>
-          <p role="alert" data-testid="registration-closed">
-            Registration for <strong>{landing.competitionName}</strong> is not open right now.
-          </p>
-          {/* Only published seasons HAVE a season page; offering it for an
-              unpublished one sends the player to a 404. */}
-          {landing.listed ? (
-            <p className="register-hint">
-              <ButtonLink href={`/c/${slug}`} variant="ghost">
-                Back to the season page
-              </ButtonLink>
-            </p>
-          ) : null}
+          <ClosedNotice slug={slug} season={landing.competitionName} listed={landing.listed} />
         </Card>
       </RegisterFrame>
     );

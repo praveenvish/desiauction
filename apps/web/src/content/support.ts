@@ -8,22 +8,16 @@
 export const SUPPORT = {
   intro:
     "We answer in person during beta. Tell us what's happening and we'll get back within a day — faster on auction night.",
+  // One card, not two. There used to be an "Email" card and an "Auction-night
+  // help" card, side by side, showing the same address — a reader had to work
+  // out that they were one inbox. The subject line is the only difference, so
+  // it lives in the note.
   channels: [
     {
       title: "Email",
       detail: "support@desiauction.in",
       href: "mailto:support@desiauction.in",
-      note: "The best channel for anything that isn't urgent. Include your competition name if you have one.",
-    },
-    {
-      title: "Auction-night help",
-      // The address alone: the old detail appended "— subject line: AUCTION
-      // NIGHT", which rendered as one two-line underlined link with prose
-      // inside it. The href pre-fills the subject, and the note below already
-      // says why it matters.
-      detail: "support@desiauction.in",
-      href: "mailto:support@desiauction.in?subject=AUCTION%20NIGHT",
-      note: "If something is wrong during a live auction, put AUCTION NIGHT in the subject line — those go to the front of the queue. The link pre-fills it.",
+      note: "Put AUCTION NIGHT in the subject if it's live — those go to the front of the queue. Include your tournament name if you have one.",
     },
   ],
   issueCategories: [
@@ -35,7 +29,7 @@ export const SUPPORT = {
       // silence at the phone step. Both fixed: the real limits (from
       // server/auth/otp.ts) first, and the passkey named as prevention for next
       // time rather than as a way out of this.
-      body: "A code lasts five minutes; you can ask for another after 30 seconds, up to five an hour, and five wrong entries lock that number for a while. If the screen has gone quiet you have probably hit one of those limits — waiting an hour clears it. Check the number you typed and your SMS filters, and email us if you are still stuck.",
+      body: "A code lasts five minutes; you can ask for another after 30 seconds, up to five an hour, and five wrong entries lock that number for a while. If the screen has gone quiet you have probably hit one of those limits — waiting an hour clears it. Check the number you typed and your spam folder or SMS filters, and email us if you are still stuck.",
       link: { label: "Read: signing in & passkeys", href: "/help/signing-in" },
     },
     {

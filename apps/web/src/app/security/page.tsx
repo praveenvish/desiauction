@@ -27,8 +27,8 @@ export default function SecurityPage() {
           <h2>Access is deliberate, not default</h2>
           <p className="prose-p">
             Money authority is granted, not inherited from a role — owning an organization doesn't
-            hand you the settlement or finance desks. Every grant is auditable, and sign-in is
-            phone-first with passkey support, not a password to leak.
+            hand you the settlement or finance desks. Every grant is auditable, and sign-in is a
+            one-time code to your email or mobile number, or a passkey — never a password to leak.
           </p>
         </div>
       </div>

@@ -31,7 +31,15 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 import { HashTabs } from "../../../../components/hash-tabs/hash-tabs";
 import { useMoney } from "../../../../components/money-unit";
@@ -68,20 +76,35 @@ export function TeamsPanel({
   view,
   slug,
   selected,
+  beforeGrid,
 }: {
   view: TeamsWorkspaceView;
   slug: string;
   selected: TeamCard | null;
+  /**
+   * Work that is waiting on the organizer (announcements, squad sheets),
+   * drawn above the team cards rather than below them — the page's job right
+   * after the auction is telling people, and it sat under eight cards.
+   */
+  beforeGrid?: ReactNode;
 }) {
   if (selected !== null) {
     return <RosterDetail slug={slug} team={selected} view={view} />;
   }
-  return <TeamGrid view={view} slug={slug} />;
+  return <TeamGrid view={view} slug={slug} beforeGrid={beforeGrid} />;
 }
 
 /* --- The franchise grid ---------------------------------------------------- */
 
-function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
+function TeamGrid({
+  view,
+  slug,
+  beforeGrid,
+}: {
+  view: TeamsWorkspaceView;
+  slug: string;
+  beforeGrid?: ReactNode;
+}) {
   const money = useMoney();
   const [query, setQuery] = useState("");
   const locked = view.rulesSource?.locked ?? false;
@@ -138,10 +161,14 @@ function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
 
       {/* DA-40: the auction lock is season state, not a validation failure on a
           text input. It is now stated before the form, not after the submit. */}
+      {/* It used to say "The auction has started… Teams stay editable until
+          you go live" — both halves at once, on a season whose auction had
+          finished. One sentence, true for the state the auction is in. */}
       {locked && view.viewer.canManageTeams ? (
         <Notice tone="warning" icon={<IconLock size={20} />} testId="teams-locked-notice">
-          The auction has started, so the team list is locked for this season. Teams stay editable
-          until you go live.
+          {view.rulesSource?.finished === true
+            ? "The auction is done, so the team list is locked for this season."
+            : "The auction has started, so the team list is locked for this season."}
         </Notice>
       ) : null}
 
@@ -155,6 +182,8 @@ function TeamGrid({ view, slug }: { view: TeamsWorkspaceView; slug: string }) {
           live.
         </Notice>
       ) : null}
+
+      {beforeGrid}
 
       {/* A league of eight fits on a screen; past that, finding one needs a box. */}
       {view.teams.length > 8 ? (

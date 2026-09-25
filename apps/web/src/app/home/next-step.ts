@@ -41,6 +41,8 @@ export interface NextStep {
 export interface NextStepInput {
   /** The team this person owns (server/roles currentTeam). */
   ownedTeam: {
+    /** Opens the owner's own squad (`/teams?team=`) rather than the grid. */
+    teamId?: string;
     teamName: string;
     competitionSlug: string;
     competitionName: string;
@@ -125,14 +127,28 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
     };
   }
   if (night !== null && (night.auctionStatus === null || UPCOMING.has(night.auctionStatus))) {
+    /*
+     * Not set up yet is WAITING, not work. The banner used to pair "the
+     * organizer hasn't set the auction up yet" with the amber action tone and
+     * a primary "Open the auction" — urging the auctioneer through a door that
+     * has nothing behind it and a delay that is not theirs to fix. Calm, and a
+     * door to the season itself, where the dates and the organizer are.
+     */
+    if (night.auctionStatus === null) {
+      return {
+        key: "auctioneer-prepare",
+        eyebrow: `Auction night · ${night.competitionName}`,
+        title: "You're the auctioneer for this season",
+        why: "The organizer hasn't set the auction up yet. You'll run it from the cockpit when they do.",
+        cta: { label: "See the season", href: `/seasons/${night.competitionSlug}` },
+        tone: "calm",
+      };
+    }
     return {
       key: "auctioneer-prepare",
       eyebrow: `Auction night · ${night.competitionName}`,
       title: "You're the auctioneer for this season",
-      why:
-        night.auctionStatus === null
-          ? "The organizer hasn't set the auction up yet. You'll run it from the cockpit when they do."
-          : "Walk through the cockpit before the night — the lot order, the owners, the big screen.",
+      why: "Walk through the cockpit before the night — the lot order, the owners, the big screen.",
       cta: { label: "Open the auction", href: `/seasons/${night.competitionSlug}/auction` },
       tone: "action",
     };
@@ -144,7 +160,13 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
       title: `Get ${team.teamName} ready for auction night`,
       why: "Pick your targets and your maximum bid for each. Only you can see your plan.",
       cta: { label: "Open my plan", href: `/seasons/${team.competitionSlug}/auction/plan` },
-      secondary: { label: "Team page", href: `/seasons/${team.competitionSlug}/teams` },
+      secondary: {
+        label: "My squad",
+        href:
+          team.teamId === undefined
+            ? `/seasons/${team.competitionSlug}/teams`
+            : `/seasons/${team.competitionSlug}/teams?team=${encodeURIComponent(team.teamId)}`,
+      },
       then: "bid live on the night — your plan follows you into the room",
       tone: "action",
     };

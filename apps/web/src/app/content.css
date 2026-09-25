@@ -252,13 +252,25 @@
 
 /* --- Card grids (help index, legal index) --------------------------------------------- */
 
-.content-grid {
+/* Doubled with `.cl-prose` because the content layout's prose rules give every
+   `ul` a --space-5 left indent, and `.cl-prose ul` outranks a bare class — the
+   legal index's cards sat pushed right of the heading above them. */
+.content-grid,
+.cl-prose .content-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: var(--space-4);
   margin: 0 0 var(--space-6);
   list-style: none;
   padding: 0;
+}
+
+/* A row of calls to action closing a content page (/about). */
+.content-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-6) 0;
 }
 
 .content-card {

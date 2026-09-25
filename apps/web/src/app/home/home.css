@@ -1075,6 +1075,13 @@
 
   .home-reg > .home-row-link {
     flex-basis: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* The verdict ("Sold · 50,000 pts") drops under the season, lined up with
+     the text: beside it, it squeezed the club name and team chip to "…". */
+  .home-reg > .home-row-link > :last-child {
+    margin-left: calc(40px + var(--space-3));
   }
 
   .home-reg > .home-own-poster {

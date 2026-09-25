@@ -8,13 +8,16 @@ import {
   Notice,
   Pill,
   SectionCard,
+  TeamChip,
+  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 
 import { monogram } from "../../components/season-hero/season-hero";
-import { myRegistrations } from "../../server/competition/public";
+import { moneyFormat } from "../../lib/money";
+import { myRegistrations, type MyRegistration } from "../../server/competition/public";
 import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/profile";
-import { REG_TONE } from "./home-parts";
+import { verdictOf } from "../me/registration-card";
 
 /**
  * THE PLAYER'S HOME.
@@ -30,6 +33,42 @@ import { REG_TONE } from "./home-parts";
  * like a different product from an organizer's is the kind of seam a reader
  * notices without being able to name.
  */
+
+/** The one word for a pre-signed place, when there is room for a team after it. */
+const PRE_SIGNED_WORD = { captain: "Captain", icon: "Icon player", retained: "Retained" } as const;
+
+/**
+ * WHERE THIS SEASON STANDS, in the career page's own words.
+ *
+ * The row used to carry the registration's raw status — a green "approved"
+ * pill on the home of a player who had been SOLD for 50,000 points, with no
+ * word about the team or the price. That is the one fact this page exists to
+ * tell them. `verdictOf` is what /me already says ("Sold · 50,000 pts"), so the
+ * two surfaces cannot drift; a pre-signed place names its team in the same
+ * breath ("Captain · Mumbai Mavericks"), because "picked before the auction" is
+ * the career page's longer explanation and the team is what a home row needs.
+ */
+function verdictFor(registration: MyRegistration): {
+  label: string;
+  tone: KitTone;
+  /** Whether the label already names the team — then no chip beside it. */
+  namesTeam: boolean;
+} {
+  const kind = registration.auction?.kind;
+  if (
+    registration.teamName !== null &&
+    (kind === "captain" || kind === "icon" || kind === "retained")
+  ) {
+    return {
+      label: `${PRE_SIGNED_WORD[kind]} · ${registration.teamName}`,
+      tone: "purple",
+      namesTeam: true,
+    };
+  }
+  // The full figure, not the room's shorthand: this is their price, once.
+  const verdict = verdictOf(registration, (amount, unit) => moneyFormat(unit).ledger(amount));
+  return { ...verdict, namesTeam: false };
+}
 
 export async function PlayerHome({
   personId,
@@ -65,7 +104,8 @@ export async function PlayerHome({
           tone="info"
           icon={<IconUser size={20} />}
           testId="home-profile-nudge"
-          title={`Complete your player profile — ${String(completeness.done)}/${String(completeness.total)}`}
+          // "Profile N of M" — the one way /home, /me and /account all say it.
+          title={`Complete your player profile · ${String(completeness.done)} of ${String(completeness.total)} done`}
           action={
             <ButtonLink href="/account" variant="secondary" size="sm">
               Finish it
@@ -93,40 +133,50 @@ export async function PlayerHome({
           }
         >
           <ul className="home-list">
-            {registrations.map((registration) => (
-              <li key={registration.registrationId} className="home-reg">
-                <Link
-                  href={`/seasons/${registration.competitionSlug}/register`}
-                  className="home-row-link"
-                >
-                  <span className="home-crest" aria-hidden>
-                    {monogram(registration.competitionName)}
-                  </span>
-                  <span className="home-row-text">
-                    <strong>{registration.competitionName}</strong>
-                    <span>
-                      {registration.orgName} ·{" "}
-                      {roleLabelIn(sportPackFor(registration.sport), registration.role)} ·{" "}
-                      {registration.number}
-                    </span>
-                  </span>
-                  <Pill tone={REG_TONE[registration.status] ?? "neutral"}>
-                    {registration.status}
-                  </Pill>
-                </Link>
-                {/* The player's own card — a sibling of the row link, never
-                    nested in it, and offered only where a verdict exists. */}
-                {registration.posterReady ? (
+            {registrations.map((registration) => {
+              const verdict = verdictFor(registration);
+              return (
+                <li key={registration.registrationId} className="home-reg">
                   <Link
-                    href={`/seasons/${registration.competitionSlug}/posters`}
-                    className="home-own-poster"
-                    data-testid="my-poster"
+                    href={`/seasons/${registration.competitionSlug}/register`}
+                    className="home-row-link"
                   >
-                    Get your card
+                    <span className="home-crest" aria-hidden>
+                      {monogram(registration.competitionName)}
+                    </span>
+                    <span className="home-row-text">
+                      <strong>{registration.competitionName}</strong>
+                      <span>
+                        {registration.orgName} ·{" "}
+                        {roleLabelIn(sportPackFor(registration.sport), registration.role)} ·{" "}
+                        {registration.number}
+                      </span>
+                      {registration.teamName !== null && !verdict.namesTeam ? (
+                        <span>
+                          <TeamChip color={registration.teamColor}>
+                            {registration.teamName}
+                          </TeamChip>
+                        </span>
+                      ) : null}
+                    </span>
+                    <Pill tone={verdict.tone} dot testId="home-reg-verdict">
+                      {verdict.label}
+                    </Pill>
                   </Link>
-                ) : null}
-              </li>
-            ))}
+                  {/* The player's own card — a sibling of the row link, never
+                    nested in it, and offered only where a verdict exists. */}
+                  {registration.posterReady ? (
+                    <Link
+                      href={`/seasons/${registration.competitionSlug}/posters`}
+                      className="home-own-poster"
+                      data-testid="my-poster"
+                    >
+                      Get your card
+                    </Link>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </SectionCard>
       ) : null}

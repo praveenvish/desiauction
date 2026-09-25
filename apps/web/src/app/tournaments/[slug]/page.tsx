@@ -42,9 +42,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       };
 }
 
-/** What this page is for, in one sentence. */
+/**
+ * What this page is for, in one sentence — which depends on whether it has
+ * anything on it yet. "Add the first one" used to sit above a list that already
+ * held a season, so the line is now decided where the seasons are known.
+ */
 const WHAT_A_TOURNAMENT_IS =
   "A tournament holds the editions that actually run. Add the first one to take registrations, pick teams and run auction night.";
+
+function whatThisIs(tournamentName: string, seasons: number): string {
+  return seasons === 0
+    ? WHAT_A_TOURNAMENT_IS
+    : `Every edition of ${tournamentName}. Add a season when the next one is ready.`;
+}
 
 /**
  * One tournament and its seasons. This is where a season is added to a
@@ -106,12 +116,6 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
               }
             : {})}
         />
-        {/* The best sentence in the journey used to vanish the moment it worked:
-            it lived only in the empty state, so once a season existed the whole
-            of the page's explanation of itself was "Demo Cricket Club · 5
-            seasons". */}
-        <p className="tg-what">{WHAT_A_TOURNAMENT_IS}</p>
-
         <Suspense fallback={<TournamentsSkeleton rows={3} />}>
           <SeasonsSection
             tournamentId={tournament.id}
@@ -137,58 +141,69 @@ async function SeasonsSection({
   addSeasonForm: ReactNode;
 }) {
   const seasons = await tournamentSeasons(tournamentId);
+  /* The best sentence in the journey used to vanish the moment it worked: it
+     lived only in the empty state, so once a season existed the whole of the
+     page's explanation of itself was "Demo Cricket Club · 5 seasons". It is
+     drawn here, beside the seasons, so it can say the right thing about them. */
+  const what = <p className="tg-what">{whatThisIs(tournamentName, seasons.length)}</p>;
 
   if (seasons.length === 0) {
     return (
-      <Card>
-        <EmptyState
-          headingLevel={2}
-          title="No seasons yet"
-          description={
-            canCreateSeason
-              ? // The line above the list already says what a tournament is;
-                // repeating it here printed the same sentence twice.
-                "Start with this year's season — dates, sport and teams come next."
-              : "This tournament has no editions yet. Ask an owner to add a season."
-          }
-          {...(canCreateSeason
-            ? {
-                action: (
-                  <FormDialog
-                    title={`New season in ${tournamentName}`}
-                    triggerLabel="Add the first season"
-                    size="lg"
-                    triggerTestId="add-first-season"
-                  >
-                    {addSeasonForm}
-                  </FormDialog>
-                ),
-              }
-            : {})}
-        />
-      </Card>
+      <>
+        {what}
+        <Card>
+          <EmptyState
+            headingLevel={2}
+            title="No seasons yet"
+            description={
+              canCreateSeason
+                ? // The line above the list already says what a tournament is;
+                  // repeating it here printed the same sentence twice.
+                  "Start with this year's season — dates, sport and teams come next."
+                : "This tournament has no editions yet. Ask an owner to add a season."
+            }
+            {...(canCreateSeason
+              ? {
+                  action: (
+                    <FormDialog
+                      title={`New season in ${tournamentName}`}
+                      triggerLabel="Add the first season"
+                      size="lg"
+                      triggerTestId="add-first-season"
+                    >
+                      {addSeasonForm}
+                    </FormDialog>
+                  ),
+                }
+              : {})}
+          />
+        </Card>
+      </>
     );
   }
 
   return (
-    <section className="seasons-section">
-      <SectionHeader
-        title={`Seasons (${String(seasons.length)})`}
-        {...(canCreateSeason
-          ? {}
-          : {
-              actions: (
-                <span className="tg-cannot" data-testid="tournament-cannot-create">
-                  Ask an owner to add a season.
-                </span>
-              ),
-            })}
-      />
-      <div className="competitions-grid" data-testid="tournament-seasons">
-        {seasons.map((season) => (
-          <SeasonCard key={season.id} season={season} />
-        ))}
-      </div>
-    </section>
+    <>
+      {what}
+      <section className="seasons-section">
+        <SectionHeader
+          title={`Seasons (${String(seasons.length)})`}
+          {...(canCreateSeason
+            ? {}
+            : {
+                actions: (
+                  <span className="tg-cannot" data-testid="tournament-cannot-create">
+                    Ask an owner to add a season.
+                  </span>
+                ),
+              })}
+        />
+        <div className="competitions-grid" data-testid="tournament-seasons">
+          {seasons.map((season) => (
+            <SeasonCard key={season.id} season={season} />
+          ))}
+        </div>
+      </section>
+    </>
   );
 }

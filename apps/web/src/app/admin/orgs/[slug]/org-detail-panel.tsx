@@ -121,10 +121,27 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               <tbody>
                 {competitions.map((competition) => (
                   <tr key={competition.id}>
+                    {/* /seasons/<slug> is a member's workspace and notFound()s
+                        for a platform admin who is not in the club — every
+                        season here was a dead link. The doors that DO open for
+                        this reader: the public page when the season is public
+                        (and not taken down), else the admin auction watch when
+                        it has an auction, else just the name. */}
                     <td data-label="Season">
-                      <Link href={`/seasons/${competition.slug}`} className="admin-name">
-                        {competition.name}
-                      </Link>
+                      {competition.visibility === "public" && !competition.held ? (
+                        <Link href={`/c/${competition.slug}`} className="admin-name">
+                          {competition.name}
+                        </Link>
+                      ) : competition.auctionId !== null ? (
+                        <Link
+                          href={`/admin/auctions/${competition.auctionId}`}
+                          className="admin-name"
+                        >
+                          {competition.name}
+                        </Link>
+                      ) : (
+                        <span className="admin-name">{competition.name}</span>
+                      )}
                     </td>
                     {/* Capability SETS are rendered verbatim on purpose; a
                         lifecycle state is not a set. "REGISTRATION_CLOSED" is

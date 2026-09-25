@@ -16,7 +16,7 @@ import { myOrgCards } from "../../server/orgs/actions";
 import { CreateOrgForm } from "./create-org-form";
 import "./orgs.css";
 
-export const metadata = { title: "Organizations · DesiAuction" };
+export const metadata = { title: "Clubs · DesiAuction" };
 
 /**
  * "Malad Cricket Club" → "MC". Two initials max.
@@ -85,9 +85,8 @@ export default async function OrgsPage({
             <div className="orgs-blank" data-testid="orgs-empty">
               <h2>Start with your club</h2>
               <p>
-                An organization is your club or academy. Everything else hangs off it — your
-                tournaments, your teams, your money and who is allowed to touch it. Most people need
-                exactly one.
+                Your club or academy comes first. Everything else hangs off it — your tournaments,
+                your teams, your money and who is allowed to touch it. Most people need exactly one.
               </p>
               {/* Its OWN test id. `new-org` belongs to the router-provided page
                   action (app/@action/orgs) — and BOTH render when the list is
@@ -96,7 +95,7 @@ export default async function OrgsPage({
                   every spec that creates an org, which is most of the suite. */}
               <FormDialog
                 title="New club"
-                triggerLabel="Create your organization"
+                triggerLabel="Create your club"
                 size="touch"
                 triggerTestId="new-org-empty"
               >
@@ -172,7 +171,7 @@ export default async function OrgsPage({
                   <IconPlus size={20} />
                 </span>
                 <span className="org-add-text">
-                  <strong>Create an organization</strong>
+                  <strong>Create a club</strong>
                   <span>A club or academy of your own.</span>
                 </span>
               </>

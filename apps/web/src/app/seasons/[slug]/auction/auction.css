@@ -3022,3 +3022,51 @@
   gap: var(--space-4);
   min-width: 0;
 }
+
+/* --- ledger: filter chips and the phone-width columns ---------------------- */
+
+.ledger-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ledger-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.ledger-filter-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.ledger-filter-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--text-heading);
+}
+
+.ledger-filter-chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* On a phone every ledger row stacks its cells as labelled pairs, and ten of
+   them made a finished auction's ledger some 46,000px tall — "Correlation" and
+   "Reason —" on every row. Actor, paddle, reason and correlation are the
+   dispute columns, read at a desk; the phone keeps who, what and for how much. */
+@media (max-width: 640px) {
+  .reg-table .ledger-col-minor {
+    display: none;
+  }
+}

@@ -613,139 +613,148 @@ export function LivePanel({
             {/* The claim door. Once a paddle is held, PaddleControl above owns
                 the "Your paddle" heading and states the same fact in its header,
                 so this card would be a second panel of the same name saying the
-                same thing. */}
-            <Card data-testid="paddle-panel" className="live-card">
-              <h2>{myPaddle !== null ? "Paddle status" : "Claim your paddle"}</h2>
-              {myPaddle !== null ? (
-                <div className="paddle-status-row">
-                  <p className="paddle-status-current">
-                    <span className="paddle-status-caption">Current paddle</span>
-                    <span data-testid="my-paddle" className="registration-name">
-                      {myPaddle.paddleNumber} · bidding for {myPaddle.teamName}
-                    </span>
-                  </p>
-                  {/* Holding several paddles is legitimate — one laptop, one
+                same thing.
+                Once the night is over there is nothing left to claim: an
+                organizer with no paddle used to be told "Claim your paddle — No
+                paddle grant yet" on a finished room. A held paddle still shows,
+                because its purse line is the owner's final account. */}
+            {finished && myPaddle === null ? null : (
+              <Card data-testid="paddle-panel" className="live-card">
+                <h2>{myPaddle !== null ? "Paddle status" : "Claim your paddle"}</h2>
+                {myPaddle !== null ? (
+                  <div className="paddle-status-row">
+                    <p className="paddle-status-current">
+                      <span className="paddle-status-caption">Current paddle</span>
+                      <span data-testid="my-paddle" className="registration-name">
+                        {myPaddle.paddleNumber} · bidding for {myPaddle.teamName}
+                      </span>
+                    </p>
+                    {/* Holding several paddles is legitimate — one laptop, one
                       auctioneer, a small club. What was missing is the way to
                       say which one is bidding right now. */}
-                  {view.myPaddles.length > 1 ? (
-                    <Select
-                      label="Bidding as"
-                      name="activePaddle"
-                      value={myPaddle.paddleId}
-                      onChange={(event) => {
-                        setActivePaddleId(event.target.value);
-                      }}
-                      data-testid="paddle-switcher"
+                    {view.myPaddles.length > 1 ? (
+                      <Select
+                        label="Bidding as"
+                        name="activePaddle"
+                        value={myPaddle.paddleId}
+                        onChange={(event) => {
+                          setActivePaddleId(event.target.value);
+                        }}
+                        data-testid="paddle-switcher"
+                      >
+                        {view.myPaddles.map((entry) => (
+                          <option key={entry.paddleId} value={entry.paddleId}>
+                            {entry.paddleNumber} · {entry.teamName}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : null}
+                    <Button
+                      variant="ghost"
+                      onClick={() => void release()}
+                      loading={pending === "release"}
+                      data-testid="release-paddle"
                     >
-                      {view.myPaddles.map((entry) => (
-                        <option key={entry.paddleId} value={entry.paddleId}>
-                          {entry.paddleNumber} · {entry.teamName}
+                      Hand back paddle
+                    </Button>
+                  </div>
+                ) : grantedTeams.length > 0 ? (
+                  <div className="date-row">
+                    <Select
+                      label="Team"
+                      name="claimTeam"
+                      value={claimTeam}
+                      onChange={(event) => {
+                        setClaimTeam(event.target.value);
+                      }}
+                    >
+                      <option value="">Choose…</option>
+                      {grantedTeams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
                         </option>
                       ))}
                     </Select>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    onClick={() => void release()}
-                    loading={pending === "release"}
-                    data-testid="release-paddle"
-                  >
-                    Hand back paddle
-                  </Button>
-                </div>
-              ) : grantedTeams.length > 0 ? (
-                <div className="date-row">
-                  <Select
-                    label="Team"
-                    name="claimTeam"
-                    value={claimTeam}
-                    onChange={(event) => {
-                      setClaimTeam(event.target.value);
-                    }}
-                  >
-                    <option value="">Choose…</option>
-                    {grantedTeams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </Select>
-                  <Button
-                    onClick={() => void claim()}
-                    loading={pending === "claim"}
-                    disabled={claimTeam === ""}
-                    data-testid="claim-paddle"
-                  >
-                    Claim paddle
-                  </Button>
-                </div>
-              ) : (
-                /* DERIVED, not asserted. This told a freshly-accepted owner to
+                    <Button
+                      onClick={() => void claim()}
+                      loading={pending === "claim"}
+                      disabled={claimTeam === ""}
+                      data-testid="claim-paddle"
+                    >
+                      Claim paddle
+                    </Button>
+                  </div>
+                ) : (
+                  /* DERIVED, not asserted. This told a freshly-accepted owner to
                    "accept your owner invitation" — the act they had just
                    completed to get to this page. They are in this room
                    precisely BECAUSE they accepted (`myTeamIds` is non-empty for
                    anyone who did), so the only thing left to say is the one
                    thing they can't do themselves. */
-                <p className="competitions-hint" data-testid="no-grant-hint">
-                  {view.myTeamIds.length > 0
-                    ? "You're the owner — but a paddle is a separate step. Ask the organizer to grant your paddle; you'll be able to claim it here the moment they do."
-                    : "No paddle grant yet — ask the organizer to grant your paddle."}
-                </p>
-              )}
-              {snapshot !== null ? (
-                <ul className="paddle-chips">
-                  {snapshot.paddles.map((paddle) => {
-                    const mineEntry = view.myPaddles.find(
-                      (entry) => entry.paddleId === paddle.paddleId,
-                    );
-                    const active = myPaddle?.paddleId === paddle.paddleId;
-                    const body = (
-                      <>
-                        <span className="paddle-chip-head">
-                          <TeamChip color={teamColors[paddle.teamId] ?? null}>
-                            {paddle.paddleNumber}
-                          </TeamChip>
-                          <span className="paddle-chip-team">{paddle.teamName}</span>
-                        </span>
-                        <span className="paddle-chip-money">
-                          {paddle.purseRemaining === null || paddle.committed === null
-                            ? "purse sealed"
-                            : `purse ${money.ledger(paddle.purseRemaining)} · committed ${money.ledger(paddle.committed)}`}
-                          {paddle.released ? " · released" : ""}
-                        </span>
-                      </>
-                    );
-                    return (
-                      <li
-                        key={paddle.paddleId}
-                        data-testid={`live-paddle-${paddle.paddleNumber}`}
-                        data-released={paddle.released ? "true" : undefined}
-                      >
-                        {/* One of MY paddles is a switch; anyone else's is a fact. */}
-                        {mineEntry !== undefined && view.myPaddles.length > 1 ? (
-                          <button
-                            type="button"
-                            className="paddle-chip"
-                            aria-pressed={active}
-                            onClick={() => {
-                              setActivePaddleId(mineEntry.paddleId);
-                            }}
-                          >
-                            {body}
-                          </button>
-                        ) : (
-                          <span className="paddle-chip" data-active={active ? "true" : undefined}>
-                            {body}
+                  <p className="competitions-hint" data-testid="no-grant-hint">
+                    {view.myTeamIds.length > 0
+                      ? "You're the owner — but a paddle is a separate step. Ask the organizer to grant your paddle; you'll be able to claim it here the moment they do."
+                      : "No paddle grant yet — ask the organizer to grant your paddle."}
+                  </p>
+                )}
+                {snapshot !== null ? (
+                  <ul className="paddle-chips">
+                    {snapshot.paddles.map((paddle) => {
+                      const mineEntry = view.myPaddles.find(
+                        (entry) => entry.paddleId === paddle.paddleId,
+                      );
+                      const active = myPaddle?.paddleId === paddle.paddleId;
+                      const body = (
+                        <>
+                          <span className="paddle-chip-head">
+                            <TeamChip color={teamColors[paddle.teamId] ?? null}>
+                              {paddle.paddleNumber}
+                            </TeamChip>
+                            <span className="paddle-chip-team">{paddle.teamName}</span>
                           </span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-            </Card>
+                          <span className="paddle-chip-money">
+                            {paddle.purseRemaining === null || paddle.committed === null
+                              ? "purse sealed"
+                              : `purse ${money.ledger(paddle.purseRemaining)} · committed ${money.ledger(paddle.committed)}`}
+                            {paddle.released ? " · released" : ""}
+                          </span>
+                        </>
+                      );
+                      return (
+                        <li
+                          key={paddle.paddleId}
+                          data-testid={`live-paddle-${paddle.paddleNumber}`}
+                          data-released={paddle.released ? "true" : undefined}
+                        >
+                          {/* One of MY paddles is a switch; anyone else's is a fact. */}
+                          {mineEntry !== undefined && view.myPaddles.length > 1 ? (
+                            <button
+                              type="button"
+                              className="paddle-chip"
+                              aria-pressed={active}
+                              onClick={() => {
+                                setActivePaddleId(mineEntry.paddleId);
+                              }}
+                            >
+                              {body}
+                            </button>
+                          ) : (
+                            <span className="paddle-chip" data-active={active ? "true" : undefined}>
+                              {body}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </Card>
+            )}
 
-            {view.viewer.canConduct ? (
+            {/* Conducting ends with the auction. The card used to stay up on a
+                completed room — Queue lots, a gold "Open next lot", a gavel —
+                every one of them a button with nothing left to act on. */}
+            {view.viewer.canConduct && !finished ? (
               <Card data-testid="conduct-panel" className="live-card">
                 <h2>Conduct</h2>
                 <div className="conduct-row">
@@ -753,7 +762,6 @@ export function LivePanel({
                     variant="secondary"
                     onClick={() => void send("queue", "QueueLots", {}, "Lots queued")}
                     loading={pending === "queue"}
-                    disabled={finished}
                     data-testid="conduct-queue"
                   >
                     Queue lots
@@ -812,31 +820,26 @@ export function LivePanel({
                     </Button>
                   ) : null}
                   {/* A finished auction cannot be completed, undone or
-                      recovered. The room used to keep offering all three after
-                      the night was over. */}
-                  {finished ? null : (
-                    <>
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          setCompleteOpen(true);
-                        }}
-                        data-testid="conduct-complete"
-                      >
-                        Close auction
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() =>
-                          void send("recover", "RecoverAuction", {}, "Recovered — state verified")
-                        }
-                        loading={pending === "recover"}
-                        data-testid="conduct-recover"
-                      >
-                        Recover
-                      </Button>
-                    </>
-                  )}
+                      recovered — the whole card is gone once it is over. */}
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setCompleteOpen(true);
+                    }}
+                    data-testid="conduct-complete"
+                  >
+                    Close auction
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      void send("recover", "RecoverAuction", {}, "Recovered — state verified")
+                    }
+                    loading={pending === "recover"}
+                    data-testid="conduct-recover"
+                  >
+                    Recover
+                  </Button>
                 </div>
               </Card>
             ) : null}
@@ -866,11 +869,17 @@ export function LivePanel({
                     {snapshot.auctionStatus}
                   </Badge>
                 ) : null}
+                {/* The raw socket word ("open") read like a status of the
+                    AUCTION — it sat beside COMPLETED as "OPEN". Say what it is
+                    about: the link to the room. The raw value stays on
+                    data-connection for anything that needs to tell
+                    "connecting" from "reconnecting". */}
                 <Badge
                   tone={connection === "open" ? "success" : "warning"}
                   data-testid="connection-state"
+                  data-connection={connection}
                 >
-                  {connection}
+                  {connection === "open" ? "Connected" : "Reconnecting"}
                 </Badge>
               </span>
             </div>

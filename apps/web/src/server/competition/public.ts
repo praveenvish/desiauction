@@ -268,6 +268,14 @@ export interface ShowcasePlayer {
   /** Why a `retained`-status player skipped the auction — the word to print. */
   preSignedAs: PreSignedKind | null;
   teamName: string | null;
+  /**
+   * What the room paid, in the season's unit ×100 — null for anyone not sold
+   * at auction (in the pool, pre-signed, passed). Public since the founder's
+   * 2026-09-24 decision that made the price the thing a player card shares;
+   * the season page carries it so a squad card can lead with its top buy
+   * instead of whoever happened to register first.
+   */
+  soldPrice: number | null;
 }
 
 interface ShowcaseRow {
@@ -287,6 +295,7 @@ interface ShowcaseRow {
   isIcon: boolean;
   isCaptain: boolean;
   isRetained: boolean;
+  soldPrice?: number | null;
 }
 
 /**
@@ -295,6 +304,18 @@ interface ShowcaseRow {
  * public outcome is the sale.
  */
 const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold'))`;
+
+/**
+ * The hammer price, when there was one: the registration's SOLD lot in a
+ * season auction that was not abandoned. One sold lot per registration per
+ * auction, and a season has one live auction, so `max` only makes the
+ * subquery scalar — it never picks between two sales. `::float8` because a
+ * raw bigint comes back from the driver as a STRING, and every consumer
+ * does arithmetic on it (a ₹2 Cr purse ×100 overflows `int`).
+ */
+const showcaseSoldPrice = sql<
+  number | null
+>`(select max(${lots.soldPrice}) from ${lots} inner join ${auctions} on ${auctions.id} = ${lots.auctionId} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${auctions.status} <> 'abandoned')::float8`;
 
 /**
  * The stored photo KEY a public surface may render, or null — the same two
@@ -350,6 +371,8 @@ function toShowcasePlayer(r: ShowcaseRow, now: Date, sport: string): ShowcasePla
     status: r.preSigned ? "retained" : r.teamId === null ? "available" : "sold",
     preSignedAs: r.preSigned ? preSignedKind(r) : null,
     teamName: r.teamName,
+    // A pre-signed player's public outcome is the mark, not a price.
+    soldPrice: r.preSigned ? null : (r.soldPrice ?? null),
   };
 }
 
@@ -428,6 +451,7 @@ export async function publicShowcase(slug: string): Promise<ShowcasePool | null>
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
+      soldPrice: showcaseSoldPrice,
       // The pool size, carried on every row. `count(*) over ()` is evaluated
       // before LIMIT, so it counts the whole approved set — one query rather
       // than a second round trip, and there is no window in which the rows and
@@ -532,6 +556,7 @@ export async function publicPlayerCard(
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
+      soldPrice: showcaseSoldPrice,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -707,6 +732,173 @@ export async function publicPlayerPoster(
       .join(".")
       .replace(/[^a-z0-9.]/gi, ""),
   };
+}
+
+/**
+ * WHAT HAPPENED TO ME AT THE AUCTION — the registration page's own read.
+ *
+ * A player the room had SOLD came back to `/seasons/<slug>/register` and was
+ * told "You're in the player pool … team owners bid to sign you", with a
+ * withdraw button under it: the page read the registration row, which stays
+ * `approved` for life, and knew nothing of the auction. This is the missing
+ * half, derived with the share card's own rules (`outcomeOf`, sold outranks
+ * every mark) so the two can never tell one player different stories.
+ *
+ * NOT a public read, and not behind the visibility gate: a private season's
+ * player is owed their own result as much as a public one's. It is keyed by
+ * the caller's own `personId` (from the session, never a parameter a stranger
+ * controls) and returns only that person's row.
+ */
+export interface MyAuctionOutcome {
+  /**
+   * `sold` — bought in the room; `captain`/`icon`/`retained` — signed before
+   * it; `passed` — the auction finished without them (lot unsold, or never
+   * reached); `pool` — still to come.
+   */
+  outcome: "sold" | "captain" | "icon" | "retained" | "passed" | "pool";
+  teamName: string | null;
+  /** `/c/<slug>/t/<teamSlug>` segment — only a published season has the page. */
+  teamSlug: string | null;
+  /** Hammer price ×100 in `unit`, sold only. */
+  pricePaise: number | null;
+  unit: MoneyUnit;
+  /** The club running the season — who to ask about dropping out. */
+  orgName: string;
+}
+
+export async function myAuctionOutcome(
+  slug: string,
+  personId: string,
+): Promise<MyAuctionOutcome | null> {
+  const [row] = await systemDb
+    .select({
+      competitionId: competitions.id,
+      unit: competitions.auctionUnit,
+      orgName: organizations.name,
+      registrationId: registrations.id,
+      teamId: registrations.teamId,
+      isIcon: registrations.isIcon,
+      isCaptain: registrations.isCaptain,
+      isRetained: registrations.isRetained,
+    })
+    .from(registrations)
+    .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+    .innerJoin(organizations, eq(organizations.id, competitions.orgId))
+    .where(
+      and(
+        eq(competitions.slug, slug),
+        eq(registrations.personId, personId),
+        eq(registrations.status, "approved"),
+      ),
+    )
+    .limit(1);
+  if (row === undefined) {
+    return null;
+  }
+  const [auction] = await systemDb
+    .select({ id: auctions.id, status: auctions.status })
+    .from(auctions)
+    .where(and(eq(auctions.competitionId, row.competitionId), ne(auctions.status, "abandoned")))
+    .limit(1);
+  const [lot] =
+    auction === undefined
+      ? []
+      : await systemDb
+          .select({
+            status: lots.status,
+            soldPrice: lots.soldPrice,
+            buyerTeamId: paddles.teamId,
+          })
+          .from(lots)
+          .leftJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+          .where(and(eq(lots.registrationId, row.registrationId), eq(lots.auctionId, auction.id)))
+          .limit(1);
+  const preSigned = lot?.status !== "sold" && isPreSigned(row);
+  const verdict = outcomeOf(
+    preSigned ? preSignedKind(row) : null,
+    lot?.status,
+    auction?.status ?? null,
+  );
+  // `outcomeOf` answers null for "a finished auction that never reached
+  // them" (and for a withdrawn/frozen lot) — for the player that is the same
+  // kind sentence as a pass: the night is over and no team took them.
+  const outcome: MyAuctionOutcome["outcome"] =
+    verdict === null || verdict === "unsold" ? "passed" : verdict;
+  const teamId = outcome === "sold" ? (lot?.buyerTeamId ?? null) : preSigned ? row.teamId : null;
+  const [team] =
+    teamId === null
+      ? []
+      : await systemDb
+          .select({ name: teams.name })
+          .from(teams)
+          .where(and(eq(teams.id, teamId), eq(teams.competitionId, row.competitionId)))
+          .limit(1);
+  return {
+    // A "sold" with no team row to name is not a sentence we can finish.
+    outcome: outcome === "sold" && team === undefined ? "pool" : outcome,
+    teamName: team?.name ?? null,
+    teamSlug: team === undefined ? null : teamSlugOf(team.name),
+    pricePaise: outcome === "sold" ? (lot?.soldPrice ?? null) : null,
+    unit: row.unit,
+    orgName: row.orgName,
+  };
+}
+
+/**
+ * THE SEASON'S TOP BUYS — the three biggest sales, for the season page.
+ *
+ * Behind the season-page gate (published, approved players only) and carrying
+ * only what the team page and player card already publish: the name, the
+ * number that addresses their page, the price and the buying team.
+ */
+export interface PublicTopBuy {
+  registrationId: string;
+  number: string;
+  name: string;
+  pricePaise: number;
+  teamName: string | null;
+}
+
+export async function publicTopBuys(slug: string, limit = 3): Promise<PublicTopBuy[]> {
+  const [comp] = await systemDb
+    .select({ id: competitions.id, visibility: competitions.visibility })
+    .from(competitions)
+    .where(eq(competitions.slug, slug))
+    .limit(1);
+  if (comp === undefined || comp.visibility !== "public") {
+    return [];
+  }
+  const rows = await systemDb
+    .select({
+      registrationId: registrations.id,
+      number: registrations.registrationNumber,
+      name: shownName,
+      price: lots.soldPrice,
+      teamName: teams.name,
+    })
+    .from(lots)
+    .innerJoin(auctions, eq(auctions.id, lots.auctionId))
+    .innerJoin(registrations, eq(registrations.id, lots.registrationId))
+    .innerJoin(people, eq(people.id, registrations.personId))
+    .leftJoin(paddles, eq(paddles.id, lots.soldToPaddleId))
+    .leftJoin(teams, eq(teams.id, paddles.teamId))
+    .where(
+      and(
+        eq(auctions.competitionId, comp.id),
+        ne(auctions.status, "abandoned"),
+        eq(lots.status, "sold"),
+        eq(registrations.status, "approved"),
+      ),
+    )
+    .orderBy(desc(lots.soldPrice), asc(registrations.registrationNumber))
+    .limit(limit);
+  return rows.map((row) => ({
+    registrationId: row.registrationId,
+    number: row.number,
+    name: row.name ?? "Player",
+    pricePaise: row.price ?? 0,
+    teamName: row.teamName,
+  }));
 }
 
 /**
@@ -1227,6 +1419,21 @@ export interface MyRegistration {
    * reached them.
    */
   posterReady: boolean;
+  /**
+   * What the night decided for this person, in the same shape /me reads
+   * (`CareerSeason.auction`) so /home can say it with the same words — "Sold ·
+   * 50,000 pts" — instead of the registration's bare "approved", which was all
+   * a sold player's home told them. The sale wins over a pre-signed mark, as it
+   * does on the career page.
+   */
+  auction:
+    { kind: PreSignedKind } | { kind: "sold"; soldPrice: number } | { kind: "unsold" } | null;
+  /** What `auction.soldPrice` counts in (0091) — rupees or points. */
+  auctionUnit: MoneyUnit;
+  /** The team this person plays for — sold to, or named captain/icon of. */
+  teamName: string | null;
+  /** That team's own colour, for its chip; null when the club set none. */
+  teamColor: string | null;
 }
 
 /** The person's registrations across every competition — the player lens.
@@ -1252,12 +1459,20 @@ export const myRegistrations = cache(async function myRegistrations(
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
       lotStatus: lots.status,
+      soldPrice: lots.soldPrice,
       auctionStatus: auctions.status,
+      auctionUnit: competitions.auctionUnit,
+      teamName: teams.name,
+      teamColor: teams.primaryColor,
     })
     .from(registrations)
     .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
     .innerJoin(organizations, eq(organizations.id, competitions.orgId))
     .innerJoin(people, eq(people.id, registrations.personId))
+    // The registration's own team: the completed auction writes the buyer here
+    // (and a captain/icon is placed here before it), so it is the one answer
+    // to "whose am I?" — the same join the career page makes.
+    .leftJoin(teams, eq(teams.id, registrations.teamId))
     /*
      * The lot is joined THROUGH its auction and only the one that counts.
      * Migration 0029 permits at most one non-abandoned auction per competition
@@ -1294,6 +1509,17 @@ export const myRegistrations = cache(async function myRegistrations(
         row.lotStatus ?? undefined,
         row.auctionStatus,
       ) !== null,
+    auctionUnit: row.auctionUnit,
+    teamName: row.teamName,
+    teamColor: row.teamColor,
+    auction:
+      row.lotStatus === "sold" && row.soldPrice !== null
+        ? { kind: "sold", soldPrice: row.soldPrice }
+        : isPreSigned(row)
+          ? { kind: preSignedKind(row) ?? "icon" }
+          : row.lotStatus === "unsold"
+            ? { kind: "unsold" }
+            : null,
   }));
 });
 

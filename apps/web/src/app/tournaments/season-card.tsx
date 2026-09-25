@@ -68,12 +68,23 @@ export function statusTone(status: string): (typeof STATUS_TONE)[keyof typeof ST
 export function seasonStatusBadge(
   status: string,
   settlement?: "settling" | "settled" | null,
+  /**
+   * The auction has been run. The competition status stops at
+   * `registration_closed` (DA-10), so a season whose squads were already
+   * picked kept badging "Registration closed" on four screens while its own
+   * overview said the auction was done. The auction's fact outranks the
+   * registration step it came after; the books' fact outranks both.
+   */
+  auctionDone?: boolean,
 ): { label: string; tone: "neutral" | "info" | "success" | "warning" } {
   if (settlement === "settled") {
     return { label: "Settled", tone: "success" };
   }
   if (settlement === "settling") {
     return { label: "Settling", tone: "warning" };
+  }
+  if (auctionDone === true) {
+    return { label: "Auction done", tone: "success" };
   }
   return { label: statusLabel(status), tone: statusTone(status) };
 }
@@ -106,11 +117,12 @@ export function SeasonCard({
     orgName?: string;
     running?: boolean;
     settlement?: "settling" | "settled" | null;
+    counts?: { auctionDone?: boolean };
   };
 }) {
   const when = dateRange(season.startsOn, season.endsOn);
   const hasMeta = when !== null || season.location !== null;
-  const badge = seasonStatusBadge(season.status, season.settlement);
+  const badge = seasonStatusBadge(season.status, season.settlement, season.counts?.auctionDone);
   return (
     <Link href={`/seasons/${season.slug}`} className="competition-link">
       <Card padding="none">

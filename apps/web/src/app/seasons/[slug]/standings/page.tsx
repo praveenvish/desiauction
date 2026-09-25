@@ -33,13 +33,19 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
   const complete = standings.recorded >= standings.playable;
   const teamOf = new Map(view.teams.map((team) => [team.id, team]));
   const lobby = standings.sport.fixtureShape === "lobby";
+  /*
+   * Before a ball is bowled every team is level, so ranking them 1, 2, 3 (by
+   * the alphabet, in effect) and printing "0/0.0 for · 0/0.0 against" under
+   * each one reported a standing nobody holds. Both wait for the first result.
+   */
+  const anyPlayed = standings.recorded > 0;
 
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
         {/* The table shares the Schedule tab with the fixtures it is derived
             from (RN-1), so this is how an organizer reaches them. */}
-        <PageIntro actions={<SiblingLink href={`/seasons/${slug}/fixtures`} label="Fixtures" />} />
+        <PageIntro actions={<SiblingLink href={`/seasons/${slug}/fixtures`} label="Schedule" />} />
         <SectionCard
           icon={<IconTrophy />}
           title={lobby ? "Points table" : "League table"}
@@ -120,7 +126,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                         data-rank={index < 3 && row.played > 0 ? String(index + 1) : undefined}
                       >
                         <td className="st-num sd-pos">
-                          <span className="sd-rank">{index + 1}</span>
+                          <span className="sd-rank">{anyPlayed ? index + 1 : "—"}</span>
                         </td>
                         <td>
                           <span className="st-team">
@@ -135,10 +141,12 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                               {/* The numbers behind the tiebreak, so it is checkable
                                 rather than trusted. The pack decides how they read
                                 — "180/20.0" in cricket, "12" in football. */}
-                              <span className="st-sub">
-                                {standings.sport.standings.summariseSide(row.scored)} for ·{" "}
-                                {standings.sport.standings.summariseSide(row.conceded)} against
-                              </span>
+                              {row.played > 0 ? (
+                                <span className="st-sub">
+                                  {standings.sport.standings.summariseSide(row.scored)} for ·{" "}
+                                  {standings.sport.standings.summariseSide(row.conceded)} against
+                                </span>
+                              ) : null}
                             </span>
                           </span>
                         </td>
