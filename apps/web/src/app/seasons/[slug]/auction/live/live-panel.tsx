@@ -303,6 +303,8 @@ export function LivePanel({
       toast({
         title: `Outbid — ${snapshot.currentLot?.currentBid?.teamName ?? "another team"}${amount !== undefined ? ` at ${money.ledger(amount)}` : ""}`,
         tone: "info",
+        // One slot for "where do I stand on this lot": the newest price only.
+        group: "bid-status",
       });
     }
     prevLeaderRef.current = leader;
@@ -317,6 +319,7 @@ export function LivePanel({
       toast({
         title: `You signed ${outcome.playerName ?? outcome.lotNumber}${outcome.amount !== null ? ` for ${money.ledger(outcome.amount)}` : ""}!`,
         tone: "success",
+        group: "bid-status",
       });
     }
   }, [snapshot, myPaddle, toast, money]);

@@ -72,4 +72,14 @@ describe("Toast", () => {
     expect(screen.getByRole("status")).not.toHaveTextContent("T1");
     expect(screen.getByRole("status")).toHaveTextContent("T5");
   });
+
+  it("a toast in a group replaces the last one in that group instead of stacking", () => {
+    const fire = renderToaster();
+    fire({ title: "Saved" });
+    fire({ title: "Outbid at 1,500", group: "bid-status" });
+    fire({ title: "Outbid at 2,500", group: "bid-status" });
+    expect(screen.queryByText("Outbid at 1,500")).toBeNull();
+    expect(screen.getByText("Outbid at 2,500")).toBeTruthy();
+    expect(screen.getByText("Saved")).toBeTruthy();
+  });
 });

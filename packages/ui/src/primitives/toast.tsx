@@ -25,6 +25,13 @@ export interface ToastOptions {
    * one-click decision. Pressing it runs the handler and dismisses the toast.
    */
   action?: { label: string; onSelect: () => void };
+  /**
+   * A toast that supersedes the last one in its group instead of stacking.
+   * A bidding war fires "Outbid" on every raise; three of them stacked over
+   * the purse board are two stale prices and a covered panel. Only the
+   * newest is true, so only the newest is shown.
+   */
+  group?: string;
 }
 
 interface ActiveToast extends ToastOptions {
@@ -56,7 +63,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (options: ToastOptions) => {
       counter.current += 1;
       const key = counter.current;
-      setToasts((current) => [...current.slice(-(MAX_VISIBLE - 1)), { ...options, key }]);
+      setToasts((current) => {
+        const kept =
+          options.group === undefined
+            ? current
+            : current.filter((item) => item.group !== options.group);
+        return [...kept.slice(-(MAX_VISIBLE - 1)), { ...options, key }];
+      });
       const duration = options.duration ?? DEFAULT_DURATION;
       if (duration > 0) {
         setTimeout(() => {
