@@ -62,7 +62,7 @@
 
 .tab[aria-selected="true"] {
   color: var(--text-heading);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--accent-line);
 }
 
 .panel {

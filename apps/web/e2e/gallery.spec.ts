@@ -27,6 +27,7 @@ const TEXT_PAIRS = [
   "text-muted/surface",
   "text-heading/surface-raised",
   "text-accent/surface",
+  "accent-ink/surface",
   "text-on-accent/accent",
   "money-value/surface",
   "money-remaining/surface",
@@ -38,8 +39,12 @@ const TEXT_PAIRS = [
 
 // border-subtle/strong are decorative separators by design (doc 10 elevation
 // model) — the 3:1 non-text floor applies to interactive affordances only.
+// A gold FILL is identified by its rim, not its paint (WCAG 1.4.11): daylight
+// fills are bright gold on paper (1.9:1) with a gold.700 edge. Gate the edge
+// and the line gold; the fill's own gate is text-on-accent/accent above.
 const UI_TOKEN_PAIRS: [string, string][] = [
-  ["accent", "surface"],
+  ["accent-edge", "surface"],
+  ["accent-line", "surface"],
   ["focus-ring", "surface"],
   ["border-interactive", "surface"],
   ["live", "surface"],

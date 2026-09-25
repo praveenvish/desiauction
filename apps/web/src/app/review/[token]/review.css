@@ -60,7 +60,7 @@
 }
 
 .review-rating-option:has(input:checked) {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
 

@@ -793,7 +793,7 @@
 .board-sound:focus-visible,
 .board-sound[aria-pressed="true"] {
   opacity: 1;
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-heading);
 }
 

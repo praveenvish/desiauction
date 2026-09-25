@@ -293,7 +293,7 @@
 }
 
 .fx-mode-option input {
-  accent-color: var(--accent-pressed);
+  accent-color: var(--accent-line);
 }
 
 .fx-mode-option:has(input:focus-visible) {
@@ -357,7 +357,7 @@
 }
 
 .fx-ground:has(input:checked) {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
   color: var(--text-heading);
 }
@@ -533,7 +533,7 @@
 }
 
 .cal-view[aria-current="page"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
   color: var(--text-heading);
 }

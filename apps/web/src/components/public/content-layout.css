@@ -98,7 +98,7 @@
 .cl-prose blockquote {
   margin: 0;
   padding-left: var(--space-4);
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--accent-line);
   color: var(--text-secondary);
 }
 

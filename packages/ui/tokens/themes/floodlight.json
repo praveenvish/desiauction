@@ -31,7 +31,14 @@
     "pressed": { "$value": "{color.gold.600}", "$type": "color" },
     "subtle": { "$value": "#E6B24A29", "$type": "color" },
     "sheen": { "$value": "{color.white}", "$type": "color" },
-    "lift": { "$value": "{color.gold.300}", "$type": "color" }
+    "lift": { "$value": "{color.gold.300}", "$type": "color" },
+    "//edge": "Floodlight needs no rim: bright gold already clears 9.8:1 on navy. edge is the old 60/40 pressed-over-accent mix, flattened, so the button is pixel-identical.",
+    "edge": { "$value": "#D8A439", "$type": "color" },
+    "line": { "$value": "{color.gold.500}", "$type": "color" },
+    "ink": { "$value": "{color.gold.500}", "$type": "color" },
+    "solid": { "$value": "{color.gold.600}", "$type": "color" },
+    "on-solid": { "$value": "{color.ink.850}", "$type": "color" },
+    "solid-edge": { "$value": "{color.gold.600}", "$type": "color" }
   },
   "live": { "$value": "{color.green.dark}", "$type": "color" },
   "success": {

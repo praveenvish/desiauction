@@ -736,17 +736,17 @@ a.wordmark:hover .wordmark-glyph {
     color: var(--text-heading);
   }
 
+  /* Where you are, on paper: a gold-leaf bed with a gold rim, not grey. */
   :global([data-theme="daylight"]) .rail-item-active,
   :global([data-theme="daylight"]) .rail-item-active:hover {
-    background: var(--surface-sunken);
+    background: var(--accent-subtle);
     background-image: none;
     color: var(--text-heading);
-    box-shadow: inset 0 0 0 1px var(--border-subtle);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
   }
 
-  /* The one touch of gold in the rail: where you are. */
   :global([data-theme="daylight"]) .rail-item-active .rail-icon {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
 
   :global([data-theme="daylight"]) .rail-group-label {

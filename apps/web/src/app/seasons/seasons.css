@@ -788,7 +788,7 @@ p + .date-row {
 
 .csv-drop:hover,
 .csv-drop-over {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
 }
 
@@ -876,7 +876,7 @@ p + .date-row {
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--accent-line);
   border-radius: var(--radius-md);
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
@@ -1421,7 +1421,7 @@ p + .date-row {
 }
 
 .stat-tile-link[data-active="true"] .stat-tile {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-line);
   outline-offset: -2px;
 }
 

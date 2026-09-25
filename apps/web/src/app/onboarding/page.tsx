@@ -41,18 +41,10 @@ export default async function OnboardingPage({
   }
   return (
     /*
-     * NOT a console surface, deliberately.
-     *
-     * This panel re-points the accent ramp at the marketing gold so the last
-     * click of the entry journey matches login's "Send code" (see
-     * --entry-accent-pressed in onboarding.css). The console primary pairs
-     * --accent-pressed with a WHITE label, and against the re-pointed ramp that
-     * is white on #CE9A2E — 2.53:1. The marketing primary reads the same ramp
-     * with the ink label the gold was measured against: 7.8:1.
-     *
-     * Two sessions found this independently and fixed it the same way. Worth
-     * keeping the reason it survived a green axe scan: the Continue button is
-     * DISABLED until a name is typed, and axe skips disabled controls.
+     * NOT a console surface: the marketing primary is the same metal gold as
+     * login's "Send code", so the entry journey wears one button end to end.
+     * The Continue button is DISABLED until a name is typed, and axe skips
+     * disabled controls — its contrast is proven on the gallery pairs, not here.
      */
     <main className="onboarding">
       <Link className="onboarding-mark" href="/">

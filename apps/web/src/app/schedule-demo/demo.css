@@ -119,7 +119,7 @@
    ink, not white: the accent is gold, and the contrast maths only works one way
    round. */
 .visually-hidden-input:checked + .demo-slot {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent);
   color: var(--text-on-accent);
 }

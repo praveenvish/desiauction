@@ -22,10 +22,10 @@
 /* A night in progress is the one thing on this page that is happening now. */
 .ax-card[data-status="live"],
 .ax-card[data-status="paused"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   box-shadow:
     var(--shadow-2),
-    inset 0 3px 0 var(--accent);
+    inset 0 3px 0 var(--accent-line);
 }
 
 .ax-head {

@@ -26,7 +26,16 @@ const COLOR_GROUPS: Record<string, string[]> = {
     "text-accent",
   ],
   "Border & focus": ["border-subtle", "border-strong", "border-interactive", "focus-ring"],
-  Accent: ["accent", "accent-hover", "accent-pressed", "accent-subtle", "live"],
+  Accent: [
+    "accent",
+    "accent-hover",
+    "accent-pressed",
+    "accent-subtle",
+    "accent-edge",
+    "accent-line",
+    "accent-ink",
+    "live",
+  ],
   Status: [
     "success-subtle",
     "success-base",
@@ -172,6 +181,13 @@ export default function GalleryPage() {
                 style={{ background: "var(--surface)", color: "var(--text-accent)" }}
               >
                 text-accent on surface
+              </div>
+              <div
+                className="pair"
+                data-pair="accent-ink/surface"
+                style={{ background: "var(--surface)", color: "var(--accent-ink)" }}
+              >
+                accent-ink on surface
               </div>
               <div
                 className="pair"

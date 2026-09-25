@@ -106,7 +106,7 @@
    dimmer than the subtle one. Selection here is stated in accent instead, so it
    reads the same way under either palette. */
 .public-filters a.showcase-filter[data-active="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
   color: var(--text-heading);
 }

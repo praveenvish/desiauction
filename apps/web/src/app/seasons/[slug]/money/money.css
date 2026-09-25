@@ -93,7 +93,7 @@
 
 .case-step[data-state="current"] {
   color: var(--text-heading);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--surface-sunken);
   font-weight: var(--font-weight-medium);
 }
@@ -131,7 +131,7 @@
 }
 
 .table-scroll.money-scroll:focus-visible {
-  outline: var(--space-05) solid var(--accent);
+  outline: var(--space-05) solid var(--accent-line);
   outline-offset: var(--space-1);
   border-radius: var(--radius-sm);
 }
@@ -188,7 +188,7 @@
 }
 
 .money-result:focus-visible {
-  outline: var(--space-05) solid var(--accent);
+  outline: var(--space-05) solid var(--accent-line);
   outline-offset: var(--space-1);
   border-radius: var(--radius-sm);
 }
@@ -380,7 +380,7 @@
 
 .case-card:hover,
 .case-card:focus-visible {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .case-card-head {

@@ -60,7 +60,7 @@
 
 .active {
   color: var(--text-accent);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--accent-line);
 }
 
 .dot {

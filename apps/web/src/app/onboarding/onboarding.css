@@ -13,15 +13,6 @@
   padding: var(--space-6) var(--space-5);
   font-family: var(--font-text);
   color: var(--text-primary);
-  /* The CTA is the last click of the entry journey, and the first one — login's
-     "Send code" — is the brand gold #E6B24A on a floodlit panel. Daylight's
-     --accent is the deeper #B57F14, so the two ends of one funnel wore
-     different buttons. The gold itself is theme-invariant (--ceremony-*), so
-     the panel below re-points the accent ramp at it. --accent-pressed has to be
-     captured HERE, from daylight's --accent-hover (the ramp step below the
-     resting fill): read inside the same rule that replaces the ramp, it would
-     resolve against the new values instead of the theme's. */
-  --entry-accent-pressed: var(--accent-hover);
 }
 
 /* The two doors out. Without them this screen had one button, zero links, and
@@ -152,11 +143,6 @@
 
 .onboarding-panel {
   box-sizing: border-box;
-  /* See --entry-accent-pressed on .onboarding: one gold across the funnel. */
-  --accent: var(--ceremony-gold);
-  --accent-hover: var(--ceremony-glow);
-  --accent-lift: var(--ceremony-glow);
-  --accent-pressed: var(--entry-accent-pressed);
   width: 100%;
   max-width: 480px;
   background: var(--surface-raised);

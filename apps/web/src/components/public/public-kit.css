@@ -291,7 +291,7 @@
 }
 
 .pk-montage-cell:nth-child(3) {
-  color: var(--accent);
+  color: var(--accent-line);
   background: color-mix(in srgb, var(--accent) 14%, var(--surface-sunken));
 }
 
@@ -565,7 +565,7 @@
 
 .pk-chip[data-active] {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-on-accent);
   font-weight: 600;
 }

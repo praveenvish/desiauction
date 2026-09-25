@@ -131,7 +131,7 @@
 }
 
 .as-step[data-state="current"] .as-step-mark {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent);
   color: var(--text-on-accent);
 }
@@ -445,7 +445,7 @@
   }
 
   .as-step[data-selected="true"] .as-step-head {
-    border-color: var(--accent);
+    border-color: var(--accent-line);
   }
 
   .as-step[data-selected="true"] .as-step-head::before {

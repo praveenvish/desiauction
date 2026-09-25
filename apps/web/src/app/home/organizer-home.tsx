@@ -1000,7 +1000,7 @@ export async function OrganizerHome({
                     />
                     <polyline
                       fill="none"
-                      stroke="var(--accent)"
+                      stroke="var(--accent-line)"
                       strokeWidth="2.6"
                       strokeLinecap="round"
                       strokeLinejoin="round"

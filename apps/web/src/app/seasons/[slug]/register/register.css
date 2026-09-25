@@ -260,7 +260,7 @@
 
 .reg-stepper-item.is-current .reg-stepper-dot {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-on-accent);
 }
 
@@ -270,7 +270,7 @@
 
 .reg-stepper-item.is-done .reg-stepper-dot {
   background: var(--accent-subtle);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-accent);
 }
 
@@ -511,13 +511,13 @@
 }
 
 .reg-chip:has(input:checked) {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
 }
 
 .reg-chip:has(input:checked) .reg-chip-mark {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-on-accent);
 }
 
@@ -822,7 +822,7 @@
 }
 
 .reg-wa-language-option:has(input:checked) {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
 }
 

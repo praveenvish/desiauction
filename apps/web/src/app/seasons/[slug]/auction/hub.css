@@ -138,7 +138,7 @@
 }
 
 .auc-filter-chip[aria-pressed="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-heading);
 }
 

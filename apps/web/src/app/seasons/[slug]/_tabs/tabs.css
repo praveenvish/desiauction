@@ -321,7 +321,7 @@
 }
 
 .st-select[data-active="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background-color: var(--accent-subtle);
   color: var(--text-heading);
 }
@@ -367,7 +367,7 @@
 }
 
 .st-chip[aria-pressed="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
   color: var(--text-heading);
 }
