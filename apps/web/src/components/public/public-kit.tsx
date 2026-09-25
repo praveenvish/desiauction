@@ -10,7 +10,7 @@
  * Server components (no hooks, no state). Interactivity that a page needs —
  * the showcase filters, the sign-in form — stays in that page's client parts.
  */
-import { SportIcon } from "@desiauction/ui";
+import { IconArrowRight, SportIcon } from "@desiauction/ui";
 import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
@@ -39,6 +39,12 @@ export interface PageHeroProps {
   sport?: string;
   /** A photograph behind the whole band (a season's cover). */
   cover?: { src: string; alt?: string } | null;
+  /**
+   * A sport key: its glyph drawn large and faint behind the band's right side,
+   * so a season with no cover photo still reads as ITS sport rather than a
+   * flat gradient. Ignored when `cover` is set (the photo says it already).
+   */
+  watermark?: string;
   /** The handwritten line. At most one per page — see `ScriptTag`. */
   script?: ReactNode;
   /** `page` (default) is the tall opener; `compact` is for content pages. */
@@ -63,6 +69,7 @@ export function PageHero({
   sport,
   cover,
   script,
+  watermark,
   size = "page",
 }: PageHeroProps) {
   const hasArt = art !== undefined || sport !== undefined;
@@ -73,6 +80,11 @@ export function PageHero({
           <Image src={cover.src} alt="" fill sizes="100vw" priority />
         </div>
       )}
+      {cover == null && watermark !== undefined ? (
+        <span className="pk-hero-watermark" aria-hidden>
+          <SportIcon sport={watermark} size={360} />
+        </span>
+      ) : null}
       <div className="pk-hero-inner">
         <div className="pk-hero-copy">
           {status === undefined ? null : <div className="pk-hero-status">{status}</div>}
@@ -254,7 +266,7 @@ export interface TopicCardProps {
 /** A link card with an icon tile — help topics, legal documents, support routes. */
 export function TopicCard({ href, title, description, icon, foot, tone = "gold" }: TopicCardProps) {
   return (
-    <Link className="pk-topic" href={href} data-tone={tone}>
+    <Link className="pk-topic da-lift" href={href} data-tone={tone}>
       {icon === undefined ? null : (
         <span className="pk-topic-tile" aria-hidden>
           {icon}
@@ -269,7 +281,109 @@ export function TopicCard({ href, title, description, icon, foot, tone = "gold" 
 
 /** The grid topic cards sit in. Four across, two on a tablet, one on a phone. */
 export function TopicGrid({ children }: { children: ReactNode }) {
-  return <div className="pk-topic-grid">{children}</div>;
+  return <div className="pk-topic-grid da-stagger">{children}</div>;
+}
+
+/* -------------------------------------------------------------- link rows -- */
+
+/**
+ * A bordered list of destinations, one row each: icon, title, one line, and a
+ * trailing fact (a reading time, a date). The shape for any set of five or
+ * fewer links, and for documents — a grid of cards with a title and a line
+ * each left orphans and half-empty rows on /legal and the help categories.
+ */
+export function LinkRows({
+  children,
+  labelledBy,
+  className,
+}: {
+  children: ReactNode;
+  /** The id of the heading naming the list. */
+  labelledBy?: string;
+  className?: string;
+}) {
+  return (
+    <ul
+      className={className === undefined ? "pk-rows da-stagger" : `pk-rows da-stagger ${className}`}
+      aria-labelledby={labelledBy}
+    >
+      {children}
+    </ul>
+  );
+}
+
+export function LinkRow({
+  href,
+  title,
+  description,
+  icon,
+  meta,
+}: {
+  href: string;
+  title: ReactNode;
+  description?: ReactNode;
+  icon?: ReactNode;
+  /** Right-aligned, muted: "4 min read", "Effective 16 Jul 2026". */
+  meta?: ReactNode;
+}) {
+  return (
+    <li>
+      <Link className="pk-row" href={href}>
+        {icon === undefined ? null : (
+          <span className="pk-row-tile" aria-hidden>
+            {icon}
+          </span>
+        )}
+        <span className="pk-row-text">
+          <span className="pk-row-title">{title}</span>
+          {description === undefined ? null : <span className="pk-row-desc">{description}</span>}
+        </span>
+        {meta === undefined ? null : <span className="pk-row-meta">{meta}</span>}
+        <IconArrowRight size={16} className="pk-row-arrow" />
+      </Link>
+    </li>
+  );
+}
+
+/* -------------------------------------------------------------- side card -- */
+
+/**
+ * A card for a content page's side column: a contact route, a set of facts,
+ * the next step. Named by its own heading, so the column reads in the outline.
+ */
+export function SideCard({
+  headingId,
+  title,
+  icon,
+  children,
+  tone = "plain",
+}: {
+  headingId: string;
+  title: ReactNode;
+  icon?: ReactNode;
+  children: ReactNode;
+  /** `accent` gives the one card on a page that is the call to action a gold rim. */
+  tone?: "plain" | "accent";
+}) {
+  return (
+    <section
+      className="pk-side-card"
+      data-tone={tone === "accent" ? "accent" : undefined}
+      aria-labelledby={headingId}
+    >
+      <div className="pk-side-head">
+        {icon === undefined ? null : (
+          <span className="pk-side-tile" aria-hidden>
+            {icon}
+          </span>
+        )}
+        <h2 className="pk-side-title" id={headingId}>
+          {title}
+        </h2>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 /* ----------------------------------------------------------- count chips -- */

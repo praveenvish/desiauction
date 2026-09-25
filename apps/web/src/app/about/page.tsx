@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { ButtonLink } from "@desiauction/ui";
+import { ButtonLink, IconGavel, IconPin } from "@desiauction/ui";
 
 import { env } from "../../env";
 import { LEGAL_IDENTITY } from "../../content/company";
 import { START_CLUB_LOGIN } from "../../lib/start-intent";
 import { ContentPage } from "../../components/public/content-page";
+import { SideCard } from "../../components/public/public-kit";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -25,7 +27,66 @@ export default function AboutPage() {
         </>
       }
       lede="DesiAuction is a platform for running tournament player auctions the way they deserve to be run: every bid server-verified, every rupee accounted for, every SOLD moment an occasion."
-      art="montage"
+      aside={
+        <>
+          {/* The leftover column holds the facts a visitor checks a young
+            company against, instead of five generic sport glyphs that said
+            nothing about it. Every figure comes from company.ts or the product. */}
+          <SideCard
+            headingId="about-facts"
+            title="At a glance"
+            icon={<IconPin size={20} weight="duotone" />}
+          >
+            <dl className="pk-side-facts">
+              <div>
+                <dt>Based in</dt>
+                <dd>Jaipur, Rajasthan</dd>
+              </div>
+              <div>
+                <dt>Company</dt>
+                <dd>{LEGAL_IDENTITY.legalName}</dd>
+              </div>
+              <div>
+                <dt>Incorporated</dt>
+                <dd>July 2022</dd>
+              </div>
+              <div>
+                <dt>Sports</dt>
+                <dd>12, from cricket to kabaddi</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>Public beta · free</dd>
+              </div>
+            </dl>
+            <p>
+              <Link href="/legal">Operator &amp; legal details</Link>
+            </p>
+          </SideCard>
+          {/* The page used to end on a paragraph, which left a convinced reader
+            nowhere to go: the two ways in, then the way to a person, beside
+            the story rather than under a picture. */}
+          <SideCard
+            headingId="about-start"
+            title="Run your first auction"
+            icon={<IconGavel size={20} weight="duotone" />}
+            tone="accent"
+          >
+            <p>Every tournament gets the full platform, free, during beta.</p>
+            <div className="content-actions">
+              <ButtonLink href={START_CLUB_LOGIN} variant="primary">
+                Create your tournament
+              </ButtonLink>
+              <ButtonLink href="/schedule-demo" variant="secondary">
+                Book a demo
+              </ButtonLink>
+            </div>
+            <p>
+              Questions first? <Link href="/support">Talk to support</Link>.
+            </p>
+          </SideCard>
+        </>
+      }
     >
       <div className="prose">
         <p className="prose-p">
@@ -42,23 +103,18 @@ export default function AboutPage() {
             Jaipur is where that company is registered (LEGAL_IDENTITY). */}
         <p className="prose-p">DesiAuction is built in Jaipur by {LEGAL_IDENTITY.legalName}.</p>
       </div>
-      {/* The page used to end on a paragraph, which left a convinced reader
-          nowhere to go. The two ways in, then the way to a person. */}
-      <div className="content-actions">
-        <ButtonLink href={START_CLUB_LOGIN} variant="primary">
-          Create your tournament
-        </ButtonLink>
-        <ButtonLink href="/schedule-demo" variant="secondary">
-          Book a demo
-        </ButtonLink>
-      </div>
-      <p className="prose-p">
-        Questions first?{" "}
-        <Link href="/support" className="prose-link">
-          Talk to support
-        </Link>
-        .
-      </p>
+      <figure className="about-shot">
+        <Image
+          src="/marketing/product/auction-board-v2.webp"
+          alt="The big-screen board of a live auction on DesiAuction: money spent, the most expensive player, and each team's remaining purse and squad"
+          width={1600}
+          height={900}
+          sizes="(max-width: 999px) 100vw, 760px"
+        />
+        <figcaption>
+          The board the whole hall watches — a real screen, from a practice auction.
+        </figcaption>
+      </figure>
     </ContentPage>
   );
 }

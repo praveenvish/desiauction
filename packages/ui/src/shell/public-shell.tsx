@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { BrandGlyph, IconChevronDown, IconBell } from "./icons";
+import { BrandGlyph, IconChevronDown } from "./icons";
 import { PopoverMenu } from "./popover-menu";
 import { PublicMobileMenu } from "./public-mobile-menu";
 import styles from "./public-shell.module.css";
@@ -33,6 +33,7 @@ export function PublicShell({
   nav = [],
   headerAction,
   mobileAction,
+  mobileSearchHref,
   footerLinks = [],
   footerGroups = [],
   footerTagline,
@@ -68,7 +69,7 @@ export function PublicShell({
                     trigger={
                       <>
                         {link.label}
-                        <IconChevronDown width={14} height={14} />
+                        <IconChevronDown size={16} />
                       </>
                     }
                     triggerClassName={styles["nav-link"] ?? ""}
@@ -102,6 +103,7 @@ export function PublicShell({
                 nav={nav}
                 linkComponent={Link}
                 {...(mobileAction !== undefined ? { action: mobileAction } : {})}
+                {...(mobileSearchHref !== undefined ? { searchHref: mobileSearchHref } : {})}
               />
             ) : null}
           </div>
@@ -124,16 +126,26 @@ export function PublicShell({
         <div className={styles["footer-inner"]}>
           {footerCompact ? null : footerGroups.length > 0 ? (
             <div className={styles["footer-grid"]}>
+              {/* The brand column is the lockup and, when the app supplies one,
+                  the subscribe row — nothing else. The display headline and
+                  the paragraph of tagline that used to sit here duplicated the
+                  page's own closing band and cost ~250px on every page. */}
               <div className={styles["footer-brand"]}>
                 <Link href={wordmarkHref} className={styles["wordmark"]}>
                   <WordmarkGlyph glyph={glyph} />
                   {wordmark}
                 </Link>
                 {footerHeading !== undefined ? (
-                  <h2 className={styles["footer-heading"]}>{footerHeading}</h2>
+                  <p className={styles["footer-heading"]}>{footerHeading}</p>
                 ) : null}
                 {footerTagline !== undefined ? (
                   <p className={styles["footer-tagline"]}>{footerTagline}</p>
+                ) : null}
+                {footerNewsletter !== undefined ? (
+                  <div className={styles["footer-newsletter"]}>
+                    <h2 className={styles["footer-group-label"]}>Stay in the game</h2>
+                    <div className={styles["newsletter-content"]}>{footerNewsletter}</div>
+                  </div>
                 ) : null}
                 {footerSocial !== undefined ? (
                   <div className={styles["footer-social"]} aria-hidden="true">
@@ -167,20 +179,6 @@ export function PublicShell({
               ))}
             </nav>
           ) : null}
-          {!footerCompact && footerNewsletter !== undefined ? (
-            <div className={styles["footer-newsletter"]}>
-              <div className={styles["newsletter-heading"]}>
-                <span className={styles["newsletter-symbol"]} aria-hidden="true">
-                  <IconBell width={24} height={24} />
-                </span>
-                <div>
-                  <h2>Stay in the game.</h2>
-                  <p>Product news. New features. A few updates a season.</p>
-                </div>
-              </div>
-              <div className={styles["newsletter-content"]}>{footerNewsletter}</div>
-            </div>
-          ) : null}
           {footerNote !== undefined || footerBottomLinks.length > 0 ? (
             <div className={styles["footer-bottom"]}>
               {footerNote !== undefined ? (
@@ -197,8 +195,10 @@ export function PublicShell({
               ) : null}
             </div>
           ) : null}
-          {/* Compact keeps its promise: the bottom bar alone. The identity is
-              a tap away through the policy links that bar carries. */}
+          {/* Optional fine print under the bottom bar. The app no longer passes
+              the operator identity here — it is published on /legal, /support
+              and /legal/grievances instead — but the slot stays for any
+              surface that needs a line of small print. */}
           {footerCompact || footerLegal === undefined ? null : (
             <div className={styles["footer-legal"]}>{footerLegal}</div>
           )}

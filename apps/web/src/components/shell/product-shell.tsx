@@ -41,7 +41,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 
 import { AdminSectionNav } from "../../app/admin/admin-section-nav";
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
-import { LEGAL_IDENTITY, legalIdentityPublished } from "../../content/company";
+import { LEGAL_IDENTITY } from "../../content/company";
 import { inboxSeenKey } from "../../lib/inbox-events";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
@@ -294,38 +294,13 @@ function toShellItem(item: NavItem): ShellNavItem {
  * /c/<slug> too, where the link no longer points at the page you are reading —
  * `aria-current="page"` means this page, not this neighbourhood.
  */
-/**
- * WHO IS OFFERING THIS SERVICE — in the footer of every public page.
- *
- * The identity was published in one place only: the bottom of the Legal Centre,
- * which is two navigations from anywhere a visitor actually stands. A footer
- * that names no company is the single loudest "this might not be a real
- * business" signal a site can send, and for an India-facing platform it is also
- * the thing the rules ask for by name (Companies Act s.12(3)(c) for the CIN,
- * Consumer Protection (E-Commerce) Rules 4(3) for the legal name and principal
- * address — see `content/company.ts`).
- *
- * Renders NOTHING while the identity is unpublished. Not a blank, not a
- * placeholder, and never a guess: an invented company name in a footer is the
- * worst line this product could print.
- */
-function OperatorIdentity(): ReactNode {
-  if (!legalIdentityPublished()) {
-    return null;
-  }
-  const id = LEGAL_IDENTITY;
-  return (
-    <p>
-      <span>{id.legalName}</span>
-      {id.registrationNumber !== null ? <span>CIN {id.registrationNumber}</span> : null}
-      {id.gstin !== null ? <span>GSTIN {id.gstin}</span> : null}
-      {id.registeredAddress !== null ? <span>{id.registeredAddress}</span> : null}
-      {id.grievanceOfficerName !== null ? (
-        <span>Grievance Officer: {id.grievanceOfficerName}</span>
-      ) : null}
-    </p>
-  );
-}
+/** Placeholder pages (see coming-soon.tsx): the bottom bar alone. */
+const QUIET_FOOTER_PATHS: ReadonlySet<string> = new Set([
+  "/careers",
+  "/blog",
+  "/case-studies",
+  "/api-docs",
+]);
 
 function publicNav(pathname: string): PublicShellLink[] {
   const mark = (link: PublicShellLink): PublicShellLink =>
@@ -757,6 +732,14 @@ export function ProductShell({
     // …but only /login takes the fill treatment (it is a floodlight surface;
     // see the login polish note). The invitation cards stay on daylight.
     const atLoginGate = pathname === "/login";
+    // The signed-in door names what is behind it: people who RUN something
+    // (a club, an auction, a platform desk) open a console; a player or an
+    // owner opens their own home. Both land on /home. Read from `navRoles`,
+    // which the shell already holds — no extra query.
+    const runsSomething =
+      navRoles !== null &&
+      (navRoles.organizes || navRoles.conducts.length > 0 || navRoles.platform.length > 0);
+    const homeLabel = runsSomething ? "Open console" : "My home";
     return (
       <PublicShell
         // The brand lockup is ONE component with a tone (brand.tsx), not markup
@@ -765,13 +748,14 @@ export function ProductShell({
         // kept a <small> the stacking CSS no longer had a rule for.
         wordmark={<BrandWordmark tone="header" />}
         wordmarkHref="/"
-        glyph={<BrandMark size={42} />}
+        glyph={<BrandMark size={36} />}
         nav={publicNav(pathname)}
+        {...(!atGate ? { mobileSearchHref: "/search" } : {})}
         {...(!atGate
           ? {
               mobileAction:
                 session !== null
-                  ? { label: "Open console", href: "/home" }
+                  ? { label: homeLabel, href: "/home" }
                   : { label: "Create your tournament", href: "/login" },
             }
           : {})}
@@ -789,12 +773,10 @@ export function ProductShell({
                 break the strict-mode locators that name it. */}
             {atGate ? null : (
               <>
-                {/* Desktop only, for now: at 320px the header action row was
-                    4 controls wide and pushed the page 4px past the viewport
-                    (responsive.spec). The phone reaches search through the
-                    footer's "Search the site"; giving the mobile menu both
-                    controls is a change to the shared shell, not to this
-                    header, and belongs in its own pass. */}
+                {/* Desktop only: at 320px the header action row was 4 controls
+                    wide and pushed the page 4px past the viewport
+                    (responsive.spec). The phone reaches search as the first
+                    entry of the menu drawer (`mobileSearchHref`). */}
                 <Link
                   className="shell-icon-button shell-desktop-only"
                   href="/search"
@@ -807,7 +789,7 @@ export function ProductShell({
             )}
             {session !== null ? (
               <Link className="shell-header-cta" href="/home">
-                Open console
+                {homeLabel}
               </Link>
             ) : atGate ? null : (
               <>
@@ -821,88 +803,57 @@ export function ProductShell({
             )}
           </>
         }
-        footerCompact={atGate}
+        // The four unadvertised "not yet" pages hold one centred message; a
+        // sitemap footer under them was taller than the page itself.
+        footerCompact={atGate || QUIET_FOOTER_PATHS.has(pathname)}
         contentFill={atLoginGate}
-        // The public footer (PX-1 01 §3). Every link is a real route (the PX-2
-        // no-dead-links ruling) — and, since 2026-08-29, a route with something
-        // on it. Four destinations left: /blog, /case-studies, /api-docs and
-        // /careers are honest placeholders that say "nothing published yet",
-        // and the footer was promoting four of them from the bottom of every
-        // public page. A no-dead-links rule is not satisfied by a link that
-        // resolves to an apology; a visitor who takes one learns the company
-        // has no writing, no customers and no API. The pages stay live, stay in
-        // the sitemap and stay findable in /search — they are simply no longer
-        // advertised. They come back the day they have content.
+        // The public footer (PX-1 01 §3; calmed in the 2026-09-25 wow pass).
+        // Nine links in three short columns, the subscribe row, one bottom bar.
+        // Every link is a real route with something on it: /blog,
+        // /case-studies, /api-docs and /careers are placeholders and are not
+        // advertised anywhere until they have content.
         //
-        // What replaced them is what a visitor at the bottom of the page is
-        // actually looking for: the way in (start an auction, book a demo), the
-        // way to a human (help, FAQ, support), and the way to check we are real
-        // (about, legal, and the operator identity below).
+        // What went, and where it lives now: FAQ is inside Help; search is the
+        // header's (and the phone menu's); Security is linked from /features
+        // and /support; Release notes from /support and /help; Rules from the
+        // Resources menu; Code of Conduct and Refunds from /legal; "Create a
+        // tournament" duplicated the header's "Start free".
         //
-        // "Contact us" is gone: /contact now redirects to /support, which the
-        // Support column already links as "Contact support" — two footer links
-        // to one page. Both demos sit under Product, and the self-serve one
-        // uses the homepage's own name for it, "Try a mock auction".
+        // THE OPERATOR IDENTITY left the footer. It is published — as the
+        // e-commerce and IT rules require — on /legal, /support and
+        // /legal/grievances (`OperatorIdentityCard`), and every page's bottom
+        // bar links to Grievances, so it is always one click away.
         footerGroups={[
           {
             label: "Product",
             links: [
               { label: "Features", href: "/features" },
-              { label: "Try a mock auction", href: "/#playground" },
-              { label: "Book a demo", href: "/schedule-demo" },
               { label: "Pricing", href: "/pricing" },
-              { label: "Security", href: "/security" },
-              { label: "Release notes", href: "/releases" },
+              { label: "Book a demo", href: "/schedule-demo" },
             ],
           },
           {
             label: "Tournaments",
             links: [
               { label: "Browse tournaments", href: "/c" },
-              // Labelled for what the link DOES, not where it lands: creating a
-              // tournament begins at the phone gate, and "Create tournament"
-              // pointing at /login read as a broken link to anyone who noticed.
-              { label: "Create a tournament", href: "/login" },
-              { label: "Rules & guidelines", href: "/rules-guidelines" },
-            ],
-          },
-          {
-            label: "Support",
-            links: [
+              { label: "Try a mock auction", href: "/#playground" },
               { label: "Help centre", href: "/help" },
-              { label: "FAQ", href: "/help/faq" },
-              { label: "Contact support", href: "/support" },
-              // Opens the report dialog over THIS page (the provider intercepts
-              // the hash), so the screenshot is of what they were looking at.
-              { label: "Report a problem", href: "#report-a-problem" },
-              { label: "Search the site", href: "/search" },
             ],
           },
           {
             label: "Company",
             links: [
               { label: "About us", href: "/about" },
+              { label: "Contact support", href: "/support" },
               { label: "Legal centre", href: "/legal" },
-              { label: "Grievance redressal", href: "/legal/grievances" },
             ],
           },
         ]}
-        footerHeading={
-          <>
-            Every sport.
-            <br />
-            <span>One community.</span>
-          </>
-        }
-        footerTagline="Bring your players together. Build your teams. Make your next tournament one to remember."
         footerNewsletter={<NewsletterForm />}
-        // The copyright belongs to the entity, not the product name: the
-        // company signing this footer is Eventztree, and it is named here for
-        // the same reason it is named in the identity block below.
-        footerNote={`© 2026 ${LEGAL_IDENTITY.tradingName ?? "DesiAuction"} — a product of ${
+        // The copyright belongs to the entity, not the product name.
+        footerNote={`© 2026 ${LEGAL_IDENTITY.tradingName ?? "DesiAuction"} · a product of ${
           LEGAL_IDENTITY.legalName ?? "our team"
-        }. In beta.`}
-        footerLegal={<OperatorIdentity />}
+        }`}
         footerBottomLinks={
           atGate
             ? [
@@ -911,12 +862,14 @@ export function ProductShell({
                 { label: "Support", href: "/support" },
               ]
             : [
-                { label: "Privacy Policy", href: "/legal/privacy" },
-                // "Terms of Use" named a document titled "Terms of Service".
-                // The label now matches what the page says it is.
-                { label: "Terms of Service", href: "/legal/terms" },
-                { label: "Refund Policy", href: "/legal/refunds" },
-                { label: "Code of Conduct", href: "/legal/code-of-conduct" },
+                { label: "Privacy", href: "/legal/privacy" },
+                { label: "Terms", href: "/legal/terms" },
+                { label: "Grievances", href: "/legal/grievances" },
+                // Opens the report dialog over THIS page (the provider
+                // intercepts the hash), so the screenshot is of what they were
+                // looking at. Signed-out visitors have no account menu; this is
+                // their way in.
+                { label: "Report a problem", href: "#report-a-problem" },
               ]
         }
         linkComponent={Link}

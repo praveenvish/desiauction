@@ -287,10 +287,16 @@ describe("PX-10 · Content integrity", () => {
   it("pricing shows no checkout affordance and keeps the beta banner", () => {
     expect(PRICING.betaBanner.toLowerCase()).toContain("free");
     expect(PRICING.tiers.length).toBe(3);
-    // No tier claims a live purchase price beyond Free — paid tiers say "at GA".
+    // No tier claims a live purchase price. The paid tiers used to print
+    // "Published at GA" in the price slot, which read as a placeholder; they
+    // now state what is true today (free in beta) and that a price comes at
+    // launch — still no figure, still no checkout.
     const paid = PRICING.tiers.filter((t) => t.name !== "Free");
     for (const tier of paid) {
-      expect(tier.price.toLowerCase()).toContain("ga");
+      expect(tier.price).toBe("Free");
+      expect(tier.price).not.toMatch(/\d/);
+      expect(tier.cadence.toLowerCase()).toContain("in beta");
+      expect(tier.cadence.toLowerCase()).toContain("at launch");
     }
   });
 
