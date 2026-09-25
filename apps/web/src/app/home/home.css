@@ -427,6 +427,14 @@
   font-size: var(--text-md-size);
 }
 
+/* Inside the card the eyebrow is where it is ("TPL 2026 · 6 not told yet"),
+   in sentence case — three shouted clauses competed with the title. */
+.home-next--embedded .home-next-eyebrow {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: var(--font-weight-medium);
+}
+
 .home-next--embedded .home-next-why {
   font-size: var(--text-sm-size);
 }
@@ -467,7 +475,19 @@
   white-space: nowrap;
 }
 
-/* ---------- journey row ---------- */
+/* ---------- journey rail (inside the hero) ---------- */
+.home-hero .home-journey-count {
+  background: color-mix(in srgb, var(--hero-ink) 14%, transparent);
+  color: var(--hero-ink);
+}
+
+/* Repeated activity folds into one row: "Registration poster generated ×6". */
+.home-feed-times {
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
 .home-journey-count {
   display: inline-grid;
   place-items: center;

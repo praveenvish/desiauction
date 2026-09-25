@@ -56,6 +56,22 @@ describe("the one next step /home leads with", () => {
     expect(step?.why).toContain("1 more thing is waiting");
   });
 
+  it("a row that names its own verb keeps it (Announce is on /teams, not 'Add teams')", () => {
+    const step = chooseNextStep({
+      ...EMPTY,
+      attention: [
+        {
+          label: "Announce captains & icons",
+          detail: "TPL · 6 not told yet",
+          href: "/seasons/tpl/teams",
+          verb: "Announce now",
+        },
+      ],
+    });
+    expect(step?.cta.label).toBe("Announce now");
+    expect(step?.eyebrow).toBe("TPL · 6 not told yet");
+  });
+
   it("an owner before the auction is sent to their plan", () => {
     expect(chooseNextStep({ ...EMPTY, ownedTeam: team("scheduled") })?.cta.href).toBe(
       "/seasons/demo-cup/auction/plan",

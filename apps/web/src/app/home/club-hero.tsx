@@ -10,6 +10,7 @@ import {
   PopoverMenu,
 } from "@desiauction/ui";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { HeroFigures, HeroStatus, SeasonCrest } from "../../components/season-hero/season-hero";
 import type { SeasonOverviewView } from "../../server/competition/actions";
@@ -42,12 +43,15 @@ export function ClubHero({
   overview,
   seasonsInClub,
   switchable,
+  footer,
 }: {
   overview: SeasonOverviewView;
   /** How many seasons this season's club runs — the line under the name. */
   seasonsInClub: number;
   /** Every season the switcher may offer; the switcher hides with one. */
   switchable: SwitchableSeason[];
+  /** Along the hero's bottom edge: the season's journey rail. */
+  footer?: ReactNode;
 }) {
   const season = overview.competition;
   const when = dateRange(season.startsOn, season.endsOn);
@@ -66,6 +70,7 @@ export function ClubHero({
       <HeroBanner
         sideAlign="start"
         testId="home-club-hero"
+        {...(footer !== undefined ? { footer } : {})}
         image={coverOf(season)}
         crest={<SeasonCrest name={season.name} logoUrl={overview.logoUrl} />}
         eyebrow={<HeroStatus live={live}>{live ? "Auction live" : badge.label}</HeroStatus>}
