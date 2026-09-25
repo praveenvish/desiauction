@@ -1,7 +1,9 @@
 .region {
   position: fixed;
   bottom: var(--space-6);
-  right: var(--space-6);
+  /* A surface that owns the right edge (a side sheet) moves toasts beside it,
+     so a confirmation never lands on the next control the reader reaches for. */
+  right: var(--toast-inset-end, var(--space-6));
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

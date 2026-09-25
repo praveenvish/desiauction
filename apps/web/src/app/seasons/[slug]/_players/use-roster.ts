@@ -39,7 +39,10 @@ export function useRoster(serverRows: readonly Row[]): Roster {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
   const [overrides, setOverrides] = useState<Record<string, Partial<Row>>>({});
-  const [inflight, setInflight] = useState<ReadonlySet<string>>(new Set());
+  // A COUNT per row, not a set: two writes to one player overlap (pick a team,
+  // then tick Icon), and the first to finish must not declare the row idle
+  // while the second is still out — a refresh would then drop its patch.
+  const [inflight, setInflight] = useState<ReadonlyMap<string, number>>(new Map());
   const [seenRows, setSeenRows] = useState(serverRows);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -83,13 +86,18 @@ export function useRoster(serverRows: readonly Row[]): Roster {
   }, []);
 
   const begin = useCallback((id: string) => {
-    setInflight((current) => new Set(current).add(id));
+    setInflight((current) => new Map(current).set(id, (current.get(id) ?? 0) + 1));
   }, []);
 
   const end = useCallback((id: string) => {
     setInflight((current) => {
-      const next = new Set(current);
-      next.delete(id);
+      const next = new Map(current);
+      const left = (next.get(id) ?? 1) - 1;
+      if (left > 0) {
+        next.set(id, left);
+      } else {
+        next.delete(id);
+      }
       return next;
     });
   }, []);
