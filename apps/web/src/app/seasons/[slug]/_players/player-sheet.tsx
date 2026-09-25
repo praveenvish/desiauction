@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   IconAlert,
+  IconCheck,
   useToast,
   IconChevronLeft,
   IconChevronRight,
@@ -896,7 +897,7 @@ function MarkToggle({
       data-testid={testId}
     >
       <span className="pd-mark-box" aria-hidden>
-        {on ? "✓" : ""}
+        {on ? <IconCheck size={16} weight="bold" /> : null}
       </span>
       <span className="pd-mark-text">
         <span className="pd-mark-label">{label}</span>

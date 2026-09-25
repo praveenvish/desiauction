@@ -49,9 +49,6 @@
   letter-spacing: 0.1em;
 }
 
-.review-row-rating-rest {
-  color: var(--border-strong);
-}
 
 .review-row-label {
   margin: 0 0 var(--space-1);

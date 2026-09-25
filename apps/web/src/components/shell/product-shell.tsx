@@ -13,7 +13,9 @@ import {
   IconGrid,
   IconGlobe,
   IconShieldCheck,
-  IconStar,
+  IconStarOutline,
+  IconCog,
+  type IconProps,
   IconChevronDown,
   IconHelp,
   IconHome,
@@ -208,26 +210,29 @@ function BellLink({
  * `org` is a grid and `team` is people, deliberately: both were `IconUsers`,
  * so an organizer who also owned a team saw the same glyph twice in one rail.
  */
-const NAV_ICONS: Record<NavIcon, ReactNode> = {
-  home: <IconHome />,
-  room: <IconGavel />,
-  cockpit: <IconBolt />,
-  team: <IconUsers />,
-  nights: <IconCalendar />,
-  trophy: <IconTrophy />,
-  org: <IconGrid />,
-  money: <IconRupee />,
-  sports: <IconStar />,
+// Components, not elements: the item you are on is drawn in the filled weight
+// (the one visual difference between "here" and "a place you could go" that
+// survives a glance), every other item in the regular outline.
+const NAV_ICONS: Record<NavIcon, (props: IconProps) => ReactNode> = {
+  home: IconHome,
+  room: IconGavel,
+  cockpit: IconBolt,
+  team: IconUsers,
+  nights: IconCalendar,
+  trophy: IconTrophy,
+  org: IconGrid,
+  money: IconRupee,
+  sports: IconStarOutline,
   // The founder's mockup icons for the three cross-season indexes
   // (ui/premium-flow, 2026-09-19): a person, a gavel, a chart.
-  player: <IconUser />,
-  gavel: <IconGavel />,
-  chart: <IconChart />,
-  find: <IconGlobe />,
-  help: <IconHelp />,
-  bell: <IconBell />,
-  account: <IconSettings />,
-  admin: <IconShieldCheck />,
+  player: IconUser,
+  gavel: IconGavel,
+  chart: IconChart,
+  find: IconGlobe,
+  help: IconHelp,
+  bell: IconBell,
+  account: IconCog,
+  admin: IconShieldCheck,
 };
 
 /**
@@ -261,7 +266,7 @@ function toShellItem(item: NavItem): ShellNavItem {
     label: item.label,
     shortLabel: item.shortLabel,
     href: item.href,
-    icon: NAV_ICONS[item.icon],
+    icon: NAV_ICONS[item.icon]({ weight: item.active === true ? "fill" : "regular" }),
     ...(item.active === true ? { active: true } : {}),
     ...(item.live === true ? { live: true } : {}),
     ...(item.choices !== undefined
@@ -347,21 +352,6 @@ function publicNav(pathname: string): PublicShellLink[] {
       ].map(mark),
     },
   ].map(mark);
-}
-
-/** The design system has no gear glyph; the utility group needs one. */
-function IconSettings() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" width={20} height={20} aria-hidden>
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.6-2-3.5-2.4 1a7.9 7.9 0 0 0-1.7-1L15 3H9l-.4 2.9a7.9 7.9 0 0 0-1.7 1l-2.4-1-2 3.5L4.6 11a7.9 7.9 0 0 0 0 2l-2 1.6 2 3.5 2.4-1a7.9 7.9 0 0 0 1.7 1L9 21h6l.4-2.9a7.9 7.9 0 0 0 1.7-1l2.4 1 2-3.5z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 /**
@@ -787,8 +777,11 @@ export function ProductShell({
           : {})}
         headerAction={
           <>
-            {/* Search and the theme switch are the two controls a visitor
-                looks for in a header and had to go to the footer to find.
+            {/* Search is the one control a visitor looks for in a header. The
+                theme switch left the public header on 2026-09-25: the landing
+                page, /login and every hero band are floodlight by design, so
+                the switch changed only the header and footer and read as
+                broken. The console keeps it.
                 They are hidden at the gates, where the page holds a single
                 decision and every other control is a way to not make it.
                 The search label is "Search", not "Search the site" — the
@@ -808,11 +801,8 @@ export function ProductShell({
                   aria-label="Search"
                   title="Search"
                 >
-                  <IconSearch width={18} height={18} />
+                  <IconSearch size={20} />
                 </Link>
-                <span className="shell-desktop-only">
-                  <ThemeToggle />
-                </span>
               </>
             )}
             {session !== null ? (

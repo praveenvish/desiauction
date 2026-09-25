@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { IconClose } from "../icons/icons";
+
 import styles from "./toast.module.css";
 
 export type ToastTone = "neutral" | "success" | "danger" | "info";
@@ -120,7 +122,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 dismiss(item.key);
               }}
             >
-              ✕
+              <IconClose size={16} />
             </button>
           </div>
         ))}

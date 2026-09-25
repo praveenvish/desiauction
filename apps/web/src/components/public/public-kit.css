@@ -510,9 +510,9 @@
 @media (prefers-reduced-motion: no-preference) {
   .pk-topic {
     transition:
-      transform 160ms ease,
-      box-shadow 160ms ease,
-      border-color 160ms ease;
+      transform var(--duration-base) var(--ease-out),
+      box-shadow var(--duration-base) var(--ease-out),
+      border-color var(--duration-base) var(--ease-out);
   }
 
   .pk-topic:hover {
@@ -608,8 +608,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .pk-chip {
     transition:
-      background-color 140ms ease,
-      border-color 140ms ease;
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
   }
 }
 

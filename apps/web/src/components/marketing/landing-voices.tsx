@@ -1,3 +1,4 @@
+import { StarGlyphs } from "@desiauction/ui";
 import { unstable_rethrow } from "next/navigation";
 
 import { landingVoices, type LandingVoice } from "../../server/reviews/voices";
@@ -57,10 +58,7 @@ export async function LandingVoices() {
             <li key={voice.id} className={styles["card"]}>
               <p className={styles["rating"]}>
                 <span className={styles["srOnly"]}>{`Rated ${String(voice.rating)} out of 5`}</span>
-                <span aria-hidden="true">
-                  {"★".repeat(voice.rating)}
-                  <span className={styles["ratingRest"]}>{"★".repeat(5 - voice.rating)}</span>
-                </span>
+                <StarGlyphs rating={voice.rating} />
               </p>
               <blockquote className={styles["quote"]}>
                 <p>{voice.quote}</p>

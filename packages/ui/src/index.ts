@@ -6,6 +6,7 @@ export { Button, ButtonLink, buttonClassName } from "./primitives/button";
 export type { ButtonProps, ButtonLinkProps, ButtonVariant, ButtonSize } from "./primitives/button";
 export { LinkComponentProvider, isRouterHref, useLinkComponent } from "./primitives/link-context";
 export { Badge } from "./primitives/badge";
+export { StarGlyphs } from "./primitives/star-glyphs";
 export type { BadgeProps, BadgeTone } from "./primitives/badge";
 export { Card, cardClassName } from "./primitives/card";
 export type { CardProps, CardElevation } from "./primitives/card";
@@ -42,6 +43,16 @@ export type {
   StatCardProps,
 } from "./primitives/console-kit";
 export { Tabs } from "./primitives/tabs";
+export {
+  Toolbar,
+  ToolbarSpacer,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarChip,
+  FilterMenu,
+  SegmentedTabs,
+} from "./primitives/toolbar";
+export type { ToolbarSearchProps, SegmentedItem } from "./primitives/toolbar";
 export type { TabsProps, TabItem } from "./primitives/tabs";
 export { Dialog } from "./primitives/dialog";
 export type { DialogProps } from "./primitives/dialog";

@@ -11,6 +11,7 @@ import {
   IconStar,
   Pill,
   SectionCard,
+  StarGlyphs,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -223,10 +224,7 @@ function ReviewRow({ review }: { review: DeskReview }) {
         <div>
           <p className="review-row-rating">
             <VisuallyHidden>{`${String(review.rating)} out of 5`}</VisuallyHidden>
-            <span aria-hidden="true">
-              {"★".repeat(review.rating)}
-              <span className="review-row-rating-rest">{"★".repeat(5 - review.rating)}</span>
-            </span>
+            <StarGlyphs rating={review.rating} />
           </p>
           <p className="pass-row-sub">
             {review.seasonName === null

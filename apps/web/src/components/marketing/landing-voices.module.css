@@ -33,9 +33,6 @@
   letter-spacing: 0.08em;
 }
 
-.ratingRest {
-  color: var(--border-strong);
-}
 
 .quote {
   flex: 1;
