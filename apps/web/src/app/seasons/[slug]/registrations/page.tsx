@@ -59,7 +59,14 @@ export default async function RegistrationsPage({
         <div className="dash-stack rd-stack">
           {/* Lineups shares this tab (RN-1 "Players"): who applied, and who
               actually took the field, are one question with two answers. */}
-          <PageIntro actions={<SiblingLink href={`/seasons/${slug}/lineups`} label="Lineups" />} />
+          {/* ...but only once there are squads to pick from. Before the
+              auction opens, "Lineups" sat above an empty desk as the first
+              button an organizer saw. */}
+          <PageIntro
+            {...(dashboard.desk.rosterLocked
+              ? { actions: <SiblingLink href={`/seasons/${slug}/lineups`} label="Lineups" /> }
+              : {})}
+          />
           <RegistrationDashboardPanel
             share={
               <ShareRegistration

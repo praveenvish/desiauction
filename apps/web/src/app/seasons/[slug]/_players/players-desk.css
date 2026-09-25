@@ -1596,3 +1596,10 @@ body:has(.pd-sheet) {
 .pd-presign-list:empty {
   display: none;
 }
+
+/* Two answers to "players are waiting": all at once, or one by one. */
+.pd-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
