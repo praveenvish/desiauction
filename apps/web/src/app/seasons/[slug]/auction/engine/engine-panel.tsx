@@ -2,7 +2,7 @@
 
 import type { EngineDiagnostics } from "@desiauction/contracts";
 import { commandRefusalMessage } from "@desiauction/core";
-import { Badge, Button, Card, useToast } from "@desiauction/ui";
+import { Badge, Button, Card, Dialog, useToast } from "@desiauction/ui";
 import { useCallback, useEffect, useState } from "react";
 
 import { engineDiagnosticsAction } from "../../../../../server/auction/conduct-actions";
@@ -33,6 +33,7 @@ const NOT_YET: Reading = { diagnostics: null, unreachable: false, refreshMs: nul
 export function EnginePanel({ slug }: { slug: string }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const hydrated = useHydrated();
 
   // Null only when the gate refuses (the conduct grant is gone): usePolled then
@@ -83,6 +84,7 @@ export function EnginePanel({ slug }: { slug: string }) {
   const unreachable = latest.unreachable || polled.failed || polled.revoked;
 
   const recover = async () => {
+    setConfirmOpen(false);
     setBusy(true);
     const ack = await submitAuctionCommand(slug, crypto.randomUUID(), "RecoverAuction", {});
     setBusy(false);
@@ -96,6 +98,13 @@ export function EnginePanel({ slug }: { slug: string }) {
 
   const healthy =
     diagnostics !== null && diagnostics.halted === null && !diagnostics.watchdog.stalled;
+  /* Recovery replays the log and heals the projections — a live-room repair.
+     On a finished auction there is no room to repair, and the button used to
+     sit there enabled all the same. */
+  const finished =
+    diagnostics?.auctionStatus === "completed" ||
+    diagnostics?.auctionStatus === "reconciled" ||
+    diagnostics?.auctionStatus === "abandoned";
 
   return (
     <div
@@ -119,8 +128,12 @@ export function EnginePanel({ slug }: { slug: string }) {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => void recover()}
+              // One click used to pause a live room with no warning. It asks first.
+              onClick={() => {
+                setConfirmOpen(true);
+              }}
               loading={busy}
+              disabled={finished}
               data-testid="engine-recover"
             >
               Recover engine
@@ -267,6 +280,33 @@ export function EnginePanel({ slug }: { slug: string }) {
           <p className="competitions-hint">Loading diagnostics…</p>
         </Card>
       ) : null}
+      <Dialog
+        open={confirmOpen}
+        onClose={() => {
+          setConfirmOpen(false);
+        }}
+        title="Recover the engine?"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConfirmOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void recover()} data-testid="engine-recover-confirm">
+              Recover engine
+            </Button>
+          </>
+        }
+      >
+        <p>
+          Rebuild this auction from its event log? The room pauses for a few seconds while it
+          replays.
+        </p>
+      </Dialog>
     </div>
   );
 }
