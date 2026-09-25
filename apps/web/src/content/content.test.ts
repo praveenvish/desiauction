@@ -206,13 +206,12 @@ describe("PX-10 · Content integrity", () => {
     // The footer said "put THAT in the subject line" and named no string. The
     // string is defined once, on the support channel, and the footer must use
     // the same words or the instruction is unfollowable.
-    const channel = SUPPORT.channels.find((entry) => entry.title === "Auction-night help");
-    // The named string moved from `detail` to `note`: the detail is now only
-    // the address (linking prose inside one anchor wrapped it to two lines),
-    // and the note both names the string and rides beside the link everywhere
-    // the channel renders. The href still pre-fills the same subject.
-    expect(channel?.note).toContain("AUCTION NIGHT");
-    expect(channel?.href).toContain("AUCTION%20NIGHT");
+    // The two channel cards (plain email, and an "Auction-night help" card
+    // with the same address and a pre-filled subject) became one card; the
+    // subject line is now named in its note rather than carried by a second
+    // copy of the address.
+    const [channel] = SUPPORT.channels;
+    expect(channel.note).toContain("AUCTION NIGHT");
     const footer = plainTextOf(HELP_ARTICLES[0]?.blocks ?? []);
     expect(footer).toContain("AUCTION NIGHT");
   });
@@ -412,7 +411,7 @@ describe("PX-10 · Search (navigation only)", () => {
     }
   });
 
-  it("reaches the eleven public pages it used to omit", () => {
+  it("reaches the public pages it used to omit", () => {
     // The release notes claimed "search that reaches every public destination"
     // while these were absent from the index. The worst was /security:
     // searching "security" returned a sign-in help article and never the page
@@ -421,12 +420,8 @@ describe("PX-10 · Search (navigation only)", () => {
     for (const href of [
       "/security",
       "/about",
-      "/careers",
       "/rules-guidelines",
       "/schedule-demo",
-      "/blog",
-      "/case-studies",
-      "/api-docs",
       "/legal",
       "/help",
       "/c",
@@ -435,6 +430,15 @@ describe("PX-10 · Search (navigation only)", () => {
       expect(hrefs, `search cannot reach ${href}`).toContain(href);
     }
     expect(searchContent("security").some((hit) => hit.href === "/security")).toBe(true);
+  });
+
+  it("never offers a page that has nothing on it yet", () => {
+    // These routes render an empty placeholder. Offering them as answers sent
+    // a searcher somewhere with nothing to read.
+    const hrefs = new Set(SEARCH_INDEX.map((doc) => doc.href));
+    for (const href of ["/careers", "/blog", "/case-studies", "/api-docs"]) {
+      expect(hrefs, `search still offers ${href}`).not.toContain(href);
+    }
   });
 
   it("finds what people actually type", () => {
@@ -446,7 +450,6 @@ describe("PX-10 · Search (navigation only)", () => {
       ["icon", "/help/icons-captains-and-coaches"],
       ["coach", "/help/icons-captains-and-coaches"],
       ["overlay", "/help/screens-for-the-room"],
-      ["api", "/api-docs"],
       ["gdpr", "/legal/privacy"],
       ["delete my account", "/legal/data-retention"],
     ];

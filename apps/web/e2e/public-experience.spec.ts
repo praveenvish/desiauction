@@ -27,7 +27,6 @@ const PUBLIC_ROUTES = [
   "/legal/terms",
   "/legal/privacy",
   "/legal/refunds",
-  "/contact",
   "/support",
   "/releases",
   "/search?q=receipt",

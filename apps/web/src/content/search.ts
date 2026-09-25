@@ -115,7 +115,6 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
     "Get help",
     "contact support bug report issue auction night email",
   ),
-  doc("Contact", "/contact", "Support", "Reach us", "contact email support response time"),
   doc(
     "Release notes",
     "/releases",
@@ -144,7 +143,6 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
     "Who we are",
     "about us company mission beta story team",
   ),
-  doc("Careers", "/careers", "Product", "Working here", "careers jobs hiring roles open"),
   doc(
     "Rules & guidelines",
     "/rules-guidelines",
@@ -159,21 +157,10 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
     "Book a live walkthrough",
     "demo walkthrough call sales talk to us book booking time slot appointment",
   ),
-  doc("Blog", "/blog", "Product", "Writing", "blog posts articles news updates"),
-  doc(
-    "Case studies",
-    "/case-studies",
-    "Product",
-    "Tournaments in practice",
-    "case studies customers stories examples",
-  ),
-  doc(
-    "API docs",
-    "/api-docs",
-    "Product",
-    "For developers",
-    "api docs integration developer webhook endpoint",
-  ),
+  // /careers, /blog, /case-studies and /api-docs are deliberately NOT here.
+  // The routes exist but have nothing on them yet, and a search result that
+  // lands on an empty page is worse than no result. Add each back the day it
+  // has something to read.
   doc(
     "Legal centre",
     "/legal",
