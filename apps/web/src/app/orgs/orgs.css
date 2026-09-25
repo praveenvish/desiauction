@@ -445,15 +445,9 @@ a.cat-group-head:hover {
   box-shadow: var(--shadow-1);
   color: inherit;
   text-decoration: none;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
 }
 
-a.org-card:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
-}
+/* The hover is the shared card recipe (`.da-lift`, motion.css). */
 
 .org-card:focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -564,12 +558,4 @@ a.org-card:hover {
 .org-add-text span {
   font-size: var(--text-xs-size);
   color: var(--text-secondary);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  a.org-card,
-  a.org-card:hover {
-    transition: none;
-    transform: none;
-  }
 }

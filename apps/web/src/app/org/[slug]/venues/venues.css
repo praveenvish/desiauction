@@ -1,0 +1,56 @@
+/* VENUES — a club's grounds (wow pass). The venues are kit SectionCards; the
+   create form is one row on a laptop (name · address · city · button), not a
+   420px column with a full-width pale button under it. Tokens only. */
+
+.vn-count {
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.vn-form.create-competition {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+  max-width: none;
+}
+
+.vn-form > .date-row {
+  display: contents;
+}
+
+.vn-form > button {
+  align-self: end;
+}
+
+@media (max-width: 899px) {
+  .vn-form.create-competition {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .vn-form > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .vn-form > button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 519px) {
+  .vn-form.create-competition {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vn-form > button {
+    justify-self: stretch;
+  }
+}
+
+.vn-form input {
+  box-sizing: border-box;
+  width: 100%;
+}
