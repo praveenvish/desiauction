@@ -192,7 +192,13 @@ test("the primary navigation is reachable on a phone and on a desktop", async ({
  * and its per-row actions, the season ladder, the auction exits) need a seeded
  * season and are covered by the RH-1 rehearsal harness; they share this rule.
  */
-const ACTION_GROUPS = [{ route: "/c", selector: ".pk-chips" }] as const;
+// Wow pass (2026-09-25): the /c facets became a one-row segmented strip
+// that scrolls sideways on a phone (tabs of different words, by design), so the
+// equal-width rule now holds on /c's two-button way out of an empty search —
+// reachable on every deployment with no seeded data.
+const ACTION_GROUPS = [
+  { route: "/c?q=zz-no-such-tournament-zz", selector: ".public-empty-actions" },
+] as const;
 
 test("action groups are equal-width, thumb-sized rows on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
