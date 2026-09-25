@@ -143,13 +143,13 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             />
             <StatCard
               icon={<IconUsers />}
-              tone="blue"
+              tone="gold"
               value={String(career.totals.teams)}
               label={career.totals.teams === 1 ? "Team" : "Teams"}
             />
             <StatCard
               icon={<IconGavel />}
-              tone="purple"
+              tone="gold"
               value={String(career.totals.soldCount)}
               label="Times sold"
             />
@@ -157,7 +157,7 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
               // ₹ only over a rupee price: "Highest price 50,000 pts" beside a
               // rupee sign read as money to a points-league player (0091).
               icon={career.totals.highestUnit === "inr" ? <IconRupee /> : <IconWallet />}
-              tone="green"
+              tone="gold"
               value={
                 career.totals.highestPrice !== null
                   ? money(career.totals.highestPrice, career.totals.highestUnit)

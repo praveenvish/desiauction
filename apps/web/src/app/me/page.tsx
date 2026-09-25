@@ -168,7 +168,9 @@ export default async function MySportsPage({
             />
           </span>
         }
-        eyebrow={<HeroStatus>Player</HeroStatus>}
+        // "Player" only for somebody who has played: an owner with no seasons
+        // was badged as one above four zeros.
+        {...(career.totals.seasons > 0 ? { eyebrow: <HeroStatus>Player</HeroStatus> } : {})}
         title={session.name}
         meta={[
           ...(profile.location !== null && profile.location !== ""
@@ -194,46 +196,50 @@ export default async function MySportsPage({
         sideAlign="start"
       />
 
-      <StatGrid testId="me-figures">
-        <StatCard
-          icon={<IconTrophy />}
-          tone="gold"
-          value={career.totals.seasons.toLocaleString("en-IN")}
-          label={career.totals.seasons === 1 ? "Season" : "Seasons"}
-          hint={
-            sports.length > 0
-              ? `${String(sports.length)} ${sports.length === 1 ? "sport" : "sports"}`
-              : "None entered yet"
-          }
-        />
-        <StatCard
-          icon={<IconMatch />}
-          tone="green"
-          value={matchesPlayed.toLocaleString("en-IN")}
-          label="Matches played"
-          hint={matchesPlayed > 0 ? `${String(wins)} won` : "From recorded lineups"}
-        />
-        <StatCard
-          icon={<IconUsers />}
-          tone="blue"
-          value={career.totals.teams.toLocaleString("en-IN")}
-          label={career.totals.teams === 1 ? "Team" : "Teams"}
-          hint="Across every club"
-        />
-        <StatCard
-          icon={<IconGavel />}
-          tone="purple"
-          value={auctioned.toLocaleString("en-IN")}
-          label={auctioned === 1 ? "Auction" : "Auctions"}
-          hint={
-            career.totals.highestPrice === null
-              ? career.totals.soldCount > 0
-                ? `Sold ${String(career.totals.soldCount)}×`
-                : "No sale yet"
-              : `Sold ${String(career.totals.soldCount)}× · top ${moneyFormat(career.totals.highestUnit).compact(career.totals.highestPrice)}`
-          }
-        />
-      </StatGrid>
+      {/* No tiles of zeros for somebody who has not played yet — the hero
+          already says the record starts with the first tournament. */}
+      {career.totals.seasons === 0 && matchesPlayed === 0 ? null : (
+        <StatGrid testId="me-figures">
+          <StatCard
+            icon={<IconTrophy />}
+            tone="gold"
+            value={career.totals.seasons.toLocaleString("en-IN")}
+            label={career.totals.seasons === 1 ? "Season" : "Seasons"}
+            hint={
+              sports.length > 0
+                ? `${String(sports.length)} ${sports.length === 1 ? "sport" : "sports"}`
+                : "None entered yet"
+            }
+          />
+          <StatCard
+            icon={<IconMatch />}
+            tone="gold"
+            value={matchesPlayed.toLocaleString("en-IN")}
+            label="Matches played"
+            hint={matchesPlayed > 0 ? `${String(wins)} won` : "From recorded lineups"}
+          />
+          <StatCard
+            icon={<IconUsers />}
+            tone="gold"
+            value={career.totals.teams.toLocaleString("en-IN")}
+            label={career.totals.teams === 1 ? "Team" : "Teams"}
+            hint="Across every club"
+          />
+          <StatCard
+            icon={<IconGavel />}
+            tone="gold"
+            value={auctioned.toLocaleString("en-IN")}
+            label={auctioned === 1 ? "Auction" : "Auctions"}
+            hint={
+              career.totals.highestPrice === null
+                ? career.totals.soldCount > 0
+                  ? `Sold ${String(career.totals.soldCount)}×`
+                  : "No sale yet"
+                : `Sold ${String(career.totals.soldCount)}× · top ${moneyFormat(career.totals.highestUnit).compact(career.totals.highestPrice)}`
+            }
+          />
+        </StatGrid>
+      )}
 
       {upcoming !== undefined ? (
         <Notice
@@ -309,99 +315,105 @@ export default async function MySportsPage({
             )}
           </SectionCard>
 
-          <SectionCard
-            icon={<IconMatch />}
-            tone="green"
-            title="Matches"
-            description={
-              shownMatches.length === 0
-                ? "Matches appear here once your team plays and the organizer records the lineup."
-                : `${String(shownMatches.length)} played or in progress`
-            }
-            flush={shownMatches.length > 0}
-            data-testid="me-matches"
-          >
-            {shownMatches.length === 0 ? undefined : (
-              <div className="me-table-wrap">
-                <table className="me-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Date</th>
-                      <th scope="col">Match</th>
-                      <th scope="col">Result</th>
-                      <th scope="col">You</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shownMatches.map((match) => (
-                      <tr key={match.fixtureId}>
-                        <td className="me-num" data-label="Date">
-                          {matchDate(match.kickoffAt)}
-                        </td>
-                        <td className="me-cell-match">
-                          <strong>
-                            {match.teamName} vs {match.opponentName}
-                          </strong>
-                          <span>
-                            {sportPackFor(match.sport).label} · {match.competitionName}
-                          </span>
-                        </td>
-                        <td data-label="Result">
-                          {match.result === null ? (
-                            <Pill tone="blue" dot>
-                              In progress
-                            </Pill>
-                          ) : (
-                            <Pill tone={RESULT_TONE[match.result]}>
-                              {RESULT_LABEL[match.result]}
-                            </Pill>
-                          )}
-                        </td>
-                        <td className={`me-played me-played--${match.played}`} data-label="You">
-                          {PLAYED_LABEL[match.played]}
-                        </td>
+          {career.totals.seasons === 0 && shownMatches.length === 0 ? null : (
+            <SectionCard
+              icon={<IconMatch />}
+              tone="gold"
+              title="Matches"
+              description={
+                shownMatches.length === 0
+                  ? "Matches and your team's published fixtures appear here once they exist."
+                  : `${String(shownMatches.length)} played or in progress`
+              }
+              flush={shownMatches.length > 0}
+              data-testid="me-matches"
+            >
+              {shownMatches.length === 0 ? undefined : (
+                <div className="me-table-wrap">
+                  <table className="me-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Match</th>
+                        <th scope="col">Result</th>
+                        <th scope="col">You</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </SectionCard>
+                    </thead>
+                    <tbody>
+                      {shownMatches.map((match) => (
+                        <tr key={match.fixtureId}>
+                          <td className="me-num" data-label="Date">
+                            {matchDate(match.kickoffAt)}
+                          </td>
+                          <td className="me-cell-match">
+                            <strong>
+                              {match.teamName} vs {match.opponentName}
+                            </strong>
+                            <span>
+                              {sportPackFor(match.sport).label} · {match.competitionName}
+                            </span>
+                          </td>
+                          <td data-label="Result">
+                            {match.result === null ? (
+                              <Pill tone="blue" dot>
+                                In progress
+                              </Pill>
+                            ) : (
+                              <Pill tone={RESULT_TONE[match.result]}>
+                                {RESULT_LABEL[match.result]}
+                              </Pill>
+                            )}
+                          </td>
+                          <td className={`me-played me-played--${match.played}`} data-label="You">
+                            {PLAYED_LABEL[match.played]}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+          )}
         </div>
 
         <aside className="me-side" aria-label="Coming up and career by sport">
-          <SectionCard
-            icon={<IconCalendar />}
-            tone="blue"
-            title="Upcoming matches"
-            description={
-              shownUpcoming.length === 0
-                ? "Your team's published fixtures appear here."
-                : "Your team's next published fixtures."
-            }
-            data-testid="me-upcoming"
-          >
-            {shownUpcoming.length === 0 ? undefined : (
-              <ul className="me-upcoming">
-                {shownUpcoming.map((match) => (
-                  <li key={match.fixtureId}>
-                    <span className="me-upcoming-when">{kickoffLabel(match.kickoffAt)}</span>
-                    <span className="me-upcoming-teams">
-                      <TeamChip color={match.teamColor}>{match.teamName}</TeamChip>
-                      <span className="me-vs">vs</span>
-                      <span className="me-upcoming-opp">{match.opponentName}</span>
-                    </span>
-                    <span className="me-upcoming-comp">{match.competitionName}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </SectionCard>
+          {shownUpcoming.length === 0 ? null : (
+            <SectionCard
+              icon={<IconCalendar />}
+              tone="gold"
+              title="Upcoming matches"
+              description={
+                shownUpcoming.length === 0
+                  ? "Your team's published fixtures appear here."
+                  : "Your team's next published fixtures."
+              }
+              data-testid="me-upcoming"
+            >
+              {shownUpcoming.length === 0 ? undefined : (
+                <ul className="me-upcoming">
+                  {shownUpcoming.map((match) => (
+                    <li key={match.fixtureId}>
+                      <span className="me-upcoming-when">{kickoffLabel(match.kickoffAt)}</span>
+                      <span className="me-upcoming-teams">
+                        <TeamChip color={match.teamColor}>{match.teamName}</TeamChip>
+                        <span className="me-vs">vs</span>
+                        <span className="me-upcoming-opp">{match.opponentName}</span>
+                      </span>
+                      <span className="me-upcoming-comp">{match.competitionName}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </SectionCard>
+          )}
 
-          {bySport.length > 0 ? (
+          {/* One sport is not a breakdown: the bar was a full-width stripe
+              saying "100%". */}
+          {bySport.length > 1 ? (
             <SectionCard
               icon={<IconChart />}
-              tone="purple"
+              tone="gold"
               title="Career by sport"
               description="Seasons and matches, per sport."
             >
