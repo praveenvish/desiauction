@@ -252,6 +252,15 @@ export function useLiveFeed(initial: ResolvedLot[], snapshot: AuctionSnapshot | 
   return { resolved: feed.resolved, events: feed.events };
 }
 
+/**
+ * The pill's word where the engine's kind is not the public one. The
+ * timeline rendered the raw kind, so a public stage printed "UNSOLD" beside a
+ * player's face — the word content/help.ts rules out on a public screen.
+ */
+const FEED_PILL: Partial<Record<FeedEvent["kind"], string>> = {
+  unsold: "Passed",
+};
+
 const FEED_TONE: Record<FeedEvent["kind"], KitTone> = {
   sold: "blue",
   unsold: "neutral",
@@ -292,7 +301,7 @@ export function AuctionTimeline({
           <li key={event.key} data-testid={`timeline-${event.kind}`} data-kind={event.kind}>
             <span className="live-rail-dot" aria-hidden />
             <span className="live-rail-pill">
-              <Pill tone={FEED_TONE[event.kind]}>{event.kind}</Pill>
+              <Pill tone={FEED_TONE[event.kind]}>{FEED_PILL[event.kind] ?? event.kind}</Pill>
             </span>
             {event.subject === undefined ? null : (
               <LotFace
@@ -585,7 +594,51 @@ export function AuctionSummaryCard({
   const totalSpent = snapshot.paddles.some((paddle) => paddle.committed === null)
     ? sold.reduce((sum, lot) => sum + (lot.soldPrice ?? 0), 0)
     : snapshot.paddles.reduce((sum, paddle) => sum + (paddle.committed ?? 0), 0);
-  const teams = [...snapshot.paddles].sort((a, b) => (b.committed ?? 0) - (a.committed ?? 0));
+  /*
+   * ONE ROW PER TEAM, RANKED BY WHAT IT SPENT.
+   *
+   * This listed paddles and printed "purse sealed" for each when the engine
+   * withheld the money from this viewer — three "purse sealed" rows under a
+   * "Total spent 1,74,500 pts" that is the sum of them. What a team spent is
+   * its hammer prices, which the room saw called, so a sealed row falls back
+   * to that sum; only the purse LEFT stays unsaid, because that the engine
+   * did withhold. A team that handed a paddle back and took another is still
+   * one team (see `teamPurseRows`).
+   */
+  const teams = [
+    ...snapshot.paddles
+      .reduce((byTeam, paddle) => {
+        const row = byTeam.get(paddle.teamId);
+        if (row === undefined) {
+          byTeam.set(paddle.teamId, {
+            teamId: paddle.teamId,
+            teamName: paddle.teamName,
+            paddleNumber: paddle.paddleNumber,
+            committed: paddle.committed,
+            purseRemaining: paddle.purseRemaining,
+          });
+        } else {
+          row.committed =
+            row.committed === null || paddle.committed === null
+              ? null
+              : row.committed + paddle.committed;
+          if (!paddle.released) {
+            row.paddleNumber = paddle.paddleNumber;
+          }
+        }
+        return byTeam;
+      }, new Map<string, { teamId: string; teamName: string; paddleNumber: string; committed: number | null; purseRemaining: number | null }>())
+      .values(),
+  ]
+    .map((team) => ({
+      ...team,
+      spent:
+        team.committed ??
+        sold
+          .filter((lot) => lot.teamName === team.teamName)
+          .reduce((sum, lot) => sum + (lot.soldPrice ?? 0), 0),
+    }))
+    .sort((a, b) => b.spent - a.spent || a.teamName.localeCompare(b.teamName));
   return (
     <section className="wrap" data-testid="auction-summary" aria-labelledby="wrap-title">
       <div className="wrap-hero">
@@ -616,7 +669,7 @@ export function AuctionSummaryCard({
           icon={<IconFile />}
           tone="purple"
           value={unsold.length}
-          label="Passed / unsold"
+          label="Passed"
           testId="summary-unsold"
         />
         <StatCard
@@ -649,7 +702,7 @@ export function AuctionSummaryCard({
                 total === null || total === 0 ? 0 : ((paddle.committed ?? 0) / total) * 100;
               const color = teamColors[paddle.teamId] ?? null;
               return (
-                <li key={paddle.paddleId}>
+                <li key={paddle.teamId}>
                   <TeamChip color={color}>{paddle.paddleNumber}</TeamChip>
                   <span className="wrap-spend-team">{paddle.teamName}</span>
                   {total === null ? (
@@ -665,7 +718,10 @@ export function AuctionSummaryCard({
                   )}
                   <span className="wrap-spend-figures">
                     {paddle.committed === null || paddle.purseRemaining === null ? (
-                      "purse sealed"
+                      <>
+                        <strong>{money.ledger(paddle.spent)}</strong>
+                        <span> spent</span>
+                      </>
                     ) : (
                       <>
                         <strong>{money.ledger(paddle.committed)}</strong>
@@ -807,8 +863,11 @@ export function RulesCard({
         ) : null}
         <div>
           <dt>Squad size</dt>
+          {/* A fixed squad is one number: "12–12 players" reads as a typo. */}
           <dd>
-            {rules.squadMin}–{rules.squadMax} players
+            {rules.squadMin === rules.squadMax
+              ? `${String(rules.squadMax)} players`
+              : `${String(rules.squadMin)}–${String(rules.squadMax)} players`}
           </dd>
         </div>
         <div>
