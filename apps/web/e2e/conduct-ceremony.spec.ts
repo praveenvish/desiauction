@@ -69,11 +69,8 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await otpLogin(organizer, `86${STAMP}`);
   await organizer.goto("/orgs");
   await organizer.getByTestId("new-org").click();
-  await organizer
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Ceremony Org ${STAMP}`);
-  await organizer.getByRole("button", { name: "Create organization" }).click();
+  await organizer.getByLabel("Club name").filter({ visible: true }).fill(`Ceremony Org ${STAMP}`);
+  await organizer.getByRole("button", { name: "Create club" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");

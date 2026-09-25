@@ -129,8 +129,8 @@ async function organizerWithOpenSeason(page: Page, stamp: string): Promise<void>
   }
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Drive Org ${stamp}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Drive Org ${stamp}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible(COLD);
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();

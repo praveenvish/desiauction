@@ -51,11 +51,8 @@ test("a points season runs the whole night in points and owes nothing", async ({
 
   await organizer.goto("/orgs");
   await organizer.getByTestId("new-org").click();
-  await organizer
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Points Org ${STAMP}`);
-  await organizer.getByRole("button", { name: "Create organization" }).click();
+  await organizer.getByLabel("Club name").filter({ visible: true }).fill(`Points Org ${STAMP}`);
+  await organizer.getByRole("button", { name: "Create club" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   // --- The season is created in points -------------------------------------
@@ -108,7 +105,11 @@ test("a points season runs the whole night in points and owes nothing", async ({
   await organizer.goto(`/seasons/${slug}/auction`);
   await hydrated(organizer);
   await organizer.getByTestId("setup-close-registration").click();
-  await expect(organizer.getByTestId("check-intake_closed")).toContainText("pass", COLD);
+  await expect(organizer.getByTestId("check-intake_closed")).toHaveAttribute(
+    "data-pass",
+    "true",
+    COLD,
+  );
   const purse = organizer.getByLabel("Purse per team (points)");
   await expect(purse).toHaveValue("1000");
   await expect(organizer.getByTestId("auction-setup")).toContainText("1,000 pts");

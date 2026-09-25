@@ -95,7 +95,7 @@ export default async function OrgsPage({
                   the id made `getByTestId("new-org")` a strict-mode violation in
                   every spec that creates an org, which is most of the suite. */}
               <FormDialog
-                title="New organization"
+                title="New club"
                 triggerLabel="Create your organization"
                 size="touch"
                 triggerTestId="new-org-empty"
@@ -165,7 +165,7 @@ export default async function OrgsPage({
           ))}
           {/* One click opens the modal rather than scrolling to a pinned card. */}
           <FormDialog
-            title="New organization"
+            title="New club"
             triggerLabel={
               <>
                 <span className="org-add-plus" aria-hidden>

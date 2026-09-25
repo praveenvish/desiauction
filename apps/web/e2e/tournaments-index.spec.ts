@@ -67,11 +67,8 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   // A person with no org cannot create a tournament, so the org comes first.
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await dialog(page)
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Tour Org ${STAMP}`);
-  await dialog(page).getByRole("button", { name: "Create organization" }).click();
+  await dialog(page).getByLabel("Club name").filter({ visible: true }).fill(`Tour Org ${STAMP}`);
+  await dialog(page).getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Tour Org ${STAMP}`, COLD);
 
   // First run owns the whole canvas: no toolbar, no summary band, one action.
@@ -244,11 +241,8 @@ test("tournaments index: axe zero violations", async ({ page }) => {
   await otpLogin(page, `74${STAMP}`);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await dialog(page)
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Axe Org ${STAMP}`);
-  await dialog(page).getByRole("button", { name: "Create organization" }).click();
+  await dialog(page).getByLabel("Club name").filter({ visible: true }).fill(`Axe Org ${STAMP}`);
+  await dialog(page).getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Axe Org ${STAMP}`, COLD);
 
   // Scan the populated surface: the empty state exercises none of the new

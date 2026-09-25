@@ -88,11 +88,8 @@ test("the full night: lobby → owners → bidding with notifications → public
   // failing.
   await organizer.goto("/orgs");
   await organizer.getByTestId("new-org").click();
-  await organizer
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Night CC ${STAMP}`);
-  await organizer.getByRole("button", { name: "Create organization" }).click();
+  await organizer.getByLabel("Club name").filter({ visible: true }).fill(`Night CC ${STAMP}`);
+  await organizer.getByRole("button", { name: "Create club" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");

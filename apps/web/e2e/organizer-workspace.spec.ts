@@ -88,11 +88,8 @@ test("founder demo: org → competition → approve → team roster → venue �
   // Organizations are born where the work is: /orgs, not the onboarding wizard.
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Workspace CC ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Workspace CC ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Workspace CC ${STAMP}`);
   orgUrl = page.url();
 

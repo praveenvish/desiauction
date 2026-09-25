@@ -94,8 +94,8 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await onboardWithName(page, OWNER, "Settlement Founder");
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Settle Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Settle Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   orgSlug = new URL(page.url()).pathname.split("/")[2] ?? "";
 

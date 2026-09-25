@@ -60,8 +60,8 @@ test("a battle royale season: one lobby, four squads, and a table built from pla
   // be scheduled — the transition rules are the same as any other fixture's.
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`BR Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`BR Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.getByRole("tab", { name: "Tournaments" }).click();
   await page.getByTestId("open-venues").click();
