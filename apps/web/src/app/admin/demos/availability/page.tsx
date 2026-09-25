@@ -6,6 +6,7 @@ import { recordAdminAccess } from "../../../../server/admin/access-log";
 import { platformDemoGate } from "../../../../server/admin/authz";
 import { publishedAvailability, publishedBlackouts } from "../../../../server/admin/demo-views";
 import { AvailabilityPanel } from "./availability-panel";
+import { AdminPageHead } from "../../admin-ui";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 import "../demos.css";
@@ -38,16 +39,13 @@ export default async function AdminDemoAvailabilityPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head">
-            <p className="dash-hint">
-              Times published here are offered on{" "}
-              <Link href="/schedule-demo" className="prose-link">
-                the public demo page
-              </Link>
-              , minus anything already booked and anything blocked below. Nothing is offered inside
-              the next two hours.
-            </p>
-          </header>
+          <AdminPageHead>
+            Times published here are offered on{" "}
+            <Link href="/schedule-demo" className="prose-link">
+              the public demo page
+            </Link>
+            , minus bookings, blocked days and the next two hours.
+          </AdminPageHead>
 
           {windows.length === 0 ? (
             <Notice

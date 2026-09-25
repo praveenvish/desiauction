@@ -8,9 +8,10 @@ import {
   IconExternal,
   IconEyeOff,
   IconGlobe,
-  IconSearch,
   Pill,
   SectionCard,
+  Toolbar,
+  ToolbarSearch,
   useToast,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -27,6 +28,7 @@ import type {
   ModerationDesk,
   PublicSeasonRow,
 } from "../../../server/admin/moderation-views";
+import { AdminFilterForm } from "../admin-filter-form";
 
 const REASON_MIN = 10;
 const REASON_MAX = 500;
@@ -42,34 +44,31 @@ const REASON_MAX = 500;
 export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
   return (
     <>
-      <SectionCard
-        icon={<IconEyeOff />}
-        tone="red"
-        title="Taken down"
-        description={
-          desk.held.length === 0
-            ? "Held off the public web by DesiAuction"
-            : `${String(desk.held.length)} held off the public web by DesiAuction`
-        }
-        flush
-        data-testid="moderation-held"
-      >
-        {desk.held.length === 0 ? (
-          <div className="admin-card-empty">
-            <EmptyState
-              headingLevel={3}
-              title="Nothing is taken down"
-              description="Every season DesiAuction takes off the public web is listed here, with who did it and why."
-            />
-          </div>
-        ) : (
+      {desk.held.length === 0 ? (
+        // Nothing held is the calm state — one line, not a 200px card.
+        <p className="admin-slim" data-testid="moderation-held">
+          <IconEyeOff size={16} />
+          <strong>Nothing is taken down.</strong>
+          <span className="admin-meta">
+            Seasons DesiAuction takes off the public web are listed here, with who and why.
+          </span>
+        </p>
+      ) : (
+        <SectionCard
+          icon={<IconEyeOff />}
+          tone="red"
+          title="Taken down"
+          description={`${String(desk.held.length)} held off the public web by DesiAuction`}
+          flush
+          data-testid="moderation-held"
+        >
           <ul className="admin-rows is-stacked">
             {desk.held.map((row) => (
               <HeldRow key={row.id} row={row} />
             ))}
           </ul>
-        )}
-      </SectionCard>
+        </SectionCard>
+      )}
       <SectionCard
         icon={<IconGlobe />}
         tone="blue"
@@ -84,23 +83,18 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
         flush
         data-testid="moderation-public"
       >
-        <form className="admin-filters" method="get" role="search" data-testid="moderation-search">
-          <label className="admin-search" htmlFor="moderation-q">
-            <span className="admin-sr-only">Find a public season</span>
-            <IconSearch size={18} aria-hidden />
-            <input
+        <AdminFilterForm testId="moderation-search">
+          <Toolbar>
+            <ToolbarSearch
               id="moderation-q"
               name="q"
-              type="search"
-              defaultValue={desk.query}
+              label="Find a public season"
               placeholder="Season, slug or club"
-              className="admin-search-input"
+              defaultValue={desk.query}
+              submitLabel="Search"
             />
-          </label>
-          <button type="submit" className="admin-search-submit">
-            Search
-          </button>
-        </form>
+          </Toolbar>
+        </AdminFilterForm>
         {desk.published.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
@@ -115,7 +109,7 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
           </div>
         ) : (
           <>
-            <ul className="admin-rows">
+            <ul className="admin-rows admin-mod-rows">
               {desk.published.map((row) => (
                 <PublicRow key={row.id} row={row} />
               ))}
@@ -159,37 +153,44 @@ function PublicRow({ row }: { row: PublicSeasonRow }) {
   const valid = length >= REASON_MIN && length <= REASON_MAX;
   return (
     <li className="pass-row" data-testid={`moderation-public-${row.slug}`}>
-      <span className="admin-cell-main">
+      <span className="admin-mod-main">
         <span className="pass-row-season">{row.name}</span>
         <span className="admin-meta">
-          <Link href={`/admin/orgs/${row.orgSlug}`} className="admin-inline-link">
+          <Link href={`/admin/orgs/${row.orgSlug}`} className="admin-quiet-link">
             {row.orgName}
-          </Link>{" "}
-          · {row.sport} · created {row.createdAt.toISOString().slice(0, 10)}
+          </Link>
+          <span aria-hidden> · </span>
+          <span className="admin-sport">{row.sport}</span>
+          <span aria-hidden> · </span>
+          created {row.createdAt.toISOString().slice(0, 10)}
         </span>
       </span>
       <div className="pass-row-actions">
         <a
-          className="admin-card-link"
+          className="admin-icon-link"
           href={`/c/${row.slug}`}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={`View the public page of ${row.name} (opens in a new tab)`}
+          title="View the public page"
           data-testid={`moderation-view-${row.slug}`}
         >
-          View the public page
-          <IconExternal size={14} className="icon-trail" />
+          <IconExternal size={16} />
         </a>
-        <Button
-          variant="danger"
-          size="sm"
+        {/* Fifty solid red buttons were a column of alarm. The row's button is
+            quiet; the dialog it opens is where the danger is said and done. */}
+        <button
+          type="button"
+          className="admin-quiet-danger"
           onClick={() => {
             setReason("");
             setOpen(true);
           }}
           data-testid={`take-down-${row.slug}`}
         >
+          <IconEyeOff size={16} />
           Take down…
-        </Button>
+        </button>
       </div>
       <Dialog
         open={open}

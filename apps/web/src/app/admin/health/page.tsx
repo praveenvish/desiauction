@@ -7,6 +7,7 @@ import { platformAdminPageGate } from "../../../server/admin/authz";
 import { HealthPanel } from "./health-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
+import { AdminPageHead } from "../admin-ui";
 
 export const metadata = { title: "Health · Platform admin · DesiAuction" };
 
@@ -28,12 +29,9 @@ export default async function AdminHealthPage() {
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head">
-          <p className="dash-hint">
-            Workers, queues, ingest, dispatch, exports and certification — as the platforms
-            themselves report them.
-          </p>
-        </header>
+        <AdminPageHead readOnly>
+          Workers, queues, ingest and certification, as each reports itself.
+        </AdminPageHead>
         <Suspense fallback={<LoadingState variant="page" />}>
           <Health />
         </Suspense>

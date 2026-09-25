@@ -7,17 +7,16 @@ import {
   IconBolt,
   IconBroadcast,
   IconCheckCircle,
+  IconChevronDown,
   IconClock,
   IconGavel,
   IconUsers,
   Pill,
   SectionCard,
-  StatCard,
-  StatGrid,
   type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 
 import { moneyFormat } from "../../../lib/money";
 import type { EngineRoom, LiveBoardView } from "../../../server/admin/live-watch";
@@ -65,27 +64,31 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         revoked={revoked}
       />
 
-      <StatGrid testId="live-summary">
-        <StatCard
-          icon={<IconGavel />}
-          tone="gold"
-          value={String(data.running.length)}
+      {/* One quiet strip, not four tall tiles. A zero is the calm answer and
+          reads muted; only trouble takes a colour. */}
+      <dl className="admin-kpis" data-testid="live-summary">
+        <Kpi
+          icon={<IconGavel size={20} weight="duotone" />}
+          value={data.running.length}
           label="Auctions running"
         />
-        <StatCard icon={<IconBolt />} tone="blue" value={String(pulse)} label="Bids · last 5 min" />
-        <StatCard
-          icon={<IconUsers />}
-          tone="green"
-          value={String(connected)}
+        <Kpi
+          icon={<IconBolt size={20} weight="duotone" />}
+          value={pulse}
+          label="Bids · last 5 min"
+        />
+        <Kpi
+          icon={<IconUsers size={20} weight="duotone" />}
+          value={connected}
           label="People connected"
         />
-        <StatCard
-          icon={<IconAlert />}
-          tone={troubled.length > 0 ? "red" : "neutral"}
-          value={String(troubled.length)}
+        <Kpi
+          icon={<IconAlert size={20} weight="duotone" />}
+          value={troubled.length}
           label="Rooms with engine trouble"
+          tone={troubled.length > 0 ? "danger" : undefined}
         />
-      </StatGrid>
+      </dl>
 
       <SectionCard
         icon={<IconBroadcast />}
@@ -108,7 +111,18 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
             />
           </div>
         ) : (
-          <ul className="admin-rows is-stacked">
+          <ul className="admin-rooms">
+            <li className="admin-room admin-room-head" aria-hidden>
+              <span>Auction</span>
+              <span className="admin-room-facts">
+                <span>Lots</span>
+                <span>Spent</span>
+                <span>Bids · 5 min</span>
+                <span>Last activity</span>
+                <span>Room</span>
+              </span>
+              <span />
+            </li>
             {data.running.map((row) => (
               <RoomRow
                 key={row.auctionId}
@@ -122,18 +136,21 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
       </SectionCard>
 
       {data.stale.length > 0 ? (
-        <SectionCard
-          icon={<IconClock />}
-          tone="amber"
-          title={
-            <>
-              Never closed <span className="admin-count">· {String(data.stale.length)}</span>
-            </>
-          }
-          description="Marked live, but nothing has happened in over twelve hours — an auction night that ended without anyone closing it. Only the organizer can close it, from their cockpit."
-          flush
-          data-testid="live-stale"
-        >
+        // A backlog, not a feed: one warning line, opened on demand.
+        <details className="admin-fold" data-testid="live-stale">
+          <summary>
+            <span className="admin-fold-icon" data-tone="warning" aria-hidden>
+              <IconClock size={16} />
+            </span>
+            <span className="admin-fold-title">
+              <strong>Never closed · {String(data.stale.length)}</strong>
+              <span className="admin-meta">
+                Marked live, silent for over twelve hours. Only the organizer can close one, from
+                their cockpit.
+              </span>
+            </span>
+            <IconChevronDown size={16} className="admin-fold-caret" />
+          </summary>
           <ul className="admin-rows">
             {data.stale.slice(0, STALE_SHOWN).map((row) => (
               <StaleRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
@@ -149,13 +166,14 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
               </ul>
             </details>
           ) : null}
-        </SectionCard>
+        </details>
       ) : null}
 
       <SectionCard
         icon={<IconCheckCircle />}
         tone="neutral"
         title="Ended in the last 24 hours"
+        description={data.ended.length === 0 ? undefined : `${String(data.ended.length)} closed`}
         flush
         data-testid="live-ended"
       >
@@ -257,8 +275,14 @@ function RoomRow({
   const trouble = engineTrouble(engine);
   const pct = (n: number) => (row.lots.total > 0 ? (n / row.lots.total) * 100 : 0);
   return (
-    <li data-testid={`live-room-${row.auctionId}`}>
-      <div className="admin-live-head">
+    <li
+      className="admin-room"
+      data-state={row.state}
+      data-trouble={trouble !== null || undefined}
+      data-testid={`live-room-${row.auctionId}`}
+    >
+      <span className="admin-room-name">
+        <span className="admin-room-dot" aria-hidden />
         <span className="admin-live-name">
           <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
           <span className="admin-meta">
@@ -266,27 +290,40 @@ function RoomRow({
             {row.openedAtMs === null ? "" : ` · opened ${istWhen(row.openedAtMs, nowMs)}`}
           </span>
         </span>
-        <Pill tone={badge.tone} dot>
-          {badge.label}
-        </Pill>
-      </div>
-
-      <span className="auc-progress" aria-hidden>
-        <span
-          className="auc-progress-seg is-sold"
-          style={{ width: `${String(pct(row.lots.sold))}%` }}
-        />
-        <span
-          className="auc-progress-seg is-unsold"
-          style={{ width: `${String(pct(row.lots.unsold))}%` }}
-        />
+        {/* "Quiet" on every row said nothing. The pill appears only when the
+            room is doing something worth a glance; the dot always carries it. */}
+        {row.state === "quiet" ? (
+          <span className="admin-sr-only">{badge.label}</span>
+        ) : (
+          <Pill tone={badge.tone} dot>
+            {badge.label}
+          </Pill>
+        )}
       </span>
 
-      <dl className="admin-live-facts">
+      <dl className="admin-room-facts">
         <div>
           <dt>Lots</dt>
-          <dd>
-            {row.lots.sold} sold · {row.lots.unsold} unsold · {row.lots.remaining} left
+          <dd className="admin-room-lots">
+            <span className="auc-progress" aria-hidden>
+              <span
+                className="auc-progress-seg is-sold"
+                style={{ width: `${String(pct(row.lots.sold))}%` }}
+              />
+              <span
+                className="auc-progress-seg is-unsold"
+                style={{ width: `${String(pct(row.lots.unsold))}%` }}
+              />
+            </span>
+            <span
+              title={`${String(row.lots.sold)} sold · ${String(row.lots.unsold)} unsold · ${String(row.lots.remaining)} left`}
+            >
+              {row.lots.sold}/{row.lots.total}
+              <span className="admin-sr-only">
+                {" "}
+                sold · {row.lots.unsold} unsold · {row.lots.remaining} left
+              </span>
+            </span>
           </dd>
         </div>
         <div>
@@ -296,7 +333,10 @@ function RoomRow({
         <div>
           <dt>Bids</dt>
           <dd>
-            {row.bids.lastFiveMinutes} in 5 min · {row.bids.total} total
+            <span data-zero={row.bids.lastFiveMinutes === 0 || undefined}>
+              {row.bids.lastFiveMinutes}
+            </span>
+            <span className="admin-meta"> · {row.bids.total} total</span>
           </dd>
         </div>
         <div>
@@ -305,20 +345,45 @@ function RoomRow({
         </div>
         <div>
           <dt>Room</dt>
-          <dd>{engineLine(engine)}</dd>
+          {/* Trouble is said in the Room column, in words, where the eye
+              already looks — not as a second full-width strip per row. */}
+          {trouble !== null ? (
+            <dd className="admin-room-trouble" role="note" data-testid="live-room-trouble">
+              <IconAlert size={16} />
+              {trouble}
+            </dd>
+          ) : (
+            <dd className="admin-meta">{engineLine(engine)}</dd>
+          )}
         </div>
       </dl>
 
-      {trouble !== null ? (
-        <p className="admin-live-trouble" role="note" data-testid="live-room-trouble">
-          {trouble}
-        </p>
-      ) : null}
-
-      <Link href={`/admin/auctions/${row.auctionId}`} className="admin-card-link">
-        Watch this auction
-        <IconArrowRight size={16} className="icon-trail" />
+      <Link href={`/admin/auctions/${row.auctionId}`} className="admin-room-watch">
+        Watch<span className="admin-sr-only"> this auction</span>
+        <IconArrowRight size={16} />
       </Link>
     </li>
+  );
+}
+
+function Kpi({
+  icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: ReactNode;
+  value: number;
+  label: string;
+  tone?: "danger" | undefined;
+}) {
+  return (
+    <div className="admin-kpi" data-zero={value === 0 || undefined} data-tone={tone}>
+      <span className="admin-kpi-icon" aria-hidden>
+        {icon}
+      </span>
+      <dt>{label}</dt>
+      <dd>{value.toLocaleString("en-IN")}</dd>
+    </div>
   );
 }

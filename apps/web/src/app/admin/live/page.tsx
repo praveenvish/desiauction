@@ -5,6 +5,7 @@ import { adminLiveBoard } from "../../../server/admin/live-watch";
 import { LiveBoard } from "./live-board";
 import "../../seasons/seasons.css";
 import "../admin.css";
+import { AdminPageHead } from "../admin-ui";
 
 export const metadata = { title: "Live · Platform admin · DesiAuction" };
 
@@ -30,12 +31,9 @@ export default async function AdminLivePage() {
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head">
-          <p className="dash-hint">
-            Every auction running right now, busiest first. Watching never touches the room — any
-            repair happens in the organizer&rsquo;s cockpit.
-          </p>
-        </header>
+        <AdminPageHead readOnly>
+          Every auction running now, busiest first. Watching never touches the room.
+        </AdminPageHead>
         <LiveBoard initial={board} />
       </div>
     </main>

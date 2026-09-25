@@ -1,9 +1,17 @@
-import { EmptyState, IconArrowRight, IconSearch, IconUsers, SectionCard } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconArrowRight,
+  Toolbar,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSpacer,
+} from "@desiauction/ui";
 import Link from "next/link";
 
 import { formatCount, maskPersonContact } from "../../../server/admin/format";
 import type { UserDirectory } from "../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
+import { AdminFilterForm } from "../admin-filter-form";
+import { RelativeTime, monogram } from "../admin-ui";
 
 /** PX-9 §3 — the user directory. GET-form search, linkable results, no writes. */
 export function UsersPanel({ directory }: { directory: UserDirectory }) {
@@ -19,54 +27,39 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
         }).toString()}`;
   return (
     <>
-      <ReadOnlyNotice />
-      <SectionCard
-        icon={<IconUsers />}
-        tone="blue"
-        title="People"
-        description={
-          <span data-testid="admin-user-count">
-            {query === ""
-              ? `${formatCount(rows.length)} shown · ${formatCount(platformTotal)} user${platformTotal === 1 ? "" : "s"} on the platform`
-              : `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} on the platform`}
-          </span>
-        }
-        flush
-      >
-        <form className="admin-filters" method="get" role="search" data-testid="admin-user-search">
-          <label className="admin-search" htmlFor="admin-user-q">
-            <span className="admin-sr-only">Search users</span>
-            <IconSearch size={18} aria-hidden />
-            <input
+      <div className="admin-panel">
+        <AdminFilterForm testId="admin-user-search">
+          <Toolbar>
+            <ToolbarSearch
               id="admin-user-q"
               name="q"
-              type="search"
-              defaultValue={query}
+              label="Search users"
               placeholder="Name or mobile number"
-              className="admin-search-input"
+              defaultValue={query}
+              submitLabel="Search"
             />
-          </label>
-          {/* PI-1 P6: profile-aware facet. URL-driven like every admin filter. */}
-          <span className="admin-field">
-            <label className="admin-field-label" htmlFor="admin-user-filter">
-              Show
-            </label>
-            <select
-              id="admin-user-filter"
-              name="filter"
-              defaultValue={directory.filter}
-              className="admin-search-input"
-              data-testid="admin-user-filter"
-            >
-              <option value="all">Everyone</option>
-              <option value="players">Players (has a registration)</option>
-              <option value="profiled">With a cricket profile</option>
-            </select>
-          </span>
-          <button type="submit" className="admin-search-submit">
-            Search
-          </button>
-        </form>
+            {/* PI-1 P6: profile-aware facet. URL-driven like every admin filter. */}
+            <span className="admin-select">
+              <label htmlFor="admin-user-filter">Show</label>
+              <select
+                id="admin-user-filter"
+                name="filter"
+                defaultValue={directory.filter}
+                data-testid="admin-user-filter"
+              >
+                <option value="all">Everyone</option>
+                <option value="players">Players (has a registration)</option>
+                <option value="profiled">With a cricket profile</option>
+              </select>
+            </span>
+            <ToolbarSpacer />
+            <ToolbarCount testId="admin-user-count">
+              {query === ""
+                ? `${formatCount(rows.length)} of ${formatCount(platformTotal)}`
+                : `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} total`}
+            </ToolbarCount>
+          </Toolbar>
+        </AdminFilterForm>
         {rows.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
@@ -82,7 +75,7 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
         ) : (
           <>
             <div className="admin-table-wrap">
-              <table className="admin-table" data-testid="admin-user-table">
+              <table className="admin-table is-linked" data-testid="admin-user-table">
                 <thead>
                   <tr>
                     <th scope="col">User</th>
@@ -100,7 +93,10 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                   {rows.map((row) => (
                     <tr key={row.id}>
                       <td data-label="User">
-                        <span className="admin-cell-main">
+                        <span className="admin-cell-main admin-person">
+                          <span className="admin-monogram" aria-hidden>
+                            {monogram(row.name)}
+                          </span>
                           <Link href={`/admin/users/${row.id}`} className="admin-name">
                             {row.name ?? "Unnamed"}
                           </Link>
@@ -116,16 +112,24 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                           </span>
                         </span>
                       </td>
-                      <td data-label="Organizations" className="admin-count admin-num">
+                      <td
+                        data-label="Organizations"
+                        className="admin-count admin-num"
+                        data-zero={row.orgs === 0 || undefined}
+                      >
                         {formatCount(row.orgs)}
                       </td>
-                      <td data-label="Active grants" className="admin-count admin-num">
+                      <td
+                        data-label="Active grants"
+                        className="admin-count admin-num"
+                        data-zero={row.activeGrants === 0 || undefined}
+                      >
                         {formatCount(row.activeGrants)}
                       </td>
                       <td data-label="Joined">
                         <RelativeTime at={row.createdAt} />
                       </td>
-                      <td data-label="Last activity">
+                      <td data-label="Last activity" className="is-side">
                         {row.lastActivityAt === null ? (
                           <span className="admin-meta">Never</span>
                         ) : (
@@ -149,7 +153,7 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
             </nav>
           </>
         )}
-      </SectionCard>
+      </div>
     </>
   );
 }

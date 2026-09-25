@@ -23,6 +23,7 @@ import { roleLabeller } from "../../../../lib/role-label";
 import { adminAuctionWatch, type AuctionWatch } from "../../../../server/admin/live-watch";
 import { eventLabel } from "../../../seasons/[slug]/auction/auction-bits";
 import { AuctionOverviewPanel } from "../../../seasons/[slug]/auction/auction-overview-panel";
+import { ReadOnlyNotice } from "../../admin-ui";
 import { LiveFreshness } from "../../live-freshness";
 import { ageLabel, istClock, istTime, istWhen, usePolled } from "../../use-polled";
 
@@ -107,6 +108,11 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
       ? null
       : Math.round(soldPrices.reduce((a, b) => a + b, 0) / soldPrices.length);
 
+  // A Base column that reads "1,000 pts" 37 times says one thing, once.
+  const firstBase = overview.lots[0]?.basePrice ?? null;
+  const sameBase =
+    overview.lots.length > 1 && overview.lots.every((lot) => lot.basePrice === firstBase);
+
   return (
     <>
       <SectionCard
@@ -122,9 +128,14 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
           </>
         }
         action={
-          <Pill tone={STATUS_TONE[header.status] ?? "neutral"} dot testId="auction-watch-status">
-            {header.status}
-          </Pill>
+          <span className="admin-pills">
+            <Pill tone={STATUS_TONE[header.status] ?? "neutral"} dot testId="auction-watch-status">
+              {header.status}
+            </Pill>
+            {/* "You are watching, not conducting" — said by the pill, with the
+                full sentence one tap away, instead of a paragraph per visit. */}
+            <ReadOnlyNotice />
+          </span>
         }
         data-testid="auction-watch-head"
       >
@@ -136,8 +147,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             revoked={revoked}
           />
           <p className="admin-meta">
-            You are watching, not conducting. Pausing, closing or recovering this auction happens in
-            the organizer&rsquo;s cockpit.
+            Watching, not conducting: pausing, closing or recovering happens in the
+            organizer&rsquo;s cockpit.
           </p>
         </div>
       </SectionCard>
@@ -152,7 +163,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
               pulse.openedAtMs === null
                 ? "Not yet"
                 : pulse.closedAtMs !== null
-                  ? `${istClock(pulse.openedAtMs)}–${istWhen(pulse.closedAtMs, data.generatedAtMs)}`
+                  ? `${istClock(pulse.openedAtMs)}–${istClock(pulse.closedAtMs)}`
                   : istWhen(pulse.openedAtMs, data.generatedAtMs)
             }
           />
@@ -212,7 +223,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
           <p className="admin-card-empty">No bids yet.</p>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table">
+            <table className="admin-table admin-tape">
               <thead>
                 <tr>
                   <th scope="col">Time</th>
@@ -225,7 +236,10 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
               </thead>
               <tbody>
                 {pulse.tape.map((bid, index) => (
-                  <tr key={`${String(bid.placedAtMs)}-${String(index)}`}>
+                  <tr
+                    key={`${String(bid.placedAtMs)}-${String(index)}`}
+                    data-outbid={bid.status === "outbid" || undefined}
+                  >
                     <td data-label="Time" className="admin-count">
                       {istTime(bid.placedAtMs)}
                     </td>
@@ -233,7 +247,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                       {bid.lotNumber}
                     </td>
                     <td data-label="Team">
-                      <span className="admin-cell-main">
+                      <span className="admin-cell-main is-inline">
                         <span className="admin-name">{bid.teamName}</span>
                         <span className="admin-meta">
                           {bid.paddleNumber}
@@ -315,7 +329,11 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         icon={<IconList />}
         tone="blue"
         title="Lots"
-        description={`${String(overview.totalLots)} lot${overview.totalLots === 1 ? "" : "s"} · base and final price, and the paddle that bought`}
+        description={
+          sameBase && firstBase !== null
+            ? `${String(overview.totalLots)} lot${overview.totalLots === 1 ? "" : "s"} · every base price ${money.compact(firstBase)}`
+            : `${String(overview.totalLots)} lot${overview.totalLots === 1 ? "" : "s"} · base and final price, and the paddle that bought`
+        }
         flush
         data-testid="auction-watch-lots"
       >
@@ -335,9 +353,11 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                   <th scope="col">Player</th>
                   <th scope="col">Lot</th>
                   <th scope="col">Status</th>
-                  <th scope="col" className="admin-num">
-                    Base
-                  </th>
+                  {sameBase ? null : (
+                    <th scope="col" className="admin-num">
+                      Base
+                    </th>
+                  )}
                   <th scope="col" className="admin-num">
                     Final
                   </th>
@@ -363,9 +383,11 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                         {LOT_STATUS_LABEL[lot.status] ?? lot.status}
                       </Pill>
                     </td>
-                    <td data-label="Base" className="admin-num admin-count">
-                      {money.compact(lot.basePrice)}
-                    </td>
+                    {sameBase ? null : (
+                      <td data-label="Base" className="admin-num admin-count">
+                        {money.compact(lot.basePrice)}
+                      </td>
+                    )}
                     <td data-label="Final" className="admin-num admin-count">
                       {lot.soldPrice === null ? "—" : money.compact(lot.soldPrice)}
                     </td>

@@ -1,16 +1,19 @@
 import {
   EmptyState,
   IconArrowRight,
-  IconLayers,
-  IconSearch,
   Pill,
-  SectionCard,
+  SegmentedTabs,
+  Toolbar,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSpacer,
 } from "@desiauction/ui";
 import Link from "next/link";
 
 import { formatCount } from "../../../server/admin/format";
 import type { OrgDirectory, OrgFilter } from "../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
+import { AdminFilterForm } from "../admin-filter-form";
+import { RelativeTime } from "../admin-ui";
 
 /**
  * PX-9 §2 — the organization directory.
@@ -43,58 +46,41 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
   const nextHref = nextCursor === null ? null : pageHref({ query, filter, after: nextCursor });
   return (
     <>
-      <ReadOnlyNotice />
-      <SectionCard
-        icon={<IconLayers />}
-        title="Organizations"
-        // One sentence, one meaning. It used to read "1 shown · 1 organization
-        // on the platform" for a search that matched one of 349, because
-        // `total` was the match count with a query and the UNFILTERED count
-        // with a filter. Match count and platform count are now separate
-        // numbers and are never spelled the same way.
-        description={
-          <span data-testid="admin-org-count">
-            {narrowed
-              ? `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} on the platform`
-              : `${formatCount(rows.length)} shown · ${formatCount(platformTotal)} organization${platformTotal === 1 ? "" : "s"} on the platform`}
-          </span>
-        }
-        flush
-      >
-        <form className="admin-filters" method="get" role="search" data-testid="admin-org-search">
-          <label className="admin-search" htmlFor="admin-org-q">
-            <span className="admin-sr-only">Search organizations, seasons and tournaments</span>
-            <IconSearch size={18} aria-hidden />
-            <input
+      <div className="admin-panel">
+        <AdminFilterForm testId="admin-org-search">
+          <Toolbar>
+            <ToolbarSearch
               id="admin-org-q"
               name="q"
-              type="search"
-              defaultValue={query}
+              label="Search organizations, seasons and tournaments"
               placeholder="Club, season or tournament"
-              className="admin-search-input"
+              defaultValue={query}
+              submitLabel="Search"
             />
-          </label>
-          <span className="admin-field">
-            <label className="admin-field-label" htmlFor="admin-org-filter">
-              Filter
-            </label>
-            <select
-              id="admin-org-filter"
-              name="filter"
-              defaultValue={filter}
-              className="admin-search-input"
-            >
-              {FILTER_LABELS.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          <button type="submit" className="admin-search-submit">
-            Search
-          </button>
-        </form>
+            {/* The four views as one segmented control — each is the filter it
+                names, and a link, so the choice is in the URL like before. */}
+            <SegmentedTabs
+              label="Organization filter"
+              items={FILTER_LABELS.map((option) => ({
+                key: option.key,
+                label: option.label,
+                active: option.key === filter,
+                href: filterHref(query, option.key),
+              }))}
+            />
+            {filter !== "all" ? <input type="hidden" name="filter" value={filter} /> : null}
+            <ToolbarSpacer />
+            {/* One sentence, one meaning. It used to read "1 shown · 1
+                organization on the platform" for a search that matched one of
+                349. Match count and platform count are separate numbers and
+                are never spelled the same way. */}
+            <ToolbarCount testId="admin-org-count">
+              {narrowed
+                ? `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} total`
+                : `${formatCount(rows.length)} of ${formatCount(platformTotal)}`}
+            </ToolbarCount>
+          </Toolbar>
+        </AdminFilterForm>
         {rows.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
@@ -113,7 +99,7 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
         ) : (
           <>
             <div className="admin-table-wrap">
-              <table className="admin-table" data-testid="admin-org-table">
+              <table className="admin-table is-linked" data-testid="admin-org-table">
                 <thead>
                   <tr>
                     <th scope="col">Organization</th>
@@ -139,11 +125,11 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                           so Seasons, Members and Cases never read as three
                           unlabelled numbers. */}
                       <td data-label="Organization">
-                        <span className="admin-cell-main">
+                        <span className="admin-cell-main is-inline">
                           <Link href={`/admin/orgs/${row.slug}`} className="admin-name">
                             {row.name}
                           </Link>
-                          <span className="admin-id">{row.slug}</span>
+                          <span className="admin-id admin-slug">{row.slug}</span>
                           {row.matchedSeason !== null ? (
                             <span className="admin-match" data-testid="admin-org-matched-season">
                               Matched: {row.matchedSeason}
@@ -151,22 +137,36 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                           ) : null}
                         </span>
                       </td>
-                      <td data-label="Seasons" className="admin-count admin-num">
+                      <td
+                        data-label="Seasons"
+                        className="admin-count admin-num"
+                        data-zero={row.competitions === 0 || undefined}
+                      >
                         {formatCount(row.competitions)}
                       </td>
-                      <td data-label="Members" className="admin-count admin-num">
+                      <td
+                        data-label="Members"
+                        className="admin-count admin-num"
+                        data-zero={row.members === 0 || undefined}
+                      >
                         {formatCount(row.members)}
                       </td>
-                      <td data-label="Auctions" className="admin-count admin-num">
+                      <td
+                        data-label="Auctions"
+                        className="admin-count admin-num"
+                        data-zero={row.auctions === 0 || undefined}
+                      >
                         {formatCount(row.auctions)}
                       </td>
-                      <td data-label="Cases">
+                      <td data-label="Cases" data-empty={row.cases === 0 || undefined}>
                         {/* `settled` is counted as unfinished — it can still be
                             closed — but it is not "open", and an amber pill on
                             a case that settled correctly reads as a problem
                             that is not there. */}
                         <span className="admin-pills">
-                          <span className="admin-count">{formatCount(row.cases)}</span>
+                          <span className="admin-count" data-zero={row.cases === 0 || undefined}>
+                            {row.cases === 0 ? "—" : formatCount(row.cases)}
+                          </span>
                           {row.openCases > 0 ? (
                             <Pill tone="amber" dot>
                               {row.openCases} open
@@ -177,14 +177,18 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                           ) : null}
                         </span>
                       </td>
-                      <td data-label="Finance">
+                      <td data-label="Finance" data-empty={!row.financeDeclared || undefined}>
+                        {/* "Not declared" 49 times down a column drowned the one
+                            org that had. The dash is named for assistive tech. */}
                         {row.financeDeclared ? (
                           <Pill tone="blue">Declared</Pill>
                         ) : (
-                          <span className="admin-dash">Not declared</span>
+                          <span className="admin-dash" title="Not declared">
+                            —<span className="admin-sr-only">Not declared</span>
+                          </span>
                         )}
                       </td>
-                      <td data-label="Last activity">
+                      <td data-label="Last activity" className="is-side">
                         {row.lastActivityAt === null ? (
                           <span className="admin-meta">Never</span>
                         ) : (
@@ -211,9 +215,21 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
             </nav>
           </>
         )}
-      </SectionCard>
+      </div>
     </>
   );
+}
+
+function filterHref(query: string, filter: OrgFilter): string {
+  const params = new URLSearchParams();
+  if (query !== "") {
+    params.set("q", query);
+  }
+  if (filter !== "all") {
+    params.set("filter", filter);
+  }
+  const qs = params.toString();
+  return qs === "" ? "/admin/orgs" : `/admin/orgs?${qs}`;
 }
 
 function pageHref({

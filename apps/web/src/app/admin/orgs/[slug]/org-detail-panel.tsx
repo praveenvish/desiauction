@@ -1,9 +1,9 @@
 import {
-  ButtonLink,
   CardGrid,
   EmptyState,
   IconArrowRight,
   IconClock,
+  IconExternal,
   IconKey,
   IconLedger,
   IconTrophy,
@@ -18,7 +18,7 @@ import Link from "next/link";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { formatCount, lifecycleLabel, maskPersonContact } from "../../../../server/admin/format";
 import type { OrgDetail } from "../../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime, absoluteIst, statusPillTone } from "../../admin-ui";
+import { AdminPageHead, RelativeTime, absoluteIst, statusPillTone } from "../../admin-ui";
 
 /**
  * PX-9 §2 — the organization inspector.
@@ -36,29 +36,31 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
   return (
     <>
       <PageTitle title={org.name} />
-      <header className="dash-head admin-head">
-        <div className="admin-head-text">
-          <p className="dash-hint">
-            <span className="admin-id">{org.slug}</span> · created {absoluteIst(org.createdAt)}
-          </p>
-          <p className="admin-meta">
-            The console link needs organizer permissions on this organization; a platform grant
-            confers none.
-          </p>
-        </div>
-        <div className="admin-head-actions">
-          {/* Opens only for someone who also holds org capability HERE —
-              `platform:admin` confers none. Named beside the door rather than
-              discovered as a 404 behind it. */}
-          <ButtonLink href={`/org/${org.slug}`} variant="secondary" data-testid="admin-open-org">
-            Open console
-          </ButtonLink>
-          <ButtonLink href="/admin/orgs" variant="secondary">
-            All organizations
-          </ButtonLink>
-        </div>
-      </header>
-      <ReadOnlyNotice />
+      <AdminPageHead
+        readOnly
+        actions={
+          <>
+            {/* Opens only for someone who also holds org capability HERE —
+                `platform:admin` confers none. Named in its tooltip rather than
+                discovered as a 404 behind it. */}
+            <Link
+              href={`/org/${org.slug}`}
+              className="admin-head-button"
+              data-testid="admin-open-org"
+              title="Needs organizer permissions on this organization; a platform grant confers none."
+            >
+              Open console
+              <IconExternal size={16} />
+            </Link>
+            <Link href="/admin/orgs" className="admin-head-button">
+              All organizations
+            </Link>
+          </>
+        }
+      >
+        <span className="admin-id admin-chip-id">{org.slug}</span>
+        <span className="admin-meta"> · created {absoluteIst(org.createdAt)}</span>
+      </AdminPageHead>
 
       <StatGrid>
         <StatCard
@@ -84,11 +86,13 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         <StatCard
           icon={<IconLedger />}
           tone={finance.declared ? "green" : "neutral"}
-          value={finance.declared ? "Declared" : "Not declared"}
+          value={finance.declared ? "Declared" : "—"}
           label="Finance"
           {...(finance.declared && finance.posture !== null
             ? { hint: `Posture: ${finance.posture}` }
-            : {})}
+            : finance.declared
+              ? {}
+              : { hint: "Not declared" })}
         />
       </StatGrid>
 
