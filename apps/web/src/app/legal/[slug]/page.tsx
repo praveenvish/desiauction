@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { IconArrowLeft, IconFile } from "@desiauction/ui";
 
 import { ContentLayout } from "../../../components/public/content-layout";
+import { OperatorIdentityCard } from "../../../components/public/operator-identity";
 import { PageBody, PageHero, SideCard } from "../../../components/public/public-kit";
 import { env } from "../../../env";
 import { Prose, tocOf } from "../../../content/blocks";
@@ -67,29 +68,36 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
             { id: "version-history", label: "Version history" },
           ]}
           aside={
-            <SideCard
-              headingId="doc-facts"
-              title="This document"
-              icon={<IconFile size={20} weight="duotone" />}
-            >
-              <dl className="pk-side-facts">
-                <div>
-                  <dt>Effective</dt>
-                  <dd>{doc.effective}</dd>
-                </div>
-                <div>
-                  <dt>Version</dt>
-                  <dd>{doc.versions[0]?.version ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt>Status</dt>
-                  <dd>Beta draft</dd>
-                </div>
-              </dl>
-              <p className="no-print">
-                <Link href="/legal">All legal documents</Link>
-              </p>
-            </SideCard>
+            <>
+              {/* The grievance page carries the operator card too: it is where
+                every footer's "Grievances" link lands. */}
+              {slug === "grievances" ? (
+                <OperatorIdentityCard headingId="operator-identity" grievanceLink={false} />
+              ) : null}
+              <SideCard
+                headingId="doc-facts"
+                title="This document"
+                icon={<IconFile size={20} weight="duotone" />}
+              >
+                <dl className="pk-side-facts">
+                  <div>
+                    <dt>Effective</dt>
+                    <dd>{doc.effective}</dd>
+                  </div>
+                  <div>
+                    <dt>Version</dt>
+                    <dd>{doc.versions[0]?.version ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>Beta draft</dd>
+                  </div>
+                </dl>
+                <p className="no-print">
+                  <Link href="/legal">All legal documents</Link>
+                </p>
+              </SideCard>
+            </>
           }
         >
           <div className="cl-prose-doc">
