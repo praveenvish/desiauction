@@ -21,7 +21,7 @@ import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
 import { compactINR, exactINR } from "../../lib/inr";
-import { moneyFormat } from "../../lib/money";
+import { cardAmount, moneyFormat } from "../../lib/money";
 import type { ReportTable } from "../../server/console/reports";
 import { reportsView } from "../../server/console/views";
 import { SeasonPicker } from "./season-picker";
@@ -156,6 +156,16 @@ export default async function ReportsPage({
 
   const fees = report.fees;
   const feeHeads = fees.paid + fees.pending + fees.waived + fees.refunded;
+  /*
+   * A season with no fee on record — nobody paid, waived or refunded, and no
+   * amount is written anywhere — has no fees to report. It used to read "₹0
+   * collected · ₹0 still due" over a bar of 43 "Not paid", which is the report
+   * inventing a debt the league never levied.
+   */
+  const feesInUse =
+    fees.paid + fees.waived + fees.refunded > 0 ||
+    (fees.collectedPaise ?? 0) > 0 ||
+    (fees.duePaise ?? 0) > 0;
   const feeRows: [string, string, number, KitTone][] = [
     ["paid", "Paid", fees.paid, "green"],
     ["pending", "Not paid", fees.pending, "amber"],
@@ -212,17 +222,19 @@ export default async function ReportsPage({
           label="Registrations"
           hint={`${count(regs.approved)} approved · ${count(regs.submitted)} to review`}
         />
-        <StatCard
-          icon={<IconReceipt />}
-          tone="green"
-          value={
-            // rupees-always: registration fees are real money in every season
-            fees.collectedPaise !== undefined ? compactINR(fees.collectedPaise) : count(fees.paid)
-          }
-          label={fees.collectedPaise !== undefined ? "Fees collected" : "Fees paid"}
-          hint={`${count(fees.paid)} of ${count(feeHeads)} players paid`}
-          progress={pctOf(fees.paid, feeHeads)}
-        />
+        {feesInUse ? (
+          <StatCard
+            icon={<IconReceipt />}
+            tone="green"
+            value={
+              // rupees-always: registration fees are real money in every season
+              fees.collectedPaise !== undefined ? compactINR(fees.collectedPaise) : count(fees.paid)
+            }
+            label={fees.collectedPaise !== undefined ? "Fees collected" : "Fees paid"}
+            hint={`${count(fees.paid)} of ${count(feeHeads)} players paid`}
+            progress={pctOf(fees.paid, feeHeads)}
+          />
+        ) : null}
         <StatCard
           icon={<IconGavel />}
           tone="blue"
@@ -234,7 +246,11 @@ export default async function ReportsPage({
         <StatCard
           icon={<IconWallet />}
           tone="purple"
-          value={auction.moneyMoved !== undefined ? unitMoney.compact(auction.moneyMoved) : "—"}
+          value={
+            auction.moneyMoved !== undefined
+              ? cardAmount(report.auctionUnit, auction.moneyMoved)
+              : "—"
+          }
           label="Auction spend"
           hint={
             auction.pursePct !== undefined && auction.pursePct !== null
@@ -265,14 +281,18 @@ export default async function ReportsPage({
           tone="green"
           title="Fees"
           description={
-            fees.collectedPaise !== undefined && fees.duePaise !== undefined
-              ? // rupees-always: registration fees are real money in every season
-                `${exactINR(fees.collectedPaise)} collected · ${exactINR(fees.duePaise)} still due`
-              : "Who has paid, by head count"
+            !feesInUse
+              ? "No entry fees recorded"
+              : fees.collectedPaise !== undefined && fees.duePaise !== undefined
+                ? // rupees-always: registration fees are real money in every season
+                  `${exactINR(fees.collectedPaise)} collected · ${exactINR(fees.duePaise)} still due`
+                : "Who has paid, by head count"
           }
           data-testid="report-fees"
         >
-          <Bars label="Fees by state" testId="report-fee-bars" bars={feeBars} />
+          {feesInUse ? (
+            <Bars label="Fees by state" testId="report-fee-bars" bars={feeBars} />
+          ) : null}
         </SectionCard>
       </CardGrid>
 
@@ -304,7 +324,7 @@ export default async function ReportsPage({
                   ? {
                       key: team.teamId,
                       label: team.name,
-                      value: unitMoney.compact(team.spend),
+                      value: cardAmount(report.auctionUnit, team.spend),
                       share: team.spend / spendMax,
                       color: team.color,
                       note: `· ${count(team.squad)} players`,
@@ -408,7 +428,9 @@ export default async function ReportsPage({
                         {[buy.role, buy.teamName].filter((part) => part !== null).join(" · ")}
                       </span>
                     </span>
-                    <span className="rp-buy-price">{unitMoney.compact(buy.price)}</span>
+                    <span className="rp-buy-price">
+                      {cardAmount(report.auctionUnit, buy.price)}
+                    </span>
                   </li>
                 ))}
               </ol>

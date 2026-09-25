@@ -32,8 +32,11 @@ const STATUS_TONE: Record<PlayerIndexRow["status"], KitTone> = {
   withdrawn: "neutral",
 };
 
+// "Not paid" is neutral here: this index spans seasons, most of which charge no
+// fee at all, and forty amber pills for money nobody asked for read as forty
+// problems. The season's own desk colours it when that season records fees.
 const FEE_TONE: Record<PlayerIndexRow["feeStatus"], KitTone> = {
-  pending: "amber",
+  pending: "neutral",
   paid: "green",
   waived: "blue",
   refunded: "neutral",
@@ -266,7 +269,11 @@ export default async function PlayersPage({
                           ) : null}
                         </span>
                       ) : (
-                        <span className="px-dash">Unassigned</span>
+                        // "Unsold" once the room has run — the season desk's word
+                        // too — and a dash before it, when nobody is placed yet.
+                        <span className="px-dash">
+                          {row.auctionDone && row.status === "approved" ? "Unsold" : "—"}
+                        </span>
                       )}
                     </td>
                     <td data-label="Status">

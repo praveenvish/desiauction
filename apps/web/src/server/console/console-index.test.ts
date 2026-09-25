@@ -119,6 +119,7 @@ describe("merging per-club player slices", () => {
     teamColor: null,
     feeStatus: "pending",
     squadRoute: null,
+    auctionDone: false,
     createdAt,
   });
   const slice = (rows: PlayerIndexRow[], approved: number): PlayersSlice => ({
