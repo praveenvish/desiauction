@@ -83,7 +83,7 @@ test("login lands on /home; the rail reaches every workspace; account is in the 
     "Find tournaments",
   ]);
   await expect(nav.getByRole("link", { name: "Tournaments", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: "Organizations" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Clubs" })).toHaveCount(0);
 
   // Help left the rail under RN-1 — that is what freed the slots beside Home.
   await expect(nav.getByRole("list").nth(1).getByRole("link")).toHaveText([
@@ -112,7 +112,7 @@ test("search navigates; the identity bar names every surface consistently", asyn
   /*
    * Search: ⌘K opens the top bar's field — keyboard-first, no modal.
    *
-   * This account holds nothing yet, so "Organizations" is NOT in its rail
+   * This account holds nothing yet, so "Clubs" is NOT in its rail
    * (see the test above). It is still in the palette, deliberately: LAW 3
    * governs what the product offers unprompted, and a search result answers a
    * question somebody asked. Creating a club is precisely what a new account

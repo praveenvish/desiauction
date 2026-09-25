@@ -107,6 +107,8 @@ export interface ShellCompetition {
    * boolean standing in for seven roles.
    */
   seasonRole: SeasonRole;
+  /** The team this person owns here, if any — "My team" opens its squad. */
+  ownTeamId?: string;
 }
 
 export interface ProductShellProps {
@@ -239,7 +241,8 @@ const NAV_ICONS: Record<NavIcon, ReactNode> = {
 const UNIVERSAL_DESTINATIONS: { key: string; label: string; href: string; keywords: string }[] = [
   {
     key: "go-orgs",
-    label: "Organizations",
+    // "Clubs" — the rail's and the phone bar's word (nav.ts RAIL_TITLES).
+    label: "Clubs",
     href: "/orgs",
     keywords: "organization org club create start academy",
   },
@@ -512,6 +515,9 @@ export function ProductShell({
         items: [
           ...seasonTabs(currentCompetition.slug, currentCompetition.seasonRole, {
             canSettle: currentCompetition.canSettle,
+            ...(currentCompetition.ownTeamId !== undefined
+              ? { ownTeamId: currentCompetition.ownTeamId }
+              : {}),
           }).map((tab) => ({
             key: `section-${tab.key}`,
             label: tab.label,
@@ -633,7 +639,7 @@ export function ProductShell({
     }
     if (orgs.length > 0) {
       groups.push({
-        label: "Organizations",
+        label: "Clubs",
         items: orgs.map((org) => ({
           key: `org-${org.slug}`,
           label: org.name,
@@ -978,6 +984,7 @@ export function ProductShell({
       seasonSwitcherFor = slug;
       const tabs = seasonTabs(slug, competition.seasonRole, {
         canSettle: competition.canSettle,
+        ...(competition.ownTeamId !== undefined ? { ownTeamId: competition.ownTeamId } : {}),
       });
       const activeTab = activeSeasonTab(pathname, slug, tabs);
       tabsNode = (

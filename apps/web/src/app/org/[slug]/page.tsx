@@ -273,7 +273,8 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       meta: "",
       seasons: tournament.editions.map((edition) => toSeason(edition, tournament.id)),
       kind: "tournament" as const,
-      href: `/org/${slug}/t/${tournament.slug}`,
+      // Straight to the tournament workspace — /org/{club}/t/{t} only redirects.
+      href: `/tournaments/${tournament.slug}`,
       seasonDialogTitle: `New season in ${tournament.name}`,
       canCreateSeason: canCreateSeasonHere,
       seasonForm: (
