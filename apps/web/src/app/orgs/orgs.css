@@ -538,7 +538,7 @@ a.org-card:hover {
 }
 
 .org-card--add:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .org-card--add .org-add-plus {

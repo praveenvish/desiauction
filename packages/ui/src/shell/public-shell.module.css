@@ -141,7 +141,7 @@
   height: 22px;
 }
 .menu-button:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 @media (min-width: 1100px) {
   .nav {

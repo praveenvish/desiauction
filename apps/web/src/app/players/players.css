@@ -142,7 +142,7 @@
 }
 
 .px-select[data-active="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
   color: var(--text-heading);
 }
@@ -323,7 +323,7 @@
 
 .px-page[aria-current="page"] {
   background: var(--accent-subtle);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-heading);
   font-weight: var(--font-weight-semibold);
 }

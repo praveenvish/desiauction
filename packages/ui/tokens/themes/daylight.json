@@ -1,6 +1,6 @@
 {
   "surface": {
-    "default": { "$value": "{color.chalk.50}", "$type": "color" },
+    "default": { "$value": "#FBFAF7", "$type": "color" },
     "raised": { "$value": "{color.white}", "$type": "color" },
     "overlay": { "$value": "{color.white}", "$type": "color" },
     "sunken": { "$value": "{color.chalk.100}", "$type": "color" },
@@ -25,13 +25,20 @@
   },
   "focus-ring": { "$value": "{color.gold.800}", "$type": "color" },
   "scrim": { "$value": "#070A0F99", "$type": "color" },
+  "//accent": "Two golds, one job each (2026-09-25). FILLS are bright gold (--accent, --accent-solid) with a near-black label (10.6:1) and a gold.700 rim (--accent-edge, 3.35:1 on surface) that carries the non-text contrast — WCAG 1.4.11 asks the component's EDGE to be identifiable, not its fill. Gold as TEXT is --accent-ink / --text-accent (gold.800, >=4.5:1); gold as a THIN LINE or selection indicator is --accent-line (gold.700, >=3:1). Never put --accent itself on text or hairlines in daylight — bright gold on paper is 1.9:1.",
   "accent": {
-    "default": { "$value": "{color.gold.700}", "$type": "color" },
-    "hover": { "$value": "{color.gold.600}", "$type": "color" },
-    "pressed": { "$value": "{color.gold.800}", "$type": "color" },
-    "subtle": { "$value": "#B57F1414", "$type": "color" },
+    "default": { "$value": "{color.gold.400}", "$type": "color" },
+    "hover": { "$value": "{color.gold.350}", "$type": "color" },
+    "pressed": { "$value": "{color.gold.700}", "$type": "color" },
+    "subtle": { "$value": "#F0B43C24", "$type": "color" },
     "sheen": { "$value": "{color.white}", "$type": "color" },
-    "lift": { "$value": "{color.gold.600}", "$type": "color" }
+    "lift": { "$value": "{color.gold.300}", "$type": "color" },
+    "edge": { "$value": "{color.gold.700}", "$type": "color" },
+    "line": { "$value": "{color.gold.700}", "$type": "color" },
+    "ink": { "$value": "{color.gold.800}", "$type": "color" },
+    "solid": { "$value": "{color.gold.400}", "$type": "color" },
+    "on-solid": { "$value": "{color.ink.950}", "$type": "color" },
+    "solid-edge": { "$value": "{color.gold.700}", "$type": "color" }
   },
   "live": { "$value": "{color.green.light}", "$type": "color" },
   "//strong": "The `strong` ramp is the text colour on its own `subtle` bed (badges), not on bare surface. Each value clears 4.5:1 against subtle-over-{surface, raised, sunken} — the composite is darker than the surface, so tuning against `surface` alone lands ~4.25 and fails axe.",

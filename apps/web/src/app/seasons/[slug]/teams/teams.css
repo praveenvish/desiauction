@@ -376,7 +376,7 @@
 }
 
 .tm-grid .tm-card:has(.team-card-cover:hover) .tm-card-link {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-accent);
 }
 

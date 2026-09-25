@@ -336,7 +336,7 @@ section.rd-card[data-flush="true"] {
 }
 
 .rd-pagebtn[aria-current="page"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
   color: var(--text-accent);
   font-weight: var(--font-weight-semibold);

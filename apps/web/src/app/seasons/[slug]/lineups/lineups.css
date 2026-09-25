@@ -43,7 +43,7 @@
 
 .lu-match[aria-current="page"] {
   background: var(--accent-subtle);
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent-line);
 }
 
 .lu-match:focus-visible {

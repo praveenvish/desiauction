@@ -1281,7 +1281,7 @@
   min-width: 168px;
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--accent-pressed) 60%, var(--accent));
+  border: 1px solid var(--accent-edge);
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--accent-sheen) 14%, var(--accent-lift)),
@@ -1676,7 +1676,7 @@
   padding: 2px 8px;
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 10px;
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.05em;
@@ -2396,7 +2396,7 @@
 /* WhatsApp is the distribution channel for this market, so it is the primary
    of the two — accent fill, ink label (doc 13: text on the gold accent is ink). */
 .share-auction-button--whatsapp {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent);
   color: var(--text-on-accent);
 }
@@ -2571,7 +2571,7 @@
 }
 
 .cockpit-gavel[data-holding="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .cockpit-gavel-label {
@@ -2741,7 +2741,7 @@
 @keyframes lot-pulse {
   from {
     box-shadow:
-      0 0 0 2px var(--accent),
+      0 0 0 2px var(--accent-line),
       0 0 36px color-mix(in srgb, var(--accent) 50%, transparent);
   }
 
@@ -3052,7 +3052,7 @@
 }
 
 .ledger-filter-chip[aria-pressed="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-heading);
 }
 

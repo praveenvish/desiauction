@@ -211,7 +211,7 @@
 
 .pd-input:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
@@ -240,7 +240,7 @@
 }
 
 .pd-filter .pd-select[data-active="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background-color: var(--accent-subtle);
   color: var(--text-heading);
 }
@@ -422,7 +422,7 @@
 
 .pd-row[data-open="true"] td:first-child,
 .pd-row[data-cursor="true"] td:first-child {
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent-line);
 }
 
 .pd-col-check {
@@ -1077,7 +1077,7 @@ body:has(.pd-sheet) {
 }
 
 .pd-mark[aria-pressed="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
 }
 
@@ -1101,7 +1101,7 @@ body:has(.pd-sheet) {
 }
 
 .pd-mark[aria-pressed="true"] .pd-mark-box {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent);
 }
 
@@ -1238,7 +1238,7 @@ body:has(.pd-sheet) {
 }
 
 .pd-preset[aria-pressed="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
 }
 

@@ -63,7 +63,7 @@
 }
 
 .tpl-tab[aria-selected="true"] {
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--accent-line);
   color: var(--text-heading);
 }
 

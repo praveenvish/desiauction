@@ -169,7 +169,7 @@
   background: var(--surface-raised);
 }
 .secondary:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   transform: translateY(-2px);
 }
 .microcopy {
@@ -362,12 +362,12 @@
 }
 .sportsGrid button:hover {
   transform: translateY(-4px);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 .sportsGrid button[aria-pressed="true"] {
   background: var(--accent);
   color: var(--text-on-accent);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   box-shadow: 0 6px 20px var(--accent-subtle);
 }
 .sportsGrid button > span:not(.sportCheck) {
@@ -546,7 +546,7 @@
   right: 20px;
   top: 44px;
   color: var(--text-accent);
-  border: 2px solid var(--accent);
+  border: 2px solid var(--accent-line);
   border-radius: 5px;
   padding: 7px;
   display: flex;
@@ -573,7 +573,7 @@
   font-size: 11px;
 }
 .demoTeams > div[data-leading="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
 }
 .demoTeams small {
@@ -641,7 +641,7 @@
 }
 .againButton:hover {
   color: var(--text-heading);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 /* Phones only: the header folds its CTA into the menu there. */
 .stickyCta {
@@ -1317,10 +1317,12 @@
 }
 @keyframes revealUp {
   from {
-    transform: translateY(20px);
+    transform: translateY(var(--reveal-lift, 32px)) scale(0.985);
+    filter: blur(6px);
   }
   to {
-    transform: translateY(0);
+    transform: none;
+    filter: none;
   }
 }
 @keyframes bidIn {
@@ -1339,8 +1341,162 @@
     transform: rotate(-10deg) scale(1);
   }
 }
+/* ==========================================================================
+   MOTION PASS (2026-09-25). Four moves, one voice:
+   1. the hero arrives — copy rises line by line, the photo settles in;
+   2. the hero drifts slower than the page as you scroll (parallax), and a gold
+      thread across the top tracks how far down the story you are;
+   3. every section waits a little lower and softer, then rises into focus as
+      it enters, siblings in a wave (--reveal-i, set by HomeMotion);
+   4. feature cards carry a gold light that follows a fine pointer.
+   Text is never faded (axe measures contrast mid-frame) — its poses are
+   transform + blur. Entrances fill BACKWARDS only: a `both` fill leaves
+   `filter: blur(0px)` on every section forever, and a filter makes each one a
+   containing block that traps position: fixed descendants. Scroll-linked motion is progressive (@supports), and the
+   reduced-motion block at the end of this file turns all of it off.
+   ========================================================================== */
+[data-motion="ready"] .home [data-reveal]:not([data-revealed]) {
+  transform: translateY(var(--reveal-lift, 32px)) scale(0.985);
+  filter: blur(6px);
+}
 .home [data-revealed="true"] {
-  animation: revealUp var(--duration-emphatic) var(--ease-out) both;
+  animation: revealUp var(--duration-dramatic) var(--ease-out) backwards;
+  animation-delay: calc(var(--reveal-i, 0) * 90ms);
+}
+[data-motion="ready"] .home .realGrid [data-reveal]:not([data-revealed]) img {
+  opacity: 0;
+  clip-path: inset(8% 6% 8% 6% round 24px);
+}
+.home .realGrid [data-revealed="true"] img {
+  animation: imageIn var(--duration-ceremony) var(--ease-out) backwards;
+  animation-delay: calc(var(--reveal-i, 0) * 120ms);
+}
+@keyframes imageIn {
+  from {
+    opacity: 0;
+    clip-path: inset(8% 6% 8% 6% round 24px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0);
+  }
+}
+
+/* 1. Hero entrance — CSS only, so it plays on first paint, before hydration. */
+@keyframes heroRise {
+  from {
+    transform: translateY(26px);
+    filter: blur(8px);
+  }
+  to {
+    transform: none;
+    filter: none;
+  }
+}
+@keyframes heroSettle {
+  from {
+    transform: scale(1.08);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+.heroCopy > * {
+  animation: heroRise var(--duration-dramatic) var(--ease-out) backwards;
+}
+.heroCopy > :nth-child(2) {
+  animation-delay: 80ms;
+}
+.heroCopy > :nth-child(3) {
+  animation-delay: 160ms;
+}
+.heroCopy > :nth-child(4) {
+  animation-delay: 220ms;
+}
+.heroCopy > :nth-child(5) {
+  animation-delay: 300ms;
+}
+.heroCopy > :nth-child(n + 6) {
+  animation-delay: 360ms;
+}
+.heroFoot > li {
+  animation: heroRise var(--duration-dramatic) var(--ease-out) backwards;
+  animation-delay: calc(420ms + var(--foot-i, 0) * 70ms);
+}
+.heroFoot > li:nth-child(2) {
+  --foot-i: 1;
+}
+.heroFoot > li:nth-child(3) {
+  --foot-i: 2;
+}
+.heroFoot > li:nth-child(4) {
+  --foot-i: 3;
+}
+.heroImage {
+  animation: heroSettle var(--duration-ceremony) var(--ease-out) backwards;
+}
+
+/* 4. Spotlight — a gold light under the content, never over the text. */
+.feature {
+  isolation: isolate;
+}
+.feature[data-spotlight]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    480px circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in srgb, var(--accent) 13%, transparent),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity var(--duration-slow) var(--ease-out);
+  pointer-events: none;
+}
+.feature[data-spotlight]:hover::before {
+  opacity: 1;
+}
+
+/* 2. Scroll-linked — browsers without scroll timelines keep a still hero. */
+@keyframes heroDrift {
+  to {
+    translate: 0 18vh;
+  }
+}
+@keyframes storyThread {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  /* The photo drifts down as the page rises; the hero clips it so it never
+     slides under the next section. */
+  .hero {
+    overflow: clip;
+  }
+  .heroArt {
+    animation: heroDrift linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 100vh;
+  }
+  .home::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    height: 2px;
+    z-index: 60;
+    transform-origin: 0 50%;
+    background: linear-gradient(90deg, var(--accent-pressed), var(--accent), var(--accent-lift));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent);
+    animation: storyThread linear both;
+    animation-timeline: scroll(root);
+    pointer-events: none;
+  }
 }
 @media (min-width: 1600px) {
   .heroArt {
@@ -1844,6 +2000,19 @@
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+  .home [data-reveal],
+  .home [data-reveal] img,
+  .home .heroArt {
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    clip-path: none !important;
+    translate: none !important;
+  }
+  .home::before,
+  .home .feature[data-spotlight]::before {
+    display: none;
   }
   .home .auctionStage:hover .auctionBoard,
   .home .feature:hover,

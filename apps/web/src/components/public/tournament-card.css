@@ -248,7 +248,7 @@
 
 .tc-action[data-primary] {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-on-accent);
 }
 

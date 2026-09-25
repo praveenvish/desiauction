@@ -754,7 +754,7 @@ p.admin-warning {
 .pass-row-note {
   margin: 0;
   padding: var(--space-2) var(--space-3);
-  border-inline-start: 3px solid var(--accent);
+  border-inline-start: 3px solid var(--accent-line);
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
   color: var(--text-secondary);

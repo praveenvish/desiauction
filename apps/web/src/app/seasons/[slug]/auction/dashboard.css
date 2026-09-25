@@ -477,7 +477,7 @@
 }
 
 .bc-switch-option[aria-pressed="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
   color: var(--text-heading);
 }

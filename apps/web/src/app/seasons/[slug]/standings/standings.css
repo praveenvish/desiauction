@@ -34,7 +34,7 @@
 }
 
 .sd-table tr[data-rank="1"] > td:first-child {
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent-line);
 }
 
 .sd-table td.sd-pts strong {

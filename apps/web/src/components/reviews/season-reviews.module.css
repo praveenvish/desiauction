@@ -81,7 +81,7 @@
 .reply {
   margin-top: var(--space-1);
   padding: var(--space-3);
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid var(--accent-line);
   background: var(--surface-raised);
 }
 

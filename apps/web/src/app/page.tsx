@@ -224,7 +224,11 @@ export default function LandingPage() {
               </p>
             </div>
             <div className={styles.bento}>
-              <article className={[styles.feature, styles.registration].join(" ")} data-reveal>
+              <article
+                className={[styles.feature, styles.registration].join(" ")}
+                data-reveal
+                data-spotlight
+              >
                 <div className={styles.featureCopy}>
                   <span className={styles.iconTile}>
                     <IconUsers size={23} />
@@ -280,7 +284,11 @@ export default function LandingPage() {
                   <p className={styles.visualNote}>Example player pool</p>
                 </div>
               </article>
-              <article className={[styles.feature, styles.screenFeature].join(" ")} data-reveal>
+              <article
+                className={[styles.feature, styles.screenFeature].join(" ")}
+                data-reveal
+                data-spotlight
+              >
                 <span className={styles.iconTile}>
                   <IconTv size={23} />
                 </span>
@@ -312,7 +320,11 @@ export default function LandingPage() {
                   Set the stage <IconArrowRight size={16} />
                 </Link>
               </article>
-              <article className={[styles.feature, styles.fixturesFeature].join(" ")} data-reveal>
+              <article
+                className={[styles.feature, styles.fixturesFeature].join(" ")}
+                data-reveal
+                data-spotlight
+              >
                 <span className={styles.iconTile}>
                   <IconCalendar size={23} />
                 </span>
@@ -339,7 +351,11 @@ export default function LandingPage() {
                   Plan your fixtures <IconArrowRight size={16} />
                 </Link>
               </article>
-              <article className={[styles.feature, styles.recordsFeature].join(" ")} data-reveal>
+              <article
+                className={[styles.feature, styles.recordsFeature].join(" ")}
+                data-reveal
+                data-spotlight
+              >
                 <div className={styles.featureCopy}>
                   <span className={styles.iconTile}>
                     <IconReceipt size={23} />

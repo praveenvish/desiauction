@@ -23,13 +23,29 @@ export function HomeMotion({ children }: { children: ReactNode }) {
       node.removeEventListener("click", onClick);
     };
   }, []);
+  /*
+   * SCROLL REVEAL. The waiting pose (lower, softly blurred) only applies once
+   * this runs — `data-motion="ready"` on the root — so the server-rendered page
+   * is complete and still before hydration, with JS off, and under reduced
+   * motion. Siblings get an index so a row of cards arrives as a wave, not a
+   * block. Text is never faded: axe measures contrast mid-animation, so text
+   * poses are transform + blur only (see guest-home.module.css).
+   */
   useEffect(() => {
+    const node = root.current;
     if (
+      !node ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
-      !root.current ||
       !("IntersectionObserver" in window)
     )
       return;
+    const targets = Array.from(node.querySelectorAll<HTMLElement>("[data-reveal]"));
+    for (const element of targets) {
+      const siblings = Array.from(element.parentElement?.children ?? []).filter((child) =>
+        child.hasAttribute("data-reveal"),
+      );
+      element.style.setProperty("--reveal-i", String(Math.min(siblings.indexOf(element), 5)));
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -39,13 +55,48 @@ export function HomeMotion({ children }: { children: ReactNode }) {
           }
         }
       },
-      { threshold: 0.12 },
+      { threshold: 0.12, rootMargin: "0px 0px -6% 0px" },
     );
-    root.current.querySelectorAll("[data-reveal]").forEach((element) => {
+    node.dataset.motion = "ready";
+    targets.forEach((element) => {
       observer.observe(element);
     });
     return () => {
       observer.disconnect();
+      delete node.dataset.motion;
+    };
+  }, []);
+  /*
+   * SPOTLIGHT. Cards marked data-spotlight carry a soft gold light that follows
+   * the pointer — fine pointers only (a finger has no hover), one delegated
+   * listener, one write per frame.
+   */
+  useEffect(() => {
+    const node = root.current;
+    if (
+      !node ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      !window.matchMedia("(hover: hover) and (pointer: fine)").matches
+    )
+      return;
+    let frame = 0;
+    let last: PointerEvent | null = null;
+    const paint = () => {
+      frame = 0;
+      const card = (last?.target as Element | null)?.closest<HTMLElement>("[data-spotlight]");
+      if (!card || !last) return;
+      const box = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${String(Math.round(last.clientX - box.left))}px`);
+      card.style.setProperty("--my", `${String(Math.round(last.clientY - box.top))}px`);
+    };
+    const onMove = (event: PointerEvent) => {
+      last = event;
+      if (!frame) frame = requestAnimationFrame(paint);
+    };
+    node.addEventListener("pointermove", onMove, { passive: true });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      node.removeEventListener("pointermove", onMove);
     };
   }, []);
   return <div ref={root}>{children}</div>;

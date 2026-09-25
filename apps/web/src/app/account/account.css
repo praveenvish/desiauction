@@ -89,7 +89,7 @@
   padding: 4px;
   border-radius: var(--radius-full);
   background: var(--surface-raised);
-  box-shadow: 0 0 0 2px var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-line);
 }
 
 .acct-id-photo-box {
@@ -835,7 +835,7 @@ a.acct-check-row:hover {
 }
 
 .acct .notify-language-option:has(input:checked) {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
 }
 

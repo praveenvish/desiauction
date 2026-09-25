@@ -114,7 +114,7 @@
 }
 
 .live-roomnav-card svg {
-  color: var(--accent);
+  color: var(--accent-line);
 }
 
 /* ---- Cards ---------------------------------------------------------------- */
@@ -166,7 +166,7 @@
   height: 64px;
   border-radius: var(--radius-xl);
   background: var(--accent-subtle);
-  color: var(--accent);
+  color: var(--accent-line);
 }
 
 .wrap-hero-text {
@@ -580,7 +580,7 @@ button.paddle-chip:focus-visible {
 
 .paddle-chip[aria-pressed="true"],
 .paddle-chip[data-active="true"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
 }
 

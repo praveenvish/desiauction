@@ -59,7 +59,7 @@
 }
 
 .me-filter a[aria-current="page"] {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent-subtle);
   color: var(--text-heading);
   font-weight: var(--font-weight-semibold);

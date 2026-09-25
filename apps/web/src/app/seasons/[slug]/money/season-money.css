@@ -79,7 +79,7 @@
 }
 
 .mn-step[data-state="current"] .mn-step-mark {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   background: var(--accent);
   color: var(--text-on-accent);
 }

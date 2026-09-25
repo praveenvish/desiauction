@@ -101,7 +101,8 @@
     color-mix(in srgb, var(--accent-sheen) 14%, var(--accent-lift)),
     var(--accent) 62%
   );
-  border-color: color-mix(in srgb, var(--accent-pressed) 60%, var(--accent));
+  /* The rim carries the non-text contrast on paper (see //accent in daylight.json). */
+  border-color: var(--accent-edge);
   color: var(--text-on-accent);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--accent-sheen) 42%, transparent),
@@ -250,29 +251,28 @@
 }
 
 /* ==========================================================================
-   CONSOLE PRIMARY (founder mockups, 2026-09-19): gold, one per screen.
-   Fill is --accent-pressed and the label is --surface-raised, a pair that
-   flips WITH the theme instead of beside it: deep gold + white in daylight
-   (5.9:1), bright gold + near-black in floodlight (7:1). A theme-keyed
-   override missed pages that carry their own theme scope (onboarding) and
-   painted white on bright gold — 2.4:1, caught by axe. No glow.
+   CONSOLE PRIMARY (founder mockups, 2026-09-19): gold, one per screen, no glow.
+   --accent-solid / --accent-on-solid are a pair that flips WITH the theme:
+   bright gold + near-black in daylight (10.6:1, gold.700 rim), deep gold +
+   near-black in floodlight (7:1). Until 2026-09-25 daylight painted this deep
+   bronze with a white label — correct, but the dullest button on the page.
    ========================================================================== */
 :global([data-surface="console"]) .primary,
 :global([data-surface="console"]) .primary:active:not(:disabled) {
-  background-color: var(--accent-pressed);
+  background-color: var(--accent-solid);
   background-image: none;
-  border-color: var(--accent-pressed);
-  color: var(--surface-raised);
+  border-color: var(--accent-solid-edge);
+  color: var(--accent-on-solid);
   box-shadow: var(--shadow-1);
 }
 
 :global([data-surface="console"]) .primary:hover:not(:disabled) {
-  background-color: var(--accent-pressed);
+  background-color: var(--accent-solid);
   background-image: linear-gradient(
     180deg,
     color-mix(in srgb, var(--surface-raised) 8%, transparent),
     transparent
   );
-  border-color: var(--accent-pressed);
+  border-color: var(--accent-solid-edge);
   box-shadow: var(--shadow-2);
 }

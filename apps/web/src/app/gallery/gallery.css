@@ -47,7 +47,7 @@
   font-weight: 500;
   color: var(--text-on-accent);
   background: var(--accent);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-line);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-4);
   cursor: pointer;
@@ -232,7 +232,7 @@
 
 .hold-button[data-holding="true"] {
   background: var(--accent-pressed);
-  color: var(--text-inverse);
+  color: var(--text-on-accent);
 }
 
 /* --- theatre demo ---------------------------------------------------------- */

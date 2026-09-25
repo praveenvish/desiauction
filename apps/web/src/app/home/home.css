@@ -82,7 +82,7 @@
 }
 
 .home-rung--now .home-rung-mark {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
   color: var(--text-accent);
 }
 
@@ -1008,7 +1008,7 @@
 }
 
 .home-create-card:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .home-create-card:focus-visible {
@@ -1105,7 +1105,7 @@
 }
 
 .home-own-poster:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-line);
 }
 
 .home-own-poster:focus-visible {
@@ -1287,7 +1287,7 @@
    it reports a fact the reader will confirm by looking left, and it is gone
    the next time they load the page. */
 .home-role-change {
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--accent-line);
 }
 
 .home-role-change p {
