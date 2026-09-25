@@ -67,6 +67,7 @@ import {
 } from "./sessions";
 import { describeUserAgent } from "./user-agent";
 import { cache } from "react";
+import { isStartClub } from "../../lib/start-intent";
 
 /**
  * SECURE, EXCEPT ON THE REHEARSAL SERVER — which is not a server that serves people.
@@ -370,8 +371,15 @@ export async function verifyOtpAction(
   // it was always going to. Only the DEFAULT destination is re-pointed: a token
   // flow (`/join/...`, `/owner-join/...`) still lands exactly where it was
   // going, because onboarding must never hijack an invite.
-  if (target === "/home" && (result.name === null || result.name.trim() === "")) {
-    redirect("/onboarding");
+  if (result.name === null || result.name.trim() === "") {
+    if (target === "/home") {
+      redirect("/onboarding");
+    }
+    // "Create your tournament" rides through onboarding: the name gate in the
+    // /home layout cannot see a query string, and would drop it.
+    if (isStartClub(target)) {
+      redirect(`/onboarding?next=${encodeURIComponent(target)}`);
+    }
   }
   redirect(target);
 }
@@ -501,8 +509,13 @@ export async function verifyEmailLoginAction(
     .limit(1);
   // The nameless-account redirect the phone path makes, for the same reason:
   // /home would only bounce them to /onboarding anyway.
-  if (target === "/home" && (person?.name === null || person?.name.trim() === "")) {
-    redirect("/onboarding");
+  if (person?.name === null || person?.name.trim() === "") {
+    if (target === "/home") {
+      redirect("/onboarding");
+    }
+    if (isStartClub(target)) {
+      redirect(`/onboarding?next=${encodeURIComponent(target)}`);
+    }
   }
   redirect(target);
 }

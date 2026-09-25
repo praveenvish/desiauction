@@ -7,7 +7,14 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { requestOtpAction, verifyOtpAction, type AuthFormState } from "../../server/auth/actions";
 import { formatPhone } from "../../lib/format-phone";
 import { track } from "../../lib/telemetry";
-import { LoginFrame, pasteDigits, useResendCountdown, writeLoginUrl } from "./login-shared";
+import {
+  LoginFrame,
+  pasteDigits,
+  submitWholeCode,
+  useResendCountdown,
+  writeLoginUrl,
+} from "./login-shared";
+import { isStartClub } from "../../lib/start-intent";
 
 /** Matches the server's RESEND_COOLDOWN_MS (otp.ts) — display only; the
  * server enforces the real limit. */
@@ -134,14 +141,24 @@ export function PhoneSignIn({
 
   return (
     <LoginFrame
-      title={atStart ? (returning ? "Welcome back" : "Sign in") : "Enter your code"}
+      title={
+        atStart
+          ? isStartClub(next)
+            ? "Create your club"
+            : returning
+              ? "Welcome back"
+              : "Sign in"
+          : "Enter your code"
+      }
       sub={
         atStart
-          ? honoredNext
-            ? "Sign in to continue where you were headed."
-            : returning
-              ? "Use your passkey, or we'll text you a code."
-              : "We'll text you a 6-digit code — no password needed."
+          ? isStartClub(next)
+            ? "First, your number — we'll text you a 6-digit code. No password. Then you name your club."
+            : honoredNext
+              ? "Sign in to continue where you were headed."
+              : returning
+                ? "Use your passkey, or we'll text you a code."
+                : "We'll text you a 6-digit code — no password needed."
           : `We sent a 6-digit code to ${formatPhone(phone)}. It can take up to 30 seconds.`
       }
       method="phone"
@@ -212,6 +229,7 @@ export function PhoneSignIn({
               maxLength={6}
               autoFocus
               onPaste={pasteDigits}
+              onChange={submitWholeCode}
               {...(state.error !== undefined ? { error: state.error } : {})}
               help="Valid for 5 minutes. Didn't get it? Check your SMS, then resend."
             />

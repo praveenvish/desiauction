@@ -52,6 +52,8 @@ export default async function HomePage({
   if (session.name === null || session.name.trim() === "") {
     redirect("/onboarding");
   }
+  // `?start=club` — the landing CTA's intent, carried through sign-in.
+  const startClub = params.start === "club";
   return (
     <main className="home">
       <Suspense fallback={<LoadingState variant="page" />}>
@@ -60,6 +62,7 @@ export default async function HomePage({
           name={session.name}
           // `?season=` — the club hero's switcher writes it (organizer home).
           focusSlug={typeof params.season === "string" ? params.season : null}
+          startClub={startClub}
         />
       </Suspense>
     </main>
@@ -110,10 +113,12 @@ async function HomeBody({
   personId,
   name,
   focusSlug,
+  startClub,
 }: {
   personId: string;
   name: string;
   focusSlug: string | null;
+  startClub: boolean;
 }) {
   const roles = await rolesOf(personId);
   const manages = roles.organizes.length > 0;
@@ -190,7 +195,7 @@ async function HomeBody({
       {/* Said once, when the menu actually changed under them (RN-1 §3.6). */}
       <RoleChangeNotice held={heldRoles} />
       {standaloneStep !== null ? <NextStepBanner step={standaloneStep} /> : null}
-      {sections.has("newcomer") ? <NewcomerHome /> : null}
+      {sections.has("newcomer") ? <NewcomerHome startClub={startClub} /> : null}
       {sections.has("owner") ? <OwnerHome teams={roles.owns} /> : null}
       {sections.has("auctioneer") ? <AuctioneerHome seasons={roles.conducts} /> : null}
       {sections.has("organizer") ? (

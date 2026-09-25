@@ -2,7 +2,7 @@
 
 import { buttonClassName, IconMail, IconPhone } from "@desiauction/ui";
 import Link from "next/link";
-import { useEffect, useState, type ClipboardEvent, type ReactNode } from "react";
+import { useEffect, useState, type ChangeEvent, type ClipboardEvent, type ReactNode } from "react";
 
 import { PasskeyLogin } from "./passkey-login";
 
@@ -86,6 +86,38 @@ export function pasteDigits(event: ClipboardEvent<HTMLInputElement>): void {
   }
   event.preventDefault();
   event.currentTarget.value = digits;
+  submitWhenComplete(event.currentTarget);
+}
+
+/**
+ * A WHOLE CODE SUBMITS ITSELF; A TYPED ONE WAITS FOR THE BUTTON.
+ *
+ * On a phone the code rarely gets typed: it is pasted, or tapped in from the
+ * keyboard's "From Messages" suggestion, and then the person had to find
+ * "Verify and continue" as well. Those arrive as one input event carrying all
+ * six digits, so they go straight through — pressing the SAME submit button,
+ * so the form's intent and pending state are exactly what a click produces.
+ * Digits typed one at a time do not auto-submit: the sixth keystroke of a
+ * mistyped code would otherwise be sent before the person saw it.
+ */
+export function submitWhenComplete(input: HTMLInputElement): void {
+  if (!/^\d{6}$/.test(input.value)) {
+    return;
+  }
+  const verify = input.form?.querySelector<HTMLButtonElement>('button[value="verify"]');
+  if (verify !== null && verify !== undefined && !verify.disabled) {
+    input.form?.requestSubmit(verify);
+  }
+}
+
+/** onChange for the code field: submit only when the code arrived whole. */
+export function submitWholeCode(event: ChangeEvent<HTMLInputElement>): void {
+  // A plain Event (not an InputEvent) carries no inputType; treat it as whole.
+  const kind = (event.nativeEvent as Partial<InputEvent>).inputType ?? "";
+  if (kind === "insertText" || kind.startsWith("delete")) {
+    return;
+  }
+  submitWhenComplete(event.currentTarget);
 }
 
 /**

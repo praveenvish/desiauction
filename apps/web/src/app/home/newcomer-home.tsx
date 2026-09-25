@@ -15,7 +15,7 @@ import { CreateOrgForm } from "../orgs/create-org-form";
  * IS the first step; sending somebody to an empty index to find the same button
  * is a page in between that teaches nothing.
  */
-export function NewcomerHome() {
+export function NewcomerHome({ startClub = false }: { startClub?: boolean }) {
   return (
     <SectionCard
       data-testid="home-choose"
@@ -30,10 +30,11 @@ export function NewcomerHome() {
       </p>
       <div className="home-choose-doors">
         <FormDialog
-          title="New organization"
+          title="Create your club"
           triggerLabel="Create your club"
           size="touch"
           triggerTestId="home-create-org"
+          defaultOpen={startClub}
         >
           <CreateOrgForm />
         </FormDialog>
