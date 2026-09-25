@@ -16,7 +16,10 @@
 export const LANDING = {
   hero: {
     h1: "SOLD, without the shouting.",
-    sub: "IPL-style player auctions for local cricket. Owners bid from their phones, the hall watches the big screen, and every rupee lands on a ledger.",
+    // Not "IPL-style … local cricket … every rupee": the product runs twelve
+    // sports and points auctions where no rupee moves, so the old line undersold
+    // the first and misdescribed the second.
+    sub: "Live player auctions for your league, in any of 12 sports. Owners bid from their phones, the hall watches the big screen, and every sale lands on the record.",
     ctaPrimary: { label: "Start your auction", href: "/login" },
     // The strongest honest offer on the page: the Free tier below is ₹0,
     // cadence "always", limited to "Up to 4 teams and 40 players" — so the note
@@ -460,8 +463,10 @@ export interface ComparisonRow {
 }
 
 export const PRICING = {
-  h1: "Simple, public pricing.",
-  sub: "You buy a Pass per tournament — no subscriptions, no seats, no “contact sales”.",
+  // The headline leads with what is true today (it is free) rather than with a
+  // pricing model that does not exist yet; the Pass model moves to the sub.
+  h1: "Free while we're in beta.",
+  sub: "One pass per tournament when paid plans arrive — no subscriptions, no seats. Tournaments you start now stay free.",
   // The single best fact on this page, promoted out of the tail of a 30-word
   // sentence inside a muted disclaimer. A visitor's real question is "what is
   // my exposure if I start tonight and the price turns out to be wrong for
@@ -485,7 +490,7 @@ export const PRICING = {
   // worse outcome than an unbilled team, so I have not guessed. Until it
   // exists, the sentence below is what keeps this page honest.
   betaBanner:
-    "During beta, everything is free — every tier, every feature, no card, and no limit enforced: the team and player numbers below describe the Passes that arrive at general availability, not a ceiling you will hit today. Paid Passes arrive with GA, at the prices published on this page.",
+    "Every tier and every feature is free during beta — no card, no limits enforced. The team and player numbers below describe the paid passes that come later.",
   trustLine:
     "Trust is never premium: the immutable ledger, receipts, and audit are in every tier, including Free.",
   // Canon (docs/45 §Limit philosophy): "Free limits are honest capacity limits,
@@ -537,7 +542,7 @@ export const PRICING = {
       // The page's sub-headline promises "no 'contact sales'" while this tier
       // is literally sold as "One relationship, many tournaments" — so the one
       // tier that does need a human offered no way to reach one.
-      cta: { label: "Talk to us about a season", href: "/contact" },
+      cta: { label: "Talk to us about a season", href: "/support" },
     },
   ] satisfies readonly PricingTier[],
   // --- Comparison table -------------------------------------------------------
@@ -621,9 +626,11 @@ export const PRICING = {
         body: "Squads and fixtures download as CSV, and receipts, the ledger and the auction's own record stay readable whatever happens to a pass. No renewal ever stands between your organization and its own paperwork.",
       },
     ],
-    // TODO(founder): this paragraph is the honest edge of what the repo can
-    // evidence, and it needs four answers none of which exist in code, docs or
-    // config anywhere I could find:
+    // TODO(founder): the page used to end this section with a dashed "What this
+    // page cannot tell you yet" box. It read as an unfinished page to every
+    // visitor who was not a procurement committee, so it was removed; the
+    // questions it stood in for are still open and still need four answers,
+    // none of which exist in code, docs or config anywhere I could find:
     //   1. Is DesiAuction itself GST-registered, and under which GSTIN? (The
     //      only GSTIN in the platform is the ORGANIZER's, on finops_profiles.)
     //   2. Can we accept a purchase order, and against what payment terms?
@@ -634,11 +641,9 @@ export const PRICING = {
     //      breakdown, SAC code" — but that is a DESIGN for a payment flow that
     //      is not built, so it is a plan, not a fact, and I have not written it
     //      as one.
-    // Answer these and the paragraph becomes three concrete sentences. Until
-    // then it says we do not know, which is at least a thing a committee can
-    // act on. Do NOT let it ship claiming a tax status we cannot produce.
-    gap: "What this page cannot tell you yet: our own GST registration, and whether we can take a purchase order or issue a proforma invoice ahead of payment. Paid passes do not exist yet, so neither does that answer. Ask us and we will put it in writing before you commit anything.",
-    cta: { label: "Talk to us about a season", href: "/contact" },
+    // Answer these and they can come back as three concrete sentences. Until
+    // then a committee asks support. Do NOT let the page claim a tax status we
+    // cannot produce.
   },
   faqs: [
     {
@@ -713,7 +718,7 @@ export const FEATURE_GROUPS = [
       "Server-verified bidding on every device at once",
       "Auctioneer cockpit with call, sell, undo, pause",
       "Synchronized SOLD ceremony with the player's name",
-      "Self-healing recovery from a server snapshot",
+      "A dropped phone rejoins exactly where the room is",
       "Public spectator stage — no sign-in required",
     ],
   },
@@ -728,16 +733,16 @@ export const FEATURE_GROUPS = [
       "Obligations computed automatically when the gavel falls",
       "Record cash, UPI and bank collections against dues",
       "Receipts numbered in an unbroken series and sealed when issued",
-      "Every document re-derivable from its events and checked against its seal",
+      "Every receipt can be checked against the original record",
       "Squad and fixture CSV downloads",
     ],
   },
   {
     title: "Trust & governance",
     features: [
-      "Grants, not roles — money authority is always deliberate",
+      "Only people you choose can touch the money",
       "Immutable, append-only ledger and audit trail",
-      "Phone-first sign-in with passkeys",
+      "Sign-in with a one-time code or passkey — no passwords",
       "Platform administration for observability and support",
     ],
   },

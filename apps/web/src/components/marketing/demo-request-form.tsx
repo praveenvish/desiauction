@@ -106,7 +106,7 @@ export function DemoRequestForm({ source }: { source: string }) {
           inputMode="numeric"
           autoComplete="tel"
           required
-          placeholder="98765 43210"
+          placeholder="e.g. 98765 43210"
           help="We'll call or WhatsApp this number."
           error={errorFor("phone")}
         />
@@ -117,7 +117,7 @@ export function DemoRequestForm({ source }: { source: string }) {
         name="orgName"
         required
         maxLength={120}
-        placeholder="Sunday Warriors Premier League"
+        placeholder="e.g. Sunday Warriors Premier League"
         error={errorFor("orgName")}
       />
 

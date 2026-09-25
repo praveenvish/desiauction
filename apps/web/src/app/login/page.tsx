@@ -114,9 +114,9 @@ export default async function LoginPage({
             Auctions for every sport
           </p>
           <p className="login-scene-line" aria-hidden="true">
-            Your auction
+            Your auction,
             <br />
-            answers to your number.
+            one code away.
           </p>
           {/* The marks, each with the sentence that makes it mean something.
               The list is real content (it is the page's whole argument), so it

@@ -840,14 +840,20 @@ export function ProductShell({
         //
         // What replaced them is what a visitor at the bottom of the page is
         // actually looking for: the way in (start an auction, book a demo), the
-        // way to a human (help, FAQ, support, contact), and the way to check we
-        // are real (about, legal, and the operator identity below).
+        // way to a human (help, FAQ, support), and the way to check we are real
+        // (about, legal, and the operator identity below).
+        //
+        // "Contact us" is gone: /contact now redirects to /support, which the
+        // Support column already links as "Contact support" — two footer links
+        // to one page. Both demos sit under Product, and the self-serve one
+        // uses the homepage's own name for it, "Try a mock auction".
         footerGroups={[
           {
             label: "Product",
             links: [
               { label: "Features", href: "/features" },
-              { label: "Try the auction demo", href: "/#playground" },
+              { label: "Try a mock auction", href: "/#playground" },
+              { label: "Book a demo", href: "/schedule-demo" },
               { label: "Pricing", href: "/pricing" },
               { label: "Security", href: "/security" },
               { label: "Release notes", href: "/releases" },
@@ -862,7 +868,6 @@ export function ProductShell({
               // pointing at /login read as a broken link to anyone who noticed.
               { label: "Create a tournament", href: "/login" },
               { label: "Rules & guidelines", href: "/rules-guidelines" },
-              { label: "Book a demo", href: "/schedule-demo" },
             ],
           },
           {
@@ -881,7 +886,6 @@ export function ProductShell({
             label: "Company",
             links: [
               { label: "About us", href: "/about" },
-              { label: "Contact us", href: "/contact" },
               { label: "Legal centre", href: "/legal" },
               { label: "Grievance redressal", href: "/legal/grievances" },
             ],

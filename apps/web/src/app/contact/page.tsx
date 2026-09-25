@@ -1,49 +1,22 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { permanentRedirect } from "next/navigation";
 
 import { env } from "../../env";
-import { SUPPORT } from "../../content/support";
-import { ContentPage } from "../../components/public/content-page";
-import "../content.css";
-
-export const metadata: Metadata = {
-  title: "Contact · DesiAuction",
-  description: "How to reach the DesiAuction team.",
-  alternates: { canonical: `${env.PUBLIC_BASE_URL}/contact` },
-};
 
 /**
- * PX-10 P-05 — Contact (PX-1 06 P-05): support email, response-time promise, and
- * a link to help. Reachable from the error page and Forbidden states. Public.
+ * /contact is kept as an address, not as a page.
+ *
+ * It rendered the same support email cards as /support with a thinner frame
+ * around them, so a reader who found both had to wonder which one was the real
+ * way in. /support is the one place now; /contact stays alive (error pages,
+ * old links and emails still point at it) and answers with a permanent
+ * redirect so browsers and crawlers learn the new address.
  */
-export default function ContactPage() {
-  return (
-    <ContentPage eyebrow="Talk to us" title="Contact us" lede={SUPPORT.intro}>
-      <div className="support-channels">
-        {SUPPORT.channels.map((channel) => (
-          <div key={channel.title} className="support-card">
-            <h2>{channel.title}</h2>
-            <p className="support-detail">
-              <a href={channel.href} className="prose-link">
-                {channel.detail}
-              </a>
-            </p>
-            <p>{channel.note}</p>
-          </div>
-        ))}
-      </div>
+export const metadata: Metadata = {
+  title: "Support · DesiAuction",
+  alternates: { canonical: `${env.PUBLIC_BASE_URL}/support` },
+};
 
-      <p className="prose-p">
-        Looking for how something works? The{" "}
-        <Link href="/help" className="prose-link">
-          help centre
-        </Link>{" "}
-        covers setup, the auction, and the money. For more ways we can help, see{" "}
-        <Link href="/support" className="prose-link">
-          support
-        </Link>
-        .
-      </p>
-    </ContentPage>
-  );
+export default function ContactPage(): never {
+  permanentRedirect("/support");
 }

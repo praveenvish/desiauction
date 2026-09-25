@@ -2212,8 +2212,12 @@ body:has(.landing.mk) .mk-hero {
   white-space: nowrap;
 }
 
+/* A fixed 260px row label, on top of the table's own 640px floor, left the tier
+   columns too little room on a phone and clipped them. A share of the table
+   keeps the labels readable and lets the tier columns keep theirs. */
 .mk-compare th[scope="row"] {
-  min-width: 260px;
+  min-width: 0;
+  width: 40%;
   text-align: left;
   color: var(--text-primary);
   font-weight: var(--font-weight-regular);
@@ -2382,34 +2386,17 @@ body:has(.landing.mk) .mk-hero {
   color: var(--text-secondary);
 }
 
-.mk-procure-gap {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  box-sizing: border-box;
-  margin-top: var(--space-5);
-  padding: var(--space-5);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-}
-
-.mk-procure-gap p {
-  flex: 1 1 26rem;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--text-sm-size);
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
 /* --- FAQ --------------------------------------------------------------------------- */
 
 .mk-faq {
   max-width: 720px;
   margin: 0 auto;
+}
+
+/* The band head's clamp() bottoms out at --space-4 on narrow widths, which set
+   "Questions" right against the first FAQ card. */
+.mk-faq .mk-band-head {
+  margin-bottom: var(--space-6);
 }
 
 .mk-faq-item {

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ButtonLink } from "@desiauction/ui";
 
 import { env } from "../../env";
+import { LEGAL_IDENTITY } from "../../content/company";
+import { START_CLUB_LOGIN } from "../../lib/start-intent";
 import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 
@@ -33,7 +37,28 @@ export default function AboutPage() {
           We're in beta. Every tournament gets the full platform, free, while we earn your trust —
           and while we build the track record that a young platform has to earn honestly.
         </p>
+        {/* Who is behind it, from the same identity the footer and the legal
+            centre publish — not a second, hand-typed copy of the company name.
+            Jaipur is where that company is registered (LEGAL_IDENTITY). */}
+        <p className="prose-p">DesiAuction is built in Jaipur by {LEGAL_IDENTITY.legalName}.</p>
       </div>
+      {/* The page used to end on a paragraph, which left a convinced reader
+          nowhere to go. The two ways in, then the way to a person. */}
+      <div className="content-actions">
+        <ButtonLink href={START_CLUB_LOGIN} variant="primary">
+          Create your tournament
+        </ButtonLink>
+        <ButtonLink href="/schedule-demo" variant="secondary">
+          Book a demo
+        </ButtonLink>
+      </div>
+      <p className="prose-p">
+        Questions first?{" "}
+        <Link href="/support" className="prose-link">
+          Talk to support
+        </Link>
+        .
+      </p>
     </ContentPage>
   );
 }
