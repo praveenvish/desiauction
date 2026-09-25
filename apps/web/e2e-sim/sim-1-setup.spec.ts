@@ -40,11 +40,8 @@ test("stage 1 — organizer sets up a 43-player points season with 3 teams", asy
 
   await org.goto("/orgs");
   await org.getByTestId("new-org").click();
-  await org
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Konkan Cricket Club ${STAMP}`);
-  await org.getByRole("button", { name: "Create organization" }).click();
+  await org.getByLabel("Club name").filter({ visible: true }).fill(`Konkan Cricket Club ${STAMP}`);
+  await org.getByRole("button", { name: "Create club" }).click();
   await expect(org.getByTestId("org-name")).toBeVisible();
 
   await org.goto("/seasons");
@@ -139,7 +136,7 @@ test("stage 1 — organizer sets up a 43-player points season with 3 teams", asy
   await org.goto(`/seasons/${slug}/auction`);
   await expect(org.getByTestId("auction-panel")).toHaveAttribute("data-hydrated", "true", COLD);
   await org.getByTestId("setup-close-registration").click();
-  await expect(org.getByTestId("check-intake_closed")).toContainText("pass", COLD);
+  await expect(org.getByTestId("check-intake_closed")).toHaveAttribute("data-pass", "true", COLD);
   const fill = async (label: string, value: string) => {
     const field = org.getByLabel(label, { exact: true });
     await field.fill(value);

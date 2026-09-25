@@ -62,6 +62,11 @@ export function RulesStep({ slug, dashboard }: { slug: string; dashboard: Auctio
   const [bands, setBands] = useState<Record<string, string>>({ ...starting.bands });
   const [fieldErrors, setFieldErrors] = useState<AuctionSetupFieldErrors>({});
   const [acceptShortSquads, setAcceptShortSquads] = useState(false);
+  // Bands only mean something when players carry one. A sheet with no band
+  // column put every player on the default price, yet the form still asked
+  // for three band prices the night would never use.
+  const bandedPlayers = dashboard.ready.pool.filter((entry) => entry.basePriceBand !== null).length;
+  const [useBands, setUseBands] = useState(bandedPlayers > 0);
 
   const { ready } = dashboard;
   // The same sum the server will do, run against whatever is typed right now.
@@ -82,7 +87,8 @@ export function RulesStep({ slug, dashboard }: { slug: string; dashboard: Auctio
       timerSeconds: timer,
       extensionSeconds: extension,
       basePriceDefault: baseDefault,
-      bands,
+      // Off means "one price for everyone": no bands in the locked config.
+      bands: useBands ? bands : {},
       acceptShortSquads,
     });
     setBusy(false);
@@ -160,7 +166,23 @@ export function RulesStep({ slug, dashboard }: { slug: string; dashboard: Auctio
             setBaseDefault(event.target.value);
           }}
         />
-        {(["A", "B", "C"] as const).map((label) => (
+        <label className="auction-ack as-bands-toggle">
+          <input
+            type="checkbox"
+            checked={useBands}
+            data-testid="use-bands"
+            onChange={(event) => {
+              setUseBands(event.target.checked);
+            }}
+          />
+          <span>
+            Different base prices by band (A / B / C).{" "}
+            {bandedPlayers > 0
+              ? `${String(bandedPlayers)} player${bandedPlayers === 1 ? " has" : "s have"} a band.`
+              : "None of your players has a band, so everyone starts at the default base price."}
+          </span>
+        </label>
+        {(useBands ? (["A", "B", "C"] as const) : []).map((label) => (
           <Field
             key={label}
             label={`Band ${label} base price (${money.label})`}
