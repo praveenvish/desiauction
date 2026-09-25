@@ -146,6 +146,8 @@ export default async function AccountPage() {
             sports={sportsPlayed}
             completeness={completeness}
             hasRegistrations={entries.length > 0}
+            // Only facts that say something: "0 Sports played · 0 Passkeys"
+            // were empty boasts in the hero.
             facts={[
               {
                 key: "sports",
@@ -165,108 +167,114 @@ export default async function AccountPage() {
                 value: String(security?.sessions.length ?? 1),
                 label: security?.sessions.length === 1 ? "Device signed in" : "Devices signed in",
               },
-            ]}
+            ].filter((fact) => fact.value !== "0")}
             signOut={<SignOutButton logout={logoutAction} />}
           />
 
           {/* Settings read like settings: an index of the cards, then the cards —
               two columns on a laptop so the page is two screens, not seven. */}
-          <nav className="acct-nav" aria-label="Account sections">
-            <ul>
-              {ACCOUNT_SECTIONS.map((section) => (
-                <li key={section.id}>
-                  <a href={`#${section.id}`}>
-                    <span aria-hidden>{section.icon}</span>
-                    {section.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          {/* A sticky section index beside ONE content column (wow pass). The
+              two-column masonry left ~1,600px of blank left column. */}
+          <div className="acct-body">
+            <nav className="acct-nav" aria-label="Account sections">
+              <ul>
+                {ACCOUNT_SECTIONS.map((section) => (
+                  <li key={section.id}>
+                    <a href={`#${section.id}`}>
+                      <span aria-hidden>{section.icon}</span>
+                      {section.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
 
-          <div className="acct-columns">
-            <div className="acct-column">
-              <ProfilePanel phone={session.phone} name={session.name} email={email} />
-              {/* PI-1: the durable identity. Prefills every future registration. */}
-              <PersonProfilePanel profile={cricketProfile} />
-              {/* SP-1 Phase 3: "how you play" has a different answer in each
+            <div className="acct-columns">
+              <div className="acct-column">
+                <ProfilePanel phone={session.phone} name={session.name} email={email} />
+                {/* PI-1: the durable identity. Prefills every future registration. */}
+                <PersonProfilePanel profile={cricketProfile} />
+                {/* SP-1 Phase 3: "how you play" has a different answer in each
                   sport — the ones this person plays, and the rest one at a time. */}
-              <SportProfiles forms={sportForms} />
-            </div>
+                <SportProfiles forms={sportForms} />
+              </div>
 
-            <div className="acct-column">
-              {security !== null ? <SecurityPanels security={security} /> : null}
+              <div className="acct-column">
+                {security !== null ? <SecurityPanels security={security} /> : null}
 
-              {/*
+                {/*
                 NOTIFICATIONS — disclosure AND real switches. The column exists
                 (notification_preferences, migration 0023) and `maySend` reads it
                 before every send, so these switches stop messages rather than
                 recording an opinion. The disclosure stays beside them: knowing
                 what we send is not the same as being able to stop it.
               */}
-              <SectionCard
-                id="notifications"
-                icon={<IconBell />}
-                tone="blue"
-                title="Notifications"
-                description="Switch any of these off and we stop sending it, by text and by email."
-                className="acct-card"
-                data-testid="notifications-panel"
-              >
-                <div className="acct-always">
-                  <span className="acct-always-text">
-                    <span className="acct-always-label">Sign-in codes</span>
-                    <span className="acct-always-detail">
-                      By SMS or email, only when you ask for one. They can&rsquo;t be turned off —
-                      they are how you get into your account.
+                <SectionCard
+                  id="notifications"
+                  icon={<IconBell />}
+                  tone="blue"
+                  title="Notifications"
+                  description="Switch any of these off and we stop sending it, by text and by email."
+                  className="acct-card"
+                  data-testid="notifications-panel"
+                >
+                  <div className="acct-always">
+                    <span className="acct-always-text">
+                      <span className="acct-always-label">Sign-in codes</span>
+                      <span className="acct-always-detail">
+                        By SMS or email, only when you ask for one. They can&rsquo;t be turned off —
+                        they are how you get into your account.
+                      </span>
                     </span>
-                  </span>
-                  <span className="acct-always-tag">Always on</span>
-                </div>
-                {settings === null ? null : <NotificationSwitches settings={settings} />}
-                {settings === null ? null : (
-                  <WhatsAppSwitch
-                    optedIn={settings.whatsapp}
-                    label={WHATSAPP_CONSENT_LABEL}
-                    language={settings.language}
-                  />
-                )}
-                {settings === null ? null : <MessageLanguageChoice language={settings.language} />}
-                <p className="acct-fineprint">
-                  The big moments — a team buys you, you are named captain, you are in a lineup —
-                  always land in <Link href="/inbox">your notifications</Link> too. We never sell
-                  your number or use it for marketing. Reply <strong>STOP</strong> to any text to
-                  stop them all, <strong>START</strong> to turn them back on.
-                </p>
-              </SectionCard>
+                    <span className="acct-always-tag">Always on</span>
+                  </div>
+                  {settings === null ? null : <NotificationSwitches settings={settings} />}
+                  {settings === null ? null : (
+                    <WhatsAppSwitch
+                      optedIn={settings.whatsapp}
+                      label={WHATSAPP_CONSENT_LABEL}
+                      language={settings.language}
+                    />
+                  )}
+                  {settings === null ? null : (
+                    <MessageLanguageChoice language={settings.language} />
+                  )}
+                  <p className="acct-fineprint">
+                    The big moments — a team buys you, you are named captain, you are in a lineup —
+                    always land in <Link href="/inbox">your notifications</Link> too. We never sell
+                    your number or use it for marketing. Reply <strong>STOP</strong> to any text to
+                    stop them all, <strong>START</strong> to turn them back on.
+                  </p>
+                </SectionCard>
 
-              {/*
+                {/*
                 YOUR DATA — the deletion path the product did not have. A manual,
                 staffed process is defensible at beta scale. An undiscoverable one
                 is not. This is the discoverable one.
               */}
-              <SectionCard
-                id="data"
-                icon={<IconShieldCheck />}
-                tone="red"
-                title="Privacy & data"
-                description="Ask us to delete your account. Your own profile is deleted; shared records — an auction you bid in, a receipt issued to you — keep the history but lose your name and number."
-                className="acct-card"
-                data-testid="your-data-panel"
-              >
-                <ErasurePanel request={erasure} />
-                <p className="acct-fineprint">
-                  Or email{" "}
-                  <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
-                    privacy@desiauction.in
-                  </a>{" "}
-                  from this account, or <Link href="/support">raise it through support</Link>. We
-                  reply within seven days either way.{" "}
-                  <Link href="/legal/data-retention">Data Retention policy</Link>
-                  {" · "}
-                  <Link href="/legal/privacy">Privacy Policy</Link>
-                </p>
-              </SectionCard>
+                <SectionCard
+                  id="data"
+                  icon={<IconShieldCheck />}
+                  tone="red"
+                  title="Privacy & data"
+                  description="Ask us to delete your account. Your own profile is deleted; shared records — an auction you bid in, a receipt issued to you — keep the history but lose your name and number."
+                  className="acct-card"
+                  data-testid="your-data-panel"
+                >
+                  <ErasurePanel request={erasure} />
+                  <p className="acct-fineprint">
+                    Or email{" "}
+                    <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
+                      privacy@desiauction.in
+                    </a>{" "}
+                    from this account, or <Link href="/support">raise it through support</Link>. We
+                    reply within seven days either way.{" "}
+                    <Link href="/legal/data-retention">Data Retention policy</Link>
+                    {" · "}
+                    <Link href="/legal/privacy">Privacy Policy</Link>
+                  </p>
+                </SectionCard>
+              </div>
             </div>
           </div>
         </main>

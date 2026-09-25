@@ -86,11 +86,16 @@ export default async function InboxPage() {
         description={
           events.length === 0
             ? "Registration decisions, auction results and account alerts land here."
-            : `${String(events.length)} ${events.length === 1 ? "notice" : "notices"} · newest first · marked read as you open this page`
+            : `${String(events.length)} ${events.length === 1 ? "notice" : "notices"} · newest first`
         }
         action={
-          <Link href="/account#notifications" className="inbox-settings">
-            <IconCog size={16} aria-hidden /> Notification settings
+          <Link
+            href="/account#notifications"
+            className="inbox-settings"
+            aria-label="Notification settings"
+          >
+            <IconCog size={16} aria-hidden />
+            <span className="inbox-settings-text">Notification settings</span>
           </Link>
         }
         flush={events.length > 0}
