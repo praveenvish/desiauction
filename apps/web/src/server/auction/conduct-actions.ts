@@ -15,6 +15,7 @@ import { competitions, lots, organizations, teams, withTenantDb, type Db } from 
 import { asc, eq } from "drizzle-orm";
 
 import { dbHandle, systemDb } from "../db";
+import { ledgerRowMatches, type LedgerFilter } from "../../lib/ledger-filter";
 import { storage } from "../media";
 import { engineWsUrl } from "./engine-client";
 import { fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-reads";
@@ -340,6 +341,10 @@ export interface LedgerView {
   rows: readonly AuctionLedgerRow[];
   /** Every row the fold produced; `rows` is the current page (DA-30). */
   totalRows: number;
+  /** The filter this page was read with — the caller's, or the default below. */
+  filter: LedgerFilter;
+  /** Rows the filter kept, across every page. */
+  filteredRows: number;
   page: number;
   totalPages: number;
   generationMs: number;
@@ -360,7 +365,12 @@ export interface LedgerView {
  * Not exported: a "use server" module may only export async functions. */
 const LEDGER_PAGE_SIZE = 100;
 
-export async function ledgerView(slug: string, page = 1): Promise<LedgerView | null> {
+export async function ledgerView(
+  slug: string,
+  page = 1,
+  /** null = no choice made: a finished auction opens on its results, a live one on everything. */
+  requested: LedgerFilter | null = null,
+): Promise<LedgerView | null> {
   const gate = await liveGate(slug);
   if (gate === null || !gate.canConduct) {
     return null;
@@ -386,14 +396,25 @@ export async function ledgerView(slug: string, page = 1): Promise<LedgerView | n
   // The fold stays whole — the ledger's guarantee is that it regenerates from
   // the event log — and only the RENDER is bounded. A 500-lot auction would
   // otherwise ship several megabytes to a browser that shows thirty rows.
-  const totalPages = Math.max(1, Math.ceil(all.length / LEDGER_PAGE_SIZE));
+  // The filter chooses which rows are PAGED, never which are folded.
+  const filter =
+    requested ??
+    (gate.auction.status === "completed" ||
+    gate.auction.status === "reconciled" ||
+    gate.auction.status === "abandoned"
+      ? "results"
+      : "all");
+  const kept = filter === "all" ? all : all.filter((row) => ledgerRowMatches(filter, row.result));
+  const totalPages = Math.max(1, Math.ceil(kept.length / LEDGER_PAGE_SIZE));
   const current = Math.min(Math.max(1, page), totalPages);
   const offset = (current - 1) * LEDGER_PAGE_SIZE;
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionName: gate.auction.name,
-    rows: all.slice(offset, offset + LEDGER_PAGE_SIZE),
+    rows: kept.slice(offset, offset + LEDGER_PAGE_SIZE),
     totalRows: all.length,
+    filter,
+    filteredRows: kept.length,
     page: current,
     totalPages,
     generationMs: performance.now() - start,

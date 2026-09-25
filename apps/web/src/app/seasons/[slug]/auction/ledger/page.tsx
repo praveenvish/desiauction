@@ -2,11 +2,13 @@ import { ButtonLink, PlayerImage } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { ledgerView } from "../../../../../server/auction/conduct-actions";
+import { parseLedgerFilter } from "../../../../../lib/ledger-filter";
 import { formatTime } from "../../../../../lib/format-date";
 import { moneyFormat } from "../../../../../lib/money";
 import { seasonUnit } from "../../../../../server/competition/season-unit";
 import "../../../seasons.css";
 import "../auction.css";
+import { LedgerFilters } from "./ledger-filters";
 
 export const metadata = { title: "Auction ledger · DesiAuction" };
 
@@ -33,15 +35,23 @@ export default async function LedgerPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; filter?: string }>;
 }) {
   const { slug } = await params;
-  const { page } = await searchParams;
-  const view = await ledgerView(slug, Number(page ?? "1") || 1);
+  const { page, filter } = await searchParams;
+  const view = await ledgerView(slug, Number(page ?? "1") || 1, parseLedgerFilter(filter));
   if (view === null) {
     notFound();
   }
   const money = moneyFormat(await seasonUnit(slug));
+  // The pager keeps the reader's chosen filter (raw — an absent one stays absent
+  // so it keeps following the default).
+  const rawFilter = parseLedgerFilter(filter);
+  const pageHref = (n: number) =>
+    `/seasons/${slug}/auction/ledger?${new URLSearchParams({
+      ...(rawFilter !== null ? { filter: rawFilter } : {}),
+      page: String(n),
+    }).toString()}`;
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
@@ -57,9 +67,11 @@ export default async function LedgerPage({
             </ButtonLink>
           </div>
           <p className="competitions-hint" data-testid="ledger-meta">
-            {view.auctionName} · {view.totalRows} rows · regenerated from the event log in{" "}
-            {view.generationMs.toFixed(1)} ms · immutable, append-only
+            {view.auctionName} · {view.totalRows} rows
+            {view.filter === "all" ? "" : ` (${String(view.filteredRows)} shown)`} · regenerated
+            from the event log in {view.generationMs.toFixed(1)} ms · immutable, append-only
           </p>
+          <LedgerFilters raw={parseLedgerFilter(filter) ?? ""} active={view.filter} />
         </header>
         <div className="table-scroll">
           <table className="reg-table" data-testid="ledger-table">
@@ -67,17 +79,28 @@ export default async function LedgerPage({
               <tr>
                 <th>#</th>
                 <th>Time</th>
-                <th>Actor</th>
-                <th>Paddle</th>
+                <th className="ledger-col-minor">Actor</th>
+                <th className="ledger-col-minor">Paddle</th>
                 <th>Team</th>
                 <th>Lot</th>
                 <th>Bid</th>
                 <th>Result</th>
-                <th>Reason</th>
-                <th>Correlation</th>
+                <th className="ledger-col-minor">Reason</th>
+                <th className="ledger-col-minor">Correlation</th>
               </tr>
             </thead>
             <tbody>
+              {view.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={10} data-testid="ledger-empty">
+                    {view.filter === "bids"
+                      ? "No bids yet."
+                      : view.filter === "results"
+                        ? "No results yet — the first sale will land here."
+                        : "Nothing on the record yet."}
+                  </td>
+                </tr>
+              ) : null}
               {view.rows.map((row) => (
                 /* `.reg-table` hides its `thead` below 1100px and restores the
                    headings through `td::before { content: attr(data-label) }`
@@ -87,8 +110,12 @@ export default async function LedgerPage({
                 <tr key={row.seq} data-testid={`ledger-row-${String(row.seq)}`}>
                   <td data-label="#">{row.seq}</td>
                   <td data-label="Time">{formatTime(row.atMs)}</td>
-                  <td data-label="Actor">{row.actorName}</td>
-                  <td data-label="Paddle">{row.paddleNumber ?? "—"}</td>
+                  <td data-label="Actor" className="ledger-col-minor">
+                    {row.actorName}
+                  </td>
+                  <td data-label="Paddle" className="ledger-col-minor">
+                    {row.paddleNumber ?? "—"}
+                  </td>
                   <td data-label="Team">{row.teamName ?? "—"}</td>
                   <td data-label="Lot">
                     {row.lotNumber !== null ? (
@@ -111,8 +138,14 @@ export default async function LedgerPage({
                   <td data-label="Result" className={resultClass(row.result)}>
                     {row.result}
                   </td>
-                  <td data-label="Reason">{row.reason ?? "—"}</td>
-                  <td data-label="Correlation" title={row.correlationId}>
+                  <td data-label="Reason" className="ledger-col-minor">
+                    {row.reason ?? "—"}
+                  </td>
+                  <td
+                    data-label="Correlation"
+                    className="ledger-col-minor"
+                    title={row.correlationId}
+                  >
                     {row.correlationId.slice(-6)}
                   </td>
                 </tr>
@@ -127,10 +160,7 @@ export default async function LedgerPage({
         {view.totalPages > 1 ? (
           <nav className="pager" aria-label="Ledger pages">
             {view.page > 1 ? (
-              <ButtonLink
-                href={`/seasons/${slug}/auction/ledger?page=${String(view.page - 1)}`}
-                variant="ghost"
-              >
+              <ButtonLink href={pageHref(view.page - 1)} variant="ghost">
                 Previous
               </ButtonLink>
             ) : (
@@ -140,10 +170,7 @@ export default async function LedgerPage({
               Page {view.page} of {view.totalPages}
             </span>
             {view.page < view.totalPages ? (
-              <ButtonLink
-                href={`/seasons/${slug}/auction/ledger?page=${String(view.page + 1)}`}
-                variant="ghost"
-              >
+              <ButtonLink href={pageHref(view.page + 1)} variant="ghost">
                 Next
               </ButtonLink>
             ) : (
