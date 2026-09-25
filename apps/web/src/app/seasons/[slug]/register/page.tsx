@@ -7,15 +7,7 @@ import {
   roleLabelIn,
   sportPackFor,
 } from "@desiauction/core";
-import {
-  Badge,
-  ButtonLink,
-  Card,
-  IconArrowRight,
-  IconCamera,
-  IconLock,
-  IconUsers,
-} from "@desiauction/ui";
+import { Badge, ButtonLink, Card, IconCamera, IconLock, IconUsers } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -24,14 +16,24 @@ import { cache, type ReactNode } from "react";
 import { env } from "../../../../env";
 import { currentSession } from "../../../../server/auth/actions";
 import { ownPhotoUrl, playerProfileFor, sportProfileFor } from "../../../../server/player/profile";
-import { registrationLanding, registrationPreview } from "../../../../server/competition/actions";
+import {
+  registrationLanding,
+  registrationPreview,
+  type RegistrationPreview,
+} from "../../../../server/competition/actions";
 import { notificationSettings } from "../../../../server/messaging/actions";
-import { myAuctionOutcome, publicCompetitionView } from "../../../../server/competition/public";
+import {
+  myAuctionOutcome,
+  publicCompetitionView,
+  publicTopBuys,
+} from "../../../../server/competition/public";
+import { TopBuysPodium } from "../../../c/top-buys";
 import { SHARE_IMAGE_SIZE } from "../../../c/[slug]/share-image-card";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
 import { dateRange } from "../../../tournaments/season-card";
 import { RegisterFlow } from "./register-flow";
 import { RegistrationStatus } from "./registration-status";
+import { VerifyStep } from "./verify-step";
 import "../../seasons.css";
 import "./register.css";
 
@@ -76,21 +78,24 @@ async function ClosedNotice({
   const view = await seasonView(slug);
   const done = view !== null && FINISHED_AUCTION.has(view.auctionStatus ?? "");
   if (done) {
+    // Here's how it ended: the podium, not just a sentence and two buttons.
+    const buys = await publicTopBuys(slug);
     return (
-      <>
-        <p role="alert" data-testid="registration-closed">
-          Registration for <strong>{season}</strong> is closed — the auction is done and the squads
-          are set.
+      <div className="reg-closed">
+        <p role="alert" data-testid="registration-closed" className="reg-closed-line">
+          Registration for <strong>{season}</strong> is closed — the auction is done. Here&apos;s
+          how it ended.
         </p>
-        <p className="register-hint reg-closed-actions">
+        {buys.length > 0 ? <TopBuysPodium slug={slug} buys={buys} unit={view.auctionUnit} /> : null}
+        <p className="reg-closed-actions">
           <ButtonLink href={`/c/${slug}#players-heading`} data-testid="registration-closed-squads">
             See the squads
           </ButtonLink>
           <ButtonLink href="/c" variant="secondary">
-            Find a tournament that&apos;s open
+            Find an open tournament
           </ButtonLink>
         </p>
-      </>
+      </div>
     );
   }
   return (
@@ -156,25 +161,102 @@ function seasonMeta(
   return parts.length === 0 ? null : parts.join(" · ");
 }
 
-/** One frame for every state of the page: kicker, the season's name, its line. */
+/**
+ * WHAT THE SEASON ASKS FOR, BESIDE THE FORM THAT ASKS IT.
+ *
+ * It was the whole signed-out card, above a button that left for /login. Now
+ * the form is on this page, so this is context: on a laptop a column beside
+ * the wizard, on a phone one line above it (the full list would push the first
+ * field below the fold). Both render; `display:none` keeps exactly one in the
+ * accessibility tree at any width.
+ */
+function SeasonSummary({
+  entryCategory,
+  open,
+}: {
+  entryCategory: RegistrationPreview["entryCategory"];
+  open: boolean;
+}) {
+  return (
+    <aside className="reg-season" aria-label="About this registration">
+      <div className="reg-preview-lede">
+        {open ? <Badge tone="success">Registration open</Badge> : null}
+        {/* PI-1: the category, before anyone signs in — a mismatch should
+            never be discovered after a code. */}
+        {entryCategory !== "open" ? (
+          <Badge tone="info" data-testid="register-category">
+            {entryCategoryLabel(entryCategory)} season
+          </Badge>
+        ) : null}
+      </div>
+      <p className="reg-preview-pitch">
+        Join the player pool — on auction day, team owners bid to sign you.
+      </p>
+      <p className="reg-needs-line">
+        You&apos;ll need your name, a photo if you like, your mobile and how you play — about a
+        minute.
+      </p>
+      <div className="reg-needs-block">
+        <h2 className="reg-preview-head">What you&apos;ll need</h2>
+        <ul className="reg-needs">
+          <li>
+            <IconCamera size={20} />
+            <span>
+              <strong>Your name and a photo</strong>
+              <span>Photo optional — both appear on the season&apos;s public page</span>
+            </span>
+          </li>
+          <li>
+            <IconLock size={20} />
+            <span>
+              <strong>Your mobile number</strong>
+              <span>For the organizer only — never published</span>
+            </span>
+          </li>
+          <li>
+            <IconUsers size={20} />
+            <span>
+              <strong>How you play</strong>
+              <span>Your role; age and styles if you like</span>
+            </span>
+          </li>
+        </ul>
+        <p className="reg-preview-foot">
+          Nothing is submitted until you confirm, and you can withdraw any time.{" "}
+          <Link href="/help/whats-public">What&apos;s public about you</Link>
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+/**
+ * One frame for every state of the page: kicker, the season's name, its line.
+ * With an `aside` it becomes the two-column sheet — the season's summary on
+ * the left, the wizard on the right — so the page a visitor verifies on is the
+ * page they finish on.
+ */
 function RegisterFrame({
   season,
   meta,
+  aside,
   children,
 }: {
   season: string | null;
   meta: string | null;
+  aside?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <main className="register">
-      <div className="register-panel">
+      <div className="register-panel" data-layout={aside === undefined ? "single" : "sheet"}>
         <header className="reg-hero">
           <p className="reg-kicker">Player registration</p>
           <h1>{season ?? "Player registration"}</h1>
           {meta !== null ? <p className="reg-meta">{meta}</p> : null}
         </header>
-        {children}
+        {aside}
+        <div className="reg-main">{children}</div>
       </div>
     </main>
   );
@@ -212,76 +294,33 @@ export default async function RegisterPage({
     if (preview === null) {
       redirect(`/login?next=${encodeURIComponent(here)}`);
     }
-    /*
-     * The button names the door it opens. It promised "Verify my mobile" while
-     * /login opened on EMAIL (LOGIN_DEFAULT_METHOD, until SMS is live) — the
-     * first thing a player met after the promise was a field for something
-     * else. The mobile number is still asked for, inside the wizard.
-     */
-    const byEmail = env.LOGIN_DEFAULT_METHOD === "email";
-    return (
-      <RegisterFrame season={preview.competitionName} meta={seasonMeta(preview)}>
-        <Card data-testid="register-preview" className="reg-preview" elevation="floating">
-          {preview.open ? (
-            <>
-              <div className="reg-preview-lede">
-                <Badge tone="success">Registration open</Badge>
-                {/* PI-1: the category, before anyone signs in — a mismatch
-                    should never be discovered after a code. */}
-                {preview.entryCategory !== "open" ? (
-                  <Badge tone="info" data-testid="register-category">
-                    {entryCategoryLabel(preview.entryCategory)} season
-                  </Badge>
-                ) : null}
-              </div>
-              <p className="reg-preview-pitch">
-                Join the player pool — on auction day, team owners bid to sign you.
-              </p>
-              <h2 className="reg-preview-head">What you&apos;ll need</h2>
-              <ul className="reg-needs">
-                <li>
-                  <IconCamera size={20} />
-                  <span>
-                    <strong>Your name and a photo</strong>
-                    <span>Photo optional — both appear on the season&apos;s public page</span>
-                  </span>
-                </li>
-                <li>
-                  <IconLock size={20} />
-                  <span>
-                    <strong>Your mobile number</strong>
-                    <span>For the organizer only — never published</span>
-                  </span>
-                </li>
-                <li>
-                  <IconUsers size={20} />
-                  <span>
-                    <strong>How you play</strong>
-                    <span>Your role; age and styles if you like</span>
-                  </span>
-                </li>
-              </ul>
-              <ButtonLink
-                href={`/login?next=${encodeURIComponent(here)}`}
-                size="lg"
-                className="reg-preview-cta"
-                data-testid="register-verify-cta"
-              >
-                {byEmail ? "Continue with email" : "Continue with your mobile"}
-                <IconArrowRight size={18} />
-              </ButtonLink>
-              <p className="reg-preview-foot">
-                {byEmail
-                  ? "We'll email you a one-time code — no password. "
-                  : "We'll text you a one-time code — no password. "}
-                Nothing is submitted until you confirm, and you can withdraw any time.{" "}
-                <Link href="/help/whats-public">What&apos;s public about you</Link>
-              </p>
-            </>
-          ) : (
-            // A preview exists only for a published season, so it is listed.
+    if (!preview.open) {
+      return (
+        <RegisterFrame season={preview.competitionName} meta={seasonMeta(preview)}>
+          <Card data-testid="register-preview" className="reg-preview" elevation="floating">
+            {/* A preview exists only for a published season, so it is listed. */}
             <ClosedNotice slug={slug} season={preview.competitionName} listed />
-          )}
+          </Card>
+        </RegisterFrame>
+      );
+    }
+    /*
+     * INLINE VERIFICATION (wow pass, founder-approved). The share link used to
+     * end in a button to /login and a hope that the visitor found their way
+     * back. The code is now step 1 of this page's own wizard, posting to the
+     * same server actions /login uses with `next` = this URL (ref included),
+     * so the session, the rate limits and the terms consent are exactly
+     * /login's. The door opens on LOGIN_DEFAULT_METHOD — email until SMS is
+     * live — and the other one is a tap away.
+     */
+    return (
+      <RegisterFrame
+        season={preview.competitionName}
+        meta={seasonMeta(preview)}
+        aside={<SeasonSummary entryCategory={preview.entryCategory} open />}
+      >
+        <Card data-testid="register-preview" className="reg-card" elevation="floating">
+          <VerifyStep next={here} defaultMethod={env.LOGIN_DEFAULT_METHOD} />
         </Card>
       </RegisterFrame>
     );
@@ -372,8 +411,15 @@ export default async function RegisterPage({
     notificationSettings(),
   ]);
   return (
-    <RegisterFrame season={landing.competitionName} meta={meta}>
+    <RegisterFrame
+      season={landing.competitionName}
+      meta={meta}
+      {...(preview === null
+        ? {}
+        : { aside: <SeasonSummary entryCategory={preview.entryCategory} open /> })}
+    >
       <RegisterFlow
+        verifiedLead
         slug={slug}
         competitionName={landing.competitionName}
         listed={landing.listed}

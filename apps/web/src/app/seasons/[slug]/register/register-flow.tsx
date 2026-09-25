@@ -1,16 +1,7 @@
 "use client";
 
 import { isMinor, type AttributeOption } from "@desiauction/core";
-import {
-  Button,
-  Card,
-  Field,
-  IconCheck,
-  IconEye,
-  PlayerImage,
-  Select,
-  VisuallyHidden,
-} from "@desiauction/ui";
+import { Button, Card, Field, IconCheck, IconEye, PlayerImage, Select } from "@desiauction/ui";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { formatDate } from "../../../../lib/format-date";
@@ -26,6 +17,7 @@ import { track } from "../../../../lib/telemetry";
 import { updateProfileAction } from "../../../../server/auth/actions";
 import { submitRegistrationAction } from "../../../../server/competition/actions";
 import { AddPhoneStep } from "./add-phone-step";
+import { RegStepper } from "./reg-stepper";
 import { RegistrationStatus } from "./registration-status";
 import { SelfPhotoUploader } from "./self-photo-uploader";
 
@@ -177,7 +169,13 @@ export function RegisterFlow({
   attributes,
   profileDefaults,
   initialLanguage = "en",
+  verifiedLead = false,
 }: {
+  /**
+   * Lead the progress row with a ticked "Verified" — the step a signed-out
+   * visitor completed inline on this page before the rest of the wizard.
+   */
+  verifiedLead?: boolean;
   slug: string;
   competitionName: string;
   /** The season is published — the confirmation links its public page. */
@@ -474,21 +472,10 @@ export function RegisterFlow({
 
   return (
     <Card data-testid="register-card" className="reg-card" elevation="floating">
-      <ol className="reg-stepper" aria-label="Registration progress">
-        {steps.map((entry, index) => (
-          <li
-            key={entry}
-            className={`reg-stepper-item ${index === stepIndex ? "is-current" : index < stepIndex ? "is-done" : ""}`}
-            aria-current={index === stepIndex ? "step" : undefined}
-          >
-            <span className="reg-stepper-dot" aria-hidden>
-              {index < stepIndex ? <IconCheck size={14} /> : index + 1}
-            </span>
-            <span className="reg-stepper-label">{STEP_LABEL[entry]}</span>
-            {index < stepIndex ? <VisuallyHidden>, done</VisuallyHidden> : null}
-          </li>
-        ))}
-      </ol>
+      <RegStepper
+        labels={[...(verifiedLead ? ["Verified"] : []), ...steps.map((entry) => STEP_LABEL[entry])]}
+        current={stepIndex + (verifiedLead ? 1 : 0)}
+      />
 
       {current === "mobile" ? (
         <section className="reg-step" data-testid="register-step-mobile">
@@ -586,7 +573,7 @@ export function RegisterFlow({
                     }}
                   />
                   <span className="reg-chip-mark" aria-hidden>
-                    <IconCheck size={14} />
+                    <IconCheck size={16} />
                   </span>
                   {entry.label}
                 </label>
