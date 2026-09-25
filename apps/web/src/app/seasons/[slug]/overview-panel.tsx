@@ -730,7 +730,7 @@ export function OverviewPanel({
               <Link
                 href={secondary.href}
                 className={buttonClassName({ variant: "secondary" }, "ov-hero-btn")}
-                data-tone="solid"
+                data-tone="glass"
                 data-testid="season-secondary"
               >
                 {secondary.label}
@@ -747,20 +747,26 @@ export function OverviewPanel({
               ) : null}
             </>
           }
+          // The season's road rides the hero's bottom edge (it was a strip of
+          // its own under the hero, repeating the hero's status pill).
+          footer={
+            <div ref={journeyRef}>
+              <VisuallyHidden>
+                <p data-testid="lifecycle-summary">
+                  {activeIndex === -1
+                    ? `All ${steps.length === 5 ? "five" : "six"} steps complete`
+                    : `Step ${String(activeIndex + 1)} of ${String(steps.length)} · ${
+                        steps[activeIndex] ?? ""
+                      }`}
+                </p>
+              </VisuallyHidden>
+              <JourneyStepper variant="rail" steps={journey} linkComponent={Link} />
+            </div>
+          }
         />
       </div>
 
-      <div className="ov-journey" data-testid="lifecycle-panel" ref={journeyRef}>
-        <VisuallyHidden>
-          <p data-testid="lifecycle-summary">
-            {activeIndex === -1
-              ? `All ${steps.length === 5 ? "five" : "six"} steps complete`
-              : `Step ${String(activeIndex + 1)} of ${String(steps.length)} · ${
-                  steps[activeIndex] ?? ""
-                }`}
-          </p>
-        </VisuallyHidden>
-        <JourneyStepper steps={journey} linkComponent={Link} />
+      <div className="ov-journey" data-testid="lifecycle-panel">
         {finished ? (
           <Retrospective view={view} slug={slug} runAgain={runAgainButton(true)} />
         ) : (
@@ -792,7 +798,8 @@ export function OverviewPanel({
       <StatGrid testId="season-figures">
         <StatCard
           icon={<IconUser />}
-          tone="green"
+          concept="players"
+          rolling
           value={view.approvedPlayers}
           label="Approved players"
           {...(approvedHint !== undefined
@@ -804,7 +811,8 @@ export function OverviewPanel({
         {view.auctionStatus === null && view.pendingPlayers > 0 ? (
           <StatCard
             icon={<IconClock />}
-            tone="amber"
+            concept="alert"
+            rolling
             value={view.pendingPlayers}
             label="Awaiting your review"
             href={`/seasons/${slug}/registrations`}
@@ -814,7 +822,8 @@ export function OverviewPanel({
         ) : null}
         <StatCard
           icon={<IconUsers />}
-          tone="red"
+          concept="teams"
+          rolling
           value={view.teamCount}
           label={view.teamCount === 1 ? "Team" : "Teams"}
           testId="overview-teams"
@@ -822,7 +831,8 @@ export function OverviewPanel({
         {view.auctionStatus !== null && view.purseCommitted !== undefined ? (
           <StatCard
             icon={<IconWallet />}
-            tone="amber"
+            concept="money"
+            rolling
             value={points ? money.exact(view.purseCommitted) : money.compact(view.purseCommitted)}
             label="Purse committed"
             {...(view.pursePct !== undefined && view.pursePct !== null
@@ -834,7 +844,7 @@ export function OverviewPanel({
         {view.auctionStatus !== null ? (
           <StatCard
             icon={<IconLayers />}
-            tone="green"
+            concept="auction"
             value={
               <>
                 {view.lotsSold}
