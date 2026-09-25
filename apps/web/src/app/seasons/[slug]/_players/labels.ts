@@ -42,8 +42,14 @@ export const FEE_LABEL: Record<FeeStatus, string> = {
   refunded: "Refunded",
 };
 
+/*
+ * "Not paid" is NEUTRAL, not a warning. Most seasons charge no entry fee, and a
+ * column of forty amber "Not paid" pills on a free league read as forty
+ * problems. Where a season does record fees, the desk says who still owes in
+ * its own figures; the pill is not the alarm.
+ */
 export const FEE_TONE: Record<FeeStatus, "warning" | "success" | "info" | "neutral"> = {
-  pending: "warning",
+  pending: "neutral",
   paid: "success",
   waived: "info",
   refunded: "neutral",

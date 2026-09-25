@@ -8,6 +8,7 @@ import {
   CardGrid,
   Dialog,
   Field,
+  Notice,
   IconAlert,
   IconArrowRight,
   IconBolt,
@@ -539,22 +540,31 @@ export function FixturesPanel({
           ? "publish"
           : "add";
   const noun = isLobby ? "lobby" : "fixture";
+  /*
+   * NOTHING TO SHOW, AND ONE THING IN THE WAY. With no grounds the season
+   * cannot have a match at all, and the page used to say so in one small amber
+   * line under four tiles of zeroes, seven zero filter chips, a search box and
+   * an Export CSV for nothing. The blocker now leads, alone; the instruments
+   * that describe a schedule wait until there is one.
+   */
+  const empty = stats.total === 0 && !filtered;
+  const needsGround = canManage && !isLobby && grounds.length === 0 && stats.total === 0;
 
   /* ---- The generate form: inline while the schedule is empty, else a dialog -- */
   const generateBlocked =
-    !isLobby && (teams.length < 2 || grounds.length === 0) ? (
+    // No grounds and nothing scheduled: the notice at the top of the page
+    // carries that blocker and its door, so it is not said twice here.
+    !isLobby && (teams.length < 2 || (grounds.length === 0 && !needsGround)) ? (
       <div className="fx-blocked" data-testid="generate-blocked">
         <IconAlert size={18} aria-hidden />
         <p className="st-note">
           {teams.length < 2
-            ? `This season has ${teams.length === 0 ? "no" : "one"} team. A round robin needs at least two.`
-            : "This organization has no active grounds yet, so there is nowhere to play."}{" "}
+            ? `This season has ${teams.length === 0 ? "no" : "one"} team. Every team needs someone to play — add at least two.`
+            : "This club has no active grounds yet, so there is nowhere to play."}{" "}
           {teams.length < 2 ? (
             <Link href={`/seasons/${slug}/teams`}>Add teams</Link>
           ) : (
-            <Link href={`/org/${orgSlug}/venues`} data-testid="add-venues-link">
-              Add a venue and its grounds
-            </Link>
+            <Link href={`/org/${orgSlug}/venues`}>Add a venue and its grounds</Link>
           )}
         </p>
       </div>
@@ -991,56 +1001,77 @@ export function FixturesPanel({
         </div>
       </div>
 
+      {needsGround ? (
+        <Notice
+          tone="warning"
+          icon={<IconPin size={20} />}
+          title="Add a ground first — matches are scheduled onto grounds"
+          action={
+            <ButtonLink href={`/org/${orgSlug}/venues`} size="sm" data-testid="add-venues-link">
+              Add a venue
+              <IconArrowRight size={16} aria-hidden />
+            </ButtonLink>
+          }
+          testId="fixtures-needs-ground"
+        >
+          Grounds belong to the club, so one added now is there for every season after this.
+        </Notice>
+      ) : null}
+
+      {/* The wrapper stays whatever is inside it: it is also the page's
+          hydration mark (`data-hydrated`), which the suites wait on. */}
       <div data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
-        <StatGrid>
-          <StatCard
-            icon={<IconCalendar />}
-            tone="gold"
-            value={stats.total}
-            label={isLobby ? "Lobbies" : "Matches"}
-            hint={
-              stats.rounds > 0
-                ? `${String(stats.rounds)} round${stats.rounds === 1 ? "" : "s"}`
-                : stats.total === 0
-                  ? "None scheduled yet"
-                  : "No rounds"
-            }
-            testId="stat-total"
-          />
-          <StatCard
-            icon={<IconCheckCircle />}
-            tone="green"
-            value={stats.completed}
-            label="Played"
-            hint={live > 0 ? `of ${String(live)} on the schedule` : "None yet"}
-            {...(live > 0 ? { progress: (stats.completed / live) * 100 } : {})}
-            testId="stat-completed"
-          />
-          <StatCard
-            icon={<IconClock />}
-            tone="blue"
-            value={upcoming}
-            label="To play"
-            hint={
-              next !== null && next.state === "upcoming" && next.fixture.kickoffAt !== null
-                ? `Next ${formatWallDate(next.fixture.kickoffAt.slice(0, 10))}`
-                : next !== null && next.state === "overdue"
-                  ? "Kickoffs have passed"
-                  : upcoming > 0
-                    ? "Nothing dated ahead"
-                    : "Nothing to play"
-            }
-            testId="stat-upcoming"
-          />
-          <StatCard
-            icon={<IconPin />}
-            tone="purple"
-            value={stats.venues}
-            label={stats.venues === 1 ? "Venue" : "Venues"}
-            hint={`${String(stats.grounds)} ${terms.ground.toLowerCase()}${stats.grounds === 1 ? "" : "s"} in use`}
-            testId="stat-venues"
-          />
-        </StatGrid>
+        {empty ? null : (
+          <StatGrid>
+            <StatCard
+              icon={<IconCalendar />}
+              tone="gold"
+              value={stats.total}
+              label={isLobby ? "Lobbies" : "Matches"}
+              hint={
+                stats.rounds > 0
+                  ? `${String(stats.rounds)} round${stats.rounds === 1 ? "" : "s"}`
+                  : stats.total === 0
+                    ? "None scheduled yet"
+                    : "No rounds"
+              }
+              testId="stat-total"
+            />
+            <StatCard
+              icon={<IconCheckCircle />}
+              tone="green"
+              value={stats.completed}
+              label="Played"
+              hint={live > 0 ? `of ${String(live)} on the schedule` : "None yet"}
+              {...(live > 0 ? { progress: (stats.completed / live) * 100 } : {})}
+              testId="stat-completed"
+            />
+            <StatCard
+              icon={<IconClock />}
+              tone="blue"
+              value={upcoming}
+              label="To play"
+              hint={
+                next !== null && next.state === "upcoming" && next.fixture.kickoffAt !== null
+                  ? `Next ${formatWallDate(next.fixture.kickoffAt.slice(0, 10))}`
+                  : next !== null && next.state === "overdue"
+                    ? "Kickoffs have passed"
+                    : upcoming > 0
+                      ? "Nothing dated ahead"
+                      : "Nothing to play"
+              }
+              testId="stat-upcoming"
+            />
+            <StatCard
+              icon={<IconPin />}
+              tone="purple"
+              value={stats.venues}
+              label={stats.venues === 1 ? "Venue" : "Venues"}
+              hint={`${String(stats.grounds)} ${terms.ground.toLowerCase()}${stats.grounds === 1 ? "" : "s"} in use`}
+              testId="stat-venues"
+            />
+          </StatGrid>
+        )}
       </div>
 
       {conflicts.length > 0 ? (
@@ -1086,7 +1117,7 @@ export function FixturesPanel({
         <SectionCard
           icon={<IconSpark />}
           title="Generate fixtures"
-          description="Deterministic round robin over this season's teams — same inputs, same schedule, every time. Home and away are shared out evenly."
+          description="Every team plays every other team. Home and away are shared out evenly."
           data-testid="generate-panel"
         >
           {generateForm}
@@ -1375,15 +1406,18 @@ export function FixturesPanel({
         action={
           canManage ? (
             <>
-              <Button
-                size="sm"
-                variant="secondary"
-                data-testid="export-csv"
-                onClick={() => void doExport()}
-              >
-                <IconDownload size={16} aria-hidden />
-                Export CSV
-              </Button>
+              {/* Nothing to export from an empty schedule. */}
+              {empty ? null : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  data-testid="export-csv"
+                  onClick={() => void doExport()}
+                >
+                  <IconDownload size={16} aria-hidden />
+                  Export CSV
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="secondary"
@@ -1400,114 +1434,120 @@ export function FixturesPanel({
         }
         data-testid="schedule-card"
       >
-        <ul className="st-chips" aria-label="Filter by status">
-          <li>
-            <button
-              type="button"
-              className="st-chip"
-              aria-pressed={filters.status === ""}
-              onClick={() => {
-                pushQuery({ status: "", page: "1" });
-              }}
-            >
-              All <span className="st-chip-count">{stats.total}</span>
-            </button>
-          </li>
-          {STATUS_CHIPS.filter((chip) => canManage || chip.managerOnly !== true).map((chip) => (
-            <li key={chip.status}>
-              <button
-                type="button"
-                className="st-chip"
-                aria-pressed={filters.status === chip.status}
-                onClick={() => {
-                  pushQuery({
-                    status: filters.status === chip.status ? "" : chip.status,
-                    page: "1",
-                  });
-                }}
-                data-testid={chip.testId}
-              >
-                {chip.label} <span className="st-chip-count">{stats[chip.key]}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <form
-          className="st-toolbar"
-          role="search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            pushQuery({ q: search, page: "1" });
-          }}
-        >
-          <label className="st-search">
-            <IconSearch size={18} aria-hidden />
-            <span className="st-sr">Search by fixture number</span>
-            <input
-              name="q"
-              type="search"
-              placeholder="Fixture number"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-              }}
-            />
-            <button type="submit" data-testid="search-submit">
-              Search
-            </button>
-          </label>
-          <select
-            className="st-select"
-            aria-label="Team"
-            name="team"
-            value={filters.team}
-            data-active={filters.team !== "" ? "true" : undefined}
-            onChange={(event) => {
-              pushQuery({ team: event.target.value, page: "1" });
-            }}
-          >
-            <option value="">All teams</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
-          {grounds.length > 0 ? (
-            <select
-              className="st-select"
-              aria-label={terms.ground}
-              name="ground"
-              value={filters.ground}
-              data-active={filters.ground !== "" ? "true" : undefined}
-              onChange={(event) => {
-                pushQuery({ ground: event.target.value, page: "1" });
-              }}
-            >
-              <option value="">All {terms.ground.toLowerCase()}s</option>
-              {grounds.map((ground) => (
-                <option key={ground.id} value={ground.id}>
-                  {ground.venueName} · {ground.name}
-                </option>
+        {/* Seven chips reading 0 and a search box over nothing are furniture;
+            they arrive with the first match. */}
+        {empty ? null : (
+          <>
+            <ul className="st-chips" aria-label="Filter by status">
+              <li>
+                <button
+                  type="button"
+                  className="st-chip"
+                  aria-pressed={filters.status === ""}
+                  onClick={() => {
+                    pushQuery({ status: "", page: "1" });
+                  }}
+                >
+                  All <span className="st-chip-count">{stats.total}</span>
+                </button>
+              </li>
+              {STATUS_CHIPS.filter((chip) => canManage || chip.managerOnly !== true).map((chip) => (
+                <li key={chip.status}>
+                  <button
+                    type="button"
+                    className="st-chip"
+                    aria-pressed={filters.status === chip.status}
+                    onClick={() => {
+                      pushQuery({
+                        status: filters.status === chip.status ? "" : chip.status,
+                        page: "1",
+                      });
+                    }}
+                    data-testid={chip.testId}
+                  >
+                    {chip.label} <span className="st-chip-count">{stats[chip.key]}</span>
+                  </button>
+                </li>
               ))}
-            </select>
-          ) : null}
-          <select
-            className="st-select"
-            aria-label="Sort"
-            name="sort"
-            value={filters.sort}
-            onChange={(event) => {
-              pushQuery({ sort: event.target.value, page: "1" });
-            }}
-          >
-            {SORTS.map((sort) => (
-              <option key={sort.value} value={sort.value}>
-                {sort.label}
-              </option>
-            ))}
-          </select>
-        </form>
+            </ul>
+            <form
+              className="st-toolbar"
+              role="search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                pushQuery({ q: search, page: "1" });
+              }}
+            >
+              <label className="st-search">
+                <IconSearch size={18} aria-hidden />
+                <span className="st-sr">Search by fixture number</span>
+                <input
+                  name="q"
+                  type="search"
+                  placeholder="Fixture number"
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                  }}
+                />
+                <button type="submit" data-testid="search-submit">
+                  Search
+                </button>
+              </label>
+              <select
+                className="st-select"
+                aria-label="Team"
+                name="team"
+                value={filters.team}
+                data-active={filters.team !== "" ? "true" : undefined}
+                onChange={(event) => {
+                  pushQuery({ team: event.target.value, page: "1" });
+                }}
+              >
+                <option value="">All teams</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              {grounds.length > 0 ? (
+                <select
+                  className="st-select"
+                  aria-label={terms.ground}
+                  name="ground"
+                  value={filters.ground}
+                  data-active={filters.ground !== "" ? "true" : undefined}
+                  onChange={(event) => {
+                    pushQuery({ ground: event.target.value, page: "1" });
+                  }}
+                >
+                  <option value="">All {terms.ground.toLowerCase()}s</option>
+                  {grounds.map((ground) => (
+                    <option key={ground.id} value={ground.id}>
+                      {ground.venueName} · {ground.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <select
+                className="st-select"
+                aria-label="Sort"
+                name="sort"
+                value={filters.sort}
+                onChange={(event) => {
+                  pushQuery({ sort: event.target.value, page: "1" });
+                }}
+              >
+                {SORTS.map((sort) => (
+                  <option key={sort.value} value={sort.value}>
+                    {sort.label}
+                  </option>
+                ))}
+              </select>
+            </form>
+          </>
+        )}
         <div className="st-table-wrap">
           <table className="st-table fx-table" data-stack="" data-testid="fixtures-table">
             <caption>

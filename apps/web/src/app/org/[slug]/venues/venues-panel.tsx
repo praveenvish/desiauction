@@ -98,7 +98,8 @@ export function VenuesPanel({
       {venues.length === 0 ? (
         <Card>
           <p className="competitions-hint" data-testid="venues-empty">
-            No venues yet. A venue holds one or more grounds; fixtures are scheduled onto grounds.
+            This club has no grounds yet. Add a venue, then its grounds — matches are scheduled onto
+            grounds.
           </p>
         </Card>
       ) : (
@@ -185,7 +186,7 @@ export function VenuesPanel({
                     onChange={(event) => {
                       setGroundName(event.target.value);
                     }}
-                    placeholder="Main Oval"
+                    placeholder="e.g. Main Oval"
                   />
                   <div className="date-row">
                     <Select
@@ -209,7 +210,7 @@ export function VenuesPanel({
                       onChange={(event) => {
                         setGroundCapacity(event.target.value);
                       }}
-                      placeholder="500"
+                      placeholder="e.g. 500"
                     />
                   </div>
                   <div className="date-row">
@@ -281,7 +282,7 @@ export function VenuesPanel({
               onChange={(event) => {
                 setVenueName(event.target.value);
               }}
-              placeholder="Azad Maidan"
+              placeholder="e.g. Azad Maidan"
             />
             <div className="date-row">
               <Field
@@ -291,7 +292,7 @@ export function VenuesPanel({
                 onChange={(event) => {
                   setVenueAddress(event.target.value);
                 }}
-                placeholder="Mahapalika Marg"
+                placeholder="e.g. Mahapalika Marg"
               />
               <Field
                 label="City"
@@ -300,7 +301,7 @@ export function VenuesPanel({
                 onChange={(event) => {
                   setVenueCity(event.target.value);
                 }}
-                placeholder="Mumbai"
+                placeholder="e.g. Mumbai"
               />
             </div>
             <Button

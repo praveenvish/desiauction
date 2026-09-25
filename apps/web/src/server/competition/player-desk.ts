@@ -21,6 +21,8 @@ export interface PlayerDeskContext {
   auctionExists: boolean;
   /** The auction has left `scheduled`: pool, marks, role and band are frozen. */
   rosterLocked: boolean;
+  /** The auction has been run (completed / reconciled): no team now means unsold. */
+  auctionDone: boolean;
   bands: readonly string[];
   roles: readonly { key: string; label: string }[];
   rolesRequired: boolean;
@@ -46,6 +48,8 @@ export async function playerDeskContext(
     canManageTeams,
     auctionExists: auction !== null && auction.status !== "abandoned",
     rosterLocked: auction !== null && auction.status !== "scheduled",
+    auctionDone:
+      auction !== null && (auction.status === "completed" || auction.status === "reconciled"),
     bands: Object.keys(auction?.config.basePriceBands ?? DEFAULT_AUCTION_CONFIG.basePriceBands),
     roles: pack.roles.values.map((value) => ({ key: value.key, label: value.label })),
     rolesRequired: pack.roles.required,

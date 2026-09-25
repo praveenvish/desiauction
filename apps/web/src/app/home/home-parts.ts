@@ -62,7 +62,16 @@ export function statusLabel(status: string): string {
  * settlement CASE's answer and outranks the competition status — the same
  * precedence the lifecycle rail below already applies.
  */
-export function seasonBadge(row: { status: string; settlement: "settling" | "settled" | null }): {
+export function seasonBadge(row: {
+  status: string;
+  settlement: "settling" | "settled" | null;
+  /**
+   * The auction has been run. The competition status stops at
+   * `registration_closed`, so without this a season with its squads picked
+   * read "Reg closed" here while its overview said the auction was done.
+   */
+  auctionDone?: boolean;
+}): {
   label: string;
   tone: Tone;
 } {
@@ -71,6 +80,9 @@ export function seasonBadge(row: { status: string; settlement: "settling" | "set
   }
   if (row.settlement === "settling") {
     return { label: "Settling", tone: "amber" };
+  }
+  if (row.auctionDone === true) {
+    return { label: "Auction done", tone: "green" };
   }
   return { label: statusLabel(row.status), tone: statusTone(row.status) };
 }

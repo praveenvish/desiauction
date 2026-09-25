@@ -34,18 +34,49 @@ export default async function TeamsPage({
     notFound();
   }
   const selectedTeam = view.teams.find((team) => team.id === sp.team) ?? null;
+  // Only for whoever may set the roles (team.manage); null otherwise.
+  const appointmentsPanel =
+    appointments !== null && selectedTeam === null ? (
+      <AppointmentsPanel slug={slug} view={appointments} />
+    ) : null;
+  const squadSheetsPanel =
+    squadSheets !== null && selectedTeam === null ? (
+      <SquadSheetsPanel slug={slug} view={squadSheets} />
+    ) : null;
+  /*
+   * WHILE SOMEBODY IS STILL WAITING TO BE TOLD, telling them is the page's job:
+   * the two panels move above the team cards. Once everyone has heard they drop
+   * back below, where they are a record rather than a to-do.
+   */
+  const announcePending = appointments !== null && appointments.pending.length > 0;
+  const sheetsPending =
+    squadSheets !== null && squadSheets.blocked === null && squadSheets.pending > 0;
+  const pendingFirst = announcePending || sheetsPending;
   return (
     <ToastProvider>
       <main className="registrations-dash tm-page">
         <div className="dash-stack tm-stack">
-          <TeamsPanel view={view} slug={slug} selected={selectedTeam} />
-          {/* Only for whoever may set the roles (team.manage); null otherwise. */}
-          {appointments !== null && selectedTeam === null ? (
-            <AppointmentsPanel slug={slug} view={appointments} />
-          ) : null}
-          {squadSheets !== null && selectedTeam === null ? (
-            <SquadSheetsPanel slug={slug} view={squadSheets} />
-          ) : null}
+          <TeamsPanel
+            view={view}
+            slug={slug}
+            selected={selectedTeam}
+            {...(pendingFirst
+              ? {
+                  beforeGrid: (
+                    <>
+                      {appointmentsPanel}
+                      {squadSheetsPanel}
+                    </>
+                  ),
+                }
+              : {})}
+          />
+          {pendingFirst ? null : (
+            <>
+              {appointmentsPanel}
+              {squadSheetsPanel}
+            </>
+          )}
         </div>
       </main>
     </ToastProvider>

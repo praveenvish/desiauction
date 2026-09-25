@@ -275,7 +275,7 @@ export default async function TournamentsPage({
                 </p>
               ) : (
                 <ButtonLink href="/orgs" size="lg">
-                  Create your organization
+                  Create your club
                 </ButtonLink>
               )}
             </div>

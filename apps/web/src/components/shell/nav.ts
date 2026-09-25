@@ -115,7 +115,7 @@ export interface RailTarget {
   href: string;
 }
 
-/** Rail active state: longest matching prefix wins; /org/* belongs to Organizations. */
+/** Rail active state: longest matching prefix wins; /org/* belongs to Clubs. */
 export function activeRailKey(pathname: string): string | null {
   if (pathname.startsWith("/org/") || pathname.startsWith("/orgs")) {
     return "orgs";
@@ -129,6 +129,14 @@ export function activeRailKey(pathname: string): string | null {
   }
   if (pathname.startsWith("/money")) {
     return "money";
+  }
+  // The three cross-season indexes (founder mockups, 2026-09-19). They have
+  // rail items and RAIL_TITLES entries, but without a key here `pageIdentity`
+  // fell through to a null title and the identity bar drew an empty h1 over
+  // /players, /auctions and /reports.
+  const index = /^\/(players|auctions|reports)(\/|$)/.exec(pathname);
+  if (index !== null) {
+    return index[1] as string;
   }
   if (pathname.startsWith("/help")) {
     return "help";
@@ -530,6 +538,9 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/auction\/ledger$/, "Ledger"],
   [/\/auction\/engine$/, "Engine"],
   [/\/auction$/, "Auction"],
+  // Without this the posters studio's trail stopped at the club and the page
+  // had no title of its own — the one season surface the shell could not name.
+  [/\/posters$/, "Posters"],
   [/\/register$/, "Register"],
   [/^\/org\/[^/]+\/t\/[^/]+$/, "Tournament"],
   [/^\/org\/[^/]+\/venues$/, "Venues"],
@@ -553,7 +564,9 @@ export function sectionLabel(pathname: string): string | null {
 const RAIL_TITLES: Record<string, string> = {
   home: "Home",
   tournaments: "Tournaments",
-  orgs: "Organizations",
+  // "Clubs", not "Organizations": the word the phone bar, /home's setup ladder
+  // and every organizer already use out loud for the thing they run.
+  orgs: "Clubs",
   money: "Money",
   players: "Players",
   auctions: "Auctions",
@@ -689,15 +702,15 @@ export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdenti
     };
   }
 
-  // Inside an org: Organizations / org / section.
+  // Inside an org: Clubs / org / section.
   const orgMatch = /^\/org\/([^/]+)/.exec(pathname);
   if (orgMatch !== null) {
     const slug = orgMatch[1] as string;
     const org = ctx.orgs.find((entry) => entry.slug === slug);
-    const label = org?.name ?? "Organization";
+    const label = org?.name ?? "Club";
     return {
       crumbs: [
-        { label: "Organizations", href: "/orgs" },
+        { label: "Clubs", href: "/orgs" },
         ...(section !== null ? [{ label, href: `/org/${slug}` }] : []),
       ],
       title: section ?? label,
@@ -907,6 +920,12 @@ export interface NavScope {
   seasonName: string;
   /** Its auction is `live` or `paused`. */
   live: boolean;
+  /**
+   * The owner's own team in this season, when the scope IS a team. "My team"
+   * then opens that team's squad (`/teams?team=`) instead of the all-teams grid
+   * an owner has no use for.
+   */
+  teamId?: string;
 }
 
 /**
@@ -919,6 +938,12 @@ export interface NavScope {
 export interface NavRoles {
   /** Holds `org:owner` or `org:staff` anywhere. */
   organizes: boolean;
+  /**
+   * How many clubs this person runs. The Clubs item is offered only past one:
+   * with a single club it is a list of one, and that club is already reached
+   * from every season's breadcrumb and from Tournaments. Absent reads as one.
+   */
+  clubs?: number;
   /** Teams owned — an accepted owner invite or a live paddle grant. */
   teams: NavScope[];
   /** Seasons held under an `auction:conductor` grant. */
@@ -1068,6 +1093,11 @@ function scopeItem(
   };
 }
 
+/** An href without its query or fragment — the part a pathname can equal. */
+function hrefPath(href: string): string {
+  return href.replace(/[?#].*$/, "");
+}
+
 /**
  * Does this path belong to this rail item?
  *
@@ -1076,12 +1106,21 @@ function scopeItem(
  * lights "My team" rather than "Tournaments". Exactly one item is ever active,
  * which is a property the test matrix asserts for every row.
  */
-function claims(item: NavItem, pathname: string): boolean {
-  switch (item.key) {
+function claims(item: NavItem, pathname: string, claimKey = item.key): boolean {
+  switch (claimKey) {
     case "home":
       return pathname === "/home" || pathname.startsWith("/home/");
     case "tournaments":
       return pathname.startsWith("/tournaments") || pathname.startsWith("/seasons");
+    // With one club there is no Clubs item (see `navigationFor`), and the club's
+    // pages belong to the Tournaments it runs rather than to nothing at all.
+    case "tournaments+clubs":
+      return (
+        pathname.startsWith("/tournaments") ||
+        pathname.startsWith("/seasons") ||
+        pathname.startsWith("/orgs") ||
+        pathname.startsWith("/org/")
+      );
     case "orgs":
       return pathname.startsWith("/orgs") || pathname.startsWith("/org/");
     case "money":
@@ -1106,10 +1145,11 @@ function claims(item: NavItem, pathname: string): boolean {
       return pathname.startsWith("/admin");
     default:
       // Scope items (team, nights, room, cockpit) own their own subtree, and a
-      // popover's item owns every one of its choices.
-      return [item.href, ...(item.choices ?? []).map((choice) => choice.href)].some(
-        (href) => pathname === href || pathname.startsWith(`${href}/`),
-      );
+      // popover's item owns every one of its choices. A query (`?team=`) is
+      // not part of the path it claims.
+      return [item.href, ...(item.choices ?? []).map((choice) => choice.href)]
+        .map(hrefPath)
+        .some((href) => pathname === href || pathname.startsWith(`${href}/`));
   }
 }
 
@@ -1130,14 +1170,7 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
   const candidates: (NavItem | null)[] = [
     { key: "home", label: "Home", shortLabel: "Home", href: "/home", icon: "home" },
     liveDoor(roles),
-    scopeItem(
-      "team",
-      roles.teams,
-      "My teams",
-      "My team",
-      "team",
-      (scope) => `/seasons/${scope.seasonSlug}/teams`,
-    ),
+    scopeItem("team", roles.teams, "My teams", "My team", "team", ownTeamHref),
     scopeItem(
       "nights",
       roles.conducts,
@@ -1155,10 +1188,14 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
           icon: "trophy",
         }
       : null,
-    roles.organizes
+    // Only for somebody who runs MORE than one club (2026-09-25 polish). With
+    // one, the item is a list of one — the club is a tap away on every
+    // season's breadcrumb and from Tournaments — and it was the sixth item of
+    // an organizer's rail. "Clubs", the word the phone bar already used.
+    roles.organizes && (roles.clubs ?? 1) > 1
       ? {
           key: "orgs",
-          label: "Organizations",
+          label: "Clubs",
           shortLabel: "Clubs",
           href: "/orgs",
           icon: "org",
@@ -1267,10 +1304,13 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
       : []),
   ];
 
-  // Exactly one active item across BOTH lists, first match wins.
+  // Exactly one active item across BOTH lists, first match wins. Without a
+  // Clubs item, Tournaments also owns the club's pages.
+  const hasClubs = rail.some((item) => item.key === "orgs");
   let claimed = false;
   const mark = (item: NavItem): NavItem => {
-    if (claimed || !claims(item, pathname)) {
+    const claimKey = item.key === "tournaments" && !hasClubs ? "tournaments+clubs" : item.key;
+    if (claimed || !claims(item, pathname, claimKey)) {
       return item;
     }
     claimed = true;
@@ -1331,10 +1371,20 @@ export function seasonRoleFor(facts: SeasonRoleFacts): SeasonRole {
  * tabs ARE the navigation the e2e suite drives, and renaming a hook during a
  * navigation change is how a suite starts failing for the wrong reason.
  */
+/** Where "My team" goes: the owner's own squad when the scope knows it. */
+function ownTeamHref(scope: NavScope): string {
+  const base = `/seasons/${scope.seasonSlug}/teams`;
+  return scope.teamId === undefined ? base : `${base}?team=${encodeURIComponent(scope.teamId)}`;
+}
+
 export function seasonTabs(
   slug: string,
   role: SeasonRole,
-  options: { canSettle?: boolean } = {},
+  options: {
+    canSettle?: boolean;
+    /** The owner's own team here — "My team" opens its squad, not the grid. */
+    ownTeamId?: string;
+  } = {},
 ): CompetitionTab[] {
   const base = `/seasons/${slug}`;
   const overview: CompetitionTab = { key: "overview", label: "Overview", href: base };
@@ -1397,7 +1447,18 @@ export function seasonTabs(
       return [overview, teams, auction];
     case "owner":
       return [
-        { key: "my-team", label: "My team", href: `${base}/teams`, testId: "open-teams" },
+        {
+          key: "my-team",
+          label: "My team",
+          href: ownTeamHref({
+            seasonSlug: slug,
+            label: "",
+            seasonName: "",
+            live: false,
+            ...(options.ownTeamId !== undefined ? { teamId: options.ownTeamId } : {}),
+          }),
+          testId: "open-teams",
+        },
         { key: "my-plan", label: "My plan", href: `${base}/auction/plan` },
         { key: "room", label: "Auction room", href: `${base}/auction/live` },
         table,
@@ -1434,7 +1495,7 @@ export function activeSeasonTab(pathname: string, slug: string, tabs: Competitio
   let best: { key: string; length: number } | null = null;
   for (const tab of tabs) {
     if (tab.key === "overview") continue;
-    const paths = [tab.href, ...(tab.claims ?? []).map((suffix) => `${base}${suffix}`)];
+    const paths = [hrefPath(tab.href), ...(tab.claims ?? []).map((suffix) => `${base}${suffix}`)];
     for (const href of paths) {
       if (owns(href) && (best === null || href.length > best.length)) {
         best = { key: tab.key, length: href.length };

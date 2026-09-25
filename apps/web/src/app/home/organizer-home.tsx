@@ -35,10 +35,11 @@ import { FormDialog } from "../../components/form-dialog";
 import { monogram } from "../../components/season-hero/season-hero";
 import { roleLabeller } from "../../lib/role-label";
 import { compactINR, ledgerINR } from "../../lib/inr";
-import { moneyFormat } from "../../lib/money";
+import { cardAmount, moneyFormat } from "../../lib/money";
 import { auctionDashboard } from "../../server/auction/actions";
 import { competitionsView, seasonOverviewView } from "../../server/competition/actions";
 import { competitionAllows } from "../../server/competition/authz";
+import { appointmentsPanelView } from "../../server/competition/appointment-actions";
 import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { homeDashboard } from "../../server/home/dashboard";
 import { grantsOfPerson } from "../../server/request-cache";
@@ -103,7 +104,7 @@ async function attentionFor(
   competition: { id: string; orgId: string; slug: string; name: string; status: string },
   dash: HomeDashboardData,
   held: readonly GrantLike[],
-): Promise<AttentionRow | null> {
+): Promise<AttentionRow | AttentionRow[] | null> {
   if (competition.status === "registration_open") {
     // The count came back with the dashboard's grouped read, and the reviewer
     // check is the desk's own rule over this render's grants — this used to
@@ -126,6 +127,41 @@ async function attentionFor(
     return null;
   }
   if (competition.status === "registration_closed") {
+    const counts = dash.counts[competition.id];
+    if (counts?.auctionDone === true) {
+      // After the hammer the status column still reads `registration_closed`,
+      // and this branch used to look only for an auction to CREATE — so an
+      // organizer with fresh squads and not one match scheduled was told
+      // "All clear". The two jobs left are the players' and the schedule's.
+      if (
+        !competitionAllows(
+          held,
+          { orgId: competition.orgId, competitionId: competition.id },
+          "competition.manage",
+        )
+      ) {
+        return null;
+      }
+      const rows: AttentionRow[] = [];
+      const appointments = await appointmentsPanelView(competition.slug);
+      if (appointments !== null && appointments.pending.length > 0) {
+        rows.push({
+          key: `announce-${competition.id}`,
+          label: "Announce captains & icons",
+          detail: `${competition.name} · ${String(appointments.pending.length)} not told yet`,
+          href: `/seasons/${competition.slug}/teams`,
+        });
+      }
+      if (counts.fixtures === 0) {
+        rows.push({
+          key: `fixtures-${competition.id}`,
+          label: "Squads are set — schedule the matches",
+          detail: competition.name,
+          href: `/seasons/${competition.slug}/fixtures`,
+        });
+      }
+      return rows;
+    }
     const dashboard = await auctionDashboard(competition.slug);
     if (dashboard !== null && dashboard.viewer.canConduct && dashboard.view === null) {
       const blockers = dashboard.ready.checks.filter((check) => !check.pass).length;
@@ -266,6 +302,7 @@ export async function OrganizerHome({
   const liveRow = dash.auctions.find((auction) => auction.status === "live") ?? null;
   // The live panel owns the live auction, so the list lists only the rest.
   const otherAuctions = dash.auctions.filter((auction) => auction.auctionId !== liveRow?.auctionId);
+  const lastDone = dash.doneAuctions[0];
 
   /*
    * THE SEASON IN FOCUS — what the club hero, the journey row and the four
@@ -299,7 +336,7 @@ export async function OrganizerHome({
       Promise.all(scanned.map((competition) => attentionFor(competition, dash, held))),
     ),
   ]);
-  const attention = scannedRows.filter((row): row is AttentionRow => row !== null);
+  const attention = scannedRows.flat().filter((row): row is AttentionRow => row !== null);
   const unscanned = view.competitions.length - scanned.length;
 
   const seasonNeedingTeams =
@@ -319,7 +356,7 @@ export async function OrganizerHome({
       cta: (
         <FormDialog
           title="New club"
-          triggerLabel="Create your organization"
+          triggerLabel="Create your club"
           size="touch"
           triggerTestId="home-create-org"
         >
@@ -487,6 +524,8 @@ export async function OrganizerHome({
             registrations: focusOverview.approvedPlayers + focusOverview.pendingPlayers,
             auctionStatus: focusOverview.auctionStatus,
             settlement: focusOverview.settlement?.status ?? null,
+            auctionUnit: focusOverview.competition.auctionUnit,
+            fixtures: focusOverview.fixtureCount,
           },
           { withTeams: false },
         );
@@ -504,12 +543,14 @@ export async function OrganizerHome({
     auction: `${focusBase}/auction`,
     // The Money tab 404s without `settlement.view`: no link beats a dead end.
     settlement: focusOverview?.viewer.canSettle === true ? `${focusBase}/money` : undefined,
+    fixtures: `${focusBase}/fixtures`,
   };
   const journeyIcon: Record<string, ReactNode> = {
     setup: <IconTrophy size={14} />,
     registration: <IconFileCheck size={14} />,
     auction: <IconGavel size={14} />,
     settlement: <IconRupee size={14} />,
+    fixtures: <IconCalendar size={14} />,
   };
   const lotsPct =
     focusOverview === null || focusOverview.lotsTotal === 0
@@ -633,7 +674,7 @@ export async function OrganizerHome({
               ) : null}
               <div>
                 <dt>Spend</dt>
-                <dd>{moneyFormat(liveRow.auctionUnit).compact(liveRow.spendPaise)}</dd>
+                <dd>{cardAmount(liveRow.auctionUnit, liveRow.spendPaise)}</dd>
               </div>
               <div>
                 <dt>Lots sold</dt>
@@ -745,7 +786,8 @@ export async function OrganizerHome({
             <StatCard
               icon={<IconWallet />}
               tone="amber"
-              value={moneyFormat(focusOverview.competition.auctionUnit).compact(
+              value={cardAmount(
+                focusOverview.competition.auctionUnit,
                 focusOverview.purseCommitted,
               )}
               label="Purse committed"
@@ -1016,13 +1058,28 @@ export async function OrganizerHome({
               tone="gold"
               title="Active auctions"
               action={
-                <Link href="/tournaments?view=seasons" className="home-more">
+                // The cross-season auctions index, which this card is a slice
+                // of — not the seasons list, which answers a different question.
+                <Link href="/auctions" className="home-more">
                   View all
                   <IconArrowRight size={14} />
                 </Link>
               }
             >
-              {otherAuctions.length === 0 ? (
+              {otherAuctions.length === 0 && liveRow === null && lastDone !== undefined ? (
+                // An auction that finished is news, not an empty state: "No
+                // auction running yet. Set up auction" was being said to an
+                // organizer whose night had ended an hour earlier.
+                <PanelEmpty
+                  icon={<IconGavel />}
+                  title={`${lastDone.competitionName}'s auction is done · ${String(
+                    lastDone.lotsSold,
+                  )} of ${String(lastDone.lotsTotal)} sold`}
+                  text="Every squad and every price is on the results page."
+                  ctaHref={`/seasons/${lastDone.competitionSlug}/auction`}
+                  ctaLabel="See results"
+                />
+              ) : otherAuctions.length === 0 ? (
                 <PanelEmpty
                   icon={<IconGavel />}
                   title={liveRow === null ? "No auction running yet." : "Nothing else scheduled."}
@@ -1057,8 +1114,8 @@ export async function OrganizerHome({
                           <span className="home-row-text">
                             <strong>{auction.competitionName}</strong>
                             <span>
-                              Spend {moneyFormat(auction.auctionUnit).compact(auction.spendPaise)} ·
-                              Lots {auction.lotsSold}/{auction.lotsTotal}
+                              Spend {cardAmount(auction.auctionUnit, auction.spendPaise)} · Lots{" "}
+                              {auction.lotsSold}/{auction.lotsTotal}
                             </span>
                             <span className="home-progress" aria-hidden>
                               <i style={{ width: `${String(pct)}%` }} />

@@ -60,6 +60,7 @@ import {
 } from "../../../server/competition/actions";
 import { formatDate } from "../../../lib/format-date";
 import { track } from "../../../lib/telemetry";
+import { TeamCrest } from "./_tabs/team-crest";
 import { SeasonImageCard } from "./season-image-card";
 import { ShareRegistration } from "./registrations/share-registration";
 
@@ -123,12 +124,22 @@ const ADVANCE_ANNOUNCEMENT: Record<string, string> = {
  * powers an explicit act of trust. Where the door is locked the banner says who
  * holds the key instead of pointing at it.
  */
+interface Onward {
+  href: string;
+  label: string;
+  title: string;
+  body?: string;
+  /** Quieter doors beside the one gold action — never a second primary. */
+  also?: { href: string; label: string; testId: string }[];
+}
+
 function nextDestination(
   slug: string,
   auctionStatus: string | null,
   canSettle: boolean,
   points: boolean,
-): { href: string; label: string; title: string } | { locked: true } {
+  fixtureCount: number,
+): Onward | { locked: true } {
   if (auctionStatus === null) {
     return {
       href: `/seasons/${slug}/auction`,
@@ -152,13 +163,31 @@ function nextDestination(
     };
   }
   if (points) {
-    // A points season (0091) ends at the hammer: there is no money to settle,
-    // so the onward step is the squads the night produced.
-    return {
-      href: `/seasons/${slug}/teams`,
-      label: "See the squads",
-      title: "The auction is done. It was played for points — nothing to settle.",
-    };
+    // A points season (0091) has no books, but the hammer is NOT the end of it:
+    // the squads still have matches to play. This used to say "See the squads"
+    // under a "Season complete" card while the step bar said Fixtures was next
+    // and not one match existed — the page contradicting itself one line apart.
+    // So the onward step is the schedule, with the two things an organizer does
+    // for the players in between (squad sheets, posters) as quiet doors.
+    const also = [
+      { href: `/seasons/${slug}/teams`, label: "Send squad sheets", testId: "next-squad-sheets" },
+      { href: `/seasons/${slug}/posters`, label: "Make posters", testId: "next-posters" },
+    ];
+    return fixtureCount === 0
+      ? {
+          href: `/seasons/${slug}/fixtures`,
+          label: "Schedule matches",
+          title: "Squads are set. Tell your players, then schedule the matches.",
+          body: "It was played for points, so there is nothing to settle.",
+          also,
+        }
+      : {
+          href: `/seasons/${slug}/fixtures`,
+          label: "Open the schedule",
+          title: "Matches are on the schedule. The season wraps up when the last one is played.",
+          body: "It was played for points, so there is nothing to settle.",
+          also,
+        };
   }
   if (!canSettle) {
     return { locked: true };
@@ -265,7 +294,8 @@ function secondaryAction(
   if (view.competition.status === "registration_closed" && view.auctionStatus === null) {
     return { href: `/seasons/${slug}/auction`, label: "Set up the auction" };
   }
-  return { href: `/seasons/${slug}/fixtures`, label: "Fixtures" };
+  // "Schedule" — the tab's own name for this surface (nav.ts seasonTabs).
+  return { href: `/seasons/${slug}/fixtures`, label: "Schedule" };
 }
 
 /** What is still missing before this season may open registration (DA-11). */
@@ -305,11 +335,6 @@ function shareLabel(part: number, pct: number): string {
   return part > 0 && pct === 0 ? "<1%" : `${String(pct)}%`;
 }
 
-/** The first letter a team is known by, for its colour tile. */
-function teamInitial(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || "•";
-}
-
 export function OverviewPanel({
   view,
   slug,
@@ -345,16 +370,27 @@ export function OverviewPanel({
   const points = view.competition.auctionUnit === "points";
   const money = useMoney();
   const steps = stepLabels(view);
-  const onward = nextDestination(slug, view.auctionStatus, view.viewer.canSettle, points);
+  const onward = nextDestination(
+    slug,
+    view.auctionStatus,
+    view.viewer.canSettle,
+    points,
+    view.fixtureCount,
+  );
   const locked = "locked" in onward;
   const cleared = clearedRungs(view);
   const activeIndex = cleared.indexOf(false);
   const auctionDone = cleared[3] === true;
   // The enum has no `completed` value (that is a migration), but the fact is
   // derivable: the auction is over and the books are discharged.
-  // A points season is finished at the hammer: there are no books to discharge.
+  //
+  // A points season has no books, so its last rung is the matches: it is over
+  // when there were fixtures and every one of them has been played (or called
+  // off). It used to be "finished at the hammer", which put "Season complete"
+  // and a gold "Run it again" on a season whose squads had not played a ball.
+  const fixturesDone = view.fixtureCount > 0 && view.fixturesOpen === 0;
   const finished =
-    auctionDone && (points || (view.settlement !== null && view.settlement.discharged));
+    auctionDone && (points ? fixturesDone : view.settlement !== null && view.settlement.discharged);
   const missing = missingForRegistration(view.competition);
   const secondary = secondaryAction(view, slug, finished);
   const canPublish = view.publishBlockers.length === 0;
@@ -457,9 +493,19 @@ export function OverviewPanel({
     }
   };
 
+  // Past the hammer the competition status is still `registration_closed` —
+  // the enum stops there (DA-10) — so the pill reads the auction instead of
+  // announcing a registration step that is two steps behind the season.
   const statusPill = finished
     ? { tone: "green" as KitTone, icon: <IconTrophy /> }
-    : (STATUS_PILL[status] ?? { tone: "neutral" as KitTone, icon: <IconCalendar /> });
+    : auctionDone
+      ? { tone: "green" as KitTone, icon: <IconCheckCircle /> }
+      : (STATUS_PILL[status] ?? { tone: "neutral" as KitTone, icon: <IconCalendar /> });
+  const statusText = finished
+    ? "completed"
+    : auctionDone
+      ? "auction done"
+      : status.replace(/_/g, " ");
 
   const journey: JourneyStep[] = steps.map((label, index) => {
     const state = cleared[index] === true ? "done" : index === activeIndex ? "current" : "upcoming";
@@ -545,7 +591,19 @@ export function OverviewPanel({
           action={
             <>
               {readinessLink}
-              {runAgainButton(false)}
+              {/* "Run it again" belongs to a season that is actually over (the
+                  Retrospective); offering it mid-season beside the real next
+                  step made starting afresh look like the thing to do. */}
+              {(onward.also ?? []).map((door) => (
+                <Link
+                  key={door.href}
+                  href={door.href}
+                  className={buttonClassName({ variant: "secondary" })}
+                  data-testid={door.testId}
+                >
+                  {door.label}
+                </Link>
+              ))}
               <Link
                 href={onward.href}
                 className={buttonClassName({ variant: "primary" })}
@@ -557,7 +615,9 @@ export function OverviewPanel({
             </>
           }
           testId="next-step"
-        />
+        >
+          {onward.body}
+        </Notice>
       );
     } else if (status === "registration_closed" && locked) {
       nextNotice = (
@@ -574,6 +634,25 @@ export function OverviewPanel({
         </Notice>
       );
     }
+  }
+
+  // Someone who cannot run the season gets no next-step banner, and used to
+  // get nothing at all between the hammer and the last match — or, on a points
+  // season, a "Season complete" card the moment the auction ended. One quiet,
+  // true line instead.
+  if (!view.viewer.canManage && auctionDone && !finished) {
+    nextNotice = (
+      <Notice
+        tone="info"
+        icon={<IconCheckCircle size={20} />}
+        title={
+          view.fixtureCount === 0 || view.fixturesOpen > 0
+            ? "Auction done — fixtures are next."
+            : "Auction done — the books are being settled."
+        }
+        testId="season-auction-done"
+      />
+    );
   }
 
   // The figures. Before an auction exists there is no purse and there are no
@@ -595,7 +674,7 @@ export function OverviewPanel({
           eyebrow={
             <span className="ov-hero-pills">
               <Pill tone={statusPill.tone} icon={statusPill.icon} testId="competition-status">
-                {finished ? "completed" : status.replace(/_/g, " ")}
+                {statusText}
               </Pill>
               {view.auctionLive ? (
                 <Pill tone="red" dot>
@@ -744,7 +823,7 @@ export function OverviewPanel({
           <StatCard
             icon={<IconWallet />}
             tone="amber"
-            value={money.compact(view.purseCommitted)}
+            value={points ? money.exact(view.purseCommitted) : money.compact(view.purseCommitted)}
             label="Purse committed"
             {...(view.pursePct !== undefined && view.pursePct !== null
               ? { hint: `${shareLabel(view.purseCommitted, view.pursePct)} of the total purse` }
@@ -816,8 +895,15 @@ export function OverviewPanel({
                           : undefined
                       }
                     >
+                      {/* The same crest every other tab draws — its logo, or two
+                          initials — rather than a one-letter tile of its own. */}
                       <span className="ov-team-tile" aria-hidden>
-                        {teamInitial(team.name)}
+                        <TeamCrest
+                          name={team.name}
+                          short={team.shortName}
+                          color={team.color}
+                          logoUrl={team.logoUrl}
+                        />
                       </span>
                       <span className="ov-team-name">{team.name}</span>
                       <span className="ov-team-figs">
@@ -930,92 +1016,111 @@ export function OverviewPanel({
             />
           ) : null}
 
+          {/* A reader who cannot run the season (a team owner, a member) is not
+              told about publishing, copy-links and listing state — that card
+              is the organizer's control panel. They get the one useful thing
+              in it: the door to the public page, when there is one. */}
+          {!view.viewer.canManage && isPublic && view.platformHold === null ? (
+            <SectionCard title="Public page" data-testid="visibility-row">
+              <div className="ov-public-actions">
+                <Link
+                  className={buttonClassName({ variant: "secondary" })}
+                  href={`/c/${slug}`}
+                  data-testid="open-public-page"
+                >
+                  View public page
+                  <IconArrowRight size={16} />
+                </Link>
+              </div>
+            </SectionCard>
+          ) : null}
+
           {/* DA-12: publishing has a block of its own, not a ghost button in the
             footer of a card about something else. */}
-          <SectionCard
-            title="Public page"
-            data-testid="visibility-row"
-            action={
-              view.platformHold !== null ? (
-                <Pill tone="red" testId="platform-hold-badge">
-                  Taken down
-                </Pill>
-              ) : (
-                <Pill tone={isPublic ? "green" : "neutral"} dot={isPublic}>
-                  {isPublic ? "LIVE" : "Not listed"}
-                </Pill>
-              )
-            }
-          >
-            <div className="ov-public">
-              {previewable && view.platformHold === null ? (
-                <div className="ov-url-row">
-                  <span className="ov-url">
-                    <span className="ov-url-text">/c/{slug}</span>
-                    {isPublic ? (
-                      <button
-                        type="button"
-                        className="ov-icon-btn"
-                        aria-label="Copy the public page link"
-                        onClick={() => void copyPublicLink()}
-                      >
-                        <IconCopy size={18} />
-                      </button>
-                    ) : null}
-                  </span>
-                  <a
-                    className="ov-icon-btn ov-icon-btn-boxed"
-                    href={`/c/${slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Open the public page in a new tab"
-                  >
-                    <IconExternal size={18} />
-                  </a>
-                </div>
-              ) : null}
-              <p className="ov-muted">
-                {view.platformHold !== null
-                  ? "DesiAuction has taken this season’s public page down. Your season, registrations and auction are untouched — only the public page is gone."
-                  : isPublic
-                    ? "This season is listed publicly — anyone can see it and share it."
-                    : "Publishing puts this season on the public directory, where players and spectators can find it."}
-              </p>
-              {view.viewer.canManage && !canPublish && !isPublic ? (
-                <ul className="season-blockers" data-testid="publish-blockers">
-                  {view.publishBlockers.map((blocker) => (
-                    <li key={blocker.code} className="season-blocker">
-                      <span>{blocker.message}</span>
-                      {blocker.code === "dates" || blocker.code === "location" ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          data-testid={`fix-${blocker.code}`}
-                          onClick={() => {
-                            setSettingsOpen(true);
-                          }}
+          {view.viewer.canManage ? (
+            <SectionCard
+              title="Public page"
+              data-testid="visibility-row"
+              action={
+                view.platformHold !== null ? (
+                  <Pill tone="red" testId="platform-hold-badge">
+                    Taken down
+                  </Pill>
+                ) : (
+                  <Pill tone={isPublic ? "green" : "neutral"} dot={isPublic}>
+                    {isPublic ? "LIVE" : "Not listed"}
+                  </Pill>
+                )
+              }
+            >
+              <div className="ov-public">
+                {previewable && view.platformHold === null ? (
+                  <div className="ov-url-row">
+                    <span className="ov-url">
+                      <span className="ov-url-text">/c/{slug}</span>
+                      {isPublic ? (
+                        <button
+                          type="button"
+                          className="ov-icon-btn"
+                          aria-label="Copy the public page link"
+                          onClick={() => void copyPublicLink()}
                         >
-                          {blocker.code === "dates" ? "Add dates" : "Add location"}
-                        </Button>
+                          <IconCopy size={18} />
+                        </button>
                       ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <div className="ov-public-actions">
-                {previewable ? (
-                  <Link
-                    className={buttonClassName({
-                      variant: publicIsPrimary && isPublic ? "primary" : "secondary",
-                    })}
-                    href={`/c/${slug}`}
-                    data-testid="open-public-page"
-                  >
-                    {isPublic ? "View public page" : "Preview the public page"}
-                    <IconArrowRight size={16} />
-                  </Link>
+                    </span>
+                    <a
+                      className="ov-icon-btn ov-icon-btn-boxed"
+                      href={`/c/${slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Open the public page in a new tab"
+                    >
+                      <IconExternal size={18} />
+                    </a>
+                  </div>
                 ) : null}
-                {view.viewer.canManage ? (
+                <p className="ov-muted">
+                  {view.platformHold !== null
+                    ? "DesiAuction has taken this season’s public page down. Your season, registrations and auction are untouched — only the public page is gone."
+                    : isPublic
+                      ? "This season is listed publicly — anyone can see it and share it."
+                      : "Publishing puts this season on the public directory, where players and spectators can find it."}
+                </p>
+                {!canPublish && !isPublic ? (
+                  <ul className="season-blockers" data-testid="publish-blockers">
+                    {view.publishBlockers.map((blocker) => (
+                      <li key={blocker.code} className="season-blocker">
+                        <span>{blocker.message}</span>
+                        {blocker.code === "dates" || blocker.code === "location" ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            data-testid={`fix-${blocker.code}`}
+                            onClick={() => {
+                              setSettingsOpen(true);
+                            }}
+                          >
+                            {blocker.code === "dates" ? "Add dates" : "Add location"}
+                          </Button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <div className="ov-public-actions">
+                  {previewable ? (
+                    <Link
+                      className={buttonClassName({
+                        variant: publicIsPrimary && isPublic ? "primary" : "secondary",
+                      })}
+                      href={`/c/${slug}`}
+                      data-testid="open-public-page"
+                    >
+                      {isPublic ? "View public page" : "Preview the public page"}
+                      <IconArrowRight size={16} />
+                    </Link>
+                  ) : null}
                   <Button
                     ref={publishRef}
                     variant={!isPublic && publicIsPrimary ? "primary" : "secondary"}
@@ -1033,10 +1138,10 @@ export function OverviewPanel({
                     {isPublic ? <IconEyeOff size={16} /> : <IconEye size={16} />}
                     {isPublic ? "Unpublish" : "Publish"}
                   </Button>
-                ) : null}
+                </div>
               </div>
-            </div>
-          </SectionCard>
+            </SectionCard>
+          ) : null}
 
           {/* One grid for the season's public face, so a reader who cannot
               manage the season sees the public page and the pass side by side

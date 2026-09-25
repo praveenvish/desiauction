@@ -71,6 +71,11 @@ export interface PlayerIndexRow {
   feeStatus: FeeStatus;
   /** How they reached their team: the room, or a mark set before it. */
   squadRoute: "auction" | "icon" | "captain" | "retained" | null;
+  /**
+   * The season's auction has been run. A player with no team is UNSOLD after
+   * it and simply not placed yet before it — the two need different words.
+   */
+  auctionDone: boolean;
   /** Epoch ms — sorts and merges across orgs without a Date crossing the wire. */
   createdAt: number;
 }
@@ -96,6 +101,9 @@ export interface PlayersSlice {
  * a correlated subquery to the wrong table (the PX-9 `financeDeclared` bug —
  * `lots.registration_id = lots.id`). Plain text cannot be rewritten that way.
  */
+/** Same hand-written discipline as `soldSql` below: the season's auction is over. */
+const auctionDoneSql = sql<boolean>`exists (select 1 from auctions done_auction where done_auction.competition_id = "registrations"."competition_id" and done_auction.status in ('completed', 'reconciled'))`;
+
 const soldSql = sql<boolean>`exists (select 1 from lots sold_lot inner join auctions sold_auction on sold_auction.id = sold_lot.auction_id where sold_lot.registration_id = "registrations"."id" and sold_lot.status = 'sold' and sold_auction.status <> 'abandoned')`;
 
 function filtersOf(seasonIds: readonly string[], query: Omit<PlayersQuery, "page">): SQL[] {
@@ -166,6 +174,7 @@ export async function playersIn(
         isCaptain: registrations.isCaptain,
         isRetained: registrations.isRetained,
         sold: soldSql,
+        auctionDone: auctionDoneSql,
         createdAt: registrations.createdAt,
       })
       .from(registrations)
@@ -230,6 +239,7 @@ export async function playersIn(
         teamColor: row.teamColor,
         feeStatus: row.feeStatus,
         squadRoute,
+        auctionDone: row.auctionDone,
         createdAt: row.createdAt.getTime(),
       },
     ];
