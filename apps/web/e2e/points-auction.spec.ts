@@ -181,7 +181,9 @@ test("a points season runs the whole night in points and owes nothing", async ({
   // --- The room bids in points ------------------------------------------------
   await organizer.getByTestId("open-live").click();
   await expect(organizer.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", COLD);
-  await expect(organizer.getByTestId("connection-state")).toHaveText("open", { timeout: 20_000 });
+  await expect(organizer.getByTestId("connection-state")).toHaveText("Connected", {
+    timeout: 20_000,
+  });
   await organizer.getByTestId("conduct-open-lot").click();
   const [bidderA, bidderB] = owners.map((owner) => owner.page) as [Page, Page];
   for (const page of [organizer, bidderA, bidderB]) {

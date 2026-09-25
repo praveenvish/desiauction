@@ -210,7 +210,7 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   await expect(organizer.getByTestId("live-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
-  await expect(organizer.getByTestId("connection-state")).toHaveText("open", {
+  await expect(organizer.getByTestId("connection-state")).toHaveText("Connected", {
     timeout: 20_000,
   });
 
