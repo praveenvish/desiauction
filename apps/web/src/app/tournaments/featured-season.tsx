@@ -24,7 +24,7 @@ import {
   SeasonCrest,
   type HeroFigure,
 } from "../../components/season-hero/season-hero";
-import { moneyFormat } from "../../lib/money";
+import { cardAmount } from "../../lib/money";
 import type { SeasonOverviewView } from "../../server/competition/actions";
 import type { CompetitionSummary } from "../../server/competition/competitions";
 import type { SeasonRow } from "../../server/competition/tournament-actions";
@@ -84,7 +84,13 @@ export function FeaturedSeason({
 }) {
   const base = `/seasons/${season.slug}`;
   const when = dateRange(season.startsOn, season.endsOn);
-  const badge = seasonStatusBadge(season.status, season.settlement);
+  const badge = seasonStatusBadge(
+    season.status,
+    season.settlement,
+    season.counts.auctionDone === true ||
+      overview?.auctionStatus === "completed" ||
+      overview?.auctionStatus === "reconciled",
+  );
   const live = overview?.auctionLive === true;
   const isPublic = season.visibility === "public";
 
@@ -112,7 +118,7 @@ export function FeaturedSeason({
           {
             key: "purse",
             icon: <IconWallet />,
-            value: moneyFormat(overview.competition.auctionUnit).compact(overview.pursePerTeam),
+            value: cardAmount(overview.competition.auctionUnit, overview.pursePerTeam),
             label: "Purse per team",
           },
         ]
@@ -136,6 +142,9 @@ export function FeaturedSeason({
       registrations: (overview?.approvedPlayers ?? 0) + (overview?.pendingPlayers ?? 0),
       auctionStatus: overview?.auctionStatus ?? null,
       settlement: overview?.settlement?.status ?? season.settlement,
+      ...(overview !== null
+        ? { auctionUnit: overview.competition.auctionUnit, fixtures: overview.fixtureCount }
+        : {}),
     },
     { withTeams: true },
   );
@@ -147,6 +156,7 @@ export function FeaturedSeason({
     // The Money tab answers 404 without `settlement.view` — no link beats a
     // link to a dead end.
     settlement: overview?.viewer.canSettle === true ? `${base}/money` : undefined,
+    fixtures: `${base}/fixtures`,
   };
 
   const menu = [

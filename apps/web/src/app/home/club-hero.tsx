@@ -58,6 +58,7 @@ export function ClubHero({
       : overview.settlement.status === "settled" || overview.settlement.status === "closed"
         ? "settled"
         : "settling",
+    overview.auctionStatus === "completed" || overview.auctionStatus === "reconciled",
   );
   const live = overview.auctionLive;
   return (

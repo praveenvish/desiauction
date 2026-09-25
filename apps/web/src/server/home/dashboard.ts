@@ -2,6 +2,7 @@ import {
   auctions,
   auditLog,
   bids,
+  fixtures,
   lots,
   payments,
   registrations,
@@ -85,6 +86,8 @@ export interface HomeTopCompetition {
    * already obeys this; the season rows now obey the same gate.
    */
   canSeeMoney: boolean;
+  /** The season's auction has been run (completed or reconciled) — the badge's next word. */
+  auctionDone: boolean;
   teams: number;
   registrations: number;
   collectedPaise: number;
@@ -166,12 +169,26 @@ export interface HomeCompetitionCounts {
    * registrations dashboard (≈10 queries a season) for this one number.
    */
   submitted: number;
+  /**
+   * Fixtures on the books, and whether the auction has been run. After the
+   * hammer the competition status still says `registration_closed`, so the
+   * attention scan needs these two to say "schedule the matches" instead of
+   * "All clear" on a season whose squads are waiting to play.
+   */
+  fixtures: number;
+  auctionDone: boolean;
 }
 
 export interface HomeDashboardData {
   stats: HomeStats;
   stages: HomeStages;
   auctions: HomeAuctionRow[];
+  /**
+   * Up to two auction nights that are DONE (completed or reconciled). The "Active auctions" card used to say "No auction running
+   * yet. Set up auction" to an organizer whose auction had finished an hour
+   * ago; it now names the night that happened.
+   */
+  doneAuctions: HomeAuctionRow[];
   top: HomeTopCompetition[];
   activity: HomeActivityRow[];
   money: HomeMoney;
@@ -356,6 +373,7 @@ async function readClubSlice(
     caseRows: [] as { id: string; competitionId: string; status: string }[],
     registrationRows: [] as { competitionId: string; status: string; count: number }[],
     teamRows: [] as { competitionId: string; count: number }[],
+    fixtureRows: [] as { competitionId: string; count: number }[],
     lotRows: [] as {
       auctionId: string;
       total: number;
@@ -387,75 +405,88 @@ async function readClubSlice(
   ]);
   const auctionIds = auctionRows.map((row) => row.id);
   const caseIds = caseRows.map((row) => row.id);
-  const [registrationRows, teamRows, lotRows, bidCountRows, obligationRows, paymentRows] =
-    await Promise.all([
-      db
-        .select({
-          competitionId: registrations.competitionId,
-          status: registrations.status,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(registrations)
-        .where(inArray(registrations.competitionId, ids))
-        .groupBy(registrations.competitionId, registrations.status),
-      db
-        .select({ competitionId: teams.competitionId, count: sql<number>`count(*)::int` })
-        .from(teams)
-        .where(inArray(teams.competitionId, ids))
-        .groupBy(teams.competitionId),
-      auctionIds.length > 0
-        ? db
-            .select({
-              auctionId: lots.auctionId,
-              total: sql<number>`count(*)::int`,
-              sold: sql<number>`count(*) filter (where ${lots.status} = 'sold')::int`,
-              remaining: sql<number>`count(*) filter (where ${lots.status} in ('prepared', 'queued', 'on_block', 'closing_soon', 'frozen'))::int`,
-              spend: sql<number>`coalesce(sum(${lots.soldPrice}) filter (where ${lots.status} = 'sold'), 0)::double precision`,
-            })
-            .from(lots)
-            .where(inArray(lots.auctionId, auctionIds))
-            .groupBy(lots.auctionId)
-        : Promise.resolve([]),
-      // Grouped by auction, not totalled: the lifecycle strip reports bids for
-      // the competitions at auction stage, so the grain has to reach them.
-      auctionIds.length > 0
-        ? db
-            .select({ auctionId: bids.auctionId, count: sql<number>`count(*)::int` })
-            .from(bids)
-            .where(inArray(bids.auctionId, auctionIds))
-            .groupBy(bids.auctionId)
-        : Promise.resolve([]),
-      caseIds.length > 0
-        ? db
-            .select({
-              caseId: settlementObligations.caseId,
-              amount: sql<number>`coalesce(sum(${settlementObligations.amount}), 0)::double precision`,
-              discharged: sql<number>`coalesce(sum(${settlementObligations.discharged}), 0)::double precision`,
-              waived: sql<number>`coalesce(sum(${settlementObligations.waived}), 0)::double precision`,
-            })
-            .from(settlementObligations)
-            .where(inArray(settlementObligations.caseId, caseIds))
-            .groupBy(settlementObligations.caseId)
-        : Promise.resolve([]),
-      caseIds.length > 0
-        ? db
-            // caseId travels so the weekly series can be filtered by whose books
-            // the viewer may open (DA-30) — the totals above already are.
-            .select({
-              caseId: payments.caseId,
-              at: payments.createdAt,
-              captured: payments.captured,
-            })
-            .from(payments)
-            .where(and(inArray(payments.caseId, caseIds), gte(payments.createdAt, since)))
-        : Promise.resolve([]),
-    ]);
+  const [
+    registrationRows,
+    teamRows,
+    fixtureRows,
+    lotRows,
+    bidCountRows,
+    obligationRows,
+    paymentRows,
+  ] = await Promise.all([
+    db
+      .select({
+        competitionId: registrations.competitionId,
+        status: registrations.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(registrations)
+      .where(inArray(registrations.competitionId, ids))
+      .groupBy(registrations.competitionId, registrations.status),
+    db
+      .select({ competitionId: teams.competitionId, count: sql<number>`count(*)::int` })
+      .from(teams)
+      .where(inArray(teams.competitionId, ids))
+      .groupBy(teams.competitionId),
+    db
+      .select({ competitionId: fixtures.competitionId, count: sql<number>`count(*)::int` })
+      .from(fixtures)
+      .where(inArray(fixtures.competitionId, ids))
+      .groupBy(fixtures.competitionId),
+    auctionIds.length > 0
+      ? db
+          .select({
+            auctionId: lots.auctionId,
+            total: sql<number>`count(*)::int`,
+            sold: sql<number>`count(*) filter (where ${lots.status} = 'sold')::int`,
+            remaining: sql<number>`count(*) filter (where ${lots.status} in ('prepared', 'queued', 'on_block', 'closing_soon', 'frozen'))::int`,
+            spend: sql<number>`coalesce(sum(${lots.soldPrice}) filter (where ${lots.status} = 'sold'), 0)::double precision`,
+          })
+          .from(lots)
+          .where(inArray(lots.auctionId, auctionIds))
+          .groupBy(lots.auctionId)
+      : Promise.resolve([]),
+    // Grouped by auction, not totalled: the lifecycle strip reports bids for
+    // the competitions at auction stage, so the grain has to reach them.
+    auctionIds.length > 0
+      ? db
+          .select({ auctionId: bids.auctionId, count: sql<number>`count(*)::int` })
+          .from(bids)
+          .where(inArray(bids.auctionId, auctionIds))
+          .groupBy(bids.auctionId)
+      : Promise.resolve([]),
+    caseIds.length > 0
+      ? db
+          .select({
+            caseId: settlementObligations.caseId,
+            amount: sql<number>`coalesce(sum(${settlementObligations.amount}), 0)::double precision`,
+            discharged: sql<number>`coalesce(sum(${settlementObligations.discharged}), 0)::double precision`,
+            waived: sql<number>`coalesce(sum(${settlementObligations.waived}), 0)::double precision`,
+          })
+          .from(settlementObligations)
+          .where(inArray(settlementObligations.caseId, caseIds))
+          .groupBy(settlementObligations.caseId)
+      : Promise.resolve([]),
+    caseIds.length > 0
+      ? db
+          // caseId travels so the weekly series can be filtered by whose books
+          // the viewer may open (DA-30) — the totals above already are.
+          .select({
+            caseId: payments.caseId,
+            at: payments.createdAt,
+            captured: payments.captured,
+          })
+          .from(payments)
+          .where(and(inArray(payments.caseId, caseIds), gte(payments.createdAt, since)))
+      : Promise.resolve([]),
+  ]);
   return {
     ...empty,
     auctionRows,
     caseRows,
     registrationRows,
     teamRows,
+    fixtureRows,
     lotRows,
     bidCountRows,
     obligationRows,
@@ -567,6 +598,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
         },
       },
       auctions: [],
+      doneAuctions: [],
       top: [],
       activity,
       money: {
@@ -587,6 +619,9 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
   const caseCompetition = new Map(caseRows.map((row) => [row.id, row.competitionId]));
   const registrationRows = slices.flatMap((slice) => slice.registrationRows);
   const teamRows = slices.flatMap((slice) => slice.teamRows);
+  const fixturesBy = new Map(
+    slices.flatMap((slice) => slice.fixtureRows).map((row) => [row.competitionId, row.count]),
+  );
   const lotRows = slices.flatMap((slice) => slice.lotRows);
   const bidCountRows = slices.flatMap((slice) => slice.bidCountRows);
   const obligationRows = slices.flatMap((slice) => slice.obligationRows);
@@ -687,25 +722,30 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     }
   }
 
+  const toAuctionRow = (row: { id: string; competitionId: string; status: string }) => {
+    const competition = bySlug.get(row.competitionId);
+    const progress = lotsBy.get(row.id);
+    return {
+      auctionId: row.id,
+      competitionSlug: competition?.slug ?? "",
+      competitionName: competition?.name ?? "Competition",
+      status: row.status,
+      lotsTotal: progress?.total ?? 0,
+      lotsSold: progress?.sold ?? 0,
+      lotsRemaining: progress?.remaining ?? 0,
+      spendPaise: progress?.spend ?? 0,
+      auctionUnit: competition?.auctionUnit ?? "inr",
+    } satisfies HomeAuctionRow;
+  };
   const auctionList: HomeAuctionRow[] = auctionRows
     .filter((row) => ACTIVE_AUCTION_STATES.has(row.status))
-    .map((row) => {
-      const competition = bySlug.get(row.competitionId);
-      const progress = lotsBy.get(row.id);
-      return {
-        auctionId: row.id,
-        competitionSlug: competition?.slug ?? "",
-        competitionName: competition?.name ?? "Competition",
-        status: row.status,
-        lotsTotal: progress?.total ?? 0,
-        lotsSold: progress?.sold ?? 0,
-        lotsRemaining: progress?.remaining ?? 0,
-        spendPaise: progress?.spend ?? 0,
-        auctionUnit: competition?.auctionUnit ?? "inr",
-      };
-    })
+    .map(toAuctionRow)
     .sort((a, b) => (a.status === b.status ? 0 : a.status === "live" ? -1 : 1))
     .slice(0, 4);
+  const doneAuctions: HomeAuctionRow[] = auctionRows
+    .filter((row) => row.status === "completed" || row.status === "reconciled")
+    .map(toAuctionRow)
+    .slice(0, 2);
 
   // The case's answer per competition, terminal states first: settled and
   // closed books both read "settled" to the person this page greets, a voided
@@ -721,6 +761,11 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
     }
   }
 
+  const auctionDoneFor = new Set(
+    auctionRows
+      .filter((row) => row.status === "completed" || row.status === "reconciled")
+      .map((row) => row.competitionId),
+  );
   const top: HomeTopCompetition[] = view.competitions
     .map((competition) => ({
       slug: competition.slug,
@@ -728,6 +773,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       status: competition.status,
       settlement: caseStatusBy.get(competition.id) ?? null,
       canSeeMoney: settleable.has(competition.orgId),
+      auctionDone: auctionDoneFor.has(competition.id),
       teams: teamsBy.get(competition.id) ?? 0,
       registrations: registrationsBy.get(competition.id) ?? 0,
       collectedPaise: collectedBy.get(competition.id) ?? 0,
@@ -801,6 +847,8 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       teams: teamsBy.get(competition.id) ?? 0,
       registrations: registrationsBy.get(competition.id) ?? 0,
       submitted: submittedBy.get(competition.id) ?? 0,
+      fixtures: fixturesBy.get(competition.id) ?? 0,
+      auctionDone: auctionDoneFor.has(competition.id),
     };
   }
 
@@ -815,6 +863,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       collectedPaise,
     },
     auctions: auctionList,
+    doneAuctions,
     top,
     activity,
     money: { collectedPaise, outstandingPaise, waivedPaise, thisWeek, lastWeek },

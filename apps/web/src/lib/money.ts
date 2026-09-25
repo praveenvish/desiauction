@@ -62,3 +62,16 @@ const POINTS: MoneyFormat = {
 export function moneyFormat(unit: MoneyUnit): MoneyFormat {
   return unit === "points" ? POINTS : INR;
 }
+
+/**
+ * The figure an ORGANIZER'S summary card shows.
+ *
+ * Rupees stay compact ("₹1.75 L" is how people say it out loud), but points
+ * are exact: a points purse is a score the organizer typed in and reads back
+ * against the room, and "1.75 L pts" rounded 1,74,500 up to a number no team
+ * ever had. Points are small enough to print in full.
+ */
+export function cardAmount(unit: MoneyUnit, amount: number): string {
+  const format = moneyFormat(unit);
+  return unit === "points" ? format.exact(amount) : format.compact(amount);
+}

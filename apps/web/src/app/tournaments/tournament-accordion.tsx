@@ -81,6 +81,12 @@ function groupStatus(group: AccordionGroup): {
   if (group.seasons.every((season) => season.status === "draft" || season.status === "setup")) {
     return { label: "In setup", tone: "info" };
   }
+  // A season whose auction is done but whose books (or matches) are not is
+  // still the league's CURRENT edition — "Between seasons" told an organizer
+  // with squads freshly picked that nothing was happening.
+  if (group.seasons.some((season) => season.counts.auctionDone === true)) {
+    return { label: "In season", tone: "success" };
+  }
   return { label: "Between seasons", tone: "neutral" };
 }
 
@@ -108,7 +114,9 @@ function SeasonRow({ season }: { season: Season }) {
       ? { label: "Settled", tone: "success" as const }
       : season.settlement === "settling"
         ? { label: "Settling", tone: "info" as const }
-        : { label: STATUS_LABEL[season.status], tone: STATUS_TONE[season.status] };
+        : season.counts.auctionDone === true
+          ? { label: "Auction done", tone: "success" as const }
+          : { label: STATUS_LABEL[season.status], tone: STATUS_TONE[season.status] };
   return (
     <Link href={`/seasons/${season.slug}`} className="tg-season" data-testid="tg-season">
       <span className="tg-season-glyph" aria-hidden>
