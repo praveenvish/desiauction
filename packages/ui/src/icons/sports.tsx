@@ -42,10 +42,12 @@ export interface SportIconProps extends Omit<SVGProps<SVGSVGElement>, "children"
 type PhosphorGlyph = typeof CricketIcon;
 
 /** A Phosphor glyph behind the sport-icon contract (size, optional title). */
-function phosphor(Glyph: PhosphorGlyph, { size = 24, title, ...rest }: SportIconProps) {
+function phosphor(
+  Glyph: PhosphorGlyph,
   // `ref` and `color` differ in type between plain SVG props and Phosphor's;
-  // neither is passed by any caller, so they are dropped rather than forwarded.
-  const { ref: _ref, color: _color, ...svg } = rest;
+  // neither is passed by any caller, so they are not forwarded.
+  { size = 24, title, ...svg }: Omit<SportIconProps, "ref" | "color">,
+) {
   return (
     <Glyph
       size={size}
