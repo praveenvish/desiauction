@@ -102,6 +102,23 @@
   color: var(--text-accent);
 }
 
+/* The article pages put their way back ("← All help", "← All legal documents")
+   in the eyebrow slot. Nothing styled it, so it rendered as the browser's
+   default visited-purple underlined link on the floodlit band. It takes the
+   eyebrow's colour and only underlines when pointed at. */
+.pk-eyebrow a,
+.article-back {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.article-back:hover {
+  text-decoration: underline;
+}
+
 .pk-hero-title {
   margin: 0;
   font-family: var(--font-display);
@@ -587,4 +604,13 @@
 .player-portrait > * {
   width: 100%;
   height: 100%;
+}
+
+/* On a phone the decorative sport strip on the content pages (/help, /about,
+   /search) cost ~140px above the first line a reader came for. It is
+   aria-hidden ornament, so the phone simply goes without it. */
+@media (max-width: 639px) {
+  .content-page .pk-hero-art {
+    display: none;
+  }
 }
