@@ -26,6 +26,11 @@ export function MoneyUnitProvider({ unit, children }: { unit: MoneyUnit; childre
   return <MoneyUnitContext.Provider value={unit}>{children}</MoneyUnitContext.Provider>;
 }
 
+/** The unit itself — for code that must carry it somewhere the context does not reach. */
+export function useMoneyUnit(): MoneyUnit {
+  return useContext(MoneyUnitContext);
+}
+
 /** This season's money formatters: `exact`, `compact`, `compactFloor`, `ledger`. */
 export function useMoney(): MoneyFormat {
   const unit = useContext(MoneyUnitContext);
