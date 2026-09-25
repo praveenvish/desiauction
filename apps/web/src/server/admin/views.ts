@@ -156,6 +156,14 @@ export interface AttentionRow {
   readonly orgSlug: string | null;
   readonly orgName: string | null;
   readonly href: string | null;
+  /**
+   * How many things this row stands for, and how long the oldest has waited —
+   * set where the source counts (stuck auctions are one row per org). The
+   * overview groups rows of a kind, and a group has to add these up rather
+   * than re-read them out of the subject sentence.
+   */
+  readonly count?: number;
+  readonly waitedMs?: number;
 }
 
 export interface FollowerRollup {
@@ -570,13 +578,15 @@ export async function attentionQueue(
     .orderBy(asc(sql`min(${auctions.createdAt})`))
     .limit(20);
   for (const row of stuck) {
-    const waited = waitedFor(deps.now() - new Date(row.oldest).getTime());
+    const waitedMs = deps.now() - new Date(row.oldest).getTime();
     rows.push({
       kind: "auction:stuck-live",
-      subject: `${countNoun(row.n, "auction")} still live — the oldest for ${waited}`,
+      subject: `${countNoun(row.n, "auction")} still live — the oldest for ${waitedFor(waitedMs)}`,
       orgSlug: row.orgSlug,
       orgName: row.orgName,
       href: `/admin/orgs/${row.orgSlug}`,
+      count: row.n,
+      waitedMs,
     });
   }
   // Settlement's own verdict — a case is discrepant because settlement said so.
