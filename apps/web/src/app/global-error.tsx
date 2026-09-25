@@ -86,7 +86,7 @@ export default function GlobalError({
                 Go home
               </a>
               {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-              <a href="/contact" style={link}>
+              <a href="/support" style={link}>
                 Contact support
               </a>
             </div>

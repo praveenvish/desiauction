@@ -451,7 +451,7 @@ export default async function PublicCompetitionPage({
 
         <PageSection headingId="contact-heading" title="Questions?">
           <p className="public-hint">
-            This competition is run by {view.orgName} — reach them through whoever shared this page
+            This tournament is run by {view.orgName} — reach them through whoever shared this page
             with you. For anything about the DesiAuction platform itself, see{" "}
             <Link href="/help">Help</Link>.
           </p>

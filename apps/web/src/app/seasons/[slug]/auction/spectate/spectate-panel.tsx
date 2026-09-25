@@ -68,7 +68,8 @@ function saleSentence(outcome: Outcome, money: MoneyFormat): string {
         outcome.amount === null ? "" : ` for ${money.ledger(outcome.amount)}`
       }.`
     : outcome.kind === "unsold"
-      ? `${who} goes unsold.`
+      ? // Public screen: never "unsold" (content/help.ts, the dignity rule).
+        `${who} passes for now.`
       : outcome.kind === "withdrawn"
         ? `${who} withdrawn from the auction.`
         : `${who} is back on the block.`;

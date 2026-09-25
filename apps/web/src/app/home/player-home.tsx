@@ -105,7 +105,7 @@ export async function PlayerHome({
           icon={<IconUser size={20} />}
           testId="home-profile-nudge"
           // "Profile N of M" — the one way /home, /me and /account all say it.
-          title={`Complete your player profile — Profile ${String(completeness.done)} of ${String(completeness.total)}`}
+          title={`Complete your player profile · ${String(completeness.done)} of ${String(completeness.total)} done`}
           action={
             <ButtonLink href="/account" variant="secondary" size="sm">
               Finish it
