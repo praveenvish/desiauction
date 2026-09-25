@@ -16,7 +16,7 @@ import {
   useResendCountdown,
   writeLoginUrl,
 } from "./login-shared";
-import { isStartClub } from "../../lib/start-intent";
+import { isRegisterNext, isStartClub } from "../../lib/start-intent";
 
 /** Display only — `requestEmailLogin` holds the real per-address budget. */
 const RESEND_COOLDOWN_S = 30;
@@ -122,20 +122,24 @@ export function EmailSignIn({
         atStart
           ? isStartClub(next)
             ? "Create your club"
-            : returning
-              ? "Welcome back"
-              : "Sign in"
+            : isRegisterNext(next)
+              ? "Register to play"
+              : returning
+                ? "Welcome back"
+                : "Sign in"
           : "Check your email"
       }
       sub={
         atStart
           ? isStartClub(next)
             ? "First, your email — we'll email you a 6-digit code. No password. Then you name your club."
-            : honoredNext
-              ? "Sign in to continue where you were headed."
-              : returning
-                ? "Use your passkey, or we'll email you a code."
-                : "We'll email you a 6-digit code — no password needed."
+            : isRegisterNext(next)
+              ? "First, your email — we'll email you a 6-digit code. Then your player details."
+              : honoredNext
+                ? "Sign in to continue where you were headed."
+                : returning
+                  ? "Use your passkey, or we'll email you a code."
+                  : "We'll email you a 6-digit code — no password needed."
           : // Conditional on reaching the mailbox, never on finding an account —
             // the one address mailed nothing (claimed on an account that never
             // confirmed it) must read exactly like every other.

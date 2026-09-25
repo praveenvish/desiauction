@@ -14,7 +14,7 @@ import {
   useResendCountdown,
   writeLoginUrl,
 } from "./login-shared";
-import { isStartClub } from "../../lib/start-intent";
+import { isRegisterNext, isStartClub } from "../../lib/start-intent";
 
 /** Matches the server's RESEND_COOLDOWN_MS (otp.ts) — display only; the
  * server enforces the real limit. */
@@ -145,20 +145,24 @@ export function PhoneSignIn({
         atStart
           ? isStartClub(next)
             ? "Create your club"
-            : returning
-              ? "Welcome back"
-              : "Sign in"
+            : isRegisterNext(next)
+              ? "Register to play"
+              : returning
+                ? "Welcome back"
+                : "Sign in"
           : "Enter your code"
       }
       sub={
         atStart
           ? isStartClub(next)
             ? "First, your number — we'll text you a 6-digit code. No password. Then you name your club."
-            : honoredNext
-              ? "Sign in to continue where you were headed."
-              : returning
-                ? "Use your passkey, or we'll text you a code."
-                : "We'll text you a 6-digit code — no password needed."
+            : isRegisterNext(next)
+              ? "First, your number — we'll text you a 6-digit code. Then your player details."
+              : honoredNext
+                ? "Sign in to continue where you were headed."
+                : returning
+                  ? "Use your passkey, or we'll text you a code."
+                  : "We'll text you a 6-digit code — no password needed."
           : `We sent a 6-digit code to ${formatPhone(phone)}. It can take up to 30 seconds.`
       }
       method="phone"
