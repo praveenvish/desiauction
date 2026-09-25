@@ -1,15 +1,10 @@
 import {
-  IconCheckCircle,
-  IconGavel,
   IconGlobe,
   IconStar,
-  IconUser,
   IconUsers,
   Pill,
   PlayerImage,
-  SectionCard,
-  StatCard,
-  StatGrid,
+  SegmentedTabs,
   TeamChip,
   type KitTone,
 } from "@desiauction/ui";
@@ -137,64 +132,52 @@ export default async function PlayersPage({
   const isAll = filters.status === "" && filters.mark === "";
   const multiSeason = view.seasons.length > 1;
 
+  /* Fees are a column only where some fee was ever recorded: a points season
+     printed "Not paid" on every row — noise, and slightly alarming. */
+  const showFee = result.rows.some((row) => row.feeStatus !== "pending");
+  const segments = [
+    {
+      key: "all",
+      label: "All",
+      count: count(result.stats.total),
+      href: hrefWith(current, { status: "", mark: "", page: "" }),
+      active: isAll,
+      testId: "players-stat-all",
+    },
+    {
+      key: "approved",
+      label: "Approved",
+      count: count(result.stats.approved),
+      href: hrefWith(current, { status: "approved", mark: "", page: "" }),
+      active: filters.status === "approved" && filters.mark === "",
+      testId: "players-stat-approved",
+    },
+    {
+      key: "sold",
+      label: "Sold",
+      count: count(result.stats.sold),
+      href: hrefWith(current, { mark: "sold", status: "", page: "" }),
+      active: filters.mark === "sold",
+      testId: "players-stat-sold",
+    },
+    {
+      key: "presigned",
+      label: "Pre-signed",
+      count: count(result.stats.preSigned),
+      href: hrefWith(current, { mark: "presigned", status: "", page: "" }),
+      active: filters.mark === "presigned",
+      testId: "players-stat-presigned",
+    },
+  ];
+
   return (
     <main className="px-players">
-      <StatGrid testId="players-stats">
-        <StatCard
-          icon={<IconUsers />}
-          tone="gold"
-          value={count(result.stats.total)}
-          label="Players"
-          hint={filters.season === "" ? "Across your seasons" : "In this season"}
-          href={hrefWith(current, { status: "", mark: "", page: "" })}
-          active={isAll}
-          linkComponent={Link}
-          testId="players-stat-all"
-        />
-        <StatCard
-          icon={<IconCheckCircle />}
-          tone="green"
-          value={count(result.stats.approved)}
-          label="Approved"
-          hint="In the pool or signed"
-          href={hrefWith(current, { status: "approved", mark: "", page: "" })}
-          active={filters.status === "approved" && filters.mark === ""}
-          linkComponent={Link}
-          testId="players-stat-approved"
-        />
-        <StatCard
-          icon={<IconGavel />}
-          tone="blue"
-          value={count(result.stats.sold)}
-          label="Sold at auction"
-          hint="Bought in the room"
-          href={hrefWith(current, { mark: "sold", status: "", page: "" })}
-          active={filters.mark === "sold"}
-          linkComponent={Link}
-          testId="players-stat-sold"
-        />
-        <StatCard
-          icon={<IconStar />}
-          tone="purple"
-          value={count(result.stats.preSigned)}
-          label="Pre-signed"
-          hint="Icons, captains, retained"
-          href={hrefWith(current, { mark: "presigned", status: "", page: "" })}
-          active={filters.mark === "presigned"}
-          linkComponent={Link}
-          testId="players-stat-presigned"
-        />
-      </StatGrid>
+      {/* The four count tiles are now the tabs they always were (each one
+          filtered the list) — the same numbers, one 36px row instead of a
+          110px band, and 520pt less on a phone. */}
+      <SegmentedTabs label="Show players" items={segments} testId="players-stats" />
 
-      <SectionCard
-        icon={<IconUser />}
-        title="All players"
-        description={
-          result.total === 1 ? "1 player matches" : `${count(result.total)} players match`
-        }
-        flush
-        data-testid="players-card"
-      >
+      <section className="px-card" data-testid="players-card" aria-label="All players">
         <PlayersFilters
           current={filters}
           seasons={view.seasons}
@@ -202,6 +185,7 @@ export default async function PlayersPage({
             id: team.id,
             label: multiSeason ? `${team.name} · ${team.seasonName}` : team.name,
           }))}
+          countLabel={result.total === 1 ? "1 player" : `${count(result.total)} players`}
         />
         {result.rows.length === 0 ? (
           <p className="px-none" role="status">
@@ -220,7 +204,7 @@ export default async function PlayersPage({
                   <th scope="col">Role</th>
                   <th scope="col">Team</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Fee</th>
+                  {showFee ? <th scope="col">Fee</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -244,7 +228,15 @@ export default async function PlayersPage({
                           >
                             {row.name ?? "Unnamed player"}
                           </Link>
-                          <span className="px-sub">{row.number}</span>
+                          <span className="px-sub">
+                            {row.number}
+                            {/* The phone row's second line carries the role
+                                and team the hidden cells hold on a laptop. */}
+                            <span className="px-sub-phone">
+                              {row.role !== null ? ` · ${row.role}` : ""}
+                              {row.teamName !== null ? ` · ${row.teamName}` : ""}
+                            </span>
+                          </span>
                         </span>
                       </div>
                     </td>
@@ -253,37 +245,39 @@ export default async function PlayersPage({
                         {row.seasonName}
                       </td>
                     ) : null}
-                    <td data-label="Role">
+                    <td className="px-cell-role" data-label="Role">
                       {row.role !== null ? (
-                        <Pill tone="neutral">{row.role}</Pill>
+                        <span className="px-role">{row.role}</span>
                       ) : (
                         <span className="px-dash">—</span>
                       )}
                     </td>
-                    <td data-label="Team">
+                    <td className="px-cell-team" data-label="Team">
                       {row.teamName !== null ? (
                         <span className="px-team">
                           <TeamChip color={row.teamColor}>{row.teamName}</TeamChip>
-                          {row.squadRoute !== null ? (
+                          {row.squadRoute !== null && row.squadRoute !== "auction" ? (
                             <span className="px-route">{ROUTE_LABEL[row.squadRoute]}</span>
                           ) : null}
                         </span>
-                      ) : (
+                      ) : row.auctionDone && row.status === "approved" ? (
                         // "Unsold" once the room has run — the season desk's word
                         // too — and a dash before it, when nobody is placed yet.
-                        <span className="px-dash">
-                          {row.auctionDone && row.status === "approved" ? "Unsold" : "—"}
-                        </span>
+                        <Pill tone="neutral">Unsold</Pill>
+                      ) : (
+                        <span className="px-dash">—</span>
                       )}
                     </td>
-                    <td data-label="Status">
+                    <td className="px-cell-status" data-label="Status">
                       <Pill tone={STATUS_TONE[row.status]} dot>
                         {STATUS_LABEL[row.status]}
                       </Pill>
                     </td>
-                    <td data-label="Fee">
-                      <Pill tone={FEE_TONE[row.feeStatus]}>{FEE_LABEL[row.feeStatus]}</Pill>
-                    </td>
+                    {showFee ? (
+                      <td className="px-cell-fee" data-label="Fee">
+                        <Pill tone={FEE_TONE[row.feeStatus]}>{FEE_LABEL[row.feeStatus]}</Pill>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -322,7 +316,7 @@ export default async function PlayersPage({
             ) : null}
           </nav>
         ) : null}
-      </SectionCard>
+      </section>
     </main>
   );
 }
