@@ -1,6 +1,5 @@
-import { Card, EmptyState, IconArrowLeft, PageIntro, SectionHeader } from "@desiauction/ui";
+import { Card, EmptyState, PageIntro } from "@desiauction/ui";
 import { enabledSports } from "../../../server/competition/sports";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense, type ReactNode } from "react";
 
@@ -91,13 +90,8 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
   return (
     <main className="competitions">
       <div className="competitions-stack">
-        {/* This page had no way back but the browser's own button. */}
-        <p className="tg-backlink">
-          <Link href="/tournaments">
-            <IconArrowLeft width={14} height={14} aria-hidden />
-            All tournaments
-          </Link>
-        </p>
+        {/* The way back is the identity bar's trail ("Tournaments"); the
+            separate "← All tournaments" row repeated it. */}
         <PageTitle title={tournament.name} />
         <PageIntro
           subtitle={tournament.orgName}
@@ -184,21 +178,19 @@ async function SeasonsSection({
 
   return (
     <>
-      {what}
-      <section className="seasons-section">
-        <SectionHeader
-          title={`Seasons (${String(seasons.length)})`}
-          {...(canCreateSeason
-            ? {}
-            : {
-                actions: (
-                  <span className="tg-cannot" data-testid="tournament-cannot-create">
-                    Ask an owner to add a season.
-                  </span>
-                ),
-              })}
-        />
-        <div className="competitions-grid" data-testid="tournament-seasons">
+      <section className="seasons-section" aria-labelledby="tg-seasons-title">
+        <div className="tg-section-head">
+          <h2 id="tg-seasons-title" className="tg-section-title">
+            Seasons <span className="tg-section-count">{seasons.length}</span>
+          </h2>
+          {what}
+          {canCreateSeason ? null : (
+            <span className="tg-cannot" data-testid="tournament-cannot-create">
+              Ask an owner to add a season.
+            </span>
+          )}
+        </div>
+        <div className="competitions-grid da-stagger" data-testid="tournament-seasons">
           {seasons.map((season) => (
             <SeasonCard key={season.id} season={season} />
           ))}

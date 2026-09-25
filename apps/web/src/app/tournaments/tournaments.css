@@ -691,8 +691,11 @@
      pills at 9rem plus the gap exceed 390, so they wrap onto separate lines —
      which is the correct outcome, and the one the old rule prevented by
      letting them collapse to 25px instead. */
+  /* Status, Sort and the layout pair share one row (the pair used to take
+     a 60px row of its own). */
   .tg-pill {
-    flex: 1 1 9rem;
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 
@@ -943,30 +946,10 @@
 }
 
 /* --- featured season (founder mockup 6) ----------------------------------- */
-/* One white card: the floodlit banner and its side panel on top, the season's
-   road underneath. */
+/* One floodlit banner (the kit's HeroBanner) with the season's road along its
+   bottom edge — no white side panel, no separate stepper band. */
 .tg-feature {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-2xl);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-}
-
-.tg-feature-top {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: center;
-}
-
-@media (min-width: 1100px) {
-  .tg-feature-top {
-    grid-template-columns: minmax(0, 2.4fr) minmax(16rem, 1fr);
-  }
+  display: block;
 }
 
 /* `.competitions h2` (seasons.css) is written for the page's own section
@@ -979,72 +962,128 @@
   color: var(--hero-ink);
 }
 
+.tg-feature .sh-ghost {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tg-feature .tg-feature-open {
+  background: var(--hero-ink);
+  border-color: var(--hero-ink);
+  color: var(--hero-night);
+  font-weight: var(--font-weight-semibold);
+}
+
+.tg-feature .tg-feature-open:hover {
+  background: var(--hero-ink-soft);
+}
+
 @media (max-width: 719px) {
   .competitions .tg-feature h2 {
     font-size: var(--text-xl-size);
   }
 }
 
-.tg-feature-side {
+/* --- the summary: one ruled strip of four facts ---------------------------- */
+.tg-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.tg-fact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+.tg-fact + .tg-fact {
+  border-inline-start: 1px solid var(--border-subtle);
+}
+
+.tg-fact-text {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  min-width: 0;
 }
 
-.tg-feature-name {
-  margin: var(--space-1) 0 0;
-  font-size: var(--text-xl-size);
-  line-height: 1.2;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.01em;
-  color: var(--text-heading);
-  overflow-wrap: anywhere;
-}
-
-.tg-feature-sub {
-  margin: 0;
-  font-size: var(--text-md-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-}
-
-.tg-feature-when {
-  margin: 0;
+.tg-fact-line {
+  overflow: hidden;
   font-size: var(--text-sm-size);
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tg-fact-value {
+  margin-inline-end: 2px;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.tg-fact[data-quiet] .tg-fact-value {
   color: var(--text-secondary);
 }
 
-.tg-feature-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+.tg-fact-hint {
+  overflow: hidden;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-/* The stepper is a card of its own in the kit; inside this card it is a row. */
-.tg-feature-steps > ol {
-  border: 0;
-  box-shadow: none;
-  background: none;
-  padding: 0;
+@media (max-width: 1023px) {
+  .tg-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tg-fact:nth-child(3) {
+    border-inline-start: 0;
+  }
+
+  .tg-fact:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
+  }
 }
 
-/* --- "Looking to create a new season?" ------------------------------------ */
+@media (max-width: 719px) {
+  .tg-fact {
+    gap: var(--space-2);
+    padding: 10px var(--space-3);
+  }
+
+  .tg-fact-hint {
+    display: none;
+  }
+
+  .tg-fact-line {
+    white-space: normal;
+    font-size: var(--text-xs-size);
+  }
+}
+
+/* --- "Running another edition?" — a quiet dashed row ------------------------ */
 .tg-cta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-4) var(--space-5);
-  width: 100%;
-  max-width: 52rem;
-  margin: var(--space-2) auto 0;
+  gap: var(--space-3) var(--space-4);
   box-sizing: border-box;
-  padding: var(--space-5) var(--space-6);
-  border: 1px solid var(--border-subtle);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-strong);
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--accent-subtle) 60%, var(--surface-raised));
+  background: transparent;
 }
 
 .tg-cta-text {
@@ -1054,7 +1093,7 @@
 
 .competitions .tg-cta h2 {
   margin: 0;
-  font-size: var(--text-md-size);
+  font-size: var(--text-sm-size);
   line-height: 1.3;
 }
 
@@ -1064,22 +1103,36 @@
   color: var(--text-secondary);
 }
 
-@media (max-width: 620px) {
-  .tg-cta {
-    padding: var(--space-4);
-  }
+/* --- one tournament: a compact section head over its season cards ---------- */
+.tg-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
 }
 
-/* See home.css: the kit's journey link overflows its row without border-box. */
-.tg-feature-steps li > * {
+.competitions .tg-section-head .tg-section-title {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: 1.3;
+}
+
+.tg-section-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  margin-inline-start: 4px;
+  padding: 0 6px;
   box-sizing: border-box;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  vertical-align: 2px;
 }
 
-/* Stacked under the banner, the side panel would restate the banner's name and
-   dates a second time; it keeps only its status, tournament and the way in. */
-@media (max-width: 1099px) {
-  .tg-feature-name,
-  .tg-feature-when {
-    display: none;
-  }
+.tg-section-head .tg-what {
+  font-size: var(--text-sm-size);
 }
