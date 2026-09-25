@@ -6,28 +6,29 @@ import {
   Button,
   ButtonLink,
   Dialog,
+  FilterMenu,
   IconArrowRight,
-  IconCheckCircle,
   IconChevronLeft,
   IconChevronRight,
-  IconClock,
+  IconCrown,
   IconDownload,
-  IconFile,
   IconGavel,
   IconKebab,
-  IconMinusCircle,
+  IconLock,
   IconRefresh,
   IconSearch,
+  IconStar,
   IconUpload,
-  IconUsers,
   IconWallet,
-  IconXCircle,
   Pill,
   PlayerImage,
   PopoverMenu,
   SectionCard,
-  StatCard,
+  SegmentedTabs,
   TeamChip,
+  Toolbar,
+  ToolbarChip,
+  ToolbarSpacer,
   useToast,
   VisuallyHidden,
   type KitTone,
@@ -69,19 +70,11 @@ import { canTriage, FEE_LABEL, PAST_TENSE, REASON_LABEL, type Row } from "../_pl
 import { decisionToast, PlayerSheet } from "../_players/player-sheet";
 import { useMutate } from "../_players/use-mutate";
 import { useRoster } from "../_players/use-roster";
+import { PlayersViews } from "../sibling-link";
 import { AddPlayerDialog } from "./add-player-dialog";
 import { ImportDialog } from "./import-dialog";
 import "../_players/players-desk.css";
 
-const STATUS_FILTERS = ["", "submitted", "approved", "rejected", "waitlisted", "withdrawn"];
-const STATUS_LABEL: Record<string, string> = {
-  "": "All statuses",
-  submitted: "Submitted",
-  approved: "Approved",
-  rejected: "Declined",
-  waitlisted: "Waitlisted",
-  withdrawn: "Withdrawn",
-};
 const SORTS = ["recent", "oldest", "name", "number", "status"];
 const SORT_LABEL: Record<string, string> = {
   recent: "Newest first",
@@ -191,6 +184,8 @@ export function RegistrationDashboardPanel({
   /** Closed, the viewer may advance the season, and the auction has not begun. */
   canReopen?: boolean;
 }) {
+  /* Registrations | Lineups, once there are squads to pick lineups from. */
+  const showViews = desk.rosterLocked;
   const router = useRouter();
   const toast = useToast();
   const hydrated = useHydrated();
@@ -667,17 +662,54 @@ export function RegistrationDashboardPanel({
   return (
     <div className="pd-desk" data-sheet-open={sheetRow !== null ? "true" : undefined}>
       {/* The page head's lede and actions. The shell draws the trail, the one
-          <h1> and — in the top bar — the season's status pill. */}
+          <h1> and — in the top bar — the season's status pill. The two derived
+          figures (auction pool, fees) ride the lede as facts, not tiles: they
+          are not filters of the list below, so they do not sit with its tabs. */}
       <div className="rd-head">
-        <p className="rd-lede">
-          {stats.total === 0
-            ? "Share the registration link, add players yourself or import your sheet."
-            : `${String(stats.total)} player${stats.total === 1 ? "" : "s"} registered · ${
-                pendingReview === 0
-                  ? "everyone reviewed"
-                  : `${String(pendingReview)} waiting for a decision`
-              }`}
-        </p>
+        <div className="rd-head-main">
+          <p className="rd-lede">
+            {stats.total === 0
+              ? "Share the registration link, add players yourself or import your sheet."
+              : `${String(stats.total)} player${stats.total === 1 ? "" : "s"} registered · ${
+                  pendingReview === 0
+                    ? "everyone reviewed"
+                    : `${String(pendingReview)} waiting for a decision`
+                }`}
+          </p>
+          {/* DA-35: the figure that decides what auction night contains — the
+              same rule the Auction tab filters on, so the two cannot disagree. */}
+          <span
+            className="rd-fact"
+            data-testid="stat-auction-pool"
+            title={`Auction pool: ${poolHint(stats)}`}
+          >
+            <IconGavel size={16} weight="duotone" aria-hidden />
+            <span>
+              <span className="stat-value">{stats.auctionPool}</span> in auction pool
+            </span>
+            <span className="rd-fact-hint stat-hint">{poolHint(stats)}</span>
+          </span>
+          {feesInUse ? (
+            <button
+              type="button"
+              className="rd-fact"
+              data-interactive="true"
+              data-testid="stat-fees-paid"
+              aria-pressed={filters.fee === "paid"}
+              title="Show the players who have paid"
+              onClick={() => {
+                changeFilter({ fee: filters.fee === "paid" ? "" : "paid" });
+              }}
+            >
+              <IconWallet size={16} weight="duotone" aria-hidden />
+              <span>
+                <span className="stat-value">{stats.fees.paid}</span> fees paid
+              </span>
+              <span className="rd-fact-hint stat-hint">{feeHint(stats)}</span>
+            </button>
+          ) : null}
+          {registrationOpen ? null : share}
+        </div>
         <div className="rd-actions">
           <Button
             variant="secondary"
@@ -686,7 +718,7 @@ export function RegistrationDashboardPanel({
               setImportOpen(true);
             }}
           >
-            <IconUpload size={18} className="icon-lead" aria-hidden />
+            <IconUpload size={16} className="icon-lead" aria-hidden />
             Import players
           </Button>
           {canReopen ? (
@@ -696,7 +728,7 @@ export function RegistrationDashboardPanel({
               loading={reopening}
               onClick={() => void reopen()}
             >
-              <IconRefresh size={18} className="icon-lead" aria-hidden />
+              <IconRefresh size={16} className="icon-lead" aria-hidden />
               Reopen registration
             </Button>
           ) : null}
@@ -709,7 +741,7 @@ export function RegistrationDashboardPanel({
         </div>
       </div>
 
-      {share}
+      {registrationOpen ? share : null}
 
       <NextStep
         stats={stats}
@@ -755,102 +787,6 @@ export function RegistrationDashboardPanel({
           are left as they are.
         </p>
       </Dialog>
-
-      {/* Eight figures, and seven of them are the list's own filters: the
-          open one is gold. The auction pool is derived, so it explains itself
-          instead of filtering. */}
-      <div className="rd-stats" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
-        <StatTile
-          icon={<IconUsers />}
-          tone="neutral"
-          label="Total"
-          value={stats.total}
-          testId="stat-total"
-          active={filters.status === "" && filters.fee === ""}
-          onSelect={() => {
-            changeFilter({ status: "", fee: "" });
-          }}
-        />
-        <StatTile
-          icon={<IconFile />}
-          tone="blue"
-          label="Submitted"
-          value={stats.submitted}
-          testId="stat-submitted"
-          active={filters.status === "submitted"}
-          onSelect={() => {
-            changeFilter({ status: "submitted" });
-          }}
-        />
-        <StatTile
-          icon={<IconCheckCircle />}
-          tone="green"
-          label="Approved"
-          value={stats.approved}
-          testId="stat-approved"
-          active={filters.status === "approved"}
-          onSelect={() => {
-            changeFilter({ status: "approved" });
-          }}
-        />
-        {/* DA-35: the figure that decides what auction night contains — the
-            same rule the Auction tab filters on, so the two cannot disagree. */}
-        <StatTile
-          icon={<IconGavel />}
-          tone="gold"
-          label="Auction pool"
-          value={stats.auctionPool}
-          testId="stat-auction-pool"
-          hint={poolHint(stats)}
-        />
-        {feesInUse ? (
-          <StatTile
-            icon={<IconWallet />}
-            tone="green"
-            label="Fees paid"
-            value={stats.fees.paid}
-            testId="stat-fees-paid"
-            active={filters.fee === "paid"}
-            onSelect={() => {
-              changeFilter({ fee: filters.fee === "paid" ? "" : "paid" });
-            }}
-            hint={feeHint(stats)}
-          />
-        ) : null}
-        <StatTile
-          icon={<IconClock />}
-          tone="amber"
-          label="Waitlisted"
-          value={stats.waitlisted}
-          testId="stat-waitlisted"
-          active={filters.status === "waitlisted"}
-          onSelect={() => {
-            changeFilter({ status: "waitlisted" });
-          }}
-        />
-        <StatTile
-          icon={<IconXCircle />}
-          tone="red"
-          label="Declined"
-          value={stats.rejected}
-          testId="stat-rejected"
-          active={filters.status === "rejected"}
-          onSelect={() => {
-            changeFilter({ status: "rejected" });
-          }}
-        />
-        <StatTile
-          icon={<IconMinusCircle />}
-          tone="neutral"
-          label="Withdrawn"
-          value={stats.withdrawn}
-          testId="stat-withdrawn"
-          active={filters.status === "withdrawn"}
-          onSelect={() => {
-            changeFilter({ status: "withdrawn" });
-          }}
-        />
-      </div>
 
       {/* DA-35: the orphan. A pre-signed player with no team is in NO auction
           and NO squad. Each name opens the player, one click from the fix. */}
@@ -917,164 +853,240 @@ export function RegistrationDashboardPanel({
         </div>
       ) : null}
 
-      <SectionCard
-        flush
-        className="rd-card"
-        icon={<IconUsers />}
-        title="Players"
-        description={`${String(page.total)} player${page.total === 1 ? "" : "s"}${
-          filtersApplied ? " match these filters" : ""
-        }`}
-        action={
-          <Button
-            size="sm"
-            variant="secondary"
-            data-testid="export-csv"
-            onClick={() => {
-              setExportOpen(true);
-            }}
-          >
-            <IconDownload size={16} className="icon-lead" aria-hidden />
-            Export
-          </Button>
-        }
-      >
+      <SectionCard flush className="rd-card" title="Players" hideHeader>
+        {/* ROW 1 — which list: the Players views, then the status tabs. The
+            counts are the old figure tiles; each one is the filter it names
+            (`stat-*` stay the suites' hooks, `.stat-value` the figure). */}
+        <div className="rd-tabs" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
+          {showViews ? <PlayersViews slug={slug} active="registrations" /> : null}
+          <SegmentedTabs
+            label="Registration status"
+            items={[
+              {
+                key: "all",
+                label: "All",
+                count: <span className="stat-value">{stats.total}</span>,
+                active: filters.status === "" && filters.fee === "",
+                testId: "stat-total",
+                onSelect: () => {
+                  changeFilter({ status: "", fee: "" });
+                },
+              },
+              {
+                key: "submitted",
+                label: "To review",
+                count: <span className="stat-value">{stats.submitted}</span>,
+                attention: stats.submitted > 0,
+                active: filters.status === "submitted",
+                testId: "stat-submitted",
+                onSelect: () => {
+                  changeFilter({ status: "submitted" });
+                },
+              },
+              {
+                key: "approved",
+                label: "Approved",
+                count: <span className="stat-value">{stats.approved}</span>,
+                active: filters.status === "approved",
+                testId: "stat-approved",
+                onSelect: () => {
+                  changeFilter({ status: "approved" });
+                },
+              },
+              {
+                key: "waitlisted",
+                label: "Waitlisted",
+                count: <span className="stat-value">{stats.waitlisted}</span>,
+                active: filters.status === "waitlisted",
+                testId: "stat-waitlisted",
+                onSelect: () => {
+                  changeFilter({ status: "waitlisted" });
+                },
+              },
+              {
+                key: "rejected",
+                label: "Declined",
+                count: <span className="stat-value">{stats.rejected}</span>,
+                active: filters.status === "rejected",
+                testId: "stat-rejected",
+                onSelect: () => {
+                  changeFilter({ status: "rejected" });
+                },
+              },
+              {
+                key: "withdrawn",
+                label: "Withdrawn",
+                count: <span className="stat-value">{stats.withdrawn}</span>,
+                active: filters.status === "withdrawn",
+                testId: "stat-withdrawn",
+                onSelect: () => {
+                  changeFilter({ status: "withdrawn" });
+                },
+              },
+            ]}
+          />
+        </div>
+
+        {/* ROW 2 — ONE toolbar: search · what is set · count · Filters · Sort ·
+            Export. It used to be a card head, a row of five selects and a
+            select-all row (~150px); the select-all is the table's own header
+            checkbox now. */}
         <form
-          className="pd-filters rd-filters"
+          className="rd-toolbar"
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
             changeFilter({ q: search.trim() });
           }}
         >
-          <div className="pd-search">
-            {/* The magnifier IS the submit button — Enter works too, and the
-                list also follows typing, a beat after the last key. */}
-            <button
-              type="submit"
-              className="pd-search-icon"
-              data-testid="search-submit"
-              aria-label="Search"
+          <Toolbar>
+            <div className="pd-search rd-search">
+              {/* The magnifier IS the submit button — Enter works too, and the
+                  list also follows typing, a beat after the last key. */}
+              <button
+                type="submit"
+                className="pd-search-icon"
+                data-testid="search-submit"
+                aria-label="Search"
+              >
+                <IconSearch size={16} aria-hidden />
+              </button>
+              <label htmlFor="pd-search" className="pd-visually-hidden">
+                Search
+              </label>
+              <input
+                id="pd-search"
+                type="text"
+                enterKeyHint="search"
+                autoComplete="off"
+                className="pd-input"
+                placeholder="Search name, phone, # or team"
+                value={search}
+                onChange={(event) => {
+                  onSearchInput(event.target.value);
+                }}
+              />
+              <kbd className="rd-kbd" aria-hidden>
+                /
+              </kbd>
+            </div>
+            {filters.role !== "" ? (
+              <ToolbarChip
+                removeLabel="Remove role filter"
+                onRemove={() => {
+                  changeFilter({ role: "" });
+                }}
+              >
+                Role: {labelOf(desk.roles, filters.role)}
+              </ToolbarChip>
+            ) : null}
+            {filters.team !== "" ? (
+              <ToolbarChip
+                removeLabel="Remove team filter"
+                onRemove={() => {
+                  changeFilter({ team: "" });
+                }}
+              >
+                Team: {teams.find((team) => team.id === filters.team)?.name ?? "—"}
+              </ToolbarChip>
+            ) : null}
+            {filters.fee !== "" ? (
+              <ToolbarChip
+                removeLabel="Remove fee filter"
+                onRemove={() => {
+                  changeFilter({ fee: "" });
+                }}
+              >
+                Fee: {(FEE_LABEL as Partial<Record<string, string>>)[filters.fee] ?? filters.fee}
+              </ToolbarChip>
+            ) : null}
+            {filtersApplied ? (
+              <button
+                type="button"
+                className="rd-reset"
+                data-testid="filters-reset"
+                onClick={() => {
+                  setSearch("");
+                  changeFilter({ q: "", status: "", fee: "", team: "", role: "", sort: "" });
+                }}
+              >
+                Clear all
+              </button>
+            ) : null}
+            <ToolbarSpacer />
+            <span className="rd-count">
+              {filtersApplied
+                ? `${String(page.total)} of ${String(stats.total)}`
+                : `${String(page.total)} player${page.total === 1 ? "" : "s"}`}
+            </span>
+            <FilterMenu
+              testId="filters-menu"
+              activeCount={[filters.role, filters.team, filters.fee].filter((v) => v !== "").length}
             >
-              <IconSearch size={16} aria-hidden />
-            </button>
-            <label htmlFor="pd-search" className="pd-visually-hidden">
-              Search
-            </label>
-            <input
-              id="pd-search"
-              type="text"
-              enterKeyHint="search"
-              autoComplete="off"
-              className="pd-input"
-              placeholder="Search name, phone, number or team   /"
-              value={search}
-              onChange={(event) => {
-                onSearchInput(event.target.value);
-              }}
-            />
-          </div>
-          <FilterSelect
-            label="Status"
-            value={filters.status}
-            onChange={(value) => {
-              changeFilter({ status: value });
-            }}
-            options={STATUS_FILTERS.map((status) => ({
-              value: status,
-              label: STATUS_LABEL[status] ?? status,
-            }))}
-          />
-          {desk.roles.length > 0 ? (
+              {desk.roles.length > 0 ? (
+                <FilterSelect
+                  label="Role"
+                  visibleLabel
+                  value={filters.role}
+                  onChange={(value) => {
+                    changeFilter({ role: value });
+                  }}
+                  options={[
+                    { value: "", label: "All roles" },
+                    ...desk.roles.map((role) => ({ value: role.key, label: role.label })),
+                  ]}
+                />
+              ) : null}
+              <FilterSelect
+                label="Team"
+                visibleLabel
+                value={filters.team}
+                onChange={(value) => {
+                  changeFilter({ team: value });
+                }}
+                options={[
+                  { value: "", label: "All teams" },
+                  ...teams.map((team) => ({ value: team.id, label: team.name })),
+                ]}
+              />
+              <FilterSelect
+                label="Fee"
+                visibleLabel
+                value={filters.fee}
+                onChange={(value) => {
+                  changeFilter({ fee: value });
+                }}
+                options={[
+                  { value: "", label: "Any fee status" },
+                  ...FEE_STATUSES.map((state) => ({ value: state, label: FEE_LABEL[state] })),
+                ]}
+              />
+            </FilterMenu>
             <FilterSelect
-              label="Role"
-              value={filters.role}
+              label="Sort"
+              className="rd-sort"
+              value={filters.sort}
               onChange={(value) => {
-                changeFilter({ role: value });
+                changeFilter({ sort: value });
               }}
-              options={[
-                { value: "", label: "All roles" },
-                ...desk.roles.map((role) => ({ value: role.key, label: role.label })),
-              ]}
+              options={SORTS.map((sort) => ({ value: sort, label: SORT_LABEL[sort] ?? sort }))}
             />
-          ) : null}
-          <FilterSelect
-            label="Team"
-            value={filters.team}
-            onChange={(value) => {
-              changeFilter({ team: value });
-            }}
-            options={[
-              { value: "", label: "All teams" },
-              ...teams.map((team) => ({ value: team.id, label: team.name })),
-            ]}
-          />
-          <FilterSelect
-            label="Fee"
-            value={filters.fee}
-            onChange={(value) => {
-              changeFilter({ fee: value });
-            }}
-            options={[
-              { value: "", label: "Any fee status" },
-              ...FEE_STATUSES.map((state) => ({ value: state, label: FEE_LABEL[state] })),
-            ]}
-          />
-          <FilterSelect
-            label="Sort"
-            value={filters.sort}
-            onChange={(value) => {
-              changeFilter({ sort: value });
-            }}
-            options={SORTS.map((sort) => ({ value: sort, label: SORT_LABEL[sort] ?? sort }))}
-          />
-          <button
-            type="button"
-            className="rd-reset"
-            data-testid="filters-reset"
-            disabled={!filtersApplied}
-            onClick={() => {
-              setSearch("");
-              changeFilter({ q: "", status: "", fee: "", team: "", role: "", sort: "" });
-            }}
-          >
-            <IconRefresh size={16} aria-hidden />
-            Reset
-          </button>
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="export-csv"
+              className="rd-export"
+              onClick={() => {
+                setExportOpen(true);
+              }}
+            >
+              <IconDownload size={16} className="icon-lead" aria-hidden />
+              Export
+            </Button>
+          </Toolbar>
         </form>
 
         <div className="pd-table-wrap" data-busy={navigating ? "true" : undefined}>
-          <div className="pd-table-head">
-            {rows.length > 0 ? (
-              <label className="pd-check">
-                <input
-                  type="checkbox"
-                  aria-label="Select all on page"
-                  checked={allOnPageSelected}
-                  onChange={() => {
-                    setSelected((prev) => {
-                      const next = new Map(prev);
-                      if (allOnPageSelected) {
-                        rows.forEach((row) => next.delete(row.id));
-                      } else {
-                        rows.forEach((row) => {
-                          next.set(row.id, { id: row.id, number: row.number, name: row.name });
-                        });
-                      }
-                      return next;
-                    });
-                  }}
-                />
-                <span>Select all on this page</span>
-              </label>
-            ) : (
-              <span />
-            )}
-            <span className="pd-quiet pd-shortcuts">
-              <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>x</kbd> select
-            </span>
-          </div>
-
           <div className="pd-table-scroll" role="region" aria-label="Registrations table">
             <table className="pd-table" data-testid="reg-table">
               <caption className="pd-visually-hidden">
@@ -1084,14 +1096,41 @@ export function RegistrationDashboardPanel({
               <thead>
                 <tr>
                   <th className="pd-col-check">
-                    <VisuallyHidden>Select</VisuallyHidden>
+                    {rows.length > 0 ? (
+                      <input
+                        type="checkbox"
+                        className="pd-row-check"
+                        aria-label="Select all on page"
+                        title="Select all on this page"
+                        checked={allOnPageSelected}
+                        onChange={() => {
+                          setSelected((prev) => {
+                            const next = new Map(prev);
+                            if (allOnPageSelected) {
+                              rows.forEach((row) => next.delete(row.id));
+                            } else {
+                              rows.forEach((row) => {
+                                next.set(row.id, {
+                                  id: row.id,
+                                  number: row.number,
+                                  name: row.name,
+                                });
+                              });
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                    ) : (
+                      <VisuallyHidden>Select</VisuallyHidden>
+                    )}
                   </th>
                   <th className="pd-col-num">#</th>
                   <th>Player</th>
                   <th className="pd-col-role">Role</th>
                   <th className="pd-col-team">Team</th>
                   <th className="pd-col-status">Status</th>
-                  <th className="pd-col-fee">Fee status</th>
+                  {feesInUse ? <th className="pd-col-fee">Fee</th> : null}
                   <th className="pd-col-date">Registered on</th>
                   <th className="pd-col-actions">
                     <VisuallyHidden>Actions</VisuallyHidden>
@@ -1127,7 +1166,7 @@ export function RegistrationDashboardPanel({
                 ))}
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="pd-empty" data-testid="reg-empty">
+                    <td colSpan={feesInUse ? 9 : 8} className="pd-empty" data-testid="reg-empty">
                       {!filtersApplied && stats.total > 0 ? (
                         <>
                           <strong>
@@ -1177,6 +1216,9 @@ export function RegistrationDashboardPanel({
               <span data-testid="page-indicator" className="pd-quiet">
                 {page.total} total · showing {firstOnPage + 1}–
                 {Math.min(page.total, firstOnPage + rows.length)}
+              </span>
+              <span className="pd-quiet pd-shortcuts">
+                <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>x</kbd> select
               </span>
               <span className="pd-pager-buttons">
                 <button
@@ -1775,7 +1817,8 @@ function PlayerRow({
               data-testid="captain-flag"
               title="Captain — skips the auction"
             >
-              Captain
+              <IconCrown size={16} weight="fill" aria-hidden />
+              <VisuallyHidden>Captain</VisuallyHidden>
             </span>
           ) : null}
           {row.isIcon ? (
@@ -1785,7 +1828,8 @@ function PlayerRow({
               data-testid="icon-flag"
               title="Icon — skips the auction"
             >
-              Icon
+              <IconStar size={16} weight="fill" aria-hidden />
+              <VisuallyHidden>Icon</VisuallyHidden>
             </span>
           ) : null}
           {row.isRetained ? (
@@ -1795,7 +1839,8 @@ function PlayerRow({
               data-testid="retained-flag"
               title="Retained — skips the auction"
             >
-              Retained
+              <IconLock size={16} weight="fill" aria-hidden />
+              <VisuallyHidden>Retained</VisuallyHidden>
             </span>
           ) : null}
         </span>
@@ -1815,17 +1860,14 @@ function PlayerRow({
           </span>
         ) : null}
       </td>
-      <td className="pd-col-fee">
-        {feesInUse ? (
+      {/* A free league has no fee column at all (it was 25 rows of "—"). */}
+      {feesInUse ? (
+        <td className="pd-col-fee">
           <Pill tone={FEE_PILL[row.feeStatus]} testId={`fee-${row.personId}`}>
             {FEE_LABEL[row.feeStatus]}
           </Pill>
-        ) : (
-          <span className="pd-quiet" data-testid={`fee-${row.personId}`}>
-            —<VisuallyHidden> no entry fee recorded</VisuallyHidden>
-          </span>
-        )}
-      </td>
+        </td>
+      ) : null}
       <td className="pd-col-date">
         <time dateTime={row.createdAt}>{formatDate(row.createdAt)}</time>
       </td>
@@ -1888,16 +1930,24 @@ function FilterSelect({
   value,
   onChange,
   options,
+  visibleLabel = false,
+  className,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: readonly { value: string; label: string }[];
+  /** Inside the Filters menu the label is shown above the select. */
+  visibleLabel?: boolean;
+  className?: string;
 }) {
   const id = `pd-filter-${label.toLowerCase()}`;
   return (
-    <span className="pd-filter">
-      <label htmlFor={id} className="pd-visually-hidden">
+    <span
+      className={["pd-filter", className].filter(Boolean).join(" ")}
+      data-labelled={visibleLabel ? "true" : undefined}
+    >
+      <label htmlFor={id} className={visibleLabel ? "rd-filter-label" : "pd-visually-hidden"}>
         {label}
       </label>
       <select
@@ -1916,40 +1966,5 @@ function FilterSelect({
         ))}
       </select>
     </span>
-  );
-}
-
-function StatTile({
-  icon,
-  tone,
-  label,
-  value,
-  testId,
-  onSelect,
-  active,
-  hint,
-}: {
-  icon: ReactNode;
-  tone: KitTone;
-  label: string;
-  value: number;
-  testId: string;
-  /** PX-4: tiles double as one-click status views (URL-backed, shareable). */
-  onSelect?: () => void;
-  active?: boolean;
-  /** A figure that is DERIVED says how, where it is read. */
-  hint?: string;
-}) {
-  // `.stat-value` / `.stat-hint` are the suites' hooks into the figure.
-  return (
-    <StatCard
-      icon={icon}
-      tone={tone}
-      value={<span className="stat-value">{value}</span>}
-      label={label}
-      {...(hint !== undefined ? { hint: <span className="stat-hint">{hint}</span> } : {})}
-      testId={testId}
-      {...(onSelect !== undefined ? { onSelect, active: active === true } : {})}
-    />
   );
 }
