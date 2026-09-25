@@ -1,7 +1,7 @@
 import {
   EmptyState,
   IconAlert,
-  IconArrowLeft,
+  SegmentedTabs,
   IconBroadcast,
   IconChart,
   IconClock,
@@ -18,8 +18,9 @@ import {
   type AnalyticsChannel,
   type ReasonRow,
 } from "../../../../server/admin/delivery-analytics-views";
-import { NavButton } from "../../../players/nav-button";
 import { TrendChart } from "./trend-chart";
+import { AdminPageHead } from "../../admin-ui";
+import { NotifySubnav } from "../notify-subnav";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 import "../notifications.css";
@@ -70,29 +71,26 @@ export default async function AdminDeliveryAnalyticsPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head ntc-page-head">
-          <NavButton href="/admin/notifications" variant="ghost" className="ntc-back">
-            <IconArrowLeft size={18} aria-hidden />
-            All notifications
-          </NavButton>
-          <p className="dash-hint">
-            How queued messages went — sent, suppressed or failed — by channel and by kind, and why
-            the ones that did not go did not. Counts only. Sign-in codes, receipts and security
-            emails are sent directly and are not counted here. Days are India time.
-          </p>
-          <nav aria-label="Time window" className="dla-windows" data-testid="analytics-windows">
-            {ANALYTICS_WINDOWS.map((days) => (
-              <NavButton
-                key={days}
-                href={`/admin/notifications/analytics?days=${String(days)}`}
-                variant={days === windowDays ? "primary" : "secondary"}
-                current={days === windowDays}
-              >
-                Last {String(days)} days
-              </NavButton>
-            ))}
-          </nav>
-        </header>
+        <AdminPageHead
+          actions={
+            <SegmentedTabs
+              label="Time window"
+              testId="analytics-windows"
+              items={ANALYTICS_WINDOWS.map((days) => ({
+                key: String(days),
+                label: `Last ${String(days)} days`,
+                href: `/admin/notifications/analytics?days=${String(days)}`,
+                active: days === windowDays,
+              }))}
+            />
+          }
+        >
+          <NotifySubnav current="analytics" />
+        </AdminPageHead>
+        <p className="admin-lede admin-lede-under">
+          Queued messages by channel and kind, and why the ones that did not go did not. Sign-in
+          codes, receipts and security emails are not counted. Days are India time.
+        </p>
 
         <SectionCard
           icon={<IconBroadcast />}

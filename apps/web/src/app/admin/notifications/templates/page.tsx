@@ -1,6 +1,5 @@
 import {
   EmptyState,
-  IconArrowLeft,
   IconClock,
   IconInfo,
   IconLock,
@@ -24,7 +23,6 @@ import {
   type StatusView,
   type WhatsAppRow,
 } from "../../../../server/admin/provider-template-views";
-import { NavButton } from "../../../players/nav-button";
 import { RelativeTime } from "../../admin-ui";
 import {
   ClearTemplate,
@@ -34,6 +32,8 @@ import {
   SubmitTemplate,
   UseApprovedName,
 } from "./template-controls";
+import { AdminPageHead } from "../../admin-ui";
+import { NotifySubnav } from "../notify-subnav";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 import "../notifications.css";
@@ -67,19 +67,13 @@ export default async function ProviderTemplatesPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head tpl-page-head">
-            {/* NavButton, not buttonClassName(): a server component. */}
-            <NavButton href="/admin/notifications" variant="ghost" className="tpl-back">
-              <IconArrowLeft size={18} aria-hidden />
-              All notifications
-            </NavButton>
-            <p className="dash-hint">
-              WhatsApp sends only templates Meta has approved, by name. Here you choose which
-              approved name each message uses, see Meta&rsquo;s verdict on it, and submit our
-              wording for approval. A mapping here wins over the server setting; clearing it goes
-              back to the server setting. Every change is on the audit log and can be reverted.
-            </p>
-          </header>
+          <AdminPageHead>
+            <NotifySubnav current="templates" />
+          </AdminPageHead>
+          <p className="admin-lede admin-lede-under">
+            Which Meta-approved template each message uses. A mapping here wins over the server
+            setting; every change is audited.
+          </p>
 
           <SyncCard view={view} />
           <OtpCard view={view} />
@@ -211,7 +205,10 @@ function Mapped({ mapped, testId }: { mapped: MappedView; testId: string }) {
           {mapped.note === null ? null : ` · ${mapped.note}`}
         </span>
       ) : null}
-      <span className="admin-meta">
+      <span
+        className="admin-meta ptpl-env"
+        title={`Server setting ${mapped.envVar}: ${mapped.envValue ?? "unset"}`}
+      >
         Server setting {mapped.envVar}: {mapped.envValue ?? "unset"}
       </span>
     </span>
@@ -292,7 +289,7 @@ function WhatsAppCard({ view }: { view: ProviderTemplatesView }) {
           </Notice>
         </div>
       )}
-      <ul className="admin-rows is-stacked">
+      <ul className="admin-rows ptpl-grid">
         {view.whatsapp.map((row) => (
           <WhatsAppKindRow key={row.kind} row={row} view={view} />
         ))}
@@ -347,7 +344,7 @@ function SmsCard({ view }: { view: ProviderTemplatesView }) {
           </Notice>
         </div>
       )}
-      <ul className="admin-rows is-stacked">
+      <ul className="admin-rows ptpl-grid">
         {view.sms.map((row) => (
           <SmsKindRow key={row.kind} row={row} />
         ))}

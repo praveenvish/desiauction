@@ -280,3 +280,389 @@
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+
+/* ══ wow pass: the switchboard ══════════════════════════════════════════
+   A column per channel, a row per message. The kind's name spans two rows:
+   its channel cells, then a footer line (opt-outs · wording). */
+
+.ntc-channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ntc-channel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) var(--space-5);
+  border-inline-end: 1px solid var(--border-subtle);
+}
+
+.ntc-channel:last-child {
+  border-inline-end: 0;
+}
+
+.ntc-channel .ntc-kind-head {
+  align-items: center;
+}
+
+.ntc-matrix {
+  --ntc-name: minmax(15rem, 1.35fr);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ntc-kinds {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ntc-kind {
+  display: grid;
+  grid-template-columns: var(--ntc-name) minmax(0, 3fr);
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.ntc-kinds > .ntc-kind:last-child {
+  border-bottom: 0;
+}
+
+.ntc-kinds > .ntc-kind:hover {
+  background: var(--surface-sunken);
+}
+
+.ntc-kind-name {
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ntc-kind-name .admin-name {
+  font-size: var(--text-sm-size);
+}
+
+.ntc-kind-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ntc-kind .ntc-cells {
+  display: grid;
+  grid-template-columns: repeat(var(--ntc-cols, 4), minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+}
+
+.ntc-matrix-head {
+  padding-block: 0;
+  height: 34px;
+  align-items: center;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ntc-matrix-head > span:first-child {
+  grid-row: auto;
+}
+
+.ntc-col-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.ntc-col-note {
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+/* A cell: switch + state on one line, then one quiet figure. */
+.ntc-kind .ntc-cell {
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.ntc-kind .ntc-cell-head {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+
+.ntc-kind .ntc-toggle {
+  min-height: 32px;
+  padding: 0;
+}
+
+.ntc-kind .ntc-toggle:hover {
+  background: none;
+}
+
+.ntc-kind .ntc-toggle input {
+  margin-top: 0;
+}
+
+.ntc-kind .ntc-locked-label {
+  min-height: 32px;
+}
+
+.ntc-counts {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.ntc-counts-bad {
+  color: var(--danger-strong);
+}
+
+.ntc-kind .ntc-why[data-shared] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.ntc-kind .ntc-cell {
+  position: relative;
+}
+
+.ntc-kind .ntc-why {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-xs-size);
+}
+
+.ntc-kind .ntc-template-link {
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+}
+
+.ntc-kind-foot {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  min-width: 0;
+  padding-top: var(--space-1);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.ntc-kind-foot .admin-meta svg {
+  vertical-align: -3px;
+}
+
+.ntc-kind-foot .ntc-controls {
+  gap: 0 var(--space-3);
+}
+
+.ntc-kind-foot .ntc-toggle {
+  min-height: 32px;
+  padding: 0 var(--space-1);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-regular);
+}
+
+.ntc-kind-foot .ntc-toggle input {
+  width: 16px;
+  height: 16px;
+  margin-top: 0;
+}
+
+.ntc-wording {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.ntc-wording-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.ntc-wording-link:hover {
+  border-color: var(--border-interactive);
+  color: var(--text-accent);
+}
+
+.ntc-wording-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ntc-recent > li {
+  padding-block: 8px;
+}
+
+.ntc-recent-line {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.admin-lede.admin-lede-under {
+  flex: none;
+  margin-top: calc(-1 * var(--space-2));
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* On a wide screen the column head names the channel, so the switch's
+   visible label steps back (it is still its accessible name). */
+@media (min-width: 900px) {
+  .ntc-kind .ntc-cell .notify-switch-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .ntc-kind .ntc-cell .ntc-locked-label {
+    display: none;
+  }
+
+  .ntc-kind .ntc-cell .ntc-toggle {
+    position: relative;
+  }
+}
+
+@media (max-width: 899px) {
+  .ntc-matrix-head {
+    display: none;
+  }
+
+  .ntc-kind {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: var(--space-4);
+    row-gap: var(--space-2);
+  }
+
+  .ntc-kind-name {
+    grid-row: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--space-2);
+  }
+
+  .ntc-kind-desc {
+    flex-basis: 100%;
+    -webkit-line-clamp: 1;
+  }
+
+  .ntc-kind .ntc-cells {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ntc-kind .ntc-cell {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .ntc-kind-foot {
+    grid-column: 1;
+  }
+
+  .ntc-channel {
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-inline: var(--space-4);
+  }
+}
+
+/* ── wow pass: delivery analytics ── three equal channel tiles, a quieter
+   "numbers by day" door, a chart with a floor. */
+
+.dla-figures {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.dla-channel {
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.dla-channel h3 {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.dla-channel dl {
+  font-size: var(--text-sm-size);
+}
+
+.dla-channel dd {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.dla-trend svg {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dla-trend summary {
+  min-height: 36px;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
