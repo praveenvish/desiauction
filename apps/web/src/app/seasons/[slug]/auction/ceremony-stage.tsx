@@ -260,8 +260,14 @@ export function CeremonyStage({
       )}
       {finished ? (
         <div className="ceremony-lot ceremony-waiting" data-testid="ceremony-finished">
-          <p className="ceremony-waiting-title" data-testid="ceremony-progress">
-            {snapshot.lotsResolved}/{snapshot.lotsTotal} lots resolved
+          {/* The figure in display type, the words in the text face: "37/37
+              LOTS RESOLVED" as one display line broke into three on a phone. */}
+          <p
+            className="ceremony-waiting-title ceremony-finished-count"
+            data-testid="ceremony-progress"
+          >
+            {snapshot.lotsResolved}/{snapshot.lotsTotal}{" "}
+            <span className="ceremony-finished-words">lots resolved</span>
           </p>
           {showcase.length > 0 ? (
             /* THE NIGHT'S HEADLINES — the biggest buys, by face, each ringed in

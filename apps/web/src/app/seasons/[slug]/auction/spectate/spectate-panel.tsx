@@ -228,7 +228,15 @@ export function SpectatePanel({
   const leadColor =
     teams.find((team) => team.name === lot?.currentBid?.teamName)?.primaryColor ?? null;
   const status = snapshot?.auctionStatus ?? null;
-  const finished = status === "completed" || status === "reconciled" || status === "abandoned";
+  // Over is decided by the snapshot when there is one, and by the server's
+  // record until then: a finished night used to open on the live layout — an
+  // empty "Bid feed" card — for as long as the socket took to answer (or for
+  // ever, when the engine was down).
+  const settledStatus = snapshot?.auctionStatus ?? auctionStatus;
+  const finished =
+    settledStatus === "completed" ||
+    settledStatus === "reconciled" ||
+    settledStatus === "abandoned";
   // A PAUSED auction is not an auction in progress. The hero renders green "on
   // the block", the leading team and a full gold countdown ring — which reads as
   // "plenty of time left" at the exact moment the clock is stopped. The ceremony
@@ -388,29 +396,16 @@ export function SpectatePanel({
           cards stand down. */}
       {finished ? squadBoard : null}
 
-      <div className="live-grid stage-hide">
-        {finished ? (
-          <>
-            <div className="live-col">
-              {/* No purse board after the night: every row read "sealed" (the
-                  engine keeps owners' headroom from guests), and the squads
-                  above already say what each team spent. */}
-              <UpNext snapshot={snapshot} lotMedia={lotMedia} />
-              <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={preSigned} />
-            </div>
-            <div className="live-col">
-              {/* Same reason as the live room and the cockpit: the component renders
-                its own connecting state, so guarding it here would move everything
-                below when the socket answers. */}
-              <span data-testid="spectate-progress">
-                <AuctionProgress snapshot={snapshot} />
-              </span>
-              {/* The rules were already on the wire and read only for the lot window.
-                "Why did that stop at ₹5L?" is answerable from here. */}
-              <RulesCard rules={rules} />
-            </div>
-          </>
-        ) : (
+      {/* After the night: the rules, once, full width. "Up next" is empty,
+          the pool card repeated the summary's tiles and the progress bar said
+          "37/37 · 0 in queue" a fourth time. */}
+      {finished ? (
+        <div className="stage-hide">
+          <RulesCard rules={rules} />
+        </div>
+      ) : null}
+      {finished ? null : (
+        <div className="live-grid stage-hide">
           <>
             <div className="live-col">
               <Card data-testid="spectate-history">
@@ -492,8 +487,8 @@ export function SpectatePanel({
               <RulesCard rules={rules} />
             </div>
           </>
-        )}
-      </div>
+        </div>
+      )}
 
       {finished ? null : squadBoard}
 

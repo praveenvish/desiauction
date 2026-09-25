@@ -434,6 +434,26 @@
   color: var(--text-heading);
 }
 
+/* The finished stage's count: the figure stays display type, the words drop
+   to the text face so the line never breaks on a phone. */
+.ceremony-finished-count {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0 var(--space-3);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ceremony-finished-words {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}
+
 /* --- the results showcase (the finished stage) -----------------------------
    The last frame of the night used to be 552px of black with "3/3 LOTS
    RESOLVED" floating in the middle of it — on the screen the product is most
@@ -1436,9 +1456,12 @@
    leaves ~272px of track, so every squad column ran 5–8px past the right edge
    and the PAGE scrolled sideways (WCAG 1.4.10). `min(280px, 100%)` keeps the
    280px comfort where there is room and yields where there is not. */
+/* `auto-fit`, not `auto-fill`: three teams on a 1440 screen left an empty
+   fourth track (~260px) on the right. Collapsing the empty tracks lets the
+   squads that exist share the whole width. */
 .squad-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: var(--space-5);
   margin-top: var(--space-3);
 }
@@ -1487,26 +1510,33 @@
   min-width: 0;
 }
 
-/* Wraps rather than truncates. Ellipsising the name was the wrong trade: with
-   two badges beside it "Arjun Sharma" became "Arjun S…", and a squad board
-   whose whole job is naming players must never eat a name to fit a badge. */
+/* ONE 44px LINE (wow pass). The row used to `flex-wrap`, so a badge or a long
+   name dropped the price onto its own line — ~110px per row on a phone. Now a
+   grid: face · name+badges (truncates, full name on hover) · role · price.
+   Role and price keep their own tracks and never wrap. */
 .squad-row {
-  display: flex;
-  /* Centre, not baseline: the row now opens with the player's face, and a
-     baseline row sits a 24px image on the text's baseline, not beside it. */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 2px var(--space-2);
-  padding: var(--space-2) 0;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 6px 0;
   border-top: 1px solid var(--border-subtle);
   font-size: var(--text-sm-size);
 }
 
+.squad-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 .squad-name {
   min-width: 0;
-  /* A name is never ellipsised here (the board's whole job is naming players),
-     so a long one has to be allowed to break rather than widen the column. */
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-primary);
   font-weight: var(--font-weight-medium);
 }
@@ -1514,17 +1544,29 @@
 /* Same as `.lot-hero-role`: the shared `roleLabel` supplies the casing, and
    `capitalize` would turn its "All-rounder" into "All-Rounder". */
 .squad-role {
-  margin-left: auto;
-  flex: none;
+  white-space: nowrap;
   color: var(--text-muted);
   font-size: var(--text-xs-size);
 }
 
+/* Tabular display numerals, not the typewriter face: money reads as money.
+   Mono stays for IDs (L007, P01). */
 .squad-price {
-  flex: none;
-  font-family: var(--font-mono);
+  white-space: nowrap;
+  text-align: right;
   font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
   color: var(--money-value);
+}
+
+/* The open-spots line is not a player: no grid tracks to honour. */
+.squad-row--open {
+  display: flex;
+}
+
+.squad-board-caption {
+  margin: calc(var(--space-1) * -1) 0 0;
+  font-size: var(--text-xs-size);
 }
 
 /* Pre-signed reads as a state, not a price: an icon cost this franchise no
@@ -1770,6 +1812,21 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+/* A finished night's conduct card holds no controls; the empty primary tier
+   must not keep its gap. */
+.cockpit-actions--primary:empty {
+  display: none;
+}
+
+.cockpit-record {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.cockpit-record .competitions-hint {
+  margin: 0;
 }
 
 /* The primary tier: the acts of the night proper, at full weight. */
@@ -2357,7 +2414,7 @@
 .share-auction-sub {
   color: var(--text-muted);
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-regular, 400);
+  font-weight: var(--font-weight-regular);
 }
 
 .share-auction-actions {

@@ -212,10 +212,10 @@ export function SquadBoard({
         <h2>Squads</h2>
         {/* The shorthand was a note to ourselves: "pre-signed" is a schema word
             and "never bid" reads as an instruction. The room needs the fact. */}
-        <span className="competitions-hint">
-          Icons and retained players joined before the auction — they were never bid on.
-        </span>
       </div>
+      <p className="competitions-hint squad-board-caption">
+        Icons and retained players joined before the auction — they were never bid on.
+      </p>
       {note === null ? null : (
         <p className="competitions-hint" data-testid="squad-board-note">
           {note}
@@ -271,8 +271,17 @@ export function SquadBoard({
                         ring
                         decorative
                       />
-                      <span className="squad-name">{member.name}</span>
-                      <MemberBadges member={member} />
+                      {/* ONE LINE, always. The row used to flex-wrap, so a
+                          badge or a long name pushed the price onto a second
+                          line and a phone row grew to ~110px. Name + badges
+                          share a cell that truncates; role and price keep
+                          their own tracks and never wrap. */}
+                      <span className="squad-who">
+                        <span className="squad-name" title={member.name}>
+                          {member.name}
+                        </span>
+                        <MemberBadges member={member} />
+                      </span>
                       <span className="squad-role">{labelOf(member.role)}</span>
                       <span className="squad-price">
                         {member.price === null ? (
