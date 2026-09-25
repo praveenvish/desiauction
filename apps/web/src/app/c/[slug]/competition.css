@@ -59,62 +59,59 @@
   }
 }
 
-/* TOP BUYS — the season's three biggest sales, once the auction is done. A
-   ranked list, not cards: rank, name (the link to the player's page), price,
-   and the buying team underneath on a phone. */
-.public-top-buys {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* YOU'RE IN — the signed-in player's own result, before anything else. */
+.public-mine {
   display: flex;
-  flex-direction: column;
-  /* A ranking, read left to right: at full page width the price sat a
-     screen away from the name it belongs to. */
-  max-width: 40rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    var(--surface-raised);
+  color: var(--text-primary);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
 }
 
-.public-top-buy {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border-subtle);
+.public-mine-icon {
+  flex: none;
+  color: var(--text-accent);
 }
 
-.public-top-buy:last-child {
-  border-bottom: none;
+.public-mine > span {
+  flex: 1 1 16rem;
+  min-width: 0;
 }
 
-.public-top-buy-rank {
-  font-weight: 700;
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
-  color: var(--text-secondary);
+.public-mine-price {
   font-variant-numeric: tabular-nums;
+  color: var(--accent-ink);
 }
 
-.public-top-buy-name {
-  font-weight: 600;
-  overflow-wrap: anywhere;
-  color: var(--text-heading);
+.public-mine-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
   text-decoration: none;
 }
 
-.public-top-buy-name:hover {
-  color: var(--text-accent);
+.public-mine-link:hover {
   text-decoration: underline;
 }
 
-.public-top-buy-price {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.public-top-buy-team {
-  grid-column: 2 / -1;
+/* The page's last word: one muted line, not a 60px "Questions?" heading. */
+.public-foot-note {
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);
-  color: var(--text-secondary);
 }
