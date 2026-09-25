@@ -3,7 +3,6 @@ import {
   IconCalendar,
   IconCheckCircle,
   IconClock,
-  IconList,
   IconMatch,
   IconUsers,
   Pill,
@@ -14,7 +13,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { SiblingLink } from "../sibling-link";
+import { PlayersViews } from "../sibling-link";
 import { notFound } from "next/navigation";
 
 import { formatWallDate, formatWallTime } from "../../../../lib/format-date";
@@ -68,27 +67,20 @@ export default async function LineupsPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <div className="st-head">
+        {/* Registrations shares this tab (RN-1 "Players"): one switcher at the
+            head of the page, then what this half is for. */}
+        <div className="st-head lu-head">
+          <PlayersViews slug={slug} active="lineups" />
           <p className="st-head-lede">
             Tick who took the field. Each player&apos;s profile counts it as a match played.
           </p>
-          <div className="st-actions">
-            {/* Registrations shares this tab (RN-1 "Players"). The buttons use
-                the TAB's names — a button saying "Registrations" under a tab
-                saying "Players" reads as two different places. */}
-            <SiblingLink href={`/seasons/${slug}/registrations`} label="Players" />
-            <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary" size="sm">
-              <IconList size={16} aria-hidden />
-              Schedule
-            </ButtonLink>
-          </div>
         </div>
 
         {fixtures.length === 0 ? (
-          <SectionCard icon={<IconUsers />} title="Lineups">
+          <SectionCard title="Lineups" hideHeader size="feature">
             <div className="st-empty">
               <span className="st-empty-glyph" aria-hidden>
-                <IconCalendar size={26} />
+                <IconUsers size={24} weight="duotone" />
               </span>
               <h3>No matches yet</h3>
               <p>
@@ -107,14 +99,14 @@ export default async function LineupsPage({
             <StatGrid>
               <StatCard
                 icon={<IconMatch />}
-                tone="gold"
+                concept="fixtures"
                 value={fixtures.length}
                 label="Matches"
                 hint={`${String(played)} played`}
               />
               <StatCard
                 icon={<IconCheckCircle />}
-                tone="green"
+                concept="done"
                 value={complete}
                 label="Lineups complete"
                 hint="Both sides recorded"
@@ -122,7 +114,7 @@ export default async function LineupsPage({
               />
               <StatCard
                 icon={<IconClock />}
-                tone="amber"
+                concept="alert"
                 value={fixtures.length - complete}
                 label="Still to record"
                 hint="One side or both missing"

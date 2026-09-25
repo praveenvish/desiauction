@@ -627,9 +627,11 @@ section.rd-card[data-flush="true"] {
     justify-self: end;
   }
 
-  .rd-kebab {
+  .rd-kebab,
+  .rd-card .pd-row .rd-kebab {
     width: 40px;
     height: 40px;
+    opacity: 1;
   }
 
   .rd-card .pd-pager {

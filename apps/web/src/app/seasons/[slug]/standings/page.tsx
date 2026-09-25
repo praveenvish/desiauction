@@ -1,6 +1,6 @@
-import { IconTrophy, IconUsers, PageIntro, Pill, SectionCard } from "@desiauction/ui";
+import { IconTrophy, IconUsers, Pill, SectionCard } from "@desiauction/ui";
 
-import { SiblingLink } from "../sibling-link";
+import { ScheduleViews } from "../sibling-link";
 import { notFound } from "next/navigation";
 
 import { standingsView } from "../../../../server/competition/fixture-actions";
@@ -45,9 +45,12 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
       <div className="dash-stack">
         {/* The table shares the Schedule tab with the fixtures it is derived
             from (RN-1), so this is how an organizer reaches them. */}
-        <PageIntro actions={<SiblingLink href={`/seasons/${slug}/fixtures`} label="Schedule" />} />
+        <div className="st-head">
+          <ScheduleViews slug={slug} active="table" />
+        </div>
         <SectionCard
           icon={<IconTrophy />}
+          concept="results"
           title={lobby ? "Points table" : "League table"}
           description={
             standings.playable === 0
@@ -58,7 +61,11 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             /* Said whenever it is not the whole story. A table built from three
                of twenty results is not wrong, but presenting it without saying
                so invites somebody to read it as the season's standing. */
-            <Pill tone={complete ? "green" : "amber"} dot testId="standings-completeness">
+            <Pill
+              tone={standings.playable === 0 ? "neutral" : complete ? "green" : "amber"}
+              dot
+              testId="standings-completeness"
+            >
               {standings.recorded} of {standings.playable} results in
             </Pill>
           }

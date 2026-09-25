@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Button,
-  Dialog,
-  IconFile,
-  IconInfo,
-  IconSend,
-  SectionCard,
-  useToast,
-} from "@desiauction/ui";
+import { Button, Dialog, IconFile, IconSend, SectionCard, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -65,7 +57,7 @@ export function SquadSheetsPanel({ slug, view }: { slug: string; view: SquadShee
       <SectionCard
         data-testid="squad-sheets-panel"
         icon={<IconFile />}
-        tone="green"
+        concept="teams"
         title="Send squad sheets"
         description={<span data-testid="squad-sheets-hint">{hint}</span>}
       >
@@ -81,10 +73,6 @@ export function SquadSheetsPanel({ slug, view }: { slug: string; view: SquadShee
               <IconSend size={18} className="icon-lead" aria-hidden />
               Send to {people(view.pending)}
             </Button>
-            <p className="tm-foot-note" data-tone="success">
-              <IconInfo size={18} aria-hidden />
-              Squad sheets include the team roster, captain, coach and first match.
-            </p>
           </div>
         ) : null}
       </SectionCard>

@@ -157,20 +157,18 @@ function TeamGrid({
             )}
           </p>
         ) : null}
+        {/* DA-40: the auction lock is season state, stated before any form.
+            A pill on the same line as the facts it qualifies, not a band. */}
+        {locked && view.viewer.canManageTeams ? (
+          <span className="tm-lock">
+            <Pill tone="amber" icon={<IconLock />} testId="teams-locked-notice">
+              {view.rulesSource?.finished === true
+                ? "Locked — the auction is done"
+                : "Locked — the auction has started"}
+            </Pill>
+          </span>
+        ) : null}
       </div>
-
-      {/* DA-40: the auction lock is season state, not a validation failure on a
-          text input. It is now stated before the form, not after the submit. */}
-      {/* It used to say "The auction has started… Teams stay editable until
-          you go live" — both halves at once, on a season whose auction had
-          finished. One sentence, true for the state the auction is in. */}
-      {locked && view.viewer.canManageTeams ? (
-        <Notice tone="warning" icon={<IconLock size={20} />} testId="teams-locked-notice">
-          {view.rulesSource?.finished === true
-            ? "The auction is done, so the team list is locked for this season."
-            : "The auction has started, so the team list is locked for this season."}
-        </Notice>
-      ) : null}
 
       {/* DA-41: this screen says "add the teams that will bid" and had no concept
           of the person who bids — every link led to Registrations or back here.
@@ -183,7 +181,9 @@ function TeamGrid({
         </Notice>
       ) : null}
 
-      {beforeGrid}
+      {/* "Tell your players": announce and squad sheets sit side by side
+          while both are to-dos, so the teams stay above the fold. */}
+      {beforeGrid !== undefined ? <div className="tm-tell">{beforeGrid}</div> : null}
 
       {/* A league of eight fits on a screen; past that, finding one needs a box. */}
       {view.teams.length > 8 ? (

@@ -60,20 +60,34 @@ export function ScheduleViews({ slug, active }: { slug: string; active: Schedule
       label="Schedule views"
       testId="season-views"
       items={[
-        { key: "list", label: "List", href: `${base}/fixtures`, active: active === "list" },
+        {
+          key: "list",
+          label: "List",
+          href: `${base}/fixtures`,
+          active: active === "list",
+          testId: "open-fixture-list",
+        },
         {
           key: "calendar",
           label: "Calendar",
           href: `${base}/fixtures/calendar`,
           active: active === "calendar",
+          testId: "open-calendar",
         },
         {
           key: "match-day",
           label: "Match day",
           href: `${base}/fixtures/match-day`,
           active: active === "match-day",
+          testId: "open-match-day",
         },
-        { key: "table", label: "Table", href: `${base}/standings`, active: active === "table" },
+        {
+          key: "table",
+          label: "Table",
+          href: `${base}/standings`,
+          active: active === "table",
+          testId: "open-standings",
+        },
       ]}
     />
   );

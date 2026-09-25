@@ -18,7 +18,6 @@ import {
   IconDownload,
   IconKebab,
   IconLayers,
-  IconMatch,
   IconPin,
   IconPlus,
   IconSearch,
@@ -65,6 +64,7 @@ import {
   formatWallTime,
 } from "../../../../lib/format-date";
 import { FixtureStatusPill } from "../_tabs/fixture-status";
+import { ScheduleViews } from "../sibling-link";
 import { TeamCrest } from "../_tabs/team-crest";
 import { ResultsCard } from "./results-card";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
@@ -946,9 +946,11 @@ export function FixturesPanel({
 
   return (
     <>
-      {/* The page's actions: the other views of the schedule, and a match by
-          hand. The shell's page head carries the title above this row. */}
-      <div className="st-head">
+      {/* ONE ROW: the four faces of the Schedule tab (List | Calendar | Match
+          day | Table — it was a "Table →" band plus two more buttons), what
+          is here, and a match by hand. */}
+      <div className="st-head fx-head">
+        <ScheduleViews slug={slug} active="list" />
         <p className="st-head-lede">
           {stats.total > 0 ? (
             <>
@@ -967,24 +969,6 @@ export function FixturesPanel({
           )}
         </p>
         <div className="st-actions">
-          <ButtonLink
-            href={`/seasons/${slug}/fixtures/calendar`}
-            variant="secondary"
-            size="sm"
-            data-testid="open-calendar"
-          >
-            <IconCalendar size={16} aria-hidden />
-            Calendar
-          </ButtonLink>
-          <ButtonLink
-            href={`/seasons/${slug}/fixtures/match-day`}
-            variant="secondary"
-            size="sm"
-            data-testid="open-match-day"
-          >
-            <IconMatch size={16} aria-hidden />
-            Match day
-          </ButtonLink>
           {canManage ? (
             <Button
               size="sm"
@@ -1025,7 +1009,7 @@ export function FixturesPanel({
           <StatGrid>
             <StatCard
               icon={<IconCalendar />}
-              tone="gold"
+              concept="fixtures"
               value={stats.total}
               label={isLobby ? "Lobbies" : "Matches"}
               hint={
@@ -1048,7 +1032,7 @@ export function FixturesPanel({
             />
             <StatCard
               icon={<IconClock />}
-              tone="blue"
+              concept="season"
               value={upcoming}
               label="To play"
               hint={
@@ -1064,7 +1048,7 @@ export function FixturesPanel({
             />
             <StatCard
               icon={<IconPin />}
-              tone="purple"
+              concept="venue"
               value={stats.venues}
               label={stats.venues === 1 ? "Venue" : "Venues"}
               hint={`${String(stats.grounds)} ${terms.ground.toLowerCase()}${stats.grounds === 1 ? "" : "s"} in use`}
@@ -1113,7 +1097,10 @@ export function FixturesPanel({
         </SectionCard>
       ) : null}
 
-      {primary === "generate" ? (
+      {/* With no ground the generator cannot run, so it waits behind the
+          "Add a ground first" notice instead of a ~500px form with a pale,
+          disabled button. */}
+      {primary === "generate" && needsGround ? null : primary === "generate" ? (
         <SectionCard
           icon={<IconSpark />}
           title="Generate fixtures"
@@ -1554,21 +1541,24 @@ export function FixturesPanel({
               This season&apos;s fixtures, grouped by round — {page.total} match
               {page.total === 1 ? "" : "es"} matching the current filters.
             </caption>
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">Fixture</th>
-                <th scope="col">Kickoff</th>
-                <th scope="col">{terms.ground}</th>
-                <th scope="col">Status</th>
-                <th scope="col">Result</th>
-                {canManage ? (
-                  <th scope="col">
-                    <VisuallyHidden>Actions</VisuallyHidden>
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
+            {/* An empty schedule draws no column heads over its one sentence. */}
+            {page.total === 0 ? null : (
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Fixture</th>
+                  <th scope="col">Kickoff</th>
+                  <th scope="col">{terms.ground}</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Result</th>
+                  {canManage ? (
+                    <th scope="col">
+                      <VisuallyHidden>Actions</VisuallyHidden>
+                    </th>
+                  ) : null}
+                </tr>
+              </thead>
+            )}
             <tbody>
               {rounds.map(({ round, rows, when }) => (
                 <Fragment key={String(round)}>
@@ -1623,35 +1613,38 @@ export function FixturesPanel({
           </table>
         </div>
 
-        <div className="st-pager">
-          <span data-testid="page-indicator">
-            Page {page.page} of {totalPages} · {page.total} total
-          </span>
-          <span className="st-actions fx-pager-actions">
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={page.page <= 1}
-              onClick={() => {
-                pushQuery({ page: String(page.page - 1) });
-              }}
-              data-testid="page-prev"
-            >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={page.page >= totalPages}
-              onClick={() => {
-                pushQuery({ page: String(page.page + 1) });
-              }}
-              data-testid="page-next"
-            >
-              Next
-            </Button>
-          </span>
-        </div>
+        {/* No pager for one page (it was "Page 1 of 1 · 0 total"). */}
+        {totalPages <= 1 ? null : (
+          <div className="st-pager">
+            <span data-testid="page-indicator">
+              Page {page.page} of {totalPages} · {page.total} total
+            </span>
+            <span className="st-actions fx-pager-actions">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page.page <= 1}
+                onClick={() => {
+                  pushQuery({ page: String(page.page - 1) });
+                }}
+                data-testid="page-prev"
+              >
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page.page >= totalPages}
+                onClick={() => {
+                  pushQuery({ page: String(page.page + 1) });
+                }}
+                data-testid="page-next"
+              >
+                Next
+              </Button>
+            </span>
+          </div>
+        )}
       </SectionCard>
 
       {expanded !== null ? (

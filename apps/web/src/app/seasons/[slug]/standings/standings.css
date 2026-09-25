@@ -94,3 +94,8 @@
     max-width: 6.5rem;
   }
 }
+
+/* 44px rows: the table read airy at 57. */
+.st-table.sd-table tbody td {
+  padding-block: 8px;
+}
