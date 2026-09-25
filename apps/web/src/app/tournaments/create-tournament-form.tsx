@@ -47,7 +47,7 @@ export function CreateTournamentForm({ orgs }: { orgs: { id: string; name: strin
         label="Tournament name"
         name="name"
         required
-        placeholder="Bandra Premier League"
+        placeholder="e.g. Bandra Premier League"
         help="The recurring competition. Its seasons are the editions that run."
         {...(state.error !== undefined ? { error: state.error } : {})}
       />

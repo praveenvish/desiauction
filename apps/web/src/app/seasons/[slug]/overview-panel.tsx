@@ -1309,7 +1309,7 @@ function SeasonSettingsDialog({
         <Field
           label="Location"
           name="season-location"
-          placeholder="Malad, Mumbai"
+          placeholder="e.g. Malad, Mumbai"
           value={location}
           onChange={(event) => {
             setLocation(event.target.value);

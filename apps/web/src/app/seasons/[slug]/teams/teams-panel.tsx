@@ -748,7 +748,7 @@ function TeamIdentityEditor({
       <Field
         label="Short name"
         name="edit-team-short"
-        placeholder="MAV"
+        placeholder="e.g. MAV"
         value={shortName}
         onChange={(event) => {
           setShortName(event.target.value);
