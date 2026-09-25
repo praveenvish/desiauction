@@ -12,13 +12,19 @@
  * component renders only what it hands over. No phones, no money, no
  * registration lists.
  */
-import { IconCalendar, IconPin, IconUsers } from "@desiauction/ui";
+import {
+  IconArrowRight,
+  IconCalendar,
+  IconChevronRight,
+  IconPin,
+  IconUsers,
+  SportIcon,
+} from "@desiauction/ui";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import "./tournament-card.css";
-import { SportBanner } from "./public-kit";
 
 export interface TournamentCardData {
   name: string;
@@ -54,12 +60,6 @@ function sportLabel(sport: string): string {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-/** Initials for a season with no crest — the same two letters the console uses. */
-function initials(name: string): string {
-  const words = name.trim().split(/\s+/).slice(0, 2);
-  return words.map((word) => word.charAt(0).toUpperCase()).join("");
 }
 
 export function TournamentCard({
@@ -119,12 +119,31 @@ export function TournamentCard({
         }
       : { label: "View tournament", href };
 
+  const hasCover = coverUrl != null && coverUrl !== "";
+  const hasLogo = logoUrl != null && logoUrl !== "";
+  const status = live ? "Live now" : open ? "Registration open" : "Registration closed";
+  const tone = live ? "live" : open ? "open" : "closed";
+  const meta = [dates, location === null || location === "" ? null : location]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
+
+  /*
+   * WOW PASS (2026-09-25). A card with no cover used to spend a 5:2 banner on
+   * the sport's stock glyph — the same bat twelve times down a page, which
+   * read as "no content yet". Without a cover the banner is now a 72px band
+   * tinted for the sport with a small glyph; the full banner is for a real
+   * photograph. The crest shows only for a real logo (initials repeated the
+   * title), the sport moved into the org line, and the footer lost its rule.
+   * On a phone the card is a row: thumb, name, one meta line, status.
+   */
   return (
-    <article className="tc" data-feature={feature ? "" : undefined}>
-      <div className="tc-banner">
-        {coverUrl == null || coverUrl === "" ? (
-          <SportBanner sport={sport} seed={slug} />
-        ) : (
+    <article
+      className="tc da-lift"
+      data-feature={feature ? "" : undefined}
+      data-cover={hasCover ? "" : undefined}
+    >
+      <div className="tc-banner" data-sport={sport}>
+        {hasCover ? (
           <Image
             className="tc-cover"
             src={coverUrl}
@@ -138,25 +157,23 @@ export function TournamentCard({
             // cover (156 KB) for a 369px card.
             sizes="(max-width: 660px) 90vw, (max-width: 1000px) 45vw, 420px"
           />
+        ) : (
+          <span className="tc-glyph" aria-hidden>
+            <SportIcon sport={sport} size={28} />
+          </span>
         )}
-        <span
-          className="tc-status"
-          data-tone={live ? "live" : open ? "open" : "closed"}
-          data-testid="tournament-card-status"
-        >
-          {live ? "Live now" : open ? "Registration open" : "Registration closed"}
+        <span className="tc-status" data-tone={tone} data-testid="tournament-card-status">
+          {status}
         </span>
       </div>
 
       <div className="tc-body">
         <div className="tc-head">
-          <span className="tc-crest" aria-hidden>
-            {logoUrl == null || logoUrl === "" ? (
-              initials(name)
-            ) : (
+          {hasLogo ? (
+            <span className="tc-crest" aria-hidden>
               <Image src={logoUrl} alt="" width={44} height={44} />
-            )}
-          </span>
+            </span>
+          ) : null}
           <div className="tc-title-block">
             {/* The whole card is not a link: it holds two destinations (the
                 season and its action), and nesting those inside one anchor is
@@ -167,15 +184,29 @@ export function TournamentCard({
                 {name}
               </Link>
             </h3>
-            <p className="tc-org">{orgName}</p>
+            <p className="tc-org">
+              <SportIcon sport={sport} size={16} className="tc-org-sport" />
+              <span className="tc-sr">{sportLabel(sport)}, </span>
+              <span>
+                {orgName}
+                {category === undefined ? null : ` · ${category}`}
+              </span>
+            </p>
+            {/* Phone row only: one meta line and the state as a dot. */}
+            <p className="tc-line">
+              <span className="tc-line-dot" data-tone={tone} aria-hidden />
+              <span className="tc-sr">{status}. </span>
+              {meta}
+            </p>
           </div>
+          <IconChevronRight size={20} className="tc-chevron" />
         </div>
 
         <dl className="tc-facts">
           {location === null || location === "" ? null : (
             <div className="tc-fact">
               <dt>
-                <IconPin width={15} height={15} aria-hidden />
+                <IconPin size={16} aria-hidden />
                 <span className="tc-sr">Where</span>
               </dt>
               <dd>{location}</dd>
@@ -183,7 +214,7 @@ export function TournamentCard({
           )}
           <div className="tc-fact">
             <dt>
-              <IconCalendar width={15} height={15} aria-hidden />
+              <IconCalendar size={16} aria-hidden />
               <span className="tc-sr">When</span>
             </dt>
             <dd>{dates}</dd>
@@ -191,7 +222,7 @@ export function TournamentCard({
           {size === null ? null : (
             <div className="tc-fact">
               <dt>
-                <IconUsers width={15} height={15} aria-hidden />
+                <IconUsers size={16} aria-hidden />
                 <span className="tc-sr">Size</span>
               </dt>
               <dd>{size}</dd>
@@ -200,16 +231,13 @@ export function TournamentCard({
         </dl>
 
         <div className="tc-foot">
-          <span className="tc-tags">
-            <span className="tc-tag">{sportLabel(sport)}</span>
-            {category === undefined ? null : <span className="tc-tag">{category}</span>}
-          </span>
           <Link
             className="tc-action"
             href={action.href}
             data-primary={live || open ? "" : undefined}
           >
             {action.label}
+            <IconArrowRight size={16} />
           </Link>
         </div>
       </div>
@@ -218,9 +246,17 @@ export function TournamentCard({
 }
 
 /** The grid tournament cards sit in. */
-export function TournamentGrid({ children, testId }: { children: ReactNode; testId?: string }) {
+export function TournamentGrid({
+  children,
+  testId,
+  className,
+}: {
+  children: ReactNode;
+  testId?: string;
+  className?: string;
+}) {
   return (
-    <div className="tc-grid" data-testid={testId}>
+    <div className={["tc-grid", className].filter(Boolean).join(" ")} data-testid={testId}>
       {children}
     </div>
   );

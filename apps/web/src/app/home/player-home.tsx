@@ -3,21 +3,21 @@ import {
   ButtonLink,
   IconArrowRight,
   IconFileCheck,
-  IconTrophy,
   IconUser,
-  Notice,
   Pill,
   SectionCard,
   TeamChip,
   type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 
 import { monogram } from "../../components/season-hero/season-hero";
 import { moneyFormat } from "../../lib/money";
 import { myRegistrations, type MyRegistration } from "../../server/competition/public";
 import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/profile";
 import { verdictOf } from "../me/registration-card";
+import "./player-home.css";
 
 /**
  * THE PLAYER'S HOME.
@@ -70,6 +70,78 @@ function verdictFor(registration: MyRegistration): {
   return { ...verdict, namesTeam: false };
 }
 
+/**
+ * THE MOMENT (wow pass). Being sold is the biggest thing that happens to a
+ * player on this product, and home said it in an 11px pill inside a generic
+ * row — under a blue "complete your profile" nag. The latest sale now leads
+ * the page as a floodlit card: the team, the price as the loudest figure on
+ * screen, and the two things a sold player does next.
+ */
+function SoldMoment({
+  registration,
+  completeness,
+}: {
+  registration: MyRegistration;
+  completeness: { done: number; total: number } | null;
+}) {
+  const auction = registration.auction;
+  if (auction?.kind !== "sold" || registration.teamName === null) {
+    return null;
+  }
+  const price = moneyFormat(registration.auctionUnit).ledger(auction.soldPrice);
+  const base = `/seasons/${registration.competitionSlug}`;
+  return (
+    <section
+      className="pm-moment"
+      data-theme="floodlight"
+      data-testid="home-sold-moment"
+      aria-labelledby="pm-moment-title"
+      style={
+        registration.teamColor === null
+          ? undefined
+          : ({ "--pm-team": registration.teamColor } as CSSProperties)
+      }
+    >
+      <div className="pm-moment-copy">
+        <p className="pm-moment-kicker">
+          {registration.competitionName} · {registration.orgName}
+        </p>
+        <h2 id="pm-moment-title" className="pm-moment-title">
+          Sold to <span className="pm-moment-team">{registration.teamName}</span>
+        </h2>
+        <p className="pm-moment-price">{price}</p>
+      </div>
+      <div className="pm-moment-actions">
+        {registration.posterReady ? (
+          <ButtonLink href={`${base}/posters`} size="lg">
+            Share your card
+            <IconArrowRight size={16} />
+          </ButtonLink>
+        ) : null}
+        <ButtonLink
+          href={`${base}/register`}
+          size="lg"
+          variant={registration.posterReady ? "secondary" : "primary"}
+        >
+          Your season
+        </ButtonLink>
+      </div>
+      {completeness !== null ? (
+        <p className="pm-moment-foot">
+          <span>
+            Profile {String(completeness.done)}/{String(completeness.total)} — the next registration
+            form starts filled in.
+          </span>
+          <Link href="/account">
+            Finish it
+            <IconArrowRight size={16} />
+          </Link>
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export async function PlayerHome({
   personId,
   offerOrganizing,
@@ -96,27 +168,32 @@ export async function PlayerHome({
    * footballer to an empty cricket career and told them that was their record.
    */
   const pack = sportPackFor(registrations[registrations.length - 1]?.sport ?? null);
+  // The most recent sale leads the page (the list is oldest-first).
+  const moment =
+    [...registrations]
+      .reverse()
+      .find((entry) => entry.auction?.kind === "sold" && entry.teamName !== null) ?? null;
 
   return (
     <>
-      {showNudge ? (
-        <Notice
-          tone="info"
-          icon={<IconUser size={20} />}
-          testId="home-profile-nudge"
-          // "Profile N of M" — the one way /home, /me and /account all say it.
-          title={`Complete your player profile · ${String(completeness.done)} of ${String(completeness.total)} done`}
-          action={
-            <ButtonLink href="/account" variant="secondary" size="sm">
-              Finish it
-            </ButtonLink>
-          }
-        >
-          {completeness.missing.length === 1
-            ? "One thing left"
-            : `${String(completeness.missing.length)} things left`}{" "}
-          — the next registration form starts filled in.
-        </Notice>
+      {moment !== null ? (
+        <SoldMoment registration={moment} completeness={showNudge ? completeness : null} />
+      ) : null}
+      {showNudge && moment === null ? (
+        <p className="pm-nudge" data-testid="home-profile-nudge">
+          <IconUser size={20} />
+          {/* "Profile N of M" — the one way /home, /me and /account all say it. */}
+          <span>
+            <strong>
+              Profile {String(completeness.done)} of {String(completeness.total)} done
+            </strong>{" "}
+            — the next registration form starts filled in.
+          </span>
+          <Link href="/account">
+            Finish it
+            <IconArrowRight size={16} />
+          </Link>
+        </p>
       ) : null}
 
       {registrations.length > 0 ? (
@@ -128,7 +205,7 @@ export async function PlayerHome({
           action={
             <Link href={`/me/${pack.key}`} className="home-more" data-testid="home-career-link">
               My {pack.label.toLowerCase()}
-              <IconArrowRight size={14} />
+              <IconArrowRight size={16} />
             </Link>
           }
         >
@@ -191,27 +268,13 @@ export async function PlayerHome({
        * their own club's dashboard.
        */}
       {offerOrganizing ? (
-        <SectionCard
-          icon={<IconTrophy />}
-          tone="neutral"
-          title="Want to run your own?"
-          action={
-            <ButtonLink
-              href="/orgs"
-              variant="secondary"
-              size="sm"
-              data-testid="home-player-organize-link"
-            >
-              Start a club
-              <IconArrowRight size={14} />
-            </ButtonLink>
-          }
-        >
-          <p className="home-card-note">
-            Anyone can start a club and run an auction on DesiAuction — you do not need to be
-            invited.
-          </p>
-        </SectionCard>
+        <p className="pm-organize">
+          Want to run your own tournament? Anyone can start a club — no invitation needed.{" "}
+          <Link href="/orgs" data-testid="home-player-organize-link">
+            Start a club
+            <IconArrowRight size={16} />
+          </Link>
+        </p>
       ) : null}
     </>
   );

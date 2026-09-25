@@ -3,6 +3,8 @@ import {
   Badge,
   ButtonLink,
   EmptyState,
+  IconArrowRight,
+  IconCheckCircle,
   IconGavel,
   IconTrophy,
   IconUsers as IconUsersUi,
@@ -16,9 +18,12 @@ import { env } from "../../../env";
 import {
   publicCompetitionView,
   publicShowcase,
+  myAuctionOutcome,
   publicTopBuys,
   teamSlugOf,
 } from "../../../server/competition/public";
+import { currentSession } from "../../../server/auth/actions";
+import { TopBuysPodium } from "../top-buys";
 import { serializeJsonLd } from "../../../server/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
 import {
@@ -113,7 +118,16 @@ export default async function PublicCompetitionPage({
   // while its own share card already said "Auction complete", and nothing on
   // the page led to the results. Same finished set the share card uses.
   const auctionDone = view.auctionStatus === "completed" || view.auctionStatus === "reconciled";
-  const topBuys = auctionDone ? await publicTopBuys(view.slug) : [];
+  const [topBuys, session] = await Promise.all([
+    auctionDone ? publicTopBuys(view.slug) : Promise.resolve([]),
+    currentSession(),
+  ]);
+  // A signed-in player who was in the room sees their own result first.
+  const mine =
+    session === null || view.auctionStatus === null
+      ? null
+      : await myAuctionOutcome(view.slug, session.personId);
+  const myTeam = mine !== null && mine.teamName !== null && mine.outcome !== "pool" ? mine : null;
   // The directory (`/c`) badges a mid-auction tournament "Live now", promises
   // "No account needed" and links straight to the spectate stage. This page knew
   // only open/closed, so a guest who clicked one of those cards through to here
@@ -197,8 +211,11 @@ export default async function PublicCompetitionPage({
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <PageHero
+        size="compact"
         cover={view.coverUrl === null ? null : { src: view.coverUrl }}
-        sport={view.sport}
+        /* No stock art without a cover: the same bat twelve times across the
+           site read as "no content yet". The copy takes the width instead. */
+        {...(view.coverUrl === null ? {} : { sport: view.sport })}
         status={
           <>
             {live ? <Badge tone="live">Live now</Badge> : null}
@@ -291,18 +308,32 @@ export default async function PublicCompetitionPage({
             ) : null}
           </>
         }
-        script={
-          <>
-            Play
-            <br />
-            Bid
-            <br />
-            Belong
-          </>
-        }
       />
 
       <PageBody>
+        {myTeam !== null ? (
+          <p className="public-mine" data-testid="public-mine">
+            <IconCheckCircle size={20} weight="fill" className="public-mine-icon" />
+            <span>
+              You&apos;re in <strong>{myTeam.teamName}</strong>
+              {myTeam.outcome === "sold" && myTeam.pricePaise !== null ? (
+                <>
+                  {" "}
+                  · sold for{" "}
+                  <strong className="public-mine-price">
+                    {formatAmount(paise(myTeam.pricePaise), myTeam.unit)}
+                  </strong>
+                </>
+              ) : null}
+            </span>
+            {myTeam.teamSlug !== null ? (
+              <Link className="public-mine-link" href={`/c/${view.slug}/t/${myTeam.teamSlug}`}>
+                Your squad
+                <IconArrowRight size={16} />
+              </Link>
+            ) : null}
+          </p>
+        ) : null}
         {stats.length > 0 ? <StatStrip label={`${view.name} at a glance`} stats={stats} /> : null}
 
         {/* TOP BUYS — the three sales the season will be remembered by, each
@@ -310,24 +341,12 @@ export default async function PublicCompetitionPage({
             in the season's own unit (a points league never reads "₹"). */}
         {topBuys.length > 0 ? (
           <PageSection headingId="top-buys-heading" title="Top buys">
-            <ol className="public-top-buys" data-testid="public-top-buys">
-              {topBuys.map((buy, index) => (
-                <li key={buy.registrationId} className="public-top-buy">
-                  <span className="public-top-buy-rank" aria-hidden>
-                    {index + 1}
-                  </span>
-                  <Link className="public-top-buy-name" href={`/c/${view.slug}/p/${buy.number}`}>
-                    {buy.name}
-                  </Link>
-                  <span className="public-top-buy-price">
-                    {formatAmount(paise(buy.pricePaise), view.auctionUnit)}
-                  </span>
-                  {buy.teamName !== null ? (
-                    <span className="public-top-buy-team">{buy.teamName}</span>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
+            <TopBuysPodium
+              slug={view.slug}
+              buys={topBuys}
+              unit={view.auctionUnit}
+              testId="public-top-buys"
+            />
           </PageSection>
         ) : null}
 
@@ -449,13 +468,10 @@ export default async function PublicCompetitionPage({
         {/* FR-1: absent until a public season has three published reviews. */}
         <PublicSeasonReviews slug={view.slug} orgName={view.orgName} />
 
-        <PageSection headingId="contact-heading" title="Questions?">
-          <p className="public-hint">
-            This tournament is run by {view.orgName} — reach them through whoever shared this page
-            with you. For anything about the DesiAuction platform itself, see{" "}
-            <Link href="/help">Help</Link>.
-          </p>
-        </PageSection>
+        <p className="public-foot-note" data-testid="public-contact">
+          Run by {view.orgName} — reach them through whoever shared this page. About DesiAuction
+          itself? <Link href="/help">Help</Link>.
+        </p>
       </PageBody>
     </main>
   );

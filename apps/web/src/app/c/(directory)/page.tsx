@@ -1,5 +1,18 @@
-import { Button, ButtonLink, Card, EmptyState, Field } from "@desiauction/ui";
+import {
+  ButtonLink,
+  Card,
+  EmptyState,
+  IconArrowLeft,
+  IconArrowRight,
+  SegmentedTabs,
+  Toolbar,
+  ToolbarChip,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSpacer,
+} from "@desiauction/ui";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { env } from "../../../env";
 import {
@@ -9,12 +22,7 @@ import {
   type DirectoryFilter,
   type DirectorySort,
 } from "../../../server/competition/public";
-import {
-  CountChips,
-  PageBody,
-  PageHero,
-  SportMontage,
-} from "../../../components/public/public-kit";
+import { PageBody, PageHero } from "../../../components/public/public-kit";
 import { TournamentCard, TournamentGrid } from "../../../components/public/tournament-card";
 import { formatDateRange } from "../format";
 import { DIRECTORY_DESCRIPTION, DIRECTORY_KICKER } from "./copy";
@@ -97,6 +105,21 @@ function directoryHref(params: {
   return query === "" ? "/c" : `/c?${query}`;
 }
 
+/** 1 … 4 5 6 … 12 — the current page, its neighbours and both ends. */
+function pageNumbers(current: number, total: number): (number | null)[] {
+  const wanted = new Set([1, total, current - 1, current, current + 1]);
+  const pages = [...wanted].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out: (number | null)[] = [];
+  for (const page of pages) {
+    const last = out.at(-1);
+    if (typeof last === "number" && page - last > 1) {
+      out.push(null);
+    }
+    out.push(page);
+  }
+  return out;
+}
+
 // PX-5 public discovery: only tournaments their organizers PUBLISHED
 // (visibility='public') appear here. Search, facet, sort and pagination are all
 // URL-backed — every view a visitor can reach is a view they can send someone.
@@ -172,9 +195,14 @@ export default async function DirectoryPage({
       tone: "closed",
     },
   ];
+  // Zero-count facets are noise ("Live now 0"); All and the active one stay.
+  const shownFacets = facets.filter(
+    (entry) => entry.key === "all" || entry.key === filter || entry.count > 0,
+  );
   return (
     <main className="public-page mk">
       <PageHero
+        size="compact"
         eyebrow={DIRECTORY_KICKER}
         title={
           <>
@@ -182,50 +210,60 @@ export default async function DirectoryPage({
           </>
         }
         lede={DIRECTORY_DESCRIPTION}
-        art={<SportMontage />}
-        script="Different sports. One platform."
-        actions={
-          <form className="public-controls" action="/c" method="get">
-            <div className="public-search">
-              <Field
-                label="Search"
-                name="q"
-                defaultValue={sp.q ?? ""}
-                placeholder="Tournament, club or city"
-              />
-              <Button type="submit">Search</Button>
-              {term === "" ? null : (
-                <ButtonLink
-                  variant="secondary"
-                  href={clearSearchHref}
-                  data-testid="directory-clear"
-                >
-                  Clear
-                </ButtonLink>
-              )}
-            </div>
-            {/* The facet rides along as a hidden input so searching inside a
-                facet keeps it, and the chips carry `q` so switching facet keeps
-                the search. Either one alone would silently drop the other. */}
-            {filter === "all" ? null : <input type="hidden" name="filter" value={filter} />}
-            <div className="public-facets" data-testid="directory-filters">
-              <CountChips
-                label="Filter tournaments"
-                chips={facets.map((entry) => ({
-                  label: entry.label,
-                  href: directoryHref({ q: term, filter: entry.key, sort }),
-                  count: entry.count,
-                  active: entry.key === filter,
-                  ...(entry.tone === undefined ? {} : { tone: entry.tone }),
-                }))}
-              />
-              <SortSelect value={sort} />
-            </div>
-          </form>
-        }
       />
 
       <PageBody>
+        {/* ONE ROW (wow pass). Search, facets, count and sort used to take four
+            rows inside the hero, and the first card started ~740px down. The
+            facet rides along as a hidden input so searching inside a facet
+            keeps it, and the facet links carry `q` so switching keeps the
+            search. */}
+        <form className="dir-toolbar" action="/c" method="get" role="search">
+          {filter === "all" ? null : <input type="hidden" name="filter" value={filter} />}
+          <Toolbar testId="directory-filters">
+            <ToolbarSearch
+              id="directory-q"
+              name="q"
+              label="Search tournaments"
+              submitLabel="Search"
+              defaultValue={sp.q ?? ""}
+              placeholder="Tournament, club or city"
+              className="dir-search"
+            />
+            {term === "" ? null : (
+              <ToolbarChip
+                href={clearSearchHref}
+                removeLabel="Clear search"
+                testId="directory-clear"
+              >
+                “{term}”
+              </ToolbarChip>
+            )}
+            <SegmentedTabs
+              label="Filter tournaments"
+              items={shownFacets.map((entry) => ({
+                key: entry.key,
+                label: entry.label,
+                count: entry.count,
+                active: entry.key === filter,
+                href: directoryHref({ q: term, filter: entry.key, sort }),
+              }))}
+            />
+            <ToolbarSpacer />
+            <ToolbarCount testId="directory-count">
+              <span aria-live="polite">
+                {directory.entries.length === directory.total
+                  ? `${String(directory.total)} ${noun}`
+                  : `${String(directory.entries.length)} of ${String(directory.total)}`}
+                <span className="visually-hidden">
+                  {countLabel === "" ? "" : ` — ${countLabel}`}
+                </span>
+              </span>
+            </ToolbarCount>
+            <SortSelect value={sort} />
+          </Toolbar>
+        </form>
+
         {directory.entries.length === 0 ? (
           <Card>
             {outOfRange ? (
@@ -312,18 +350,7 @@ export default async function DirectoryPage({
             <h2 id="directory-results" className="visually-hidden">
               Tournament results
             </h2>
-            <div className="public-results-head">
-              <p className="public-count" aria-live="polite" data-testid="directory-count">
-                {countLabel}
-              </p>
-              <p className="public-helper">
-                {/* Email sign-in is the default (LOGIN_DEFAULT_METHOD), so a
-                    helper naming only a mobile number undersold who can join. */}
-                Anyone can watch. Registering takes an email or mobile number, your name and playing
-                role — about a minute.
-              </p>
-            </div>
-            <TournamentGrid testId="directory-list">
+            <TournamentGrid testId="directory-list" className="da-stagger">
               {directory.entries.map((entry) => (
                 <TournamentCard
                   key={entry.slug}
@@ -350,23 +377,39 @@ export default async function DirectoryPage({
         {directory.totalPages > 1 ? (
           <nav className="public-pagination" aria-label="Pagination">
             {directory.page > 1 ? (
-              <ButtonLink
-                variant="ghost"
+              <Link
+                className="dir-page dir-page-step"
                 href={directoryHref({ q: term, filter, sort, page: directory.page - 1 })}
+                aria-label="Previous page"
               >
-                Previous
-              </ButtonLink>
+                <IconArrowLeft size={16} />
+              </Link>
             ) : null}
-            <span>
-              Page {directory.page} of {directory.totalPages}
-            </span>
+            {pageNumbers(directory.page, directory.totalPages).map((entry, index) =>
+              entry === null ? (
+                <span key={`gap-${String(index)}`} className="dir-page-gap" aria-hidden>
+                  …
+                </span>
+              ) : (
+                <Link
+                  key={entry}
+                  className="dir-page"
+                  href={directoryHref({ q: term, filter, sort, page: entry })}
+                  aria-current={entry === directory.page ? "page" : undefined}
+                  aria-label={`Page ${String(entry)}`}
+                >
+                  {entry}
+                </Link>
+              ),
+            )}
             {directory.page < directory.totalPages ? (
-              <ButtonLink
-                variant="ghost"
+              <Link
+                className="dir-page dir-page-step"
                 href={directoryHref({ q: term, filter, sort, page: directory.page + 1 })}
+                aria-label="Next page"
               >
-                Next
-              </ButtonLink>
+                <IconArrowRight size={16} />
+              </Link>
             ) : null}
           </nav>
         ) : null}

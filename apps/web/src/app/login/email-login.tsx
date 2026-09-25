@@ -126,7 +126,7 @@ export function EmailSignIn({
               ? "Register to play"
               : returning
                 ? "Welcome back"
-                : "Sign in"
+                : "Continue to DesiAuction"
           : "Check your email"
       }
       sub={
@@ -139,7 +139,7 @@ export function EmailSignIn({
                 ? "Sign in to continue where you were headed."
                 : returning
                   ? "Use your passkey, or we'll email you a code."
-                  : "We'll email you a 6-digit code — no password needed."
+                  : "New here or coming back — one code does both."
           : // Conditional on reaching the mailbox, never on finding an account —
             // the one address mailed nothing (claimed on an account that never
             // confirmed it) must read exactly like every other.
@@ -220,7 +220,7 @@ export function EmailSignIn({
           // Said once, under the button it applies to, and only to a device
           // that has never signed in — a returning one does not need telling.
           <p className="login-hint" data-testid="email-login-new-hint">
-            New to DesiAuction? The same code creates your account.
+            No password to remember — your first code also creates your account.
           </p>
         ) : null}
         {!atStart ? (

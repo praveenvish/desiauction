@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
 import type { LoginMethod } from "./login-shared";
 import "./login.css";
 
-export const metadata = { title: "Sign in · DesiAuction" };
+export const metadata = { title: "Continue to DesiAuction" };
 
 /**
  * The trust argument, in one place. It used to exist only inside the

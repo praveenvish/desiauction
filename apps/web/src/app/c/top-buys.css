@@ -1,0 +1,93 @@
+/* Top buys podium — shared by /c/[slug] and the register closed notice. */
+.top-buys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--space-3);
+}
+
+.top-buy {
+  min-width: 0;
+}
+
+.top-buy-link {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "price rank"
+    "name name"
+    "team team";
+  row-gap: var(--space-1);
+  column-gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  text-decoration: none;
+  box-shadow: var(--shadow-1);
+}
+
+.top-buy[data-rank="1"] .top-buy-link {
+  border-color: var(--accent-line);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    var(--surface-raised);
+}
+
+.top-buy-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.top-buy-price {
+  grid-area: price;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl-size);
+  line-height: 1.1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+.top-buy-rank {
+  grid-area: rank;
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.top-buy[data-rank="1"] .top-buy-rank {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.top-buy-name {
+  grid-area: name;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  overflow-wrap: anywhere;
+}
+
+.top-buy-team {
+  grid-area: team;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}

@@ -156,11 +156,103 @@
   color: var(--text-secondary);
 }
 
+/* Two ways out, as one row of equal, thumb-sized buttons. */
 .public-empty-actions {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-3);
+  width: min(100%, 26rem);
+}
+
+.public-empty-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  justify-content: center;
+}
+
+/* --- Directory toolbar (wow pass): one row ------------------------------- */
+.dir-toolbar {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+
+.dir-toolbar .dir-search {
+  flex: 1 1 18rem;
+  max-width: 24rem;
+}
+
+.dir-toolbar .public-sort select {
+  min-height: 36px;
+  padding: 0 var(--space-8) 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+}
+
+@media (max-width: 639px) {
+  /* Phone: search takes the row; tabs scroll sideways on their own row; the
+     count and sort share the last one. Three short rows, not seven. */
+  .dir-toolbar .dir-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .dir-toolbar nav {
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .dir-toolbar .public-sort-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Numbered pages with arrow steps. */
+.dir-page,
+.dir-page-gap {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.dir-page {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: var(--font-weight-semibold);
+}
+
+.dir-page:hover {
+  border-color: var(--border-interactive);
+}
+
+.dir-page[aria-current="page"] {
+  background: var(--accent);
+  border-color: var(--accent-line);
+  color: var(--text-on-accent);
+}
+
+.dir-page:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* --- Directory cards ---------------------------------------------------------- */
@@ -402,9 +494,10 @@
 
 .public-pagination {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin-top: var(--space-8);
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
@@ -1066,6 +1159,35 @@
   color: var(--text-secondary);
 }
 
+/* Laptop: the message on the left, the actions stacked beside it — a share
+   affordance must not outweigh the page it shares (wow pass). */
+@media (min-width: 900px) {
+  .share-sheet {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+    grid-auto-flow: row dense;
+    column-gap: var(--space-5);
+    align-items: start;
+  }
+
+  .share-sheet-head,
+  .share-sheet-preview,
+  .share-sheet-note {
+    grid-column: 1;
+  }
+
+  .share-sheet-primary,
+  .share-sheet-wide,
+  .share-sheet-actions {
+    grid-column: 2;
+  }
+
+  .share-sheet-primary,
+  .share-sheet-wide {
+    min-height: 44px;
+  }
+}
+
 /* --- RH-1b · Public surfaces on a phone ----------------------------------- */
 
 /*
@@ -1278,8 +1400,43 @@
 }
 
 .team-page-signed {
-  font-style: italic;
+  font-weight: 400;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.team-page-badge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
   color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  line-height: 20px;
+  font-weight: var(--font-weight-semibold);
+  vertical-align: 2px;
+}
+
+/* Phone: one grouped list with hairlines, not twelve bordered cards. */
+@media (max-width: 639px) {
+  .team-page-squad {
+    gap: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface-raised);
+  }
+
+  .team-page-squad > li + li {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .team-page-player {
+    min-height: 56px;
+    border: 0;
+    border-radius: 0;
+  }
 }
 
 .team-page-mark {
@@ -1292,4 +1449,31 @@
   color: var(--text-on-accent, #070a0f);
   font-size: 12px;
   font-weight: 700;
+}
+
+/* --- Public player page: the price leads (wow pass) ----------------------- */
+.player-sold {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-2) 0 0;
+}
+
+.player-sold-price {
+  font-family: var(--font-display);
+  font-size: clamp(var(--display-sm-size), 5vw, var(--display-lg-size));
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+.player-sold-team {
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
 }

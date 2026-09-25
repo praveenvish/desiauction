@@ -1,0 +1,185 @@
+/* The player's home (wow pass). Its own file: home.css belongs to the
+   organizer/console stream. Tokens only; floodlight pinned on the moment. */
+
+.pm-moment {
+  --pm-team: var(--accent);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "copy actions"
+    "foot foot";
+  align-items: end;
+  gap: var(--space-5) var(--space-6);
+  padding: clamp(var(--space-5), 3vw, var(--space-8));
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 24%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      50% 120% at 0% 100%,
+      color-mix(in srgb, var(--pm-team) 30%, transparent),
+      transparent 65%
+    ),
+    var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
+}
+
+/* The team's own colour, as the card's left edge. */
+.pm-moment::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--pm-team);
+}
+
+.pm-moment-copy {
+  grid-area: copy;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pm-moment-kicker {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.pm-moment-title {
+  margin: 0;
+  font-size: var(--text-2xl-size);
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.pm-moment-team {
+  color: var(--text-accent);
+}
+
+.pm-moment-price {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(var(--display-sm-size), 6vw, var(--display-lg-size));
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+.pm-moment-actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.pm-moment-foot {
+  grid-area: foot;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.pm-moment-foot a,
+.pm-nudge a,
+.pm-organize a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pm-moment-foot a:hover,
+.pm-nudge a:hover,
+.pm-organize a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 719px) {
+  .pm-moment {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "copy"
+      "actions"
+      "foot";
+  }
+
+  .pm-moment-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pm-moment-actions > * {
+    justify-content: center;
+    white-space: nowrap;
+  }
+}
+
+/* The profile nudge, as one slim row instead of a full-width blue notice. */
+.pm-nudge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.pm-nudge > svg {
+  flex: none;
+  color: var(--text-accent);
+}
+
+.pm-nudge > span {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.pm-nudge strong {
+  color: var(--text-primary);
+}
+
+/* "Want to run your own?" — a line at the foot, not a 120px card. */
+.pm-organize {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}

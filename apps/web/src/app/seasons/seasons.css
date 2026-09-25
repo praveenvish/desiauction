@@ -12,7 +12,6 @@
 /* /register is a PUBLIC surface with no identity bar above it, so it keeps the
    full opening measure. */
 .register {
-  min-height: 100vh;
   background: var(--surface);
   color: var(--text-primary);
   font-family: var(--font-text);
