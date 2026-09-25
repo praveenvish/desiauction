@@ -15,13 +15,18 @@
 // Idempotent: re-running for the same person is a no-op, so it is safe in
 // setup:local and safe to re-run against a live database.
 //
-// Run: pnpm --filter @desiauction/web seed:admin -- <phone>
+// Run: pnpm --filter @desiauction/web seed:admin -- <phone or email>
 //   e.g. pnpm --filter @desiauction/web seed:admin -- +919999000001
+//        pnpm --filter @desiauction/web seed:admin -- founder@example.com
 //        pnpm --filter @desiauction/web seed:admin -- --revoke +919999000001
+//
+// Email as well as phone: sign-in is email-first, so an account may have no
+// mobile number at all — and could not be made an administrator by phone.
 import { auditLog, createDb, grants, newId, people } from "@desiauction/db";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capabilities.js";
+import { describeGrantTarget, parseGrantTarget } from "../src/server/admin/grant-target.js";
 
 /**
  * WHICH PLATFORM GRANT.
@@ -41,12 +46,12 @@ import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../src/server/admin/capa
  * All are platform-scoped, and RLS makes all equally uninsertable by the
  * application role: this script is the only route.
  *
- *   pnpm --filter @desiauction/web seed:admin -- <phone>
- *   pnpm --filter @desiauction/web seed:admin -- --set platform:billing <phone>
- *   pnpm --filter @desiauction/web seed:admin -- --set platform:demo <phone>
- *   pnpm --filter @desiauction/web seed:admin -- --set platform:privacy <phone>
- *   pnpm --filter @desiauction/web seed:admin -- --set platform:support <phone>
- *   pnpm --filter @desiauction/web seed:admin -- --set platform:moderation <phone>
+ *   pnpm --filter @desiauction/web seed:admin -- <phone or email>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:billing <phone or email>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:demo <phone or email>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:privacy <phone or email>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:support <phone or email>
+ *   pnpm --filter @desiauction/web seed:admin -- --set platform:moderation <phone or email>
  */
 const SETS = [
   "platform:admin",
@@ -81,39 +86,43 @@ if (process.env["NODE_ENV"] === "production" && process.env["ALLOW_SEED_IN_PRODU
 const handle = createDb(URL_);
 const db = handle.db;
 
-function normalizePhone(input: string): string {
-  const trimmed = input.trim();
-  return trimmed.startsWith("+") ? trimmed : `+91${trimmed.replace(/^0+/, "")}`;
-}
-
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((arg) => arg !== "--");
   const revoke = args.includes("--revoke");
   // `--set <value>` consumes its own argument, so the value must not be
-  // mistaken for the phone number. Guarded on the flag being PRESENT: an
-  // `indexOf` of -1 plus one is 0, which excluded the first argument — the
-  // phone — on every invocation that did not pass --set at all.
+  // mistaken for the person. Guarded on the flag being PRESENT: an `indexOf`
+  // of -1 plus one is 0, which excluded the first argument — the person — on
+  // every invocation that did not pass --set at all.
   const setFlagIndex = args.indexOf("--set");
-  const phoneArg = args.find(
+  const targetArg = args.find(
     (arg, index) => !arg.startsWith("--") && (setFlagIndex === -1 || index !== setFlagIndex + 1),
   );
-  if (phoneArg === undefined) {
+  if (targetArg === undefined) {
     throw new Error(
-      "Usage: pnpm --filter @desiauction/web seed:admin -- [--revoke] [--set <set>] <phone>\n" +
+      "Usage: pnpm --filter @desiauction/web seed:admin -- [--revoke] [--set <set>] <phone or email>\n" +
         "  e.g. pnpm --filter @desiauction/web seed:admin -- +919999000001\n" +
+        "       pnpm --filter @desiauction/web seed:admin -- founder@example.com\n" +
         "       pnpm --filter @desiauction/web seed:admin -- --set platform:billing +919999000001",
     );
   }
-  const phone = normalizePhone(phoneArg);
+  const target = parseGrantTarget(targetArg);
+  if (target.kind === "invalid") {
+    throw new Error(
+      `"${target.input}" is neither an Indian mobile number nor an email address. Use the number or email the person signs in with.`,
+    );
+  }
+  const who = describeGrantTarget(target);
 
   const [person] = await db
     .select({ id: people.id, name: people.name })
     .from(people)
-    .where(eq(people.phone, phone))
+    .where(
+      target.kind === "email" ? eq(people.email, target.email) : eq(people.phone, target.phone),
+    )
     .limit(1);
   if (person === undefined) {
     throw new Error(
-      `No person with phone ${phone}. They must sign in once before they can be made a platform admin.`,
+      `No person with ${target.kind} ${who}. They must sign in once before they can be given ${SET}.`,
     );
   }
 
@@ -133,7 +142,7 @@ async function main(): Promise<void> {
 
   if (revoke) {
     if (existing === undefined) {
-      console.log(`${person.name ?? phone} is not a platform admin. Nothing to revoke.`);
+      console.log(`${person.name ?? who} does not hold ${SET}. Nothing to revoke.`);
       return;
     }
     await db.transaction(async (tx) => {
@@ -150,12 +159,12 @@ async function main(): Promise<void> {
         meta: { capabilitySet: SET, domain: "platform", via: "seed:admin" },
       });
     });
-    console.log(`Revoked platform.admin from ${person.name ?? phone}.`);
+    console.log(`Revoked ${SET} from ${person.name ?? who}.`);
     return;
   }
 
   if (existing !== undefined) {
-    console.log(`${person.name ?? phone} is already a platform admin. Nothing to do.`);
+    console.log(`${person.name ?? who} already holds ${SET}. Nothing to do.`);
     return;
   }
 
@@ -179,8 +188,8 @@ async function main(): Promise<void> {
       meta: { capabilitySet: SET, domain: "platform", via: "seed:admin" },
     });
   });
-  console.log(`\n  ${person.name ?? phone} is now a platform admin.`);
-  console.log(`  Sign in as ${phone} → avatar menu → Platform admin (or go to /admin).\n`);
+  console.log(`\n  ${person.name ?? who} now holds ${SET}.`);
+  console.log(`  Sign in as ${who} → avatar menu → Platform admin (or go to /admin).\n`);
 }
 
 main()
