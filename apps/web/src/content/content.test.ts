@@ -120,12 +120,11 @@ describe("PX-10 · Broken-link detection", () => {
       LANDING.beta.ctaPrimary.href,
       LANDING.beta.ctaSecondary.href,
       // /pricing carries links this suite never saw: three tier CTAs, the
-      // procurement route out, the closing band, and the FAQ's link to the
-      // policy it paraphrases. A pricing page is where a dead link costs the
-      // most, so it is held to the same rule as everything else.
+      // closing band, and the FAQ's link to the policy it paraphrases. A
+      // pricing page is where a dead link costs the most, so it is held to the
+      // same rule as everything else.
       ...PRICING.tiers.map((tier) => tier.cta.href),
       ...PRICING.faqs.flatMap((faq) => (faq.link === undefined ? [] : [faq.link.href])),
-      PRICING.procurement.cta.href,
       PRICING.closing.ctaPrimary.href,
       PRICING.closing.ctaSecondary.href,
       ...SUPPORT.issueCategories.map((issue) => issue.link.href),
@@ -619,7 +618,7 @@ describe("pricing — the page may not promise a ceiling the product has no idea
    * change at the same time, which is the point of pinning it.
    */
   it("says plainly that no limit is enforced during beta", () => {
-    expect(PRICING.betaBanner).toContain("no limit enforced");
+    expect(PRICING.betaBanner).toContain("no limits enforced");
   });
 
   it("still quotes the tier numbers, so the promise itself is unchanged", () => {

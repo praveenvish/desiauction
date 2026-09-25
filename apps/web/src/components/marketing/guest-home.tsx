@@ -260,7 +260,8 @@ export function AuctionLab({
                 </div>
                 <div>
                   <span>PLAYER 007</span>
-                  <h3>Praveen Vishnoi</h3>
+                  {/* A fictional player: the demo is a sample, not a real person's lot. */}
+                  <h3>Aniket Sawant</h3>
                   <p>
                     {sport?.role} <span>·</span> {sport?.label}
                   </p>

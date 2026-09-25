@@ -190,8 +190,7 @@ export default function LandingPage() {
               </figure>
             </div>
             <p className={styles.realNote}>
-              Screenshots from a practice auction run on DesiAuction, with Praveen Vishnoi on the
-              block. The other players, teams and owners are fictional.
+              Screenshots from a practice auction on DesiAuction. Teams and owners are fictional.
             </p>
           </div>
         </section>
@@ -391,7 +390,9 @@ export default function LandingPage() {
             <div className={styles.journeyIntro} data-reveal>
               <p className={styles.eyebrow}>FROM “LET’S PLAY” TO GAME DAY</p>
               <h2 id="journey-title">
-                Three steps from sign-up
+                {/* "from sign-up" hyphen-broke across three lines at phone widths;
+                    the shorter line keeps the two-line rhythm everywhere. */}
+                Three steps
                 <br />
                 <span>to auction night.</span>
               </h2>
