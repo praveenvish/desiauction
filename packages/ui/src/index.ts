@@ -22,6 +22,7 @@ export { Field, Select } from "./primitives/field";
 export type { FieldProps, SelectProps } from "./primitives/field";
 export {
   CardGrid,
+  CONCEPT_TONE,
   HeroBanner,
   IconTile,
   JourneyStepper,
@@ -31,11 +32,14 @@ export {
   StatCard,
   StatGrid,
   TeamChip,
+  kitTone,
 } from "./primitives/console-kit";
+export { KitFigure } from "./primitives/console-kit-figure";
 export type {
   HeroBannerProps,
   IconTileProps,
   JourneyStep,
+  KitConcept,
   KitTone,
   NoticeProps,
   PillProps,

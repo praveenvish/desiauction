@@ -72,7 +72,7 @@
    single-competition and register surfaces that share this stylesheet. */
 .competitions .competitions-stack {
   max-width: 1280px;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .seasons-section {
@@ -343,7 +343,7 @@ p + .date-row {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 /* A flex item defaults to min-width:auto, so a card wrapping a wide table grew
