@@ -2,7 +2,7 @@ import { FormDialog } from "../../../components/form-dialog";
 import { CreateOrgForm } from "../../orgs/create-org-form";
 
 /**
- * /orgs — "New organization".
+ * /orgs — "New club".
  *
  * Unconditional: anyone who can reach the organizations index can start one,
  * so there is no capability read here and nothing to gate on.
@@ -19,12 +19,7 @@ import { CreateOrgForm } from "../../orgs/create-org-form";
  */
 export default function OrgsAction() {
   return (
-    <FormDialog
-      title="New organization"
-      triggerLabel="+ New organization"
-      size="touch"
-      triggerTestId="new-org"
-    >
+    <FormDialog title="New club" triggerLabel="+ New club" size="touch" triggerTestId="new-org">
       <CreateOrgForm />
     </FormDialog>
   );

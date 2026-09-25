@@ -28,7 +28,8 @@
 /* Anchors land below the Live shell's strip, not under it. */
 .live-anchor,
 .live-main,
-.live-col[id] {
+.live-col[id],
+.live-layout [data-testid="current-lot"] {
   scroll-margin-top: var(--space-16);
 }
 

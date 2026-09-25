@@ -187,6 +187,9 @@ export function LivePanel({
   const claim = async () => {
     if (await send("claim", "ClaimPaddle", { teamId: claimTeam }, "Paddle claimed")) {
       router.refresh();
+      // The claim form sits at the foot of the room and the paddle at its
+      // head: on a phone the owner was left ~2,000px below the Raise button.
+      bringBiddingIntoView("top");
     }
   };
 
@@ -303,6 +306,8 @@ export function LivePanel({
       toast({
         title: `Outbid — ${snapshot.currentLot?.currentBid?.teamName ?? "another team"}${amount !== undefined ? ` at ${money.ledger(amount)}` : ""}`,
         tone: "info",
+        // One slot for "where do I stand on this lot": the newest price only.
+        group: "bid-status",
       });
     }
     prevLeaderRef.current = leader;
@@ -317,11 +322,23 @@ export function LivePanel({
       toast({
         title: `You signed ${outcome.playerName ?? outcome.lotNumber}${outcome.amount !== null ? ` for ${money.ledger(outcome.amount)}` : ""}!`,
         tone: "success",
+        group: "bid-status",
       });
     }
   }, [snapshot, myPaddle, toast, money]);
 
   const lot = snapshot?.currentLot ?? null;
+
+  // Every new lot is a fresh decision for a bidder. An owner who scrolled
+  // down to read the squads was not shown the next player going up; bring
+  // the lot back into view — only for paddle holders, only when it changes.
+  const lotId = lot?.lotId ?? null;
+  const holdsPaddle = myPaddle !== null;
+  useEffect(() => {
+    if (lotId !== null && holdsPaddle) {
+      bringBiddingIntoView("lot");
+    }
+  }, [lotId, holdsPaddle]);
   const grantedTeams = view.teams.filter((team) => view.myGrantTeamIds.includes(team.id));
   // The squad board's row universe. A conductor keeps every franchise; a bidder
   // gets their own — see `viewer.canSeeAllSquads`.
@@ -913,4 +930,27 @@ export function LivePanel({
       </Dialog>
     </div>
   );
+}
+
+/** Scroll the bidding area into view, if it is not already; instant under reduced motion. */
+function bringBiddingIntoView(target: "top" | "lot"): void {
+  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "auto"
+    : "smooth";
+  if (target === "top") {
+    window.scrollTo({ top: 0, behavior });
+    return;
+  }
+  const hero = document.querySelector('[data-testid="current-lot"]');
+  if (hero === null) {
+    return;
+  }
+  // Scroll when the lot OR the Raise button under it is cut off: on a phone
+  // the lot could be on screen with Raise a few pixels below the fold.
+  const raise = document.querySelector('[data-testid="bid-next"]');
+  const heroBox = hero.getBoundingClientRect();
+  const raiseBottom = raise?.getBoundingClientRect().bottom ?? heroBox.bottom;
+  if (heroBox.top < 0 || raiseBottom > window.innerHeight) {
+    hero.scrollIntoView({ behavior, block: "start" });
+  }
 }

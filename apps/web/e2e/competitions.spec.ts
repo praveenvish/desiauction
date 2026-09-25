@@ -55,8 +55,8 @@ test("the competition journey: create, open, team, register, approve", async ({
   await otpLogin(page, PHONE_ORG);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Comp Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Comp Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Comp Org ${STAMP}`);
 
   // Create a competition with dates + location (so the lifecycle guard passes).
@@ -129,8 +129,8 @@ test("registration is refused before intake opens", async ({ browser, page }) =>
   await otpLogin(page, `88${stamp}`);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Closed Org ${stamp}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Closed Org ${stamp}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");

@@ -34,8 +34,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
 async function createOrg(page: Page, name: string): Promise<void> {
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(name);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(name);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(name);
 }
 
@@ -344,8 +344,8 @@ test("mobile 360px: the full entry journey works one-handed", async ({ browser }
     await expect(page).toHaveURL(/\/home/);
     await page.goto("/orgs");
     await page.getByTestId("new-org").click();
-    await page.getByLabel("Organization name").filter({ visible: true }).fill(`Mira XI ${STAMP}`);
-    await page.getByRole("button", { name: "Create organization" }).click();
+    await page.getByLabel("Club name").filter({ visible: true }).fill(`Mira XI ${STAMP}`);
+    await page.getByRole("button", { name: "Create club" }).click();
     await expect(page.getByTestId("org-name")).toHaveText(`Mira XI ${STAMP}`);
     // No horizontal scroll on the journey's surfaces; name offenders on failure.
     const offenders = await page.evaluate(() => {

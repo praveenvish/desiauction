@@ -74,6 +74,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
       sports={sportOptions}
       orgs={[{ id: tournament.orgId, name: tournament.orgName }]}
       tournamentId={tournament.id}
+      suggestedName={`${tournament.name} ${String(new Date().getFullYear())}`}
     />
   );
 
@@ -145,7 +146,9 @@ async function SeasonsSection({
           title="No seasons yet"
           description={
             canCreateSeason
-              ? WHAT_A_TOURNAMENT_IS
+              ? // The line above the list already says what a tournament is;
+                // repeating it here printed the same sentence twice.
+                "Start with this year's season — dates, sport and teams come next."
               : "This tournament has no editions yet. Ask an owner to add a season."
           }
           {...(canCreateSeason

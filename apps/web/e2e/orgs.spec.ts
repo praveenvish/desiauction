@@ -50,8 +50,8 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
   await otpLogin(page, PHONE_A);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`MPL ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`MPL ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`MPL ${STAMP}`);
   const orgUrl = page.url();
 
@@ -121,8 +121,8 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
     await otpLogin(pageB, PHONE_B);
     await pageB.goto("/orgs");
     await pageB.getByTestId("new-org").click();
-    await pageB.getByLabel("Organization name").filter({ visible: true }).fill(`Rivals ${STAMP}`);
-    await pageB.getByRole("button", { name: "Create organization" }).click();
+    await pageB.getByLabel("Club name").filter({ visible: true }).fill(`Rivals ${STAMP}`);
+    await pageB.getByRole("button", { name: "Create club" }).click();
     await expect(pageB.getByTestId("org-name")).toHaveText(`Rivals ${STAMP}`);
     bOrgUrl = pageB.url();
   });

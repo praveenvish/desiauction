@@ -150,7 +150,7 @@ function AddTeamControl({
             ref={nameRef}
             label="Team name"
             name="team-name"
-            placeholder="Malad Mavericks"
+            placeholder="e.g. Malad Mavericks"
             value={name}
             onChange={(event) => {
               setName(event.target.value);
@@ -161,7 +161,7 @@ function AddTeamControl({
             <Field
               label="Short name"
               name="team-short"
-              placeholder="MAV"
+              placeholder="e.g. MAV"
               value={shortName}
               onChange={(event) => {
                 setShortName(event.target.value);

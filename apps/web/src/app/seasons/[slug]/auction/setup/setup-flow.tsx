@@ -94,8 +94,10 @@ export function AuctionSetupFlow({
         <ul className="as-gates">
           {ready.checks.map((check) => (
             <li key={check.id} data-testid={`check-${check.id}`} data-pass={check.pass}>
+              {/* "Done / To do", not "pass / fail": an open registration on
+                  the first visit is the next step, not something broken. */}
               <Badge tone={check.pass ? "success" : "warning"}>
-                {check.pass ? "pass" : "fail"}
+                {check.pass ? "done" : "to do"}
               </Badge>
               <span>{check.label}</span>
             </li>

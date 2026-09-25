@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
+
+import { MoneyUnitProvider, useMoneyUnit } from "../money-unit";
 
 /**
  * A live surface's status strip, handed up to the Live shell's header.
@@ -30,11 +32,20 @@ export const ShellStatusContext = createContext<ShellStatusChannel>({
 /** Renders nothing where it sits; its child appears in the Live shell header. */
 export function PageStatus({ children }: { children: ReactNode }) {
   const { publish, retract } = useContext(ShellStatusContext);
+  // The shell renders what is published OUTSIDE this page's providers, so the
+  // season's money unit did not travel with it: a points season's live header
+  // read "₹1,000" while the panel under it said "1,000 pts". The unit is
+  // captured here and re-provided around the published node.
+  const unit = useMoneyUnit();
+  const node = useMemo(
+    () => <MoneyUnitProvider unit={unit}>{children}</MoneyUnitProvider>,
+    [unit, children],
+  );
   useEffect(() => {
-    publish(children);
+    publish(node);
     return () => {
-      retract(children);
+      retract(node);
     };
-  }, [publish, retract, children]);
+  }, [publish, retract, node]);
   return null;
 }

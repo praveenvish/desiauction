@@ -201,6 +201,8 @@ export function RegistrationDashboardPanel({
 
   const [selected, setSelected] = useState<Map<string, Picked>>(new Map());
   const [bulkBusy, setBulkBusy] = useState<TriageAction | "select" | null>(null);
+  const [approveAllOpen, setApproveAllOpen] = useState(false);
+  const [approvingAll, setApprovingAll] = useState(false);
   const [search, setSearch] = useState(filters.search);
   const [importOpen, setImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -515,6 +517,45 @@ export function RegistrationDashboardPanel({
     roster.settle();
   };
 
+  /**
+   * APPROVE EVERYONE WAITING, in one decision.
+   *
+   * An organizer who imported their own list has already decided about every
+   * name on it; "Start reviewing" then walked them through 43 sheets to say
+   * yes 43 times. The same server path as the bulk bar — every row still goes
+   * through the triage rules and the approval messages — scoped to the
+   * submitted players on every page, not just the one on screen.
+   */
+  const approveAllSubmitted = async () => {
+    setApprovingAll(true);
+    const found = await selectAllMatchingAction(slug, { status: "submitted" });
+    if (!found.ok) {
+      setApprovingAll(false);
+      toast({ title: found.error, tone: "danger" });
+      return;
+    }
+    const result = await bulkTriageAction(
+      slug,
+      found.rows.map((row) => row.id),
+      "approve",
+    );
+    setApprovingAll(false);
+    setApproveAllOpen(false);
+    if (!result.ok) {
+      toast({ title: result.error ?? "Approving everyone failed.", tone: "danger" });
+      return;
+    }
+    toast({
+      title: [
+        `${String(result.applied ?? 0)} approved`,
+        ...((result.skipped ?? 0) > 0 ? [`${String(result.skipped)} skipped`] : []),
+        ...((result.notifying ?? 0) > 0 ? ["messages on their way"] : []),
+      ].join(" · "),
+      tone: "success",
+    });
+    roster.settle();
+  };
+
   /* --- One row -------------------------------------------------------- */
   const decideRow = async (row: Row, action: TriageAction) => {
     const status =
@@ -665,8 +706,43 @@ export function RegistrationDashboardPanel({
         slug={slug}
         teamsCount={teams.length}
         onReview={beginReview}
+        onApproveAll={() => {
+          setApproveAllOpen(true);
+        }}
         onOpenPlayer={openSheet}
       />
+      <Dialog
+        open={approveAllOpen}
+        onClose={() => {
+          if (!approvingAll) setApproveAllOpen(false);
+        }}
+        title={`Approve all ${String(stats.submitted)} waiting players?`}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setApproveAllOpen(false);
+              }}
+              disabled={approvingAll}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void approveAllSubmitted()}
+              loading={approvingAll}
+              data-testid="approve-all-confirm"
+            >
+              Approve {String(stats.submitted)}
+            </Button>
+          </>
+        }
+      >
+        <p>
+          They join the auction pool, and each one gets their approval message. Waitlisted players
+          are left as they are.
+        </p>
+      </Dialog>
 
       {/* Eight figures, and seven of them are the list's own filters: the
           open one is gold. The auction pool is derived, so it explains itself
@@ -1440,6 +1516,7 @@ function NextStep({
   slug,
   teamsCount,
   onReview,
+  onApproveAll,
   onOpenPlayer,
 }: {
   stats: RegistrationStats;
@@ -1448,6 +1525,7 @@ function NextStep({
   slug: string;
   teamsCount: number;
   onReview: () => void;
+  onApproveAll: () => void;
   onOpenPlayer: (id: string) => void;
 }) {
   const pending = stats.submitted + stats.waitlisted;
@@ -1463,11 +1541,21 @@ function NextStep({
   } else if (pending > 0) {
     eyebrow = "Review";
     title = `${String(pending)} player${pending === 1 ? " is" : "s are"} waiting for a decision`;
-    why = "Open each one, approve or decline, and the next opens by itself.";
+    why =
+      stats.submitted > 1
+        ? "Approve everyone at once if you already know them — or open each one, and the next opens by itself."
+        : "Open each one, approve or decline, and the next opens by itself.";
     action = (
-      <Button variant="secondary" onClick={onReview} data-testid="start-review">
-        Start reviewing <IconArrowRight size={16} className="icon-trail" />
-      </Button>
+      <div className="pd-next-actions">
+        {stats.submitted > 1 ? (
+          <Button onClick={onApproveAll} data-testid="approve-all">
+            Approve all {String(stats.submitted)}
+          </Button>
+        ) : null}
+        <Button variant="secondary" onClick={onReview} data-testid="start-review">
+          Start reviewing <IconArrowRight size={16} className="icon-trail" />
+        </Button>
+      </div>
     );
   } else if (orphans.length > 0) {
     const first = orphans[0];

@@ -10,7 +10,10 @@ import {
   resolveKeyDown,
   resolveKeyUp,
 } from "../../../../../components/auction/cockpit-keys";
-import { lotsNeedingResolution } from "../../../../../components/auction/needs-resolution";
+import {
+  lotsNeedingResolution,
+  unsoldToRequeue,
+} from "../../../../../components/auction/needs-resolution";
 import { HashTabs } from "../../../../../components/hash-tabs/hash-tabs";
 import { formatDateTime } from "../../../../../lib/format-date";
 import { lotSeed } from "../../../../../lib/player-seed";
@@ -157,6 +160,47 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     },
     [slug, router, toast],
   );
+
+  /**
+   * ROUND TWO IN ONE PRESS. The same `RequeueLot` the per-row button sends,
+   * once per unsold lot, one after another — so every lot goes through the
+   * engine's own gauntlet (rounds used, unsold policy) exactly as a click
+   * would. The queue is ordered by the lot's draw, so the order these land in
+   * does not matter. The first refusal stops the sweep and is said once, with
+   * how many made it back, rather than a toast per row.
+   */
+  const requeueAllUnsold = async (lotIds: readonly string[]) => {
+    setPending("requeue-all");
+    let requeued = 0;
+    let refusal: string | null = null;
+    try {
+      for (const lotId of lotIds) {
+        const ack = await submitAuctionCommand(slug, commandId(), "RequeueLot", { lotId });
+        if (!ack.accepted) {
+          refusal = commandRefusalMessage(ack.reason);
+          break;
+        }
+        requeued += 1;
+      }
+    } catch {
+      refusal =
+        "Lost the connection before the auction answered — check the queue before acting again.";
+    } finally {
+      setPending(null);
+    }
+    if (refusal === null) {
+      toast({
+        title: `${String(requeued)} unsold ${requeued === 1 ? "player is" : "players are"} back in the queue`,
+        tone: "success",
+      });
+    } else {
+      toast({
+        title: `${String(requeued)} of ${String(lotIds.length)} requeued — ${refusal}`,
+        tone: "danger",
+      });
+    }
+    router.refresh();
+  };
 
   /**
    * DA-16: completing an auction is irreversible and was one unguarded click.
@@ -744,6 +788,23 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     This auction has ended. These lots stay as they finished — the ledger and the
                     replay are the record now.
                   </p>
+                ) : null}
+                {!finished && unsoldToRequeue(needsResolution).length > 1 ? (
+                  <div className="cockpit-actions">
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        void requeueAllUnsold(
+                          unsoldToRequeue(needsResolution).map((entry) => entry.id),
+                        )
+                      }
+                      loading={pending === "requeue-all"}
+                      disabled={stale || (busy && pending !== "requeue-all")}
+                      data-testid="requeue-all-unsold"
+                    >
+                      Requeue all unsold ({unsoldToRequeue(needsResolution).length})
+                    </Button>
+                  </div>
                 ) : null}
                 <ol className="cockpit-queue">
                   {needsResolution.map((entry) => (

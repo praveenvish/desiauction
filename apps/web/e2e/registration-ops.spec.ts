@@ -111,8 +111,8 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   // Org + competition, open for registration.
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Ops Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Ops Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
@@ -288,8 +288,8 @@ test("an organizer adds one player by hand, then imports their photo by filename
   await otpLogin(page, `82${STAMP}`);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Hand Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Hand Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
@@ -349,8 +349,8 @@ test("declining for 'other' demands the reason, keeps it from the player, and sh
   await otpLogin(page, `85${STAMP}`);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Decline Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Decline Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
@@ -436,8 +436,8 @@ test("registration operations dashboard: axe zero violations", async ({ page }) 
   await otpLogin(page, `83${STAMP}`);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Axe Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Axe Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();
@@ -464,8 +464,8 @@ test("a Google Form export imports through the mapping step", async ({ page }) =
 
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Form Org ${stamp}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Form Org ${stamp}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");
@@ -608,8 +608,8 @@ test("a file's own vocabulary is mapped onto the season's", async ({ page }) => 
 
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Vocab Org ${stamp}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Vocab Org ${stamp}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");

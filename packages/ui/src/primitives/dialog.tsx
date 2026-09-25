@@ -17,6 +17,28 @@ export interface DialogProps {
   size?: "default" | "wide";
 }
 
+const FIELD =
+  "[autofocus], input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]):not([disabled]), textarea:not([disabled]), select:not([disabled])";
+
+/**
+ * WHERE THE CURSOR GOES WHEN A FORM OPENS: its first field.
+ *
+ * `showModal()` focuses the first focusable element, and in every dialog that
+ * is the header's close button — so "Add a team", "New tournament" and the
+ * rest opened with nothing to type into, and the first keystrokes went
+ * nowhere. A dialog with no field (a confirmation) keeps the platform's
+ * choice.
+ */
+function firstField(node: HTMLDialogElement): HTMLElement | null {
+  for (const field of node.querySelectorAll<HTMLElement>(FIELD)) {
+    // Layout-less environments have no checkVisibility; treat as visible.
+    if (typeof field.checkVisibility !== "function" || field.checkVisibility()) {
+      return field;
+    }
+  }
+  return null;
+}
+
 /**
  * Built on native <dialog>: browser-managed focus trap, Escape, ::backdrop,
  * top-layer stacking — the simplest correct modal (IP-1_DESIGN §13 spirit).
@@ -32,6 +54,7 @@ export function Dialog({ open, onClose, title, children, footer, size = "default
     }
     if (open && !node.open) {
       node.showModal();
+      firstField(node)?.focus();
     } else if (!open && node.open) {
       node.close();
     }

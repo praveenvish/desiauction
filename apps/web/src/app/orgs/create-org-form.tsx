@@ -40,13 +40,13 @@ export function CreateOrgForm() {
           ("Malad Premier League") named a LEAGUE — the exact thing an
           organization is not. */}
       <Field
-        label="Organization name"
+        label="Club name"
         name="name"
         // Survives a refusal: the form is uncontrolled, so React clears it when
         // the action returns, and the rejected name vanished with the reason.
         defaultValue={state.name ?? ""}
         key={state.name ?? ""}
-        placeholder="Malad Cricket Club"
+        placeholder="e.g. Malad Cricket Club"
         help="Your club's real name — 'Malad Cricket Club', not this year's league. You'll be its owner, and you can invite people once it exists."
         required
         {...(state.error !== undefined ? { error: state.error } : {})}
@@ -56,7 +56,7 @@ export function CreateOrgForm() {
           screen; without `state.created` the button flicks back to idle and
           invites a second submit that would create a second organization. */}
       <Button type="submit" loading={pending || state.created !== undefined}>
-        Create organization
+        Create club
       </Button>
     </form>
   );

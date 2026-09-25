@@ -12,6 +12,7 @@ export function CreateCompetitionForm({
   orgs,
   sports,
   tournamentId,
+  suggestedName,
 }: {
   orgs: { id: string; name: string }[];
   /**
@@ -33,6 +34,13 @@ export function CreateCompetitionForm({
    * `competitions.tournament_id` is nullable precisely so that stays possible.
    */
   tournamentId?: string;
+  /**
+   * The name this season most likely has — "<Tournament> 2026" inside a
+   * tournament. Pre-filled rather than shown as a placeholder: an example
+   * name in dark placeholder type read as already typed, and the organizer
+   * then had to type the obvious answer anyway.
+   */
+  suggestedName?: string;
 }) {
   const [state, formAction, pending] = useActionState(createCompetitionAction, {});
   /**
@@ -76,7 +84,8 @@ export function CreateCompetitionForm({
       <Field
         label="Season name"
         name="name"
-        placeholder="Malad Premier League 2026"
+        placeholder="e.g. Malad Premier League 2026"
+        {...(suggestedName !== undefined ? { defaultValue: suggestedName } : {})}
         required
         {...errorFor("name")}
       />
@@ -106,7 +115,7 @@ export function CreateCompetitionForm({
         <option value="inr">Rupees (₹) — real money</option>
         <option value="points">Points — no money changes hands</option>
       </Select>
-      <Field label="Location" name="location" placeholder="Malad, Mumbai" />
+      <Field label="Location" name="location" placeholder="e.g. Malad, Mumbai" />
       <div className="date-row">
         <Field label="Starts on" name="startsOn" type="date" />
         <Field label="Ends on" name="endsOn" type="date" {...errorFor("endsOn")} />

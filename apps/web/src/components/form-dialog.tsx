@@ -51,6 +51,7 @@ export function FormDialog({
   triggerAsLink = false,
   triggerClassName,
   triggerTestId,
+  defaultOpen = false,
 }: {
   title: string;
   triggerLabel: ReactNode;
@@ -60,8 +61,10 @@ export function FormDialog({
   triggerAsLink?: boolean;
   triggerClassName?: string;
   triggerTestId?: string;
+  /** Open on arrival — the visitor already asked for this form (a `?start=` link). */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   // Stable identity: the forms put this in a `useEffect` dependency list, and a
   // fresh arrow every render would re-run the navigation effect on every render.
   const close = useCallback(() => {

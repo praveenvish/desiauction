@@ -65,7 +65,7 @@ export function NextStepBanner({ step, embedded = false }: { step: NextStep; emb
             // The club is made in a dialog, as everywhere else. The test hook is
             // the one the old setup ladder's first rung carried.
             <FormDialog
-              title="New organization"
+              title="New club"
               triggerLabel={step.cta.label}
               size="touch"
               triggerTestId="home-create-org"

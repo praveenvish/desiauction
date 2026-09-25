@@ -636,6 +636,17 @@
 
 /* --- The player sheet -------------------------------------------------- */
 
+/*
+ * Toasts step aside while the sheet is open. They used to sit bottom-right,
+ * on top of the sheet's lower controls: pick a team, and "X → Team · Undo"
+ * landed exactly over the Icon toggle, so the next click went to the toast
+ * (or its Undo) and the mark was never sent. On a phone the sheet is the
+ * whole screen, so there is no beside; that case keeps the default.
+ */
+body:has(.pd-sheet) {
+  --toast-inset-end: calc(min(560px, 100vw) + var(--space-6));
+}
+
 .pd-sheet {
   position: fixed;
   inset-block: 0;
@@ -1447,6 +1458,10 @@
     border-inline-start: 0;
   }
 
+  body:has(.pd-sheet) {
+    --toast-inset-end: var(--space-6);
+  }
+
   .pd-sheet-scroll {
     padding: var(--space-4) var(--space-4) var(--space-12);
   }
@@ -1580,4 +1595,11 @@
 
 .pd-presign-list:empty {
   display: none;
+}
+
+/* Two answers to "players are waiting": all at once, or one by one. */
+.pd-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }

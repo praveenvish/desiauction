@@ -51,8 +51,8 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
   // Competition with two teams and an approved pool, intake closed.
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Auction Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Auction Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();
@@ -103,7 +103,7 @@ test("the foundation journey: ready gate, create, paddles, queue, machines, repl
     timeout: 30_000,
   });
   for (const check of ["intake_closed", "pool_present", "teams_present"]) {
-    await expect(page.getByTestId(`check-${check}`)).toContainText("pass");
+    await expect(page.getByTestId(`check-${check}`)).toHaveAttribute("data-pass", "true");
   }
 
   // Create the auction: deterministic lot queue from the approved pool.
@@ -150,11 +150,8 @@ test("auction foundation page: axe zero violations", async ({ page }) => {
   await otpLogin(page, `85${STAMP}`);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Axe Auction Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Axe Auction Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();

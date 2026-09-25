@@ -42,11 +42,8 @@ test("auction setup walks the organizer from approved players to an open room on
 
   await organizer.goto("/orgs");
   await organizer.getByTestId("new-org").click();
-  await organizer
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Setup Org ${STAMP}`);
-  await organizer.getByRole("button", { name: "Create organization" }).click();
+  await organizer.getByLabel("Club name").filter({ visible: true }).fill(`Setup Org ${STAMP}`);
+  await organizer.getByRole("button", { name: "Create club" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");
@@ -101,7 +98,11 @@ test("auction setup walks the organizer from approved players to an open room on
     "current",
   );
   await organizer.getByTestId("setup-close-registration").click();
-  await expect(organizer.getByTestId("check-intake_closed")).toContainText("pass", COLD);
+  await expect(organizer.getByTestId("check-intake_closed")).toHaveAttribute(
+    "data-pass",
+    "true",
+    COLD,
+  );
   await expect(organizer.getByTestId("setup-step-rules")).toHaveAttribute("data-state", "current");
 
   // --- Step 2: the rules, then the auction exists -----------------------------

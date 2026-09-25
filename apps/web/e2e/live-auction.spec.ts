@@ -65,11 +65,8 @@ test("the live auction: 1 organizer + 3 bidders, anti-snipe, restart, convergenc
   await otpLogin(organizer, `88${STAMP}`);
   await organizer.goto("/orgs");
   await organizer.getByTestId("new-org").click();
-  await organizer
-    .getByLabel("Organization name")
-    .filter({ visible: true })
-    .fill(`Live Org ${STAMP}`);
-  await organizer.getByRole("button", { name: "Create organization" }).click();
+  await organizer.getByLabel("Club name").filter({ visible: true }).fill(`Live Org ${STAMP}`);
+  await organizer.getByRole("button", { name: "Create club" }).click();
   await expect(organizer.getByTestId("org-name")).toBeVisible();
 
   await organizer.goto("/seasons");

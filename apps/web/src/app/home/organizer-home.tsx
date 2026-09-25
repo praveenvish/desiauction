@@ -318,7 +318,7 @@ export async function OrganizerHome({
       done: view.orgs.length > 0,
       cta: (
         <FormDialog
-          title="New organization"
+          title="New club"
           triggerLabel="Create your organization"
           size="touch"
           triggerTestId="home-create-org"

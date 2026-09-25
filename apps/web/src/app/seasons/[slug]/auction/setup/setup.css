@@ -282,6 +282,11 @@
   margin-bottom: var(--space-3);
 }
 
+/* The band switch reads as a sentence across the grid, not a cell in it. */
+.as-bands-toggle {
+  grid-column: 1 / -1;
+}
+
 /* --- Owners --------------------------------------------------------------- */
 
 .as-owners {

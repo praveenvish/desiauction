@@ -42,8 +42,8 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   // Organization with a venue and two grounds.
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Fixture Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Fixture Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.getByRole("tab", { name: "Tournaments" }).click();
   await page.getByTestId("open-venues").click();
@@ -157,8 +157,8 @@ test("fixtures dashboard and venues page: axe zero violations", async ({ page })
   await otpLogin(page, `81${STAMP}`);
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Axe Fix Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Axe Fix Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
   await page.getByRole("tab", { name: "Tournaments" }).click();
   await page.getByTestId("open-venues").click();

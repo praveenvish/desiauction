@@ -84,10 +84,11 @@ export default async function LoginPage({
     searchParams,
     cookies(),
   ]);
-  if (session !== null) {
-    redirect("/home");
-  }
   const next = params.next;
+  if (session !== null) {
+    // Already signed in: go where the link was going, not to a generic /home.
+    redirect(safeNext(next));
+  }
   // "Continue where you were headed" must only be promised where it is true.
   // `?next=https://evil.example` is correctly refused by safeNext (PX-11) and
   // lands on /home — the security held, but the sentence above the form was

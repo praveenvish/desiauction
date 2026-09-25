@@ -62,8 +62,8 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   // (FormDialog) — the field is in the DOM but display:none until its
   // trigger is clicked, which .filter({ visible: true }) correctly excludes.
   await page.getByTestId("home-create-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Public CC ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Public CC ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
 
   await page.goto("/seasons");

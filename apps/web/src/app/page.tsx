@@ -20,6 +20,7 @@ import {
 } from "../components/marketing/icons";
 import styles from "./guest-home.module.css";
 import "./marketing.css";
+import { START_CLUB_LOGIN } from "../lib/start-intent";
 
 const description =
   "Run a live player auction for your league: owners bid from their phones while the room watches the big screen. Registration, squads, fixtures and receipts in one place. Free during beta.";
@@ -45,7 +46,7 @@ const sports = SPORTS.map((sport) => ({
  * One sign-up label on the page. The header keeps its short "Start free";
  * every CTA inside the page says what the click starts.
  */
-const SIGNUP = { href: "/login", label: "Create your tournament" } as const;
+const SIGNUP = { href: START_CLUB_LOGIN, label: "Create your tournament" } as const;
 
 export default function LandingPage() {
   return (

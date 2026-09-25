@@ -17,6 +17,18 @@ describe("Dialog", () => {
     expect(screen.getByText("This cannot be undone.")).toBeVisible();
   });
 
+  it("puts the cursor in the first field, not on the close button", () => {
+    render(
+      <Dialog open onClose={() => undefined} title="Add a team">
+        <label>
+          Team name
+          <input name="name" />
+        </label>
+      </Dialog>,
+    );
+    expect(screen.getByLabelText("Team name")).toHaveFocus();
+  });
+
   it("renders footer actions", () => {
     render(
       <Dialog
@@ -107,6 +119,9 @@ describe("Dialog", () => {
         <input aria-label="Name" />
       </Dialog>,
     );
+    // Opening lands on the first field; the ORDER is what this checks, so walk
+    // it from the top of the dialog.
+    (document.activeElement as HTMLElement).blur();
     await userEvent.tab();
     expect(screen.getByRole("button", { name: "Close T" })).toHaveFocus();
   });

@@ -127,8 +127,8 @@ test("search navigates; the identity bar names every surface consistently", asyn
   // until its trigger is clicked — a closed <dialog> keeps its form in the DOM
   // but display:none, so filling straight through would match nothing.
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Shell Org ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Shell Org ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org ${STAMP}`);
   // Creating an org navigates to it client-side (see the @action/redirect
   // note in docs); the heading can paint before the URL settles, and the
@@ -176,8 +176,8 @@ test("search navigates; the identity bar names every surface consistently", asyn
   // A second org + competition light the switchers.
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();
-  await page.getByLabel("Organization name").filter({ visible: true }).fill(`Shell Org B ${STAMP}`);
-  await page.getByRole("button", { name: "Create organization" }).click();
+  await page.getByLabel("Club name").filter({ visible: true }).fill(`Shell Org B ${STAMP}`);
+  await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toHaveText(`Shell Org B ${STAMP}`);
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();
