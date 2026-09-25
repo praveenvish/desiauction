@@ -58,6 +58,8 @@ export interface AccountHeroProps {
   /** Labels of the sports this person plays (has a profile for, or entered). */
   sports: string[];
   completeness: ProfileCompleteness;
+  /** Whether this person has entered any season — decides the photo line. */
+  hasRegistrations: boolean;
   /** Three small facts under the name — sports, passkeys, devices. */
   facts: { key: string; icon: ReactNode; value: string; label: string }[];
   /** The sign-out form, which must be a client component to sweep localStorage. */
@@ -73,12 +75,14 @@ export function AccountHero({
   photoUrl,
   sports,
   completeness,
+  hasRegistrations,
   facts,
   signOut,
 }: AccountHeroProps) {
   const hasName = name !== null && name.trim() !== "";
   const missing = new Set(completeness.missing);
   const percent = Math.round((completeness.done / Math.max(1, completeness.total)) * 100);
+  const progressLabel = `Profile ${String(completeness.done)} of ${String(completeness.total)}`;
   const left = completeness.total - completeness.done;
 
   return (
@@ -169,9 +173,14 @@ export function AccountHero({
         </ul>
         <div className="acct-id-foot">
           <p className="acct-id-note">
-            {photoUrl === null
-              ? "Your photo arrives with your first season registration."
-              : "Your photo comes from your season registration."}
+            {/* "Arrives with your FIRST registration" was said to people who had
+                already registered — without a photo, because the form's photo
+                is optional. The promise is only true for someone yet to enter. */}
+            {photoUrl !== null
+              ? "Your photo comes from your season registration."
+              : hasRegistrations
+                ? "Add a photo on your next season registration — it shows here and on your card."
+                : "Your photo arrives with your first season registration."}
           </p>
           <div className="acct-id-actions">
             <Link href="/me" className="acct-link">
@@ -189,12 +198,15 @@ export function AccountHero({
         <StatCard
           icon={<IconSpark />}
           tone={left === 0 ? "green" : "gold"}
-          value={`${String(percent)}%`}
-          label={`Profile ${String(completeness.done)}/${String(completeness.total)} complete`}
+          // "Profile N of M" — the one way /home, /me and /account say it. It
+          // was "1/8", "Profile 1 of 8", "Profile 1/8" and "13%" on three
+          // screens; the percentage is still the bar, just not a fourth wording.
+          value={left === 0 ? "Complete" : `${String(left)} left`}
+          label={progressLabel}
           hint={
             left === 0
               ? "Everything the product uses is filled in"
-              : `${String(left)} left — each one saves a question at your next registration`
+              : "Each one saves a question at your next registration"
           }
           progress={percent}
           testId="profile-completion"

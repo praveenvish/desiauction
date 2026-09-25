@@ -9,7 +9,7 @@ import {
   withTenantDb,
 } from "@desiauction/db";
 import { profileCompleteness, type Gender, type ProfileCompleteness } from "@desiauction/core";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
 
 import { dbHandle } from "../db";
 import { logSecurityEvent } from "../auth/security-events";
@@ -287,7 +287,23 @@ export async function profileCompletenessFor(
    * would be asking about a sport they do not play.
    */
   const sports = await sportProfilesFor(personId);
-  const anyRole = sports.find((entry) => entry.defaultRole !== null)?.defaultRole ?? null;
+  /*
+   * A playing role given on ANY registration answers it too. Somebody who
+   * entered a season as a batter was told "Playing role — not done" on /home,
+   * /me and /account, because only the profile's DEFAULT role counted; the
+   * registration form had asked and they had answered. The profile default
+   * still wins where there is one; the registration is the fallback.
+   */
+  const anyRole =
+    sports.find((entry) => entry.defaultRole !== null)?.defaultRole ??
+    (
+      await dbHandle.db
+        .select({ role: registrations.role })
+        .from(registrations)
+        .where(and(eq(registrations.personId, personId), isNotNull(registrations.role)))
+        .limit(1)
+    )[0]?.role ??
+    null;
   const anyAttribute = (key: string): string | null =>
     sports.map((entry) => entry.attributes[key]).find((value) => value !== undefined) ?? null;
   return profileCompleteness({
