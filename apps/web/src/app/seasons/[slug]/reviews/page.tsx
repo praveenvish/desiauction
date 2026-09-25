@@ -34,54 +34,61 @@ export default async function SeasonReviewsPage({ params }: { params: Promise<{ 
     notFound();
   }
   const shown = view.shown !== null && view.shown.count > 0 ? view.shown : null;
+  const quiet =
+    shown === null &&
+    (view.manage === null || (view.manage.asked === 0 && view.manage.awaitingModeration === 0));
 
   return (
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <StatGrid>
-            <StatCard
-              icon={<IconStar />}
-              tone="gold"
-              value={shown?.average !== null && shown !== null ? shown.average.toFixed(1) : "—"}
-              label="Average rating"
-              hint={
-                shown?.average !== null && shown !== null ? (
-                  <Stars rating={Math.round(shown.average)} decorative />
-                ) : (
-                  "Out of 5"
-                )
-              }
-            />
-            <StatCard
-              icon={<IconMessageCircle />}
-              tone="green"
-              value={shown?.count ?? 0}
-              label={shown?.count === 1 ? "Review" : "Reviews"}
-              hint={view.isPublic ? "Shown on your public page" : "From players and owners"}
-            />
-            {view.manage !== null ? (
-              <>
-                <StatCard
-                  icon={<IconSend />}
-                  tone="blue"
-                  value={view.manage.asked}
-                  label="Asked so far"
-                  hint={`${String(view.manage.reviewed)} answered`}
-                  {...(view.manage.asked > 0
-                    ? { progress: (view.manage.reviewed / view.manage.asked) * 100 }
-                    : {})}
-                />
-                <StatCard
-                  icon={<IconEye />}
-                  tone="purple"
-                  value={view.manage.awaitingModeration}
-                  label="Being read"
-                  hint="By DesiAuction, before they appear"
-                />
-              </>
-            ) : null}
-          </StatGrid>
+          {/* Four tiles of zeros (and a "—") took the fold of an empty
+              season. They appear once there is something to count. */}
+          {quiet ? null : (
+            <StatGrid>
+              <StatCard
+                icon={<IconStar />}
+                tone="gold"
+                value={shown?.average !== null && shown !== null ? shown.average.toFixed(1) : "—"}
+                label="Average rating"
+                hint={
+                  shown?.average !== null && shown !== null ? (
+                    <Stars rating={Math.round(shown.average)} decorative />
+                  ) : (
+                    "Out of 5"
+                  )
+                }
+              />
+              <StatCard
+                icon={<IconMessageCircle />}
+                tone="gold"
+                value={shown?.count ?? 0}
+                label={shown?.count === 1 ? "Review" : "Reviews"}
+                hint={view.isPublic ? "Shown on your public page" : "From players and owners"}
+              />
+              {view.manage !== null ? (
+                <>
+                  <StatCard
+                    icon={<IconSend />}
+                    tone="gold"
+                    value={view.manage.asked}
+                    label="Asked so far"
+                    hint={`${String(view.manage.reviewed)} answered`}
+                    {...(view.manage.asked > 0
+                      ? { progress: (view.manage.reviewed / view.manage.asked) * 100 }
+                      : {})}
+                  />
+                  <StatCard
+                    icon={<IconEye />}
+                    tone="gold"
+                    value={view.manage.awaitingModeration}
+                    label="Being read"
+                    hint="By DesiAuction, before they appear"
+                  />
+                </>
+              ) : null}
+            </StatGrid>
+          )}
 
           {view.manage !== null ? (
             <AskReviewsCard slug={slug} manage={view.manage} isPublic={view.isPublic} />

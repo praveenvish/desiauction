@@ -109,10 +109,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
     <main className="registrations-dash">
       <div className="dash-stack">
         <div className="st-head">
-          <p className="st-head-lede">
-            Every row links to the screen that changes it. Pass or fail comes from the
-            platform&apos;s own auction-readiness checks.
-          </p>
+          <p className="st-head-lede">Every row links to the screen that changes it.</p>
           {auctionOver ? (
             <Pill tone="green" dot testId="readiness-verdict">
               Auction completed
@@ -154,9 +151,17 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                   </span>
                   <span className="rd-text">
                     <strong>{check.label}</strong>
+                    {/* The detail only when it adds something: "Registration is
+                        closed — the pool is locked" used to be followed by
+                        "Registration is closed". The pass/blocked word stays for
+                        screen readers; the green check says it to the eye. */}
                     <span className="st-note">
                       <span className="st-sr">{check.pass ? "Pass: " : "Blocked: "}</span>
-                      {checkDetail(check, view.competition.status)}
+                      {check.label
+                        .toLowerCase()
+                        .startsWith(checkDetail(check, view.competition.status).toLowerCase())
+                        ? null
+                        : checkDetail(check, view.competition.status)}
                     </span>
                   </span>
                   {/* A blocked gate names where it is cleared — the page's own
@@ -166,7 +171,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                       {fixOf(check.id, base).label}
                     </Link>
                   ) : (
-                    <Pill tone="green">Pass</Pill>
+                    <span />
                   )}
                 </li>
               ))}
@@ -216,7 +221,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
 
         <SectionCard
           icon={<IconLayers />}
-          tone="blue"
+          tone="gold"
           title="Preparation"
           description="Where each part of the season stands"
           data-testid="readiness-sections"
@@ -243,7 +248,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
             <Area
               testId="readiness-registrations"
               icon={<IconUser />}
-              tone="green"
+              tone="gold"
               title="Registrations"
               detail={
                 registrations?.stats !== undefined
@@ -266,7 +271,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
             <Area
               testId="readiness-teams"
               icon={<IconUsers />}
-              tone="purple"
+              tone="gold"
               title="Teams"
               detail={view.teams.length >= 2 ? "Enough to hold an auction" : "At least two needed"}
               pill={String(view.teams.length)}
@@ -277,7 +282,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
             <Area
               testId="readiness-venues"
               icon={<IconPin />}
-              tone="blue"
+              tone="gold"
               title="Grounds"
               detail={
                 venues !== null
@@ -285,13 +290,13 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                   : "Venues of the organization"
               }
               pill={`${String(activeGrounds)} active`}
-              pillTone={activeGrounds > 0 ? "green" : "neutral"}
+              pillTone={activeGrounds > 0 ? "green" : "amber"}
               {...(org !== null ? { href: `/org/${org.slug}/venues`, link: "Manage venues" } : {})}
             />
             <Area
               testId="readiness-fixtures"
               icon={<IconCalendar />}
-              tone="amber"
+              tone="gold"
               title="Fixtures"
               detail={
                 fixtures !== null
@@ -310,7 +315,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
                   ? "red"
                   : fixtures !== null && fixtures.stats.published > 0
                     ? "green"
-                    : "neutral"
+                    : "amber"
               }
               href={`${base}/fixtures`}
               link="Open fixtures"
@@ -318,46 +323,34 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
           </ul>
         </SectionCard>
 
-        <div className="rd-actions">
-          {/* ONE next step. While a gate is blocked, creating the auction is not
+        {auctionOver ? null : (
+          <div className="rd-actions">
+            {/* ONE next step. While a gate is blocked, creating the auction is not
               it — the first blocker's fix is, so that is the ink button and the
               auction is the secondary one. */}
-          {auctionOver ? (
-            // Nothing is left to get ready, so the way back is the one action.
-            <ButtonLink href={base} size="touch" data-testid="readiness-back">
+            {firstBlocked !== undefined ? (
+              <ButtonLink
+                href={fixOf(firstBlocked.id, base).href}
+                size="touch"
+                data-testid="readiness-next"
+              >
+                {fixOf(firstBlocked.id, base).label}
+              </ButtonLink>
+            ) : null}
+            <ButtonLink
+              href={`${base}/auction`}
+              size="touch"
+              {...(firstBlocked !== undefined ? { variant: "secondary" as const } : {})}
+            >
+              {auction !== null && auction.view !== null
+                ? "Open auction setup"
+                : "Create the auction"}
+            </ButtonLink>
+            <ButtonLink href={base} variant="secondary" size="touch">
               Back to overview
             </ButtonLink>
-          ) : null}
-          {firstBlocked !== undefined ? (
-            <ButtonLink
-              href={fixOf(firstBlocked.id, base).href}
-              size="touch"
-              data-testid="readiness-next"
-            >
-              {fixOf(firstBlocked.id, base).label}
-            </ButtonLink>
-          ) : null}
-          {auctionOver ? (
-            <ButtonLink href={`${base}/auction`} variant="secondary" size="touch">
-              See the results
-            </ButtonLink>
-          ) : (
-            <>
-              <ButtonLink
-                href={`${base}/auction`}
-                size="touch"
-                {...(firstBlocked !== undefined ? { variant: "secondary" as const } : {})}
-              >
-                {auction !== null && auction.view !== null
-                  ? "Open auction setup"
-                  : "Create the auction"}
-              </ButtonLink>
-              <ButtonLink href={base} variant="secondary" size="touch">
-                Back to overview
-              </ButtonLink>
-            </>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </main>
   );
