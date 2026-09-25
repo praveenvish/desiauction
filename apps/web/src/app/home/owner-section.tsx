@@ -2,6 +2,7 @@ import {
   ButtonLink,
   IconArrowRight,
   IconFileCheck,
+  IconGavel,
   IconRupee,
   IconShieldCheck,
   IconUsers,
@@ -49,6 +50,17 @@ function pct(part: number, whole: number): number {
   return whole <= 0 ? 0 : Math.round((part / whole) * 100);
 }
 
+/**
+ * The line under "12 / 12". "at least 12" beside a full squad of 12 read as a
+ * shortfall; when the minimum IS the maximum there is one number that matters,
+ * and a full squad is simply complete.
+ */
+export function squadHint(size: number, min: number, max: number): string {
+  if (size >= max) return "Squad complete";
+  if (min === max) return `full squad ${String(max)}`;
+  return `at least ${String(min)}`;
+}
+
 export async function OwnerSection({ team }: { team: OwnedTeam }) {
   const [plan, unit] = await Promise.all([
     planView(team.competitionSlug, team.teamId),
@@ -60,6 +72,7 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
   const live = team.auctionStatus === "live" || team.auctionStatus === "paused";
   const over = team.auctionStatus === "completed" || team.auctionStatus === "reconciled";
   const status = STATUS[team.auctionStatus] ?? { label: "Auction", tone: "neutral" };
+  const squadHref = `${base}/teams?team=${encodeURIComponent(team.teamId)}`;
   return (
     <SectionCard
       data-testid="home-owner"
@@ -80,7 +93,9 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
             tone="gold"
             value={money.compactFloor(plan.standing.purseRemaining)}
             label="Purse left"
-            hint={`of ${money.compact(plan.rules.pursePerTeam)}`}
+            // The whole purse in full: "of 1 L pts" put the lakh shorthand on a
+            // points purse, which nobody counts that way — "of 1,00,000 pts".
+            hint={`of ${money.ledger(plan.rules.pursePerTeam)}`}
             progress={pct(plan.standing.purseRemaining, plan.rules.pursePerTeam)}
           />
           <StatCard
@@ -88,7 +103,7 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
             tone="blue"
             value={`${String(plan.standing.squadSize)} / ${String(plan.rules.squadMax)}`}
             label="Squad"
-            hint={`at least ${String(plan.rules.squadMin)}`}
+            hint={squadHint(plan.standing.squadSize, plan.rules.squadMin, plan.rules.squadMax)}
             progress={pct(plan.standing.squadSize, plan.rules.squadMax)}
           />
           {/* Before the night the plan is the work; after it, what was spent
@@ -96,7 +111,9 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
               nothing. */}
           {over ? (
             <StatCard
-              icon={<IconRupee />}
+              // The rupee glyph only on rupees: "Spent 89,500 pts" under a ₹
+              // told a points league it had spent money (0091).
+              icon={unit === "inr" ? <IconRupee /> : <IconGavel />}
               tone="green"
               value={money.compact(plan.rules.pursePerTeam - plan.standing.purseRemaining)}
               label="Spent"
@@ -116,11 +133,22 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
         </StatGrid>
       ) : null}
       <nav className="home-owner-links" aria-label={`${team.teamName} shortcuts`}>
+        {/*
+         * THE SQUAD, not the grid. "Team page" opened every team in the season
+         * and left the owner to find their own; `?team=` opens theirs, with the
+         * buy prices. After the auction it is the thing to look at — Fixtures
+         * may well be empty for weeks — so it leads.
+         */}
         {over ? (
-          <ButtonLink href={`${base}/fixtures`} size="sm">
-            Fixtures
-            <IconArrowRight size={14} />
-          </ButtonLink>
+          <>
+            <ButtonLink href={squadHref} size="sm" data-testid="home-owner-squad">
+              My squad
+              <IconArrowRight size={14} />
+            </ButtonLink>
+            <ButtonLink href={`${base}/fixtures`} size="sm" variant="secondary">
+              Fixtures
+            </ButtonLink>
+          </>
         ) : (
           <ButtonLink
             href={`${base}/auction/live`}
@@ -136,9 +164,11 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
             My plan
           </ButtonLink>
         )}
-        <ButtonLink href={`${base}/teams`} size="sm" variant="ghost">
-          Team page
-        </ButtonLink>
+        {over ? null : (
+          <ButtonLink href={squadHref} size="sm" variant="ghost" data-testid="home-owner-squad">
+            My squad
+          </ButtonLink>
+        )}
       </nav>
     </SectionCard>
   );

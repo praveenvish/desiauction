@@ -226,8 +226,11 @@ export async function auctionsIndexView(): Promise<AuctionsIndexView> {
     if (fact === undefined) continue;
     const ownsTeam = ownedBySlug.get(season.slug) ?? null;
     const { canManage: manage, canConduct: conduct } = season.access;
-    // A season with no auction yet is only news to the person who sets one up.
-    if (fact.status === "none" && !manage) continue;
+    // A season with no auction yet is news to the person who sets one up — and
+    // to the auctioneer appointed to run it, whose /home already counts it "in
+    // the queue". Dropping it here left /auctions saying "0 Upcoming" and not
+    // listing the one night that person was waiting on.
+    if (fact.status === "none" && !manage && !conduct) continue;
     const role = { manage, conduct, ownsTeam };
     cards.push({
       slug: season.slug,

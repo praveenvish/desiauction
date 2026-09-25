@@ -94,6 +94,19 @@ describe("the one next step /home leads with", () => {
       conducting: { competitionSlug: "pl", competitionName: "PL", auctionStatus: "scheduled" },
     });
     expect(before?.key).toBe("auctioneer-prepare");
+    expect(before?.tone).toBe("action");
+    expect(before?.cta.href).toBe("/seasons/pl/auction");
+  });
+
+  it("an auction nobody has set up yet is a calm wait with a door to the season, not an amber call to act", () => {
+    const waiting = chooseNextStep({
+      ...EMPTY,
+      conducting: { competitionSlug: "pl", competitionName: "PL", auctionStatus: null },
+    });
+    expect(waiting?.key).toBe("auctioneer-prepare");
+    expect(waiting?.tone).toBe("calm");
+    expect(waiting?.cta).toEqual({ label: "See the season", href: "/seasons/pl" });
+    expect(waiting?.why).toContain("hasn't set the auction up yet");
   });
 
   it("someone with nothing waiting gets no banner rather than a filler one", () => {

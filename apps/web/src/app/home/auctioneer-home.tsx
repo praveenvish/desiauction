@@ -49,18 +49,49 @@ function readiness(season: ConductedSeason): { label: string; tone: Tone; dot?: 
   return { label: "Ready", tone: "blue" };
 }
 
-/** "2026-03-14T18:30" → "14 Mar". Null where the organizer has set no date. */
-function when(startsOn: string | null): string | null {
+/** Today in India as "YYYY-MM-DD" — the seasons' dates are IST wall-clock. */
+const IST_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * "2026-03-14T18:30" → "14 Mar" this year, "14 Mar 2025" in any other. Null
+ * where the organizer has set no date.
+ *
+ * The year used to be dropped always, so a night still waiting in the queue
+ * read "1 Aug" beside "Not set up yet" in late September — which August, and
+ * is it coming or gone? A date in the past on a night that has not happened is
+ * said plainly, with the one useful next step: it is the organizer's date, so
+ * ask them. A finished night keeps its plain date; the past is where it belongs.
+ */
+export function nightDate(startsOn: string | null, over: boolean, now = new Date()): string | null {
   if (startsOn === null) return null;
-  const parsed = new Date(startsOn.length <= 10 ? `${startsOn}T00:00` : startsOn);
-  return Number.isNaN(parsed.getTime())
-    ? null
-    : parsed.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const day = startsOn.slice(0, 10);
+  const parsed = new Date(`${day}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const today = IST_DAY.format(now);
+  const label = parsed.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }),
+  });
+  if (!over && day < today) {
+    const full = parsed.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    return `Date passed · ${full} — check with the organizer`;
+  }
+  return label;
 }
 
 function Row({ season }: { season: ConductedSeason }) {
   const state = readiness(season);
-  const date = when(season.startsOn);
+  const date = nightDate(season.startsOn, OVER.has(season.auctionStatus ?? ""));
   return (
     <li>
       <Link href={`/seasons/${season.competitionSlug}/auction`} className="home-row-link">

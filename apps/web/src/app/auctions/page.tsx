@@ -105,7 +105,13 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
       </ul>
 
       {card.facts.status === "none" ? (
-        <p className="ax-note">No auction yet — set the purse and rules to create one.</p>
+        // Addressed to whoever is reading: the organizer can fix it, the
+        // auctioneer can only wait for it (their card lists no door until then).
+        <p className="ax-note">
+          {card.roleLabel === "Organizer"
+            ? "No auction yet — set the purse and rules to create one."
+            : "The organizer hasn't set this auction up yet. You'll run it from the cockpit when they do."}
+        </p>
       ) : (
         <div className="ax-progress">
           <div className="ax-progress-row">
@@ -130,6 +136,14 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
       <footer className="ax-foot">
         <span className="ax-role">{card.roleLabel}</span>
         <span className="ax-links">
+          {/* A night with no auction offers an auctioneer nothing to open —
+              the season page, where the dates and the organizer are, instead
+              of an empty footer. */}
+          {card.links.length === 0 ? (
+            <NavButton href={`/seasons/${card.slug}`} variant="secondary" size="sm">
+              See the season
+            </NavButton>
+          ) : null}
           {card.links.map((link) => (
             <NavButton
               key={link.label}
@@ -154,6 +168,22 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
 export default async function AuctionsPage() {
   const view = await auctionsIndexView();
   const { totals } = view;
+  /*
+   * "Upcoming" counts the nights still being set up as well as the scheduled
+   * ones — /home's "1 in the queue" counts both, and the two pages disagreed
+   * ("0 Upcoming") about the same single night.
+   */
+  const notSetUp = view.cards.filter((card) => card.facts.status === "none").length;
+  const upcoming = totals.upcoming + notSetUp;
+  /*
+   * Whether the spend tile is this reader's to see at all. "Shown to
+   * organizers and auctioneers" was printed to an auctioneer — true of them,
+   * and so no explanation of the dash; for them the honest word is that
+   * nothing has been sold yet.
+   */
+  const holdsMoneySight = view.cards.some(
+    (card) => card.roleLabel === "Organizer" || card.roleLabel === "Auctioneer",
+  );
 
   if (view.cards.length === 0) {
     return (
@@ -186,9 +216,15 @@ export default async function AuctionsPage() {
         <StatCard
           icon={<IconCalendar />}
           tone="blue"
-          value={count(totals.upcoming)}
+          value={count(upcoming)}
           label="Upcoming"
-          hint="Scheduled nights"
+          hint={
+            notSetUp === 0
+              ? "Scheduled nights"
+              : notSetUp === upcoming
+                ? "Waiting to be set up"
+                : `${count(notSetUp)} still being set up`
+          }
         />
         <StatCard
           icon={<IconBolt />}
@@ -218,7 +254,9 @@ export default async function AuctionsPage() {
           label="Total spend"
           hint={
             totals.spend === undefined && totals.pointsSpend === undefined
-              ? "Shown to organizers and auctioneers"
+              ? holdsMoneySight
+                ? "Nothing sold yet"
+                : "Shown to organizers and auctioneers"
               : spendHint(totals)
           }
           testId="auctions-spend"
