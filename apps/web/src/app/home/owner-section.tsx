@@ -1,17 +1,4 @@
-import {
-  ButtonLink,
-  IconArrowRight,
-  IconFileCheck,
-  IconGavel,
-  IconRupee,
-  IconShieldCheck,
-  IconUsers,
-  IconWallet,
-  Pill,
-  SectionCard,
-  StatCard,
-  StatGrid,
-} from "@desiauction/ui";
+import { ButtonLink, IconArrowRight, Pill, PlayerImage } from "@desiauction/ui";
 import Link from "next/link";
 
 import { moneyFormat } from "../../lib/money";
@@ -19,6 +6,7 @@ import { planView } from "../../server/auction/owner-plan-actions";
 import { seasonUnit } from "../../server/competition/season-unit";
 import type { OwnedTeam } from "../../server/roles/roles";
 import type { Tone } from "./home-parts";
+import "./owner-home.css";
 
 /**
  * A TEAM OWNER'S HOME HALF (launch polish, Phase 2).
@@ -45,11 +33,6 @@ const STATUS: Record<string, { label: string; tone: Tone; dot?: boolean }> = {
   reconciled: { label: "Auction finished", tone: "green" },
 };
 
-/** Share of a whole, as the 0–100 a stat card's bar takes; 0 for no whole. */
-function pct(part: number, whole: number): number {
-  return whole <= 0 ? 0 : Math.round((part / whole) * 100);
-}
-
 /**
  * The line under "12 / 12". "at least 12" beside a full squad of 12 read as a
  * shortfall; when the minimum IS the maximum there is one number that matters,
@@ -61,6 +44,52 @@ export function squadHint(size: number, min: number, max: number): string {
   return `at least ${String(min)}`;
 }
 
+/** The purse as one graphic: the gold arc is what is LEFT. */
+function PurseRing({ left, whole }: { left: number; whole: number }) {
+  const share = whole <= 0 ? 0 : Math.max(0, Math.min(1, left / whole));
+  const r = 30;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg className="ow-ring" viewBox="0 0 72 72" width="72" height="72" aria-hidden>
+      <circle cx="36" cy="36" r={r} className="ow-ring-track" />
+      {/* What is spent, drawn quietly; what is left, in gold, after it. */}
+      <circle
+        cx="36"
+        cy="36"
+        r={r}
+        className="ow-ring-spent"
+        strokeDasharray={`${String(c * (1 - share))} ${String(c)}`}
+        transform={`rotate(${String(-90 + 360 * share)} 36 36)`}
+      />
+      <circle
+        cx="36"
+        cy="36"
+        r={r}
+        className="ow-ring-left"
+        strokeDasharray={`${String(c * share)} ${String(c)}`}
+        transform="rotate(-90 36 36)"
+      />
+    </svg>
+  );
+}
+
+/** Two letters for the crest. */
+function crestOf(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("");
+}
+
+/*
+ * WOW PASS (2026-09-25). One card holding three bordered stat cards with a
+ * row of 28px buttons under them, then 590px of nothing — and "Purse left"
+ * and "Spent" were the same fact twice. The team is now a hero object: crest,
+ * name and state; the purse as one ring (left vs spent); the squad count; the
+ * squad's faces as a strip; and the doors. No card inside a card.
+ */
 export async function OwnerSection({ team }: { team: OwnedTeam }) {
   const [plan, unit] = await Promise.all([
     planView(team.competitionSlug, team.teamId),
@@ -73,66 +102,97 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
   const over = team.auctionStatus === "completed" || team.auctionStatus === "reconciled";
   const status = STATUS[team.auctionStatus] ?? { label: "Auction", tone: "neutral" };
   const squadHref = `${base}/teams?team=${encodeURIComponent(team.teamId)}`;
+  const bought =
+    plan === null
+      ? []
+      : plan.lots
+          .filter((lot) => lot.status === "sold" && lot.soldToTeamId === team.teamId)
+          .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0));
+  const shown = bought.slice(0, 12);
+  const titleId = `ow-${team.teamId}`;
   return (
-    <SectionCard
-      data-testid="home-owner"
-      icon={<IconShieldCheck />}
-      tone="gold"
-      title={team.teamName}
-      description={team.competitionName}
-      action={
+    <section className="ow-hero" data-testid="home-owner" aria-labelledby={titleId}>
+      <header className="ow-head">
+        <span className="ow-crest" aria-hidden>
+          {crestOf(team.teamName)}
+        </span>
+        <div className="ow-id">
+          <p className="ow-kicker">My team · {team.competitionName}</p>
+          <h2 id={titleId} className="ow-name">
+            {team.teamName}
+          </h2>
+        </div>
         <Pill tone={status.tone} dot={status.dot === true}>
           {status.label}
         </Pill>
-      }
-    >
+      </header>
+
       {plan !== null ? (
-        <StatGrid testId="home-owner-figures">
-          <StatCard
-            icon={<IconWallet />}
-            tone="gold"
-            value={money.compactFloor(plan.standing.purseRemaining)}
-            label="Purse left"
-            // The whole purse in full: "of 1 L pts" put the lakh shorthand on a
-            // points purse, which nobody counts that way — "of 1,00,000 pts".
-            hint={`of ${money.ledger(plan.rules.pursePerTeam)}`}
-            progress={pct(plan.standing.purseRemaining, plan.rules.pursePerTeam)}
-          />
-          <StatCard
-            icon={<IconUsers />}
-            tone="blue"
-            value={`${String(plan.standing.squadSize)} / ${String(plan.rules.squadMax)}`}
-            label="Squad"
-            hint={squadHint(plan.standing.squadSize, plan.rules.squadMin, plan.rules.squadMax)}
-            progress={pct(plan.standing.squadSize, plan.rules.squadMax)}
-          />
-          {/* Before the night the plan is the work; after it, what was spent
-              is the fact — a count of targets for a finished auction means
-              nothing. */}
-          {over ? (
-            <StatCard
-              // The rupee glyph only on rupees: "Spent 89,500 pts" under a ₹
-              // told a points league it had spent money (0091).
-              icon={unit === "inr" ? <IconRupee /> : <IconGavel />}
-              tone="green"
-              value={money.compact(plan.rules.pursePerTeam - plan.standing.purseRemaining)}
-              label="Spent"
-              hint="at the auction"
-            />
-          ) : (
-            <StatCard
-              icon={<IconFileCheck />}
-              tone="purple"
-              value={`${String(plan.targets.length)} target${plan.targets.length === 1 ? "" : "s"}`}
-              label="My plan"
-              hint="only you can see it"
-              href={`${base}/auction/plan`}
-              linkComponent={Link}
-            />
+        <div className="ow-figures" data-testid="home-owner-figures">
+          <div className="ow-purse">
+            <PurseRing left={plan.standing.purseRemaining} whole={plan.rules.pursePerTeam} />
+            <div className="ow-figure">
+              <span className="ow-value">{money.compactFloor(plan.standing.purseRemaining)}</span>
+              <span className="ow-label">
+                Purse left
+                {/* Spent is the other half of the same ring, said once. */}
+                <span className="ow-hint">
+                  {over
+                    ? `${money.compact(plan.rules.pursePerTeam - plan.standing.purseRemaining)} spent of ${money.ledger(plan.rules.pursePerTeam)}`
+                    : `of ${money.ledger(plan.rules.pursePerTeam)}`}
+                </span>
+              </span>
+            </div>
+          </div>
+          <div className="ow-figure">
+            <span className="ow-value">
+              {String(plan.standing.squadSize)}
+              <span className="ow-of">/{String(plan.rules.squadMax)}</span>
+            </span>
+            <span className="ow-label">
+              Squad
+              <span className="ow-hint">
+                {squadHint(plan.standing.squadSize, plan.rules.squadMin, plan.rules.squadMax)}
+              </span>
+            </span>
+          </div>
+          {over ? null : (
+            <Link className="ow-figure ow-figure-link" href={`${base}/auction/plan`}>
+              <span className="ow-value">{String(plan.targets.length)}</span>
+              <span className="ow-label">
+                {plan.targets.length === 1 ? "Target" : "Targets"} in my plan
+                <span className="ow-hint">only you can see it</span>
+              </span>
+            </Link>
           )}
-        </StatGrid>
+        </div>
       ) : null}
-      <nav className="home-owner-links" aria-label={`${team.teamName} shortcuts`}>
+
+      {shown.length > 0 ? (
+        <Link className="ow-squad" href={squadHref} aria-label={`${team.teamName} squad`}>
+          <ul className="ow-faces">
+            {shown.map((lot) => (
+              <li key={lot.lotId} title={lot.playerName ?? ""}>
+                <PlayerImage
+                  name={lot.playerName ?? "Player"}
+                  seed={lot.registrationId}
+                  src={plan?.lotMedia[lot.lotId]?.photoUrl ?? null}
+                  size="sm"
+                  shape="round"
+                  decorative
+                />
+              </li>
+            ))}
+          </ul>
+          <span className="ow-squad-more">
+            {bought.length > shown.length ? `+${String(bought.length - shown.length)} more · ` : ""}
+            See the squad
+            <IconArrowRight size={16} />
+          </span>
+        </Link>
+      ) : null}
+
+      <nav className="ow-links" aria-label={`${team.teamName} shortcuts`}>
         {/*
          * THE SQUAD, not the grid. "Team page" opened every team in the season
          * and left the owner to find their own; `?team=` opens theirs, with the
@@ -141,35 +201,31 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
          */}
         {over ? (
           <>
-            <ButtonLink href={squadHref} size="sm" data-testid="home-owner-squad">
+            <ButtonLink href={squadHref} data-testid="home-owner-squad">
               My squad
-              <IconArrowRight size={14} />
+              <IconArrowRight size={16} />
             </ButtonLink>
-            <ButtonLink href={`${base}/fixtures`} size="sm" variant="secondary">
+            <ButtonLink href={`${base}/fixtures`} variant="secondary">
               Fixtures
             </ButtonLink>
           </>
         ) : (
-          <ButtonLink
-            href={`${base}/auction/live`}
-            size="sm"
-            variant={live ? "primary" : "secondary"}
-          >
+          <ButtonLink href={`${base}/auction/live`} variant={live ? "primary" : "secondary"}>
             {live ? "Enter the live room" : "Auction room"}
-            <IconArrowRight size={14} />
+            <IconArrowRight size={16} />
           </ButtonLink>
         )}
         {over ? null : (
-          <ButtonLink href={`${base}/auction/plan`} size="sm" variant="secondary">
+          <ButtonLink href={`${base}/auction/plan`} variant="secondary">
             My plan
           </ButtonLink>
         )}
         {over ? null : (
-          <ButtonLink href={squadHref} size="sm" variant="ghost" data-testid="home-owner-squad">
+          <ButtonLink href={squadHref} variant="ghost" data-testid="home-owner-squad">
             My squad
           </ButtonLink>
         )}
       </nav>
-    </SectionCard>
+    </section>
   );
 }
