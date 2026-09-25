@@ -11,6 +11,7 @@ import {
 import { adminLiveNow } from "../../server/admin/live-watch";
 import { platformAdminPageGate } from "../../server/admin/authz";
 import type { SportCatalogueRow } from "../../server/admin/views";
+import { AdminPageHead } from "./admin-ui";
 import { OverviewPanel } from "./overview-panel";
 import "../seasons/seasons.css";
 import "./admin.css";
@@ -39,6 +40,9 @@ export default async function AdminPage() {
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
+        <AdminPageHead readOnly>
+          The whole platform at a glance, as each part reports itself.
+        </AdminPageHead>
         <Suspense fallback={<LoadingState variant="page" />}>
           <Board />
         </Suspense>
@@ -88,7 +92,7 @@ function SportCatalogue({ rows }: { rows: SportCatalogueRow[] }) {
       icon={<IconBall />}
       tone="green"
       title="Sports"
-      description={`${String(live)} of ${String(rows.length)} shipped packs switched on. Seeded by migration — administration observes.`}
+      description={`${String(live)} of ${String(rows.length)} shipped packs switched on`}
     >
       <ul className="adm-sports">
         {rows.map((row) => (

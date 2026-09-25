@@ -2,7 +2,6 @@
 
 import {
   Button,
-  EmptyState,
   Field,
   IconEyeOff,
   IconGlobe,
@@ -25,6 +24,7 @@ import {
 } from "../../../server/admin/review-actions";
 import type { DeskAsk, DeskReview, ReviewDesk } from "../../../server/admin/review-views";
 import type { AskOutcome } from "../../../server/reviews/desk";
+import { AdminEmpty } from "../admin-ui";
 
 /**
  * ASK, THEN MODERATE (FR-1 Phase 2).
@@ -67,13 +67,9 @@ export function ReviewDeskPanel({ desk }: { desk: ReviewDesk }) {
         data-testid="review-desk-pending"
       >
         {desk.pending.length === 0 ? (
-          <div className="admin-card-empty">
-            <EmptyState
-              headingLevel={3}
-              title="Nothing waiting"
-              description="New reviews land here as people send them."
-            />
-          </div>
+          <AdminEmpty icon={<IconStar size={24} weight="duotone" />} title="Nothing waiting">
+            New reviews land here as people send them.
+          </AdminEmpty>
         ) : (
           <ul className="admin-rows is-stacked">
             {desk.pending.map((review) => (

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { recordAdminAccess } from "../../../server/admin/access-log";
 import { platformModerationGate } from "../../../server/admin/authz";
 import { adminModerationDesk } from "../../../server/admin/moderation-views";
+import { AdminPageHead } from "../admin-ui";
 import { ModerationPanel } from "./moderation-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
@@ -36,14 +37,9 @@ export default async function AdminModerationPage({
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head">
-            <p className="dash-hint">
-              Every season on the open web, and every one DesiAuction has taken down. Taking a page
-              down removes its public page, player pages, share cards and directory listing at once;
-              the club keeps running its season. The organizer sees your reason, and it lands on the
-              audit log against your name.
-            </p>
-          </header>
+          <AdminPageHead>
+            Every season on the open web, and every one DesiAuction has taken down.
+          </AdminPageHead>
           <ModerationPanel desk={desk} />
         </div>
       </main>

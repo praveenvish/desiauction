@@ -1,11 +1,23 @@
 /* FR-1 Phase 2 — the review desk. Loaded after admin.css, which owns the rows
    (`.admin-rows.is-stacked`) each review sits in. */
 
+/* One row: the contact, then Ask — the button sits on the field's line
+   (26px is the label's height above the input). */
 .review-ask {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-width: 32rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2) var(--space-3);
+  max-width: 40rem;
+}
+
+.review-ask > :first-child {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.review-ask > div:last-child {
+  padding-top: 26px;
 }
 
 .review-ask-result {
@@ -48,7 +60,6 @@
   font-size: var(--text-base-size);
   letter-spacing: 0.1em;
 }
-
 
 .review-row-label {
   margin: 0 0 var(--space-1);

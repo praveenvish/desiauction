@@ -5,6 +5,7 @@ import {
   Dialog,
   Field,
   IconCheckCircle,
+  IconChevronDown,
   IconTrash,
   Pill,
   SectionCard,
@@ -26,7 +27,7 @@ import type { DeskRow, ErasureDesk } from "../../../server/privacy/desk";
  * sits behind a dialog that names the consequence and a typed word the button
  * will not accept without.
  */
-export function ErasureDeskPanel({ desk }: { desk: ErasureDesk }) {
+export function ErasureDeskPanel({ desk, nowMs }: { desk: ErasureDesk; nowMs: number }) {
   return (
     <>
       {desk.open.length > 0 ? (
@@ -34,25 +35,34 @@ export function ErasureDeskPanel({ desk }: { desk: ErasureDesk }) {
           icon={<IconTrash />}
           tone="red"
           title="Open requests"
-          description={`${String(desk.open.length)} waiting, oldest first · the account page promises a reply within seven days`}
+          description={`${String(desk.open.length)} waiting, oldest first · a reply is promised within ${String(PROMISE_DAYS)} days`}
           flush
           data-testid="erasure-open"
         >
           <ul className="admin-rows is-stacked">
             {desk.open.map((row) => (
-              <ErasureRow key={row.id} row={row} />
+              <ErasureRow key={row.id} row={row} nowMs={nowMs} />
             ))}
           </ul>
         </SectionCard>
       ) : null}
       {desk.decided.length > 0 ? (
-        <SectionCard
-          icon={<IconCheckCircle />}
-          tone="neutral"
-          title="Recently decided"
-          flush
-          data-testid="erasure-decided"
-        >
+        // History, folded: a count line, opened on demand. Nineteen rows of
+        // "asked · decided · Erased" were near-zero information at full height.
+        <details className="admin-fold" data-testid="erasure-decided">
+          <summary>
+            <span className="admin-fold-icon" aria-hidden>
+              <IconCheckCircle size={16} />
+            </span>
+            <span className="admin-fold-title">
+              <strong>Recently decided · {String(desk.decided.length)}</strong>
+              <span className="admin-meta">
+                {String(desk.decided.filter((row) => row.status === "completed").length)} erased ·{" "}
+                {String(desk.decided.filter((row) => row.status === "declined").length)} declined
+              </span>
+            </span>
+            <IconChevronDown size={16} className="admin-fold-caret" />
+          </summary>
           <ul className="admin-rows">
             {desk.decided.map((row) => (
               <li key={row.id}>
@@ -82,13 +92,33 @@ export function ErasureDeskPanel({ desk }: { desk: ErasureDesk }) {
               </li>
             ))}
           </ul>
-        </SectionCard>
+        </details>
       ) : null}
     </>
   );
 }
 
-function ErasureRow({ row }: { row: DeskRow }) {
+/** The account page's promise, drawn: how long this request has left. */
+const PROMISE_DAYS = 7;
+
+function SlaPill({ requestedAt, nowMs }: { requestedAt: Date; nowMs: number }) {
+  const waited = Math.floor((nowMs - requestedAt.getTime()) / 86_400_000);
+  const left = PROMISE_DAYS - waited;
+  if (left < 0) {
+    return (
+      <Pill tone="red" dot testId="erasure-sla">
+        Overdue by {String(-left)} day{left === -1 ? "" : "s"}
+      </Pill>
+    );
+  }
+  return (
+    <Pill tone={left <= 2 ? "amber" : "neutral"} dot testId="erasure-sla">
+      {left === 0 ? "Due today" : `${String(left)} day${left === 1 ? "" : "s"} left`}
+    </Pill>
+  );
+}
+
+function ErasureRow({ row, nowMs }: { row: DeskRow; nowMs: number }) {
   const toast = useToast();
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -130,6 +160,7 @@ function ErasureRow({ row }: { row: DeskRow }) {
             Cannot erase yet
           </Pill>
         )}
+        <SlaPill requestedAt={row.requestedAt} nowMs={nowMs} />
       </div>
       <p className="pass-row-sub">
         asked {row.requestedAt.toISOString().slice(0, 10)}
@@ -152,39 +183,41 @@ function ErasureRow({ row }: { row: DeskRow }) {
           {row.blocked}
         </p>
       ) : null}
-      <div className="pass-row-field">
-        <Field
-          label="Note"
-          name={`note-${row.id}`}
-          value={note}
-          onChange={(event) => {
-            setNote(event.target.value);
-          }}
-          help="Required to decline — the person reads it on their account page. Optional when erasing."
-        />
-      </div>
-      <div className="pass-row-actions is-pair">
-        <Button
-          variant="danger"
-          disabled={row.blocked !== null}
-          onClick={() => {
-            setConfirmation("");
-            setConfirmOpen(true);
-          }}
-          data-testid={`erase-${row.personId}`}
-        >
-          Erase account…
-        </Button>
-        <Button
-          variant="secondary"
-          loading={pending}
-          onClick={() => {
-            run(() => declineErasureAction(row.id, note));
-          }}
-          data-testid={`decline-erasure-${row.personId}`}
-        >
-          Decline
-        </Button>
+      <div className="admin-decide">
+        <div className="pass-row-field">
+          <Field
+            label="Note"
+            name={`note-${row.id}`}
+            value={note}
+            onChange={(event) => {
+              setNote(event.target.value);
+            }}
+            help="Required to decline — the person reads it on their account page. Optional when erasing."
+          />
+        </div>
+        <div className="pass-row-actions is-pair">
+          <Button
+            variant="danger"
+            disabled={row.blocked !== null}
+            onClick={() => {
+              setConfirmation("");
+              setConfirmOpen(true);
+            }}
+            data-testid={`erase-${row.personId}`}
+          >
+            Erase account…
+          </Button>
+          <Button
+            variant="secondary"
+            loading={pending}
+            onClick={() => {
+              run(() => declineErasureAction(row.id, note));
+            }}
+            data-testid={`decline-erasure-${row.personId}`}
+          >
+            Decline
+          </Button>
+        </div>
       </div>
       <Dialog
         open={confirmOpen}

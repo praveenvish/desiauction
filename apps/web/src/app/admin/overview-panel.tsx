@@ -5,10 +5,10 @@ import {
   IconArrowRight,
   IconBroadcast,
   IconChart,
+  IconCheckCircle,
   IconClock,
   IconFlag,
   IconGavel,
-  IconInbox,
   IconLedger,
   IconShieldCheck,
   IconTrophy,
@@ -32,7 +32,7 @@ import {
 } from "../../server/admin/format";
 import type { LiveBoard } from "../../server/admin/live-views";
 import type { PlatformOverview } from "../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime, statusPillTone } from "./admin-ui";
+import { RelativeTime, statusPillTone } from "./admin-ui";
 import { groupAttention } from "./attention-groups";
 
 function pct(rate: number): number {
@@ -67,8 +67,6 @@ export function OverviewPanel({
   const attentionGroups = groupAttention(attention);
   return (
     <>
-      <ReadOnlyNotice />
-
       <StatGrid testId="admin-totals">
         <StatCard
           icon={<IconFlag />}
@@ -114,66 +112,21 @@ export function OverviewPanel({
         />
       </StatGrid>
 
+      <AttentionStrip attentionGroups={attentionGroups} desks={desks} />
+
       <div className="adm-overview">
         <div className="adm-col">
           <LiveNow live={live} />
 
           <SectionCard
-            icon={<IconAlert />}
-            tone={attention.length === 0 ? "green" : "red"}
-            title="Attention queue"
-            /* Every link here used to read "Open the console →" and point at an
-               org console that `platform:admin` cannot open. The links now go
-               where administration can actually go, and the sentence says who
-               holds the fix. */
-            description="Administration cannot act on these. Each links to what an administrator can open; the repair lives in the owning console, under its own permissions."
-            flush={attention.length > 0}
-          >
-            {attention.length === 0 ? (
-              <EmptyState
-                title="Nothing needs a human"
-                description="No dead jobs, no stalled runner, no stuck auction, no discrepant case, no failed delivery."
-              />
-            ) : (
-              <ul className="adm-rows" data-testid="admin-attention">
-                {attentionGroups.groups.map((group) => (
-                  <li key={group.kind} className="adm-row">
-                    <span className="adm-row-dot" data-tone="red" aria-hidden />
-                    <span className="adm-row-main">
-                      <span className="adm-row-title">{group.title}</span>
-                      <span className="adm-row-sub adm-mono">{group.sub}</span>
-                    </span>
-                    {group.href !== null ? (
-                      <Link href={group.href} className="adm-link">
-                        {group.linkLabel}
-                        <IconArrowRight size={14} aria-hidden />
-                      </Link>
-                    ) : null}
-                  </li>
-                ))}
-                {attentionGroups.more > 0 ? (
-                  <li className="adm-row" data-testid="admin-attention-more">
-                    <span className="adm-row-main">
-                      <span className="adm-row-sub">
-                        and {attentionGroups.more} more{" "}
-                        {attentionGroups.more === 1 ? "problem" : "problems"}
-                      </span>
-                    </span>
-                  </li>
-                ) : null}
-              </ul>
-            )}
-          </SectionCard>
-
-          <SectionCard
             icon={<IconClock />}
             tone="neutral"
             title="Recent activity"
-            description="The latest audit entries, administration's own page views left out."
+            description="Latest audit entries, admin page views left out"
             action={
               <Link href="/admin/audit" className="adm-link">
                 Audit explorer
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
             }
             flush={recent.length > 0}
@@ -182,16 +135,12 @@ export function OverviewPanel({
               <EmptyState title="No activity yet" description="The audit log is empty." />
             ) : (
               <>
-                <ul className="adm-rows" data-testid="admin-recent">
+                <ul className="adm-rows adm-feed" data-testid="admin-recent">
                   {recent.map((row) => (
-                    <li key={row.id} className="adm-row">
-                      <span className="adm-row-main">
-                        <span className="adm-row-title adm-mono">{row.action}</span>
-                        <span className="adm-row-sub">
-                          by {actorLabel(row.actor, row.actorName)}
-                        </span>
-                      </span>
+                    <li key={row.id} className="adm-feed-row">
                       <RelativeTime at={row.at} />
+                      <span className="adm-feed-action">{row.action}</span>
+                      <span className="adm-feed-actor">{actorLabel(row.actor, row.actorName)}</span>
                     </li>
                   ))}
                 </ul>
@@ -205,7 +154,7 @@ export function OverviewPanel({
                     data-testid="admin-access-log-link"
                   >
                     Administration&rsquo;s own access log
-                    <IconArrowRight size={14} aria-hidden />
+                    <IconArrowRight size={16} aria-hidden />
                   </Link>
                 </p>
               </>
@@ -214,13 +163,11 @@ export function OverviewPanel({
         </div>
 
         <div className="adm-col">
-          {desks.desks > 0 ? <DeskCard items={desks.items} /> : null}
-
           <SectionCard
             icon={<IconShieldCheck />}
             tone={runnerVerdict.healthy && followers.behind === 0 ? "green" : "amber"}
             title="System status"
-            description="The job runner and each club's settlement follower, as they report themselves."
+            description="As the runner and each follower report themselves"
           >
             {/* `runnerVerdict`, NOT `runner.healthy`. The snapshot's rule is
                 `dead === 0`, which a runner that never runs also satisfies —
@@ -267,14 +214,14 @@ export function OverviewPanel({
             <p className="adm-foot adm-foot-inline">
               <Link href="/admin/health" className="adm-link">
                 Platform health
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
               {/* Whether the deployment holds the registered DLT ids it needs is
                   a health fact like any other — without an id a message shape
                   does not send at all. */}
               <Link href="/admin/messaging" className="adm-link" data-testid="admin-messaging-link">
                 Messaging
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
             </p>
           </SectionCard>
@@ -295,7 +242,7 @@ export function OverviewPanel({
             action={
               <Link href="/admin/health" className="adm-link">
                 Finance health
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
             }
           >
@@ -380,7 +327,7 @@ function LiveNow({ live }: { live: LiveBoard }) {
       action={
         <Link href="/admin/live" className="adm-link" data-testid="admin-live-board-link">
           Open the live board
-          <IconArrowRight size={14} aria-hidden />
+          <IconArrowRight size={16} aria-hidden />
         </Link>
       }
       flush={shown.length > 0}
@@ -399,7 +346,12 @@ function LiveNow({ live }: { live: LiveBoard }) {
                   <span className="adm-row-sub">{row.orgName}</span>
                 </span>
                 <span className="adm-row-side">
-                  <Pill tone={ROOM_TONE[row.state]}>{ROOM_WORDS[row.state]}</Pill>
+                  {/* "quiet" on every row said nothing; the dot carries it. */}
+                  {row.state === "quiet" ? (
+                    <span className="admin-sr-only">{ROOM_WORDS[row.state]}</span>
+                  ) : (
+                    <Pill tone={ROOM_TONE[row.state]}>{ROOM_WORDS[row.state]}</Pill>
+                  )}
                   <span className="adm-row-sub">
                     {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in 5
                     min
@@ -419,42 +371,100 @@ function LiveNow({ live }: { live: LiveBoard }) {
   );
 }
 
-/** Work on the desks this operator holds — the one card here they can act on. */
-function DeskCard({ items }: { items: readonly DeskItem[] }) {
+/**
+ * What needs a human, in one card directly under the figures: the desks this
+ * operator can act on first (gold), then what administration can only point
+ * at (red). It replaces an "Attention queue" card and a "Waiting on your desks"
+ * card that each spent a header and a paragraph on one or two rows.
+ */
+function AttentionStrip({
+  attentionGroups,
+  desks,
+}: {
+  attentionGroups: ReturnType<typeof groupAttention>;
+  desks: { items: readonly DeskItem[]; desks: number };
+}) {
+  const deskItems = desks.desks > 0 ? desks.items : [];
+  const nothing = attentionGroups.groups.length === 0 && deskItems.length === 0;
+  if (nothing) {
+    return (
+      <p className="admin-slim" data-testid="admin-attention-clear">
+        <IconCheckCircle size={16} />
+        <strong>Nothing needs a human.</strong>
+        <span className="admin-meta">
+          No dead jobs, stalled runner, stuck auction, discrepant case or failed delivery
+          {desks.desks > 0 ? ", and your desks are clear" : ""}.
+        </span>
+      </p>
+    );
+  }
   return (
-    <SectionCard
-      icon={<IconInbox />}
-      tone={items.length === 0 ? "green" : "gold"}
-      title="Waiting on your desks"
-      description={
-        items.length === 0 ? "Your desks are clear." : "The one card here you can act on."
-      }
-      flush={items.length > 0}
-      data-testid="admin-desks"
-    >
-      {items.length === 0 ? undefined : (
-        <ul className="adm-rows">
-          {items.map((item) => (
+    <section className="adm-alerts" aria-labelledby="adm-alerts-title">
+      <div className="adm-alerts-head">
+        <h2 className="adm-alerts-title" id="adm-alerts-title">
+          <IconAlert size={16} />
+          Needs attention
+        </h2>
+        {/* Administration cannot act on the red rows; the gold ones are this
+            operator's own desks. */}
+        <span className="admin-meta">Red: fixed in the owning console · Gold: your desks</span>
+      </div>
+      {deskItems.length > 0 ? (
+        <ul className="adm-rows adm-alert-rows" data-testid="admin-desks">
+          {deskItems.map((item) => (
             <li key={item.key} className="adm-row" data-testid={`admin-desk-${item.key}`}>
+              <span className="adm-row-dot" data-tone="amber" aria-hidden />
               <span className="adm-row-main">
                 <span className="adm-row-title">
                   {countNoun(item.count, item.label[0], item.label[1])}
+                  {item.oldestAt !== null ? (
+                    <span className="adm-row-sub">
+                      {" "}
+                      · oldest <RelativeTime at={item.oldestAt} />
+                    </span>
+                  ) : null}
                 </span>
-                {item.oldestAt !== null ? (
-                  <span className="adm-row-sub">
-                    oldest <RelativeTime at={item.oldestAt} />
-                  </span>
-                ) : null}
               </span>
               <Link href={item.href} className="adm-link">
                 Open
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
             </li>
           ))}
         </ul>
-      )}
-    </SectionCard>
+      ) : null}
+      {attentionGroups.groups.length > 0 ? (
+        <ul className="adm-rows adm-alert-rows" data-testid="admin-attention">
+          {attentionGroups.groups.map((group) => (
+            <li key={group.kind} className="adm-row">
+              <span className="adm-row-dot" data-tone="red" aria-hidden />
+              <span className="adm-row-main">
+                <span className="adm-row-title">
+                  {group.title}
+                  <span className="adm-row-code"> {group.sub}</span>
+                </span>
+              </span>
+              {group.href !== null ? (
+                <Link href={group.href} className="adm-link">
+                  {group.linkLabel}
+                  <IconArrowRight size={16} aria-hidden />
+                </Link>
+              ) : null}
+            </li>
+          ))}
+          {attentionGroups.more > 0 ? (
+            <li className="adm-row" data-testid="admin-attention-more">
+              <span className="adm-row-main">
+                <span className="adm-row-sub">
+                  and {attentionGroups.more} more{" "}
+                  {attentionGroups.more === 1 ? "problem" : "problems"}
+                </span>
+              </span>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+    </section>
   );
 }
 

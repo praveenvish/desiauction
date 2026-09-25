@@ -1,4 +1,5 @@
-import { IconEye, Notice, type BadgeTone, type KitTone } from "@desiauction/ui";
+import { IconEye, type BadgeTone, type KitTone } from "@desiauction/ui";
+import type { ReactNode } from "react";
 
 /**
  * PX-9 shared admin rendering. Presentation only — no reads, no rules. The
@@ -49,17 +50,98 @@ export function statusPillTone(status: string): KitTone {
 }
 
 /**
- * Administration says what it is, at the top of every surface. Not decoration:
- * an operator arriving at a platform-wide console during an incident needs to
- * know, before they click anything, that nothing here can act.
+ * Administration says what it is, at the top of every read-only surface. Not
+ * decoration: an operator arriving at a platform-wide console during an
+ * incident needs to know, before they click anything, that nothing here can act.
+ *
+ * It used to be a three-line banner repeated above every page (~80px on a
+ * laptop, ~150px on a phone, the same paragraph each time). The FACT stays
+ * visible — a pill beside the page's lede — and the sentence is one tap away.
+ * A <details>, so it opens without script.
  */
 export function ReadOnlyNotice() {
   return (
-    <Notice tone="info" icon={<IconEye size={20} />} testId="admin-readonly">
-      Read-only. Administration observes the platform; every operational fix happens in the console
-      that owns it, under that console&rsquo;s own permissions — which a platform grant alone does
-      not confer. Page views here are recorded in the audit log.
-    </Notice>
+    <details className="admin-ro" data-testid="admin-readonly">
+      <summary className="admin-ro-pill">
+        <IconEye size={16} />
+        Read-only
+        <span className="admin-sr-only">: what that means</span>
+      </summary>
+      <p className="admin-ro-panel">
+        Administration observes the platform; every operational fix happens in the console that owns
+        it, under that console&rsquo;s own permissions — which a platform grant alone does not
+        confer. Page views here are recorded in the audit log.
+      </p>
+    </details>
+  );
+}
+
+/**
+ * The page's one line under the shell's title: a short lede on the left, the
+ * page's doors and the read-only pill on the right. A <div>, not a <header> —
+ * the shell owns the page's one banner landmark.
+ */
+export function AdminPageHead({
+  children,
+  actions,
+  readOnly = false,
+}: {
+  children?: ReactNode;
+  actions?: ReactNode;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="admin-pagehead">
+      {children !== undefined ? <div className="admin-lede">{children}</div> : null}
+      {actions !== undefined || readOnly ? (
+        <div className="admin-pagehead-end">
+          {actions}
+          {readOnly ? <ReadOnlyNotice /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Two initials for a person's monogram; "?" for the unnamed. */
+export function monogram(name: string | null): string {
+  const words = (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word !== "");
+  if (words.length === 0) return "?";
+  const first = words[0]?.[0] ?? "";
+  const last = words.length > 1 ? (words[words.length - 1]?.[0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
+/**
+ * The empty-state recipe for administration's queues: centred, a duotone glyph
+ * in a soft ring, a title, one line, and at most two doors. A queue at zero is
+ * the GOOD state, so it should look settled rather than broken.
+ */
+export function AdminEmpty({
+  icon,
+  title,
+  children,
+  actions,
+  testId,
+}: {
+  icon: ReactNode;
+  title: ReactNode;
+  children?: ReactNode;
+  actions?: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div className="admin-empty" data-testid={testId}>
+      <span className="admin-empty-ring" aria-hidden>
+        {icon}
+      </span>
+      <p className="admin-empty-title">{title}</p>
+      {children !== undefined ? <p className="admin-empty-body">{children}</p> : null}
+      {actions !== undefined ? <div className="admin-empty-actions">{actions}</div> : null}
+    </div>
   );
 }
 

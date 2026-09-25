@@ -1,4 +1,4 @@
-import { EmptyState, IconCalendar, SectionCard, ToastProvider } from "@desiauction/ui";
+import { IconCalendar, IconExternal, ToastProvider } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -6,6 +6,7 @@ import { recordAdminAccess } from "../../../server/admin/access-log";
 import { platformDemoGate } from "../../../server/admin/authz";
 import { demoQueue } from "../../../server/admin/demo-views";
 import { DemoQueuePanel } from "./demo-queue-panel";
+import { AdminEmpty, AdminPageHead } from "../admin-ui";
 import "../../seasons/seasons.css";
 import "../admin.css";
 import "./demos.css";
@@ -41,25 +42,41 @@ export default async function AdminDemosPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head">
-            <p className="dash-hint">
-              People who asked for a demo. Answer them, then record what happened — an outcome is
-              how &ldquo;nobody replied&rdquo; becomes something we can see rather than something we
-              assume.{" "}
-              <Link href="/admin/demos/availability" className="prose-link">
-                Publish the times you&apos;re free
-              </Link>{" "}
-              and they can book themselves.
-            </p>
-          </header>
+          <AdminPageHead
+            actions={
+              <Link href="/admin/demos/availability" className="admin-head-button">
+                Publish availability
+              </Link>
+            }
+          >
+            People who asked for a demo. Answer them, then record what happened.
+          </AdminPageHead>
           {queue.open.length === 0 && queue.answered.length === 0 ? (
-            <SectionCard icon={<IconCalendar />} tone="neutral" title="Demo requests">
-              <EmptyState
-                headingLevel={3}
+            <div className="admin-panel">
+              <AdminEmpty
+                icon={<IconCalendar size={24} weight="duotone" />}
                 title="Nobody has asked yet"
-                description="When somebody fills in the form on /schedule-demo, they appear here with their tournament, their number and whatever they told us."
-              />
-            </SectionCard>
+                actions={
+                  <>
+                    <Link href="/admin/demos/availability" className="admin-head-button">
+                      Publish availability
+                    </Link>
+                    <a
+                      href="/schedule-demo"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="admin-head-button"
+                    >
+                      Open the demo page
+                      <IconExternal size={16} />
+                    </a>
+                  </>
+                }
+              >
+                Requests from /schedule-demo land here with the tournament, a number and whatever
+                they told us.
+              </AdminEmpty>
+            </div>
           ) : (
             <DemoQueuePanel queue={queue} />
           )}
