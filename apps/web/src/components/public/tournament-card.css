@@ -87,10 +87,12 @@
 
 /* ---- body ---- */
 
+/* A column, so the foot can sink: in a grid row of cards with different
+   amounts of copy, the Register buttons sat at three different heights. */
 .tc-body {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
-  align-content: start;
   padding: var(--space-5);
 }
 
@@ -209,6 +211,7 @@
   gap: var(--space-3);
   align-items: center;
   justify-content: space-between;
+  margin-top: auto;
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-subtle);
 }

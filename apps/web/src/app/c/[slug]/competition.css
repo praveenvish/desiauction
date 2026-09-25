@@ -58,3 +58,63 @@
     background: var(--hero-shade);
   }
 }
+
+/* TOP BUYS — the season's three biggest sales, once the auction is done. A
+   ranked list, not cards: rank, name (the link to the player's page), price,
+   and the buying team underneath on a phone. */
+.public-top-buys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  /* A ranking, read left to right: at full page width the price sat a
+     screen away from the name it belongs to. */
+  max-width: 40rem;
+}
+
+.public-top-buy {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.public-top-buy:last-child {
+  border-bottom: none;
+}
+
+.public-top-buy-rank {
+  font-weight: 700;
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.public-top-buy-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  color: var(--text-heading);
+  text-decoration: none;
+}
+
+.public-top-buy-name:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.public-top-buy-price {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.public-top-buy-team {
+  grid-column: 2 / -1;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
