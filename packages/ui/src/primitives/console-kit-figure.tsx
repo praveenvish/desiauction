@@ -35,5 +35,7 @@ export function KitFigure({ value }: { value: string }) {
     // Once, on arrival; later values roll through RollingNumber itself.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return <RollingNumber value={zeros ?? value} />;
+  // A space inside the odometer's inline-flex run collapses ("1,74,500pts"),
+  // so the figure's spaces are drawn as no-break spaces.
+  return <RollingNumber value={(zeros ?? value).replace(/ /g, "\u00a0")} />;
 }

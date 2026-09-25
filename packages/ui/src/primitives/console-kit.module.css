@@ -568,26 +568,49 @@ a.journey-link:focus-visible {
 }
 
 /* RAIL: the journey along a HeroBanner's bottom edge — no card, hero inks,
-   marks joined by a hairline that turns gold as far as the season has got. */
+   marks joined by a continuous track that turns gold as far as the season
+   has got. Each step after the first carries the track segment before it. */
 .journey[data-variant="rail"] {
+  display: flex;
+  align-items: center;
   padding: 0;
   background: none;
   border: 0;
   box-shadow: none;
 }
 
+.journey[data-variant="rail"] .journey-step {
+  display: flex;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.journey[data-variant="rail"] .journey-step:first-child {
+  flex: none;
+}
+
 .journey[data-variant="rail"] .journey-step + .journey-step::before {
   content: "";
-  position: absolute;
-  top: 50%;
-  left: calc(-1 * var(--space-3));
-  width: var(--space-4);
-  height: 1px;
-  background: color-mix(in srgb, var(--hero-ink-soft) 40%, transparent);
+  flex: 1 1 auto;
+  min-width: var(--space-3);
+  height: 2px;
+  margin-inline: var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--hero-ink-soft) 30%, transparent);
 }
 
 .journey[data-variant="rail"] .journey-step[data-state="done"] + .journey-step::before {
-  background: var(--accent);
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 70%, transparent)
+  );
+}
+
+.journey[data-variant="rail"] .journey-link {
+  flex: none;
+  height: auto;
 }
 
 .journey[data-variant="rail"] .journey-link {
@@ -700,8 +723,14 @@ a.journey-link:focus-visible {
   }
 
   .journey[data-variant="rail"] .journey-step + .journey-step::before {
-    left: -6px;
-    width: 6px;
+    flex: none;
+    width: 10px;
+    min-width: 0;
+    margin-inline: 3px;
+  }
+
+  .journey[data-variant="rail"] .journey-step[data-focus="true"] {
+    flex: 1 1 auto;
   }
 }
 
