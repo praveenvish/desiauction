@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 
 import { env } from "../../env";
-import { ContentPage } from "../../components/public/content-page";
-import "../content.css";
-import "../marketing.css";
+import { ComingSoon } from "../../components/public/coming-soon";
 
 export const metadata: Metadata = {
   title: "Case studies · DesiAuction",
@@ -20,18 +18,14 @@ export const metadata: Metadata = {
  * auth. */
 export default function CaseStudiesPage() {
   return (
-    <ContentPage
+    <ComingSoon
       eyebrow="Proof"
       title={
         <>
           Case <em>studies</em>
         </>
       }
-      lede="We're in beta with our first tournaments now. Full write-ups — real numbers, real organizers, on the record — will appear here once tournaments finish their seasons."
-    >
-      <p className="mk-placeholder">
-        Nothing published yet. No stock stories, no invented numbers — check back during beta.
-      </p>
-    </ContentPage>
+      lede="Full write-ups — real numbers, real organizers, on the record — will appear here once our first tournaments finish their seasons. No stock stories, no invented numbers."
+    />
   );
 }

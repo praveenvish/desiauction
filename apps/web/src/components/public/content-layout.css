@@ -14,8 +14,8 @@
 }
 
 @media (min-width: 1000px) {
-  .cl:has(.cl-aside) {
-    grid-template-columns: minmax(0, 1fr) 240px;
+  .cl[data-side] {
+    grid-template-columns: minmax(0, 1fr) 320px;
   }
 
   .cl-related {
@@ -133,11 +133,25 @@
   border-top: 1px solid var(--border-subtle);
 }
 
+/* ---- the side column ---- */
+
+.cl-side {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  min-width: 0;
+}
+
+@media (min-width: 1000px) {
+  .cl-side {
+    position: sticky;
+    top: calc(64px + var(--space-6));
+  }
+}
+
 /* ---- on this page ---- */
 
 .cl-aside {
-  position: sticky;
-  top: var(--space-16);
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
@@ -195,4 +209,28 @@
   font-family: var(--font-text);
   font-size: clamp(1.25rem, 2.2vw, 1.5rem);
   color: var(--text-heading);
+}
+
+/* A list's own heading in a non-prose main column (help categories, legal). */
+.cl-list-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* A document rendered by `Prose` in a non-prose column keeps the measure. */
+.cl-prose-doc {
+  max-width: 72ch;
+}
+
+.cl-main > .content-section {
+  max-width: 72ch;
+}
+
+.cl-main > .content-section {
+  margin: 0 0 var(--space-4);
 }

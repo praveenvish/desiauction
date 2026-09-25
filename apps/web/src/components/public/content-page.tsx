@@ -11,30 +11,36 @@
 import type { ReactNode } from "react";
 
 import { ContentLayout, type ContentAnchor } from "./content-layout";
-import { PageBody, PageHero, SportMontage } from "./public-kit";
+import { PageBody, PageHero } from "./public-kit";
 
 export function ContentPage({
   eyebrow,
   title,
   lede,
-  /** Art for the band. `montage` is the site-wide five-sport strip. */
-  art = "none",
   anchors,
   meta,
   related,
   relatedTitle,
   foot,
+  aside,
+  actions,
+  prose,
   children,
 }: {
   eyebrow?: ReactNode;
   title: ReactNode;
   lede?: ReactNode;
-  art?: "none" | "montage";
   anchors?: ContentAnchor[];
   meta?: ReactNode;
   related?: ReactNode;
   relatedTitle?: string;
   foot?: ReactNode;
+  /** The right-hand column beside the text (see ContentLayout). */
+  aside?: ReactNode;
+  /** Buttons in the title band. */
+  actions?: ReactNode;
+  /** False when the main column is components, not a document. */
+  prose?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -44,7 +50,7 @@ export function ContentPage({
         {...(eyebrow === undefined ? {} : { eyebrow })}
         title={title}
         {...(lede === undefined ? {} : { lede })}
-        {...(art === "montage" ? { art: <SportMontage /> } : {})}
+        {...(actions === undefined ? {} : { actions })}
       />
       <PageBody>
         <ContentLayout
@@ -53,6 +59,8 @@ export function ContentPage({
           {...(related === undefined ? {} : { related })}
           {...(relatedTitle === undefined ? {} : { relatedTitle })}
           {...(foot === undefined ? {} : { foot })}
+          {...(aside === undefined ? {} : { aside })}
+          {...(prose === undefined ? {} : { prose })}
         >
           {children}
         </ContentLayout>

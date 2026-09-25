@@ -551,18 +551,21 @@ a.content-card:focus-visible {
   outline-offset: 2px;
 }
 
+/* A drawn chevron, not a typed "+" glyph (one icon language). */
 .faq-item summary::after {
-  content: "+";
+  content: "";
   flex: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-xl-size);
-  line-height: 1;
-  color: var(--text-accent);
+  inline-size: 8px;
+  block-size: 8px;
+  margin-right: 4px;
+  border-right: 2px solid var(--text-accent);
+  border-bottom: 2px solid var(--text-accent);
+  transform: translateY(-2px) rotate(45deg);
   transition: transform var(--duration-fast) var(--ease-out);
 }
 
 .faq-item[open] summary::after {
-  transform: rotate(45deg);
+  transform: translateY(2px) rotate(-135deg);
 }
 
 .faq-item p {
@@ -613,9 +616,55 @@ a.content-card:focus-visible {
 
 /* --- Release notes ------------------------------------------------------------------- */
 
+.releases {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .release {
-  padding: var(--space-5) 0;
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-6);
+  padding: var(--space-6) 0;
   border-bottom: 1px solid var(--border-subtle);
+  scroll-margin-top: calc(64px + var(--space-6));
+}
+
+.releases > li:first-child .release {
+  padding-top: 0;
+}
+
+.releases > li:last-child .release {
+  border-bottom: 0;
+}
+
+.release-meta {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.release-date {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.release-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--accent-line);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .release h2 {
@@ -624,14 +673,8 @@ a.content-card:focus-visible {
   font-weight: var(--font-weight-semibold);
   font-size: var(--text-xl-size, var(--text-lg-size));
   color: var(--text-heading);
-  margin: 0 0 var(--space-1);
-}
-
-.release-meta {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm-size);
   margin: 0 0 var(--space-2);
+  scroll-margin-top: calc(64px + var(--space-6));
 }
 
 .release ul {
@@ -647,6 +690,18 @@ a.content-card:focus-visible {
 
 .release ul li::marker {
   color: var(--text-accent);
+}
+
+@media (max-width: 720px) {
+  .release {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .release-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
 }
 
 /* --- Visually hidden helper ------------------------------------------------------------ */
@@ -727,10 +782,304 @@ a.content-card:focus-visible {
   text-decoration: none;
 }
 
-.content-view-all::after {
-  content: "→";
-}
-
 .content-view-all:hover {
   text-decoration: underline;
+}
+
+/* ---- help index: one card per guide (wow pass) ---- */
+
+.help-index {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-5);
+}
+
+@media (min-width: 1000px) {
+  .help-index {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.help-guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.help-guide:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-subtle));
+  box-shadow: var(--shadow-2);
+}
+
+.help-guide-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.help-guide-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.help-guide-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--text-heading);
+}
+
+.help-guide-desc {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.help-guide-list {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.help-guide-list li {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.help-guide-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding-block: var(--space-2);
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  text-decoration: none;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.help-guide-link svg {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.help-guide-link:hover {
+  color: var(--text-accent);
+  transform: translateX(2px);
+}
+
+.help-guide-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.help-guide-time {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.help-guide .article-meta {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-guide,
+  .help-guide-link {
+    transition: none;
+  }
+
+  .help-guide-link:hover {
+    transform: none;
+  }
+}
+
+/* The popular-search chips stay on one line: on a phone they scroll sideways
+   rather than stacking into a two-column grid of taps. */
+.pk-hero .content-searchbar + .pk-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .pk-hero .content-searchbar + .pk-chips {
+    display: flex;
+    padding-bottom: 2px;
+  }
+
+  .pk-hero .content-searchbar + .pk-chips .pk-chip {
+    min-height: 40px;
+    white-space: nowrap;
+  }
+}
+
+/* ---- /about: one real picture of the product in use ---- */
+.about-shot {
+  margin: var(--space-2) 0 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.about-shot img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-2);
+}
+
+.about-shot figcaption {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+/* ---- feature cards: a 2×2 of icon + title + body (/security, /rules) ---- */
+/* Always a clean 2×2 (four cards): auto-fit made 3 + an orphan. */
+.feature-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .feature-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.feature-card {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.feature-card-tile {
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.feature-card-num {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.feature-card h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--text-heading);
+}
+
+.feature-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+/* ---- /support (wow pass) ---- */
+.support-issues .faq-item p + p {
+  padding-top: 0;
+}
+
+.support-issues .faq-item p:not(:last-child) {
+  padding-bottom: var(--space-3);
+}
+
+.pk-side-card .support-detail a {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.support-sla {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.support-foot {
+  margin: 0;
+  max-width: 72ch;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* ---- /search, empty state ---- */
+.search-suggest {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .search-suggest-rows {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Two columns of rows: the divider is drawn per row instead of per item. */
+  .search-suggest-rows > li + li {
+    border-top: 0;
+  }
+
+  .search-suggest-rows > li:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .search-suggest-rows > li:nth-child(odd) {
+    border-right: 1px solid var(--border-subtle);
+  }
 }
