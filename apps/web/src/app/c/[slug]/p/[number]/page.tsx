@@ -197,19 +197,16 @@ export default async function PlayerProfilePage({
    * lead now; the number and the status stay in the hero where they were.
    */
   const pricePaise = poster?.input.outcome === "sold" ? poster.input.pricePaise : null;
+  const soldFor =
+    pricePaise !== null && poster !== null
+      ? formatAmount(paise(pricePaise), poster.input.unit)
+      : null;
+  /*
+   * WOW PASS: the price is why this link gets opened, so it is the hero's
+   * loudest figure, with the team beside it — and the strip below no longer
+   * repeats team, price, role or age, which the hero now says once.
+   */
   const facts: Stat[] = [
-    ...(player.teamName !== null ? [{ value: player.teamName, label: "Team" }] : []),
-    ...(pricePaise !== null && poster !== null
-      ? [
-          {
-            // In the season's own unit (0091): a points league reads "pts".
-            value: formatAmount(paise(pricePaise), poster.input.unit),
-            label: "Sold for",
-          },
-        ]
-      : []),
-    { value: roleLabelIn(sportPackFor(player.sport), player.role), label: "Role" },
-    ...(player.age !== null ? [{ value: `${String(player.age)} yrs`, label: "Age" }] : []),
     ...(batting !== null ? [{ value: batting, label: "Batting" }] : []),
     ...(bowling !== null ? [{ value: bowling, label: "Bowling" }] : []),
     // Whatever else this season's sport asks about, already labelled by its
@@ -246,10 +243,25 @@ export default async function PlayerProfilePage({
             {status}
           </Badge>
         }
-        eyebrow={<Link href={`/c/${slug}`}>{player.competitionName}</Link>}
+        eyebrow={
+          <>
+            <Link href={`/c/${slug}`}>{player.competitionName}</Link> · #{player.number}
+          </>
+        }
         title={player.name}
         lede={roleAge}
-        meta={<HeroFact>#{player.number}</HeroFact>}
+        meta={
+          soldFor !== null ? (
+            <p className="player-sold" data-testid="player-sold">
+              <span className="player-sold-price">{soldFor}</span>
+              {player.teamName !== null ? (
+                <span className="player-sold-team">to {player.teamName}</span>
+              ) : null}
+            </p>
+          ) : player.teamName !== null ? (
+            <HeroFact>{player.teamName}</HeroFact>
+          ) : undefined
+        }
         actions={
           <>
             {player.competitionOpen ? (
@@ -280,7 +292,9 @@ export default async function PlayerProfilePage({
       />
 
       <PageBody>
-        <StatStrip label={`${player.name} — player details`} stats={facts} />
+        {facts.length > 0 ? (
+          <StatStrip label={`${player.name} — player details`} stats={facts} />
+        ) : null}
 
         {/* The page the OG route calls "the viral unit — a player posts their
             own card" had exactly one action on it: a back link. No way for the

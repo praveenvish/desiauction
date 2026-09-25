@@ -115,3 +115,8 @@
   font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);
 }
+
+/* The podium is followed by a flush section; give it its own breathing room. */
+.pk-body .top-buys {
+  margin-bottom: var(--space-4);
+}
