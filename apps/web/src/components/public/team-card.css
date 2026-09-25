@@ -132,7 +132,7 @@
   object-fit: cover;
 }
 
-/* A person's name wraps rather than being cut: "Praveen Vis…" is worse than
+/* A person's name wraps rather than being cut: "Aniket Saw…" is worse than
    two lines, and a squad list is exactly where people look for their own. */
 .team-card-player-name {
   min-width: 0;

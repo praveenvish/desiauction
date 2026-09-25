@@ -139,7 +139,7 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
   await expect(org.getByTestId("cockpit-panel")).toBeVisible(COLD);
   await board.goto(`/seasons/${slug}/auction/board`);
   for (const o of owners) {
-    await expect(o.page.getByTestId("connection-state")).toHaveText("open", COLD);
+    await expect(o.page.getByTestId("connection-state")).toHaveText("Connected", COLD);
   }
 
   // --- Helpers ------------------------------------------------------------------------
@@ -321,7 +321,7 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
             "true",
             COLD,
           );
-          await expect(r.page.getByTestId("connection-state")).toHaveText("open", COLD);
+          await expect(r.page.getByTestId("connection-state")).toHaveText("Connected", COLD);
           await synced(r, winner.team, current!);
           log(`   ${r.team} reloaded mid-lot, back in sync at ${current}`);
         }
