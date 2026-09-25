@@ -43,3 +43,16 @@ export function lotsNeedingResolution<T extends ResolvableLot>(
     (entry) => (entry.status === "frozen" || entry.status === "unsold") && !moved.has(entry.id),
   );
 }
+
+/**
+ * THE LOTS "REQUEUE ALL UNSOLD" SENDS BACK, and only those.
+ *
+ * Between rounds the unsold come back as a batch, and a conductor clicking
+ * Requeue eight times in a row on auction night is eight chances to hit the
+ * wrong row. Frozen lots are deliberately left out: one can carry a standing
+ * bid the conductor froze on purpose, and each needs its own decision —
+ * requeue or withdraw — not a sweep.
+ */
+export function unsoldToRequeue<T extends ResolvableLot>(needsResolution: readonly T[]): T[] {
+  return needsResolution.filter((entry) => entry.status === "unsold");
+}

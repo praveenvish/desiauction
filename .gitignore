@@ -26,3 +26,4 @@ test-results/
 *.log
 *.tsbuildinfo
 .local/
+test-results-sim/
