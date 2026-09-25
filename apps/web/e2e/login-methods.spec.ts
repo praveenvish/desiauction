@@ -68,7 +68,7 @@ test("a first visit is told the code creates an account; a returning device is n
 }) => {
   await page.goto("/login?method=email");
   await expect(page.getByTestId("email-login-new-hint")).toBeVisible();
-  await expect(page.locator("h1")).toHaveText("Sign in");
+  await expect(page.locator("h1")).toHaveText("Continue to DesiAuction");
 
   // The cookie a completed sign-in leaves behind (sessions.ts RETURNING_COOKIE).
   await context.addCookies([{ name: "da_returning", value: "1", url: page.url() }]);
