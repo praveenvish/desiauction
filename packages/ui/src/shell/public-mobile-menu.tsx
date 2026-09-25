@@ -3,13 +3,15 @@
 import { useState, type ElementType } from "react";
 
 import { Drawer } from "./drawer";
-import { IconMenu, IconArrowRight } from "./icons";
+import { IconMenu, IconArrowRight, IconSearch } from "./icons";
 import type { PublicShellLink } from "./public-shell-types";
 import styles from "./public-shell.module.css";
 
 export interface PublicMobileMenuProps {
   nav: PublicShellLink[];
   action?: PublicShellLink;
+  /** Site search, listed first — the header's search control is desktop-only. */
+  searchHref?: string;
   linkComponent?: ElementType;
 }
 
@@ -25,6 +27,7 @@ export interface PublicMobileMenuProps {
 export function PublicMobileMenu({
   nav,
   action,
+  searchHref,
   linkComponent: Link = "a",
 }: PublicMobileMenuProps) {
   const [open, setOpen] = useState(false);
@@ -43,7 +46,7 @@ export function PublicMobileMenu({
           setOpen(true);
         }}
       >
-        <IconMenu />
+        <IconMenu size={24} />
       </button>
       {/* Mounted only while open. A <dialog> stays in the DOM when closed, and
           the Drawer titles itself with an <h2> — so an always-mounted menu put
@@ -55,6 +58,18 @@ export function PublicMobileMenu({
         <Drawer open onClose={close} title="Explore" className={styles["mobile-panel"] ?? ""}>
           <p className={styles["drawer-intro"]}>Your sport. Your people. Your moment.</p>
           <nav aria-label="Site" className={styles["drawer-nav"] ?? ""}>
+            {searchHref !== undefined ? (
+              <Link
+                href={searchHref}
+                className={`${styles["drawer-link"] ?? ""} ${styles["drawer-search"] ?? ""}`}
+                onClick={close}
+              >
+                <span className={styles["drawer-search-label"]}>
+                  <IconSearch size={20} />
+                  Search the site
+                </span>
+              </Link>
+            ) : null}
             {nav.map((link) =>
               link.children !== undefined && link.children.length > 0 ? (
                 <div key={link.label} className={styles["drawer-group"] ?? ""}>
@@ -68,7 +83,7 @@ export function PublicMobileMenu({
                       onClick={close}
                     >
                       {child.label}
-                      <IconArrowRight />
+                      <IconArrowRight size={16} />
                     </Link>
                   ))}
                 </div>
@@ -81,7 +96,7 @@ export function PublicMobileMenu({
                   onClick={close}
                 >
                   {link.label}
-                  <IconArrowRight />
+                  <IconArrowRight size={16} />
                 </Link>
               ),
             )}
@@ -89,7 +104,7 @@ export function PublicMobileMenu({
           {action !== undefined ? (
             <Link href={action.href} className={styles["mobile-action"]} onClick={close}>
               {action.label}
-              <IconArrowRight width={18} height={18} />
+              <IconArrowRight size={16} />
             </Link>
           ) : null}
         </Drawer>
