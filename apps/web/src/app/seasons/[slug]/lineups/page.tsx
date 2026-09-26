@@ -13,7 +13,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { PlayersViews } from "../sibling-link";
+import { ScheduleViews } from "../sibling-link";
 import { notFound } from "next/navigation";
 
 import { formatWallDate, formatWallTime } from "../../../../lib/format-date";
@@ -67,10 +67,10 @@ export default async function LineupsPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        {/* Registrations shares this tab (RN-1 "Players"): one switcher at the
-            head of the page, then what this half is for. */}
+        {/* One face of the Schedule tab (round 2): the same switcher, in the
+            same place, as List, Calendar, Match day and Table. */}
         <div className="st-head lu-head">
-          <PlayersViews slug={slug} active="lineups" />
+          <ScheduleViews slug={slug} active="lineups" />
           <p className="st-head-lede">
             Tick who took the field. Each player&apos;s profile counts it as a match played.
           </p>

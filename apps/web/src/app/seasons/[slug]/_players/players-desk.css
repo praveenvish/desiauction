@@ -534,9 +534,11 @@
   color: var(--text-accent);
 }
 
+/* Captain and icon are both honours, so both wear gold (round 2: the crown
+   was green beside a gold star — two hues for one idea). */
 .pd-mark-chip[data-kind="captain"] {
-  background: var(--success-subtle);
-  color: var(--success-strong);
+  background: var(--accent-subtle);
+  color: var(--text-accent);
 }
 
 .pd-row-actions {
@@ -671,6 +673,11 @@ body:has(.pd-sheet) {
   to {
     transform: translateX(0);
   }
+}
+
+/* The team on the meta line is a phone-only echo of the Team column. */
+.pd-meta-phone {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

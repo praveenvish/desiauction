@@ -160,8 +160,8 @@ export interface CompetitionTab {
   /**
    * Extra path suffixes this tab owns, beyond its own href.
    *
-   * A consolidated tab needs them: "Players" is Registrations AND Lineups, so
-   * standing on /lineups must still light Players rather than leaving the strip
+   * A consolidated tab needs them: "Schedule" is Fixtures, Lineups AND the
+   * Table, so standing on /lineups must still light Schedule rather than leaving the strip
    * blank or falling through to Overview — a strip that cannot say where you
    * are is worse than a longer one (LAW 2).
    */
@@ -590,10 +590,9 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/readiness$/, "Readiness"],
   /*
    * "Players", not "Registrations" — the tab that leads here is called Players
-   * (RN-1 Phase 4 consolidated Registrations + Lineups under it), and a tab
-   * whose page announces a different name is the shell contradicting itself
-   * one line apart. The CHILD keeps its own name: Lineups is Lineups, under a
-   * Players tab that stays lit. Same reasoning for Schedule below.
+   * (RN-1 Phase 4), and a tab whose page announces a different name is the
+   * shell contradicting itself one line apart. A CHILD keeps its own name:
+   * Lineups is Lineups, under a Schedule tab that stays lit.
    */
   [/\/registrations$/, "Players"],
   [/\/fixtures\/calendar$/, "Calendar"],
@@ -1431,8 +1430,8 @@ export function seasonRoleFor(facts: SeasonRoleFacts): SeasonRole {
  *
  * Two consolidations take the organizer from nine tabs to seven, each joining
  * surfaces that answer one question:
- *   · PLAYERS  = Registrations + Lineups — "who is in this season"
- *   · SCHEDULE = Fixtures + Table        — "when, and how it went"
+ *   · PLAYERS  = Registrations                    — "who is in this season"
+ *   · SCHEDULE = Fixtures + Lineups + Table       — "when, who played, how it went"
  *
  * The `testId`s are carried forward from `competitionTabs` unchanged: these
  * tabs ARE the navigation the e2e suite drives, and renaming a hook during a
@@ -1466,8 +1465,10 @@ export function seasonTabs(
     label: "Auction",
     href: `${base}/auction`,
     testId: "open-auction",
-    // Readiness is reached from the auction page and is not a tab of its own.
-    claims: ["/readiness"],
+    // Readiness and the result posters are reached from the auction page and
+    // are not tabs of their own; standing on either lights Auction (round 2:
+    // the posters studio lit nothing and read as a page outside the season).
+    claims: ["/readiness", "/posters"],
   };
   const teams: CompetitionTab = {
     key: "teams",
@@ -1486,9 +1487,7 @@ export function seasonTabs(
           label: "Players",
           href: `${base}/registrations`,
           testId: "open-dashboard",
-          // Who is IN this season: who applied and was approved, and who
-          // actually took the field. Lineups is reached from Registrations.
-          claims: ["/lineups"],
+          // Who is IN this season: who applied and was approved.
         },
         teams,
         {
@@ -1496,9 +1495,11 @@ export function seasonTabs(
           label: "Schedule",
           href: `${base}/fixtures`,
           testId: "open-fixtures",
-          // When it is played, and how it went — the table is derived from the
-          // fixtures beside it, so the two are one question.
-          claims: ["/standings"],
+          // When it is played, who played it, and how it went — lineups are
+          // recorded per match and the table is derived from the fixtures
+          // beside it, so all three are one question (round 2 moved Lineups
+          // here from Players).
+          claims: ["/standings", "/lineups"],
         },
         auction,
         // Absent without `settlement.view`, never disabled — the surface itself
@@ -1575,7 +1576,13 @@ export function activeSeasonTab(pathname: string, slug: string, tabs: Competitio
    * tabs, so nothing is lit rather than underlining a page you are not on.
    * `my-entry` IS /register for a player, and is caught by the loop above.
    */
-  if (pathname.startsWith(`${base}/posters`) || pathname.startsWith(`${base}/register`)) {
+  if (
+    pathname.startsWith(`${base}/posters`) ||
+    pathname.startsWith(`${base}/register`) ||
+    // The books without the Money tab 404; the strip must not claim Overview
+    // under a "not found" (round 2).
+    pathname.startsWith(`${base}/money`)
+  ) {
     return "";
   }
   return "overview";

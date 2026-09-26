@@ -56,9 +56,6 @@ export default async function RegistrationsPage({
     <ToastProvider>
       <main className="registrations-dash rd-page">
         <div className="dash-stack rd-stack">
-          {/* Lineups shares this tab (RN-1 "Players"): the Registrations |
-              Lineups switcher leads the list's own tab row, once there are
-              squads to pick lineups from. */}
           <RegistrationDashboardPanel
             share={
               <ShareRegistration

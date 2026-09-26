@@ -70,7 +70,6 @@ import { canTriage, FEE_LABEL, PAST_TENSE, REASON_LABEL, type Row } from "../_pl
 import { decisionToast, PlayerSheet } from "../_players/player-sheet";
 import { useMutate } from "../_players/use-mutate";
 import { useRoster } from "../_players/use-roster";
-import { PlayersViews } from "../sibling-link";
 import { AddPlayerDialog } from "./add-player-dialog";
 import { ImportDialog } from "./import-dialog";
 import "../_players/players-desk.css";
@@ -184,8 +183,6 @@ export function RegistrationDashboardPanel({
   /** Closed, the viewer may advance the season, and the auction has not begun. */
   canReopen?: boolean;
 }) {
-  /* Registrations | Lineups, once there are squads to pick lineups from. */
-  const showViews = desk.rosterLocked;
   const router = useRouter();
   const toast = useToast();
   const hydrated = useHydrated();
@@ -854,11 +851,10 @@ export function RegistrationDashboardPanel({
       ) : null}
 
       <SectionCard flush className="rd-card" title="Players" hideHeader>
-        {/* ROW 1 — which list: the Players views, then the status tabs. The
+        {/* ROW 1 — the status tabs. The
             counts are the old figure tiles; each one is the filter it names
             (`stat-*` stay the suites' hooks, `.stat-value` the figure). */}
         <div className="rd-tabs" data-testid="stat-row" data-hydrated={hydrated ? "true" : "false"}>
-          {showViews ? <PlayersViews slug={slug} active="registrations" /> : null}
           <SegmentedTabs
             label="Registration status"
             items={[
@@ -1776,6 +1772,19 @@ function PlayerRow({
               <span className="pd-mono">{row.number}</span>
               {/* DA-35: never raw E.164 at a human. */}
               <span data-private>{personContact(row)}</span>
+              {/* PHONE: the team (and its marks) ride this line, so a row is
+                  two lines beside the face (~56px), not three (~115px). The
+                  laptop keeps them in the Team column. */}
+              <span className="pd-meta-phone">
+                {row.teamName !== null
+                  ? row.teamName
+                  : auctionDone && row.status === "approved"
+                    ? "Unsold"
+                    : null}
+                {row.isCaptain ? <IconCrown size={16} weight="fill" alt="Captain" /> : null}
+                {row.isIcon ? <IconStar size={16} weight="fill" alt="Icon" /> : null}
+                {row.isRetained ? <IconLock size={16} weight="fill" alt="Retained" /> : null}
+              </span>
             </span>
             {row.duplicateName || categoryFlagged ? (
               <span className="pd-player-flags">

@@ -288,6 +288,11 @@ section.rd-card[data-flush="true"] {
   overflow: visible;
 }
 
+/* 48px rows at a laptop: a 32px face, 8px above and below. */
+.rd-card .pd-table td {
+  padding-block: var(--space-2);
+}
+
 /* ---- Row 2: the one toolbar ---- */
 
 .rd-toolbar {
@@ -675,9 +680,48 @@ section.rd-card[data-flush="true"] {
     display: none;
   }
 
-  /* The list row says who and which team; the number is in the sheet. */
+  /* The list row says who and which team; the phone number is in the sheet.
+     The team moves up onto the meta line (.pd-meta-phone), so the Team cell
+     leaves the row unless it has a warning to give. */
   .rd-card .pd-row .pd-player-meta [data-private] {
     display: none;
+  }
+
+  .rd-card .pd-row td.pd-col-team:not(:has(.pd-sub-danger)) {
+    display: none;
+  }
+
+  .rd-card .pd-row td.pd-col-team .pd-team,
+  .rd-card .pd-row td.pd-col-team .pd-marks-inline {
+    display: none;
+  }
+
+  .rd-card .pd-row .pd-player-meta {
+    flex-wrap: nowrap;
+    gap: 0 6px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .rd-card .pd-row .pd-meta-phone {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .rd-card .pd-row .pd-meta-phone:not(:empty)::before {
+    content: "·";
+    color: var(--text-muted);
+  }
+
+  .rd-card .pd-row .pd-meta-phone svg {
+    flex: none;
+    color: var(--accent-ink, var(--text-accent));
   }
 
   .rd-toolbar .rd-sort {
