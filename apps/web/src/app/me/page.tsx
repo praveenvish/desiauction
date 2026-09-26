@@ -32,6 +32,7 @@ import {
   type CareerMatch,
 } from "../../server/player/career";
 import { ownPhotoUrl, playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
+import { rolesOf, type OwnedTeam } from "../../server/roles/roles";
 import { RegistrationCard } from "./registration-card";
 import "./me.css";
 
@@ -105,7 +106,7 @@ export default async function MySportsPage({
   }
   // Today in IST — fixture kickoffs are local wall-clock text.
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-  const [query, career, matches, upcomingMatches, profile, completeness, photoUrl] =
+  const [query, career, matches, upcomingMatches, profile, completeness, photoUrl, roles] =
     await Promise.all([
       searchParams,
       playerCareer(session.personId),
@@ -114,7 +115,9 @@ export default async function MySportsPage({
       playerProfileFor(session.personId),
       profileCompletenessFor(session.personId),
       ownPhotoUrl(session.personId),
+      rolesOf(session.personId),
     ]);
+  const owns = roles.owns;
 
   // Sports this person actually played, in the platform's own order.
   const played = new Set(career.seasons.map((season) => season.sport));
@@ -183,9 +186,14 @@ export default async function MySportsPage({
             : []),
           ...(sports.length > 0
             ? sports.map((pack) => <HeroChip key={pack.key}>{pack.label}</HeroChip>)
-            : // This is the PLAYING record: a team owner with no registrations
-              // was told they had no tournaments while running a squad in one.
-              [<>Your playing record starts with your first registration.</>]),
+            : owns.length > 0
+              ? // A team owner's record is the team: said as a fact, not an absence.
+                owns.map((team) => (
+                  <HeroChip key={`${team.auctionId}:${team.teamId}`}>
+                    Owner · {team.teamName}
+                  </HeroChip>
+                ))
+              : [<>Your playing record starts with your first registration.</>]),
         ]}
         actions={
           <Link href="/account" className="sh-ghost">
@@ -279,45 +287,66 @@ export default async function MySportsPage({
 
       <div className="me-layout">
         <div className="me-main">
-          <SectionCard
-            icon={<IconTrophy />}
-            title="My registrations"
-            description={
-              seasons.length === 0
-                ? "Every season you enter shows up here, with where it stands."
-                : `${String(seasons.length)} ${seasons.length === 1 ? "season" : "seasons"} · newest first`
-            }
-            action={
-              <Link href="/c" className="me-link">
-                Find a tournament <IconArrowRight size={14} aria-hidden />
-              </Link>
-            }
-            data-testid="me-tournaments"
-          >
-            {seasons.length === 0 ? (
-              <p className="me-empty">
-                No registrations as a player yet. <Link href="/c">Find a tournament to play</Link>.
-              </p>
-            ) : (
-              <ul className="me-regs">
-                {seasons.map((season) => {
-                  const pack = sportPackFor(season.sport);
-                  return (
-                    <li key={season.registrationId}>
-                      <RegistrationCard
-                        season={season}
-                        eyebrow={`${pack.label} · ${seasonYear(season.startsOn)}`}
-                        subline={season.orgName}
-                        money={(amount, unit) => moneyFormat(unit).compact(amount)}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </SectionCard>
+          {owns.length > 0 ? <OwnedTeams teams={owns} /> : null}
+          {seasons.length === 0 && owns.length > 0 ? (
+            // An owner who has never entered as a player: one quiet line, not
+            // a second full-weight card under their team.
+            <p className="me-quiet" data-testid="me-tournaments">
+              <IconTrophy size={16} aria-hidden />
+              <span>
+                Playing too? <Link href="/c">Find a tournament to enter</Link> — your seasons show
+                up here.
+              </span>
+            </p>
+          ) : (
+            <SectionCard
+              icon={<IconTrophy />}
+              title="My registrations"
+              description={
+                seasons.length === 0
+                  ? "Every season you enter shows up here, with where it stands."
+                  : `${String(seasons.length)} ${seasons.length === 1 ? "season" : "seasons"} · newest first`
+              }
+              action={
+                <Link href="/c" className="me-link">
+                  Find a tournament <IconArrowRight size={14} aria-hidden />
+                </Link>
+              }
+              data-testid="me-tournaments"
+            >
+              {seasons.length === 0 ? (
+                <p className="me-empty">
+                  No registrations as a player yet. <Link href="/c">Find a tournament to play</Link>
+                  .
+                </p>
+              ) : (
+                <ul className="me-regs">
+                  {seasons.map((season) => {
+                    const pack = sportPackFor(season.sport);
+                    return (
+                      <li key={season.registrationId}>
+                        <RegistrationCard
+                          season={season}
+                          eyebrow={`${pack.label} · ${seasonYear(season.startsOn)}`}
+                          subline={season.orgName}
+                          money={(amount, unit) => moneyFormat(unit).compact(amount)}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </SectionCard>
+          )}
 
-          {career.totals.seasons === 0 && shownMatches.length === 0 ? null : (
+          {career.totals.seasons === 0 && shownMatches.length === 0 ? null : shownMatches.length ===
+            0 ? (
+            // No match yet is one quiet line, not a full-weight empty card.
+            <p className="me-quiet" data-testid="me-matches">
+              <IconMatch size={16} aria-hidden />
+              Matches appear here once your team&apos;s fixtures are played.
+            </p>
+          ) : (
             <SectionCard
               icon={<IconMatch />}
               tone="gold"
@@ -448,5 +477,59 @@ export default async function MySportsPage({
         </aside>
       </div>
     </main>
+  );
+}
+
+const OWNED_STATUS: Record<string, { label: string; tone: KitTone }> = {
+  scheduled: { label: "Auction coming up", tone: "blue" },
+  live: { label: "Auction live", tone: "red" },
+  paused: { label: "Auction paused", tone: "amber" },
+  completed: { label: "Auction finished", tone: "green" },
+  reconciled: { label: "Auction finished", tone: "green" },
+};
+
+/**
+ * TEAMS I OWN (wow pass, round 2). An owner with no registrations was told
+ * "No tournaments yet" while running a squad in one. Ownership is part of the
+ * record, so it is a row here — from the same roles read the rail uses.
+ */
+function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
+  return (
+    <SectionCard
+      icon={<IconUsers />}
+      title="Teams I own"
+      description={`${String(teams.length)} ${teams.length === 1 ? "team" : "teams"} · as owner`}
+      data-testid="me-owned"
+    >
+      <ul className="me-regs">
+        {teams.map((team) => {
+          const status = OWNED_STATUS[team.auctionStatus] ?? {
+            label: "Auction being set up",
+            tone: "neutral" as KitTone,
+          };
+          return (
+            <li key={`${team.auctionId}:${team.teamId}`}>
+              <Link
+                href={`/seasons/${team.competitionSlug}/teams?team=${encodeURIComponent(team.teamId)}`}
+                className="me-reg da-lift"
+              >
+                <span className="me-reg-top">
+                  <span className="me-reg-when">Owner</span>
+                  <Pill tone={status.tone} dot>
+                    {status.label}
+                  </Pill>
+                </span>
+                <strong className="me-reg-name">{team.teamName}</strong>
+                <span className="me-reg-org">{team.competitionName}</span>
+                <span className="me-reg-foot me-reg-go">
+                  My squad
+                  <IconArrowRight size={16} aria-hidden />
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </SectionCard>
   );
 }
