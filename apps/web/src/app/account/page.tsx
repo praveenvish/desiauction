@@ -156,6 +156,26 @@ export default async function AccountPage() {
     : roles.owns.length > 0
       ? { href: "/me", label: "My teams" }
       : null;
+  /*
+   * ROLE-VOICED SWITCHES (round 5). The catalogue's wording is a player's
+   * ("when an organizer approves, waitlists or declines you"); an owner or a
+   * club runner reads the same switch in their own terms. Presentation only —
+   * the topics and what they gate are untouched.
+   */
+  const OWNER_DETAIL: Record<string, string> = {
+    registration: "Only if you enter a season as a player yourself.",
+    auction: "When an auction you take part in is about to start, and how it went.",
+  };
+  const switchSettings =
+    settings === null || !nonPlayer
+      ? settings
+      : {
+          ...settings,
+          topics: settings.topics.map((entry) => ({
+            ...entry,
+            detail: OWNER_DETAIL[entry.topic] ?? entry.detail,
+          })),
+        };
   const sections = nonPlayer
     ? ACCOUNT_SECTIONS.filter((section) => section.id !== "player" && section.id !== "sports")
     : ACCOUNT_SECTIONS;
@@ -292,7 +312,9 @@ export default async function AccountPage() {
                     </span>
                     <span className="acct-always-tag">Always on</span>
                   </div>
-                  {settings === null ? null : <NotificationSwitches settings={settings} />}
+                  {switchSettings === null ? null : (
+                    <NotificationSwitches settings={switchSettings} />
+                  )}
                   {settings === null ? null : (
                     <WhatsAppSwitch
                       optedIn={settings.whatsapp}

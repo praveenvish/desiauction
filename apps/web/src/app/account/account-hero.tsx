@@ -1,5 +1,6 @@
 import { PROFILE_ITEMS, type ProfileCompleteness, type ProfileItem } from "@desiauction/core";
 import {
+  IconChevronDown,
   IconCheckCircle,
   IconChevronRight,
   IconCircle,
@@ -237,38 +238,48 @@ export function AccountHero({
           progress={percent}
           testId="profile-completion"
         />
-        <ul className="acct-checklist" aria-label="Profile checklist">
-          {items.map((item) => {
-            const done = !missing.has(item);
-            const { label, hint, href } = ITEM_LABELS[item];
-            const body = (
-              <>
-                {done ? (
-                  <IconCheckCircle size={16} className="acct-check-icon" aria-hidden />
-                ) : (
-                  <IconCircle size={16} className="acct-check-icon" aria-hidden />
-                )}
-                <span className="acct-check-text">
-                  <span>{label}</span>
-                  {!done && hint !== undefined ? (
-                    <span className="acct-check-hint">{hint}</span>
-                  ) : null}
-                </span>
-              </>
-            );
-            return (
-              <li key={item} data-done={done}>
-                {!done && href !== undefined ? (
-                  <a href={href} className="acct-check-row">
-                    {body}
-                  </a>
-                ) : (
-                  <span className="acct-check-row">{body}</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        {/* ONE CARD, FOLDED (round 5). The eight-item checklist stood in its
+            own card above every form — on a phone, a screen of circles before
+            the first field. Its count leads; the items open on a tap. A laptop
+            that can style the fold shows them open beside the identity card. */}
+        <details className="acct-check-fold">
+          <summary className="acct-check-summary">
+            <span>{left === 0 ? "See the checklist" : `See the ${String(left)} left`}</span>
+            <IconChevronDown size={16} aria-hidden />
+          </summary>
+          <ul className="acct-checklist" aria-label="Profile checklist">
+            {items.map((item) => {
+              const done = !missing.has(item);
+              const { label, hint, href } = ITEM_LABELS[item];
+              const body = (
+                <>
+                  {done ? (
+                    <IconCheckCircle size={16} className="acct-check-icon" aria-hidden />
+                  ) : (
+                    <IconCircle size={16} className="acct-check-icon" aria-hidden />
+                  )}
+                  <span className="acct-check-text">
+                    <span>{label}</span>
+                    {!done && hint !== undefined ? (
+                      <span className="acct-check-hint">{hint}</span>
+                    ) : null}
+                  </span>
+                </>
+              );
+              return (
+                <li key={item} data-done={done}>
+                  {!done && href !== undefined ? (
+                    <a href={href} className="acct-check-row">
+                      {body}
+                    </a>
+                  ) : (
+                    <span className="acct-check-row">{body}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       </div>
     </div>
   );
