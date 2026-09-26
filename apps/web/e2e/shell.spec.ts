@@ -156,7 +156,7 @@ test("search navigates; the identity bar names every surface consistently", asyn
   /*
    * "Players", not "Registrations": RN-1 Phase 4 took the organizer's strip
    * from nine tabs to seven by joining the surfaces that answer one question —
-   * Players is Registrations AND Lineups — and the page announces the same
+   * Players is who is in the season — and the page announces the same
    * name the tab does, rather than contradicting it one line apart.
    */
   await tabs.getByRole("link", { name: "Players" }).click();

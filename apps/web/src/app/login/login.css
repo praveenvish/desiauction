@@ -146,13 +146,16 @@
 /* The sports strip and the handwritten tag beside it. */
 .login-scene-art {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.login-scene-art .pk-script {
-  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+.login-scene-art > * {
+  min-width: 0;
+}
+
+.login-scene-art .pk-montage {
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* What is true about the platform, in four words each. Never a count we cannot

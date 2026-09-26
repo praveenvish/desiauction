@@ -80,6 +80,30 @@ export function AvailabilityPanel({
         title="Weekly windows"
         description="All times are Indian Standard Time. A window repeats every week until you retire it; retiring one never cancels a call already booked inside it."
       >
+        {/* The week at a glance: what the public page offers each day, before
+            the form that changes it. Monday first, as a diary reads. */}
+        <ol className="demo-week" aria-label="Published windows, by day">
+          {[1, 2, 3, 4, 5, 6, 0].map((day) => {
+            const mine = windows.filter((window) => window.weekday === day);
+            return (
+              <li key={day} className="demo-week-day" data-open={mine.length > 0 || undefined}>
+                <span className="demo-week-name">{(DAYS[day] ?? "").slice(0, 3)}</span>
+                {mine.length === 0 ? (
+                  <span className="demo-week-none">
+                    <span aria-hidden>—</span>
+                    <span className="admin-sr-only">nothing offered</span>
+                  </span>
+                ) : (
+                  mine.map((window) => (
+                    <span key={window.id} className="demo-week-slot">
+                      {clock(window.startMinute)}–{clock(window.endMinute)}
+                    </span>
+                  ))
+                )}
+              </li>
+            );
+          })}
+        </ol>
         <div className="demo-availability-form">
           <Select
             label="Day"

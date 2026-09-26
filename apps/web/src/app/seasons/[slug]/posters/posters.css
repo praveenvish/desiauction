@@ -34,6 +34,23 @@
   background: var(--surface-sunken);
 }
 
+/* The preview keeps the poster's OWN shape: a portrait 1080×1350 or a story
+   is never taller than the screen, and is centred instead of stretched. */
+.ps-layout .poster-preview-image {
+  inline-size: auto;
+  max-inline-size: 100%;
+  max-block-size: 72vh;
+  margin-inline: auto;
+}
+
+@media (min-width: 1024px) {
+  /* The controls scroll; the preview stays in view beside them. */
+  .ps-layout > :last-child {
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+
 /* --- The controls ---------------------------------------------------------- */
 
 .ps-fieldset {
@@ -45,29 +62,41 @@
 
 .ps-legend {
   padding: 0 0 var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--text-sm-size);
   font-weight: 600;
   color: var(--text-secondary);
 }
 
+/* A 3-up grid of look tiles (wow pass): the stacked one-per-row list ran
+   ~410px in a 380px column. The hint moved to the tile's tooltip. */
 .ps-swatches {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: var(--space-2);
 }
 
 /* A template is a look, so the control shows the look: the two chips are the
    renderer's own accent and heading colours over its own ground. */
 .ps-swatch {
+  position: relative;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--space-2);
   padding: var(--space-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
   cursor: pointer;
-  transition: border-color var(--duration-fast) ease;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .ps-swatch:hover {
+    transform: translateY(-1px);
+  }
 }
 
 .ps-swatch:hover {
@@ -95,8 +124,8 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  inline-size: 40px;
-  block-size: 28px;
+  inline-size: 100%;
+  block-size: 36px;
   flex: 0 0 auto;
   border: 1px solid;
   border-radius: var(--radius-sm);
@@ -112,22 +141,26 @@
   display: flex;
   flex-direction: column;
   min-inline-size: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-sm-size);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .ps-swatch-label small {
-  font-weight: 400;
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
+  /* Read on hover (the tile's title) — six descriptions stacked the column. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .ps-check {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  font-size: var(--text-sm);
+  font-size: var(--text-sm-size);
   color: var(--text-primary);
 }
 
@@ -155,7 +188,7 @@
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-sm-size);
   cursor: pointer;
 }
 

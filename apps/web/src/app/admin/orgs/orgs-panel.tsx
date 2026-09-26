@@ -1,16 +1,19 @@
 import {
   EmptyState,
-  IconArrowRight,
-  IconLayers,
-  IconSearch,
+  Pager,
   Pill,
-  SectionCard,
+  SegmentedTabs,
+  Toolbar,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSpacer,
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { formatCount } from "../../../server/admin/format";
+import { countNoun, formatCount } from "../../../server/admin/format";
 import type { OrgDirectory, OrgFilter } from "../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
+import { AdminFilterForm } from "../admin-filter-form";
+import { RelativeTime, TableCount } from "../admin-ui";
 
 /**
  * PX-9 §2 — the organization directory.
@@ -37,67 +40,58 @@ function filterLabel(filter: OrgFilter): string {
   return FILTER_LABELS.find((option) => option.key === filter)?.label ?? "All";
 }
 
-export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
+export function OrgsPanel({
+  directory,
+  paged = false,
+}: {
+  directory: OrgDirectory;
+  /** On a later page (a cursor is set): the pager offers the way back. */
+  paged?: boolean;
+}) {
   const { rows, total, platformTotal, filter, query, nextCursor } = directory;
   const narrowed = query !== "" || filter !== "all";
   const nextHref = nextCursor === null ? null : pageHref({ query, filter, after: nextCursor });
   return (
     <>
-      <ReadOnlyNotice />
-      <SectionCard
-        icon={<IconLayers />}
-        title="Organizations"
-        // One sentence, one meaning. It used to read "1 shown · 1 organization
-        // on the platform" for a search that matched one of 349, because
-        // `total` was the match count with a query and the UNFILTERED count
-        // with a filter. Match count and platform count are now separate
-        // numbers and are never spelled the same way.
-        description={
-          <span data-testid="admin-org-count">
-            {narrowed
-              ? `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} on the platform`
-              : `${formatCount(rows.length)} shown · ${formatCount(platformTotal)} organization${platformTotal === 1 ? "" : "s"} on the platform`}
-          </span>
-        }
-        flush
-      >
-        <form className="admin-filters" method="get" role="search" data-testid="admin-org-search">
-          <label className="admin-search" htmlFor="admin-org-q">
-            <span className="admin-sr-only">Search organizations, seasons and tournaments</span>
-            <IconSearch size={18} aria-hidden />
-            <input
+      <div className="admin-panel">
+        <AdminFilterForm testId="admin-org-search">
+          <Toolbar>
+            <ToolbarSearch
               id="admin-org-q"
               name="q"
-              type="search"
-              defaultValue={query}
+              label="Search organizations, seasons and tournaments"
               placeholder="Club, season or tournament"
-              className="admin-search-input"
+              defaultValue={query}
+              submitLabel="Search"
             />
-          </label>
-          <span className="admin-field">
-            <label className="admin-field-label" htmlFor="admin-org-filter">
-              Filter
-            </label>
-            <select
-              id="admin-org-filter"
-              name="filter"
-              defaultValue={filter}
-              className="admin-search-input"
-            >
-              {FILTER_LABELS.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          <button type="submit" className="admin-search-submit">
-            Search
-          </button>
-        </form>
+            {/* The four views as one segmented control — each is the filter it
+                names, and a link, so the choice is in the URL like before. */}
+            <SegmentedTabs
+              label="Organization filter"
+              items={FILTER_LABELS.map((option) => ({
+                key: option.key,
+                label: option.label,
+                active: option.key === filter,
+                href: filterHref(query, option.key),
+              }))}
+            />
+            {filter !== "all" ? <input type="hidden" name="filter" value={filter} /> : null}
+            <ToolbarSpacer />
+            {/* One sentence, one meaning. It used to read "1 shown · 1
+                organization on the platform" for a search that matched one of
+                349. Match count and platform count are separate numbers and
+                are never spelled the same way. */}
+            <ToolbarCount testId="admin-org-count">
+              {narrowed
+                ? `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} total`
+                : `${formatCount(rows.length)} of ${formatCount(platformTotal)}`}
+            </ToolbarCount>
+          </Toolbar>
+        </AdminFilterForm>
         {rows.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No organization matches"
               description={
@@ -113,7 +107,7 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
         ) : (
           <>
             <div className="admin-table-wrap">
-              <table className="admin-table" data-testid="admin-org-table">
+              <table className="admin-table is-linked da-rows" data-testid="admin-org-table">
                 <thead>
                   <tr>
                     <th scope="col">Organization</th>
@@ -138,53 +132,88 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                           hidden; `data-label` names every figure in its place,
                           so Seasons, Members and Cases never read as three
                           unlabelled numbers. */}
-                      <td data-label="Organization">
-                        <span className="admin-cell-main">
+                      <td data-label="Organization" data-cell="title">
+                        <span className="admin-cell-main is-inline">
                           <Link href={`/admin/orgs/${row.slug}`} className="admin-name">
                             {row.name}
                           </Link>
-                          <span className="admin-id">{row.slug}</span>
+                          <span className="admin-id admin-slug">{row.slug}</span>
                           {row.matchedSeason !== null ? (
                             <span className="admin-match" data-testid="admin-org-matched-season">
                               Matched: {row.matchedSeason}
                             </span>
                           ) : null}
                         </span>
+                        <span className="da-row-meta">
+                          {[
+                            row.competitions > 0 ? countNoun(row.competitions, "season") : null,
+                            row.members > 0 ? countNoun(row.members, "member") : null,
+                            row.openCases > 0 ? `${formatCount(row.openCases)} open` : null,
+                            row.financeDeclared ? "finance declared" : null,
+                          ]
+                            .filter((part) => part !== null)
+                            .join(" · ") || "No seasons yet"}
+                        </span>
                       </td>
-                      <td data-label="Seasons" className="admin-count admin-num">
-                        {formatCount(row.competitions)}
+                      <td
+                        data-label="Seasons"
+                        className="admin-count admin-num"
+                        data-zero={row.competitions === 0 || undefined}
+                      >
+                        <TableCount n={row.competitions} />
                       </td>
-                      <td data-label="Members" className="admin-count admin-num">
-                        {formatCount(row.members)}
+                      <td
+                        data-label="Members"
+                        className="admin-count admin-num"
+                        data-zero={row.members === 0 || undefined}
+                      >
+                        <TableCount n={row.members} />
                       </td>
-                      <td data-label="Auctions" className="admin-count admin-num">
-                        {formatCount(row.auctions)}
+                      <td
+                        data-label="Auctions"
+                        className="admin-count admin-num"
+                        data-zero={row.auctions === 0 || undefined}
+                      >
+                        <TableCount n={row.auctions} />
                       </td>
-                      <td data-label="Cases">
+                      <td data-label="Cases" data-empty={row.cases === 0 || undefined}>
                         {/* `settled` is counted as unfinished — it can still be
                             closed — but it is not "open", and an amber pill on
                             a case that settled correctly reads as a problem
                             that is not there. */}
                         <span className="admin-pills">
-                          <span className="admin-count">{formatCount(row.cases)}</span>
+                          {/* One figure, not "1" beside "● 1 open": the total
+                              only when it says more than its parts. */}
+                          {row.cases === 0 ? (
+                            <TableCount n={0} />
+                          ) : row.cases > row.openCases + row.settledCases ? (
+                            <span className="admin-count">{formatCount(row.cases)}</span>
+                          ) : null}
                           {row.openCases > 0 ? (
                             <Pill tone="amber" dot>
                               {row.openCases} open
                             </Pill>
                           ) : null}
                           {row.settledCases > 0 ? (
-                            <Pill tone="green">{row.settledCases} settled</Pill>
+                            <Pill tone="neutral">{row.settledCases} settled</Pill>
                           ) : null}
                         </span>
                       </td>
-                      <td data-label="Finance">
+                      <td data-label="Finance" data-empty={!row.financeDeclared || undefined}>
+                        {/* "Not declared" 49 times down a column drowned the one
+                            org that had. The dash is named for assistive tech. */}
                         {row.financeDeclared ? (
-                          <Pill tone="blue">Declared</Pill>
+                          <span className="admin-state" data-tone="green">
+                            <span className="admin-state-dot" aria-hidden />
+                            Declared
+                          </span>
                         ) : (
-                          <span className="admin-dash">Not declared</span>
+                          <span className="admin-dash" title="Not declared">
+                            —<span className="admin-sr-only">Not declared</span>
+                          </span>
                         )}
                       </td>
-                      <td data-label="Last activity">
+                      <td data-label="Last activity" className="is-side" data-cell="figure">
                         {row.lastActivityAt === null ? (
                           <span className="admin-meta">Never</span>
                         ) : (
@@ -199,21 +228,35 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
             {/* There was no pagination anywhere: 50 of 349 organizations, and
                 the other 299 were unreachable by browsing OR by any filter. A
                 LINK, not a button: administration submits nothing. */}
-            <nav className="admin-pagination" aria-label="More organizations">
-              {nextHref === null ? (
-                <span className="admin-meta">End of the list.</span>
-              ) : (
-                <Link href={nextHref} data-testid="admin-org-next">
-                  Next 50
-                  <IconArrowRight size={16} className="icon-trail" />
-                </Link>
-              )}
-            </nav>
+            <div className="admin-pagination">
+              <Pager
+                label="More organizations"
+                total={total}
+                shown={rows.length}
+                noun="organizations"
+                firstHref={paged ? filterHref(query, filter) : null}
+                nextHref={nextHref}
+                linkComponent={Link}
+                nextTestId="admin-org-next"
+              />
+            </div>
           </>
         )}
-      </SectionCard>
+      </div>
     </>
   );
+}
+
+function filterHref(query: string, filter: OrgFilter): string {
+  const params = new URLSearchParams();
+  if (query !== "") {
+    params.set("q", query);
+  }
+  if (filter !== "all") {
+    params.set("filter", filter);
+  }
+  const qs = params.toString();
+  return qs === "" ? "/admin/orgs" : `/admin/orgs?${qs}`;
 }
 
 function pageHref({

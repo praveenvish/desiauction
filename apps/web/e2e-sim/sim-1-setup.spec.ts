@@ -92,7 +92,7 @@ test("stage 1 — organizer sets up a 43-player points season with 3 teams", asy
   log("43 players imported");
 
   // Approve everyone, page by page — filtered to the ones still waiting.
-  await org.getByLabel("Status", { exact: true }).selectOption({ label: "Submitted" });
+  await org.getByTestId("stat-submitted").click();
   for (let round = 0; round < 5; round += 1) {
     const approved =
       (await org.getByTestId("stat-approved").locator(".stat-value").textContent()) ?? "0";
@@ -107,7 +107,7 @@ test("stage 1 — organizer sets up a 43-player points season with 3 teams", asy
   await expect(org.getByTestId("stat-approved").locator(".stat-value")).toHaveText("43", COLD);
   await expect(org.getByText("No registrations match these filters")).toBeVisible(COLD);
   await org.getByTestId("filters-reset").click();
-  await expect(org.getByLabel("Status", { exact: true })).toHaveValue("", COLD);
+  await expect(org.getByTestId("stat-total")).toHaveAttribute("aria-pressed", "true", COLD);
   await expect(org).not.toHaveURL(/status=/);
   log("43 approved");
 

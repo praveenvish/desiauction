@@ -3,35 +3,25 @@ import {
   IconArrowRight,
   IconCalendar,
   IconChevronDown,
-  IconGavel,
   IconPin,
-  IconUser,
-  IconUsers,
   PopoverMenu,
 } from "@desiauction/ui";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
-import { HeroFigures, HeroStatus, SeasonCrest } from "../../components/season-hero/season-hero";
+import { HeroStatus, SeasonCrest } from "../../components/season-hero/season-hero";
 import type { SeasonOverviewView } from "../../server/competition/actions";
 import { coverOf } from "../tournaments/featured-season";
 import { dateRange, seasonStatusBadge } from "../tournaments/season-card";
 
 /**
  * The club hero at the top of an organizer's /home (founder mockup 2): the
- * season this person is working on, its crest and its three figures, and a
+ * season this person is working on, its crest and its road, and a
  * switcher when they run more than one season.
  *
  * No quote. The mockup carries a club motto; no such field exists, and a line
  * the organizer never wrote is not something this page may put in their mouth.
  */
-
-const AUCTION_WORD: Record<string, string> = {
-  scheduled: "Scheduled",
-  live: "Live",
-  paused: "Paused",
-  completed: "Done",
-  reconciled: "Done",
-};
 
 export interface SwitchableSeason {
   slug: string;
@@ -42,12 +32,15 @@ export function ClubHero({
   overview,
   seasonsInClub,
   switchable,
+  footer,
 }: {
   overview: SeasonOverviewView;
   /** How many seasons this season's club runs — the line under the name. */
   seasonsInClub: number;
   /** Every season the switcher may offer; the switcher hides with one. */
   switchable: SwitchableSeason[];
+  /** Along the hero's bottom edge: the season's journey rail. */
+  footer?: ReactNode;
 }) {
   const season = overview.competition;
   const when = dateRange(season.startsOn, season.endsOn);
@@ -66,13 +59,27 @@ export function ClubHero({
       <HeroBanner
         sideAlign="start"
         testId="home-club-hero"
+        {...(footer !== undefined ? { footer } : {})}
         image={coverOf(season)}
         crest={<SeasonCrest name={season.name} logoUrl={overview.logoUrl} />}
-        eyebrow={<HeroStatus live={live}>{live ? "Auction live" : badge.label}</HeroStatus>}
+        eyebrow={
+          <HeroStatus
+            live={live}
+            done={badge.label === "Settled" || badge.label === "Auction done"}
+          >
+            {live ? "Auction live" : badge.label}
+          </HeroStatus>
+        }
         title={
-          <Link href={`/seasons/${season.slug}`} className="home-hero-link">
-            {season.name}
-          </Link>
+          // One link per destination: with one season, "Open season" is the
+          // door; the title links only when that button is the season switch.
+          switchable.length > 1 ? (
+            <Link href={`/seasons/${season.slug}`} className="home-hero-link">
+              {season.name}
+            </Link>
+          ) : (
+            season.name
+          )
         }
         meta={[
           ...(overview.orgName !== ""
@@ -98,33 +105,8 @@ export function ClubHero({
                 </>,
               ]
             : []),
-          <HeroFigures
-            key="figures"
-            label={`${season.name} at a glance`}
-            figures={[
-              {
-                key: "teams",
-                icon: <IconUsers />,
-                value: overview.teamCount.toLocaleString("en-IN"),
-                label: "Teams",
-              },
-              {
-                key: "players",
-                icon: <IconUser />,
-                value: overview.approvedPlayers.toLocaleString("en-IN"),
-                label: "Players",
-              },
-              {
-                key: "auction",
-                icon: <IconGavel />,
-                value:
-                  overview.auctionStatus === null
-                    ? "Not set"
-                    : (AUCTION_WORD[overview.auctionStatus] ?? "Set up"),
-                label: "Auction night",
-              },
-            ]}
-          />,
+          // No hero figures here: the KPI tiles right under the hero carry
+          // Teams and Players (they said "3 Teams, 43 Players" twice).
         ]}
         actions={
           switchable.length > 1 ? (

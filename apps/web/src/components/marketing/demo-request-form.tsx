@@ -97,6 +97,7 @@ export function DemoRequestForm({ source }: { source: string }) {
           autoComplete="name"
           required
           maxLength={120}
+          placeholder="e.g. Rohan Kulkarni"
           error={errorFor("name")}
         />
         <Field
@@ -178,6 +179,7 @@ export function DemoRequestForm({ source }: { source: string }) {
           name="email"
           type="email"
           autoComplete="email"
+          placeholder="e.g. you@yourclub.in"
           help="For a written confirmation."
           error={errorFor("email")}
         />
@@ -195,7 +197,7 @@ export function DemoRequestForm({ source }: { source: string }) {
           rows={3}
           maxLength={2000}
           className={styles["note"]}
-          placeholder="What you're worried about, what you tried last year, who else needs to see it. If you picked another sport, tell us which."
+          placeholder="What worries you — and which sport, if it's another one"
         />
       </div>
 

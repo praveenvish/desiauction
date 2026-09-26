@@ -5,10 +5,10 @@ import {
   IconArrowRight,
   IconBroadcast,
   IconChart,
+  IconCheckCircle,
   IconClock,
   IconFlag,
   IconGavel,
-  IconInbox,
   IconLedger,
   IconShieldCheck,
   IconTrophy,
@@ -17,7 +17,6 @@ import {
   SectionCard,
   StatCard,
   StatGrid,
-  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 
@@ -30,18 +29,20 @@ import {
   lifecycleLabel,
   waitedFor,
 } from "../../server/admin/format";
-import type { LiveBoard } from "../../server/admin/live-views";
+import type { LiveBoardView } from "../../server/admin/live-watch";
 import type { PlatformOverview } from "../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime, statusPillTone } from "./admin-ui";
+import { humanAction, KpiValue, RelativeTime, statusPillTone } from "./admin-ui";
 import { groupAttention } from "./attention-groups";
+import { erasureDaysLeft, erasureSlaWords } from "./erasure/erasure-sla";
+import { ROOM_TONE, STUCK_LABEL, engineTrouble, roomBadge, stuckSummary } from "./room-state";
 
 function pct(rate: number): number {
   return Math.round(rate * 100);
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  direct: "no share link",
-  other: "unrecognised link",
+  direct: "typed in or bookmarked",
+  other: "other links",
 };
 
 /**
@@ -60,20 +61,21 @@ export function OverviewPanel({
 }: {
   overview: PlatformOverview;
   outcomes: OutcomeMetrics;
-  live: LiveBoard;
+  live: LiveBoardView;
   desks: { items: readonly DeskItem[]; desks: number };
 }) {
   const { totals, runnerVerdict, followers, attention, recent, liveAuctions } = overview;
-  const attentionGroups = groupAttention(attention);
+  const attentionGroups = groupAttention(attention, {
+    stuckLiveTotal: liveAuctions.stale,
+    stuck: stuckSummary(live),
+  });
   return (
     <>
-      <ReadOnlyNotice />
-
       <StatGrid testId="admin-totals">
         <StatCard
           icon={<IconFlag />}
-          tone="gold"
-          value={formatCount(totals.orgs)}
+          concept="club"
+          value={<KpiValue n={totals.orgs} />}
           label="Organizations"
           hint="All clubs"
           href="/admin/orgs"
@@ -81,19 +83,18 @@ export function OverviewPanel({
         />
         <StatCard
           icon={<IconTrophy />}
-          tone="blue"
-          value={formatCount(totals.competitions)}
+          concept="season"
+          value={<KpiValue n={totals.competitions} />}
           label="Seasons"
           hint="Across every club"
           // The one tile without a door. Seasons are listed per club, and the
-          // organizations directory is where an administrator reaches them.
-          href="/admin/orgs"
-          linkComponent={Link}
+          // Organizations tile beside it is the door there (one link per
+          // destination — it used to be a second link to the same page).
         />
         <StatCard
           icon={<IconUser />}
-          tone="green"
-          value={formatCount(totals.people)}
+          concept="players"
+          value={<KpiValue n={totals.people} />}
           label="Users"
           hint="With an account"
           href="/admin/users"
@@ -101,79 +102,35 @@ export function OverviewPanel({
         />
         <StatCard
           icon={<IconGavel />}
-          tone="purple"
-          value={formatCount(totals.auctions)}
+          concept="auction"
+          value={<KpiValue n={totals.auctions} />}
           label="Auctions"
           hint={
-            liveAuctions.total > 0
-              ? `${formatCount(liveAuctions.total - liveAuctions.stale)} live now`
+            // The Live now card's own count (the board's rule), not a second one.
+            live.running.length > 0
+              ? `${formatCount(live.running.length)} live now`
               : "None live now"
           }
-          href="/admin/live"
-          linkComponent={Link}
+          // No door here: "Open the live board" on the Live now card is it.
         />
       </StatGrid>
+
+      {/* The live board's own clock: one "now" for the whole overview. */}
+      <AttentionStrip attentionGroups={attentionGroups} desks={desks} nowMs={live.generatedAtMs} />
 
       <div className="adm-overview">
         <div className="adm-col">
           <LiveNow live={live} />
 
           <SectionCard
-            icon={<IconAlert />}
-            tone={attention.length === 0 ? "green" : "red"}
-            title="Attention queue"
-            /* Every link here used to read "Open the console →" and point at an
-               org console that `platform:admin` cannot open. The links now go
-               where administration can actually go, and the sentence says who
-               holds the fix. */
-            description="Administration cannot act on these. Each links to what an administrator can open; the repair lives in the owning console, under its own permissions."
-            flush={attention.length > 0}
-          >
-            {attention.length === 0 ? (
-              <EmptyState
-                title="Nothing needs a human"
-                description="No dead jobs, no stalled runner, no stuck auction, no discrepant case, no failed delivery."
-              />
-            ) : (
-              <ul className="adm-rows" data-testid="admin-attention">
-                {attentionGroups.groups.map((group) => (
-                  <li key={group.kind} className="adm-row">
-                    <span className="adm-row-dot" data-tone="red" aria-hidden />
-                    <span className="adm-row-main">
-                      <span className="adm-row-title">{group.title}</span>
-                      <span className="adm-row-sub adm-mono">{group.sub}</span>
-                    </span>
-                    {group.href !== null ? (
-                      <Link href={group.href} className="adm-link">
-                        {group.linkLabel}
-                        <IconArrowRight size={14} aria-hidden />
-                      </Link>
-                    ) : null}
-                  </li>
-                ))}
-                {attentionGroups.more > 0 ? (
-                  <li className="adm-row" data-testid="admin-attention-more">
-                    <span className="adm-row-main">
-                      <span className="adm-row-sub">
-                        and {attentionGroups.more} more{" "}
-                        {attentionGroups.more === 1 ? "problem" : "problems"}
-                      </span>
-                    </span>
-                  </li>
-                ) : null}
-              </ul>
-            )}
-          </SectionCard>
-
-          <SectionCard
             icon={<IconClock />}
             tone="neutral"
             title="Recent activity"
-            description="The latest audit entries, administration's own page views left out."
+            description="Latest audit entries, admin page views left out"
             action={
               <Link href="/admin/audit" className="adm-link">
                 Audit explorer
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
             }
             flush={recent.length > 0}
@@ -182,16 +139,14 @@ export function OverviewPanel({
               <EmptyState title="No activity yet" description="The audit log is empty." />
             ) : (
               <>
-                <ul className="adm-rows" data-testid="admin-recent">
+                <ul className="adm-rows adm-feed" data-testid="admin-recent">
                   {recent.map((row) => (
-                    <li key={row.id} className="adm-row">
-                      <span className="adm-row-main">
-                        <span className="adm-row-title adm-mono">{row.action}</span>
-                        <span className="adm-row-sub">
-                          by {actorLabel(row.actor, row.actorName)}
-                        </span>
-                      </span>
+                    <li key={row.id} className="adm-feed-row">
                       <RelativeTime at={row.at} />
+                      <span className="adm-feed-action" title={row.action}>
+                        {humanAction(row.action)}
+                      </span>
+                      <span className="adm-feed-actor">{actorLabel(row.actor, row.actorName)}</span>
                     </li>
                   ))}
                 </ul>
@@ -205,7 +160,7 @@ export function OverviewPanel({
                     data-testid="admin-access-log-link"
                   >
                     Administration&rsquo;s own access log
-                    <IconArrowRight size={14} aria-hidden />
+                    <IconArrowRight size={16} aria-hidden />
                   </Link>
                 </p>
               </>
@@ -214,13 +169,11 @@ export function OverviewPanel({
         </div>
 
         <div className="adm-col">
-          {desks.desks > 0 ? <DeskCard items={desks.items} /> : null}
-
           <SectionCard
             icon={<IconShieldCheck />}
             tone={runnerVerdict.healthy && followers.behind === 0 ? "green" : "amber"}
             title="System status"
-            description="The job runner and each club's settlement follower, as they report themselves."
+            description="As the runner and each follower report themselves"
           >
             {/* `runnerVerdict`, NOT `runner.healthy`. The snapshot's rule is
                 `dead === 0`, which a runner that never runs also satisfies —
@@ -267,37 +220,34 @@ export function OverviewPanel({
             <p className="adm-foot adm-foot-inline">
               <Link href="/admin/health" className="adm-link">
                 Platform health
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
               {/* Whether the deployment holds the registered DLT ids it needs is
                   a health fact like any other — without an id a message shape
                   does not send at all. */}
               <Link href="/admin/messaging" className="adm-link" data-testid="admin-messaging-link">
                 Messaging
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
             </p>
           </SectionCard>
 
-          <SectionCard icon={<IconGavel />} tone="purple" title="Auctions by status">
+          <SectionCard icon={<IconGavel />} concept="auction" title="Auctions by status">
             <StatusList
               lines={overview.auctionsByStatus}
-              liveAuctions={liveAuctions}
+              rooms={{
+                running: live.running.filter((row) => row.status === "live").length,
+                silent: live.stale.length,
+              }}
               empty="No auction has been created yet."
             />
           </SectionCard>
 
           <SectionCard
             icon={<IconLedger />}
-            tone="blue"
+            concept="money"
             title="Settlements"
             description={`${countNoun(totals.cases, "settlement case")} · ${countNoun(totals.financeOrgs, "finance org")}`}
-            action={
-              <Link href="/admin/health" className="adm-link">
-                Finance health
-                <IconArrowRight size={14} aria-hidden />
-              </Link>
-            }
           >
             <StatusList
               lines={overview.casesByStatus}
@@ -307,7 +257,7 @@ export function OverviewPanel({
 
           <SectionCard
             icon={<IconChart />}
-            tone="green"
+            concept="results"
             title={`Outcomes · last ${String(outcomes.windowDays)} days`}
           >
             <dl className="adm-figures" data-testid="admin-outcomes">
@@ -343,36 +293,22 @@ export function OverviewPanel({
   );
 }
 
-const ROOM_TONE: Record<LiveBoard["running"][number]["state"], KitTone> = {
-  active: "green",
-  quiet: "neutral",
-  paused: "amber",
-  stale: "red",
-};
-
-const ROOM_WORDS: Record<LiveBoard["running"][number]["state"], string> = {
-  active: "bidding",
-  quiet: "quiet",
-  paused: "paused",
-  stale: "silent",
-};
-
 /**
  * What is live, first — before totals, before outcomes. On an auction night it
  * is the only question; on any other day it answers itself in one line.
  */
-function LiveNow({ live }: { live: LiveBoard }) {
+function LiveNow({ live }: { live: LiveBoardView }) {
   const shown = live.running.slice(0, 5);
   return (
     <SectionCard
       icon={<IconBroadcast />}
-      tone={shown.length > 0 ? "red" : "neutral"}
+      tone={shown.length > 0 ? "green" : "neutral"}
       title="Live now"
       description={
         shown.length === 0
           ? `No auction is running right now.${
               live.stale.length > 0
-                ? ` ${countNoun(live.stale.length, "auction")} marked live ${live.stale.length === 1 ? "was" : "were"} never closed.`
+                ? ` ${countNoun(live.stale.length, "auction")} marked live or paused ${live.stale.length === 1 ? "has" : "have"} been silent for over 12 hours.`
                 : ""
             }`
           : `${countNoun(live.running.length, "auction")} running`
@@ -380,7 +316,7 @@ function LiveNow({ live }: { live: LiveBoard }) {
       action={
         <Link href="/admin/live" className="adm-link" data-testid="admin-live-board-link">
           Open the live board
-          <IconArrowRight size={14} aria-hidden />
+          <IconArrowRight size={16} aria-hidden />
         </Link>
       }
       flush={shown.length > 0}
@@ -389,24 +325,34 @@ function LiveNow({ live }: { live: LiveBoard }) {
       {shown.length === 0 ? undefined : (
         <>
           <ul className="adm-rows">
-            {shown.map((row) => (
-              <li key={row.auctionId} className="adm-row">
-                <span className="adm-row-dot" data-tone={ROOM_TONE[row.state]} aria-hidden />
-                <span className="adm-row-main">
-                  <Link href={`/admin/auctions/${row.auctionId}`} className="adm-row-title">
-                    {row.seasonName}
-                  </Link>
-                  <span className="adm-row-sub">{row.orgName}</span>
-                </span>
-                <span className="adm-row-side">
-                  <Pill tone={ROOM_TONE[row.state]}>{ROOM_WORDS[row.state]}</Pill>
-                  <span className="adm-row-sub">
-                    {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in 5
-                    min
+            {shown.map((row) => {
+              /* The live board's own pill rule (room-state.ts roomBadge): a
+                 room the engine is in trouble with is never "Bidding" here. */
+              const badge = roomBadge(row.state, engineTrouble(live.engine[row.auctionId]));
+              return (
+                <li key={row.auctionId} className="adm-row">
+                  <span className="adm-row-dot" data-tone={badge.tone} aria-hidden />
+                  <span className="adm-row-main">
+                    <Link href={`/admin/auctions/${row.auctionId}`} className="adm-row-title">
+                      {row.seasonName}
+                    </Link>
+                    <span className="adm-row-sub">{row.orgName}</span>
                   </span>
-                </span>
-              </li>
-            ))}
+                  <span className="adm-row-side">
+                    {/* "quiet" on every row said nothing; the dot carries it. */}
+                    {badge.dotState === "quiet" ? (
+                      <span className="admin-sr-only">{badge.label}</span>
+                    ) : (
+                      <Pill tone={badge.tone}>{badge.label}</Pill>
+                    )}
+                    <span className="adm-row-sub">
+                      {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in
+                      5 min
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
           {live.running.length > shown.length ? (
             <p className="adm-foot">
@@ -419,42 +365,122 @@ function LiveNow({ live }: { live: LiveBoard }) {
   );
 }
 
-/** Work on the desks this operator holds — the one card here they can act on. */
-function DeskCard({ items }: { items: readonly DeskItem[] }) {
+/**
+ * What needs a human, in one card directly under the figures: the desks this
+ * operator can act on first (gold), then what administration can only point
+ * at (red). It replaces an "Attention queue" card and a "Waiting on your desks"
+ * card that each spent a header and a paragraph on one or two rows.
+ */
+function erasureOldestWords(askedMs: number, nowMs: number): string {
+  const left = erasureDaysLeft(askedMs, nowMs);
+  const words = erasureSlaWords(left).toLowerCase();
+  return left > 0 ? `has ${words}` : words;
+}
+
+function AttentionStrip({
+  attentionGroups,
+  desks,
+  nowMs,
+}: {
+  attentionGroups: ReturnType<typeof groupAttention>;
+  desks: { items: readonly DeskItem[]; desks: number };
+  nowMs: number;
+}) {
+  const deskItems = desks.desks > 0 ? desks.items : [];
+  const nothing = attentionGroups.groups.length === 0 && deskItems.length === 0;
+  if (nothing) {
+    return (
+      <p className="admin-slim" data-testid="admin-attention-clear">
+        <IconCheckCircle size={16} />
+        <strong>Nothing needs a human.</strong>
+        <span className="admin-meta">
+          No dead jobs, stalled runner, stuck auction, discrepant case or failed delivery
+          {desks.desks > 0 ? ", and your desks are clear" : ""}.
+        </span>
+      </p>
+    );
+  }
   return (
-    <SectionCard
-      icon={<IconInbox />}
-      tone={items.length === 0 ? "green" : "gold"}
-      title="Waiting on your desks"
-      description={
-        items.length === 0 ? "Your desks are clear." : "The one card here you can act on."
-      }
-      flush={items.length > 0}
-      data-testid="admin-desks"
-    >
-      {items.length === 0 ? undefined : (
-        <ul className="adm-rows">
-          {items.map((item) => (
+    <section className="adm-alerts" aria-labelledby="adm-alerts-title">
+      <div className="adm-alerts-head">
+        <h2 className="adm-alerts-title" id="adm-alerts-title">
+          <IconAlert size={16} />
+          Needs attention
+        </h2>
+        {/* Administration cannot act on the red rows; the gold ones are this
+            operator's own desks — said by the dots and the doors ("Open" on a
+            desk, the board's name on the rest), not by a colour legend. */}
+      </div>
+      {deskItems.length > 0 ? (
+        <ul className="adm-rows adm-alert-rows" data-testid="admin-desks">
+          {deskItems.map((item) => (
             <li key={item.key} className="adm-row" data-testid={`admin-desk-${item.key}`}>
+              <span className="adm-row-dot" data-tone="amber" aria-hidden />
               <span className="adm-row-main">
                 <span className="adm-row-title">
                   {countNoun(item.count, item.label[0], item.label[1])}
+                  {item.oldestAt === null ? null : item.key === "erasure" ? (
+                    // The erasure desk's own promise words, not an age: "7d"
+                    // floored an overdue request into looking on time.
+                    <span className="adm-row-sub" data-testid="admin-erasure-sla">
+                      {" "}
+                      · oldest {erasureOldestWords(item.oldestAt.getTime(), nowMs)}
+                    </span>
+                  ) : (
+                    <span className="adm-row-sub">
+                      {" "}
+                      · oldest <RelativeTime at={item.oldestAt} />
+                    </span>
+                  )}
                 </span>
-                {item.oldestAt !== null ? (
-                  <span className="adm-row-sub">
-                    oldest <RelativeTime at={item.oldestAt} />
-                  </span>
-                ) : null}
               </span>
               <Link href={item.href} className="adm-link">
                 Open
-                <IconArrowRight size={14} aria-hidden />
+                <IconArrowRight size={16} aria-hidden />
               </Link>
             </li>
           ))}
         </ul>
-      )}
-    </SectionCard>
+      ) : null}
+      {attentionGroups.groups.length > 0 ? (
+        <ul className="adm-rows adm-alert-rows" data-testid="admin-attention">
+          {attentionGroups.groups.map((group) => (
+            <li key={group.kind} className="adm-row">
+              <span className="adm-row-dot" data-tone="red" aria-hidden />
+              <span className="adm-row-main">
+                <span className="adm-row-title" title={group.kind}>
+                  {group.title}
+                  {/* The kind's code ("auction:stuck-live") is the hover, not
+                      the copy; only what follows it (the club, the count) is. */}
+                  {group.sub.startsWith(`${group.kind} · `) ? (
+                    <span className="adm-row-code">
+                      {" "}
+                      · {group.sub.slice(group.kind.length + 3)}
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+              {group.href !== null ? (
+                <Link href={group.href} className="adm-link">
+                  {group.linkLabel}
+                  <IconArrowRight size={16} aria-hidden />
+                </Link>
+              ) : null}
+            </li>
+          ))}
+          {attentionGroups.more > 0 ? (
+            <li className="adm-row" data-testid="admin-attention-more">
+              <span className="adm-row-main">
+                <span className="adm-row-sub">
+                  and {attentionGroups.more} more{" "}
+                  {attentionGroups.more === 1 ? "problem" : "problems"}
+                </span>
+              </span>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+    </section>
   );
 }
 
@@ -472,7 +498,7 @@ function Figure({
     <div className="adm-figure">
       <dt>{label}</dt>
       {/* 1539 and 1558 were four unbroken digits the eye has to count. */}
-      <dd>
+      <dd data-zero={value === 0 || undefined}>
         {formatCount(value)}
         {suffix ?? ""}
       </dd>
@@ -491,11 +517,12 @@ function Figure({
  */
 function StatusList({
   lines,
-  liveAuctions,
+  rooms,
   empty,
 }: {
   lines: readonly { status: string; count: number }[];
-  liveAuctions?: { total: number; stale: number };
+  /** The live board's split of the `live` status (room-state.ts): one rule, both surfaces. */
+  rooms?: { running: number; silent: number };
   empty: string;
 }) {
   if (lines.length === 0) {
@@ -504,17 +531,16 @@ function StatusList({
   return (
     <div className="adm-chips">
       {lines.map((line) => {
-        if (line.status === "live" && liveAuctions !== undefined && liveAuctions.stale > 0) {
-          const running = liveAuctions.total - liveAuctions.stale;
+        if (line.status === "live" && rooms !== undefined && rooms.silent > 0) {
           return (
             <span key={line.status} className="adm-chips">
-              {running > 0 ? (
-                <Pill tone="green" dot>
-                  Live now · {formatCount(running)}
+              {rooms.running > 0 ? (
+                <Pill tone={ROOM_TONE.active} dot>
+                  Running · {formatCount(rooms.running)}
                 </Pill>
               ) : null}
-              <Pill tone="red" dot testId="admin-stuck-live">
-                Stuck in live · {formatCount(liveAuctions.stale)}
+              <Pill tone={ROOM_TONE.stale} dot testId="admin-stuck-live">
+                {STUCK_LABEL} · {formatCount(rooms.silent)}
               </Pill>
             </span>
           );

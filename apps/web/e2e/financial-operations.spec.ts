@@ -81,7 +81,9 @@ test("founder demo: settle an auction → open Financial Operations → observe,
   await otpLogin(page, "9999000002");
 
   await page.goto("/orgs");
-  await page.getByRole("link", { name: /Demo Cricket Club/ }).click();
+  // Anchored: /orgs also lists each club's latest seasons, and those rows name
+  // the club too. The club's own card is the link whose name STARTS with it.
+  await page.getByRole("link", { name: /^Demo Cricket Club/ }).click();
   // Await the org page before reading the slug off the URL — a click is not a
   // navigation, and an empty slug turns every later assertion into a lie.
   await expect(page.getByTestId("org-name")).toBeVisible();

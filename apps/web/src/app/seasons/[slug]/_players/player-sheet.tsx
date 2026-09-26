@@ -5,11 +5,13 @@ import {
   Badge,
   Button,
   IconAlert,
-  useToast,
+  IconCheck,
   IconChevronLeft,
   IconChevronRight,
   IconClose,
   PlayerImage,
+  ScrollStrip,
+  useToast,
 } from "@desiauction/ui";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 
@@ -341,8 +343,8 @@ function SheetTabs({
   row: Row;
 }) {
   return (
-    // eslint-disable-next-line jsx-a11y/interactive-supports-focus -- see Tabs in @desiauction/ui: focus belongs to the tabs, not the list
-    <div
+    <ScrollStrip
+      activeKey={active}
       className="pd-tabs"
       role="tablist"
       aria-label="Player sections"
@@ -390,7 +392,7 @@ function SheetTabs({
           ) : null}
         </button>
       ))}
-    </div>
+    </ScrollStrip>
   );
 }
 
@@ -896,7 +898,7 @@ function MarkToggle({
       data-testid={testId}
     >
       <span className="pd-mark-box" aria-hidden>
-        {on ? "✓" : ""}
+        {on ? <IconCheck size={16} weight="bold" /> : null}
       </span>
       <span className="pd-mark-text">
         <span className="pd-mark-label">{label}</span>

@@ -22,6 +22,11 @@ export default function ReleasesPage() {
           Release <em>notes</em>
         </>
       }
+      prose={false}
+      anchors={RELEASES.map((release) => ({
+        id: `release-${slugify(release.version)}`,
+        label: release.version,
+      }))}
       lede={
         <>
           {/* Same guard as /support: APP_VERSION defaults to "dev", which is a
@@ -36,22 +41,31 @@ export default function ReleasesPage() {
         </>
       }
     >
-      {RELEASES.map((release) => {
-        const releaseId = `release-${slugify(release.version)}`;
-        return (
-          <section key={release.version} className="release" aria-labelledby={releaseId}>
-            <h2 id={releaseId}>{release.title}</h2>
-            <p className="release-meta">
-              {release.version} · {release.date}
-            </p>
-            <ul>
-              {release.highlights.map((highlight) => (
-                <li key={highlight}>{highlight}</li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+      {/* A changelog, Linear-style: the date and the area sit in a gutter on
+          the left, the release on the right, one rule between entries. */}
+      <ol className="releases">
+        {RELEASES.map((release) => {
+          const releaseId = `release-${slugify(release.version)}`;
+          return (
+            <li key={release.version}>
+              <section className="release" aria-labelledby={releaseId}>
+                <p className="release-meta">
+                  <span className="release-date">{release.date}</span>
+                  <span className="release-chip">{release.version}</span>
+                </p>
+                <div className="release-body">
+                  <h2 id={releaseId}>{release.title}</h2>
+                  <ul>
+                    {release.highlights.map((highlight) => (
+                      <li key={highlight}>{highlight}</li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+            </li>
+          );
+        })}
+      </ol>
     </ContentPage>
   );
 }

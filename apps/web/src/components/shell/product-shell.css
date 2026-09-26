@@ -69,15 +69,18 @@
   align-items: center;
   min-height: 44px;
   padding: 0 var(--space-2);
-  color: var(--text-accent);
+  /* Neutral ink: gold is reserved for the header's ONE primary ("Start
+     free"). Two gold calls side by side read as two competing doors. */
+  color: var(--text-primary);
   text-decoration: none;
   font-family: var(--font-text);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .shell-header-link:hover {
-  text-decoration: underline;
+  color: var(--text-accent);
 }
 
 /* Without this the link fell back to the UA's default focus ring — a blue
@@ -380,4 +383,13 @@
    under AA for 12px text. The rail's secondary ink passes. */
 [data-theme="daylight"] .shell-railuser-text span {
   color: var(--text-secondary);
+}
+
+/* A phone's icon row leaves the title about 130px: "Good morning, Praveen"
+   clamped to "Good morning,…" and cut off the one word that was theirs.
+   Under 480px the lead goes and the name stays (still read in full above). */
+@media (max-width: 479px) {
+  .shell-title-lead {
+    display: none;
+  }
 }

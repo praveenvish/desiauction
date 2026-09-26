@@ -1,15 +1,21 @@
 import {
   EmptyState,
-  IconArrowRight,
-  IconFileCheck,
-  IconSearch,
-  SectionCard,
+  Pager,
+  Toolbar,
+  ToolbarChip,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSelect,
+  ToolbarSpacer,
 } from "@desiauction/ui";
 import Link from "next/link";
 
+import { ADMIN_ACCESS_ACTION } from "../../../server/admin/capabilities";
 import { actorLabel, formatCount, isSystemActor } from "../../../server/admin/format";
 import type { AuditEntry, AuditFilters, AuditPage } from "../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
+import { AdminFilterForm } from "../admin-filter-form";
+import { absoluteIst, humanAction } from "../admin-ui";
+import { formatDayDate } from "../../../lib/format-date";
 
 /**
  * PX-9 §4 — the audit viewer.
@@ -22,124 +28,131 @@ import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
 export function AuditPanel({ page }: { page: AuditPage }) {
   const { rows, actions, total, filters, nextCursor } = page;
   const nextHref = nextCursor === null ? null : auditHref(filters, nextCursor);
+  const days = groupByDay(rows);
   return (
     <>
-      <ReadOnlyNotice />
-      {/* A hundred audit entries under zero headings: the page had one h1 and
-          nothing else, so nothing named what the list was. */}
-      <SectionCard
-        icon={<IconFileCheck />}
-        title="Events"
-        description={
-          <span data-testid="admin-audit-count">
-            {formatCount(rows.length)} shown · {formatCount(total)} matching event
-            {total === 1 ? "" : "s"} · times are IST
-          </span>
-        }
-        flush
-      >
-        <form className="admin-filters" method="get" role="search" data-testid="admin-audit-search">
-          <label className="admin-search" htmlFor="admin-audit-q">
-            <span className="admin-sr-only">Search</span>
-            <IconSearch size={18} aria-hidden />
-            <input
+      <div className="admin-panel">
+        <AdminFilterForm testId="admin-audit-search">
+          <Toolbar>
+            <ToolbarSearch
               id="admin-audit-q"
               name="q"
-              type="search"
-              defaultValue={filters.q ?? ""}
+              label="Search"
               placeholder="Actor, scope, subject or action"
-              className="admin-search-input"
+              defaultValue={filters.q ?? ""}
+              submitLabel="Filter"
             />
-          </label>
-          <span className="admin-field">
-            <label className="admin-field-label" htmlFor="admin-audit-action">
-              Action
-            </label>
-            <select
+            <ToolbarSelect
               id="admin-audit-action"
               name="action"
+              label="Action"
               defaultValue={filters.action ?? ""}
-              className="admin-search-input"
-            >
-              <option value="">All actions</option>
-              {actions.map((action) => (
-                <option key={action} value={action}>
-                  {action}
-                </option>
-              ))}
-            </select>
-          </span>
-          <span className="admin-field">
-            <label className="admin-field-label" htmlFor="admin-audit-from">
-              From
-            </label>
-            <input
-              id="admin-audit-from"
-              name="from"
-              type="date"
-              defaultValue={filters.from ?? ""}
-              className="admin-search-input"
+              options={[
+                { value: "", label: "All actions" },
+                ...actions.map((action) => ({ value: action, label: humanAction(action) })),
+              ]}
             />
-          </span>
-          <span className="admin-field">
-            <label className="admin-field-label" htmlFor="admin-audit-to">
-              To
-            </label>
-            <input
-              id="admin-audit-to"
-              name="to"
-              type="date"
-              defaultValue={filters.to ?? ""}
-              className="admin-search-input"
-            />
-          </span>
-          {/* Deep links carry actor/scope; keep them across a filter submit. */}
-          {filters.actor !== undefined ? (
-            <input type="hidden" name="actor" value={filters.actor} />
-          ) : null}
-          {filters.scopeId !== undefined ? (
-            <input type="hidden" name="scopeId" value={filters.scopeId} />
-          ) : null}
-          <button type="submit" className="admin-search-submit">
-            Filter
-          </button>
-        </form>
+            <span className="admin-select admin-select-date">
+              <label htmlFor="admin-audit-from">From</label>
+              <input
+                id="admin-audit-from"
+                name="from"
+                type="date"
+                defaultValue={filters.from ?? ""}
+              />
+            </span>
+            <span className="admin-select admin-select-date">
+              <label htmlFor="admin-audit-to">To</label>
+              <input id="admin-audit-to" name="to" type="date" defaultValue={filters.to ?? ""} />
+            </span>
+            {/* Deep links carry actor/scope; keep them across a filter change,
+                and show them — a hidden filter is a list that lies. */}
+            {filters.actor !== undefined ? (
+              <>
+                <input type="hidden" name="actor" value={filters.actor} />
+                <ToolbarChip
+                  href={auditHref({ ...filters, actor: undefined }, null)}
+                  removeLabel="Remove the person filter"
+                >
+                  Person …{filters.actor.slice(-6)}
+                </ToolbarChip>
+              </>
+            ) : null}
+            {filters.scopeId !== undefined ? (
+              <>
+                <input type="hidden" name="scopeId" value={filters.scopeId} />
+                <ToolbarChip
+                  href={auditHref({ ...filters, scopeId: undefined }, null)}
+                  removeLabel="Remove the scope filter"
+                >
+                  Scope …{filters.scopeId.slice(-6)}
+                </ToolbarChip>
+              </>
+            ) : null}
+            <ToolbarSpacer />
+            {/* A hundred audit entries under zero headings: the page had one h1
+                and nothing else. The day headings below name the list now. */}
+            <ToolbarCount testId="admin-audit-count">
+              {formatCount(rows.length)} of {formatCount(total)} event{total === 1 ? "" : "s"}
+            </ToolbarCount>
+          </Toolbar>
+        </AdminFilterForm>
         {rows.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
-              headingLevel={3}
+              size="compact"
+              headingLevel={2}
               title="No matching events"
               description="Nothing in the audit log matches these filters."
             />
           </div>
         ) : (
           <>
-            <ul className="admin-rows" data-testid="admin-audit-list">
-              {rows.map((row) => (
-                <AuditRow key={row.id} row={row} />
+            <div className="admin-log" data-testid="admin-audit-list">
+              {days.map((day) => (
+                <section key={day.key} className="admin-log-day" aria-label={day.label}>
+                  <h2 className="admin-log-date">{day.label}</h2>
+                  <ul className="admin-log-rows">
+                    {runs(day.rows, filters.action !== ADMIN_ACCESS_ACTION).map((run) =>
+                      run.length === 1 ? (
+                        <AuditRow key={run[0]?.id} row={run[0] as AuditEntry} />
+                      ) : isSignInPair(run) ? (
+                        <AuditRow
+                          key={run[0]?.id}
+                          row={run[0] as AuditEntry}
+                          askedAt={(run[1] as AuditEntry).at}
+                        />
+                      ) : (
+                        <AccessRun key={run[0]?.id} rows={run} />
+                      ),
+                    )}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
             {/* Paging replaces "narrow the filters to see more" — which was the
                 only route past event 100 of 3,720. */}
-            <nav className="admin-pagination" aria-label="Older events">
-              {nextHref === null ? (
-                <span className="admin-meta">End of the matching events.</span>
-              ) : (
-                <Link href={nextHref} data-testid="admin-audit-next">
-                  Older 100
-                  <IconArrowRight size={16} className="icon-trail" />
-                </Link>
-              )}
-            </nav>
+            <div className="admin-pagination">
+              <Pager
+                label="Older events"
+                total={total}
+                shown={rows.length}
+                noun="events"
+                firstHref={filters.after !== undefined ? auditHref(filters, null) : null}
+                nextHref={nextHref}
+                linkComponent={Link}
+                nextTestId="admin-audit-next"
+              />
+            </div>
           </>
         )}
-      </SectionCard>
+      </div>
     </>
   );
 }
 
 /** The current filters, plus a cursor. Every filter survives the page turn. */
-function auditHref(filters: AuditFilters, after: string): string {
+function auditHref(filters: AuditFilters, after: string | null): string {
   const params = new URLSearchParams();
   for (const key of ["q", "action", "actor", "scopeId", "from", "to"] as const) {
     const value = filters[key];
@@ -147,17 +160,162 @@ function auditHref(filters: AuditFilters, after: string): string {
       params.set(key, value);
     }
   }
-  params.set("after", after);
-  return `/admin/audit?${params.toString()}`;
+  if (after !== null) {
+    params.set("after", after);
+  }
+  const qs = params.toString();
+  return qs === "" ? "/admin/audit" : `/admin/audit?${qs}`;
 }
 
-function AuditRow({ row }: { row: AuditEntry }) {
+const DAY = { format: (at: Date | number): string => formatDayDate(at, true) };
+
+const CLOCK = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+/** Newest first in, newest first out — consecutive rows of one IST day. */
+function groupByDay(
+  rows: readonly AuditEntry[],
+): { key: string; label: string; rows: AuditEntry[] }[] {
+  const today = DAY.format(new Date());
+  const groups: { key: string; label: string; rows: AuditEntry[] }[] = [];
+  for (const row of rows) {
+    const label = DAY.format(row.at);
+    const last = groups[groups.length - 1];
+    if (last !== undefined && last.key === label) {
+      last.rows.push(row);
+    } else {
+      groups.push({ key: label, label: label === today ? `Today · ${label}` : label, rows: [row] });
+    }
+  }
+  return groups;
+}
+
+/**
+ * Administration records its own page views, so an operator's browsing sat
+ * between every real event as five, ten, twenty "admin.accessed" rows. A run of
+ * them by one person folds into ONE row that says so and opens to the list.
+ * Nothing is dropped or reordered: the rows are all still here, in order.
+ * Filtered to the access log itself, nothing folds — there it IS the record.
+ */
+function runs(rows: readonly AuditEntry[], fold: boolean): AuditEntry[][] {
+  if (!fold) return rows.map((row) => [row]);
+  const out: AuditEntry[][] = [];
+  for (const row of rows) {
+    const last = out[out.length - 1];
+    const head = last?.[0];
+    /* A sign-in is two rows — the code asked for, then used — and they were
+       half of every page. The request folds into the sign-in it led to (same
+       person, within ten minutes); filtered to either action, nothing folds. */
+    if (
+      last !== undefined &&
+      head !== undefined &&
+      last.length === 1 &&
+      head.action === SIGN_IN_ACTION &&
+      row.action === CODE_ASKED_ACTION &&
+      head.actor === row.actor &&
+      head.at.getTime() - row.at.getTime() <= PAIR_WINDOW_MS &&
+      head.at.getTime() >= row.at.getTime()
+    ) {
+      last.push(row);
+      continue;
+    }
+    if (
+      last !== undefined &&
+      head !== undefined &&
+      row.action === ADMIN_ACCESS_ACTION &&
+      head.action === ADMIN_ACCESS_ACTION &&
+      head.actor === row.actor
+    ) {
+      last.push(row);
+    } else {
+      out.push([row]);
+    }
+  }
+  return out;
+}
+
+const SIGN_IN_ACTION = "auth.login.otp";
+const CODE_ASKED_ACTION = "auth.otp.requested";
+const PAIR_WINDOW_MS = 10 * 60_000;
+
+function isSignInPair(run: readonly AuditEntry[]): boolean {
   return (
-    <li>
-      <span className="admin-attention-subject">
-        <span>
-          <span className="admin-action">{row.action}</span>
-          <span className="admin-meta">
+    run.length === 2 && run[0]?.action === SIGN_IN_ACTION && run[1]?.action === CODE_ASKED_ACTION
+  );
+}
+
+function surfaceOf(row: AuditEntry): string | null {
+  const meta = row.meta as { surface?: unknown } | null | undefined;
+  return meta !== null && meta !== undefined && typeof meta.surface === "string"
+    ? meta.surface
+    : null;
+}
+
+function AccessRun({ rows }: { rows: readonly AuditEntry[] }) {
+  const first = rows[0] as AuditEntry;
+  const last = rows[rows.length - 1] as AuditEntry;
+  const surfaces = [...new Set(rows.map(surfaceOf).filter((name) => name !== null))];
+  return (
+    <li className="admin-log-row admin-log-run">
+      <time
+        className="admin-log-time"
+        dateTime={first.at.toISOString()}
+        title={`${absoluteIst(last.at)} – ${absoluteIst(first.at)}`}
+      >
+        <span className="admin-sr-only">{absoluteIst(first.at)}</span>
+        <span aria-hidden>{CLOCK.format(first.at)}</span>
+      </time>
+      <details className="admin-log-main admin-log-runbody">
+        <summary>
+          <span className="admin-log-line">
+            <span className="admin-log-by">
+              {actorLabel(first.actor, first.actorName)} viewed {rows.length} administration pages
+            </span>
+            {surfaces.length > 0 ? (
+              <span className="admin-log-keys"> · {surfaces.join(", ")}</span>
+            ) : null}
+          </span>
+        </summary>
+        <ul className="admin-log-runlist">
+          {rows.map((row) => (
+            <AuditRow key={row.id} row={row} />
+          ))}
+        </ul>
+      </details>
+      <span className="admin-log-scope">platform</span>
+    </li>
+  );
+}
+
+function AuditRow({
+  row,
+  askedAt,
+}: {
+  row: AuditEntry;
+  /** A sign-in that folds in the code request before it (see `runs`). */
+  askedAt?: Date;
+}) {
+  const meta = row.meta !== null && row.meta !== undefined ? JSON.stringify(row.meta) : null;
+  return (
+    <li className="admin-log-row">
+      {/* On a forensic surface the absolute moment IS the datum: the clock is
+          drawn first, and the full zone-named timestamp is what assistive
+          technology hears (and what a hover shows). */}
+      <time className="admin-log-time" dateTime={row.at.toISOString()} title={absoluteIst(row.at)}>
+        <span className="admin-sr-only">{absoluteIst(row.at)}</span>
+        <span aria-hidden>{CLOCK.format(row.at)}</span>
+      </time>
+      <span className="admin-log-main">
+        <span className="admin-log-line">
+          {/* The sentence is the copy; the code is the hover and the filter. */}
+          <span className="admin-action" title={row.action}>
+            {humanAction(row.action)}
+          </span>
+          <span className="admin-log-by">
             {" by "}
             {/* A machine-derived row (a lot the timer closed, a sweep the
                 coordinator ran) is signed with the zero ULID. It rendered as a
@@ -171,31 +329,60 @@ function AuditRow({ row }: { row: AuditEntry }) {
             {row.subject !== null ? (
               <>
                 {" on "}
-                {row.subjectName ?? row.subject.slice(-6)}
+                <span className="admin-log-subject">
+                  {row.subjectName ?? row.subject.slice(-6)}
+                </span>
               </>
             ) : null}
           </span>
+          {askedAt !== undefined ? (
+            <span className="admin-log-keys" title={absoluteIst(askedAt)}>
+              {" · code asked for at "}
+              {CLOCK.format(askedAt)}
+            </span>
+          ) : null}
         </span>
-        <span className="admin-attention-kind">
-          {row.scopeType}
-          {row.scopeLabel !== null ? ` · ${row.scopeLabel}` : ""}
-          {/* The platform sentinel is a 26-zero ULID — the noisiest string on
-              the page, linking to a filter on a synthetic id. The word
-              "platform" above already says everything the zeros said. */}
-          {/^0+$/.test(row.scopeId) ? null : (
-            <>
-              {" · "}
-              <Link href={`/admin/audit?scopeId=${row.scopeId}`}>{row.scopeId}</Link>
-            </>
-          )}
-        </span>
-        {row.meta !== null && row.meta !== undefined ? (
-          <pre className="admin-evidence">{JSON.stringify(row.meta)}</pre>
+        {meta !== null ? (
+          <details className="admin-log-meta">
+            {/* The evidence is one click away, not a second line on every
+                row: the summary names its fields, the panel shows it whole. */}
+            <summary title={meta}>
+              <span className="admin-sr-only">Evidence: </span>
+              Details<span className="admin-log-keys"> · {evidenceKeys(row.meta)}</span>
+            </summary>
+            <pre className="admin-evidence">{JSON.stringify(row.meta, null, 2)}</pre>
+          </details>
         ) : null}
       </span>
-      {/* On a forensic surface the absolute moment IS the datum, so it is drawn
-          rather than hidden in a `title` only a mouse can reach. */}
-      <RelativeTime at={row.at} absolute />
+      <span className="admin-log-scope">
+        {row.scopeType}
+        {row.scopeLabel !== null ? ` · ${row.scopeLabel}` : ""}
+        {/* The platform sentinel is a 26-zero ULID — the noisiest string on
+            the page, linking to a filter on a synthetic id. The word
+            "platform" already says everything the zeros said. */}
+        {/^0+$/.test(row.scopeId) ? null : (
+          <Link
+            href={`/admin/audit?scopeId=${row.scopeId}`}
+            className="admin-log-id"
+            title={`Every event in scope ${row.scopeId}`}
+          >
+            <span className="admin-sr-only">Filter to scope </span>…{row.scopeId.slice(-6)}
+          </Link>
+        )}
+      </span>
     </li>
   );
+}
+
+/**
+ * How much evidence the row carries, for the summary. It listed the raw keys
+ * ("reason · source · eventSeq · correlationId") — field names, not words;
+ * the fields themselves are one press away, verbatim.
+ */
+function evidenceKeys(meta: unknown): string {
+  if (meta !== null && typeof meta === "object" && !Array.isArray(meta)) {
+    const count = Object.keys(meta).length;
+    return count === 0 ? "none" : `${String(count)} field${count === 1 ? "" : "s"}`;
+  }
+  return "1 value";
 }

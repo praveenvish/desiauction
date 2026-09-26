@@ -27,9 +27,12 @@
   grid-template-columns: auto minmax(0, 1fr) auto minmax(9rem, auto);
 }
 
-.rd-checks > li:first-child,
-.rd-areas > li:first-child {
-  padding-top: 0;
+/* Every row the same height, the first included (round 2: the first row sat
+   12px under the card head and read as a different kind of row). The list
+   draws its own top rule instead. */
+.rd-checks,
+.rd-areas {
+  border-top: 1px solid var(--border-subtle);
 }
 
 .rd-checks > li:last-child,
@@ -94,13 +97,48 @@
     justify-self: start;
   }
 
+  /* PHONE: each area is one tappable-looking row — tile · title and state ·
+     chevron — instead of a third line of link text. The link keeps its words
+     for assistive tech (font-size 0 hides glyphs, not the text node). */
   .rd-areas > li {
     grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tile text go"
+      "tile state go";
+    row-gap: 4px;
+  }
+
+  .rd-areas > li > :first-child {
+    grid-area: tile;
+    align-self: start;
+  }
+
+  .rd-areas > li > .rd-text {
+    grid-area: text;
+  }
+
+  .rd-areas > li > .rd-state {
+    grid-area: state;
   }
 
   .rd-areas .st-link {
-    grid-column: 2 / -1;
-    justify-self: start;
+    grid-area: go;
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    justify-self: end;
+    border-radius: var(--radius-md);
+    font-size: 0;
+  }
+
+  .rd-areas .st-link::after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--text-secondary);
+    border-top: 2px solid var(--text-secondary);
+    transform: rotate(45deg) translateX(-2px);
   }
 
   .rd-actions > * {

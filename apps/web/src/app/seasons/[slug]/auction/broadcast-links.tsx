@@ -85,7 +85,7 @@ export function BroadcastLinks({ slug }: { slug: string }) {
   return (
     <SectionCard
       icon={<IconTv />}
-      tone="green"
+      concept="neutral"
       title="Screens for the room"
       description="Two chrome-free surfaces fed by the same live snapshot as this page."
       data-testid="broadcast-links"

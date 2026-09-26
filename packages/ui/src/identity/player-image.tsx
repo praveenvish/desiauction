@@ -112,12 +112,14 @@ function Mark({
   px,
   teamColor,
   decorative,
+  round,
 }: {
   name: string;
   seed: string;
   px: number;
   teamColor?: string | undefined;
   decorative: boolean;
+  round: boolean;
 }) {
   const identity = placeholderIdentity(seed, name);
   // Gradient ids must be unique per instance: a page draws dozens of marks.
@@ -166,13 +168,19 @@ function Mark({
       <rect width={px} height={px} fill={`url(#${washId})`} />
       <Pattern identity={identity} px={px} />
       <rect width={px} height={px} fill={`url(#${shadeId})`} />
-      <rect
-        x={0}
-        y={px - Math.max(2, px / 16)}
-        width={px}
-        height={Math.max(2, px / 16)}
-        fill={edge}
-      />
+      {/* The team edge is a square frame's base line. A round frame would
+          clip it into a flat chord across the bottom of the disc, which read
+          as a rendering bug at every size — so a round mark carries the
+          colour in its wash alone. */}
+      {round ? null : (
+        <rect
+          x={0}
+          y={px - Math.max(2, px / 16)}
+          width={px}
+          height={Math.max(2, px / 16)}
+          fill={edge}
+        />
+      )}
       {identity.initials !== null ? (
         <text
           className={styles["glyph"]}
@@ -284,7 +292,14 @@ export function PlayerImage({
           />
         </>
       ) : (
-        <Mark name={name} seed={seed} px={px} teamColor={teamColor} decorative={decorative} />
+        <Mark
+          name={name}
+          seed={seed}
+          px={px}
+          teamColor={teamColor}
+          decorative={decorative}
+          round={shape === "round"}
+        />
       )}
     </span>
   );

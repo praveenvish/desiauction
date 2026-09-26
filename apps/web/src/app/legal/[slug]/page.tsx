@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { IconArrowLeft } from "@desiauction/ui";
+import { IconArrowLeft, IconFile } from "@desiauction/ui";
 
-import { PageBody, PageHero } from "../../../components/public/public-kit";
+import { ContentLayout } from "../../../components/public/content-layout";
+import { OperatorIdentityCard } from "../../../components/public/operator-identity";
+import { PageBody, PageHero, SideCard } from "../../../components/public/public-kit";
 import { env } from "../../../env";
-import { Prose } from "../../../content/blocks";
+import { Prose, tocOf } from "../../../content/blocks";
 import { LEGAL_DOCUMENTS, legalDocument } from "../../../content/legal";
 import "../../content.css";
 
@@ -50,26 +52,74 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
           </Link>
         }
         title={doc.title}
-        lede={`Effective ${doc.effective} · version ${doc.versions[0]?.version ?? ""}`}
+        lede={doc.summary}
       />
       <PageBody>
-        <Prose blocks={doc.blocks} />
+        {/* A legal document had no table of contents and an empty right 40%
+            of the page. The side column now carries "On this page" and the
+            document's facts; the TOC lists the h2s only (h3s made it a wall). */}
+        <ContentLayout
+          prose={false}
+          meta={`Effective ${doc.effective} · version ${doc.versions[0]?.version ?? ""}`}
+          anchors={[
+            ...tocOf(doc.blocks)
+              .filter((heading) => heading.level === 2)
+              .map((heading) => ({ id: heading.id, label: heading.text })),
+            { id: "version-history", label: "Version history" },
+          ]}
+          aside={
+            <>
+              {/* The grievance page carries the operator card too: it is where
+                every footer's "Grievances" link lands. */}
+              {slug === "grievances" ? (
+                <OperatorIdentityCard headingId="operator-identity" grievanceLink={false} />
+              ) : null}
+              <SideCard
+                headingId="doc-facts"
+                title="This document"
+                icon={<IconFile size={20} weight="duotone" />}
+              >
+                <dl className="pk-side-facts">
+                  <div>
+                    <dt>Effective</dt>
+                    <dd>{doc.effective}</dd>
+                  </div>
+                  <div>
+                    <dt>Version</dt>
+                    <dd>{doc.versions[0]?.version ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>Beta draft</dd>
+                  </div>
+                </dl>
+                <p className="no-print">
+                  <Link href="/legal">All legal documents</Link>
+                </p>
+              </SideCard>
+            </>
+          }
+        >
+          <div className="cl-prose-doc">
+            <Prose blocks={doc.blocks} />
+          </div>
 
-        <section className="content-section" aria-labelledby="version-history">
-          <h2 id="version-history" className="prose-h2">
-            Version history
-          </h2>
-          <dl className="prose-dl">
-            {doc.versions.map((version) => (
-              <div key={version.version} className="prose-dl-row">
-                <dt>
-                  {version.version} — {version.date}
-                </dt>
-                <dd>{version.note}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+          <section className="content-section" aria-labelledby="version-history">
+            <h2 id="version-history" className="prose-h2">
+              Version history
+            </h2>
+            <dl className="prose-dl">
+              {doc.versions.map((version) => (
+                <div key={version.version} className="prose-dl-row">
+                  <dt>
+                    {version.version} — {version.date}
+                  </dt>
+                  <dd>{version.note}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </ContentLayout>
       </PageBody>
     </main>
   );

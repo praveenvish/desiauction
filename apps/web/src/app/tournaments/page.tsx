@@ -1,17 +1,4 @@
-import {
-  ButtonLink,
-  Card,
-  IconAlert,
-  IconArrowRight,
-  IconCalendar,
-  IconPlay,
-  IconTile,
-  IconTrophy,
-  IconUsers,
-  StatCard,
-  StatGrid,
-} from "@desiauction/ui";
-import Link from "next/link";
+import { ButtonLink, Card, IconTrophy } from "@desiauction/ui";
 import { enabledSports } from "../../server/competition/sports";
 import { redirect } from "next/navigation";
 
@@ -27,11 +14,6 @@ import "../seasons/seasons.css";
 import "./tournaments.css";
 
 export const metadata = { title: "Tournaments · DesiAuction" };
-
-/** `Stat` never formats a number itself (C-7) — the caller owns the locale. */
-function count(value: number): string {
-  return value.toLocaleString("en-IN");
-}
 
 /**
  * The tournaments index — rail slot 2, built to Tournaments & Orgs.dc.html.
@@ -161,61 +143,8 @@ export default async function TournamentsPage({
     </FormDialog>
   );
 
-  /*
-   * ONE summary, whichever view is showing (founder mockup, 2026-09-19). The
-   * index used to swap between a tournament band and a season band; both led
-   * with counts of the same rows in different units. The four figures that
-   * matter are all about seasons — how many, how many taking entries, how many
-   * in flight, and the one to-do — and the tournament count rides the first
-   * card's hint rather than taking a card of its own.
-   */
-  const tournamentsHint =
-    view.totals.tournaments === 0
-      ? "All one-off seasons"
-      : `Across ${count(view.totals.tournaments)} tournament${view.totals.tournaments === 1 ? "" : "s"}`;
+  // Only what THIS person may decide (`registration.review`).
   const pending = view.canReviewAnywhere ? view.totals.pending : 0;
-  const summary = (
-    <StatGrid testId="tg-summary">
-      <StatCard
-        icon={<IconCalendar />}
-        tone="gold"
-        value={count(view.totals.seasons)}
-        label="Total seasons"
-        hint={tournamentsHint}
-      />
-      <StatCard
-        icon={<IconUsers />}
-        tone="green"
-        value={count(view.totals.open)}
-        label="Accepting entries"
-        hint={view.totals.open === 0 ? "Nobody taking entries" : "Players can register"}
-      />
-      <StatCard
-        icon={<IconPlay />}
-        tone="blue"
-        value={count(view.totals.inFlight)}
-        label="In flight"
-        hint="In setup or open"
-      />
-      {/* The only figure here that is a to-do rather than a fact, and it
-          counts only what THIS person may decide: a viewer holding no
-          `registration.review` was once shown "2 awaiting your decision" over
-          a decision that was never theirs to make. */}
-      <StatCard
-        icon={<IconAlert />}
-        tone={pending > 0 ? "amber" : "neutral"}
-        value={count(pending)}
-        label="Registrations to review"
-        hint={
-          !view.canReviewAnywhere
-            ? "Owners and staff review these"
-            : pending === 0
-              ? "Nothing waiting"
-              : "Awaiting approval"
-        }
-      />
-    </StatGrid>
-  );
 
   const featuredNode =
     featured === null ? null : (
@@ -281,42 +210,13 @@ export default async function TournamentsPage({
             </div>
           </Card>
         ) : (
-          <>
-            <TournamentsBrowser
-              groups={groups}
-              initialMode={mode}
-              summary={summary}
-              featured={featuredNode}
-              {...(canCreate ? { actionGrouped: newTournament, actionSeasons: newSeason } : {})}
-            />
-
-            {canCreate ? (
-              <section className="tg-cta" aria-labelledby="tg-cta-title">
-                <IconTile icon={<IconTrophy />} tone="gold" size="lg" />
-                <div className="tg-cta-text">
-                  <h2 id="tg-cta-title">Looking to create a new season?</h2>
-                  <p>Run another edition, invite more players and keep the excitement going.</p>
-                </div>
-                <FormDialog
-                  title="New season"
-                  triggerLabel="+ New season"
-                  variant="secondary"
-                  size="touch"
-                  triggerTestId="cta-new-season"
-                >
-                  <CreateCompetitionForm sports={sportOptions} orgs={createIn} />
-                </FormDialog>
-              </section>
-            ) : null}
-
-            <p className="tg-footnote">
-              Need help managing tournaments?{" "}
-              <Link href="/help">
-                Visit our help center
-                <IconArrowRight size={14} />
-              </Link>
-            </p>
-          </>
+          <TournamentsBrowser
+            groups={groups}
+            initialMode={mode}
+            pendingReview={pending}
+            featured={featuredNode}
+            {...(canCreate ? { actionGrouped: newTournament, actionSeasons: newSeason } : {})}
+          />
         )}
       </div>
     </main>

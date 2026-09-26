@@ -1,9 +1,12 @@
 "use client";
+
+import { ScrollStrip } from "@desiauction/ui";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconArrowRight, IconCheck, IconGavel, IconRefresh, IconTrophy } from "./icons";
 import { track } from "../../lib/telemetry";
 import styles from "../../app/guest-home.module.css";
+import { exactINR } from "../../lib/inr";
 
 /** Content remains visible before hydration and when motion is disabled. */
 export function HomeMotion({ children }: { children: ReactNode }) {
@@ -24,12 +27,12 @@ export function HomeMotion({ children }: { children: ReactNode }) {
     };
   }, []);
   /*
-   * SCROLL REVEAL. The waiting pose (lower, softly blurred) only applies once
-   * this runs — `data-motion="ready"` on the root — so the server-rendered page
-   * is complete and still before hydration, with JS off, and under reduced
+   * SCROLL REVEAL. The waiting pose (24px lower) only applies once this runs
+   * — `data-motion="ready"` on the root — so the server-rendered page is
+   * complete and still before hydration, with JS off, and under reduced
    * motion. Siblings get an index so a row of cards arrives as a wave, not a
-   * block. Text is never faded: axe measures contrast mid-animation, so text
-   * poses are transform + blur only (see guest-home.module.css).
+   * block. Transform only: no blur, no opacity (axe samples contrast
+   * mid-animation, and a pose that never resolves must still be readable).
    */
   useEffect(() => {
     const node = root.current;
@@ -39,18 +42,32 @@ export function HomeMotion({ children }: { children: ReactNode }) {
       !("IntersectionObserver" in window)
     )
       return;
-    const targets = Array.from(node.querySelectorAll<HTMLElement>("[data-reveal]"));
+    /*
+     * FAIL OPEN. Only what is BELOW the fold at load ever waits, and the
+     * waiting pose is transform-only (24px lower) — never blurred, never
+     * transparent. Anything already on screen is simply shown. So a render
+     * that never scrolls (a link unfurler, print, a full-page screenshot, a
+     * slow device mid-hydration) sees the whole page, sharp.
+     */
+    const fold = window.innerHeight;
+    const targets = Array.from(node.querySelectorAll<HTMLElement>("[data-reveal]")).filter(
+      (element) => element.getBoundingClientRect().top > fold,
+    );
     for (const element of targets) {
       const siblings = Array.from(element.parentElement?.children ?? []).filter((child) =>
         child.hasAttribute("data-reveal"),
       );
       element.style.setProperty("--reveal-i", String(Math.min(siblings.indexOf(element), 5)));
+      element.dataset.reveal = "wait";
     }
+    const reveal = (element: Element) => {
+      element.setAttribute("data-revealed", "true");
+    };
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            entry.target.setAttribute("data-revealed", "true");
+            reveal(entry.target);
             observer.unobserve(entry.target);
           }
         }
@@ -61,7 +78,22 @@ export function HomeMotion({ children }: { children: ReactNode }) {
     targets.forEach((element) => {
       observer.observe(element);
     });
+    // Safety nets: printing shows everything; and anything that is in view
+    // but somehow was not reported (a missed observer tick, a jump-scroll)
+    // settles within 1.5s rather than waiting in its pose.
+    const revealAll = () => {
+      targets.forEach(reveal);
+    };
+    const safety = window.setTimeout(() => {
+      for (const element of targets) {
+        const box = element.getBoundingClientRect();
+        if (box.top < window.innerHeight && box.bottom > 0) reveal(element);
+      }
+    }, 1500);
+    window.addEventListener("beforeprint", revealAll);
     return () => {
+      window.clearTimeout(safety);
+      window.removeEventListener("beforeprint", revealAll);
       observer.disconnect();
       delete node.dataset.motion;
     };
@@ -103,7 +135,8 @@ export function HomeMotion({ children }: { children: ReactNode }) {
 }
 
 type SportOption = { key: string; label: string; role: string };
-const money = (value: number) => `₹${value.toLocaleString("en-IN")}`;
+/** The mock purse in rupees, through the product's one rupee formatter. */
+const money = (value: number) => exactINR(value * 100);
 
 /**
  * THE DEMO NEEDS A RIVAL.
@@ -162,7 +195,7 @@ export function StickyCta({ href, label }: { href: string; label: string }) {
         tabIndex={visible ? undefined : -1}
         data-track="sticky:signup"
       >
-        {label} <IconArrowRight size={18} />
+        {label} <IconArrowRight size={20} />
       </Link>
     </div>
   );
@@ -253,7 +286,7 @@ export function AuctionLab({
             Pick yours, then run a mock auction.
           </p>
         </div>
-        <div
+        <ScrollStrip
           className={styles.sportsGrid}
           role="group"
           aria-label="Choose a sport for the auction demo"
@@ -272,12 +305,12 @@ export function AuctionLab({
               <span>{item.label}</span>
               {selected === item.key && (
                 <span className={styles.sportCheck}>
-                  <IconCheck size={12} />
+                  <IconCheck size={16} />
                 </span>
               )}
             </button>
           ))}
-        </div>
+        </ScrollStrip>
         <div className={styles.demoLayout}>
           <div className={styles.demoCopy} data-reveal>
             <p className={styles.eyebrow}>
@@ -294,7 +327,7 @@ export function AuctionLab({
             </p>
             <p>On auction night, owners do this from their phones while the room watches.</p>
             <Link className={styles.textLink} href="/help/conducting-the-auction">
-              See how a real auction works <IconArrowRight size={17} />
+              See how a real auction works <IconArrowRight size={16} />
             </Link>
           </div>
           <div id="demo-auction" className={styles.auctionStage}>
@@ -327,7 +360,7 @@ export function AuctionLab({
                 <p>{status}</p>
                 {sold && (
                   <span className={styles.soldStamp}>
-                    SOLD <IconCheck size={17} />
+                    SOLD <IconCheck size={16} />
                   </span>
                 )}
               </div>
@@ -340,14 +373,14 @@ export function AuctionLab({
                       {sold ? "Player signed" : falconsLead ? "Leading · you" : "Your team"}
                     </small>
                   </span>
-                  {falconsLead && <IconTrophy size={15} />}
+                  {falconsLead && <IconTrophy size={16} />}
                 </div>
                 <div data-leading={voyagersLead}>
                   <span className={styles.teamBadge}>V</span>
                   <span>
                     Voyagers<small>{voyagersLead ? "Leading bid" : "Rival owner"}</small>
                   </span>
-                  {voyagersLead && <IconTrophy size={15} />}
+                  {voyagersLead && <IconTrophy size={16} />}
                 </div>
               </div>
               {sold ? (
@@ -363,7 +396,7 @@ export function AuctionLab({
                     </span>
                   </Link>
                   <button type="button" className={styles.againButton} onClick={reset}>
-                    <IconRefresh size={15} /> Try again
+                    <IconRefresh size={16} /> Try again
                   </button>
                 </div>
               ) : (

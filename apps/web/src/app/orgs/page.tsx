@@ -2,17 +2,21 @@ import {
   Card,
   IconCalendar,
   IconChevronRight,
-  IconPlus,
   IconShieldCheck,
+  IconTrophy,
   IconUsers,
+  ListRow,
   Pill,
+  SectionCard,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { FormDialog } from "../../components/form-dialog";
 import { currentSession } from "../../server/auth/actions";
+import { memberCompetitions } from "../../server/competition/resolve";
 import { myOrgCards } from "../../server/orgs/actions";
+import { dateRange } from "../tournaments/season-card";
 import { CreateOrgForm } from "./create-org-form";
 import "./orgs.css";
 
@@ -64,7 +68,16 @@ export default async function OrgsPage({
   if (session === null) {
     redirect("/login?next=/orgs");
   }
-  const [orgs, params] = await Promise.all([myOrgCards(), searchParams]);
+  const [orgs, params, seasons] = await Promise.all([
+    myOrgCards(),
+    searchParams,
+    memberCompetitions(session.personId),
+  ]);
+  /* The page used to end after the club cards (~700px of canvas). The most
+     useful next object is where those clubs' work is: their latest seasons. */
+  const recent = [...seasons]
+    .sort((a, b) => (b.startsOn ?? "").localeCompare(a.startsOn ?? ""))
+    .slice(0, 5);
 
   /* Empty was two interactive elements and ~850px of grey: a "+ New
      organization" button in the page-action slot, a "Create an organization"
@@ -124,64 +137,90 @@ export default async function OrgsPage({
 
         {/* One card per club (founder mockups): the crest, the name and the
             reader's standing, then the three figures that say how big it is.
-            The create affordance is the last card of the same grid. */}
-        <div className="org-cards" data-testid="orgs-list">
-          {orgs.map((org) => (
-            <Link
-              key={org.id}
-              href={`/org/${org.slug}`}
-              className="org-card"
-              // Named for where it GOES; the figures inside are decoration for
-              // assistive technology (the old row read as one long sentence).
-              aria-label={`${org.name} — you are ${org.role === "Owner" ? "an owner" : `a ${org.role.toLowerCase()}`}`}
+            One create door: the page's "+ New club" (round 2 dropped the
+            dashed tile that repeated it). */}
+        {/* A club or two beside their latest seasons (round 5A): stacked, one
+            club card and a one-row list ended the page at y≈400 with the right
+            two-thirds of the canvas blank. Many clubs keep the full-width grid. */}
+        <div className="orgs-duo" data-duo={orgs.length <= 2 && recent.length > 0 ? "" : undefined}>
+          <div className="org-cards da-stagger" data-testid="orgs-list">
+            {orgs.map((org) => (
+              <Link
+                key={org.id}
+                href={`/org/${org.slug}`}
+                className="org-card da-lift"
+                // Named for where it GOES; the figures inside are decoration for
+                // assistive technology (the old row read as one long sentence).
+                aria-label={`${org.name} — you are ${org.role === "Owner" ? "an owner" : `a ${org.role.toLowerCase()}`}`}
+              >
+                <span className="org-card-top" aria-hidden>
+                  <span className="org-monogram">{monogram(org.name)}</span>
+                  <span className="org-card-id">
+                    <strong>{org.name}</strong>
+                    <span className="org-slug">/{org.slug}</span>
+                  </span>
+                  <Pill tone={org.role === "Owner" ? "gold" : "neutral"}>{org.role}</Pill>
+                </span>
+                <span className="org-card-figures" aria-hidden>
+                  <span className="org-card-figure">
+                    <IconCalendar size={16} />
+                    <b>{org.seasons}</b> {count(org.seasons, "season")}
+                  </span>
+                  <span className="org-card-figure">
+                    <IconShieldCheck size={16} />
+                    <b>{org.teams}</b> {count(org.teams, "team")}
+                  </span>
+                  <span className="org-card-figure">
+                    <IconUsers size={16} />
+                    <b>{org.members}</b> {count(org.members, "member")}
+                  </span>
+                  <span className="org-card-go">
+                    <IconChevronRight size={18} />
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+
+          {recent.length > 0 ? (
+            <SectionCard
+              icon={<IconTrophy />}
+              concept="season"
+              title="Latest seasons"
+              description={
+                seasons.length > recent.length
+                  ? `The newest ${String(recent.length)} of ${String(seasons.length)} across your clubs`
+                  : "Across your clubs"
+              }
+              action={
+                <Link href="/tournaments" className="orgs-more">
+                  All tournaments
+                </Link>
+              }
+              flush
+              data-testid="orgs-recent-seasons"
             >
-              <span className="org-card-top" aria-hidden>
-                <span className="org-monogram">{monogram(org.name)}</span>
-                <span className="org-card-id">
-                  <strong>{org.name}</strong>
-                  <span className="org-slug">/{org.slug}</span>
-                </span>
-                <Pill tone={org.role === "Owner" ? "gold" : "neutral"}>{org.role}</Pill>
-              </span>
-              <span className="org-card-figures" aria-hidden>
-                <span className="org-card-figure">
-                  <IconCalendar size={16} />
-                  <b>{org.seasons}</b> {count(org.seasons, "season")}
-                </span>
-                <span className="org-card-figure">
-                  <IconShieldCheck size={16} />
-                  <b>{org.teams}</b> {count(org.teams, "team")}
-                </span>
-                <span className="org-card-figure">
-                  <IconUsers size={16} />
-                  <b>{org.members}</b> {count(org.members, "member")}
-                </span>
-                <span className="org-card-go">
-                  <IconChevronRight size={18} />
-                </span>
-              </span>
-            </Link>
-          ))}
-          {/* One click opens the modal rather than scrolling to a pinned card. */}
-          <FormDialog
-            title="New club"
-            triggerLabel={
-              <>
-                <span className="org-add-plus" aria-hidden>
-                  <IconPlus size={20} />
-                </span>
-                <span className="org-add-text">
-                  <strong>Create a club</strong>
-                  <span>A club or academy of your own.</span>
-                </span>
-              </>
-            }
-            triggerAsLink
-            triggerClassName="org-card org-card--add"
-            triggerTestId="create-org-row"
-          >
-            <CreateOrgForm />
-          </FormDialog>
+              <ul className="orgs-seasons">
+                {recent.map((season) => (
+                  <li key={season.id}>
+                    <ListRow
+                      href={`/seasons/${season.slug}`}
+                      linkComponent={Link}
+                      title={season.name}
+                      meta={[
+                        season.orgName,
+                        dateRange(season.startsOn, season.endsOn),
+                        season.location,
+                      ]
+                        .filter((part): part is string => part !== null && part !== "")
+                        .join(" · ")}
+                      figure={<IconChevronRight size={16} aria-hidden />}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          ) : null}
         </div>
       </div>
     </main>

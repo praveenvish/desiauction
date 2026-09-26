@@ -222,8 +222,11 @@ export function ControlToggle({
       />
       <span className="notify-switch-text">
         <span className="notify-switch-label">
-          {label}
-          <span className="admin-sr-only"> — {kindLabel}</span>
+          {/* The column head says "Opt-out"; the row says who. */}
+          <span aria-hidden>{side === "person" ? "People" : "Clubs"}</span>
+          <span className="admin-sr-only">
+            {label} — {kindLabel}
+          </span>
         </span>
       </span>
     </label>
@@ -250,7 +253,7 @@ export function ChannelControl({
     return (
       <Button
         variant="secondary"
-        size="touch"
+        size="sm"
         loading={pending}
         onClick={() => {
           run(() => setChannelSwitch(channel, true));
@@ -263,16 +266,19 @@ export function ChannelControl({
   }
   return (
     <>
+      {/* Quiet until it is needed: a kill switch is an incident tool, and four
+          full buttons in a row read as the page's main action. */}
       <Button
-        variant="secondary"
-        size="touch"
+        variant="ghost"
+        size="sm"
         onClick={() => {
           setReason("");
           setOpen(true);
         }}
+        aria-label={`Switch ${label} off…`}
         data-testid={`notify-channel-off-${channel}`}
       >
-        Switch {label} off…
+        Switch off…
       </Button>
       <Dialog
         open={open}
@@ -333,8 +339,8 @@ export function RevertButton({ auditId, summary }: { auditId: string; summary: s
   const { pending, run } = useRun();
   return (
     <Button
-      variant="secondary"
-      size="touch"
+      variant="ghost"
+      size="sm"
       loading={pending}
       onClick={() => {
         run(() => revertNotificationSwitch(auditId));

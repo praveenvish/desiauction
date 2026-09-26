@@ -1,4 +1,4 @@
-import { ButtonLink, ToastProvider } from "@desiauction/ui";
+import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { cockpitView } from "../../../../../server/auction/conduct-actions";
@@ -18,17 +18,17 @@ export default async function EnginePage({ params }: { params: Promise<{ slug: s
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <header className="dash-head">
-            <div className="competition-title-row title-row-actions">
-              <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
-                Cockpit
-              </ButtonLink>
-            </div>
-            <p className="competitions-hint">
-              {view.auctionName} — read-only engine truth: replay, queue, hashes, watchdog
-            </p>
-          </header>
-          <EnginePanel slug={slug} />
+          {/* No head band: the identity bar names the page, and the one door
+              (Cockpit) rides in the health card. First data used to start at
+              y≈400 on a laptop. */}
+          <EnginePanel
+            slug={slug}
+            record={{
+              status: view.view.auction.status,
+              events: view.view.eventCount,
+              lots: view.view.lots.length,
+            }}
+          />
         </div>
       </main>
     </ToastProvider>

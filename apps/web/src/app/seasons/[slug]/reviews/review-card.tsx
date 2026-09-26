@@ -2,6 +2,7 @@ import { IconStar, IconStarOutline, IconUser, Pill } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
 import type { PublishedReview } from "../../../../server/reviews/season";
+import { formatDate } from "../../../../lib/format-date";
 
 /**
  * One published review, as the console shows it: who (only as far as they
@@ -33,12 +34,7 @@ export function Stars({ rating, decorative = false }: { rating: number; decorati
 }
 
 function when(date: Date): string {
-  return date.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatDate(date);
 }
 
 function initials(name: string): string {

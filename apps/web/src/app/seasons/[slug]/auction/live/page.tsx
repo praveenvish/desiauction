@@ -59,9 +59,13 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
                 <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
                   Spectate
                 </ButtonLink>
-                <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
-                  Auction setup
-                </ButtonLink>
+                {/* The setup page is the organizer's desk. An owner reached a
+                    page that is not theirs from the foot of their own room. */}
+                {view.viewer.canConduct ? (
+                  <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
+                    Auction setup
+                  </ButtonLink>
+                ) : null}
               </nav>
             }
           />

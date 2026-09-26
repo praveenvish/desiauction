@@ -262,7 +262,7 @@ export function ResultsCard({
   return (
     <SectionCard
       icon={<IconTrophy />}
-      tone="green"
+      concept="results"
       title="Results"
       description={
         played.some(isLobbyFixture)

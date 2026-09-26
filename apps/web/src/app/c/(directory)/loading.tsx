@@ -21,20 +21,19 @@ import "../directory.css";
 export default function DirectoryLoading() {
   return (
     <main className="public-page mk">
-      <header className="public-hero public-head" data-theme="floodlight">
-        <div className="mk-container public-hero-inner">
-          <p className="mk-kicker">{DIRECTORY_KICKER}</p>
-          <h1>Tournaments</h1>
-          <p className="public-sub">{DIRECTORY_DESCRIPTION}</p>
-          <div className="public-controls public-controls-loading">
-            <Skeleton height="44px" style={{ borderRadius: "var(--radius-md)" }} />
-            <Skeleton height="32px" width="60%" style={{ borderRadius: "var(--radius-full)" }} />
+      <header className="pk-hero" data-theme="floodlight" data-size="compact">
+        <div className="pk-hero-inner">
+          <div className="pk-hero-copy">
+            <p className="pk-eyebrow">{DIRECTORY_KICKER}</p>
+            <h1 className="pk-hero-title">Tournaments</h1>
+            <p className="pk-hero-lede">{DIRECTORY_DESCRIPTION}</p>
           </div>
         </div>
       </header>
       <div className="public-body">
         <div className="mk-container">
           <div className="public-results">
+            <Skeleton height="44px" style={{ borderRadius: "var(--radius-md)" }} />
             <p className="public-count" role="status">
               Loading tournaments…
             </p>

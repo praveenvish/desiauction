@@ -1,5 +1,6 @@
 import { PROFILE_ITEMS, type ProfileCompleteness, type ProfileItem } from "@desiauction/core";
 import {
+  IconChevronDown,
   IconCheckCircle,
   IconChevronRight,
   IconCircle,
@@ -64,7 +65,18 @@ export interface AccountHeroProps {
   facts: { key: string; icon: ReactNode; value: string; label: string }[];
   /** The sign-out form, which must be a client component to sweep localStorage. */
   signOut: ReactNode;
+  /**
+   * False for someone who runs a club, owns a team or conducts — and does not
+   * play: their checklist is the account's own items (name, email, passkey),
+   * not "Playing role" and "Batting or bowling style" (review r3).
+   */
+  playerItems?: boolean;
+  /** The door to this person's record — "My sports" or "My teams" — or none. */
+  recordLink?: { href: string; label: string } | null;
 }
+
+/** What an account that does not play is asked to finish. */
+const ACCOUNT_ITEMS: readonly ProfileItem[] = ["name", "email", "passkey"];
 
 export function AccountHero({
   personId,
@@ -78,12 +90,21 @@ export function AccountHero({
   hasRegistrations,
   facts,
   signOut,
+  playerItems = true,
+  recordLink = { href: "/me", label: "My sports" },
 }: AccountHeroProps) {
   const hasName = name !== null && name.trim() !== "";
   const missing = new Set(completeness.missing);
-  const percent = Math.round((completeness.done / Math.max(1, completeness.total)) * 100);
-  const progressLabel = `Profile ${String(completeness.done)} of ${String(completeness.total)}`;
-  const left = completeness.total - completeness.done;
+  const items = playerItems
+    ? PROFILE_ITEMS
+    : PROFILE_ITEMS.filter((item) => ACCOUNT_ITEMS.includes(item));
+  const total = items.length;
+  const doneCount = items.filter((item) => !missing.has(item)).length;
+  const percent = Math.round((doneCount / Math.max(1, total)) * 100);
+  const progressLabel = playerItems
+    ? `Profile ${String(doneCount)} of ${String(total)}`
+    : `Account ${String(doneCount)} of ${String(total)}`;
+  const left = total - doneCount;
 
   return (
     <div className="acct-top">
@@ -158,19 +179,21 @@ export function AccountHero({
             ) : null}
           </div>
         </div>
-        <ul className="acct-id-facts" aria-label="Your account at a glance">
-          {facts.map((fact) => (
-            <li key={fact.key}>
-              <span className="acct-id-fact-icon" aria-hidden>
-                {fact.icon}
-              </span>
-              <span className="acct-id-fact-text">
-                <span className="acct-id-fact-value">{fact.value}</span>
-                <span className="acct-id-fact-label">{fact.label}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        {facts.length === 0 ? null : (
+          <ul className="acct-id-facts" aria-label="Your account at a glance">
+            {facts.map((fact) => (
+              <li key={fact.key}>
+                <span className="acct-id-fact-icon" aria-hidden>
+                  {fact.icon}
+                </span>
+                <span className="acct-id-fact-text">
+                  <span className="acct-id-fact-value">{fact.value}</span>
+                  <span className="acct-id-fact-label">{fact.label}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="acct-id-foot">
           <p className="acct-id-note">
             {/* "Arrives with your FIRST registration" was said to people who had
@@ -183,9 +206,11 @@ export function AccountHero({
                 : "Your photo arrives with your first season registration."}
           </p>
           <div className="acct-id-actions">
-            <Link href="/me" className="acct-link">
-              My sports <IconChevronRight size={14} aria-hidden />
-            </Link>
+            {recordLink === null ? null : (
+              <Link href={recordLink.href} className="acct-link">
+                {recordLink.label} <IconChevronRight size={14} aria-hidden />
+              </Link>
+            )}
             {signOut}
           </div>
         </div>
@@ -206,43 +231,55 @@ export function AccountHero({
           hint={
             left === 0
               ? "Everything the product uses is filled in"
-              : "Each one saves a question at your next registration"
+              : playerItems
+                ? "Each one saves a question at your next registration"
+                : "Each one makes signing in and receipts smoother"
           }
           progress={percent}
           testId="profile-completion"
         />
-        <ul className="acct-checklist" aria-label="Profile checklist">
-          {PROFILE_ITEMS.map((item) => {
-            const done = !missing.has(item);
-            const { label, hint, href } = ITEM_LABELS[item];
-            const body = (
-              <>
-                {done ? (
-                  <IconCheckCircle size={16} className="acct-check-icon" aria-hidden />
-                ) : (
-                  <IconCircle size={16} className="acct-check-icon" aria-hidden />
-                )}
-                <span className="acct-check-text">
-                  <span>{label}</span>
-                  {!done && hint !== undefined ? (
-                    <span className="acct-check-hint">{hint}</span>
-                  ) : null}
-                </span>
-              </>
-            );
-            return (
-              <li key={item} data-done={done}>
-                {!done && href !== undefined ? (
-                  <a href={href} className="acct-check-row">
-                    {body}
-                  </a>
-                ) : (
-                  <span className="acct-check-row">{body}</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        {/* ONE CARD, FOLDED (round 5). The eight-item checklist stood in its
+            own card above every form — on a phone, a screen of circles before
+            the first field. Its count leads; the items open on a tap. A laptop
+            that can style the fold shows them open beside the identity card. */}
+        <details className="acct-check-fold">
+          <summary className="acct-check-summary">
+            <span>{left === 0 ? "See the checklist" : `See the ${String(left)} left`}</span>
+            <IconChevronDown size={16} aria-hidden />
+          </summary>
+          <ul className="acct-checklist" aria-label="Profile checklist">
+            {items.map((item) => {
+              const done = !missing.has(item);
+              const { label, hint, href } = ITEM_LABELS[item];
+              const body = (
+                <>
+                  {done ? (
+                    <IconCheckCircle size={16} className="acct-check-icon" aria-hidden />
+                  ) : (
+                    <IconCircle size={16} className="acct-check-icon" aria-hidden />
+                  )}
+                  <span className="acct-check-text">
+                    <span>{label}</span>
+                    {!done && hint !== undefined ? (
+                      <span className="acct-check-hint">{hint}</span>
+                    ) : null}
+                  </span>
+                </>
+              );
+              return (
+                <li key={item} data-done={done}>
+                  {!done && href !== undefined ? (
+                    <a href={href} className="acct-check-row">
+                      {body}
+                    </a>
+                  ) : (
+                    <span className="acct-check-row">{body}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       </div>
     </div>
   );

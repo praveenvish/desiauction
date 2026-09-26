@@ -78,6 +78,9 @@
 
 .acct-id-main {
   position: relative;
+  /* The card stretches to the checklist beside it on a laptop; the identity
+     takes the spare height (centred) instead of a band of blank above the foot. */
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-5);
@@ -161,7 +164,10 @@
   position: relative;
   margin-top: auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* One to three facts share the full width, on a phone too (they used to
+     fill two of three fixed columns). */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: var(--space-3);
   margin-bottom: 0;
   padding: 0;
@@ -252,27 +258,96 @@
   text-decoration: underline;
 }
 
+/* ONE CARD (round 5): the count, then the checklist folded under it. It was
+   two cards — the figure, and a grid of items with a ragged right column. */
 .acct-strength {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
   min-width: 0;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+.acct-strength > [data-testid="profile-completion"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.acct-check-fold {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.acct-check-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  list-style: none;
+  cursor: pointer;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.acct-check-summary::-webkit-details-marker {
+  display: none;
+}
+
+.acct-check-summary svg {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.acct-check-fold[open] .acct-check-summary svg {
+  transform: rotate(180deg);
+}
+
+.acct-check-summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .acct-checklist {
   box-sizing: border-box;
-  flex: 1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
   gap: 0 var(--space-3);
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: 0 var(--space-4) var(--space-3);
   list-style: none;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-1);
+}
+
+/* Four items or fewer read as one column — three in two columns left a
+   ragged hole beside the last. */
+.acct-checklist:not(:has(> li:nth-child(5))) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A laptop has the room: the fold stands open beside the identity card, and
+   its summary stands down. Where the browser cannot style the fold's
+   content, the summary stays and the list opens on a click, as on a phone. */
+@supports selector(::details-content) {
+  @media (min-width: 1024px) {
+    .acct-check-fold::details-content {
+      content-visibility: visible;
+    }
+
+    .acct-check-summary {
+      display: none;
+    }
+
+    .acct-checklist {
+      padding-top: var(--space-2);
+    }
+  }
 }
 
 .acct-check-row {
@@ -362,11 +437,28 @@ a.acct-check-row:hover {
 
 /* ---- the two columns --------------------------------------------------------- */
 
+/* One reading column; the section index rides beside it on a laptop and
+   sticks under the header on a phone. */
+.acct-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.acct-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-block: var(--space-2);
+  background: var(--surface);
+}
+
 .acct-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-5);
-  align-items: start;
+  min-width: 0;
 }
 
 .acct-column {
@@ -377,8 +469,37 @@ a.acct-check-row:hover {
 }
 
 @media (min-width: 1100px) {
-  .acct-columns {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .acct-body {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: var(--space-8);
+    align-items: start;
+  }
+
+  .acct-nav {
+    top: var(--space-4);
+    padding: 0;
+    background: none;
+  }
+
+  .acct-nav ul {
+    flex-direction: column;
+    gap: 2px;
+    overflow: visible;
+  }
+
+  .acct-nav a {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 36px;
+    border-color: transparent;
+    background: none;
+    border-radius: var(--radius-md);
+  }
+
+  .acct-nav a:hover {
+    border-color: transparent;
+    background: var(--surface-sunken);
   }
 }
 
@@ -568,7 +689,6 @@ a.acct-check-row:hover {
   color: var(--text-heading);
 }
 
-.acct-block-empty,
 .security-intro,
 .security-note {
   margin: 0;
@@ -970,4 +1090,140 @@ a.acct-check-row:hover {
   .events .security-meta {
     text-align: start;
   }
+}
+
+/* ROUND 2: a single fact ("16 devices signed in") sat in a 90px tile under
+   an otherwise empty band. One fact is a line, not a tile. */
+.acct-id-facts:has(> li:only-child) {
+  display: flex;
+}
+
+.acct-id-facts > li:only-child {
+  padding: 0;
+  background: none;
+}
+
+.acct-id-facts > li:only-child .acct-id-fact-text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.acct-id-facts > li:only-child .acct-id-fact-value {
+  font-size: var(--text-md-size);
+}
+
+.acct-id-facts > li:only-child .acct-id-fact-label {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* Three facts on a 390 phone: icon over figure, so "Seasons entered" keeps
+   one line instead of wrapping beside a 32px tile. */
+@media (max-width: 479px) {
+  .acct-id-facts li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  /* Round 5: the figure and its word are the fact; the icon tile above them
+     doubled each tile's height on the longest page a phone has. */
+  .acct-id-facts li .acct-id-fact-icon {
+    display: none;
+  }
+}
+
+/* Someone who runs, owns or conducts and does not play: the player forms,
+   folded under one line instead of three full cards asking how they bat. */
+.acct-fold {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.acct-fold > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-5);
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.acct-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.acct-fold > summary strong {
+  color: var(--text-heading);
+}
+
+.acct-fold > summary::after {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.acct-fold[open] > summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.acct-fold > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.acct-fold-body {
+  display: grid;
+  gap: var(--space-5);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* An empty list inside a form reads left-set, like the rows it stands in for. */
+.acct-empty-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.acct-empty-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.acct-empty-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.acct-empty-text h4 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
 }

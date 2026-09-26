@@ -212,13 +212,14 @@
 }
 
 .article-toc h2 {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   color: var(--text-muted);
   margin: 0 0 var(--space-3);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .article-toc ul {
@@ -271,6 +272,13 @@
   flex-wrap: wrap;
   gap: var(--space-3);
   margin: var(--space-6) 0;
+}
+
+/* In a side card the actions share one width: a primary and a secondary of
+   different intrinsic widths read as a mistake on a phone. */
+.cl-side .content-actions > * {
+  flex: 1 1 100%;
+  justify-content: center;
 }
 
 .content-card {
@@ -367,7 +375,9 @@ a.content-card:focus-visible {
   max-width: 620px;
   padding: var(--space-2);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
+  /* The site's field radius, not a pill: the search bar was the one
+     rounded-full input on the site (round 5). */
+  border-radius: var(--radius-lg);
   background: var(--surface-raised);
   box-shadow: var(--shadow-1);
   transition:
@@ -387,7 +397,7 @@ a.content-card:focus-visible {
   min-width: 0;
   padding: var(--space-2) var(--space-4);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-primary);
   font: inherit;
@@ -401,7 +411,7 @@ a.content-card:focus-visible {
 .content-searchbar button {
   padding: var(--space-2) var(--space-6);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: var(--accent);
   color: var(--text-on-accent, #06210a);
   font: inherit;
@@ -455,7 +465,8 @@ a.content-card:focus-visible {
 
 .search-result-section {
   color: var(--text-muted);
-  font-family: var(--font-mono);
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
   font-size: var(--text-xs-size);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -551,18 +562,21 @@ a.content-card:focus-visible {
   outline-offset: 2px;
 }
 
+/* A drawn chevron, not a typed "+" glyph (one icon language). */
 .faq-item summary::after {
-  content: "+";
+  content: "";
   flex: none;
-  font-family: var(--font-mono);
-  font-size: var(--text-xl-size);
-  line-height: 1;
-  color: var(--text-accent);
+  inline-size: 8px;
+  block-size: 8px;
+  margin-right: 4px;
+  border-right: 2px solid var(--text-accent);
+  border-bottom: 2px solid var(--text-accent);
+  transform: translateY(-2px) rotate(45deg);
   transition: transform var(--duration-fast) var(--ease-out);
 }
 
 .faq-item[open] summary::after {
-  transform: rotate(45deg);
+  transform: translateY(2px) rotate(-135deg);
 }
 
 .faq-item p {
@@ -607,15 +621,70 @@ a.content-card:focus-visible {
 }
 
 .support-detail {
-  font-family: var(--font-mono);
   font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* --- Release notes ------------------------------------------------------------------- */
 
+.releases {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .release {
-  padding: var(--space-5) 0;
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-6);
+  padding: var(--space-6) 0;
   border-bottom: 1px solid var(--border-subtle);
+  scroll-margin-top: calc(64px + var(--space-6));
+}
+
+.releases > li:first-child .release {
+  padding-top: 0;
+}
+
+.releases > li:last-child .release {
+  border-bottom: 0;
+}
+
+.release-meta {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.release-date {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The area, as a quiet label rather than a pill: six identical gold-outline
+   pills read as decoration, not as categories — the TOC is where they're
+   navigated; here they only name the area. */
+.release-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.release-chip::before {
+  content: "";
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent-line);
 }
 
 .release h2 {
@@ -624,14 +693,8 @@ a.content-card:focus-visible {
   font-weight: var(--font-weight-semibold);
   font-size: var(--text-xl-size, var(--text-lg-size));
   color: var(--text-heading);
-  margin: 0 0 var(--space-1);
-}
-
-.release-meta {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm-size);
   margin: 0 0 var(--space-2);
+  scroll-margin-top: calc(64px + var(--space-6));
 }
 
 .release ul {
@@ -647,6 +710,18 @@ a.content-card:focus-visible {
 
 .release ul li::marker {
   color: var(--text-accent);
+}
+
+@media (max-width: 720px) {
+  .release {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .release-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
 }
 
 /* --- Visually hidden helper ------------------------------------------------------------ */
@@ -727,10 +802,511 @@ a.content-card:focus-visible {
   text-decoration: none;
 }
 
-.content-view-all::after {
-  content: "→";
-}
-
 .content-view-all:hover {
   text-decoration: underline;
+}
+
+/* ---- help index: one card per guide (wow pass) ---- */
+
+/* EQUAL ROWS (round 5). Cards at their own height left a ~200px hole under
+   the short guide and ragged bottoms across the grid; a row now shares one
+   height, and each card's list takes the slack so its "View all" sits on the
+   row's common baseline. */
+.help-index {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: stretch;
+  gap: var(--space-5);
+}
+
+@media (min-width: 1000px) {
+  .help-index {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* A phone gets each guide's first three articles and its "View all": the
+   full lists ran ~9,000px under the search. */
+@media (max-width: 639px) {
+  .help-guide-list > li:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+.help-guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.help-guide:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-subtle));
+  box-shadow: var(--shadow-2);
+}
+
+.help-guide-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.help-guide-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.help-guide-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--text-heading);
+}
+
+.help-guide-desc {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.help-guide-list {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.help-guide-list li {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.help-guide-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding-block: var(--space-2);
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  text-decoration: none;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.help-guide-link svg {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.help-guide-link:hover {
+  color: var(--text-accent);
+  transform: translateX(2px);
+}
+
+.help-guide-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.help-guide-time {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.help-guide .article-meta {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-guide,
+  .help-guide-link {
+    transition: none;
+  }
+
+  .help-guide-link:hover {
+    transform: none;
+  }
+}
+
+/* The popular-search chips stay on one line: on a phone they scroll sideways
+   rather than stacking into a two-column grid of taps. */
+.pk-hero .content-searchbar + .pk-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .pk-hero .content-searchbar + .pk-chips {
+    display: flex;
+    padding-bottom: 2px;
+  }
+
+  .pk-hero .content-searchbar + .pk-chips .pk-chip {
+    min-height: 40px;
+    white-space: nowrap;
+  }
+}
+
+/* ---- /about: one real picture of the product in use ---- */
+.about-shot {
+  margin: var(--space-2) 0 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.about-shot img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-2);
+}
+
+.about-shot figcaption {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+/* ---- /about rhythm: a pull-quote and three principles ---- */
+.cl-prose .about-quote {
+  margin: var(--space-4) 0;
+  padding: var(--space-1) 0 var(--space-1) var(--space-5);
+  border-left: 3px solid var(--accent);
+  color: var(--text-heading);
+}
+
+.about-quote p {
+  margin: 0;
+  max-width: 30ch;
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+/* On a phone the display-size quote ran six lines (~250px). It steps down to
+   the text face — the display face is for 30px and up (type-scale.test.ts). */
+@media (max-width: 719px) {
+  .about-quote p {
+    max-width: none;
+    font-family: var(--font-text);
+    font-size: 1.375rem;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+}
+
+.cl-prose .about-principles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 719px) {
+  .cl-prose .about-principles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.about-principles li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.about-principles svg {
+  color: var(--accent-ink);
+}
+
+.about-principles strong {
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.about-principles span {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+/* ---- /security "Under the hood": a ruled two-column fact list ---- */
+.cl-list-title.sec-facts-title {
+  margin-top: var(--space-6);
+}
+
+.sec-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 719px) {
+  .sec-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sec-facts li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sec-facts strong {
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.sec-facts span {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+/* ---- feature cards: a 2×2 of icon + title + body (/security, /rules) ---- */
+/* Always a clean 2×2 (four cards): auto-fit made 3 + an orphan. */
+.feature-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .feature-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.feature-card {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.feature-card-tile {
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.feature-card-num {
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.feature-card h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--text-heading);
+}
+
+.feature-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+/* On a phone each card is an icon-left row: the stacked tile, title and
+   text ran ~280px a card, four tall cards for four sentences. */
+@media (max-width: 639px) {
+  .feature-card {
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: var(--space-1);
+    padding: var(--space-4);
+  }
+
+  .feature-card-tile {
+    grid-row: 1 / span 2;
+    inline-size: 40px;
+    block-size: 40px;
+    margin-bottom: 0;
+  }
+
+  .feature-card h3,
+  .feature-card p {
+    grid-column: 2;
+  }
+}
+
+/* ---- /support (wow pass) ---- */
+.support-issues .faq-item p + p {
+  padding-top: 0;
+}
+
+.support-issues .faq-item p:not(:last-child) {
+  padding-bottom: var(--space-3);
+}
+
+.pk-side-card .support-detail a {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.support-sla {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.support-foot {
+  /* The column's one measure (round 5): the rule ran 960px under an
+     893px accordion and paragraph. */
+  max-width: 68ch;
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* ---- /search, empty state ---- */
+.search-suggest {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .search-suggest-rows {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Two columns of rows: the divider is drawn per row instead of per item. */
+  .search-suggest-rows > li + li {
+    border-top: 0;
+  }
+
+  .search-suggest-rows > li:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .search-suggest-rows > li:nth-child(odd) {
+    border-right: 1px solid var(--border-subtle);
+  }
+}
+
+/* A rule the index jumps to lands clear of the sticky header. */
+.feature-card[id] {
+  scroll-margin-top: calc(64px + var(--space-6));
+}
+
+/* /legal: a document revised since launch — the dot carries the colour, the
+   label stays in primary ink. */
+.legal-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.legal-updated::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* /search, empty: the words people search for, as quiet chips. */
+.search-common-title {
+  margin-top: var(--space-4);
+}
+
+.search-common {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-common a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.search-common a:hover {
+  border-color: var(--accent-line);
+}
+
+.search-common a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

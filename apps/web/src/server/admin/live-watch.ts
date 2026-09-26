@@ -35,6 +35,8 @@ import {
 const ENGINE_BUDGET_MS = 2_000;
 /** How many rooms one refresh asks the engine about. The rest read "not checked". */
 const ENGINE_PROBE_CAP = 20;
+/** The overview's Live now band draws five rooms; it asks about those only. */
+const OVERVIEW_PROBE_CAP = 5;
 
 export type EngineRoom =
   | { readonly state: "unreachable" }
@@ -97,8 +99,12 @@ export async function adminLiveBoard(): Promise<LiveBoardView | null> {
   if ((await platformAdminGate()) === null) {
     return null;
   }
-  const board = await liveAuctionBoard(systemDb, Date.now());
-  const probed = board.running.slice(0, ENGINE_PROBE_CAP);
+  return withEngine(await liveAuctionBoard(systemDb, Date.now()), ENGINE_PROBE_CAP);
+}
+
+/** The board plus the engine's view of its first `cap` running rooms. */
+async function withEngine(board: LiveBoard, cap: number): Promise<LiveBoardView> {
+  const probed = board.running.slice(0, cap);
   const rooms = await Promise.all(probed.map((row) => engineRoom(row.auctionId)));
   const engine: Record<string, EngineRoom> = {};
   board.running.forEach((row, index) => {
@@ -108,15 +114,16 @@ export async function adminLiveBoard(): Promise<LiveBoardView | null> {
 }
 
 /**
- * The Overview's "Live now" band: the same board, without asking the engine —
- * the overview must render fast even when the engine is down, and it links to
- * the board that does ask.
+ * The Overview's "Live now" band: the same board, asking the engine only about
+ * the rooms the band draws (OVERVIEW_PROBE_CAP), in parallel under the same
+ * short budget — so a room the live board calls "Engine trouble" is never
+ * drawn "Bidding" here (round-5 review). Everything else links to the board.
  */
-export async function adminLiveNow(): Promise<LiveBoard | null> {
+export async function adminLiveNow(): Promise<LiveBoardView | null> {
   if ((await platformAdminGate()) === null) {
     return null;
   }
-  return liveAuctionBoard(systemDb, Date.now());
+  return withEngine(await liveAuctionBoard(systemDb, Date.now()), OVERVIEW_PROBE_CAP);
 }
 
 export async function adminAuctionExists(auctionId: string): Promise<boolean> {

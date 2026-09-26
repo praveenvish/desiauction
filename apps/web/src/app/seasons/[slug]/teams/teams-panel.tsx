@@ -77,10 +77,13 @@ export function TeamsPanel({
   slug,
   selected,
   beforeGrid,
+  ownTeamId,
 }: {
   view: TeamsWorkspaceView;
   slug: string;
   selected: TeamCard | null;
+  /** The viewer's own team (an owner): its card leads and says so. */
+  ownTeamId?: string;
   /**
    * Work that is waiting on the organizer (announcements, squad sheets),
    * drawn above the team cards rather than below them — the page's job right
@@ -91,7 +94,7 @@ export function TeamsPanel({
   if (selected !== null) {
     return <RosterDetail slug={slug} team={selected} view={view} />;
   }
-  return <TeamGrid view={view} slug={slug} beforeGrid={beforeGrid} />;
+  return <TeamGrid view={view} slug={slug} beforeGrid={beforeGrid} ownTeamId={ownTeamId} />;
 }
 
 /* --- The franchise grid ---------------------------------------------------- */
@@ -100,10 +103,12 @@ function TeamGrid({
   view,
   slug,
   beforeGrid,
+  ownTeamId,
 }: {
   view: TeamsWorkspaceView;
   slug: string;
   beforeGrid?: ReactNode;
+  ownTeamId?: string | undefined;
 }) {
   const money = useMoney();
   const [query, setQuery] = useState("");
@@ -111,13 +116,18 @@ function TeamGrid({
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (needle === "") return view.teams;
-    return view.teams.filter(
+    // The owner's own team leads; everyone else keeps the season's order.
+    const ordered =
+      ownTeamId === undefined
+        ? view.teams
+        : [...view.teams].sort((a, b) => Number(b.id === ownTeamId) - Number(a.id === ownTeamId));
+    if (needle === "") return ordered;
+    return ordered.filter(
       (team) =>
         team.name.toLowerCase().includes(needle) ||
         (team.shortName ?? "").toLowerCase().includes(needle),
     );
-  }, [query, view.teams]);
+  }, [query, view.teams, ownTeamId]);
 
   return (
     <>
@@ -157,20 +167,18 @@ function TeamGrid({
             )}
           </p>
         ) : null}
+        {/* DA-40: the auction lock is season state, stated before any form.
+            A pill on the same line as the facts it qualifies, not a band. */}
+        {locked && view.viewer.canManageTeams ? (
+          <span className="tm-lock">
+            <Pill tone="amber" icon={<IconLock />} testId="teams-locked-notice">
+              {view.rulesSource?.finished === true
+                ? "Locked — the auction is done"
+                : "Locked — the auction has started"}
+            </Pill>
+          </span>
+        ) : null}
       </div>
-
-      {/* DA-40: the auction lock is season state, not a validation failure on a
-          text input. It is now stated before the form, not after the submit. */}
-      {/* It used to say "The auction has started… Teams stay editable until
-          you go live" — both halves at once, on a season whose auction had
-          finished. One sentence, true for the state the auction is in. */}
-      {locked && view.viewer.canManageTeams ? (
-        <Notice tone="warning" icon={<IconLock size={20} />} testId="teams-locked-notice">
-          {view.rulesSource?.finished === true
-            ? "The auction is done, so the team list is locked for this season."
-            : "The auction has started, so the team list is locked for this season."}
-        </Notice>
-      ) : null}
 
       {/* DA-41: this screen says "add the teams that will bid" and had no concept
           of the person who bids — every link led to Registrations or back here.
@@ -183,7 +191,9 @@ function TeamGrid({
         </Notice>
       ) : null}
 
-      {beforeGrid}
+      {/* "Tell your players": announce and squad sheets sit side by side
+          while both are to-dos, so the teams stay above the fold. */}
+      {beforeGrid !== undefined ? <div className="tm-tell">{beforeGrid}</div> : null}
 
       {/* A league of eight fits on a screen; past that, finding one needs a box. */}
       {view.teams.length > 8 ? (
@@ -217,7 +227,7 @@ function TeamGrid({
         <ul className="tm-grid" data-testid="teams-list">
           {shown.map((team) => (
             <li key={team.id}>
-              <TeamGridCard team={team} slug={slug} />
+              <TeamGridCard team={team} slug={slug} own={team.id === ownTeamId} />
             </li>
           ))}
           {shown.length === 0 ? <li className="tm-grid-empty">No teams match “{query}”.</li> : null}
@@ -260,7 +270,7 @@ function teamPaint(color: string | null): CSSProperties | undefined {
   return color !== null ? ({ "--team": color } as CSSProperties) : undefined;
 }
 
-function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
+function TeamGridCard({ team, slug, own }: { team: TeamCard; slug: string; own: boolean }) {
   const money = useMoney();
   const remaining =
     team.purseTotal !== undefined && team.spent !== undefined
@@ -270,7 +280,11 @@ function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
   const full =
     team.squadMax !== undefined && team.squadMax !== null && team.squadFilled >= team.squadMax;
   return (
-    <article className="team-card tm-card" style={teamPaint(team.color)}>
+    <article
+      className="team-card tm-card"
+      style={teamPaint(team.color)}
+      data-own={own ? "true" : undefined}
+    >
       <div className="tm-card-top">
         <Crest team={team} size="md" />
         <div className="tm-card-id">
@@ -281,6 +295,7 @@ function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
             ) : null}
           </span>
           <span className="tm-card-owner" title={owner}>
+            {own ? <span className="tm-card-yours">Your team · </span> : null}
             {owner}
           </span>
         </div>
@@ -430,7 +445,7 @@ function RosterDetail({
         <SectionCard
           className="tm-presign-card"
           icon={<IconCrown />}
-          tone="amber"
+          tone="gold"
           title="Captain, icons & retained"
           description="Named before the auction — they join this squad without being bid for."
         >
@@ -636,7 +651,7 @@ function RosterDetail({
           />
           <StatCard
             icon={money.unit === "points" ? <IconWallet /> : <IconRupee />}
-            tone="green"
+            concept="money"
             value={remaining !== null && (team.purseTotal ?? 0) > 0 ? money.exact(remaining) : "—"}
             label="Remaining"
           />
@@ -653,7 +668,7 @@ function RosterDetail({
           />
           <StatCard
             icon={<IconTrophy />}
-            tone="amber"
+            tone="gold"
             value={<span className="tm-stat-name">{team.topBuyName ?? "—"}</span>}
             label="Top buy"
             {...(team.topBuyPrice !== undefined && team.topBuyPrice !== null

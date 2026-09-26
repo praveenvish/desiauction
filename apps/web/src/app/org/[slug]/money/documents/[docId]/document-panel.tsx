@@ -25,6 +25,7 @@ import { DELIVERY_LANE_LABEL } from "../../../../../../server/financial-operatio
 import "../../../../../seasons/[slug]/money/money.css";
 import "../../finance.css";
 import { useHydrated } from "../../../../../../lib/use-hydrated";
+import { formatDateTime } from "../../../../../../lib/format-date";
 
 /**
  * PX-8 §4 — Operations detail: one document, end to end.
@@ -67,11 +68,7 @@ const STREAM_LABEL: Record<string, string> = {
 };
 
 function when(atMs: number): string {
-  return new Date(atMs).toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return formatDateTime(atMs);
 }
 
 export function DocumentPanel({ slug, workspace }: { slug: string; workspace: DocumentWorkspace }) {

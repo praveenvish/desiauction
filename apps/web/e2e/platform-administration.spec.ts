@@ -116,12 +116,13 @@ test("founder demo: sign in → platform health → find an org → inspect → 
   const grants = page.getByTestId("admin-user-grants");
   await expect(grants).toBeVisible();
   // Grants are shown as the capability SETS they are — the four partitions,
-  // visible as four different kinds of trust rather than one word "admin".
-  await expect(grants).toContainText("org:owner");
-  await expect(grants).toContainText("settlement:controller");
-  await expect(grants).toContainText("finops:controller");
+  // visible as four different kinds of trust rather than one word "admin" —
+  // named in words (the raw key is the hover).
+  await expect(grants).toContainText("Club owner");
+  await expect(grants).toContainText("Settlement controller");
+  await expect(grants).toContainText("Finance controller");
   // …including the platform grant itself, on the platform scope.
-  await expect(grants).toContainText("platform:admin");
+  await expect(grants).toContainText("Platform admin");
   await expect(grants).toContainText("The platform");
   await axeClean(page, "/admin/users/[personId]");
 

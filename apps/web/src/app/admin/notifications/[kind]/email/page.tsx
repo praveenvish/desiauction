@@ -1,6 +1,5 @@
 import {
   EmptyState,
-  IconArrowLeft,
   IconClock,
   IconMail,
   Pill,
@@ -17,9 +16,10 @@ import {
   type LanguageView,
   type TemplateEditorView,
 } from "../../../../../server/admin/template-views";
-import { NavButton } from "../../../../players/nav-button";
 import { RelativeTime } from "../../../admin-ui";
 import { RestoreButton, TemplateEditor } from "./template-editor";
+import { AdminPageHead } from "../../../admin-ui";
+import { NotifySubnav } from "../../notify-subnav";
 import "../../../../seasons/seasons.css";
 import "../../../admin.css";
 import "../../notifications.css";
@@ -81,18 +81,13 @@ export default async function EmailWordingPage({ params }: { params: Promise<{ k
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head tpl-page-head">
-            <NavButton href="/admin/notifications" variant="ghost" className="tpl-back">
-              <IconArrowLeft size={18} aria-hidden />
-              All notifications
-            </NavButton>
-            <p className="dash-hint">
-              The words of one email. Links, the layout and the facts in it (codes, amounts, squads)
-              stay DesiAuction&rsquo;s; the wording is yours to change. A publish goes out to
-              everyone from the next email sent, is on the audit log with your name, and can be
-              undone from the history.
-            </p>
-          </header>
+          <AdminPageHead>
+            <NotifySubnav current="email" />
+          </AdminPageHead>
+          <p className="admin-lede admin-lede-under">
+            The words of one email. Links, layout and facts stay ours; a publish is audited and can
+            be undone.
+          </p>
 
           <SectionCard
             icon={<IconMail />}
@@ -127,6 +122,7 @@ export default async function EmailWordingPage({ params }: { params: Promise<{ k
             {view.changes.length === 0 ? (
               <div className="admin-card-empty">
                 <EmptyState
+                  size="compact"
                   headingLevel={3}
                   title="Nothing changed yet"
                   description="This email still uses DesiAuction's default wording in every language."

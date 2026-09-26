@@ -88,15 +88,26 @@ li:has(> .sh-figures) {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 36px;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--hero-crest-line);
-  border-radius: var(--radius-md);
-  background: var(--hero-crest-bed);
+  /* A fact, not a control (round 5): even a borderless filled pill still
+     read as something to press ("Cricket", "Owner · …" — review r2–r4). A
+     small gold dot and the word, in the hero's meta voice. */
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--hero-ink);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
+}
+
+.sh-chip::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--ceremony-gold, var(--accent));
 }
 
 .sh-ghost,
@@ -186,6 +197,16 @@ li:has(> .sh-figures) {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* State, not brand: live and done wear the product's state colours
+   (system.css), so "Auction done" is the same green here as everywhere. */
+.sh-status[data-state="live"] {
+  background: var(--state-live);
+}
+
+.sh-status[data-state="complete"] {
+  background: var(--state-complete);
 }
 
 .sh-status-dot {

@@ -1,7 +1,9 @@
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
+import { currentSession } from "../../../server/auth/actions";
 import { requireOnboarded } from "../../../server/auth/onboarding-gate";
+import { rolesOf } from "../../../server/roles/roles";
 import { seasonOverviewView } from "../../../server/competition/actions";
 import { seasonPass } from "../../../server/competition/pass";
 import { CreatedToast } from "./created-toast";
@@ -21,7 +23,17 @@ export default async function CompetitionHomePage({
   const { slug } = await params;
   // See /seasons: the public children under [slug] rule out a gate layout here.
   await requireOnboarded();
-  const [view, pass] = await Promise.all([seasonOverviewView(slug), seasonPass(slug)]);
+  const session = await currentSession();
+  const [view, pass, roles] = await Promise.all([
+    seasonOverviewView(slug),
+    seasonPass(slug),
+    session === null ? null : rolesOf(session.personId),
+  ]);
+  // The viewer's own team(s) here, marked in the Teams list the way /teams
+  // marks "Your team" (review r2, r3). Identity only — no new figures.
+  const mineTeamIds = (roles?.owns ?? [])
+    .filter((team) => team.competitionSlug === slug)
+    .map((team) => team.teamId);
   if (view === null) {
     // Non-members and unknown slugs are indistinguishable (tenancy, IP-2 pattern).
     notFound();
@@ -39,6 +51,7 @@ export default async function CompetitionHomePage({
           <OverviewPanel
             view={view}
             slug={slug}
+            mineTeamIds={mineTeamIds}
             // What the season's pass covers, and how close it is — visible at 2
             // of 4 teams, not only at the refusal. The pass is the club's
             // commercial arrangement, so it is shown only to the people who run

@@ -158,7 +158,21 @@
 .board-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  /* One height per row: "Most expensive" carries a face and a two-line name,
+     and its three neighbours stood shorter beside it. */
+  align-items: stretch;
   gap: 14px;
+}
+/* The unit rides as a suffix so the figure never wraps (see TileMoney). */
+.board-tile-value {
+  white-space: nowrap;
+}
+.board-tile-unit {
+  margin-left: 0.2em;
+  font-size: 0.45em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
 }
 .board-tile {
   display: flex;
@@ -201,7 +215,10 @@
   width: clamp(56px, 4.6vw, 96px);
   height: clamp(56px, 4.6vw, 96px);
 }
+/* The top buy shares its tile with a face, so its figure steps down a size
+   to keep the unit inside the tile. */
 .board-tile-top {
+  font-size: clamp(var(--text-2xl-size), 2.6vw, var(--display-sm-size));
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -209,6 +226,7 @@
   color: var(--ceremony-gold);
 }
 .board-tile-note {
+  white-space: normal;
   font-size: var(--text-xl-size);
   font-weight: 600;
   color: var(--text-secondary);
@@ -291,9 +309,11 @@
   height: 30px;
   padding: 0 8px;
   border-radius: var(--radius-full, 999px);
-  background: color-mix(in srgb, var(--live) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--live) 40%, transparent);
-  color: var(--live);
+  /* Neutral, not "live" green: three green pills read as three winners. The
+     crest carries the team's colour. */
+  background: color-mix(in srgb, var(--surface-raised) 60%, transparent);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -388,6 +408,10 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Flush with the grid's left edge — the UA list inset pushed it 40px in. */
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .board-recent-list li {
   display: grid;
@@ -739,6 +763,109 @@
 }
 
 @media (max-width: 560px) {
+  /* The header spent ~350px before the first number: the kicker wrapped
+     ("CONNECTING TO THE / AUCTION ROOM") and the identity line ran at 2xl. */
+  .board-kicker {
+    font-size: var(--text-sm-size);
+    line-height: var(--text-sm-line);
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .board-sub {
+    font-size: var(--text-base-size);
+    line-height: var(--text-base-line);
+  }
+  .board-head {
+    gap: 12px;
+  }
+  /* A team standing is a compact card: name over one row of purse, spent and
+     squad (~120px, from ~280px). The faces stand down — Recent sales, below,
+     carries them. */
+  .board-team {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top top"
+      "mid stats";
+    align-items: end;
+    gap: 10px 16px;
+    padding: 14px 16px;
+  }
+  .board-team-top {
+    grid-area: top;
+  }
+  .board-team-mid {
+    grid-area: mid;
+  }
+  .board-team-faces {
+    display: none;
+  }
+  .board-purse-value {
+    font-size: var(--text-2xl-size);
+  }
+  .board-purse-label,
+  .board-team-stats dt {
+    font-size: var(--text-xs-size);
+  }
+  .board-team-stats {
+    grid-area: stats;
+    grid-template-columns: auto auto;
+    gap: 16px;
+    padding-top: 0;
+    border-top: 0;
+    text-align: end;
+  }
+  .board-team-stats dd {
+    font-size: var(--text-lg-size);
+  }
+  .board-recent-who {
+    min-width: 0;
+  }
+  .board-recent-name {
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--text-lg-size);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* 2×2 headline tiles on a phone, not four full-width slabs (~560px). */
+  .board-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .board-tile {
+    padding: 14px;
+  }
+  /* TWO BY TWO (round 5). "Most expensive" spanned a row and pushed "Passed"
+     onto a row of its own — 2 + 1 + 1. On a phone the top buy is its figure
+     and its name; the face stands down (Recent sales carries the faces). */
+  .board-tile-face {
+    display: none;
+  }
+  .board-tile-label {
+    font-size: var(--text-sm-size);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  .board-tile-note {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: var(--text-sm-size);
+    line-height: var(--text-sm-line);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .board-tile-value {
+    font-size: var(--text-2xl-size);
+  }
+  .board-tile-top {
+    font-size: var(--text-2xl-size);
+  }
+  /* The progress runs the page's width: at its own intrinsic width a
+     finished night's full bar read as ~60% on a phone. */
+  .board-progress {
+    width: 100%;
+    min-width: 0;
+  }
   /* On a phone the brand leads the page (lockup left, sound right) and the
      progress follows the title, rather than a right-aligned column under it. */
   .board-head-side {
@@ -752,12 +879,46 @@
   /* The buyer used to be dropped on a phone, leaving "Rahul Singh  ₹35,000" —
      a sale with no purchaser, which is half the news. It wraps under the name
      instead. */
+  /* ONE SALE, ONE LINE OF NAME (round 5): face, the name with its buyer
+     under it in small type, the price. The buyer took a full line of its own
+     and the name was cut to make room for nothing. */
   .board-recent-list li {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 0;
+    padding: 10px 14px;
+  }
+  .board-recent-who {
+    display: contents;
+  }
+  .board-recent-face {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 44px;
+    height: 44px;
+  }
+  .board-recent-name {
+    grid-column: 2;
+    grid-row: 1;
   }
   .board-recent-team {
-    grid-column: 1 / -1;
+    grid-column: 2;
     grid-row: 2;
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--text-sm-size);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .board-recent-swatch {
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+  }
+  .board-recent-price {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    font-size: var(--text-lg-size);
   }
   .board-block {
     grid-template-columns: 1fr;

@@ -1,5 +1,7 @@
 "use client";
 
+import { SegmentedTabs } from "@desiauction/ui";
+
 import type { LedgerFilter } from "../../../../../lib/ledger-filter";
 import { useFilterQuery } from "../../../../../lib/use-filter-query";
 
@@ -20,29 +22,30 @@ const OPTIONS: readonly { value: LedgerFilter; label: string }[] = [
 export function LedgerFilters({
   raw,
   active,
+  counts,
 }: {
   /** The `filter` param as it arrived ("" when absent). */
   raw: string;
   /** What the server actually filtered by — the raw choice or its default. */
   active: LedgerFilter;
+  /** The row count behind the ACTIVE reading, shown on its segment. */
+  counts?: Partial<Record<LedgerFilter, number>>;
 }) {
   const { commit } = useFilterQuery({ filter: raw });
   return (
-    <div className="ledger-filter" role="group" aria-label="Show rows">
-      {OPTIONS.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          className="ledger-filter-chip"
-          aria-pressed={active === option.value}
-          onClick={() => {
-            commit({ filter: option.value });
-          }}
-          data-testid={`ledger-filter-${option.value}`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedTabs
+      label="Show rows"
+      testId="ledger-filter"
+      items={OPTIONS.map((option) => ({
+        key: option.value,
+        label: option.label,
+        ...(counts?.[option.value] !== undefined ? { count: counts[option.value] } : {}),
+        active: active === option.value,
+        testId: `ledger-filter-${option.value}`,
+        onSelect: () => {
+          commit({ filter: option.value });
+        },
+      }))}
+    />
   );
 }

@@ -9,8 +9,11 @@ import {
   IconCrown,
   IconFlag,
   IconGavel,
+  IconImage,
   IconList,
   IconMegaphone,
+  IconPlay,
+  IconSend,
   IconTrophy,
   IconUsers,
   IconWallet,
@@ -20,6 +23,7 @@ import {
   TeamChip,
 } from "@desiauction/ui";
 
+import type { ReactNode } from "react";
 import type { AuctionDashboard } from "../../../../server/auction/actions";
 import type { AppointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { formatTime } from "../../../../lib/format-date";
@@ -29,6 +33,7 @@ import { LotStatusPill, PaddleChip, eventLabel } from "./auction-bits";
 import { BroadcastLinks } from "./broadcast-links";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 import { useMoney } from "../../../../components/money-unit";
+import { formatCount } from "../../../../lib/plural";
 
 /*
  * THE OVERVIEW TAB AS A DASHBOARD (founder mockup 4).
@@ -246,7 +251,7 @@ export function OverviewDashboard({
   const purseCard = (
     <SectionCard
       icon={<IconWallet />}
-      tone="blue"
+      concept="money"
       title="Paddle purse breakdown"
       data-testid="purse-burndown"
       action={
@@ -301,7 +306,7 @@ export function OverviewDashboard({
 
   /* ---- Ready to open ------------------------------------------------------- */
   const readyCard = (
-    <SectionCard icon={<IconFlag />} tone="red" title="Ready to open" className="dash-ready">
+    <SectionCard icon={<IconFlag />} concept="auction" title="Ready to open" className="dash-ready">
       <ul className="dash-checks">
         {ready.checks.map((check) => (
           <li key={check.id} data-pass={check.pass}>
@@ -384,7 +389,7 @@ export function OverviewDashboard({
   const paddlesCard = (
     <SectionCard
       icon={<IconUsers />}
-      tone="amber"
+      concept="teams"
       title="Paddles"
       description="One paddle per team, held by the team's owner on their own device."
       action={<TabLink tab="paddles">Manage</TabLink>}
@@ -561,7 +566,7 @@ export function OverviewDashboard({
       icon={<IconClock />}
       tone="neutral"
       title="Event log & replay"
-      description={`${String(view.eventCount)} immutable events · single-writer order`}
+      description={`${formatCount(view.eventCount)} events, in the order they happened`}
       action={<TabLink tab="log">View all events</TabLink>}
       flush
     >
@@ -595,13 +600,22 @@ export function OverviewDashboard({
    * posters on `canPoster`, replay and ledger on conducting (both 404
    * otherwise), Teams on the appointment authority. */
   const settled = status === "completed" || status === "reconciled";
-  const afterDoors: { key: string; href: string; label: string; note: string }[] = [];
+  const afterDoors: {
+    key: string;
+    href: string;
+    label: string;
+    note: string;
+    icon: ReactNode;
+    /** Something here still needs doing — a gold dot on the door. */
+    pending?: boolean;
+  }[] = [];
   if (settled && viewer.canPoster) {
     afterDoors.push({
       key: "posters",
       href: `/seasons/${slug}/posters`,
       label: "Share result posters",
       note: "A poster for every signing and every squad, ready for WhatsApp.",
+      icon: <IconImage size={20} weight="duotone" />,
     });
   }
   if (settled && appointments !== null) {
@@ -610,11 +624,14 @@ export function OverviewDashboard({
       href: `/seasons/${slug}/teams`,
       label: "Send squad sheets",
       note: "Every player gets their squad, captain and first match.",
+      icon: <IconSend size={20} weight="duotone" />,
     });
     afterDoors.push({
       key: "appointments",
       href: `/seasons/${slug}/teams`,
       label: "Announce captains & icons",
+      icon: <IconMegaphone size={20} weight="duotone" />,
+      pending: appointments.pending.length > 0,
       note:
         appointments.pending.length > 0
           ? `${String(appointments.pending.length)} named but not told yet.`
@@ -624,39 +641,39 @@ export function OverviewDashboard({
     });
   }
   if (settled && viewer.canConduct) {
+    // One door for the record: the replay steps through it; the ledger is
+    // one tab away (Log) and the event card below links it too (round 2).
     afterDoors.push({
       key: "replay",
       href: `/seasons/${slug}/auction/replay`,
-      label: "Review the night",
-      note: "Step through every lot, bid and hammer in order.",
-    });
-    afterDoors.push({
-      key: "ledger",
-      href: `/seasons/${slug}/auction/ledger`,
-      label: "Open the ledger",
-      note: "The full record — every sale, every bid, who and when.",
+      label: "Replay the night",
+      note: "Every lot, bid and hammer, in the order it happened.",
+      icon: <IconPlay size={20} weight="duotone" />,
     });
   }
   const afterCard =
     afterDoors.length > 0 ? (
       <SectionCard
         icon={<IconFlag />}
-        tone="green"
+        concept="done"
         title="After the auction"
         description="The squads are final. Here is what is left to do."
         data-testid="after-auction-card"
       >
-        <ul className="dash-after">
+        <ul className="dash-after da-stagger">
           {afterDoors.map((door) => (
             <li key={door.key}>
               <a
-                className="dash-after-link"
+                className="dash-after-link da-lift"
                 href={door.href}
                 data-testid={`after-auction-${door.key}`}
               >
+                <span className="dash-after-icon" aria-hidden>
+                  {door.icon}
+                  {door.pending === true ? <span className="dash-after-dot" /> : null}
+                </span>
                 <strong>{door.label}</strong>
-                <span>{door.note}</span>
-                <IconArrowRight size={16} />
+                <span className="dash-after-note">{door.note}</span>
               </a>
             </li>
           ))}
@@ -665,24 +682,44 @@ export function OverviewDashboard({
     ) : null;
 
   const showScreens = viewer.canConduct && status !== "abandoned";
+  const rulesCard =
+    dashboard.rules !== null ? (
+      <RulesCard
+        rules={dashboard.rules}
+        action={<TabLink tab="room">Room &amp; settings</TabLink>}
+      />
+    ) : null;
 
   return (
     <div className="dash" data-testid="auction-dashboard">
       {progress}
       {terminal ? afterCard : null}
-      <CardGrid>
-        {blockCard}
-        {purseCard}
-      </CardGrid>
-      <CardGrid>
-        {showScreens ? <BroadcastLinks slug={slug} /> : null}
-        {dashboard.rules !== null ? (
-          <RulesCard
-            rules={dashboard.rules}
-            action={<TabLink tab="room">Room &amp; settings</TabLink>}
-          />
-        ) : null}
-      </CardGrid>
+      {/* A finished night has nothing on the block: that card said so in a
+          165px box. The purses pair with the rules instead, and the paddles
+          with the room screens, so every row is balanced. */}
+      {terminal ? (
+        <>
+          <CardGrid>
+            {purseCard}
+            {rulesCard}
+          </CardGrid>
+          <CardGrid>
+            {showScreens ? <BroadcastLinks slug={slug} /> : null}
+            {paddlesCard}
+          </CardGrid>
+        </>
+      ) : (
+        <>
+          <CardGrid>
+            {blockCard}
+            {purseCard}
+          </CardGrid>
+          <CardGrid>
+            {showScreens ? <BroadcastLinks slug={slug} /> : null}
+            {rulesCard}
+          </CardGrid>
+        </>
+      )}
       {/* Readiness, this device's link to the room and the owners' plans are
           all questions about a night still to come. */}
       {terminal ? null : (
@@ -692,12 +729,18 @@ export function OverviewDashboard({
         </CardGrid>
       )}
       {terminal ? null : plansCard}
-      <CardGrid>
-        {paddlesCard}
-        {/* Once the night is settled the After-the-auction card carries this
-            door with its count; a second card of the same name would repeat it. */}
-        {terminal && afterCard !== null ? null : appointmentsCard}
-      </CardGrid>
+      {terminal ? (
+        afterCard !== null ? null : (
+          appointmentsCard
+        )
+      ) : (
+        <CardGrid>
+          {paddlesCard}
+          {/* Once the night is settled the After-the-auction card carries this
+              door with its count; a second card of the same name would repeat it. */}
+          {appointmentsCard}
+        </CardGrid>
+      )}
       {queueCard}
       {logCard}
     </div>

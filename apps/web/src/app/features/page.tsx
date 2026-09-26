@@ -4,11 +4,16 @@ import type { ReactNode } from "react";
 
 import { env } from "../../env";
 import { FEATURE_GROUPS, LANDING } from "../../content/marketing";
+import Link from "next/link";
+
 import {
+  IconArrowRight,
   IconCheck,
+  IconGavel,
   IconLedger,
   IconRefresh,
   IconShieldCheck,
+  IconUsers,
 } from "../../components/marketing/icons";
 import { slugify } from "../../lib/slug";
 import "../content.css";
@@ -21,6 +26,13 @@ export const metadata: Metadata = {
 };
 
 const FOUNDATION_ICONS = [IconShieldCheck, IconLedger, IconRefresh] as const;
+
+/** A distinct glyph per capability card. */
+const GROUP_ICONS: Record<string, typeof IconCheck> = {
+  Registration: IconUsers,
+  "The live auction": IconGavel,
+  "Money & records": IconLedger,
+};
 
 /**
  * Product vignettes: each feature group is SHOWN as the surface it describes,
@@ -169,9 +181,14 @@ const VIGNETTES: Record<string, ReactNode> = {
  * surface it describes.
  */
 export default function FeaturesPage() {
+  // "Trust & governance" is not a bento card: the trust band below states the
+  // same guarantees, and the page used to say them twice in a row.
+  const groups = FEATURE_GROUPS.filter((group) => group.title !== "Trust & governance");
   return (
-    <main className="mk">
-      <section className="mk-hero" data-theme="floodlight">
+    // ONE surface family for the whole page — floodlight, like the landing.
+    // It used to flip dark → cream → dark → dark footer, and read as two sites.
+    <main className="mk mk-features-page" data-theme="floodlight">
+      <section className="mk-hero mk-features-hero">
         <div className="mk-container mk-center">
           <div className="mk-hero-copy" style={{ maxWidth: 720, margin: "0 auto" }}>
             <p className="mk-kicker" style={{ justifyContent: "center" }}>
@@ -187,39 +204,45 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      <section className="mk-band" style={{ paddingTop: 0 }}>
+      <section className="mk-band mk-features-band" aria-label="What it does">
         <div className="mk-container">
-          {FEATURE_GROUPS.map((group, index) => {
-            const headingId = `feature-${slugify(group.title)}`;
-            return (
-              <section
-                key={group.title}
-                className={`mk-show${index % 2 === 1 ? " mk-show--flip" : ""}`}
-                aria-labelledby={headingId}
-              >
-                <div>
-                  <h2 id={headingId}>{group.title}</h2>
+          {/* A bento, not four zig-zag rows: each capability is a card with its
+              surface inside it. The live auction — the night itself — takes
+              the tall tile. */}
+          <div className="mk-fbento da-stagger">
+            {groups.map((group, index) => {
+              const headingId = `feature-${slugify(group.title)}`;
+              const Icon = GROUP_ICONS[group.title] ?? IconCheck;
+              return (
+                <section
+                  key={group.title}
+                  className="mk-fcard"
+                  data-feature={index === 1 ? "lead" : undefined}
+                  aria-labelledby={headingId}
+                >
+                  <div className="mk-fcard-head">
+                    <span className="mk-fcard-tile" aria-hidden>
+                      <Icon weight="duotone" />
+                    </span>
+                    <h2 id={headingId}>{group.title}</h2>
+                  </div>
+                  <div className="mk-fcard-visual">{VIGNETTES[group.title]}</div>
                   <ul className="mk-checklist">
                     {group.features.map((feature) => (
                       <li key={feature}>
-                        <IconCheck />
+                        <IconCheck size={20} />
                         {feature}
                       </li>
                     ))}
                   </ul>
-                </div>
-                <div className="mk-show-visual">{VIGNETTES[group.title]}</div>
-              </section>
-            );
-          })}
+                </section>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      <section
-        className="mk-band mk-band--dark"
-        data-theme="floodlight"
-        aria-labelledby="features-foundation"
-      >
+      <section className="mk-band mk-features-trust" aria-labelledby="features-foundation">
         <div className="mk-container">
           <div className="mk-band-head mk-band-head--center mk-center">
             <p className="mk-kicker">Why you can trust it</p>
@@ -227,13 +250,13 @@ export default function FeaturesPage() {
               {LANDING.foundation.h2}
             </h2>
           </div>
-          <div className="mk-cards">
+          <div className="mk-cards da-stagger">
             {LANDING.foundation.cards.map((card, index) => {
               const Icon = FOUNDATION_ICONS[index] ?? IconCheck;
               return (
                 <div key={card.title} className="mk-card">
-                  <span className="mk-icon-tile">
-                    <Icon />
+                  <span className="mk-icon-tile" aria-hidden>
+                    <Icon weight="duotone" />
                   </span>
                   <h3>{card.title}</h3>
                   <p>{card.body}</p>
@@ -241,6 +264,11 @@ export default function FeaturesPage() {
               );
             })}
           </div>
+          <p className="mk-features-more">
+            <Link href="/security">
+              How sign-in, access and your data are protected <IconArrowRight size={16} />
+            </Link>
+          </p>
           <div className="mk-cta-actions mk-cta-actions--closing">
             <ButtonLink href="/login" variant="primary" size="lg">
               Start your auction

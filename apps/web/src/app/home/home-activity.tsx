@@ -12,6 +12,8 @@ import {
 } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
+import { SHARED_EVENT_NAMES } from "../../lib/event-names";
+
 /**
  * The feed is read by organizers, not operators, so the raw event name is the
  * wrong thing to print: "finops.PeriodClosed" is a fact about our ledger
@@ -20,6 +22,7 @@ import type { ReactNode } from "react";
  * internal domain word translated so "Finops" never reaches a screen.
  */
 const ACTIVITY_PHRASE: Record<string, string> = {
+  ...SHARED_EVENT_NAMES,
   "auction.BidAccepted": "Bid accepted",
   "auction.AuctionAborted": "Auction stopped",
   "auction.conduct": "Auction conducted",
@@ -134,4 +137,27 @@ export function ago(iso: string): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${String(hours)}h ago`;
   return `${String(Math.floor(hours / 24))}d ago`;
+}
+
+/**
+ * Consecutive events that say the same thing about the same place fold into
+ * one row with a count: six "Made a player poster · Thane Sports
+ * Club" lines were ~360px of one fact. The newest of the run stands for it.
+ */
+export function groupActivity<T extends { action: string }>(
+  rows: readonly T[],
+  sameAs: (row: T) => string = (row) =>
+    `${row.action}|${(row as { scope?: string | null }).scope ?? ""}`,
+): { row: T; times: number }[] {
+  const out: { row: T; times: number; key: string }[] = [];
+  for (const row of rows) {
+    const key = sameAs(row);
+    const last = out[out.length - 1];
+    if (last !== undefined && last.key === key && row.action !== "finops.summary") {
+      last.times += 1;
+    } else {
+      out.push({ row, times: 1, key });
+    }
+  }
+  return out;
 }

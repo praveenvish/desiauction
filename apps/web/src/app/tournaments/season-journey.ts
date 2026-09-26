@@ -1,3 +1,5 @@
+import { formatCount } from "../../lib/plural";
+
 /**
  * ONE SEASON'S ROAD, as the console's journey stepper draws it.
  *
@@ -106,7 +108,7 @@ function hintFor(
     case "registration":
       if (state === "done") return "Closed";
       if (input.status === "registration_open") {
-        return `Open · ${input.registrations.toLocaleString("en-IN")} registered`;
+        return `Open · ${formatCount(input.registrations)} registered`;
       }
       return state === "current" ? "Not open yet" : "Pending";
     case "auction":

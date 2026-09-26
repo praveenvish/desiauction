@@ -1,24 +1,21 @@
 /* /reports — one season, summed up. CSS bars only; tokens only; both themes. */
 
 .rp-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  min-height: 40px;
 }
 
 .rp-scope {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
   margin: 0;
   min-width: 0;
 }
 
 .rp-scope-name {
   color: var(--text-heading);
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
+  font-size: var(--text-md-size);
   font-weight: var(--font-weight-semibold);
   overflow-wrap: anywhere;
 }
@@ -38,8 +35,33 @@
   font-size: var(--text-sm-size);
 }
 
+.rp-picker-label {
+  font-weight: var(--font-weight-semibold);
+}
+
 .rp-picker .px-select {
   min-width: 0;
+  height: 36px;
+}
+
+.rp-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.rp-open:hover {
+  text-decoration: underline;
+}
+
+.rp-zero {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
 }
 
 /* ---- bars ---- */
@@ -53,12 +75,35 @@
   list-style: none;
 }
 
+/* Name and figure on one line, the bar full width under them (round 2): with
+   the note beside it the bar was squeezed to ~50px, and on a phone the name
+   was cut to "Mum…". */
 .rp-bar-row {
   display: grid;
-  grid-template-columns: minmax(88px, 34%) 1fr auto;
-  align-items: center;
-  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label value"
+    "track track";
+  align-items: baseline;
+  gap: 6px var(--space-3);
   font-size: var(--text-sm-size);
+}
+
+.rp-bar-row > .rp-bar-label {
+  grid-area: label;
+  font-weight: var(--font-weight-medium);
+}
+
+.rp-bar-row > .rp-bar-track {
+  grid-area: track;
+}
+
+.rp-bar-row > .rp-bar-value {
+  grid-area: value;
+}
+
+.rp-bars {
+  gap: var(--space-4);
 }
 
 .rp-bar-label {
@@ -123,12 +168,6 @@
 .rp-bar-note {
   color: var(--text-muted);
   font-weight: var(--font-weight-regular);
-}
-
-.rp-empty {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
 }
 
 /* ---- top buys ---- */
@@ -204,14 +243,25 @@
 }
 
 @media (max-width: 719px) {
+  /* Name over the bar, figures under it. Sharing row one with "89,500 pts ·
+     90% · 10,500 left · 12 players" cut every team to "Mum…/Pune…". */
   .rp-bar-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-1) var(--space-3);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "label"
+      "track"
+      "value";
+    gap: var(--space-1);
   }
 
-  .rp-bar-track {
-    grid-column: 1 / -1;
-    grid-row: 2;
+  .rp-bar-label {
+    white-space: normal;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .rp-bar-value {
+    text-align: start;
+    white-space: normal;
   }
 
   .rp-picker {
@@ -220,5 +270,12 @@
 
   .rp-picker .px-select {
     flex: 1;
+  }
+}
+
+/* Three tiles in a two-column phone grid left an orphan half-tile. */
+@media (max-width: 719px) {
+  [data-testid="reports-stats"] > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }

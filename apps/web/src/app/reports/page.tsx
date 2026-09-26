@@ -1,6 +1,8 @@
 import {
   ButtonLink,
   CardGrid,
+  EmptyState,
+  IconArrowRight,
   IconChart,
   IconCheckCircle,
   IconDownload,
@@ -10,12 +12,14 @@ import {
   IconStar,
   IconUsers,
   IconWallet,
+  type KitTone,
   Notice,
   PlayerImage,
   SectionCard,
   StatCard,
   StatGrid,
-  type KitTone,
+  Toolbar,
+  ToolbarSpacer,
 } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
@@ -28,11 +32,12 @@ import { SeasonPicker } from "./season-picker";
 import { NavButton } from "../players/nav-button";
 import "../players/players.css";
 import "./reports.css";
+import { formatCount } from "../../lib/plural";
 
 export const metadata = { title: "Reports · DesiAuction" };
 
 function count(value: number): string {
-  return value.toLocaleString("en-IN");
+  return formatCount(value);
 }
 
 function pctOf(part: number, whole: number): number {
@@ -118,19 +123,24 @@ export default async function ReportsPage({
     return (
       <main className="px-players">
         <section className="px-empty" data-testid="reports-empty">
-          <span className="px-empty-glyph" aria-hidden>
-            <IconChart size={30} />
-          </span>
-          <h2>No reports yet</h2>
-          <p>
-            Reports summarise the seasons you run — registrations, fees and auction spend. Once you
-            review registrations for a season, its report appears here.
-          </p>
-          <div className="px-empty-actions">
-            <NavButton href="/tournaments" variant="primary" size="touch">
-              Go to tournaments
-            </NavButton>
-          </div>
+          <EmptyState
+            icon={<IconChart />}
+            title="No reports yet"
+            headingLevel={2}
+            description={
+              <>
+                Reports summarise the seasons you run — registrations, fees and auction spend. Once
+                you review registrations for a season, its report appears here.
+              </>
+            }
+            action={
+              <>
+                <NavButton href="/tournaments" variant="primary" size="touch">
+                  Go to tournaments
+                </NavButton>
+              </>
+            }
+          />
         </section>
       </main>
     );
@@ -146,6 +156,8 @@ export default async function ReportsPage({
     ["withdrawn", "Withdrawn", regs.withdrawn, "neutral"],
   ];
   const statusMax = Math.max(...statusRows.map((row) => row[2]), 1);
+  /** Statuses nobody is in: one quiet line, not four empty bars. */
+  const zeroStatuses = statusRows.filter((row) => row[2] === 0).map((row) => row[1].toLowerCase());
   const statusBars: Bar[] = statusRows.map(([key, label, value, tone]) => ({
     key,
     label,
@@ -192,15 +204,23 @@ export default async function ReportsPage({
 
   return (
     <main className="px-players">
-      <div className="rp-toolbar">
-        <p className="rp-scope">
-          <span className="rp-scope-name">{season.name}</span>
-          <span className="rp-scope-org">{season.orgName}</span>
-        </p>
+      {/* ONE ROW: which season, and the switch to another. The title band
+          above the tiles (~70px) was the season's name in a heading. */}
+      <Toolbar className="rp-toolbar">
         {view.seasons.length > 1 ? (
           <SeasonPicker current={season.slug} seasons={view.seasons} />
-        ) : null}
-      </div>
+        ) : (
+          <p className="rp-scope">
+            <span className="rp-scope-name">{season.name}</span>
+            <span className="rp-scope-org">· {season.orgName}</span>
+          </p>
+        )}
+        <ToolbarSpacer />
+        <Link href={`/seasons/${season.slug}`} className="rp-open">
+          Open the season
+          <IconArrowRight size={16} aria-hidden />
+        </Link>
+      </Toolbar>
 
       {!money ? (
         <Notice
@@ -225,7 +245,7 @@ export default async function ReportsPage({
         {feesInUse ? (
           <StatCard
             icon={<IconReceipt />}
-            tone="green"
+            tone="gold"
             value={
               // rupees-always: registration fees are real money in every season
               fees.collectedPaise !== undefined ? compactINR(fees.collectedPaise) : count(fees.paid)
@@ -237,7 +257,7 @@ export default async function ReportsPage({
         ) : null}
         <StatCard
           icon={<IconGavel />}
-          tone="blue"
+          tone="gold"
           value={`${count(auction.sold)} / ${count(lotsAll)}`}
           label="Lots sold"
           hint={auction.status === null ? "No auction yet" : `${count(auction.unsold)} unsold`}
@@ -245,7 +265,7 @@ export default async function ReportsPage({
         />
         <StatCard
           icon={<IconWallet />}
-          tone="purple"
+          tone="gold"
           value={
             auction.moneyMoved !== undefined
               ? cardAmount(report.auctionUnit, auction.moneyMoved)
@@ -265,6 +285,9 @@ export default async function ReportsPage({
         />
       </StatGrid>
 
+      {/* Rebalanced (wow pass): no Fees card when no fee was ever recorded,
+          spend and purse are ONE card (they charted the same bars twice), and
+          every row is a pair, so the masonry leaves no hole. */}
       <CardGrid>
         <SectionCard
           icon={<IconUsers />}
@@ -273,39 +296,53 @@ export default async function ReportsPage({
           action={<CsvLink slug={season.slug} table="registrations" label="registrations" />}
           data-testid="report-registrations"
         >
-          <Bars bars={statusBars} label="Registrations by status" testId="report-status-bars" />
+          <Bars
+            bars={statusBars.filter((bar) => bar.value !== "0")}
+            label="Registrations by status"
+            testId="report-status-bars"
+          />
+          {zeroStatuses.length > 0 ? (
+            <p className="rp-zero">{zeroStatuses.map((label) => `0 ${label}`).join(" · ")}</p>
+          ) : null}
         </SectionCard>
 
-        <SectionCard
-          icon={<IconReceipt />}
-          tone="green"
-          title="Fees"
-          description={
-            !feesInUse
-              ? "No entry fees recorded"
-              : fees.collectedPaise !== undefined && fees.duePaise !== undefined
+        {feesInUse ? (
+          <SectionCard
+            icon={<IconReceipt />}
+            title="Fees"
+            description={
+              fees.collectedPaise !== undefined && fees.duePaise !== undefined
                 ? // rupees-always: registration fees are real money in every season
                   `${exactINR(fees.collectedPaise)} collected · ${exactINR(fees.duePaise)} still due`
                 : "Who has paid, by head count"
-          }
-          data-testid="report-fees"
-        >
-          {feesInUse ? (
+            }
+            data-testid="report-fees"
+          >
             <Bars label="Fees by state" testId="report-fee-bars" bars={feeBars} />
-          ) : null}
-        </SectionCard>
+          </SectionCard>
+        ) : (
+          <SectionCard
+            icon={<IconGavel />}
+            title="Sold and unsold"
+            description="How the auction pool went"
+            data-testid="report-lots"
+          >
+            <LotBars sold={auction.sold} unsold={auction.unsold} remaining={auction.remaining} />
+          </SectionCard>
+        )}
       </CardGrid>
 
       <CardGrid>
         <SectionCard
           icon={<IconWallet />}
-          tone="purple"
-          title={money ? "Auction spend by team" : "Squads by team"}
+          title={money ? "Purse by team" : "Squads by team"}
           description={
             report.teams.length === 0
               ? "No teams yet"
               : money
-                ? "What each team spent at the auction"
+                ? report.teams[0]?.purse !== undefined
+                  ? `What each team spent of its ${unitMoney.exact(report.teams[0].purse)} purse`
+                  : "What each team spent at the auction"
                 : "Players signed to each team"
           }
           {...(money && report.teams.length > 0
@@ -314,7 +351,11 @@ export default async function ReportsPage({
           data-testid="report-teams"
         >
           {report.teams.length === 0 ? (
-            <p className="rp-empty">Teams appear here once they are created.</p>
+            <EmptyState
+              size="compact"
+              icon={<IconUsers />}
+              title="Teams appear here once they are created"
+            />
           ) : (
             <Bars
               label={money ? "Spend by team" : "Squad size by team"}
@@ -325,9 +366,17 @@ export default async function ReportsPage({
                       key: team.teamId,
                       label: team.name,
                       value: cardAmount(report.auctionUnit, team.spend),
-                      share: team.spend / spendMax,
+                      // Against the PURSE when there is one, so the bar is how
+                      // much of it went — the old second card's whole job.
+                      share:
+                        team.purse !== undefined && team.purse > 0
+                          ? Math.min(1, team.spend / team.purse)
+                          : team.spend / spendMax,
                       color: team.color,
-                      note: `· ${count(team.squad)} players`,
+                      note:
+                        team.purse !== undefined
+                          ? `· ${String(pctOf(team.spend, team.purse))}% · ${unitMoney.compactFloor(Math.max(0, team.purse - team.spend))} left · ${count(team.squad)} players`
+                          : `· ${count(team.squad)} players`,
                     }
                   : {
                       key: team.teamId,
@@ -343,63 +392,7 @@ export default async function ReportsPage({
 
         {money ? (
           <SectionCard
-            icon={<IconChart />}
-            tone="amber"
-            title="Purse utilisation"
-            description={
-              report.teams[0]?.purse !== undefined
-                ? `Purse per team ${unitMoney.exact(report.teams[0].purse)}`
-                : "No auction purse set yet"
-            }
-            data-testid="report-purse"
-          >
-            {report.teams.length === 0 || report.teams[0]?.purse === undefined ? (
-              <p className="rp-empty">Create the auction to set a purse per team.</p>
-            ) : (
-              <Bars
-                label="Purse used by team"
-                testId="report-purse-bars"
-                bars={report.teams.map((team) => {
-                  const used = pctOf(team.spend ?? 0, team.purse ?? 0);
-                  return {
-                    key: team.teamId,
-                    label: team.name,
-                    value: `${String(used)}%`,
-                    share: used / 100,
-                    color: team.color,
-                    note: `· ${unitMoney.compactFloor(Math.max(0, (team.purse ?? 0) - (team.spend ?? 0)))} left`,
-                  };
-                })}
-              />
-            )}
-          </SectionCard>
-        ) : (
-          <SectionCard
-            icon={<IconGavel />}
-            tone="blue"
-            title="Sold and unsold"
-            description="How the auction pool went"
-            data-testid="report-lots"
-          >
-            <LotBars sold={auction.sold} unsold={auction.unsold} remaining={auction.remaining} />
-          </SectionCard>
-        )}
-      </CardGrid>
-
-      {money ? (
-        <CardGrid>
-          <SectionCard
-            icon={<IconGavel />}
-            tone="blue"
-            title="Sold and unsold"
-            description="How the auction pool went"
-            data-testid="report-lots"
-          >
-            <LotBars sold={auction.sold} unsold={auction.unsold} remaining={auction.remaining} />
-          </SectionCard>
-          <SectionCard
             icon={<IconStar />}
-            tone="gold"
             title="Top buys"
             description="The five dearest players of the night"
             {...((report.topBuys ?? []).length > 0
@@ -408,7 +401,7 @@ export default async function ReportsPage({
             data-testid="report-top-buys"
           >
             {(report.topBuys ?? []).length === 0 ? (
-              <p className="rp-empty">Nobody has been sold yet.</p>
+              <EmptyState size="compact" icon={<IconGavel />} title="Nobody has been sold yet" />
             ) : (
               <ol className="rp-buys">
                 {(report.topBuys ?? []).map((buy, index) => (
@@ -436,13 +429,32 @@ export default async function ReportsPage({
               </ol>
             )}
           </SectionCard>
-        </CardGrid>
+        ) : feesInUse ? (
+          <SectionCard
+            icon={<IconGavel />}
+            title="Sold and unsold"
+            description="How the auction pool went"
+            data-testid="report-lots"
+          >
+            <LotBars sold={auction.sold} unsold={auction.unsold} remaining={auction.remaining} />
+          </SectionCard>
+        ) : null}
+      </CardGrid>
+
+      {money && feesInUse ? (
+        <SectionCard
+          icon={<IconGavel />}
+          title="Sold and unsold"
+          description="How the auction pool went"
+          data-testid="report-lots"
+        >
+          <LotBars sold={auction.sold} unsold={auction.unsold} remaining={auction.remaining} />
+        </SectionCard>
       ) : null}
 
       <p className="rp-foot">
         <IconCheckCircle size={16} aria-hidden /> Figures are read live from the season&rsquo;s own
-        desks — the same numbers its Registrations, Teams and Auction tabs show.{" "}
-        <Link href={`/seasons/${season.slug}`}>Open the season</Link>
+        desks — the same numbers its Registrations, Teams and Auction tabs show.
       </p>
     </main>
   );
@@ -461,15 +473,20 @@ function LotBars({ sold, unsold, remaining }: { sold: number; unsold: number; re
           label: "Unsold",
           value: count(unsold),
           share: unsold / all,
-          tone: "amber",
-        },
-        {
-          key: "remaining",
-          label: "Still to go",
-          value: count(remaining),
-          share: remaining / all,
           tone: "neutral",
         },
+        // "Still to go 0" after the night is a bar about nothing.
+        ...(remaining > 0
+          ? [
+              {
+                key: "remaining",
+                label: "Still to go",
+                value: count(remaining),
+                share: remaining / all,
+                tone: "neutral" as const,
+              },
+            ]
+          : []),
       ]}
     />
   );

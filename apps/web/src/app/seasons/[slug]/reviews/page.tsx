@@ -1,4 +1,5 @@
 import {
+  EmptyState,
   IconEye,
   IconMessageCircle,
   IconSend,
@@ -34,54 +35,61 @@ export default async function SeasonReviewsPage({ params }: { params: Promise<{ 
     notFound();
   }
   const shown = view.shown !== null && view.shown.count > 0 ? view.shown : null;
+  const quiet =
+    shown === null &&
+    (view.manage === null || (view.manage.asked === 0 && view.manage.awaitingModeration === 0));
 
   return (
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack">
-          <StatGrid>
-            <StatCard
-              icon={<IconStar />}
-              tone="gold"
-              value={shown?.average !== null && shown !== null ? shown.average.toFixed(1) : "—"}
-              label="Average rating"
-              hint={
-                shown?.average !== null && shown !== null ? (
-                  <Stars rating={Math.round(shown.average)} decorative />
-                ) : (
-                  "Out of 5"
-                )
-              }
-            />
-            <StatCard
-              icon={<IconMessageCircle />}
-              tone="green"
-              value={shown?.count ?? 0}
-              label={shown?.count === 1 ? "Review" : "Reviews"}
-              hint={view.isPublic ? "Shown on your public page" : "From players and owners"}
-            />
-            {view.manage !== null ? (
-              <>
-                <StatCard
-                  icon={<IconSend />}
-                  tone="blue"
-                  value={view.manage.asked}
-                  label="Asked so far"
-                  hint={`${String(view.manage.reviewed)} answered`}
-                  {...(view.manage.asked > 0
-                    ? { progress: (view.manage.reviewed / view.manage.asked) * 100 }
-                    : {})}
-                />
-                <StatCard
-                  icon={<IconEye />}
-                  tone="purple"
-                  value={view.manage.awaitingModeration}
-                  label="Being read"
-                  hint="By DesiAuction, before they appear"
-                />
-              </>
-            ) : null}
-          </StatGrid>
+          {/* Four tiles of zeros (and a "—") took the fold of an empty
+              season. They appear once there is something to count. */}
+          {quiet ? null : (
+            <StatGrid>
+              <StatCard
+                icon={<IconStar />}
+                tone="gold"
+                value={shown?.average !== null && shown !== null ? shown.average.toFixed(1) : "—"}
+                label="Average rating"
+                hint={
+                  shown?.average !== null && shown !== null ? (
+                    <Stars rating={Math.round(shown.average)} decorative />
+                  ) : (
+                    "Out of 5"
+                  )
+                }
+              />
+              <StatCard
+                icon={<IconMessageCircle />}
+                tone="gold"
+                value={shown?.count ?? 0}
+                label={shown?.count === 1 ? "Review" : "Reviews"}
+                hint={view.isPublic ? "Shown on your public page" : "From players and owners"}
+              />
+              {view.manage !== null ? (
+                <>
+                  <StatCard
+                    icon={<IconSend />}
+                    tone="gold"
+                    value={view.manage.asked}
+                    label="Asked so far"
+                    hint={`${String(view.manage.reviewed)} answered`}
+                    {...(view.manage.asked > 0
+                      ? { progress: (view.manage.reviewed / view.manage.asked) * 100 }
+                      : {})}
+                  />
+                  <StatCard
+                    icon={<IconEye />}
+                    tone="gold"
+                    value={view.manage.awaitingModeration}
+                    label="Being read"
+                    hint="By DesiAuction, before they appear"
+                  />
+                </>
+              ) : null}
+            </StatGrid>
+          )}
 
           {view.manage !== null ? (
             <AskReviewsCard slug={slug} manage={view.manage} isPublic={view.isPublic} />
@@ -89,7 +97,7 @@ export default async function SeasonReviewsPage({ params }: { params: Promise<{ 
 
           <SectionCard
             icon={<IconMessageCircle />}
-            tone="green"
+            concept="neutral"
             title="What players and owners said"
             description={
               shown === null
@@ -99,17 +107,22 @@ export default async function SeasonReviewsPage({ params }: { params: Promise<{ 
             data-testid="season-reviews"
           >
             {shown === null ? (
-              <div className="st-empty">
-                <span className="st-empty-glyph" aria-hidden>
-                  <IconStar size={26} />
-                </span>
-                <h3>No reviews to show yet</h3>
-                <p>
-                  {view.canManage
-                    ? "Reviews appear here once our team has read them. Ask your players and owners once the season is done."
-                    : `Reviews appear once at least ${String(view.publicThreshold)} have been published.`}
-                </p>
-              </div>
+              <EmptyState
+                icon={<IconStar />}
+                title="No reviews to show yet"
+                headingLevel={3}
+                description={
+                  <>
+                    {view.canManage
+                      ? view.manage !== null &&
+                        view.manage.askable.players + view.manage.askable.owners === 0 &&
+                        view.manage.asked === 0
+                        ? "Reviews appear here once DesiAuction has read them. Nobody can be asked yet — a player needs an approved entry, an email and a date of birth on file."
+                        : "Reviews appear here once DesiAuction has read them."
+                      : `Reviews appear once at least ${String(view.publicThreshold)} have been published.`}
+                  </>
+                }
+              />
             ) : (
               <div className="rv-body">
                 <p className="rv-summary" data-testid="season-review-summary">

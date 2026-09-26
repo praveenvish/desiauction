@@ -17,26 +17,26 @@ export default async function ReplayPage({ params }: { params: Promise<{ slug: s
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <header className="dash-head">
+        <header className="dash-head replay-head">
           <div className="competition-title-row">
-            <h1>Replay viewer</h1>
-            {/* One action group, hard right — the bare buttons sat at flex
-                extremes, scattering "Cockpit" into the middle of the page. */}
+            <div className="replay-title">
+              <h1>Replay viewer</h1>
+              {/* Reader's words, not the implementation's — and one line: the
+                  lede used to take a band of its own under the title. */}
+              <p className="competitions-hint">
+                {data.auctionName} · every bid and hammer, exactly as recorded. Read-only.
+              </p>
+            </div>
+            {/* One action group, hard right. */}
             <div className="replay-head-actions">
-              <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
+              <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary" size="sm">
                 Cockpit
               </ButtonLink>
-              <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
+              <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary" size="sm">
                 Ledger
               </ButtonLink>
             </div>
           </div>
-          <p className="competitions-hint">
-            {/* Reader's words, not the implementation's: "fold the immutable
-                log" described the code to an organizer reviewing their night. */}
-            {data.auctionName} — step through the auction event by event, exactly as it was
-            recorded. Read-only: nothing on this page can change the record.
-          </p>
         </header>
         <ReplayPanel data={data} />
       </div>

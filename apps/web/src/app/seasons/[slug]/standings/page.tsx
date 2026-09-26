@@ -1,6 +1,6 @@
-import { IconTrophy, IconUsers, PageIntro, Pill, SectionCard } from "@desiauction/ui";
+import { EmptyState, IconTrophy, IconUsers, Pill, SectionCard } from "@desiauction/ui";
 
-import { SiblingLink } from "../sibling-link";
+import { ScheduleViews } from "../sibling-link";
 import { notFound } from "next/navigation";
 
 import { standingsView } from "../../../../server/competition/fixture-actions";
@@ -45,9 +45,12 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
       <div className="dash-stack">
         {/* The table shares the Schedule tab with the fixtures it is derived
             from (RN-1), so this is how an organizer reaches them. */}
-        <PageIntro actions={<SiblingLink href={`/seasons/${slug}/fixtures`} label="Schedule" />} />
+        <div className="st-head">
+          <ScheduleViews slug={slug} active="table" />
+        </div>
         <SectionCard
           icon={<IconTrophy />}
+          concept="results"
           title={lobby ? "Points table" : "League table"}
           description={
             standings.playable === 0
@@ -58,20 +61,23 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             /* Said whenever it is not the whole story. A table built from three
                of twenty results is not wrong, but presenting it without saying
                so invites somebody to read it as the season's standing. */
-            <Pill tone={complete ? "green" : "amber"} dot testId="standings-completeness">
+            <Pill
+              tone={standings.playable === 0 ? "neutral" : complete ? "green" : "amber"}
+              dot
+              testId="standings-completeness"
+            >
               {standings.recorded} of {standings.playable} results in
             </Pill>
           }
           flush={standings.rows.length > 0}
         >
           {standings.rows.length === 0 ? (
-            <div className="st-empty">
-              <span className="st-empty-glyph" aria-hidden>
-                <IconUsers size={26} />
-              </span>
-              <h3>No teams yet</h3>
-              <p>The table appears once this season has teams.</p>
-            </div>
+            <EmptyState
+              icon={<IconUsers />}
+              title="No teams yet"
+              headingLevel={3}
+              description={<>The table appears once this season has teams.</>}
+            />
           ) : (
             <>
               <div className="st-table-wrap">
@@ -83,9 +89,13 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                   </caption>
                   <thead>
                     <tr>
-                      <th scope="col" className="st-num sd-pos">
-                        #
-                      </th>
+                      {/* No rank column until something is ranked: a column of
+                          dashes is a column of nothing (round 2). */}
+                      {anyPlayed ? (
+                        <th scope="col" className="st-num sd-pos">
+                          #
+                        </th>
+                      ) : null}
                       <th scope="col">Team</th>
                       <th scope="col" className="st-num">
                         <abbr title="Played">P</abbr>
@@ -124,10 +134,13 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                         key={row.teamId}
                         data-testid={`standings-${row.teamId}`}
                         data-rank={index < 3 && row.played > 0 ? String(index + 1) : undefined}
+                        data-unplayed={row.played === 0 ? "true" : undefined}
                       >
-                        <td className="st-num sd-pos">
-                          <span className="sd-rank">{anyPlayed ? index + 1 : "—"}</span>
-                        </td>
+                        {anyPlayed ? (
+                          <td className="st-num sd-pos">
+                            <span className="sd-rank">{index + 1}</span>
+                          </td>
+                        ) : null}
                         <td>
                           <span className="st-team">
                             <TeamCrest
@@ -190,7 +203,12 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                   </tbody>
                 </table>
               </div>
-              <p className="st-foot-note">{standingsFootnote(standings.sport)}</p>
+              {/* The rules, one click away rather than a paragraph under every
+                  table (round 2). */}
+              <details className="sd-how">
+                <summary>How points work</summary>
+                <p className="st-foot-note">{standingsFootnote(standings.sport)}</p>
+              </details>
             </>
           )}
         </SectionCard>

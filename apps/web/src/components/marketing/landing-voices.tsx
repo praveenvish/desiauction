@@ -1,7 +1,9 @@
+import { StarGlyphs } from "@desiauction/ui";
 import { unstable_rethrow } from "next/navigation";
 
 import { landingVoices, type LandingVoice } from "../../server/reviews/voices";
 import styles from "./landing-voices.module.css";
+import { formatMonthYear } from "../../lib/format-date";
 
 /**
  * "In their own words" (FR-1 Phase 5). Not "from organizers" or "from people
@@ -34,11 +36,7 @@ async function voices(): Promise<readonly LandingVoice[]> {
 }
 
 function month(date: Date): string {
-  return date.toLocaleDateString("en-IN", {
-    month: "long",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatMonthYear(date);
 }
 
 export async function LandingVoices() {
@@ -57,10 +55,7 @@ export async function LandingVoices() {
             <li key={voice.id} className={styles["card"]}>
               <p className={styles["rating"]}>
                 <span className={styles["srOnly"]}>{`Rated ${String(voice.rating)} out of 5`}</span>
-                <span aria-hidden="true">
-                  {"★".repeat(voice.rating)}
-                  <span className={styles["ratingRest"]}>{"★".repeat(5 - voice.rating)}</span>
-                </span>
+                <StarGlyphs rating={voice.rating} />
               </p>
               <blockquote className={styles["quote"]}>
                 <p>{voice.quote}</p>

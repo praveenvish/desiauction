@@ -1,0 +1,188 @@
+/* The administration section strip (admin-section-nav.tsx). The shell's tab
+   language — secondary ink, a gold underline on the page you are on — with a
+   grouped "More" menu so sixteen sections fit a laptop rail. Tokens only. */
+
+.adn {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+/* Under 1024px the strip scrolls; it is a `da-scroll-strip` (system.css), so
+   the end with more sections past it fades. It used to hard-cut at
+   "Organizat" with no hint there was more. */
+
+/* Wide enough for the strip: no scroll box, so the menu is not clipped. */
+@media (min-width: 1024px) {
+  .adn {
+    overflow: visible;
+  }
+}
+
+.adn::-webkit-scrollbar {
+  display: none;
+}
+
+.adn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.adn-list > li {
+  display: flex;
+}
+
+.adn-list > li.adn-group-start {
+  margin-inline-start: var(--space-2);
+  padding-inline-start: var(--space-2);
+  border-inline-start: 1px solid var(--border-subtle);
+}
+
+/* The rule sits beside a tab, never above an empty strip end. */
+.adn-list > li.adn-group-start {
+  align-items: center;
+}
+
+.adn-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  color: var(--text-secondary);
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color var(--duration-fast) var(--ease-out);
+  cursor: pointer;
+}
+
+.adn-tab:hover {
+  color: var(--text-primary);
+}
+
+.adn-tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.adn-tab[data-active] {
+  color: var(--text-accent);
+  border-bottom-color: var(--accent-line);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ---- More ---- */
+
+.adn-more-item {
+  margin-inline-start: auto;
+}
+
+.adn-more {
+  position: relative;
+  display: flex;
+}
+
+.adn-more-button {
+  list-style: none;
+}
+
+.adn-more-button::-webkit-details-marker {
+  display: none;
+}
+
+.adn-caret {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.adn-more[open] .adn-caret {
+  transform: rotate(180deg);
+}
+
+.adn-more[open] > .adn-more-button {
+  color: var(--text-primary);
+}
+
+.adn-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(9.5rem, auto));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+}
+
+.adn-panel-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.adn-panel-label {
+  margin: 0 0 var(--space-2);
+  padding-inline: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.adn-panel-link {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.adn-panel-link:hover {
+  background: var(--surface-sunken);
+}
+
+.adn-panel-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.adn-panel-link[data-active] {
+  color: var(--text-accent);
+  background: var(--accent-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* A phone scrolls the strip, and a scrolling box clips an absolute child —
+   so the menu is pinned to the viewport under the strip instead. */
+@media (max-width: 1023px) {
+  .adn-panel {
+    position: fixed;
+    top: calc(var(--shell-topbar-h, 56px) + 46px);
+    left: var(--space-4);
+    right: var(--space-4);
+    grid-template-columns: 1fr 1fr;
+    max-height: 70dvh;
+    overflow-y: auto;
+  }
+}

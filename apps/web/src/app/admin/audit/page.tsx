@@ -8,6 +8,7 @@ import type { AuditFilters } from "../../../server/admin/views";
 import { AuditPanel } from "./audit-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
+import { AdminPageHead } from "../admin-ui";
 
 export const metadata = { title: "Audit · Platform admin · DesiAuction" };
 
@@ -43,13 +44,8 @@ export default async function AdminAuditPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head">
-          <p className="dash-hint">
-            Every audited action on the platform, newest first. Search matches the actor, the scope,
-            the subject and the action — the whole correlation chain, from one box.
-          </p>
-        </header>
-        <Suspense key={JSON.stringify(filters)} fallback={<LoadingState variant="page" />}>
+        <AdminPageHead readOnly>Every audited action, newest first. Times are IST.</AdminPageHead>
+        <Suspense fallback={<LoadingState variant="page" />}>
           <Explorer filters={filters} />
         </Suspense>
       </div>

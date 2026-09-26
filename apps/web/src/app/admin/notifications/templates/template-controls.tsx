@@ -145,7 +145,7 @@ export function MapTemplate({
     <>
       <Button
         variant="secondary"
-        size="touch"
+        size="sm"
         onClick={() => {
           setValue(current ?? "");
           setLanguages([...(currentLanguages ?? ["en", "hi"])]);
@@ -267,7 +267,7 @@ export function ClearTemplate({
   return (
     <Button
       variant="ghost"
-      size="touch"
+      size="sm"
       loading={pending}
       onClick={() => {
         run(() => clearProviderTemplate(kind, channel));
@@ -298,7 +298,7 @@ export function UseApprovedName({
   return (
     <Button
       variant="primary"
-      size="touch"
+      size="sm"
       loading={pending}
       onClick={() => {
         run(() => mapProviderTemplate(kind, "whatsapp", name, ["en", "hi"], "Approved by Meta"));
@@ -316,7 +316,7 @@ export function RefreshFromMeta() {
   return (
     <Button
       variant="secondary"
-      size="touch"
+      size="sm"
       loading={pending}
       onClick={() => {
         run(() => refreshTemplateStatus());
@@ -366,7 +366,7 @@ export function SubmitTemplate({
     <>
       <Button
         variant="secondary"
-        size="touch"
+        size="sm"
         onClick={() => {
           setName(suggestedName);
           setLanguages(["en", "hi"]);
@@ -467,8 +467,8 @@ export function RevertTemplate({ auditId, summary }: { auditId: string; summary:
   const { pending, run } = useRun();
   return (
     <Button
-      variant="secondary"
-      size="touch"
+      variant="ghost"
+      size="sm"
       loading={pending}
       onClick={() => {
         run(() => revertProviderTemplate(auditId));

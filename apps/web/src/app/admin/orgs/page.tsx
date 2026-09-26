@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { adminOrganizations } from "../../../server/admin/actions";
 import { platformAdminPageGate } from "../../../server/admin/authz";
 import type { OrgFilter } from "../../../server/admin/views";
+import { AdminPageHead } from "../admin-ui";
 import { OrgsPanel } from "./orgs-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
@@ -30,16 +31,11 @@ export default async function AdminOrgsPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head">
-          <p className="dash-hint">
-            Every organization on the platform, with what it has done. Follow a link to work in the
-            organization&rsquo;s own console.
-          </p>
-        </header>
-        <Suspense
-          key={`${q ?? ""}-${filter ?? ""}-${after ?? ""}`}
-          fallback={<LoadingState variant="page" />}
-        >
+        <AdminPageHead readOnly>Every club on the platform, and what it has done.</AdminPageHead>
+        {/* Not keyed on the query: the filter form applies itself as you type,
+            and a keyed boundary would remount it (and drop the caret) on every
+            navigation. The old rows stay until the new ones land. */}
+        <Suspense fallback={<LoadingState variant="page" />}>
           <Directory query={q} filter={filterOf(filter)} after={after} />
         </Suspense>
       </div>
@@ -60,5 +56,5 @@ async function Directory({
   if (directory === null) {
     notFound();
   }
-  return <OrgsPanel directory={directory} />;
+  return <OrgsPanel directory={directory} paged={after !== undefined} />;
 }

@@ -32,8 +32,13 @@ import {
 import { formatDate, formatDateTime } from "../../lib/format-date";
 import { isKnownEvent, labelForEvent } from "../../lib/inbox-events";
 
-/** How many sessions and events render before "Show more". */
-const PAGE = 10;
+/**
+ * What renders first: this device and the two most recent others, and the
+ * last three security events; "Show all" opens the rest in one press. Ten of
+ * each ran the account page to ~700px of devices before anything else.
+ */
+const FIRST_SESSIONS = 3;
+const FIRST_EVENTS = 3;
 
 type Pending =
   | { kind: "revoke-session"; session: SessionView }
@@ -47,8 +52,8 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
   const [deviceName, setDeviceName] = useState("");
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [sessionsShown, setSessionsShown] = useState(PAGE);
-  const [eventsShown, setEventsShown] = useState(PAGE);
+  const [sessionsShown, setSessionsShown] = useState(FIRST_SESSIONS);
+  const [eventsShown, setEventsShown] = useState(FIRST_EVENTS);
   const [pending, setPending] = useState<Pending | null>(null);
   const [renameTo, setRenameTo] = useState("");
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -176,7 +181,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
       <SectionCard
         id="security"
         icon={<IconLock />}
-        tone="purple"
+        tone="gold"
         title="Sign-in & security"
         description="Passkeys let you in without a code. Every device signed in to your account is listed here."
         className="acct-card"
@@ -184,9 +189,17 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
         <div className="acct-block" data-testid="passkeys-panel">
           <h3 className="acct-block-title">Passkeys</h3>
           {security.passkeys.length === 0 ? (
-            <p className="acct-block-empty">
-              No passkeys yet. Add one to sign in with your fingerprint or face — no code needed.
-            </p>
+            // Left-aligned, as the form around it is: a centred empty state
+            // sat alone in the middle of a left-set card.
+            <div className="acct-empty-row">
+              <span className="acct-empty-icon" aria-hidden>
+                <IconKey size={20} weight="duotone" />
+              </span>
+              <span className="acct-empty-text">
+                <h4>No passkeys yet</h4>
+                <span>Add one to sign in with your fingerprint or face — no code needed.</span>
+              </span>
+            </div>
           ) : (
             <ul className="security-list">
               {security.passkeys.map((passkey) => (
@@ -336,10 +349,10 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                 variant="secondary"
                 data-testid="show-more-sessions"
                 onClick={() => {
-                  setSessionsShown((shown) => shown + PAGE);
+                  setSessionsShown(security.sessions.length);
                 }}
               >
-                Show more ({String(security.sessions.length - sessionsShown)} left)
+                Show all {String(security.sessions.length)} devices
               </Button>
             </div>
           ) : null}
@@ -381,16 +394,20 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                 variant="secondary"
                 data-testid="show-more-events"
                 onClick={() => {
-                  setEventsShown((shown) => shown + PAGE);
+                  setEventsShown(security.events.length);
                 }}
               >
-                Show more ({String(security.events.length - eventsShown)} left)
+                {/* "All" only when it is all: past the kept window the button
+                    says what it opens, so it agrees with the note beside it. */}
+                {security.eventsTotal > security.events.length
+                  ? `Show the ${String(security.events.length)} most recent`
+                  : `Show all ${String(security.events.length)} events`}
               </Button>
             ) : null}
             {/* Truncation is ADMITTED rather than performed silently. */}
             {security.eventsTotal > security.events.length ? (
               <p className="security-note" data-testid="events-truncated">
-                Showing the {String(security.events.length)} most recent of{" "}
+                This page keeps the {String(security.events.length)} most recent of your{" "}
                 {String(security.eventsTotal)} events. Need the full history?{" "}
                 <Link href="/support">Ask support</Link>.
               </p>

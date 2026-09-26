@@ -1,0 +1,10 @@
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  vertical-align: -0.15em;
+}
+
+.rest {
+  color: var(--border-strong);
+}

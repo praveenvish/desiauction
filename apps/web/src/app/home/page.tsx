@@ -7,7 +7,7 @@ import { currentSession } from "../../server/auth/actions";
 import { myRegistrations, type MyRegistration } from "../../server/competition/public";
 import { currentTeam, rolesOf, type PersonRoles } from "../../server/roles/roles";
 import { AuctioneerHome } from "./auctioneer-home";
-import { greetingFor } from "./home-parts";
+import { greetingParts } from "./home-parts";
 import { homeSections } from "./home-router";
 import { MemberHome } from "./member-home";
 import { NewcomerHome } from "./newcomer-home";
@@ -176,7 +176,7 @@ async function HomeBody({
   const team = currentTeam(roles);
   const nextStepFor = (input: {
     managedLive: { competitionSlug: string; competitionName: string } | null;
-    attention: { label: string; detail: string; href: string }[];
+    attention: { label: string; detail: string; href: string; verb?: string }[];
   }): NextStep | null =>
     chooseNextStep({
       ownedTeam: team,
@@ -209,14 +209,22 @@ async function HomeBody({
     <>
       {/* The first name only: "Good afternoon, Aarav Sharma" ran out of room on
           a phone and the h1 truncated to "Good afternoon, A…" — a greeting
-          that cut the person's own name off. */}
+          that cut the person's own name off. Even the first name lost to the
+          phone's icon row ("Good morning,…"), so there the daypart is the
+          `lead` the shell drops, and the name stays. */}
       <PageTitle
-        title={greetingFor(new Date(), firstNameOf(name))}
+        {...greetingProps(greetingParts(new Date(), firstNameOf(name)))}
         subtitle={identityLine(roles, entries)}
       />
       {/* Said once, when the menu actually changed under them (RN-1 §3.6). */}
       <RoleChangeNotice held={heldRoles} />
-      {standaloneStep !== null ? <NextStepBanner step={standaloneStep} /> : null}
+      {standaloneStep !== null ? (
+        <NextStepBanner
+          step={standaloneStep}
+          // The auctioneer's home has no hero of its own; its step is it.
+          hero={standaloneStep.key.startsWith("auctioneer-")}
+        />
+      ) : null}
       {sections.has("newcomer") ? <NewcomerHome startClub={startClub} /> : null}
       {sections.has("owner") ? <OwnerHome teams={roles.owns} /> : null}
       {sections.has("auctioneer") ? <AuctioneerHome seasons={roles.conducts} /> : null}
@@ -233,4 +241,11 @@ async function HomeBody({
       {sections.has("member") ? <MemberHome clubCount={roles.memberOf.length} /> : null}
     </>
   );
+}
+
+function greetingProps(parts: { lead: string | null; title: string }): {
+  title: string;
+  lead?: string;
+} {
+  return parts.lead !== null ? { title: parts.title, lead: parts.lead } : { title: parts.title };
 }

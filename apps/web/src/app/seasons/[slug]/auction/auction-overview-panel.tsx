@@ -112,7 +112,14 @@ export function AuctionOverviewPanel({
             <div className="teams-head">
               <div className="teams-head-title">
                 <h2 className="auc-block-title">
-                  {onBlock !== null ? "● On the block now" : "Nothing on the block"}
+                  {onBlock !== null ? (
+                    <>
+                      <span className="auc-live-dot" aria-hidden />
+                      On the block now
+                    </>
+                  ) : (
+                    "Nothing on the block"
+                  )}
                 </h2>
               </div>
             </div>

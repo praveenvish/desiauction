@@ -169,3 +169,73 @@
     transform: none;
   }
 }
+
+/*
+ * THE CARD RECIPE (2026-09-25) — one hover for every clickable card, so a
+ * tournament tile, a stat tile and an admin row card answer the pointer the
+ * same way: a 2px lift, a deeper shadow, a gold-tinted rim, and a gold edge
+ * that sweeps in along the top. Press settles it back. Touch devices get
+ * none of it (there is no hover to answer), reduced motion keeps the colour
+ * change and drops the movement.
+ *
+ * Uses ::before for the edge — do not put `.da-lift` on an element that
+ * draws its own ::before. The element becomes a positioning context.
+ */
+.da-lift {
+  position: relative;
+  isolation: isolate;
+}
+
+.da-lift::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--accent-line, var(--accent)), transparent);
+  opacity: 0;
+  transform: scaleX(0.2);
+  pointer-events: none;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .da-lift {
+    transition:
+      transform var(--duration-base) var(--ease-out),
+      box-shadow var(--duration-base) var(--ease-out),
+      border-color var(--duration-base) var(--ease-out);
+  }
+
+  .da-lift::before {
+    transition:
+      transform var(--duration-slow) var(--ease-out),
+      opacity var(--duration-base) var(--ease-out);
+  }
+
+  .da-lift:hover {
+    transform: translateY(var(--depth-lift-sm));
+    box-shadow: var(--shadow-2);
+    border-color: color-mix(in srgb, var(--accent) 38%, var(--border-subtle));
+  }
+
+  .da-lift:hover::before {
+    opacity: 1;
+    transform: none;
+  }
+
+  .da-lift:active {
+    transform: translateY(0) scale(0.995);
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .da-lift:hover {
+    border-color: color-mix(in srgb, var(--accent) 38%, var(--border-subtle));
+  }
+}
+
+.da-lift:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}

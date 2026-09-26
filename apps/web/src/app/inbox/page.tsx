@@ -1,5 +1,15 @@
 import { competitions } from "@desiauction/db";
-import { EmptyState, IconBell, IconCog, SectionCard } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconBell,
+  IconCheckCircle,
+  IconCog,
+  IconGavel,
+  IconMegaphone,
+  IconShieldCheck,
+  IconUsers,
+  SectionCard,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
@@ -8,6 +18,7 @@ import { detailOf } from "../../lib/inbox-events";
 import { currentSession } from "../../server/auth/actions";
 import { systemDb } from "../../server/db";
 import { listInboxEvents } from "../../server/auth/security-events";
+import { rolesOf } from "../../server/roles/roles";
 import { InboxList } from "./inbox-list";
 import "./inbox.css";
 
@@ -74,67 +85,161 @@ export default async function InboxPage() {
   if (session === null) {
     redirect("/login?next=/inbox");
   }
-  const events = await listInboxEvents(session.personId, WINDOW);
+  const [events, roles] = await Promise.all([
+    listInboxEvents(session.personId, WINDOW),
+    rolesOf(session.personId),
+  ]);
+  const organizerOnly = roles.organizes.length > 0 && !roles.plays;
+  /*
+   * The rail says what lands for THIS person (round 4): an owner and an
+   * auctioneer were told "Which team bought you". Player kinds for someone who
+   * plays — or a brand-new account, which is most likely a player — owner and
+   * auctioneer kinds for those roles, account alerts for everyone.
+   */
+  const owner = roles.owns.length > 0;
+  const conductor = roles.conducts.length > 0;
+  const showPlayer = roles.plays || (!owner && !conductor && !organizerOnly);
   const named = await competitionsNamed(
     events.map((event) => competitionIdOf(event.meta) ?? "").filter((id) => id !== ""),
   );
   return (
     <main className="inbox">
-      <SectionCard
-        icon={<IconBell />}
-        title="All notifications"
-        description={
-          events.length === 0
-            ? "Registration decisions, auction results and account alerts land here."
-            : `${String(events.length)} ${events.length === 1 ? "notice" : "notices"} · newest first · marked read as you open this page`
-        }
-        action={
-          <Link href="/account#notifications" className="inbox-settings">
-            <IconCog size={16} aria-hidden /> Notification settings
+      <div className="inbox-main">
+        <SectionCard
+          icon={<IconBell />}
+          title="All notifications"
+          description={
+            events.length === 0
+              ? "Registration decisions, auction results and account alerts land here."
+              : `${String(events.length)} ${events.length === 1 ? "notice" : "notices"} · newest first`
+          }
+          action={
+            <Link
+              href="/account#notifications"
+              className="inbox-settings"
+              aria-label="Notification settings"
+            >
+              <IconCog size={16} aria-hidden />
+              <span className="inbox-settings-text">Notification settings</span>
+            </Link>
+          }
+          flush={events.length > 0}
+        >
+          {events.length === 0 ? (
+            <EmptyState
+              headingLevel={3}
+              title="Nothing yet"
+              description="New notices appear here the moment they happen."
+            />
+          ) : (
+            <InboxList
+              personId={session.personId}
+              events={events.map((event) => {
+                const competitionId = competitionIdOf(event.meta);
+                const competition = competitionId === null ? undefined : named.get(competitionId);
+                const detail = detailOf(event.meta);
+                return {
+                  action: event.action,
+                  at: event.at.toISOString(),
+                  ...(detail === null ? {} : { detail }),
+                  ...(competition !== undefined
+                    ? {
+                        subject: {
+                          name: competition.name,
+                          ...(competition.publicPage ? { href: `/c/${competition.slug}` } : {}),
+                        },
+                      }
+                    : {}),
+                };
+              })}
+            />
+          )}
+        </SectionCard>
+      </div>
+      {/*
+       * WHAT LANDS HERE (wow pass, round 2). The list stopped at 960px and left
+       * the right third of a laptop blank; the rail now says what kinds of
+       * notice arrive, and where the ones that do not (sign-ins) went.
+       */}
+      <aside className="inbox-rail" aria-labelledby="inbox-rail-title">
+        <h2 id="inbox-rail-title" className="inbox-rail-title">
+          What lands here
+        </h2>
+        {/* An organizer who does not play was told "which team bought you".
+            Their clubs' work lives on each season's tabs; the inbox is for
+            what happens to THEM — said so, with the door to the seasons. */}
+        {organizerOnly ? (
+          <p className="inbox-foot" data-testid="inbox-organizer-note">
+            Your clubs&apos; work — registrations, auction nights, fixtures — lives on each
+            season&apos;s own tabs. This inbox is for things that happen to you.{" "}
+            <Link href="/tournaments">Your tournaments</Link>
+          </p>
+        ) : null}
+        <ul className="inbox-kinds">
+          {showPlayer ? (
+            <>
+              <li>
+                <IconCheckCircle size={20} aria-hidden />
+                <span>
+                  <strong>Registration decisions</strong>
+                  The moment the organizer decides on your entry.
+                </span>
+              </li>
+              <li>
+                <IconGavel size={20} aria-hidden />
+                <span>
+                  <strong>Auction results</strong>
+                  Which team bought you, and for how much.
+                </span>
+              </li>
+              <li>
+                <IconUsers size={20} aria-hidden />
+                <span>
+                  <strong>Your team</strong>
+                  Named captain, squad set, picked in a lineup.
+                </span>
+              </li>
+            </>
+          ) : null}
+          {owner ? (
+            <li>
+              <IconUsers size={20} aria-hidden />
+              <span>
+                <strong>Your squad</strong>
+                The team you own — invites, and its squad sheet once the auction settles.
+              </span>
+            </li>
+          ) : null}
+          {conductor ? (
+            <li>
+              <IconMegaphone size={20} aria-hidden />
+              <span>
+                <strong>Auction nights you run</strong>
+                When a club names you its auctioneer, and changes to that night.
+              </span>
+            </li>
+          ) : null}
+          <li>
+            <IconShieldCheck size={20} aria-hidden />
+            <span>
+              <strong>Account alerts</strong>
+              Changes to your name, number, email or devices.
+            </span>
+          </li>
+        </ul>
+        {/* Where the sign-ins went: routine sign-ins and code requests are kept
+            off this list (server/auth/inbox-filter.ts) and live in the
+            account's security log — said here, so they do not seem lost. */}
+        <p className="inbox-foot">
+          Sign-ins and sign-in codes are in{" "}
+          <Link href="/account#activity" data-testid="inbox-signins-link">
+            Account → Security activity
           </Link>
-        }
-        flush={events.length > 0}
-      >
-        {events.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="Nothing yet"
-            description="New notices appear here the moment they happen."
-          />
-        ) : (
-          <InboxList
-            personId={session.personId}
-            events={events.map((event) => {
-              const competitionId = competitionIdOf(event.meta);
-              const competition = competitionId === null ? undefined : named.get(competitionId);
-              const detail = detailOf(event.meta);
-              return {
-                action: event.action,
-                at: event.at.toISOString(),
-                ...(detail === null ? {} : { detail }),
-                ...(competition !== undefined
-                  ? {
-                      subject: {
-                        name: competition.name,
-                        ...(competition.publicPage ? { href: `/c/${competition.slug}` } : {}),
-                      },
-                    }
-                  : {}),
-              };
-            })}
-          />
-        )}
-      </SectionCard>
-      {/* Where the sign-ins went: routine sign-ins and code requests are kept
-          off this list (server/auth/inbox-filter.ts) and live in the account's
-          security log — said here, so they do not seem lost. */}
-      <p className="inbox-foot">
-        Sign-ins and sign-in codes are in{" "}
-        <Link href="/account#activity" data-testid="inbox-signins-link">
-          Account → Security activity
-        </Link>
-        .
-      </p>
+          .
+        </p>
+        {/* One link per destination (round 3B): notification settings is the
+            gear in the page head, not a second link here. */}
+      </aside>
     </main>
   );
 }

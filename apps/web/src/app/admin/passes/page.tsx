@@ -1,10 +1,12 @@
-import { EmptyState, IconWallet, SectionCard, ToastProvider } from "@desiauction/ui";
+import { IconWallet, ToastProvider } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
 import { platformBillingGate } from "../../../server/admin/authz";
 import { adminPassQueue } from "../../../server/admin/pass-views";
 import { PassQueuePanel } from "./pass-queue-panel";
+import { AdminEmpty, AdminPageHead } from "../admin-ui";
 import "../../seasons/seasons.css";
 import "../admin.css";
 
@@ -38,21 +40,24 @@ export default async function AdminPassesPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head">
-            <p className="dash-hint">
-              Season pass requests. Granting moves the season&apos;s tier and lifts its ceilings;
-              declining answers the organizer without changing anything. Both land on the audit log
-              against your name.
-            </p>
-          </header>
+          <AdminPageHead>
+            Season pass requests. Granting lifts the season&apos;s ceilings; both answers are
+            audited.
+          </AdminPageHead>
           {queue.open.length === 0 && queue.recent.length === 0 ? (
-            <SectionCard icon={<IconWallet />} tone="neutral" title="Pass requests">
-              <EmptyState
-                headingLevel={3}
+            <div className="admin-panel">
+              <AdminEmpty
+                icon={<IconWallet size={24} weight="duotone" />}
                 title="No pass requests"
-                description="When an organizer runs out of room on their pass and asks for more, it appears here."
-              />
-            </SectionCard>
+                actions={
+                  <Link href="/pricing" className="admin-head-button">
+                    What a pass includes
+                  </Link>
+                }
+              >
+                When an organizer runs out of room on their pass and asks for more, it appears here.
+              </AdminEmpty>
+            </div>
           ) : (
             <PassQueuePanel queue={queue} />
           )}

@@ -44,7 +44,7 @@ export function PersonProfilePanel({ profile }: { profile: PlayerProfile }) {
     <SectionCard
       id="player"
       icon={<IconFile />}
-      tone="blue"
+      tone="gold"
       title="Player profile"
       description="About you, remembered once — your next registration form starts filled in. Every field is optional."
       className="acct-card"

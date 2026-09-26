@@ -14,7 +14,9 @@ export function SeasonPicker({
   const multiOrg = new Set(seasons.map((season) => season.orgName)).size > 1;
   return (
     <span className="rp-picker">
-      <label htmlFor="rp-season">Season</label>
+      <label htmlFor="rp-season" className="rp-picker-label">
+        Season
+      </label>
       <select
         id="rp-season"
         className="px-select"

@@ -7,6 +7,7 @@ import { platformAdminPageGate } from "../../../server/admin/authz";
 import { UsersPanel } from "./users-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
+import { AdminPageHead } from "../admin-ui";
 
 export const metadata = { title: "Users · Platform admin · DesiAuction" };
 
@@ -23,16 +24,8 @@ export default async function AdminUsersPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head">
-          <p className="dash-hint">
-            Everyone on the platform, and what they hold. Grants are shown as the capability sets
-            they actually are.
-          </p>
-        </header>
-        <Suspense
-          key={`${q ?? ""}-${after ?? ""}-${filter ?? ""}`}
-          fallback={<LoadingState variant="page" />}
-        >
+        <AdminPageHead readOnly>Everyone on the platform, and what they hold.</AdminPageHead>
+        <Suspense fallback={<LoadingState variant="page" />}>
           <Directory query={q} after={after} filter={filter} />
         </Suspense>
       </div>
@@ -58,5 +51,5 @@ async function Directory({
   if (directory === null) {
     notFound();
   }
-  return <UsersPanel directory={directory} />;
+  return <UsersPanel directory={directory} paged={after !== undefined} />;
 }

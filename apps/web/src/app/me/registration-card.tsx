@@ -1,4 +1,4 @@
-import { Pill, TeamChip, type KitTone } from "@desiauction/ui";
+import { Pill, RosterMark, TeamChip, type KitTone } from "@desiauction/ui";
 import type { MoneyUnit } from "@desiauction/core";
 import Link from "next/link";
 
@@ -61,7 +61,7 @@ export function RegistrationCard({
 }) {
   const verdict = verdictOf(season, money);
   return (
-    <Link href={`/seasons/${season.competitionSlug}/register`} className="me-reg">
+    <Link href={`/seasons/${season.competitionSlug}/register`} className="me-reg da-lift">
       <span className="me-reg-top">
         <span className="me-reg-when">{eyebrow}</span>
         <Pill tone={verdict.tone} dot>
@@ -81,9 +81,9 @@ export function RegistrationCard({
           <span className="me-reg-noteam">No team yet</span>
         )}
         {season.isCaptain && season.auction?.kind !== "captain" ? (
-          <Pill tone="purple">Captain</Pill>
+          <RosterMark kind="captain" />
         ) : season.isViceCaptain ? (
-          <Pill tone="purple">Vice-captain</Pill>
+          <RosterMark kind="vice-captain" />
         ) : null}
       </span>
     </Link>

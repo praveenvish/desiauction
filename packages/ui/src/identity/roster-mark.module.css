@@ -1,0 +1,21 @@
+/* One badge for every squad row — see `roster-mark.tsx`. */
+.mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--space-2);
+  box-sizing: border-box;
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 40%, transparent);
+  color: var(--accent-ink);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  vertical-align: middle;
+}

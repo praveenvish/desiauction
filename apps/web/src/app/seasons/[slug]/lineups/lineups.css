@@ -261,3 +261,8 @@
     flex: 1 1 auto;
   }
 }
+
+/* The Players views switcher leads; the lede sits beside it. */
+.st-head.lu-head {
+  justify-content: flex-start;
+}

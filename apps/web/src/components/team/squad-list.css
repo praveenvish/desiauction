@@ -1,0 +1,78 @@
+/* The one squad list — see `squad-list.tsx`. It rides the home-duo card kit
+   (`.hd-*`) and adds only the non-wrapping head and the row badges. */
+
+/* The name truncates; the count and "See all" never move to a second line. */
+.sq-title {
+  flex: 1 1 auto;
+}
+
+.sq-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sq-count {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  box-sizing: border-box;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.sq-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sq-list .hd-link {
+  flex: none;
+}
+
+.sq-caption {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Name, then its marks, on one line: the name gives way first. */
+.sq-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.sq-line .hd-name {
+  min-width: 0;
+}
+
+.sq-line > :not(.hd-name) {
+  flex: none;
+}
+
+.sq-more {
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}

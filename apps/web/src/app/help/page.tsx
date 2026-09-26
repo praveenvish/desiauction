@@ -1,7 +1,8 @@
 import {
+  IconArrowRight,
+  IconFlag,
   IconGavel,
   IconHelp,
-  IconMessageCircle,
   IconReceipt,
   IconSpark,
   IconTrophy,
@@ -13,15 +14,7 @@ import type { ReactNode } from "react";
 
 import { env } from "../../env";
 import { HELP_ARTICLES, HELP_CATEGORIES, helpArticlesIn } from "../../content/help";
-import {
-  CountChips,
-  PageBody,
-  PageHero,
-  PageSection,
-  SportMontage,
-  TopicCard,
-  TopicGrid,
-} from "../../components/public/public-kit";
+import { CountChips, PageBody, PageHero } from "../../components/public/public-kit";
 import "../content.css";
 import "../marketing.css";
 
@@ -32,20 +25,17 @@ export const metadata: Metadata = {
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/help` },
 };
 
-type Tone = "gold" | "green" | "blue" | "amber" | "purple" | "neutral";
-
 /**
- * A face per category, so a reader scanning six sections has something other
- * than the heading to recognise. Keyed by the category's own slug — a new
- * category without an entry gets the neutral question mark rather than
- * nothing, which is the one thing a card grid cannot survive.
+ * A face per category — a DISTINCT glyph, one tint. (It was one glyph repeated
+ * on every card of a section, in five different tile colours.) Keyed by the
+ * category's own slug; a new category without an entry gets the question mark.
  */
-const CATEGORY_FACE: Record<string, { icon: ReactNode; tone: Tone }> = {
-  "getting-started": { icon: <IconSpark width={20} height={20} />, tone: "gold" },
-  organizer: { icon: <IconTrophy width={20} height={20} />, tone: "blue" },
-  player: { icon: <IconUsers width={20} height={20} />, tone: "green" },
-  auction: { icon: <IconGavel width={20} height={20} />, tone: "purple" },
-  money: { icon: <IconReceipt width={20} height={20} />, tone: "amber" },
+const CATEGORY_ICON: Record<string, ReactNode> = {
+  "getting-started": <IconSpark size={24} weight="duotone" />,
+  organizer: <IconTrophy size={24} weight="duotone" />,
+  player: <IconUsers size={24} weight="duotone" />,
+  auction: <IconGavel size={24} weight="duotone" />,
+  money: <IconReceipt size={24} weight="duotone" />,
 };
 
 /**
@@ -77,7 +67,6 @@ export default function HelpIndexPage() {
           </>
         }
         lede="Everything you need to run a tournament on DesiAuction — described exactly as the platform works."
-        art={<SportMontage />}
         actions={
           <>
             <form
@@ -104,61 +93,85 @@ export default function HelpIndexPage() {
       />
 
       <PageBody>
-        {HELP_CATEGORIES.map((category) => {
-          const face = CATEGORY_FACE[category.slug] ?? {
-            icon: <IconHelp width={20} height={20} />,
-            tone: "neutral" as Tone,
-          };
-          return (
-            <PageSection
-              key={category.slug}
-              headingId={category.slug}
-              title={category.title}
-              lede={category.description}
-              action={
-                <Link className="content-view-all" href={`/help/category/${category.slug}`}>
-                  View all
-                </Link>
-              }
-              flush
-            >
-              <TopicGrid>
+        {/* A CATEGORY INDEX, not six stacked card grids: one card per guide,
+            its articles listed inside it as plain rows. Six cards make a clean
+            3×2 — the old layout left an orphan or a half-empty row under
+            every section and ran to ~3,950px on a laptop. */}
+        <h2 className="visually-hidden-heading" id="guides">
+          Guides
+        </h2>
+        <div className="help-index da-stagger">
+          {HELP_CATEGORIES.map((category) => (
+            <section key={category.slug} className="help-guide" aria-labelledby={category.slug}>
+              <div className="help-guide-head">
+                <span className="help-guide-tile" aria-hidden>
+                  {CATEGORY_ICON[category.slug] ?? <IconHelp size={24} weight="duotone" />}
+                </span>
+                <div>
+                  <h3 className="help-guide-title" id={category.slug}>
+                    {category.title}
+                  </h3>
+                  <p className="help-guide-desc">{category.description}</p>
+                </div>
+              </div>
+              <ul className="help-guide-list">
                 {helpArticlesIn(category.slug).map((article) => (
-                  <TopicCard
-                    key={article.slug}
-                    href={`/help/${article.slug}`}
-                    icon={face.icon}
-                    tone={face.tone}
-                    title={article.title}
-                    description={article.summary}
-                    foot={`${String(article.readMinutes)} min read`}
-                  />
+                  <li key={article.slug}>
+                    <Link href={`/help/${article.slug}`} className="help-guide-link">
+                      <span>{article.title}</span>
+                      <span className="help-guide-time">{article.readMinutes} min</span>
+                    </Link>
+                  </li>
                 ))}
-              </TopicGrid>
-            </PageSection>
-          );
-        })}
-
-        <PageSection headingId="more" title="More" flush>
-          <TopicGrid>
-            <TopicCard
-              href="/help/faq"
-              icon={<IconHelp width={20} height={20} />}
-              title="Frequently asked questions"
-              description="Quick answers to the things people ask most."
-            />
-            <TopicCard
-              href="/support"
-              tone="neutral"
-              icon={<IconMessageCircle width={20} height={20} />}
-              title="Support"
-              description="Reach a human, report a bug, or check what changed."
-            />
-          </TopicGrid>
-          <p className="article-meta">
-            {HELP_ARTICLES.length} articles · always free to read, no sign-in needed.
-          </p>
-        </PageSection>
+              </ul>
+              <Link className="content-view-all" href={`/help/category/${category.slug}`}>
+                View all <IconArrowRight size={16} />
+              </Link>
+            </section>
+          ))}
+          <section className="help-guide help-guide-more" aria-labelledby="more">
+            <div className="help-guide-head">
+              <span className="help-guide-tile" aria-hidden>
+                <IconFlag size={24} weight="duotone" />
+              </span>
+              <div>
+                <h3 className="help-guide-title" id="more">
+                  More help
+                </h3>
+                <p className="help-guide-desc">Quick answers, a human, and what changed lately.</p>
+              </div>
+            </div>
+            <ul className="help-guide-list">
+              <li>
+                <Link href="/help/faq" className="help-guide-link">
+                  <span>Frequently asked questions</span>
+                  <IconArrowRight size={16} />
+                </Link>
+              </li>
+              <li>
+                <Link href="/support" className="help-guide-link">
+                  <span>Contact support</span>
+                  <IconArrowRight size={16} />
+                </Link>
+              </li>
+              <li>
+                <Link href="/rules-guidelines" className="help-guide-link">
+                  <span>Rules &amp; guidelines</span>
+                  <IconArrowRight size={16} />
+                </Link>
+              </li>
+              <li>
+                <Link href="/releases" className="help-guide-link">
+                  <span>Release notes</span>
+                  <IconArrowRight size={16} />
+                </Link>
+              </li>
+            </ul>
+            <p className="article-meta">
+              {HELP_ARTICLES.length} articles · free to read, no sign-in needed.
+            </p>
+          </section>
+        </div>
       </PageBody>
     </main>
   );

@@ -114,6 +114,7 @@ export function BoardPanel({
   lotMedia,
   pursePerTeam = null,
   preSignedByTeam = {},
+  settledStatus,
 }: {
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
@@ -148,6 +149,12 @@ export function BoardPanel({
    * "Squad 10" on the wall while every other page said 12.
    */
   preSignedByTeam?: Record<string, number>;
+  /**
+   * The server's record of the auction's status. A finished night the engine
+   * never answered for read "CONNECTING TO THE AUCTION ROOM" over a wall of
+   * dashes; /spectate says COMPLETED from the same record (round 4).
+   */
+  settledStatus?: AuctionStatus | undefined;
 }) {
   const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
@@ -166,6 +173,9 @@ export function BoardPanel({
   // and when it was sent NOTHING, which is every anonymous watcher of this
   // page, it is never "₹0": the projector once read "TOTAL SPEND ₹0" beside
   // "PLAYERS SOLD 78" and "MOST EXPENSIVE ₹60,000".
+  /** Over, and read from the record: no socket, but nothing left to wait for. */
+  const overOffline =
+    snapshot === null && (settledStatus === "completed" || settledStatus === "reconciled");
   const visibleCommitted =
     snapshot === null
       ? []
@@ -182,7 +192,9 @@ export function BoardPanel({
     lotsSold.reduce((sum, entry) => sum + (entry.soldPrice ?? 0), 0);
   const totalSpend =
     snapshot === null
-      ? null
+      ? overOffline
+        ? soldSum(soldLots)
+        : null
       : visibleCommitted.length === 0
         ? soldSum(soldLots)
         : visibleCommitted.reduce((sum, value) => sum + value, 0);
@@ -190,7 +202,9 @@ export function BoardPanel({
   // is the owners' live headroom, which the engine seals from this audience
   // (P1-6), and deriving it here would undo that on a projector.
   const finished =
-    snapshot?.auctionStatus === "completed" || snapshot?.auctionStatus === "reconciled";
+    overOffline ||
+    snapshot?.auctionStatus === "completed" ||
+    snapshot?.auctionStatus === "reconciled";
   const topBuy = soldLots.reduce<ResolvedLot | null>(
     (best, lot) => ((lot.soldPrice ?? 0) > (best?.soldPrice ?? -1) ? lot : best),
     null,
@@ -220,7 +234,7 @@ export function BoardPanel({
    * so the tiebreak (name) is what orders them, and the order the room sees
    * first is alphabetical rather than arbitrary.
    */
-  const connecting = snapshot === null;
+  const connecting = snapshot === null && !overOffline;
   const teams = connecting
     ? teamIdentities
         .map((team) => ({
@@ -236,22 +250,43 @@ export function BoardPanel({
           bought: 0,
         }))
         .sort((a, b) => a.teamName.localeCompare(b.teamName))
-    : teamPurseRows(snapshot, teamIdentities)
-        .map((row) => {
-          const bought = soldLots.filter((lot) => lot.teamName === row.teamName);
-          const committed = row.committed ?? soldSum(bought);
-          return {
-            ...row,
-            committed,
-            purseRemaining:
-              row.purseRemaining ??
-              (finished && pursePerTeam !== null ? Math.max(0, pursePerTeam - committed) : null),
-            // Pre-signed players are on the squad too — see `preSignedByTeam`.
-            squad: bought.length + (preSignedByTeam[row.teamId] ?? 0),
-            bought: bought.length,
-          };
-        })
-        .sort((a, b) => b.committed - a.committed || a.teamName.localeCompare(b.teamName));
+    : snapshot === null
+      ? // Finished, from the record: each franchise's squad and spend are the
+        // hammer prices already on this page; the purse left follows from them.
+        teamIdentities
+          .map((team) => {
+            const bought = soldLots.filter((lot) => lot.teamName === team.name);
+            const committed = soldSum(bought);
+            return {
+              teamId: team.id,
+              teamName: team.name,
+              team,
+              committed,
+              purseRemaining: pursePerTeam === null ? null : Math.max(0, pursePerTeam - committed),
+              total: null,
+              activePaddles: [] as string[],
+              leading: false,
+              squad: bought.length + (preSignedByTeam[team.id] ?? 0),
+              bought: bought.length,
+            };
+          })
+          .sort((a, b) => b.committed - a.committed || a.teamName.localeCompare(b.teamName))
+      : teamPurseRows(snapshot, teamIdentities)
+          .map((row) => {
+            const bought = soldLots.filter((lot) => lot.teamName === row.teamName);
+            const committed = row.committed ?? soldSum(bought);
+            return {
+              ...row,
+              committed,
+              purseRemaining:
+                row.purseRemaining ??
+                (finished && pursePerTeam !== null ? Math.max(0, pursePerTeam - committed) : null),
+              // Pre-signed players are on the squad too — see `preSignedByTeam`.
+              squad: bought.length + (preSignedByTeam[row.teamId] ?? 0),
+              bought: bought.length,
+            };
+          })
+          .sort((a, b) => b.committed - a.committed || a.teamName.localeCompare(b.teamName));
 
   // A projector is ONE frame, so the board has to spend its height rather than
   // overflow it. When a player is under the hammer the room is watching the
@@ -268,7 +303,7 @@ export function BoardPanel({
     src: lotMedia[entry.lotId]?.photoUrl ?? null,
   });
 
-  const status = snapshot?.auctionStatus ?? null;
+  const status = snapshot?.auctionStatus ?? (overOffline ? settledStatus : null);
   const lot = snapshot?.currentLot ?? null;
   // THE FACE ON THE BLOCK. `lotMedia` is keyed by lot id, which is the one key
   // the live socket's `currentLot` and the server-rendered media both carry —
@@ -333,9 +368,7 @@ export function BoardPanel({
             {status === "live" && !stale ? (
               <i className="board-live-dot" aria-hidden="true" />
             ) : null}
-            {snapshot === null
-              ? "Connecting to the auction room"
-              : BOARD_KICKER[snapshot.auctionStatus]}
+            {status !== null ? BOARD_KICKER[status] : "Connecting to the auction room"}
           </p>
           <h1 className="board-title">{auctionName}</h1>
           {identity.length > 0 ? (
@@ -362,6 +395,8 @@ export function BoardPanel({
               <span className="board-progress-count">
                 &mdash;<span className="board-progress-total">/&mdash;</span>
               </span>
+            ) : snapshot === null ? (
+              <span className="board-progress-count">{feed.resolved.length}</span>
             ) : (
               <span className="board-progress-count">
                 {snapshot.lotsResolved}
@@ -375,7 +410,9 @@ export function BoardPanel({
                   width: `${String(
                     snapshot !== null && snapshot.lotsTotal > 0
                       ? Math.round((snapshot.lotsResolved / snapshot.lotsTotal) * 100)
-                      : 0,
+                      : overOffline
+                        ? 100
+                        : 0,
                   )}%`,
                 }}
               />
@@ -528,7 +565,7 @@ export function BoardPanel({
                 totalSpend === null ? "board-tile-value board-tile-muted" : "board-tile-value"
               }
             >
-              {totalSpend === null ? "—" : money.ledger(totalSpend)}
+              {totalSpend === null ? "—" : <TileMoney text={money.ledger(totalSpend)} />}
             </span>
           </div>
           <div className="board-tile">
@@ -558,7 +595,9 @@ export function BoardPanel({
                   />
                 </span>
                 <span className="board-tile-value board-tile-top">
-                  {money.ledger(topBuy.soldPrice)}
+                  <span>
+                    <TileMoney text={money.ledger(topBuy.soldPrice)} />
+                  </span>
                   <span className="board-tile-note">
                     {topBuy.playerName ?? topBuy.lotNumber}
                     {topBuy.teamName !== null ? ` · ${topBuy.teamName}` : ""}
@@ -588,9 +627,13 @@ export function BoardPanel({
               <div className="board-team-top">
                 <BoardCrest team={team.team} fallback={team.teamName} />
                 <h3 className="board-team-name">{team.teamName}</h3>
-                <span className="board-paddle">
-                  {team.activePaddles.length > 0 ? team.activePaddles.join(" · ") : "—"}
-                </span>
+                {/* A finished night holds no paddles: the pill said "—" on every
+                    card. It stays while connecting, where it reserves space. */}
+                {connecting || team.activePaddles.length > 0 ? (
+                  <span className="board-paddle">
+                    {team.activePaddles.length > 0 ? team.activePaddles.join(" · ") : "—"}
+                  </span>
+                ) : null}
               </div>
               <div className="board-team-mid">
                 <div className="board-team-purse">
@@ -599,7 +642,7 @@ export function BoardPanel({
                       this viewer. Before the socket answers, nothing has been
                       withheld — it simply is not known yet, and saying "sealed"
                       there would state a permission fact that is not true. */}
-                    {connecting
+                    {connecting || (overOffline && team.purseRemaining === null)
                       ? "—"
                       : team.purseRemaining === null
                         ? "sealed"
@@ -691,5 +734,23 @@ export function BoardPanel({
         </section>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A headline figure whose unit never wraps alone: "1,74,500 pts" at 64px
+ * broke to a second line holding just "pts", doubling the tile. The unit is
+ * set as a small suffix; a rupee figure (prefix symbol) passes through.
+ */
+function TileMoney({ text }: { text: string }) {
+  const match = /^(.*?)\s?(pts)$/.exec(text);
+  if (match === null) {
+    return <>{text}</>;
+  }
+  return (
+    <>
+      {match[1]}
+      <small className="board-tile-unit">{match[2]}</small>
+    </>
   );
 }

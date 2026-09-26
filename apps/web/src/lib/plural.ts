@@ -11,6 +11,15 @@
  */
 const GROUPED = new Intl.NumberFormat("en-IN");
 
+/**
+ * `174500` → `1,74,500`: the product's one count format (round 3B). Every
+ * figure that is not money — players, lots, events, sends — goes through here;
+ * money goes through `lib/money` (its season's unit) or `lib/inr` (fees).
+ */
+export function formatCount(value: number): string {
+  return GROUPED.format(value);
+}
+
 export function countNoun(value: number, noun: string, pluralNoun?: string): string {
   return `${GROUPED.format(value)} ${value === 1 ? noun : (pluralNoun ?? `${noun}s`)}`;
 }

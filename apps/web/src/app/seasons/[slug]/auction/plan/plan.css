@@ -301,3 +301,186 @@
     grid-template-columns: minmax(0, 1.6fr) minmax(140px, 1fr);
   }
 }
+
+/* --- what the team bought (wow pass): a list, not a comma paragraph -------- */
+.plan-bought-title {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.plan-bought {
+  display: grid;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-bought-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.plan-bought-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.plan-bought-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.plan-bought-role {
+  white-space: nowrap;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.plan-bought-price {
+  min-width: 6rem;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.plan-noplan {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* THE NIGHT'S SQUAD without a plan (round 5): its sums, then everyone in it. */
+.plan-squad {
+  gap: var(--space-4);
+}
+
+.plan-squad-head,
+.plan-squad-facts {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.plan-squad-head h2 {
+  margin: 0;
+}
+
+.plan-squad-head .plan-hint {
+  margin: var(--space-1) 0 0;
+}
+
+.plan-squad-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.plan-squad-facts > div {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.plan-squad-facts dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.plan-squad-facts dd {
+  margin: 0;
+  font-size: var(--text-xl-size);
+  line-height: 1.25;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.plan-squad-facts dd span {
+  color: var(--text-muted);
+}
+
+.plan-squad-facts .plan-squad-sub {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+/* Pre-signed and bought read as one list: no card gap between them. */
+.plan-squad .plan-bought + .plan-bought {
+  margin-top: calc(-1 * var(--space-4));
+}
+
+/* The badge stays on the name's line (round-5 review: a dropped "Captain"
+   gave rows in one list two heights); the name truncates first. */
+.plan-bought-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.plan-bought-line > :not(.plan-bought-name) {
+  flex: none;
+}
+
+.plan-bought-price--signed {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.plan-exit-short {
+  display: none;
+}
+
+@media (max-width: 519px) {
+  .plan-exit-long {
+    display: none;
+  }
+
+  .plan-exit-short {
+    display: inline;
+  }
+
+  /* The squad count over its split, full width; spent and left beside
+     each other under it — three tiles in a row clipped "10 bought + 2 pre". */
+  .plan-squad-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .plan-squad-facts > div:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .plan-squad-facts > div {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .plan-squad-facts dd {
+    font-size: var(--text-md-size);
+  }
+}
+
+/* The state belongs to the title: the badge sits beside "My plan", not at
+   the far edge of the page. */
+.plan-panel .competition-title-row {
+  justify-content: flex-start;
+}

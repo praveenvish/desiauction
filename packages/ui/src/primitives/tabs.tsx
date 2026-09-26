@@ -3,6 +3,7 @@
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import styles from "./tabs.module.css";
+import { useScrollStrip } from "./use-scroll-strip";
 
 export interface TabItem {
   id: string;
@@ -33,6 +34,9 @@ export function Tabs({ tabs, selectedId, defaultTabId, onSelect, label }: TabsPr
   const listRef = useRef<HTMLDivElement>(null);
   const [internal, setInternal] = useState(defaultTabId ?? tabs[0]?.id ?? "");
   const active = selectedId ?? internal;
+  // A tab row that overflows a phone fades at the edge it continues past,
+  // instead of hard-cutting a label mid-word ("Not…", round 4A).
+  useScrollStrip(listRef, active);
 
   const select = (id: string) => {
     setInternal(id);
@@ -80,7 +84,7 @@ export function Tabs({ tabs, selectedId, defaultTabId, onSelect, label }: TabsPr
         ref={listRef}
         role="tablist"
         aria-label={label}
-        className={styles["tablist"]}
+        className={`${styles["tablist"] ?? ""} da-scroll-strip`}
         onKeyDown={onKeyDown}
       >
         {tabs.map((tab) => (

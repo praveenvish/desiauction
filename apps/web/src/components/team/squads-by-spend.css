@@ -1,0 +1,148 @@
+/* Squads by spend: a finished night's teams by what they spent (shared). */
+.ax-spend {
+  container-type: inline-size;
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ax-spend-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.4fr) auto minmax(0, 1.4fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ax-spend-row:first-child {
+  border-top: 0;
+}
+
+.ax-spend-team .ax-muted {
+  white-space: nowrap;
+}
+
+.ax-spend-team {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ax-spend-team strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-heading);
+}
+
+.ax-spend-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  align-self: center;
+}
+
+.ax-spend-bar {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.ax-spend-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.ax-spend-figure {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.ax-spend-top {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+.ax-spend-link {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.ax-spend-link:hover {
+  text-decoration: underline;
+}
+
+/* By the block's own width, not the viewport: in a half-width column on a
+   laptop (the tournament page) the four-column row squeezed names to "Mum…". */
+@container (max-width: 859px) {
+  .ax-spend-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "team figure"
+      "bar bar"
+      "top top";
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .ax-spend-team {
+    grid-area: team;
+  }
+
+  .ax-spend-figure {
+    grid-area: figure;
+  }
+
+  .ax-spend-bar {
+    grid-area: bar;
+  }
+
+  .ax-spend-top {
+    grid-area: top;
+  }
+
+  /* The name wins the row on a phone: the purse total and the count step
+     aside (the bar already says how much of it went). */
+  .ax-spend-figure .ax-muted,
+  .ax-spend-team .ax-muted {
+    display: none;
+  }
+}
+
+.ax-spend .ax-muted {
+  color: var(--text-muted);
+}
+
+.ax-spend-foot {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .ax-spend-link {
+    display: none;
+  }
+
+  .ax-spend-foot {
+    display: block;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+    font-size: var(--text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-accent);
+    text-decoration: none;
+  }
+}

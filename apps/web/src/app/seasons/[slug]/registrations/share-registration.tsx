@@ -76,19 +76,26 @@ export function ShareRegistration({
   if (!open) {
     return (
       // One line, not a panel: a closed link is a fact to know, not a task.
-      <p className="share-reg-closed rd-share-closed" data-testid="share-registration">
+      <span
+        className="share-reg-closed rd-share-closed"
+        data-testid="share-registration"
+        title="The link no longer takes new players. You can still add or import players here."
+      >
         <span className="share-reg-dot" aria-hidden />
         <span data-testid="share-closed">
-          <strong>Registration is closed</strong> — the link no longer takes new players. You can
-          still add or import players here.
+          Registration closed
+          <span className="rd-share-closed-more">
+            {" "}
+            — the link no longer takes new players; you can still add or import them here
+          </span>
         </span>
-      </p>
+      </span>
     );
   }
 
   return (
     <div className="rd-share" data-testid="share-registration">
-      <IconTile icon={<IconGlobe />} tone="green" size="md" />
+      <IconTile icon={<IconGlobe />} concept="players" size="sm" />
       <div className="rd-share-text">
         <label className="share-reg-label" htmlFor={`share-${slug}`}>
           Registration is open — share this link to recruit players

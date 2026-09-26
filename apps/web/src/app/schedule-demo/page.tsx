@@ -5,7 +5,10 @@ import { DemoRequestForm } from "../../components/marketing/demo-request-form";
 import { env } from "../../env";
 import { DEMO_SOURCES } from "../../server/marketing/demo-requests";
 import { hasBookableSlots } from "../../server/marketing/demo-slots";
+import { IconCalendar, IconPlay } from "@desiauction/ui";
+
 import { ContentPage } from "../../components/public/content-page";
+import { SideCard } from "../../components/public/public-kit";
 import "../content.css";
 import "./demo.css";
 
@@ -57,40 +60,61 @@ export default async function ScheduleDemoPage({
         </>
       }
       lede="Twenty minutes, on a call, watching a real auction run: teams and purses, players going under the hammer, the gavel, and the receipts that come out the other side. Not slides."
+      prose={false}
+      aside={
+        <>
+          {/* How it works, as a timeline beside the form rather than 12px
+              text jammed above it. */}
+          <SideCard
+            headingId="demo-how"
+            title="How it works"
+            icon={<IconCalendar size={20} weight="duotone" />}
+          >
+            <ol className="demo-steps">
+              <li>
+                <strong>Tell us about your tournament.</strong> How many teams, and when your
+                auction is — a rough answer is fine.
+              </li>
+              <li>
+                <strong>
+                  {bookable ? "Pick a time that suits you." : "We come back to you within a day."}
+                </strong>{" "}
+                {bookable
+                  ? "Slots are half an hour, evenings and weekends, Indian Standard Time."
+                  : "Usually much less. Evenings and weekends are no problem."}
+              </li>
+              <li>
+                <strong>Watch it run.</strong> We use a tournament that has already finished, so you
+                see the whole night — including the settlement afterwards.
+              </li>
+            </ol>
+          </SideCard>
+          <SideCard
+            headingId="demo-start"
+            title="Rather just start?"
+            icon={<IconPlay size={20} weight="duotone" />}
+            tone="accent"
+          >
+            <p>
+              Every tournament gets the full platform, free, during beta. Set yours up and ask us
+              questions as they come up.
+            </p>
+            <p>
+              <Link href="/login">Set up your tournament</Link>
+            </p>
+            <p className="demo-footnote">
+              Only want to write to a person?{" "}
+              <a href="mailto:support@desiauction.in?subject=Demo%20request" data-private>
+                support@desiauction.in
+              </a>
+            </p>
+          </SideCard>
+        </>
+      }
     >
-      <ol className="demo-steps">
-        <li>
-          <strong>Tell us about your tournament.</strong> How many teams, and when your auction is —
-          a rough answer is fine.
-        </li>
-        <li>
-          <strong>
-            {bookable ? "Pick a time that suits you." : "We come back to you within a day."}
-          </strong>{" "}
-          {bookable
-            ? "Slots are half an hour, evenings and weekends, Indian Standard Time."
-            : "Usually much less. Evenings and weekends are no problem."}
-        </li>
-        <li>
-          <strong>Watch it run.</strong> We use a tournament that has already finished, so you see
-          the whole night — including the settlement afterwards, which is the part most people have
-          never seen done properly.
-        </li>
-      </ol>
-
-      <DemoRequestForm source={source} />
-
-      <p className="prose-p demo-footnote">
-        Would you rather just start? Every tournament gets the full platform, free, during beta —{" "}
-        <Link href="/login" className="prose-link">
-          set yours up now
-        </Link>{" "}
-        and ask us questions as they come up. If you only want to write to a person, we&apos;re at{" "}
-        <a href="mailto:support@desiauction.in?subject=Demo%20request" className="prose-link">
-          support@desiauction.in
-        </a>
-        .
-      </p>
+      <div className="demo-form-card">
+        <DemoRequestForm source={source} />
+      </div>
     </ContentPage>
   );
 }

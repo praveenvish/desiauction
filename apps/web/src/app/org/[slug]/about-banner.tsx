@@ -49,7 +49,11 @@ export function AboutBanner({
 
   return (
     <>
-      <section className="od-about" data-testid="org-about">
+      <section
+        className="od-about"
+        data-testid="org-about"
+        data-empty={description === null ? "true" : undefined}
+      >
         <div className="od-about-body">
           <p className="od-about-kicker">About</p>
           {description !== null ? (
@@ -62,15 +66,15 @@ export function AboutBanner({
         </div>
         {canManage ? (
           <Button
-            variant="secondary"
-            size="touch"
+            variant={description !== null ? "secondary" : "ghost"}
+            size="sm"
             onClick={() => {
               setDraft(description ?? "");
               setOpen(true);
             }}
             data-testid="edit-about"
           >
-            {description !== null ? "Edit" : "Add description"}
+            {description !== null ? "Edit" : "+ Add description"}
           </Button>
         ) : null}
       </section>

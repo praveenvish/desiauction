@@ -3,6 +3,7 @@
 import {
   Button,
   ButtonLink,
+  EmptyState,
   IconAlert,
   IconClock,
   IconCog,
@@ -12,11 +13,12 @@ import {
   Notice,
   Pill,
   PlayerImage,
+  ScrollStrip,
   SectionCard,
   Select,
+  type TabItem,
   TeamChip,
   useToast,
-  type TabItem,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -331,7 +333,7 @@ export function AuctionPanel({
           ) : undefined
         }
       >
-        <div className="auc-filter" role="group" aria-label="Show players">
+        <ScrollStrip className="auc-filter" role="group" aria-label="Show players">
           {LOT_FILTERS.map((option) => {
             const n = view.lots.filter((lot) => lotMatches(option.id, lot.status)).length;
             return (
@@ -349,7 +351,7 @@ export function AuctionPanel({
               </button>
             );
           })}
-        </div>
+        </ScrollStrip>
         <div className="auc-lots-head" aria-hidden>
           <span>#</span>
           <span>Player</span>
@@ -406,7 +408,13 @@ export function AuctionPanel({
           })}
           {visibleLots.length === 0 ? (
             <li className="auc-empty">
-              {view.lots.length === 0 ? "No players in this auction." : "No players here yet."}
+              <EmptyState
+                size="compact"
+                icon={<IconUsers />}
+                title={
+                  view.lots.length === 0 ? "No players in this auction" : "No players here yet"
+                }
+              />
             </li>
           ) : null}
         </ul>
@@ -418,7 +426,7 @@ export function AuctionPanel({
     view === null ? null : (
       <SectionCard
         icon={<IconUsers />}
-        tone="amber"
+        concept="teams"
         title="Paddles"
         data-testid="paddles-panel"
         flush
@@ -441,7 +449,7 @@ export function AuctionPanel({
         }
       >
         {view.paddles.length === 0 ? (
-          <p className="auc-empty">No paddles yet.</p>
+          <EmptyState size="compact" icon={<IconUsers />} title="No paddles yet" />
         ) : (
           <>
             <div className="auc-pad-head" aria-hidden>

@@ -80,22 +80,35 @@
   }
 }
 
+.me-layout[data-single] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1100px) {
+  .me-layout[data-owner] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The night's four figures in one row once the column can hold them (the
+   owner's even two-column layout on a laptop): the 2×2 block was what left
+   the right column taller than the left. */
+.me-layout[data-owner] .me-side {
+  container: me-side / inline-size;
+}
+
+@container me-side (min-width: 540px) {
+  .me-side .me-night-facts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 .me-main,
 .me-side {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   min-width: 0;
-}
-
-.me-empty {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-}
-
-.me-empty a {
-  color: var(--text-accent);
 }
 
 /* ---- registrations as cards ---- */
@@ -116,19 +129,12 @@
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
+  /* A well inside its section, not a second bordered card in a card. */
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--surface-raised);
+  background: var(--surface-sunken);
   color: inherit;
   text-decoration: none;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.me-reg:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
 }
 
 .me-reg-top {
@@ -353,7 +359,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--violet-base);
+  background: var(--accent);
 }
 
 .me-privacy {
@@ -431,4 +437,370 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Owned teams: the foot is the door. */
+.me-reg-go {
+  gap: var(--space-1);
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* "No matches yet" as one quiet line, not a full-weight card. */
+.me-quiet {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.me-quiet > svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+
+/* One season is not a grid: the lone card takes the row and lays its team
+   out beside the name instead of sitting in a third of the panel. */
+@media (min-width: 720px) {
+  .me-regs > li:only-child {
+    grid-column: 1 / -1;
+  }
+
+  .me-regs > li:only-child > .me-reg {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top foot"
+      "name foot"
+      "org foot";
+    align-items: center;
+    column-gap: var(--space-6);
+  }
+
+  .me-regs > li:only-child .me-reg-top {
+    grid-area: top;
+    justify-content: flex-start;
+  }
+
+  .me-regs > li:only-child .me-reg-name {
+    grid-area: name;
+  }
+
+  .me-regs > li:only-child .me-reg-org {
+    grid-area: org;
+  }
+
+  .me-regs > li:only-child .me-reg-foot {
+    grid-area: foot;
+    justify-content: flex-end;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.me-quiet a {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The squad rail's season line, under its title. */
+.me-squad-season {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+/* An owned team: the owner home hero in miniature — crest, name, the purse
+   and squad figures, and the squad's door. */
+.me-regs > li > .me-reg.me-owned {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "crest body go";
+  align-items: center;
+  column-gap: var(--space-4);
+}
+
+.me-owned-crest {
+  grid-area: crest;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  box-shadow: 0 0 0 4px var(--accent-subtle);
+}
+
+.me-owned-body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.me-owned-body .me-reg-top {
+  justify-content: flex-start;
+  margin: 0;
+}
+
+.me-owned-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.me-owned-figures b {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.me-owned-go {
+  grid-area: go;
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 519px) {
+  .me-regs > li > .me-reg.me-owned {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "crest body"
+      "go go";
+    row-gap: var(--space-3);
+  }
+}
+
+/* ---- /me/[sport]: the career as a record, one line per season ---- */
+.me-career {
+  display: grid;
+}
+
+.me-career-row {
+  display: grid;
+  grid-template-columns: 2.2fr 1.4fr 1fr 1.4fr 0.9fr;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+}
+
+@media (min-width: 760px) {
+  .me-career:not([data-armband]) .me-career-row {
+    grid-template-columns: 2.2fr 1.4fr 1fr 1.4fr;
+  }
+}
+
+.me-play-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.me-play-empty p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.me-career-row > * {
+  min-width: 0;
+}
+
+.me-career-head {
+  border-top: 0;
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.me-career-season {
+  display: grid;
+  min-width: 0;
+}
+
+.me-career-season a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  text-decoration: none;
+}
+
+.me-career-season a:hover {
+  color: var(--text-accent);
+}
+
+.me-career-season a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.me-career-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.me-career-role,
+.me-career-armband {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-career-none {
+  color: var(--text-muted);
+}
+
+/* Phone: the season on its own line, its four facts in a two-by-two under it. */
+@media (max-width: 759px) {
+  .me-career-head {
+    display: none;
+  }
+
+  .me-career-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .me-career-head + .me-career-row {
+    border-top: 0;
+  }
+
+  .me-career-season {
+    grid-column: 1 / -1;
+  }
+
+  .me-career-row > [data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: var(--text-xs-size);
+    color: var(--text-muted);
+  }
+}
+
+/* /me/[sport] "How you play": the sport's own answers, as a row of facts. */
+.me-play {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.me-play > div {
+  display: grid;
+  gap: 2px;
+}
+
+.me-play dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.me-play dd {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.me-play dd[data-empty="true"] {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+/* Phone: an odd tile out takes the whole row instead of sitting alone in
+   half of it (the 2 + 1 break). */
+@media (max-width: 639px) {
+  .me [data-testid="me-figures"] > :last-child:nth-child(odd),
+  .me [data-testid="career-totals"] > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* An owner's auction night (round 5): four figures, then the dearest buys. */
+.me-night-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.me-night-facts > div {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.me-night-facts dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.me-night-facts dd {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.me-night-top {
+  display: grid;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.me-night-top li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.me-night-name {
+  overflow: hidden;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-night-price {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }

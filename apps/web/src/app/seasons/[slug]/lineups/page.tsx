@@ -1,9 +1,9 @@
 import {
   ButtonLink,
+  EmptyState,
   IconCalendar,
   IconCheckCircle,
   IconClock,
-  IconList,
   IconMatch,
   IconUsers,
   Pill,
@@ -14,12 +14,14 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { SiblingLink } from "../sibling-link";
+import { ScheduleViews } from "../sibling-link";
 import { notFound } from "next/navigation";
 
 import { formatWallDate, formatWallTime } from "../../../../lib/format-date";
 import { lineupPageView } from "../../../../server/competition/lineup-actions";
 import type { LineupFixture } from "../../../../server/competition/lineups";
+import { RoundRobinPreview } from "../_tabs/round-robin-preview";
+import { emptySchedule } from "../fixtures/empty-schedule-step";
 import { LineupSideEditor } from "./lineup-side-editor";
 import "../../seasons.css";
 import "../_tabs/tabs.css";
@@ -61,6 +63,8 @@ export default async function LineupsPage({
     notFound();
   }
   const { fixtures, selected, sides, announce } = view;
+  const empty = fixtures.length === 0 ? await emptySchedule(slug) : null;
+  const step = empty?.step ?? null;
   const complete = fixtures.filter(
     (fixture) => fixture.recorded.home !== null && fixture.recorded.away !== null,
   ).length;
@@ -68,53 +72,55 @@ export default async function LineupsPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <div className="st-head">
+        {/* One face of the Schedule tab (round 2): the same switcher, in the
+            same place, as List, Calendar, Match day and Table. */}
+        <div className="st-head lu-head">
+          <ScheduleViews slug={slug} active="lineups" />
           <p className="st-head-lede">
             Tick who took the field. Each player&apos;s profile counts it as a match played.
           </p>
-          <div className="st-actions">
-            {/* Registrations shares this tab (RN-1 "Players"). The buttons use
-                the TAB's names — a button saying "Registrations" under a tab
-                saying "Players" reads as two different places. */}
-            <SiblingLink href={`/seasons/${slug}/registrations`} label="Players" />
-            <ButtonLink href={`/seasons/${slug}/fixtures`} variant="secondary" size="sm">
-              <IconList size={16} aria-hidden />
-              Schedule
-            </ButtonLink>
-          </div>
         </div>
 
         {fixtures.length === 0 ? (
-          <SectionCard icon={<IconUsers />} title="Lineups">
-            <div className="st-empty">
-              <span className="st-empty-glyph" aria-hidden>
-                <IconCalendar size={26} />
-              </span>
-              <h3>No matches yet</h3>
-              <p>
-                Lineups are recorded per match. Create the fixtures first, then come back after each
-                game.
-              </p>
-              <div className="st-empty-actions">
-                <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
-                  Go to schedule
-                </ButtonLink>
-              </div>
-            </div>
+          <SectionCard title="Lineups" hideHeader size="feature">
+            <EmptyState
+              size={(empty?.teams.length ?? 0) >= 2 ? "compact" : "default"}
+              icon={<IconUsers />}
+              title="No matches yet"
+              headingLevel={3}
+              description={
+                <>Lineups are recorded per match, once there are fixtures. {step?.why}</>
+              }
+              action={
+                step !== null ? (
+                  <ButtonLink href={step.href} size="sm">
+                    {step.label}
+                  </ButtonLink>
+                ) : undefined
+              }
+            />
           </SectionCard>
-        ) : (
+        ) : null}
+        {fixtures.length === 0 && empty !== null ? (
+          <RoundRobinPreview
+            teams={empty.teams}
+            title="The matches you will record"
+            lede="Each gets a lineup for both sides."
+            testId="lineups-pairings"
+          />
+        ) : fixtures.length === 0 ? null : (
           <>
             <StatGrid>
               <StatCard
                 icon={<IconMatch />}
-                tone="gold"
+                concept="fixtures"
                 value={fixtures.length}
                 label="Matches"
                 hint={`${String(played)} played`}
               />
               <StatCard
                 icon={<IconCheckCircle />}
-                tone="green"
+                concept="done"
                 value={complete}
                 label="Lineups complete"
                 hint="Both sides recorded"
@@ -122,7 +128,7 @@ export default async function LineupsPage({
               />
               <StatCard
                 icon={<IconClock />}
-                tone="amber"
+                concept="alert"
                 value={fixtures.length - complete}
                 label="Still to record"
                 hint="One side or both missing"

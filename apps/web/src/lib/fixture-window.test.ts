@@ -13,7 +13,7 @@ describe("outsideWindowMessage", () => {
       perDay: 1,
     });
     expect(text).toContain("6 match days (1 match a day)");
-    expect(text).toContain("19 Sept – 21 Sept");
+    expect(text).toContain("19 Sep – 21 Sep");
     expect(text).toContain("Add more kickoff times");
   });
 
@@ -27,7 +27,7 @@ describe("outsideWindowMessage", () => {
       perDay: 1,
     });
     expect(text).toContain("before the season begins");
-    expect(text).toContain("on or after 19 Sept");
+    expect(text).toContain("on or after 19 Sep");
   });
 
   it("says the start is after the season when the whole plan misses it", () => {

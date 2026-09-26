@@ -1,6 +1,9 @@
+import { StarGlyphs } from "@desiauction/ui";
+
 import type { PublishedReview, SeasonReviews } from "../../server/reviews/season";
 import { ReportReview } from "./report-review";
 import styles from "./season-reviews.module.css";
+import { formatMonthYear } from "../../lib/format-date";
 
 /**
  * A SEASON'S PUBLISHED REVIEWS (FR-1 Phase 4) — shared by the public season page
@@ -21,20 +24,13 @@ function Stars({ rating, decorative = false }: { rating: number; decorative?: bo
   return (
     <span className={styles["stars"]}>
       {decorative ? null : <span className={styles["srOnly"]}>{`${String(rating)} out of 5`}</span>}
-      <span aria-hidden="true">
-        {"★".repeat(rating)}
-        <span className={styles["starsRest"]}>{"★".repeat(5 - rating)}</span>
-      </span>
+      <StarGlyphs rating={rating} />
     </span>
   );
 }
 
 function when(date: Date): string {
-  return date.toLocaleDateString("en-IN", {
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatMonthYear(date);
 }
 
 export function SeasonReviewSummary({ shown }: { shown: SeasonReviews }) {

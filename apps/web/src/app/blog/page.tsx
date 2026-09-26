@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 
 import { env } from "../../env";
-import { ContentPage } from "../../components/public/content-page";
-import "../content.css";
-import "../marketing.css";
+import { ComingSoon } from "../../components/public/coming-soon";
 
 export const metadata: Metadata = {
   title: "Blog · DesiAuction",
@@ -18,12 +16,10 @@ export const metadata: Metadata = {
 /** Honest placeholder — no fabricated posts. Public, no auth. */
 export default function BlogPage() {
   return (
-    <ContentPage
+    <ComingSoon
       eyebrow="Notes"
       title="Blog"
-      lede="We're in beta with our first tournaments now. Notes on running auction night, building the platform, and what we learn from real organizers will appear here as we have something worth saying — no filler posts to fill a schedule."
-    >
-      <p className="mk-placeholder">Nothing published yet. Check back during beta.</p>
-    </ContentPage>
+      lede="Notes on running auction night, building the platform, and what we learn from real organizers will appear here when we have something worth saying — no filler posts to fill a schedule."
+    />
   );
 }

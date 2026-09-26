@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import { roleLabeller } from "../../../../lib/role-label";
-import { Card, IconPlus, PlayerImage } from "@desiauction/ui";
+import { Card, IconPlus, PlayerImage, RosterMark } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
 import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
@@ -160,12 +160,10 @@ export function squadSizesOf(
 function MemberBadges({ member }: { member: SquadMember }) {
   return (
     <>
-      {member.icon ? <span className="squad-tag squad-tag--icon">Icon</span> : null}
-      {member.retained ? <span className="squad-tag squad-tag--retained">Retained</span> : null}
-      {member.captain ? <span className="squad-tag squad-tag--captain">Captain</span> : null}
-      {member.viceCaptain && !member.captain ? (
-        <span className="squad-tag squad-tag--captain">Vice-captain</span>
-      ) : null}
+      {member.icon ? <RosterMark kind="icon" /> : null}
+      {member.retained ? <RosterMark kind="retained" /> : null}
+      {member.captain ? <RosterMark kind="captain" /> : null}
+      {member.viceCaptain && !member.captain ? <RosterMark kind="vice-captain" /> : null}
     </>
   );
 }
@@ -212,10 +210,10 @@ export function SquadBoard({
         <h2>Squads</h2>
         {/* The shorthand was a note to ourselves: "pre-signed" is a schema word
             and "never bid" reads as an instruction. The room needs the fact. */}
-        <span className="competitions-hint">
-          Icons and retained players joined before the auction — they were never bid on.
-        </span>
       </div>
+      <p className="competitions-hint squad-board-caption">
+        Icons and retained players joined before the auction — they were never bid on.
+      </p>
       {note === null ? null : (
         <p className="competitions-hint" data-testid="squad-board-note">
           {note}
@@ -245,14 +243,18 @@ export function SquadBoard({
                   prices printed on the rows below it, so that is what the line
                   says; only a line still waiting for the socket stays a dash. */}
               {showPurse ? (
-                <p className="squad-team-purse">
+                <p
+                  className="squad-team-purse"
+                  data-spent={remaining !== undefined && remaining !== null ? undefined : ""}
+                >
+                  {/* Before (or without) the socket, what a squad SPENT is still
+                      known — it is the prices on the rows below — so the line
+                      says it rather than a lone dash. */}
                   {remaining !== undefined && remaining !== null
                     ? `${money.ledger(remaining)} left`
-                    : snapshot === null
-                      ? "\u2014"
-                      : `${money.ledger(
-                          members.reduce((sum, member) => sum + (member.price ?? 0), 0),
-                        )} spent`}
+                    : `${money.ledger(
+                        members.reduce((sum, member) => sum + (member.price ?? 0), 0),
+                      )} spent`}
                 </p>
               ) : null}
               {members.length === 0 ? (
@@ -271,12 +273,21 @@ export function SquadBoard({
                         ring
                         decorative
                       />
-                      <span className="squad-name">{member.name}</span>
-                      <MemberBadges member={member} />
+                      {/* ONE LINE, always. The row used to flex-wrap, so a
+                          badge or a long name pushed the price onto a second
+                          line and a phone row grew to ~110px. Name + badges
+                          share a cell that truncates; role and price keep
+                          their own tracks and never wrap. */}
+                      <span className="squad-who">
+                        <span className="squad-name" title={member.name}>
+                          {member.name}
+                        </span>
+                        <MemberBadges member={member} />
+                      </span>
                       <span className="squad-role">{labelOf(member.role)}</span>
                       <span className="squad-price">
                         {member.price === null ? (
-                          <span className="squad-presigned">pre-signed</span>
+                          <span className="squad-presigned">Pre-signed</span>
                         ) : (
                           money.ledger(member.price)
                         )}
@@ -319,7 +330,10 @@ export function PoolSummary({
   const unsold = resolved.filter((lot) => lot.status === "unsold").length;
   const withdrawn = resolved.filter((lot) => lot.status === "withdrawn").length;
   // Queue + whatever is on the block right now.
-  const remaining = (snapshot?.queue.length ?? 0) + (snapshot?.currentLot === null ? 0 : 1);
+  // `snapshot?.currentLot` is undefined — not null — with no snapshot, which
+  // counted a phantom lot on the block: "Remaining 1" on a finished night.
+  const remaining =
+    (snapshot?.queue.length ?? 0) + ((snapshot?.currentLot ?? null) === null ? 0 : 1);
   const spend = sold.reduce((total, lot) => total + (lot.soldPrice ?? 0), 0);
   const top = sold.reduce<ResolvedLot | null>(
     (best, lot) => ((lot.soldPrice ?? 0) > (best?.soldPrice ?? 0) ? lot : best),

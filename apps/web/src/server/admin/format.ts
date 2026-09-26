@@ -6,12 +6,8 @@
  * operator has to re-read.
  */
 
-const GROUPED = new Intl.NumberFormat("en-IN");
-
-/** `1558` → `1,558`. The platform counts in thousands; ungrouped digits do not. */
-export function formatCount(value: number): string {
-  return GROUPED.format(value);
-}
+/** `1558` → `1,558`. The product's one count format lives in `lib/plural`. */
+export { formatCount } from "../../lib/plural";
 
 /**
  * Counted nouns live in `lib/plural` — the readiness gates need the same

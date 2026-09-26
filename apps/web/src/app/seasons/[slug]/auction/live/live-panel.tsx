@@ -4,13 +4,13 @@ import { commandRefusalMessage } from "@desiauction/core";
 import {
   Badge,
   Button,
+  ButtonLink,
   Card,
   Dialog,
   Field,
   IconClock,
   IconGavel,
   IconHome,
-  IconTrophy,
   IconUser,
   IconUsers,
   IconWallet,
@@ -58,11 +58,11 @@ import { useMoney } from "../../../../../components/money-unit";
 // model) — and the engine enforces it regardless.
 
 const AUCTION_TONE = {
-  scheduled: "info",
+  scheduled: "neutral",
   live: "success",
   paused: "warning",
-  completed: "neutral",
-  reconciled: "neutral",
+  completed: "success",
+  reconciled: "success",
   abandoned: "danger",
 } as const;
 
@@ -75,6 +75,40 @@ const ROOM_NAV = [
   { href: "#live-purses", label: "Purses", icon: <IconWallet size={18} /> },
   { href: "#live-timeline", label: "Timeline", icon: <IconClock size={18} /> },
 ];
+
+/**
+ * WHERE YOU ARE IN THE ROOM. The rail listed the room's sections with none
+ * marked, so it read as a menu of other pages. The section nearest the top of
+ * the viewport is the current one — "Overview" until anything else is.
+ */
+function useActiveAnchor(hrefs: string): string {
+  const first = hrefs.split(" ")[0] ?? "";
+  const [active, setActive] = useState(first);
+  useEffect(() => {
+    const targets = hrefs
+      .split(" ")
+      .map((href) => document.getElementById(href.slice(1)))
+      .filter((node): node is HTMLElement => node !== null);
+    if (targets.length === 0 || typeof IntersectionObserver === "undefined") return undefined;
+    const visible = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) visible.set(entry.target.id, entry.boundingClientRect.top);
+          else visible.delete(entry.target.id);
+        }
+        const inView = targets.find((node) => visible.has(node.id));
+        setActive(inView === undefined ? first : `#${inView.id}`);
+      },
+      { rootMargin: "0px 0px -60% 0px" },
+    );
+    for (const node of targets) observer.observe(node);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hrefs, first]);
+  return active;
+}
 
 export function LivePanel({
   slug,
@@ -382,11 +416,36 @@ export function LivePanel({
     view.plan === undefined ? "a player" : planNameOf(view.plan, registrationId);
   /** The auction is not taking bids — paused, or over. */
   const notTakingBids = snapshot !== null && snapshot.auctionStatus !== "live";
-  const finished =
-    snapshot !== null &&
-    (snapshot.auctionStatus === "completed" ||
-      snapshot.auctionStatus === "reconciled" ||
-      snapshot.auctionStatus === "abandoned");
+  // The snapshot is the truth once it arrives; until then (or with the engine
+  // away) the page's own server-rendered status decides — a completed room
+  // used to offer Close and Recover while the cockpit said there was nothing
+  // left to recover.
+  const status = snapshot?.auctionStatus ?? view.status;
+  const finished = status === "completed" || status === "reconciled" || status === "abandoned";
+  /** Over, and the engine never answered: say so from the record, not a skeleton. */
+  const overOffline = finished && snapshot === null;
+  // The anchors this room actually draws: the timeline and pool stand down
+  // once the night is over, and a room read without the engine has no purses.
+  const roomNav = ROOM_NAV.filter(
+    (item) =>
+      (!finished || (item.href !== "#live-timeline" && item.href !== "#live-pool")) &&
+      (!overOffline || item.href !== "#live-purses"),
+  );
+  const roomNavKey = roomNav.map((item) => item.href).join(" ");
+  const activeAnchor = useActiveAnchor(roomNavKey);
+  const soldCount = feed.resolved.filter((row) => row.status === "sold").length;
+  const unsoldCount = feed.resolved.filter((row) => row.status === "unsold").length;
+  /** The viewer's own team on a finished night: its squad and what it spent. */
+  const myOutcome =
+    myPaddle === null
+      ? null
+      : {
+          teamName: myPaddle.teamName,
+          squad: squadSizes[myPaddle.teamId] ?? 0,
+          spent: feed.resolved
+            .filter((row) => row.status === "sold" && row.teamId === myPaddle.teamId)
+            .reduce((sum, row) => sum + (row.soldPrice ?? 0), 0),
+        };
 
   return (
     <div
@@ -407,6 +466,7 @@ export function LivePanel({
           variant="shell"
           offline={offline}
           lotMedia={view.lotMedia}
+          settledStatus={overOffline ? status : undefined}
         />
       </PageStatus>
 
@@ -422,25 +482,23 @@ export function LivePanel({
             to give it a column. A phone scrolls; it never sees this rail. */}
         <nav className="live-roomnav" aria-label="In this room">
           <ul>
-            {ROOM_NAV.map((item) => (
+            {/* The timeline and pool cards stand down once the night is over,
+                so their anchors do too. */}
+            {roomNav.map((item) => (
               <li key={item.href}>
-                <a href={item.href}>
+                <a
+                  href={item.href}
+                  aria-current={activeAnchor === item.href ? "location" : undefined}
+                >
                   {item.icon}
                   {item.label}
                 </a>
               </li>
             ))}
           </ul>
-          {finished ? (
-            <p className="live-roomnav-card">
-              <IconTrophy size={28} />
-              <span>
-                Great auction!
-                <br />
-                Well played.
-              </span>
-            </p>
-          ) : null}
+          {/* The floating "Great auction!" rail card is gone: the wrap band
+              above the room already says it, and the card hung alone halfway
+              down an otherwise empty rail. */}
         </nav>
 
         <div className="live-main" id="live-top">
@@ -457,9 +515,70 @@ export function LivePanel({
 
           {/* Two columns, as the Owner Room comp has it: the lot and the paddle
               on the left where the eye lives, the board on the right. */}
-          <div className="live-grid">
+          <div className="live-grid" data-single={overOffline ? "" : undefined}>
             <div className="live-col" id="live-stage">
-              {lot !== null ? (
+              {overOffline ? (
+                /* The stage used to hold a "Connecting to the auction room…"
+                   skeleton over a finished night, and the purses a column of
+                   dashes: the socket is not what a finished room needs. The
+                   record is — sold and unsold from the server's own read, and
+                   the doors to the full story. */
+                <Card className="live-card live-over" data-testid="live-over">
+                  <h2>This auction is over</h2>
+                  {myOutcome !== null ? (
+                    /* AN OWNER'S RESULT, not a pointer to the squads. The card
+                       held two lines and a "See the squads" button that led to
+                       the list directly beneath it; what an owner opens a
+                       finished room for is where their own team landed. */
+                    <>
+                      <p className="competitions-hint">
+                        {/* The team names the figures below; the night's
+                            count is its own sentence (round-5 review: "Mumbai
+                            Mavericks · 30 sold" read as Mumbai's 30). */}
+                        Your team: {myOutcome.teamName}. The night: {soldCount} sold · {unsoldCount}{" "}
+                        unsold. Every squad below is final.
+                      </p>
+                      <dl className="live-over-figures" data-testid="live-over-mine">
+                        <div>
+                          <dt>Squad</dt>
+                          <dd>
+                            {myOutcome.squad}
+                            <span>/{view.rules.squadMax}</span>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Spent</dt>
+                          <dd>{money.ledger(myOutcome.spent)}</dd>
+                        </div>
+                        <div>
+                          <dt>Purse left</dt>
+                          <dd>
+                            {money.ledger(Math.max(0, view.rules.pursePerTeam - myOutcome.spent))}
+                          </dd>
+                        </div>
+                      </dl>
+                    </>
+                  ) : (
+                    <p className="competitions-hint">
+                      {soldCount} sold · {unsoldCount} unsold. Every squad below is final.
+                    </p>
+                  )}
+                  {view.viewer.canConduct ? (
+                    <div className="live-over-actions">
+                      <ButtonLink
+                        href={`/seasons/${slug}/auction/ledger`}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Read the ledger
+                      </ButtonLink>
+                      <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
+                        See the squads
+                      </ButtonLink>
+                    </div>
+                  ) : null}
+                </Card>
+              ) : lot !== null ? (
                 <>
                   <LotHero
                     roles={view.roles}
@@ -501,39 +620,50 @@ export function LivePanel({
                 />
               )}
 
-              <Card data-testid="bid-feed" className="live-card">
-                <div className="competition-head">
-                  <h2>Bid feed</h2>
-                  {connection === "open" ? (
-                    <span className="live-feed-live">
-                      <span className="live-pulse" aria-hidden />
-                      Live
-                    </span>
-                  ) : null}
-                </div>
-                {lot === null || lot.bidHistory.length === 0 ? (
-                  <p className="competitions-hint" data-testid="bid-feed-empty">
-                    {lot === null
-                      ? "Bids appear here once a lot opens."
-                      : "Bids will appear here the moment they land."}
-                  </p>
-                ) : (
-                  <BidFeedList
-                    bids={lot.bidHistory}
-                    playerName={lot.playerName}
-                    teamColors={colorOfTeamName}
-                    testId="bid-history"
-                  />
-                )}
-              </Card>
+              {/* A finished room has no bids to feed: the card used to say
+                  "Bids appear here once a lot opens" under a completed night. */}
+              {finished ? null : (
+                <Card data-testid="bid-feed" className="live-card">
+                  <div className="competition-head">
+                    <h2>Bid feed</h2>
+                    {/* "Live" is a claim about the AUCTION, not the socket: a
+                      finished room keeps its connection open, and the pill
+                      used to glow green over a completed night. */}
+                    {connection === "open" && snapshot?.auctionStatus === "live" ? (
+                      <span className="live-feed-live">
+                        <span className="live-pulse" aria-hidden />
+                        Live
+                      </span>
+                    ) : null}
+                  </div>
+                  {lot === null || lot.bidHistory.length === 0 ? (
+                    <p className="competitions-hint" data-testid="bid-feed-empty">
+                      {lot === null
+                        ? "Bids appear here once a lot opens."
+                        : "Bids will appear here the moment they land."}
+                    </p>
+                  ) : (
+                    <BidFeedList
+                      bids={lot.bidHistory}
+                      playerName={lot.playerName}
+                      teamColors={colorOfTeamName}
+                      testId="bid-history"
+                    />
+                  )}
+                </Card>
+              )}
 
-              <div id="live-timeline" className="live-anchor">
-                <AuctionTimeline
-                  feed={feed}
-                  lotMedia={view.lotMedia}
-                  teamColors={new Map(view.teams.map((team) => [team.name, team.primaryColor]))}
-                />
-              </div>
+              {/* Once the night is over the timeline held one row ("passes for
+                  now"); the summary's "Watch the replay" is the full story. */}
+              {finished ? null : (
+                <div id="live-timeline" className="live-anchor">
+                  <AuctionTimeline
+                    feed={feed}
+                    lotMedia={view.lotMedia}
+                    teamColors={new Map(view.teams.map((team) => [team.name, team.primaryColor]))}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="live-col">
@@ -541,7 +671,10 @@ export function LivePanel({
                   claimed — lot or no lot. Bidding (PaddleControl, left) comes
                   and goes with the lot; "what have I got and what can I spend"
                   does not. */}
-              {myPaddle !== null ? (
+              {/* Over and read from the record: the squad board below holds
+                  all twelve with their badges — a second, shorter copy of the
+                  same squad here said "10" beside "12/12". */}
+              {myPaddle !== null && !overOffline ? (
                 <MyTeamCard
                   snapshot={snapshot}
                   myTeamId={myPaddle.teamId}
@@ -559,56 +692,49 @@ export function LivePanel({
                   the socket answered — this component sits above the purse
                   board, the pool summary and the squad board, so its arrival
                   moved all three. */}
-              <AuctionProgress snapshot={snapshot} />
+              {finished ? null : <AuctionProgress snapshot={snapshot} />}
               {/* THE SEAL. A bidder sees their own purse and committed spend,
                   the lot on the block and the public bid feed — not every
                   rival's remaining money. Decided on the server
                   (`viewer.canSeeAllPurses`) and obeyed here; the conductor's
                   board is unchanged. */}
-              <div id="live-purses" className="live-anchor">
-                <PurseBoard
-                  snapshot={snapshot}
-                  teams={view.teams}
-                  myPaddleNumber={myPaddle?.paddleNumber ?? null}
-                  visibleTeamIds={view.viewer.canSeeAllPurses ? null : view.myTeamIds}
-                  heading={view.viewer.canSeeAllPurses ? "Purses" : "Your purse"}
-                  rules={view.rules}
-                  squadSizes={squadSizes}
-                  note={
-                    view.viewer.canSeeAllPurses
-                      ? null
-                      : "Rivals' remaining purses are sealed — you see your own."
-                  }
-                />
-              </div>
-              <div id="live-pool" className="live-anchor">
-                <PoolSummary
-                  snapshot={snapshot}
-                  resolved={feed.resolved}
-                  preSigned={view.preSigned}
-                />
-              </div>
+              {overOffline ? null : (
+                <div id="live-purses" className="live-anchor">
+                  <PurseBoard
+                    snapshot={snapshot}
+                    teams={view.teams}
+                    myPaddleNumber={myPaddle?.paddleNumber ?? null}
+                    visibleTeamIds={view.viewer.canSeeAllPurses ? null : view.myTeamIds}
+                    heading={view.viewer.canSeeAllPurses ? "Purses" : "Your purse"}
+                    rules={view.rules}
+                    squadSizes={squadSizes}
+                    note={
+                      view.viewer.canSeeAllPurses
+                        ? null
+                        : "Rivals' remaining purses are sealed — you see your own."
+                    }
+                  />
+                </div>
+              )}
+              {/* Sold / passed / spend / top buy are the summary's tiles once the
+                  night is over — a second copy here said them all again. */}
+              {finished ? null : (
+                <div id="live-pool" className="live-anchor">
+                  <PoolSummary
+                    snapshot={snapshot}
+                    resolved={feed.resolved}
+                    preSigned={view.preSigned}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          <div id="live-squads" className="live-anchor">
-            <SquadBoard
-              roles={view.roles}
-              teams={boardTeams}
-              lotMedia={view.lotMedia}
-              preSigned={view.preSigned}
-              resolved={feed.resolved}
-              snapshot={snapshot}
-              squadMax={view.rules.squadMax}
-              showPurse={view.viewer.canSeeAllPurses}
-              note={
-                view.viewer.canSeeAllSquads
-                  ? null
-                  : "Your squad. Every sale is called out in the room and appears in the bid feed."
-              }
-            />
-          </div>
-
+          {/* THE ROOM'S CONTROLS BEFORE ITS RECORD (round 3C): Conduct sat
+              under three full squads — y≈2900 on a laptop, the end of a
+              13,000px phone page. It follows the stage now, and on a phone a
+              conductor's card leads the room (live.css). Position only: the
+              gavel inside keeps its size, label and hold behaviour. */}
           <div className="live-controls" data-conduct={view.viewer.canConduct ? "true" : "false"}>
             {/* The claim door. Once a paddle is held, PaddleControl above owns
                 the "Your paddle" heading and states the same fact in its header,
@@ -616,9 +742,17 @@ export function LivePanel({
                 same thing.
                 Once the night is over there is nothing left to claim: an
                 organizer with no paddle used to be told "Claim your paddle — No
-                paddle grant yet" on a finished room. A held paddle still shows,
-                because its purse line is the owner's final account. */}
-            {finished && myPaddle === null ? null : (
+                paddle grant yet" on a finished room. A held paddle is gone too:
+                there is nothing left to hand back, and the owner's final account
+                is the My-team card and the squads below. */}
+            {/* An organizer with no paddle grant and no team was told to "ask
+                the organizer" — themselves. A conductor who could only ever
+                read that sentence gets the Conduct card on its own (round 2). */}
+            {finished ||
+            (myPaddle === null &&
+              grantedTeams.length === 0 &&
+              view.myTeamIds.length === 0 &&
+              view.viewer.canConduct) ? null : (
               <Card data-testid="paddle-panel" className="live-card">
                 <h2>{myPaddle !== null ? "Paddle status" : "Claim your paddle"}</h2>
                 {myPaddle !== null ? (
@@ -845,6 +979,24 @@ export function LivePanel({
             ) : null}
           </div>
 
+          <div id="live-squads" className="live-anchor">
+            <SquadBoard
+              roles={view.roles}
+              teams={boardTeams}
+              lotMedia={view.lotMedia}
+              preSigned={view.preSigned}
+              resolved={feed.resolved}
+              snapshot={snapshot}
+              squadMax={view.rules.squadMax}
+              showPurse={view.viewer.canSeeAllPurses}
+              note={
+                view.viewer.canSeeAllSquads
+                  ? null
+                  : "Your squad. Every sale is called out in the room and appears in the bid feed."
+              }
+            />
+          </div>
+
           {/* THE ROOM'S BOTTOM BAR: the doors to the other views on the left,
               and — the only place raw transport words appear — the feed
               diagnostics on the right. The strip used to sit ABOVE the lot,
@@ -852,37 +1004,42 @@ export function LivePanel({
               ribbon already says in the room's own language. */}
           <div className="live-bottombar">
             {exits}
-            <div className="live-diagnostics" data-testid="live-diagnostics">
-              <span className="live-diagnostics-label">Feed diagnostics</span>
-              <span className="live-substatus-meta">
-                <ConnectionQuality
-                  connection={connection}
-                  drift={drift}
-                  stale={stale}
-                  offline={offline}
-                />
-                <span className="competitions-hint" data-testid="snapshot-version">
-                  v{version}
-                </span>
-                {snapshot !== null ? (
-                  <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
-                    {snapshot.auctionStatus}
-                  </Badge>
-                ) : null}
-                {/* The raw socket word ("open") read like a status of the
+            {/* A finished night the engine never answered for has no feed to
+                diagnose, and the room's header already says COMPLETED — the
+                bar keeps only its doors. */}
+            {overOffline ? null : (
+              <div className="live-diagnostics" data-testid="live-diagnostics">
+                <span className="live-diagnostics-label">Feed diagnostics</span>
+                <span className="live-substatus-meta">
+                  <ConnectionQuality
+                    connection={connection}
+                    drift={drift}
+                    stale={stale}
+                    offline={offline}
+                  />
+                  <span className="competitions-hint" data-testid="snapshot-version">
+                    v{version}
+                  </span>
+                  {snapshot !== null ? (
+                    <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
+                      {snapshot.auctionStatus}
+                    </Badge>
+                  ) : null}
+                  {/* The raw socket word ("open") read like a status of the
                     AUCTION — it sat beside COMPLETED as "OPEN". Say what it is
                     about: the link to the room. The raw value stays on
                     data-connection for anything that needs to tell
                     "connecting" from "reconnecting". */}
-                <Badge
-                  tone={connection === "open" ? "success" : "warning"}
-                  data-testid="connection-state"
-                  data-connection={connection}
-                >
-                  {connection === "open" ? "Connected" : "Reconnecting"}
-                </Badge>
-              </span>
-            </div>
+                  <Badge
+                    tone={connection === "open" ? "success" : "warning"}
+                    data-testid="connection-state"
+                    data-connection={connection}
+                  >
+                    {connection === "open" ? "Connected" : "Reconnecting"}
+                  </Badge>
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

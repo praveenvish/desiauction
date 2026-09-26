@@ -6,7 +6,10 @@ import {
   appointmentsPanelView,
   squadSheetsPanelView,
 } from "../../../../server/competition/appointment-actions";
+import { currentSession } from "../../../../server/auth/actions";
+import { rolesOf } from "../../../../server/roles/roles";
 import { AppointmentsPanel } from "./appointments-panel";
+import { OwnSquad } from "./own-squad";
 import { SquadSheetsPanel } from "./squad-sheets-panel";
 import { TeamsPanel } from "./teams-panel";
 import "../../seasons.css";
@@ -25,14 +28,26 @@ export default async function TeamsPage({
   searchParams: Promise<{ team?: string }>;
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
-  const [view, appointments, squadSheets] = await Promise.all([
+  const [view, appointments, squadSheets, session] = await Promise.all([
     teamsWorkspaceView(slug),
     appointmentsPanelView(slug),
     squadSheetsPanelView(slug),
+    currentSession(),
   ]);
   if (view === null) {
     notFound();
   }
+  /*
+   * THE OWNER'S OWN TEAM (wow pass, round 2): somebody who cannot see rosters
+   * here but owns one of these teams gets their squad inline, and their card
+   * leads the grid. The roles read is the same one the rail is built from.
+   */
+  const owned =
+    session === null || view.viewer.canSeeRoster
+      ? undefined
+      : (await rolesOf(session.personId)).owns.find((team) => team.competitionSlug === slug);
+  const ownCard =
+    owned === undefined ? undefined : view.teams.find((team) => team.id === owned.teamId);
   const selectedTeam = view.teams.find((team) => team.id === sp.team) ?? null;
   // Only for whoever may set the roles (team.manage); null otherwise.
   const appointmentsPanel =
@@ -56,10 +71,19 @@ export default async function TeamsPage({
     <ToastProvider>
       <main className="registrations-dash tm-page">
         <div className="dash-stack tm-stack">
+          {ownCard !== undefined && (selectedTeam === null || selectedTeam.id === ownCard.id) ? (
+            <OwnSquad
+              slug={slug}
+              teamId={ownCard.id}
+              teamName={ownCard.name}
+              color={ownCard.color}
+            />
+          ) : null}
           <TeamsPanel
             view={view}
             slug={slug}
             selected={selectedTeam}
+            {...(ownCard !== undefined ? { ownTeamId: ownCard.id } : {})}
             {...(pendingFirst
               ? {
                   beforeGrid: (

@@ -10,8 +10,15 @@
    gutter, so tabbed pages sat at 296px while titles and tabs sat at 272 —
    and on a phone the content lost 48px to a double inset. */
 [data-surface="console"] .registrations-dash,
-[data-surface="console"] .org-home {
+[data-surface="console"] .org-home,
+[data-surface="console"] .orgs,
+[data-surface="console"] .competitions,
+[data-surface="console"] .competition-home {
   padding-inline: 0;
+  padding-top: 0;
+  /* The shell owns the page's vertical measure too: a wrapper at 100vh left a
+     tall empty band under short pages. */
+  min-height: 0;
 }
 
 /* Stat tiles are a ruled figure strip, not a row of boxes (≈20 pages). */

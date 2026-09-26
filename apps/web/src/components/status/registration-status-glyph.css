@@ -1,0 +1,24 @@
+/* The shape half of a registration status (see the component). Hidden unless
+   a surface's phone row asks for it. Colours are the state tokens. */
+.reg-glyph {
+  display: none;
+  flex: none;
+  line-height: 0;
+  color: var(--text-muted);
+}
+
+.reg-glyph[data-status="approved"] {
+  color: var(--success-strong);
+}
+
+.reg-glyph[data-status="submitted"] {
+  color: var(--info-strong);
+}
+
+.reg-glyph[data-status="waitlisted"] {
+  color: var(--warning-strong);
+}
+
+.reg-glyph[data-status="rejected"] {
+  color: var(--danger-strong);
+}

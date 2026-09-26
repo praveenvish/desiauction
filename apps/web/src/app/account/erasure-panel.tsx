@@ -10,6 +10,7 @@ import {
   type ErasureFormState,
 } from "../../server/privacy/actions";
 import type { MyErasureRequest } from "../../server/privacy/requests";
+import { formatDate } from "../../lib/format-date";
 
 /**
  * "Delete my account" — as a request somebody answers, not a button that fires.
@@ -47,8 +48,8 @@ export function ErasurePanel({ request }: { request: MyErasureRequest | null }) 
           <Pill tone="amber" dot>
             Deletion requested
           </Pill>{" "}
-          You asked on {request.requestedAt.toISOString().slice(0, 10)}. We reply within seven days;
-          until then you can take it back.
+          You asked on {formatDate(request.requestedAt)}. We reply within seven days; until then you
+          can take it back.
         </p>
         <Button
           variant="secondary"
@@ -76,8 +77,8 @@ export function ErasurePanel({ request }: { request: MyErasureRequest | null }) 
       {request?.status === "declined" && request.decisionNote !== null ? (
         <p className="account-prose" role="note" data-testid="erasure-declined">
           <Pill tone="neutral">Not deleted</Pill> Your request from{" "}
-          {request.requestedAt.toISOString().slice(0, 10)} was declined: {request.decisionNote} You
-          can ask again at any time.
+          {formatDate(request.requestedAt)} was declined: {request.decisionNote} You can ask again
+          at any time.
         </p>
       ) : null}
       <Button

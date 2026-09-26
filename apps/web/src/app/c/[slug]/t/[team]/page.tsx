@@ -1,6 +1,6 @@
-import { cache, type CSSProperties } from "react";
+import { cache, type CSSProperties, type ReactNode } from "react";
 import { formatAmount, paise, roleLabelIn, sportPackFor, type MoneyUnit } from "@desiauction/core";
-import { ButtonLink, IconArrowLeft, PlayerImage } from "@desiauction/ui";
+import { ButtonLink, IconArrowLeft, PlayerImage, RosterMark } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -108,7 +108,9 @@ export default async function PublicTeamPage({
       : [{ value: facts.remainingLabel, label: "Purse left" }]),
     ...(facts.topBuy === null
       ? []
-      : [{ value: facts.topBuy.priceLabel, label: `Top buy · ${facts.topBuy.name}`, aside: true }]),
+      : // A figure like the three before it, so no divider of its own: the
+        // strip drew one rule before the last tile only (review r2, r3).
+        [{ value: facts.topBuy.priceLabel, label: `Top buy · ${facts.topBuy.name}` }]),
   ];
   const messages = {
     en: teamShareMessage(
@@ -128,24 +130,30 @@ export default async function PublicTeamPage({
 
   return (
     <main className="public-page mk">
+      {/* No `sport`: the crest rides the title, and the sport's stock glyph
+          would take the right half back as decoration. */}
       <PageHero
-        sport={team.sport}
-        art={
-          <div className="team-page-crest" style={{ "--team": colour } as CSSProperties}>
-            {team.team.crestUrl === null ? (
-              crestFallback
-            ) : (
-              <CrestImage
-                src={team.team.crestUrl}
-                fallback={crestFallback}
-                width={160}
-                height={160}
-              />
-            )}
-          </div>
-        }
         eyebrow={<Link href={`/c/${slug}`}>{team.competitionName}</Link>}
-        title={team.team.name}
+        /* THE CREST BESIDE THE NAME (round 5): a 220px disc filled the hero's
+           right half with decoration and no information; at 96px beside the
+           title it identifies the team the way the player page's avatar does. */
+        title={
+          <span className="player-title team-page-title">
+            <span className="team-page-crest" style={{ "--team": colour } as CSSProperties}>
+              {team.team.crestUrl === null ? (
+                crestFallback
+              ) : (
+                <CrestImage
+                  src={team.team.crestUrl}
+                  fallback={crestFallback}
+                  width={160}
+                  height={160}
+                />
+              )}
+            </span>
+            <span>{team.team.name}</span>
+          </span>
+        }
         /* "Our squad" spoke as the team, on a page anyone can land on from a
            forwarded link; the season's name says whose squad it is. */
         lede={
@@ -184,31 +192,35 @@ export default async function PublicTeamPage({
                         name={member.name}
                         seed={member.registrationId}
                         size="md"
+                        shape="round"
                         src={member.photoUrl}
                         decorative
                       />
                     </span>
                     <span className="team-page-who">
-                      <strong>{member.name}</strong>
+                      <strong>
+                        <NameWithBadge
+                          name={member.name}
+                          badge={
+                            /* The role on the sheet, as a badge after the name
+                               — not in the price slot, where gold italics
+                               read as a price. */
+                            member.marks.includes("captain") ? (
+                              <RosterMark kind="captain" className="team-page-badge" />
+                            ) : member.marks.includes("icon") ? (
+                              <RosterMark kind="icon" className="team-page-badge" />
+                            ) : null
+                          }
+                        />
+                      </strong>
                       <span>{roleLabelIn(pack, member.role)}</span>
                     </span>
                     <span className="team-page-price">
                       {member.pricePaise !== null ? (
-                        member.marks.includes("captain") ? (
-                          <>
-                            <span className="team-page-mark">C</span>
-                            {formatPrice(member.pricePaise, team.unit)}
-                          </>
-                        ) : (
-                          formatPrice(member.pricePaise, team.unit)
-                        )
+                        formatPrice(member.pricePaise, team.unit)
                       ) : (
                         <span className="team-page-signed">
-                          {member.marks.includes("captain")
-                            ? "Captain"
-                            : member.marks.includes("icon")
-                              ? "Icon"
-                              : "Retained"}
+                          {member.marks.includes("retained") ? "Retained" : "Pre-signed"}
                         </span>
                       )}
                     </span>
@@ -239,4 +251,27 @@ export default async function PublicTeamPage({
 /** A player's price in the season's own unit — "₹12,500" or "1,250 pts". */
 function formatPrice(pricePaise: number, unit: MoneyUnit): string {
   return formatAmount(paise(pricePaise), unit);
+}
+
+/**
+ * A name with its badge, where the badge never takes a line of its own
+ * (round-5 review): the name's last word and the badge are glued together, so
+ * a long name wraps before its last word and the badge rides that word.
+ */
+function NameWithBadge({ name, badge }: { name: string; badge: ReactNode }) {
+  if (badge === null) {
+    return <>{name}</>;
+  }
+  const cut = name.trimEnd().lastIndexOf(" ");
+  const head = cut === -1 ? "" : name.slice(0, cut + 1);
+  const last = cut === -1 ? name : name.slice(cut + 1);
+  return (
+    <>
+      {head}
+      <span className="team-page-nowrap">
+        {last}
+        {badge}
+      </span>
+    </>
+  );
 }

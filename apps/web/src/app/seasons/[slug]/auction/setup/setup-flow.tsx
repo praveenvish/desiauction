@@ -1,6 +1,14 @@
 "use client";
 
-import { Badge, Button, ButtonLink, IconArrowRight, IconCheck, useToast } from "@desiauction/ui";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  IconArrowRight,
+  IconCheck,
+  useScrollStrip,
+  useToast,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -273,6 +281,8 @@ export function AuctionSetupFlow({
     }
     strip.scrollTo({ left: Math.max(0, chip.offsetLeft - strip.offsetLeft - 16) });
   }, [selected]);
+  // The product's one scroll strip: fade the end with more steps past it.
+  useScrollStrip(stripRef, selected);
 
   return (
     <section className="as-flow" aria-labelledby="as-flow-title" data-testid="setup-flow">
@@ -291,7 +301,7 @@ export function AuctionSetupFlow({
         </span>
       </header>
       <div className="as-board">
-        <ol className="as-steps" aria-label="Setup steps" ref={stripRef}>
+        <ol className="as-steps da-scroll-strip" aria-label="Setup steps" ref={stripRef}>
           {steps.map((step, index) => (
             <li
               key={step.id}

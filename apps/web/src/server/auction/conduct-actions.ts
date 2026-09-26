@@ -16,6 +16,7 @@ import { asc, eq } from "drizzle-orm";
 
 import { dbHandle, systemDb } from "../db";
 import { ledgerRowMatches, type LedgerFilter } from "../../lib/ledger-filter";
+import { ledgerOutcomes, type OutcomePass } from "../../lib/ledger-passes";
 import { storage } from "../media";
 import { engineWsUrl } from "./engine-client";
 import { fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-reads";
@@ -354,6 +355,14 @@ export interface LedgerView {
    * free of media). Same rule and seed as the live room's `lotMedia`.
    */
   faces: Record<string, { registrationId: string; photoUrl: string | null }>;
+  /**
+   * Which pass each outcome row on THIS page was (see ledger-passes.ts),
+   * keyed by seq — folded over the whole log, so a re-run reads the same on
+   * any page. Only outcome rows appear.
+   */
+  passes: Record<number, OutcomePass>;
+  /** Lots + re-runs, so the header can say what "48 results" is made of. */
+  outcomes: { lots: number; sold: number; unsold: number; reRuns: number };
 }
 
 /**
@@ -408,10 +417,26 @@ export async function ledgerView(
   const totalPages = Math.max(1, Math.ceil(kept.length / LEDGER_PAGE_SIZE));
   const current = Math.min(Math.max(1, page), totalPages);
   const offset = (current - 1) * LEDGER_PAGE_SIZE;
+  const rows = kept.slice(offset, offset + LEDGER_PAGE_SIZE);
+  const outcomes = ledgerOutcomes(all);
+  const passes: Record<number, OutcomePass> = {};
+  for (const row of rows) {
+    const pass = outcomes.bySeq.get(row.seq);
+    if (pass !== undefined) {
+      passes[row.seq] = pass;
+    }
+  }
   return {
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     auctionName: gate.auction.name,
-    rows: kept.slice(offset, offset + LEDGER_PAGE_SIZE),
+    rows,
+    passes,
+    outcomes: {
+      lots: outcomes.lots,
+      sold: outcomes.sold,
+      unsold: outcomes.unsold,
+      reRuns: outcomes.reRuns,
+    },
     totalRows: all.length,
     filter,
     filteredRows: kept.length,

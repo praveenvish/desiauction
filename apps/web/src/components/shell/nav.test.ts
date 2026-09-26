@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
+  adminNavLayout,
   adminSectionsFor,
   activeAdminTab,
   activeOrgMoneyTab,
@@ -305,5 +306,50 @@ describe("careerTitle", () => {
   it("reads the segment, not the rest of the URL", () => {
     expect(careerTitle("/me/football/")).toBe("My football");
     expect(careerTitle("/me/football?from=home")).toBe("My football");
+  });
+});
+
+/*
+ * THE ADMIN STRIP FITS (wow pass). Sixteen sections overflowed a 1440 rail and
+ * hid the Notifications tab — so on every notifications page no tab was lit.
+ */
+describe("adminNavLayout", () => {
+  const ALL = adminSectionsFor([
+    "platform.admin",
+    "platform.pass",
+    "platform.demo",
+    "platform.privacy",
+    "platform.support",
+    "platform.moderate",
+  ]);
+
+  it("keeps the platform and people sections inline and folds the rest", () => {
+    const layout = adminNavLayout(ALL, "overview");
+    expect(layout.inline.map((s) => s.key)).toEqual([
+      "overview",
+      "live",
+      "health",
+      "audit",
+      "orgs",
+      "users",
+    ]);
+    expect(layout.pinned).toBeNull();
+    const folded = layout.more.flatMap((group) => group.items.map((s) => s.key));
+    // Every section is reachable exactly once.
+    expect([...layout.inline.map((s) => s.key), ...folded].sort()).toEqual(
+      ALL.map((s) => s.key).sort(),
+    );
+  });
+
+  it("always draws the section you are on", () => {
+    expect(adminNavLayout(ALL, "notifications").pinned?.key).toBe("notifications");
+    expect(adminNavLayout(ALL, "live").pinned).toBeNull();
+  });
+
+  it("shows a small key-ring inline, with no menu", () => {
+    const few = adminSectionsFor(["platform.support", "platform.demo"]);
+    const layout = adminNavLayout(few, "reports");
+    expect(layout.more).toEqual([]);
+    expect(layout.inline.map((s) => s.key)).toEqual(few.map((s) => s.key));
   });
 });

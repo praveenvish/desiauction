@@ -60,7 +60,7 @@ function toMs(value) {
  * would report the one line in the codebase that is most obviously fine.
  */
 function firstDuration(declaration) {
-  for (const token of declaration.split(/\s+/)) {
+  for (const token of declaration.trim().split(/\s+/)) {
     if (token.startsWith("var(")) return null; // already a token
     const ms = toMs(token);
     if (ms !== null) return ms;
@@ -68,27 +68,53 @@ function firstDuration(declaration) {
   return null;
 }
 
+/*
+ * Split a shorthand into its comma-separated layers, ignoring commas inside
+ * parentheses (`var(--x, 1s)`, `cubic-bezier(.2, .8, .2, 1)`). Every layer of
+ * `transition: transform 180ms, box-shadow 180ms` is its own interaction.
+ */
+function layers(value) {
+  const out = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of value) {
+    if (ch === "(") depth += 1;
+    if (ch === ")") depth -= 1;
+    if (ch === "," && depth === 0) {
+      out.push(current);
+      current = "";
+    } else current += ch;
+  }
+  out.push(current);
+  return out;
+}
+
 const violations = [];
 for (const dirRoot of ROOTS) {
   for (const file of cssFiles(join(root, dirRoot))) {
-    const lines = readFileSync(file, "utf8").split("\n");
-    lines.forEach((line, index) => {
-      const m =
-        /^\s*(animation|transition|animation-duration|transition-duration)\s*:\s*([^;]+);/.exec(
-          line,
-        );
-      if (m === null) return;
-      const ms = firstDuration(m[2]);
-      if (ms === null || ms > THRESHOLD_MS) return;
-      const context = `${lines[index - 1] ?? ""}\n${line}`;
-      if (context.includes("motion-ok:")) return;
+    const text = readFileSync(file, "utf8");
+    const lines = text.split("\n");
+    // Whole-file scan, so a declaration wrapped over several lines is read as
+    // one: the line-by-line version never saw `transition:\n  transform 180ms`.
+    const declaration =
+      /(?:^|[;{\s])(animation|transition|animation-duration|transition-duration)\s*:\s*([^;{}]+);/g;
+    for (const m of text.matchAll(declaration)) {
+      const offset = (m.index ?? 0) + m[0].indexOf(m[1]);
+      const first = text.slice(0, offset).split("\n").length - 1;
+      const last = first + m[2].split("\n").length - 1;
+      const ms = layers(m[2])
+        .map((layer) => firstDuration(layer))
+        .find((value) => value !== null && value > 0 && value <= THRESHOLD_MS);
+      if (ms === undefined) continue;
+      const context = lines.slice(Math.max(0, first - 1), last + 1).join("\n");
+      if (context.includes("motion-ok:")) continue;
       violations.push({
         file: file.slice(root.length + 1),
-        line: index + 1,
+        line: first + 1,
         ms,
-        text: line.trim(),
+        text: `${m[1]}: ${m[2].replace(/\s+/g, " ").trim()}`,
       });
-    });
+    }
   }
 }
 
