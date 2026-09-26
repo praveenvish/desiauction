@@ -78,3 +78,57 @@
 .admin-rows.demo-window-list {
   border-top: 1px solid var(--border-subtle);
 }
+
+/* ── wow pass round 2: the week at a glance ── */
+.demo-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.demo-week-day {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 64px;
+  padding: var(--space-2);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.demo-week-day[data-open] {
+  border-style: solid;
+  border-color: var(--accent-line);
+  background: var(--surface-raised);
+}
+
+.demo-week-name {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.demo-week-none {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.demo-week-slot {
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 599px) {
+  .demo-week {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

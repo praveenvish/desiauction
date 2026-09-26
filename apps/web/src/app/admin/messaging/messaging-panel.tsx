@@ -1,9 +1,17 @@
-import { EmptyState, IconFileCheck, IconLock, IconSend, Pill, SectionCard } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconFileCheck,
+  IconLock,
+  IconMessageCircle,
+  IconSend,
+  Pill,
+  SectionCard,
+} from "@desiauction/ui";
 
-import { maskContact } from "../../../server/admin/format";
+import { formatCount, maskContact } from "../../../server/admin/format";
 import type { MessagingOverview } from "../../../server/admin/views";
 import { NavButton } from "../../players/nav-button";
-import { RelativeTime } from "../admin-ui";
+import { RelativeTime, TableCount } from "../admin-ui";
 
 /**
  * Can this deployment actually text anyone, and who must it never text?
@@ -72,9 +80,12 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                     </span>
                   </td>
                   <td data-label="Status">
-                    <Pill tone={row.configured ? "green" : "red"} dot>
+                    {/* The verdict pill in the card head already says how many;
+                        a row says its own state as a dot and a word. */}
+                    <span className="admin-state" data-tone={row.configured ? "green" : "red"}>
+                      <span className="admin-state-dot" aria-hidden />
                       {row.configured ? "Registered" : "Missing"}
-                    </Pill>
+                    </span>
                   </td>
                   <td data-label="Environment variable" className="is-wide">
                     <code className="admin-env" title={row.variable}>
@@ -90,7 +101,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
 
       <SectionCard
         icon={<IconSend />}
-        tone="blue"
+        tone="neutral"
         title="Delivery by message"
         description={`Last ${String(overview.deliveryWindowDays)} days, counted from the sender's own audit rows`}
         flush
@@ -124,20 +135,24 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                 {overview.delivery.map((row) => (
                   <tr key={row.template}>
                     <td data-label="Message">
-                      <span className="admin-name">{row.template}</span>
+                      <span className="admin-name admin-mono-key">{row.template}</span>
                     </td>
                     <td data-label="Sent" className="admin-count admin-num">
-                      {String(row.sent)}
+                      <TableCount n={row.sent} />
                     </td>
                     {/* Failed is a delivery problem. Suppressed is the gate
                         working — somebody said stop, or a club switched the
                         topic off. Folding them together would send an operator
                         chasing an outage that is not happening. */}
                     <td data-label="Failed" className="admin-count admin-num">
-                      {row.failed === 0 ? "0" : <strong>{String(row.failed)}</strong>}
+                      {row.failed === 0 ? (
+                        <TableCount n={0} />
+                      ) : (
+                        <strong className="admin-bad">{formatCount(row.failed)}</strong>
+                      )}
                     </td>
                     <td data-label="Suppressed" className="admin-count admin-num">
-                      {String(row.suppressed)}
+                      <TableCount n={row.suppressed} />
                     </td>
                   </tr>
                 ))}
@@ -148,8 +163,8 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
       </SectionCard>
 
       <SectionCard
-        icon={<IconSend />}
-        tone={overview.whatsapp.failed > 0 ? "red" : "blue"}
+        icon={<IconMessageCircle />}
+        tone={overview.whatsapp.failed > 0 ? "red" : "neutral"}
         title="WhatsApp delivery"
         description={`Last ${String(overview.deliveryWindowDays)} days, from Meta's callbacks. All "awaiting" and nothing delivered means the callback URL is not subscribed.`}
       >
@@ -157,10 +172,10 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
           <Pill tone="neutral">
             awaiting <span className="admin-count">{String(overview.whatsapp.awaiting)}</span>
           </Pill>
-          <Pill tone="green">
+          <Pill tone={overview.whatsapp.delivered > 0 ? "green" : "neutral"}>
             delivered <span className="admin-count">{String(overview.whatsapp.delivered)}</span>
           </Pill>
-          <Pill tone="green">
+          <Pill tone={overview.whatsapp.read > 0 ? "green" : "neutral"}>
             read <span className="admin-count">{String(overview.whatsapp.read)}</span>
           </Pill>
           <Pill tone={overview.whatsapp.failed > 0 ? "red" : "neutral"}>
@@ -248,13 +263,15 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                       </span>
                     </td>
                     <td data-label="Reason">
-                      <Pill
-                        tone={
-                          row.reason === "bounce" || row.reason === "complaint" ? "red" : "neutral"
+                      <span
+                        className="admin-state"
+                        data-tone={
+                          row.reason === "bounce" || row.reason === "complaint" ? "red" : undefined
                         }
                       >
+                        <span className="admin-state-dot" aria-hidden />
                         {row.reason}
-                      </Pill>
+                      </span>
                     </td>
                     <td data-label="Topic">{row.scope}</td>
                     <td data-label="Since">

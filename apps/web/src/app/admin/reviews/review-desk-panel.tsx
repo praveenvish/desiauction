@@ -24,7 +24,6 @@ import {
 } from "../../../server/admin/review-actions";
 import type { DeskAsk, DeskReview, ReviewDesk } from "../../../server/admin/review-views";
 import type { AskOutcome } from "../../../server/reviews/desk";
-import { AdminEmpty } from "../admin-ui";
 
 /**
  * ASK, THEN MODERATE (FR-1 Phase 2).
@@ -54,34 +53,37 @@ export function ReviewDeskPanel({ desk }: { desk: ReviewDesk }) {
   return (
     <>
       <AskCard />
-      <SectionCard
-        icon={<IconStar />}
-        tone="amber"
-        title="Waiting for a decision"
-        description={
-          desk.pending.length === 0
-            ? "Publish the ones worth standing behind; hide the rest"
-            : `${String(desk.pending.length)} to publish or hide`
-        }
-        flush
-        data-testid="review-desk-pending"
-      >
-        {desk.pending.length === 0 ? (
-          <AdminEmpty icon={<IconStar size={24} weight="duotone" />} title="Nothing waiting">
-            New reviews land here as people send them.
-          </AdminEmpty>
-        ) : (
+      {desk.pending.length === 0 ? (
+        // An empty queue is the calm state: one line, not a 300px card with a
+        // centred star in it. The counts of what was decided ride along.
+        <p className="admin-slim is-info" data-testid="review-desk-pending">
+          <IconStar size={16} />
+          <strong>Nothing waiting.</strong>
+          <span className="admin-meta">
+            New reviews land here as people send them · {String(desk.published.length)} published ·{" "}
+            {String(desk.hidden.length)} hidden
+          </span>
+        </p>
+      ) : (
+        <SectionCard
+          icon={<IconStar />}
+          tone="gold"
+          title="Waiting for a decision"
+          description={`${String(desk.pending.length)} to publish or hide`}
+          flush
+          data-testid="review-desk-pending"
+        >
           <ul className="admin-rows is-stacked">
             {desk.pending.map((review) => (
               <ReviewRow key={review.id} review={review} />
             ))}
           </ul>
-        )}
-      </SectionCard>
+        </SectionCard>
+      )}
       {desk.published.length > 0 ? (
         <SectionCard
           icon={<IconGlobe />}
-          tone="green"
+          tone="neutral"
           title="Published"
           description={`${String(desk.published.length)} live`}
           flush

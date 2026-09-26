@@ -1,4 +1,4 @@
-import { IconInfo, Notice, ToastProvider } from "@desiauction/ui";
+import { IconInfo, ToastProvider } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -48,16 +48,16 @@ export default async function AdminDemoAvailabilityPage() {
           </AdminPageHead>
 
           {windows.length === 0 ? (
-            <Notice
-              tone="warning"
-              icon={<IconInfo size={20} />}
-              title="No times published — and that is a working state."
-            >
-              The demo page is currently promising that a person will come back within a working
-              day, and the request form behind it works exactly as it should. Publish windows below
-              only if you will keep them: a calendar offering a slot nobody attends is worse than no
-              calendar at all.
-            </Notice>
+            // A working state, said as one line — not an amber banner above
+            // the only thing on the page an operator came to do.
+            <p className="admin-slim is-info">
+              <IconInfo size={16} />
+              <strong>No times published — and that is a working state.</strong>
+              <span className="admin-meta">
+                The demo page promises a reply within a working day. Publish only windows you will
+                keep: a slot nobody attends is worse than no calendar.
+              </span>
+            </p>
           ) : null}
 
           <AvailabilityPanel windows={windows} blackouts={blackouts} />

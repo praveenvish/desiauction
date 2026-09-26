@@ -198,16 +198,20 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         </StatGrid>
       </div>
 
-      <AuctionOverviewPanel
-        overview={overview}
-        unit={header.auctionUnit}
-        idleHint="No lot is under the hammer right now."
-        finished={
-          header.status === "completed" ||
-          header.status === "reconciled" ||
-          header.status === "abandoned"
-        }
-      />
+      {/* Progress and the purse burndown sat loose on the page between two
+          cards; they are a card like everything around them. */}
+      <section className="admin-watch-progress" aria-label="Auction progress">
+        <AuctionOverviewPanel
+          overview={overview}
+          unit={header.auctionUnit}
+          idleHint="No lot is under the hammer right now."
+          finished={
+            header.status === "completed" ||
+            header.status === "reconciled" ||
+            header.status === "abandoned"
+          }
+        />
+      </section>
 
       {engine !== null ? <EngineCard engine={engine} /> : null}
 
@@ -347,7 +351,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table">
+            <table className="admin-table admin-lots">
               <thead>
                 <tr>
                   <th scope="col">Player</th>
@@ -388,7 +392,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                         {money.compact(lot.basePrice)}
                       </td>
                     )}
-                    <td data-label="Final" className="admin-num admin-count">
+                    <td data-label="Final" className="admin-num admin-count is-side">
                       {lot.soldPrice === null ? "—" : money.compact(lot.soldPrice)}
                     </td>
                     <td data-label="Paddle">{lot.paddleNumber ?? "—"}</td>
@@ -404,7 +408,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         icon={<IconLayers />}
         tone="neutral"
         title="Latest events"
-        description={`The tail of the auction’s append-only log — ${String(pulse.eventCount)} events in all.`}
+        description={`The most recent, newest first — ${String(pulse.eventCount)} in all.`}
         flush
         data-testid="auction-watch-events"
       >
