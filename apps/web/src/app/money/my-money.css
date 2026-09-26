@@ -16,7 +16,8 @@
 .my-money--books {
   display: grid;
   gap: var(--space-5);
-  align-items: start;
+  /* Side by side the two cards share one height (312 vs 252 read as a gap). */
+  align-items: stretch;
 }
 
 @media (min-width: 1024px) {

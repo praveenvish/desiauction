@@ -2954,6 +2954,10 @@ a.admin-quiet-link:hover {
   border-top: 1px solid var(--border-subtle);
 }
 
+.admin-lot-list .da-row {
+  padding-inline: var(--space-4);
+}
+
 .admin-lot-list .da-row-figure {
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);

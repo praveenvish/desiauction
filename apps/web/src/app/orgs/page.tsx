@@ -3,15 +3,20 @@ import {
   IconCalendar,
   IconChevronRight,
   IconShieldCheck,
+  IconTrophy,
   IconUsers,
+  ListRow,
   Pill,
+  SectionCard,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { FormDialog } from "../../components/form-dialog";
 import { currentSession } from "../../server/auth/actions";
+import { memberCompetitions } from "../../server/competition/resolve";
 import { myOrgCards } from "../../server/orgs/actions";
+import { dateRange } from "../tournaments/season-card";
 import { CreateOrgForm } from "./create-org-form";
 import "./orgs.css";
 
@@ -63,7 +68,16 @@ export default async function OrgsPage({
   if (session === null) {
     redirect("/login?next=/orgs");
   }
-  const [orgs, params] = await Promise.all([myOrgCards(), searchParams]);
+  const [orgs, params, seasons] = await Promise.all([
+    myOrgCards(),
+    searchParams,
+    memberCompetitions(session.personId),
+  ]);
+  /* The page used to end after the club cards (~700px of canvas). The most
+     useful next object is where those clubs' work is: their latest seasons. */
+  const recent = [...seasons]
+    .sort((a, b) => (b.startsOn ?? "").localeCompare(a.startsOn ?? ""))
+    .slice(0, 5);
 
   /* Empty was two interactive elements and ~850px of grey: a "+ New
      organization" button in the page-action slot, a "Create an organization"
@@ -163,6 +177,46 @@ export default async function OrgsPage({
             </Link>
           ))}
         </div>
+
+        {recent.length > 0 ? (
+          <SectionCard
+            icon={<IconTrophy />}
+            concept="season"
+            title="Latest seasons"
+            description={
+              seasons.length > recent.length
+                ? `The newest ${String(recent.length)} of ${String(seasons.length)} across your clubs`
+                : "Across your clubs"
+            }
+            action={
+              <Link href="/tournaments" className="orgs-more">
+                All tournaments
+              </Link>
+            }
+            flush
+            data-testid="orgs-recent-seasons"
+          >
+            <ul className="orgs-seasons">
+              {recent.map((season) => (
+                <li key={season.id}>
+                  <ListRow
+                    href={`/seasons/${season.slug}`}
+                    linkComponent={Link}
+                    title={season.name}
+                    meta={[
+                      season.orgName,
+                      dateRange(season.startsOn, season.endsOn),
+                      season.location,
+                    ]
+                      .filter((part): part is string => part !== null && part !== "")
+                      .join(" · ")}
+                    figure={<IconChevronRight size={16} aria-hidden />}
+                  />
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        ) : null}
       </div>
     </main>
   );

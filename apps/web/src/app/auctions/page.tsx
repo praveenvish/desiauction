@@ -10,10 +10,13 @@ import {
   IconWallet,
   type KitTone,
   Pill,
+  SectionCard,
 } from "@desiauction/ui";
 import Link from "next/link";
 
 import { compactINR } from "../../lib/inr";
+import { auctionDashboard } from "../../server/auction/actions";
+import { seasonUnit } from "../../server/competition/season-unit";
 import { moneyFormat } from "../../lib/money";
 import type { AuctionNightStatus } from "../../server/console/auctions-index";
 import {
@@ -163,6 +166,109 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
   );
 }
 
+interface SpendNight {
+  slug: string;
+  seasonName: string;
+  unit: "inr" | "points";
+  teams: {
+    teamName: string;
+    color: string | null;
+    spent: number;
+    purseTotal: number;
+    players: number;
+    topBuy: { name: string; price: number } | null;
+  }[];
+}
+
+async function spendNightOf(slug: string, seasonName: string): Promise<SpendNight | null> {
+  const [dash, unit] = await Promise.all([auctionDashboard(slug), seasonUnit(slug)]);
+  const overview = dash?.overview ?? null;
+  if (overview === null || overview.paddles.length === 0) {
+    return null;
+  }
+  const teams: SpendNight["teams"] = [];
+  for (const paddle of overview.paddles) {
+    // Money-gated upstream: without the figures there is nothing to draw.
+    if (paddle.spent === undefined || paddle.purseTotal === undefined) {
+      return null;
+    }
+    const bought = overview.lots.filter(
+      (lot) => lot.status === "sold" && lot.paddleNumber === paddle.paddleNumber,
+    );
+    const top = bought.reduce<(typeof bought)[number] | null>(
+      (best, lot) => (best === null || (lot.soldPrice ?? 0) > (best.soldPrice ?? 0) ? lot : best),
+      null,
+    );
+    teams.push({
+      teamName: paddle.teamName,
+      color: paddle.color,
+      spent: paddle.spent,
+      purseTotal: paddle.purseTotal,
+      players: bought.length,
+      topBuy:
+        top === null ? null : { name: top.playerName ?? top.lotNumber, price: top.soldPrice ?? 0 },
+    });
+  }
+  teams.sort((a, b) => b.spent - a.spent);
+  return { slug, seasonName, unit, teams };
+}
+
+function SquadsBySpend({ night }: { night: SpendNight }) {
+  const money = moneyFormat(night.unit);
+  return (
+    <SectionCard
+      icon={<IconWallet />}
+      concept="money"
+      title="Squads by spend"
+      description={`${night.seasonName} · what each team spent of its purse, and its top buy`}
+      action={
+        <Link href={`/seasons/${night.slug}/teams`} className="ax-spend-link">
+          See the squads
+        </Link>
+      }
+      data-testid="auctions-spend"
+    >
+      <ul className="ax-spend da-stagger">
+        {night.teams.map((team) => (
+          <li key={team.teamName} className="ax-spend-row">
+            <span className="ax-spend-team">
+              <span
+                className="ax-spend-dot"
+                style={{ background: team.color ?? "var(--accent)" }}
+                aria-hidden
+              />
+              <strong>{team.teamName}</strong>
+              <span className="ax-muted">{team.players} bought</span>
+            </span>
+            <span className="ax-spend-bar" aria-hidden>
+              <span
+                style={{
+                  width: `${String(team.purseTotal > 0 ? Math.round((team.spent / team.purseTotal) * 100) : 0)}%`,
+                  background: team.color ?? "var(--accent)",
+                }}
+              />
+            </span>
+            <span className="ax-spend-figure">
+              <strong>{money.exact(team.spent)}</strong>
+              <span className="ax-muted"> of {money.compact(team.purseTotal)}</span>
+            </span>
+            <span className="ax-spend-top">
+              {team.topBuy === null ? (
+                <span className="ax-muted">No buys</span>
+              ) : (
+                <>
+                  <span className="ax-muted">Top buy </span>
+                  {team.topBuy.name} · {money.exact(team.topBuy.price)}
+                </>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </SectionCard>
+  );
+}
+
 /**
  * /auctions — every auction night this person runs, conducts, owns a team in or
  * can watch, across their clubs. Money moved shows only where they hold money
@@ -187,6 +293,24 @@ export default async function AuctionsPage() {
   const holdsMoneySight = view.cards.some(
     (card) => card.roleLabel === "Organizer" || card.roleLabel === "Auctioneer",
   );
+
+  /*
+   * THE PAGE DOES NOT END AFTER ONE CARD (round 4A). With only a night or two
+   * the card grid stopped at y≈250 and the rest was canvas. The latest
+   * finished night's squads-by-spend follows it — read through the hub's own
+   * gated read (auctionDashboard), so a viewer without money sight gets no
+   * figures and the block does not render.
+   */
+  const finishedCard =
+    view.cards.length <= 3
+      ? view.cards.find(
+          (card) => card.facts.status === "completed" || card.facts.status === "settled",
+        )
+      : undefined;
+  const spendNight =
+    finishedCard === undefined
+      ? null
+      : await spendNightOf(finishedCard.slug, finishedCard.seasonName);
 
   if (view.cards.length === 0) {
     return (
@@ -282,6 +406,8 @@ export default async function AuctionsPage() {
           <AuctionCard key={card.slug} card={card} />
         ))}
       </div>
+
+      {spendNight !== null ? <SquadsBySpend night={spendNight} /> : null}
     </main>
   );
 }

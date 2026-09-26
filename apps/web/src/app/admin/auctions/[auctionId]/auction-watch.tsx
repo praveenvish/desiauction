@@ -291,7 +291,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         icon={<IconUsers />}
         tone="purple"
         title="Teams"
-        description="Players bought, purse spent and left, and each team's top buy."
+        description="Players bought at auction (icons and captains join before it), purse spent and left, and each team's top buy."
         flush
         data-testid="auction-watch-teams"
       >
@@ -306,7 +306,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                 <tr>
                   <th scope="col">Team</th>
                   <th scope="col" className="admin-num">
-                    Players
+                    Bought
                   </th>
                   <th scope="col" className="admin-num">
                     Spent
@@ -328,7 +328,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                         <span className="admin-meta">{team.paddleNumber}</span>
                       </span>
                     </td>
-                    <td data-label="Players" className="admin-num admin-count">
+                    <td data-label="Bought" className="admin-num admin-count">
                       {team.players}
                     </td>
                     <td data-label="Spent" className="admin-num admin-count">

@@ -8,6 +8,7 @@ import {
   IconTrophy,
   IconWallet,
   ListRow,
+  Pill,
   VisuallyHidden,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -209,7 +210,8 @@ function clubBooks(
           ? {
               key: `season-${season.slug}`,
               title: season.name,
-              meta: "Ran on points — nothing to settle",
+              meta: "Ran on points — nothing to settle · see where the points went",
+              href: `/seasons/${season.slug}/teams`,
               kind: "points",
             }
           : settle.has(org.id)
@@ -257,7 +259,7 @@ function ClubBooks({ rows }: { rows: BookRow[] }) {
               title={row.title}
               meta={row.meta}
               {...(row.href !== undefined ? { href: row.href, linkComponent: Link } : {})}
-              {...(row.kind === "points" ? { status: "Points" } : {})}
+              {...(row.kind === "points" ? { status: <Pill tone="neutral">Points</Pill> } : {})}
             />
           </li>
         ))}
