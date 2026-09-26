@@ -317,6 +317,12 @@ a.stat:hover .stat-chevron {
     gap: 10px;
   }
 
+  /* An odd count left one half-tile orphaned on the last row (the owner's
+     "30/37 Lots sold"): the last tile takes the whole row instead. */
+  .stat-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
   .stat {
     gap: 10px;
     min-height: 64px;

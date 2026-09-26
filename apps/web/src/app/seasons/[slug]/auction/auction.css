@@ -1686,9 +1686,11 @@
   color: var(--text-secondary);
 }
 
+/* The text face with tabular figures: the mono face also set the top
+   buyer's NAME in typewriter type. Mono stays for IDs (L007). */
 .pool-money strong {
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 

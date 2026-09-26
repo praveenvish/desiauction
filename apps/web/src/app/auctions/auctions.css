@@ -59,8 +59,14 @@
     column-gap: var(--space-8);
   }
 
+  /* In the wide card the pill sat at the end of the left column — mid-card,
+     aligned to nothing. Here it sits beside the title it qualifies. */
   .ax-card:only-child > .ax-head {
     grid-area: head;
+  }
+
+  .ax-card:only-child .ax-titles {
+    flex: 0 1 auto;
   }
 
   .ax-card:only-child > .ax-meta {
