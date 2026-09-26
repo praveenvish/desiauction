@@ -2448,6 +2448,59 @@ a.admin-quiet-link:hover {
   .admin-follow-facts .admin-digest {
     display: none;
   }
+
+  /* THE LIST ROW (round 3C): name over ONE line of facts — it still wrapped
+     to three. The quiet facts share the line and ellipsize; the one that asks
+     for action ("1 to recover") never shrinks and sits at the line's end. */
+  .admin-follow-row:not(.admin-follow-head) .admin-follow-facts {
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .admin-follow-row:not(.admin-follow-head) .admin-follow-facts > div {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .admin-follow-row:not(.admin-follow-head) .admin-follow-facts > div:last-child {
+    flex: none;
+    margin-inline-start: auto;
+    overflow: visible;
+  }
+
+  .admin-follow-row:not(.admin-follow-head) .admin-follow-facts dd {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admin-follow-row:has(.admin-follow-fails[open]) .admin-follow-facts {
+    flex-wrap: wrap;
+  }
+
+  /* Healthy says nothing on a phone: a green "Current" and "Pass" on every
+     one of 26 rows crowded out the facts that differ (round 2 "healthy rows
+     shout"). They stay for assistive tech; problems still show as pills. */
+  .admin-follow-row:not(.admin-follow-head)
+    .admin-follow-facts
+    > div:has(> dd > .admin-state[data-tone="green"]),
+  .admin-follow-row:not(.admin-follow-head)
+    .admin-follow-facts
+    > div:has(> dd > .admin-follow-cert > .admin-state[data-tone="green"]) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .admin-follow-row:not(.admin-follow-head) .admin-follow-chans {
+    flex-wrap: nowrap;
+  }
 }
 
 /* ---- Audit, round 2: one line per event; evidence and runs on demand ---- */
@@ -2816,4 +2869,43 @@ a.admin-quiet-link:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Messaging on a phone (round 3C): one list row per template — key, its text
+   as ONE ellipsized line, the state at the right. The variable is inside the
+   opened row there; a laptop keeps its own column for it. */
+.admin-tpl-env-phone {
+  display: none;
+}
+
+.admin-inline-meta.da-row-meta {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .admin-tpl-env-phone {
+    display: block;
+  }
+
+  table.da-rows .admin-inline-meta.da-row-meta {
+    display: inline;
+  }
+
+  table.da-rows .admin-tpl-body:not([open]) > summary {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  table.da-rows .admin-tpl-body[open] {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 719px) {
+  /* The scope type rides the row's one meta line on a phone. */
+  [data-testid="admin-user-grants"] [data-cell="title"] .admin-cell-main > .admin-meta {
+    display: none;
+  }
 }

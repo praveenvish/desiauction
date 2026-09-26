@@ -53,7 +53,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
           </p>
         )}
         <div className="admin-table-wrap">
-          <table className="admin-table" data-testid="admin-template-table">
+          <table className="admin-table da-rows" data-testid="admin-template-table">
             <thead>
               <tr>
                 <th scope="col">Message</th>
@@ -64,7 +64,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
             <tbody>
               {overview.templates.map((row) => (
                 <tr key={row.key} data-testid={`admin-template-${row.key}`}>
-                  <td data-label="Message">
+                  <td data-label="Message" data-cell="title">
                     <span className="admin-cell-main">
                       <span className="admin-name admin-mono-key">{row.key}</span>
                       {/* The registered sentence, verbatim — folded behind the
@@ -76,10 +76,15 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                           {row.channel} · {row.category} · {row.locale} · {row.body}
                         </summary>
                         <p className="admin-meta">{row.body}</p>
+                        {/* A phone drops the variable column (round 3C: it ran
+                            three lines per row); opening the row names it. */}
+                        <p className="admin-meta admin-tpl-env-phone">
+                          Set by <code className="admin-env">{row.variable}</code>
+                        </p>
                       </details>
                     </span>
                   </td>
-                  <td data-label="Status">
+                  <td data-label="Status" data-cell="figure">
                     {/* The verdict pill in the card head already says how many;
                         a row says its own state as a dot and a word. */}
                     <span className="admin-state" data-tone={row.configured ? "green" : "red"}>
@@ -117,7 +122,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-delivery-table">
+            <table className="admin-table da-rows" data-testid="admin-delivery-table">
               <thead>
                 <tr>
                   <th scope="col">Message</th>
@@ -135,10 +140,14 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
               <tbody>
                 {overview.delivery.map((row) => (
                   <tr key={row.template}>
-                    <td data-label="Message">
+                    <td data-label="Message" data-cell="title">
                       <span className="admin-name admin-mono-key">{row.template}</span>
+                      {/* The phone's one line under the key. */}
+                      <span className="da-row-meta">
+                        Failed {formatCount(row.failed)} · Suppressed {formatCount(row.suppressed)}
+                      </span>
                     </td>
-                    <td data-label="Sent" className="admin-count admin-num">
+                    <td data-label="Sent" className="admin-count admin-num" data-cell="figure">
                       <TableCount n={row.sent} />
                     </td>
                     {/* Failed is a delivery problem. Suppressed is the gate
@@ -240,7 +249,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-suppression-table">
+            <table className="admin-table da-rows" data-testid="admin-suppression-table">
               <thead>
                 <tr>
                   <th scope="col">Contact</th>
@@ -256,15 +265,18 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                     {/* Masked, like every other contact on this surface.
                         Administration needs to see THAT a contact is
                         suppressed and why; it does not need the contact. */}
-                    <td data-label="Contact">
+                    <td data-label="Contact" data-cell="title">
                       <span className="admin-cell-main">
                         <span className="admin-name" data-private>
                           {maskContact(row.contact)}
                         </span>
-                        <span className="admin-meta">{row.channel}</span>
+                        <span className="admin-meta">
+                          {row.channel}
+                          <span className="da-row-meta admin-inline-meta"> · {row.scope}</span>
+                        </span>
                       </span>
                     </td>
-                    <td data-label="Reason">
+                    <td data-label="Reason" data-cell="status">
                       <span
                         className="admin-state"
                         data-tone={
@@ -276,7 +288,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                       </span>
                     </td>
                     <td data-label="Topic">{row.scope}</td>
-                    <td data-label="Since">
+                    <td data-label="Since" data-cell="figure">
                       <RelativeTime at={row.createdAt} />
                     </td>
                   </tr>

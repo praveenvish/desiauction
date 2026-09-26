@@ -538,20 +538,27 @@ section.rd-card[data-flush="true"] {
     display: none;
   }
 
-  /* Status as its dot: the word stays the pill's text for assistive tech
-     (font-size 0 hides glyphs, not the text node) and the row keeps its
-     width for the name. */
-  .rd-card .pd-row .pd-status > span {
-    gap: 0;
-    min-height: 0;
-    padding: 6px;
-    background: transparent;
-    font-size: 0;
+  /* Status as a SHAPE (round 3C): the dot alone was a colour-only signal,
+     and the word pushed names onto two lines. The glyph (tick, clock, pause,
+     cross) stands in the dot's slot; the pill's word stays the accessible
+     text (font-size 0 hides glyphs, not the text node). */
+  .rd-card .pd-row .pd-status {
+    display: inline-flex;
+    align-items: center;
   }
 
-  .rd-card .pd-row .pd-status > span > span {
-    width: 9px;
-    height: 9px;
+  .rd-card .pd-row .pd-status .reg-glyph {
+    display: inline-flex;
+    padding: 4px;
+  }
+
+  .rd-card .pd-row .pd-status > span:not(.reg-glyph) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .rd-card .pd-table .pd-row td:first-child,
@@ -653,6 +660,14 @@ section.rd-card[data-flush="true"] {
   .rd-card .pd-row .pd-meta-phone:not(:empty)::before {
     content: "·";
     color: var(--text-muted);
+  }
+
+  .rd-card .pd-row .pd-meta-team {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .rd-card .pd-row .pd-meta-phone svg {

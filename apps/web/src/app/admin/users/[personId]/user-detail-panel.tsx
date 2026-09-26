@@ -106,7 +106,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-user-grants">
+            <table className="admin-table da-rows" data-testid="admin-user-grants">
               <thead>
                 <tr>
                   <th scope="col">Scope</th>
@@ -118,10 +118,14 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
               <tbody>
                 {grants.map((grant) => (
                   <tr key={grant.id}>
-                    <td data-label="Scope">
+                    <td data-label="Scope" data-cell="title">
                       <span className="admin-cell-main">
                         <span className="admin-name">{grant.scopeLabel}</span>
                         <span className="admin-meta">{grant.scopeType}</span>
+                      </span>
+                      {/* The phone's one line under the scope. */}
+                      <span className="da-row-meta">
+                        {grant.scopeType} · {grant.capabilitySet} · {absoluteIst(grant.createdAt)}
                       </span>
                     </td>
                     <td data-label="Capability set">
@@ -144,7 +148,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                         </span>
                       </span>
                     </td>
-                    <td data-label="State">
+                    <td data-label="State" data-cell="figure">
                       {grant.revokedAt === null ? (
                         <Pill tone="green" dot>
                           Active

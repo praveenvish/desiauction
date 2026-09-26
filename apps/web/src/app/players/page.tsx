@@ -17,6 +17,7 @@ import { PLAYERS_PAGE_SIZE, type PlayerIndexRow } from "../../server/console/pla
 import { FEE_LABEL, STATUS_LABEL } from "../seasons/[slug]/_players/labels";
 import { NavButton } from "./nav-button";
 import { PlayersFilters } from "./players-filters";
+import { RegistrationStatusGlyph } from "../../components/status/registration-status-glyph";
 import "./players.css";
 import { formatCount } from "../../lib/plural";
 
@@ -282,6 +283,7 @@ export default async function PlayersPage({
                       )}
                     </td>
                     <td className="px-cell-status" data-label="Status">
+                      <RegistrationStatusGlyph status={row.status} />
                       <Pill tone={STATUS_TONE[row.status]} dot>
                         {STATUS_LABEL[row.status]}
                       </Pill>

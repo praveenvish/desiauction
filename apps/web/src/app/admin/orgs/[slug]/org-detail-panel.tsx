@@ -119,7 +119,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-org-competitions">
+            <table className="admin-table da-rows" data-testid="admin-org-competitions">
               <thead>
                 <tr>
                   <th scope="col">Season</th>
@@ -138,7 +138,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                         this reader: the public page when the season is public
                         (and not taken down), else the admin auction watch when
                         it has an auction, else just the name. */}
-                    <td data-label="Season">
+                    <td data-label="Season" data-cell="title">
                       {competition.visibility === "public" && !competition.held ? (
                         <Link href={`/c/${competition.slug}`} className="admin-name">
                           {competition.name}
@@ -153,12 +153,21 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                       ) : (
                         <span className="admin-name">{competition.name}</span>
                       )}
+                      {/* The phone's one line: the facts a laptop gives columns. */}
+                      <span className="da-row-meta">
+                        {[
+                          competition.held ? "Taken down" : lifecycleLabel(competition.visibility),
+                          competition.caseStatus === null
+                            ? "No case"
+                            : `Settlement ${lifecycleLabel(competition.caseStatus).toLowerCase()}`,
+                        ].join(" · ")}
+                      </span>
                     </td>
                     {/* Capability SETS are rendered verbatim on purpose; a
                         lifecycle state is not a set. "REGISTRATION_CLOSED" is
                         an un-translated database value, not a name anyone
                         needs to type back. */}
-                    <td data-label="Status">
+                    <td data-label="Status" data-cell="figure">
                       <Pill tone={statusPillTone(competition.status)} dot>
                         {lifecycleLabel(competition.status)}
                       </Pill>
@@ -172,7 +181,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                         </Pill>
                       )}
                     </td>
-                    <td data-label="Auction">
+                    <td data-label="Auction" data-cell="status">
                       {competition.auctionStatus === null || competition.auctionId === null ? (
                         <span className="admin-dash">No auction</span>
                       ) : (
@@ -222,7 +231,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-org-grants">
+            <table className="admin-table da-rows" data-testid="admin-org-grants">
               <thead>
                 <tr>
                   <th scope="col">Person</th>
@@ -233,15 +242,16 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               <tbody>
                 {grants.map((grant) => (
                   <tr key={grant.id}>
-                    <td data-label="Person">
+                    <td data-label="Person" data-cell="title">
                       <Link href={`/admin/users/${grant.personId}`} className="admin-name">
                         {grant.name ?? grant.personId.slice(-6)}
                       </Link>
+                      <span className="da-row-meta">{grant.capabilitySet}</span>
                     </td>
                     <td data-label="Capability set">
                       <span className="admin-action">{grant.capabilitySet}</span>
                     </td>
-                    <td data-label="State">
+                    <td data-label="State" data-cell="figure">
                       {grant.revokedAt === null ? (
                         <Pill tone="green" dot>
                           Active

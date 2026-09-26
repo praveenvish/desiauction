@@ -75,6 +75,7 @@ import { useMutate } from "../_players/use-mutate";
 import { useRoster } from "../_players/use-roster";
 import { AddPlayerDialog } from "./add-player-dialog";
 import { ImportDialog } from "./import-dialog";
+import { RegistrationStatusGlyph } from "../../../../components/status/registration-status-glyph";
 import "../_players/players-desk.css";
 
 const SORTS = ["recent", "oldest", "name", "number", "status"];
@@ -1746,11 +1747,14 @@ function PlayerRow({
                   two lines beside the face (~56px), not three (~115px). The
                   laptop keeps them in the Team column. */}
               <span className="pd-meta-phone">
-                {row.teamName !== null
-                  ? row.teamName
-                  : auctionDone && row.status === "approved"
-                    ? "Unsold"
-                    : null}
+                {/* Its own box, so a long team name ends in an ellipsis and the
+                    captain/icon marks after it stay on screen (round 2: "Pune
+                    Panthe" hard-clipped and the marks vanished). */}
+                {row.teamName !== null ? (
+                  <span className="pd-meta-team">{row.teamName}</span>
+                ) : auctionDone && row.status === "approved" ? (
+                  <span className="pd-meta-team">Unsold</span>
+                ) : null}
                 {row.isCaptain ? <IconCrown size={16} weight="fill" alt="Captain" /> : null}
                 {row.isIcon ? <IconStar size={16} weight="fill" alt="Icon" /> : null}
                 {row.isRetained ? <IconLock size={16} weight="fill" alt="Retained" /> : null}
@@ -1829,6 +1833,7 @@ function PlayerRow({
       </td>
       <td className="pd-col-status">
         <span className="pd-status">
+          <RegistrationStatusGlyph status={row.status} />
           <Pill tone={STATUS_PILL[row.status]} dot>
             {row.status === "rejected" ? "declined" : row.status}
           </Pill>
