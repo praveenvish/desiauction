@@ -1071,6 +1071,13 @@
   gap: var(--space-4);
 }
 
+.reg-status-photo {
+  flex: none;
+  display: block;
+  width: 96px;
+  height: 96px;
+}
+
 .reg-status-title {
   display: flex;
   flex-direction: column;
@@ -1156,6 +1163,47 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* The sold price as the card's hero figure: gold display numerals on a warm
+   wash, the sentence that used to carry it as its caption. */
+.reg-sold {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-5);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    135deg,
+    var(--accent-subtle),
+    color-mix(in srgb, var(--accent-subtle) 25%, transparent)
+  );
+}
+
+.reg-sold-label {
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reg-sold-figure {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 7vw, 3.5rem);
+  line-height: 1.05;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--accent-ink);
+}
+
+.reg-sold-note {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
 .reg-status-body {
   margin: 0;
   color: var(--text-secondary);
@@ -1205,9 +1253,11 @@
 }
 
 @media (width <= 480px) {
-  .reg-status-head {
-    flex-direction: column;
-    align-items: flex-start;
+  /* The avatar sits beside the name on a phone too, at a phone's size — it
+     used to stand alone on a 130px row of its own (round 2). */
+  .reg-status-photo {
+    width: 64px;
+    height: 64px;
   }
 
   .reg-status-actions > * {
