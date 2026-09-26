@@ -10,7 +10,6 @@ import {
   IconFlag,
   IconGavel,
   IconImage,
-  IconLedger,
   IconList,
   IconMegaphone,
   IconPlay,
@@ -251,7 +250,7 @@ export function OverviewDashboard({
   const purseCard = (
     <SectionCard
       icon={<IconWallet />}
-      tone="blue"
+      concept="money"
       title="Paddle purse breakdown"
       data-testid="purse-burndown"
       action={
@@ -306,7 +305,7 @@ export function OverviewDashboard({
 
   /* ---- Ready to open ------------------------------------------------------- */
   const readyCard = (
-    <SectionCard icon={<IconFlag />} tone="red" title="Ready to open" className="dash-ready">
+    <SectionCard icon={<IconFlag />} concept="auction" title="Ready to open" className="dash-ready">
       <ul className="dash-checks">
         {ready.checks.map((check) => (
           <li key={check.id} data-pass={check.pass}>
@@ -389,7 +388,7 @@ export function OverviewDashboard({
   const paddlesCard = (
     <SectionCard
       icon={<IconUsers />}
-      tone="amber"
+      concept="teams"
       title="Paddles"
       description="One paddle per team, held by the team's owner on their own device."
       action={<TabLink tab="paddles">Manage</TabLink>}
@@ -566,7 +565,7 @@ export function OverviewDashboard({
       icon={<IconClock />}
       tone="neutral"
       title="Event log & replay"
-      description={`${String(view.eventCount)} immutable events · single-writer order`}
+      description={`${view.eventCount.toLocaleString("en-IN")} events, in the order they happened`}
       action={<TabLink tab="log">View all events</TabLink>}
       flush
     >
@@ -641,26 +640,21 @@ export function OverviewDashboard({
     });
   }
   if (settled && viewer.canConduct) {
+    // One door for the record: the replay steps through it; the ledger is
+    // one tab away (Log) and the event card below links it too (round 2).
     afterDoors.push({
       key: "replay",
       href: `/seasons/${slug}/auction/replay`,
-      label: "Review the night",
-      note: "Step through every lot, bid and hammer in order.",
+      label: "Replay the night",
+      note: "Every lot, bid and hammer, in the order it happened.",
       icon: <IconPlay size={20} weight="duotone" />,
-    });
-    afterDoors.push({
-      key: "ledger",
-      href: `/seasons/${slug}/auction/ledger`,
-      label: "Open the ledger",
-      note: "The full record — every sale, every bid, who and when.",
-      icon: <IconLedger size={20} weight="duotone" />,
     });
   }
   const afterCard =
     afterDoors.length > 0 ? (
       <SectionCard
         icon={<IconFlag />}
-        tone="green"
+        concept="done"
         title="After the auction"
         description="The squads are final. Here is what is left to do."
         data-testid="after-auction-card"

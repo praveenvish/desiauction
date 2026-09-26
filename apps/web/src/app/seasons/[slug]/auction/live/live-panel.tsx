@@ -630,7 +630,14 @@ export function LivePanel({
                 paddle grant yet" on a finished room. A held paddle is gone too:
                 there is nothing left to hand back, and the owner's final account
                 is the My-team card and the squads below. */}
-            {finished ? null : (
+            {/* An organizer with no paddle grant and no team was told to "ask
+                the organizer" — themselves. A conductor who could only ever
+                read that sentence gets the Conduct card on its own (round 2). */}
+            {finished ||
+            (myPaddle === null &&
+              grantedTeams.length === 0 &&
+              view.myTeamIds.length === 0 &&
+              view.viewer.canConduct) ? null : (
               <Card data-testid="paddle-panel" className="live-card">
                 <h2>{myPaddle !== null ? "Paddle status" : "Claim your paddle"}</h2>
                 {myPaddle !== null ? (

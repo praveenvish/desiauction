@@ -325,6 +325,16 @@
   .live-controls[data-conduct="true"] {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
+
+  .live-controls > :only-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Breathing room between the gavel row and the sentence that explains it
+   (spacing only — the gavel keeps its size and label). */
+#live-gavel-hint {
+  margin-top: var(--space-2);
 }
 
 .paddle-status-row {

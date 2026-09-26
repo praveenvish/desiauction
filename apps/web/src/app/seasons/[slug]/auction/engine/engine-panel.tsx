@@ -10,6 +10,8 @@ import {
   Dialog,
   IconAlert,
   IconGavel,
+  IconList,
+  IconPlay,
   IconRefresh,
   IconShieldCheck,
   useToast,
@@ -41,7 +43,24 @@ interface Reading {
 
 const NOT_YET: Reading = { diagnostics: null, unreachable: false, refreshMs: null, at: 0 };
 
-export function EnginePanel({ slug }: { slug: string }) {
+/** What the page already knows from the record, before the engine answers. */
+export interface EngineRecord {
+  status: string;
+  events: number;
+  lots: number;
+}
+
+const STATUS_WORD: Record<string, string> = {
+  draft: "Not started",
+  scheduled: "Scheduled",
+  open: "Live",
+  paused: "Paused",
+  completed: "Completed",
+  reconciled: "Completed",
+  abandoned: "Abandoned",
+};
+
+export function EnginePanel({ slug, record }: { slug: string; record?: EngineRecord }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -112,10 +131,11 @@ export function EnginePanel({ slug }: { slug: string }) {
   /* Recovery replays the log and heals the projections — a live-room repair.
      On a finished auction there is no room to repair, and the button used to
      sit there enabled all the same. */
-  const finished =
-    diagnostics?.auctionStatus === "completed" ||
-    diagnostics?.auctionStatus === "reconciled" ||
-    diagnostics?.auctionStatus === "abandoned";
+  const status = diagnostics?.auctionStatus ?? record?.status;
+  const finished = status === "completed" || status === "reconciled" || status === "abandoned";
+  /* A finished auction with no engine answering is not an incident: the
+     engine only matters while a room is live, and the record is sealed. */
+  const restful = finished && unreachable;
 
   return (
     <div
@@ -130,10 +150,12 @@ export function EnginePanel({ slug }: { slug: string }) {
       <Card data-testid="recovery-status" className="engine-health">
         <span
           className="engine-health-tile"
-          data-tone={unreachable || (diagnostics !== null && !healthy) ? "danger" : "ok"}
+          data-tone={
+            restful ? "ok" : unreachable || (diagnostics !== null && !healthy) ? "danger" : "ok"
+          }
           aria-hidden
         >
-          {unreachable || (diagnostics !== null && !healthy) ? (
+          {!restful && (unreachable || (diagnostics !== null && !healthy)) ? (
             <IconAlert size={24} weight="duotone" />
           ) : (
             <IconShieldCheck size={24} weight="duotone" />
@@ -142,19 +164,19 @@ export function EnginePanel({ slug }: { slug: string }) {
         <div className="engine-health-body">
           <div className="engine-health-title">
             <h2>
-              {unreachable
-                ? "We can't reach the engine"
-                : diagnostics === null
-                  ? "Checking the engine…"
-                  : healthy
-                    ? "The engine is healthy"
-                    : "The engine needs attention"}
+              {restful
+                ? "The auction is over — nothing is running"
+                : unreachable
+                  ? "We can't reach the engine"
+                  : diagnostics === null
+                    ? "Checking the engine…"
+                    : healthy
+                      ? "The engine is healthy"
+                      : "The engine needs attention"}
             </h2>
-            {unreachable ? (
-              <Badge tone="danger" data-testid="engine-unreachable">
-                engine unreachable
-              </Badge>
-            ) : diagnostics !== null ? (
+            {/* The title already says "can't reach"; a red badge repeating it
+                was the page shouting twice (round 2). */}
+            {unreachable ? null : diagnostics !== null ? (
               <Badge tone={healthy ? "success" : "danger"} data-testid="engine-health">
                 {healthy ? "healthy" : "attention required"}
               </Badge>
@@ -168,38 +190,91 @@ export function EnginePanel({ slug }: { slug: string }) {
             <p className="competitions-hint">
               {diagnostics !== null
                 ? `${String(diagnostics.eventCount)} events on the record, every one verified · ${String(diagnostics.connectedClients)} ${diagnostics.connectedClients === 1 ? "screen" : "screens"} connected${refreshMs !== null ? " · checked just now" : ""}.`
-                : unreachable
-                  ? "The engine isn't answering. The live room stays read-only until it does; this page checks again on its own."
-                  : "Reading the engine's own account of the room…"}
+                : restful
+                  ? "The engine only runs while a room is live. Every sale and bid is in the ledger, and the replay steps through them."
+                  : unreachable
+                    ? "The engine isn't answering. The live room stays read-only until it does; this page checks again on its own."
+                    : "Reading the engine's own account of the room…"}
             </p>
           )}
-          <p className="engine-health-explain">
-            {finished
-              ? "The auction is over, so there is nothing to recover."
-              : "If the room ever looks stuck, Recover rebuilds it from the record. The room pauses for a few seconds."}
-          </p>
+          {restful ? null : (
+            <p className="engine-health-explain">
+              {finished
+                ? "The auction is over, so there is nothing to recover."
+                : "If the room ever looks stuck, Recover rebuilds it from the record. The room pauses for a few seconds."}
+            </p>
+          )}
         </div>
         <div className="engine-health-actions">
-          <Button
-            variant="secondary"
-            size="sm"
-            // One click used to pause a live room with no warning. It asks first.
-            onClick={() => {
-              setConfirmOpen(true);
-            }}
-            loading={busy}
-            disabled={finished}
-            data-testid="engine-recover"
-          >
-            <IconRefresh size={16} />
-            Recover engine
-          </Button>
-          <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="ghost" size="sm">
-            <IconGavel size={16} />
-            Cockpit
-          </ButtonLink>
+          {finished ? (
+            <>
+              <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary" size="sm">
+                <IconList size={16} />
+                Ledger
+              </ButtonLink>
+              <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="ghost" size="sm">
+                <IconPlay size={16} />
+                Replay
+              </ButtonLink>
+            </>
+          ) : null}
+          {finished ? null : (
+            <Button
+              variant="secondary"
+              size="sm"
+              // One click used to pause a live room with no warning. It asks first.
+              onClick={() => {
+                setConfirmOpen(true);
+              }}
+              loading={busy}
+              disabled={finished}
+              data-testid="engine-recover"
+            >
+              <IconRefresh size={16} />
+              Recover engine
+            </Button>
+          )}
+          {finished ? null : (
+            <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="ghost" size="sm">
+              <IconGavel size={16} />
+              Cockpit
+            </ButtonLink>
+          )}
         </div>
       </Card>
+
+      {/* What the record says, from the page's own read — so the page is
+          never one sentence over a blank canvas while the engine is quiet. */}
+      {record !== undefined ? (
+        <dl className="engine-facts" data-testid="engine-record">
+          <div>
+            <dt>Auction</dt>
+            <dd>{STATUS_WORD[status ?? record.status] ?? status ?? record.status}</dd>
+          </div>
+          <div>
+            <dt>Events on the record</dt>
+            <dd>{(diagnostics?.eventCount ?? record.events).toLocaleString("en-IN")}</dd>
+          </div>
+          <div>
+            <dt>Lots</dt>
+            <dd>{record.lots.toLocaleString("en-IN")}</dd>
+          </div>
+          <div>
+            <dt>Engine</dt>
+            <dd>
+              {diagnostics !== null
+                ? healthy
+                  ? "Answering"
+                  : "Needs attention"
+                : unreachable
+                  ? restful
+                    ? "Idle"
+                    : "Not answering"
+                  : "Checking…"}
+            </dd>
+          </div>
+        </dl>
+      ) : null}
 
       {diagnostics !== null ? (
         <details className="engine-details">

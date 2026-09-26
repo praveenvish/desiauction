@@ -21,7 +21,14 @@ export default async function EnginePage({ params }: { params: Promise<{ slug: s
           {/* No head band: the identity bar names the page, and the one door
               (Cockpit) rides in the health card. First data used to start at
               y≈400 on a laptop. */}
-          <EnginePanel slug={slug} />
+          <EnginePanel
+            slug={slug}
+            record={{
+              status: view.view.auction.status,
+              events: view.view.eventCount,
+              lots: view.view.lots.length,
+            }}
+          />
         </div>
       </main>
     </ToastProvider>

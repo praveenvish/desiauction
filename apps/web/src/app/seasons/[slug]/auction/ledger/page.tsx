@@ -85,7 +85,7 @@ export default async function LedgerPage({
               {view.filter === "all"
                 ? `${String(view.totalRows)} rows`
                 : `${String(view.filteredRows)} of ${String(view.totalRows)} rows`}{" "}
-              · immutable, append-only
+              · as recorded
             </span>
           </ToolbarCount>
           {/* Actor, paddle, reason and correlation are the DISPUTE columns,

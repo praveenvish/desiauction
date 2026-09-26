@@ -807,6 +807,28 @@
   min-width: 0;
 }
 
+/* ROUND 2: the cockpit runs to the same 24px gutters as the room bar above it
+   (a centred 1240px column sat inset under a full-bleed bar), and the right
+   rail — purses, pool — stays in view while the left column scrolls. */
+.cockpit-page > .dash-stack {
+  max-width: none;
+}
+
+@media (min-width: 901px) {
+  .cockpit-grid > .cockpit-col:last-child,
+  .live-grid > .live-col:last-child {
+    position: sticky;
+    top: 80px;
+  }
+}
+
+.live-exits-label {
+  align-self: center;
+  margin-inline-end: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
 /* --- the owner room grid -------------------------------------------------- */
 .live-grid {
   display: grid;
@@ -899,6 +921,16 @@
   .live-exits > :only-child,
   .live-exits > :nth-child(odd):last-child {
     grid-column: 1 / -1;
+  }
+
+  /* With its label first, the label takes a row and the parity flips. */
+  .live-exits > .live-exits-label,
+  .live-exits:has(> .live-exits-label) > :nth-child(even):last-child {
+    grid-column: 1 / -1;
+  }
+
+  .live-exits:has(> .live-exits-label) > :nth-child(odd):last-child:not(:only-child) {
+    grid-column: auto;
   }
 }
 
@@ -4305,5 +4337,55 @@
 @media (prefers-reduced-motion: reduce) {
   .ceremony-skel {
     animation: none;
+  }
+}
+
+/* ---- Engine: the record's own facts under the health card (round 2) ---- */
+.engine-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.engine-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+.engine-facts > div + div {
+  border-inline-start: 1px solid var(--border-subtle);
+}
+
+.engine-facts dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.engine-facts dd {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+@media (max-width: 719px) {
+  .engine-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .engine-facts > div:nth-child(3) {
+    border-inline-start: 0;
+  }
+
+  .engine-facts > div:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
   }
 }
