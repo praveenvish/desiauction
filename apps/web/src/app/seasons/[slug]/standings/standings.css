@@ -99,3 +99,72 @@
 .st-table.sd-table tbody td {
   padding-block: 8px;
 }
+
+/* A team that has not played shows its zeros quietly — the row is a fact
+   about the future, not a scoreline (round 2). */
+.st-table.sd-table tbody tr[data-unplayed="true"] td.st-num,
+.st-table.sd-table tbody tr[data-unplayed="true"] td.st-num strong {
+  color: var(--text-muted);
+}
+
+/* ---- "How points work": the rules behind one line ---- */
+.sd-how {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sd-how > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  cursor: pointer;
+  list-style: none;
+}
+
+.sd-how > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sd-how > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.sd-how[open] > summary::after {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+.sd-how > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.sd-how > .st-foot-note {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 0;
+}
+
+/* PHONE: a team's name wraps to two lines rather than losing its end
+   ("Mumbai Maver…") — the name is what the row is for. */
+@media (max-width: 719px) {
+  .sd-table .st-team-name {
+    display: -webkit-box;
+    max-width: none;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.25;
+  }
+}

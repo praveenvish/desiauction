@@ -90,9 +90,13 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                   </caption>
                   <thead>
                     <tr>
-                      <th scope="col" className="st-num sd-pos">
-                        #
-                      </th>
+                      {/* No rank column until something is ranked: a column of
+                          dashes is a column of nothing (round 2). */}
+                      {anyPlayed ? (
+                        <th scope="col" className="st-num sd-pos">
+                          #
+                        </th>
+                      ) : null}
                       <th scope="col">Team</th>
                       <th scope="col" className="st-num">
                         <abbr title="Played">P</abbr>
@@ -131,10 +135,13 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                         key={row.teamId}
                         data-testid={`standings-${row.teamId}`}
                         data-rank={index < 3 && row.played > 0 ? String(index + 1) : undefined}
+                        data-unplayed={row.played === 0 ? "true" : undefined}
                       >
-                        <td className="st-num sd-pos">
-                          <span className="sd-rank">{anyPlayed ? index + 1 : "—"}</span>
-                        </td>
+                        {anyPlayed ? (
+                          <td className="st-num sd-pos">
+                            <span className="sd-rank">{index + 1}</span>
+                          </td>
+                        ) : null}
                         <td>
                           <span className="st-team">
                             <TeamCrest
@@ -197,7 +204,12 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                   </tbody>
                 </table>
               </div>
-              <p className="st-foot-note">{standingsFootnote(standings.sport)}</p>
+              {/* The rules, one click away rather than a paragraph under every
+                  table (round 2). */}
+              <details className="sd-how">
+                <summary>How points work</summary>
+                <p className="st-foot-note">{standingsFootnote(standings.sport)}</p>
+              </details>
             </>
           )}
         </SectionCard>

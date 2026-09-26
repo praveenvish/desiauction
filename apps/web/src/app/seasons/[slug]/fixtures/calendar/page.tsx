@@ -1,5 +1,6 @@
 import { addDays } from "@desiauction/core";
 import {
+  ButtonLink,
   IconArrowLeft,
   IconArrowRight,
   IconCalendar,
@@ -13,7 +14,8 @@ import { notFound } from "next/navigation";
 
 import { formatWallDate, formatWallTime } from "../../../../../lib/format-date";
 import { calendarView } from "../../../../../server/competition/fixture-actions";
-import type { FixtureSnapshot } from "../../../../../server/competition/fixtures";
+import { nowWallClock, type FixtureSnapshot } from "../../../../../server/competition/fixtures";
+import { EmptyWeek } from "../empty-week";
 import { FixtureStatusPill } from "../../_tabs/fixture-status";
 import { ScheduleViews } from "../../sibling-link";
 import "../../../seasons.css";
@@ -108,6 +110,14 @@ export default async function CalendarPage({
     notFound();
   }
   const step = view.view === "week" ? 7 : 1;
+  const today = nowWallClock().slice(0, 10);
+  const nothingHere =
+    view.view !== "timeline" && view.days.every((day) => day.fixtures.length === 0);
+  // The next match after the day on screen — the one jump an empty page offers.
+  const next = view.upcoming.find(
+    (fixture) => fixture.kickoffAt !== null && fixture.kickoffAt.slice(0, 10) > view.date,
+  );
+  const nextDate = next?.kickoffAt?.slice(0, 10) ?? null;
   const href = (patch: { view?: string; date?: string }) => {
     const next = new URLSearchParams();
     next.set("view", patch.view ?? view.view);
@@ -153,6 +163,11 @@ export default async function CalendarPage({
                 >
                   <IconArrowRight size={16} aria-hidden />
                 </Link>
+                {view.date !== today ? (
+                  <Link href={href({ date: today })} className="cal-today">
+                    Today
+                  </Link>
+                ) : null}
               </span>
             ) : null}
           </div>
@@ -174,6 +189,35 @@ export default async function CalendarPage({
               <Lines fixtures={view.timeline} empty="" withDate />
             ) : undefined}
           </SectionCard>
+        ) : nothingHere ? (
+          <EmptyWeek
+            date={view.date}
+            today={today}
+            testId="calendar-empty"
+            title={view.view === "week" ? "Nothing this week" : "Nothing on this day"}
+            body={
+              nextDate !== null
+                ? `The next match is on ${formatWallDate(nextDate)}.`
+                : view.upcoming.length === 0
+                  ? "No matches are scheduled yet. Build the schedule from the list, then every match lands here by day."
+                  : "No more matches after this date."
+            }
+            actions={
+              <>
+                {nextDate !== null ? (
+                  <ButtonLink href={href({ date: nextDate })} size="sm">
+                    Jump to {formatWallDate(nextDate)}
+                    <IconArrowRight size={16} className="icon-trail" />
+                  </ButtonLink>
+                ) : null}
+                {view.upcoming.length === 0 ? (
+                  <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
+                    Build the schedule
+                  </ButtonLink>
+                ) : null}
+              </>
+            }
+          />
         ) : (
           view.days.map((day) => (
             /* A calendar that never names a weekday is not a calendar. */
@@ -191,20 +235,20 @@ export default async function CalendarPage({
           ))
         )}
 
-        <SectionCard
-          icon={<IconClock />}
-          tone="blue"
-          title="Upcoming fixtures"
-          description={
-            view.upcoming.length === 0 ? "Nothing upcoming." : "The next matches to be played"
-          }
-          flush={view.upcoming.length > 0}
-          data-testid="upcoming-panel"
-        >
-          {view.upcoming.length > 0 ? (
+        {view.upcoming.length > 0 ? (
+          <SectionCard
+            icon={<IconClock />}
+            concept="fixtures"
+            title="Upcoming fixtures"
+            description={
+              view.upcoming.length === 0 ? "Nothing upcoming." : "The next matches to be played"
+            }
+            flush={view.upcoming.length > 0}
+            data-testid="upcoming-panel"
+          >
             <Lines fixtures={view.upcoming} empty="" withDate />
-          ) : undefined}
-        </SectionCard>
+          </SectionCard>
+        ) : null}
       </div>
     </main>
   );
