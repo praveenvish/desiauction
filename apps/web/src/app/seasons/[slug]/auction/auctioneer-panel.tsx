@@ -31,7 +31,7 @@ export function AuctioneerPanel({ slug, view }: { slug: string; view: Auctioneer
   return (
     <SectionCard
       icon={<IconGavel />}
-      tone="purple"
+      concept="auction"
       title="Auctioneer"
       description="Someone who runs this season's auction room without owning the club. They can open lots and bring the hammer down; undoing a sale stays with the club's owners."
       className="auctioneers"

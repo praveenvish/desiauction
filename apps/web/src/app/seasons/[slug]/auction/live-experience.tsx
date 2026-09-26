@@ -660,21 +660,21 @@ export function AuctionSummaryCard({
       <StatGrid>
         <StatCard
           icon={<IconUsers />}
-          tone="blue"
+          concept="players"
           value={sold.length}
           label="Players sold"
           testId="summary-sold"
         />
         <StatCard
           icon={<IconFile />}
-          tone="purple"
+          concept="neutral"
           value={unsold.length}
           label="Passed"
           testId="summary-unsold"
         />
         <StatCard
           icon={<IconWallet />}
-          tone="green"
+          concept="money"
           value={money.ledger(totalSpent)}
           label="Total spent"
           testId="summary-spent"
@@ -849,7 +849,7 @@ export function RulesCard({
   return (
     <SectionCard
       icon={<IconFile />}
-      tone="amber"
+      concept="neutral"
       title="Rules of the night"
       action={action}
       data-testid="auction-rules"

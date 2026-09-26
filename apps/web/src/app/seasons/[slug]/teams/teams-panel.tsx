@@ -445,7 +445,7 @@ function RosterDetail({
         <SectionCard
           className="tm-presign-card"
           icon={<IconCrown />}
-          tone="amber"
+          tone="gold"
           title="Captain, icons & retained"
           description="Named before the auction — they join this squad without being bid for."
         >
@@ -651,7 +651,7 @@ function RosterDetail({
           />
           <StatCard
             icon={money.unit === "points" ? <IconWallet /> : <IconRupee />}
-            tone="green"
+            concept="money"
             value={remaining !== null && (team.purseTotal ?? 0) > 0 ? money.exact(remaining) : "—"}
             label="Remaining"
           />
@@ -668,7 +668,7 @@ function RosterDetail({
           />
           <StatCard
             icon={<IconTrophy />}
-            tone="amber"
+            tone="gold"
             value={<span className="tm-stat-name">{team.topBuyName ?? "—"}</span>}
             label="Top buy"
             {...(team.topBuyPrice !== undefined && team.topBuyPrice !== null

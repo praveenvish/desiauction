@@ -869,7 +869,7 @@ export function FixturesPanel({
     ) : latest !== undefined ? (
       <SectionCard
         icon={<IconTrophy />}
-        tone="green"
+        concept="results"
         title="Latest result"
         description={
           latest.round !== null ? `Round ${String(latest.round)} · ${latest.number}` : latest.number

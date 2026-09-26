@@ -473,7 +473,7 @@ function CaseMoney({ settlementCase }: { settlementCase: CaseView }) {
       />
       <StatCard
         icon={<IconWallet />}
-        tone="green"
+        concept="money"
         value={<Amount value={financial.discharged} />}
         label="Collected"
         hint="Confirmed as received"
@@ -744,7 +744,12 @@ function NextStep({
   if (settlementCase.status === "settled") {
     const blocked = readiness !== null && !readiness.ready;
     return (
-      <SectionCard icon={<IconLock />} tone="green" title="Close the case" className="mn-step-card">
+      <SectionCard
+        icon={<IconLock />}
+        concept="money"
+        title="Close the case"
+        className="mn-step-card"
+      >
         <p className="section-note">
           Closing runs the full financial verification and seals an evidence package that can be
           replayed for ever. Once closed, the auction reads as Reconciled.
@@ -1230,7 +1235,7 @@ function Collect({
   return (
     <SectionCard
       icon={<IconRupee />}
-      tone="green"
+      concept="money"
       title="Record a payment"
       description="Record the money as it arrives. It is confirmed once it is actually in hand — confirming puts it on the books and takes it off what the team owes."
     >

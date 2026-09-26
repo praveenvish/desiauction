@@ -13,12 +13,6 @@
   --kit-solid: var(--success-base);
 }
 
-.toned[data-tone="blue"] {
-  --kit-fg: var(--info-strong);
-  --kit-bg: var(--info-subtle);
-  --kit-solid: var(--info-base);
-}
-
 .toned[data-tone="amber"] {
   --kit-fg: var(--warning-strong);
   --kit-bg: var(--warning-subtle);
@@ -31,13 +25,11 @@
   --kit-solid: var(--danger-base);
 }
 
+/* Blue and purple are decoration, not state (round 2): they draw the neutral
+   recipe so the console reads gold + ink, with colour kept for what is true. */
+.toned[data-tone="neutral"],
+.toned[data-tone="blue"],
 .toned[data-tone="purple"] {
-  --kit-fg: var(--violet-strong);
-  --kit-bg: var(--violet-subtle);
-  --kit-solid: var(--violet-base);
-}
-
-.toned[data-tone="neutral"] {
   --kit-fg: var(--text-secondary);
   --kit-bg: var(--surface-sunken);
   --kit-solid: var(--text-muted);
@@ -65,6 +57,11 @@
 .tile[data-size="lg"] {
   width: 48px;
   height: 48px;
+}
+
+/* A neutral tile keeps its shape on a raised card in both themes. */
+.tile:is([data-tone="neutral"], [data-tone="blue"], [data-tone="purple"]) {
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 
 .tile svg {
@@ -121,6 +118,16 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-3);
+}
+
+/* A head that carries a sentence top-aligns its tile with the title — centred
+   against two or five lines it floated beside nothing (round 2). */
+.card-head:has(.card-desc) {
+  align-items: flex-start;
+}
+
+.card-head:has(.card-desc) > .card-action {
+  align-self: center;
 }
 
 /* Visually hidden but still the card's name for assistive tech. */

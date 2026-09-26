@@ -418,7 +418,7 @@ export function AuctionPanel({
     view === null ? null : (
       <SectionCard
         icon={<IconUsers />}
-        tone="amber"
+        concept="teams"
         title="Paddles"
         data-testid="paddles-panel"
         flush

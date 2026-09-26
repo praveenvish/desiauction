@@ -55,8 +55,15 @@ export {
   ToolbarChip,
   FilterMenu,
   SegmentedTabs,
+  ToolbarSelect,
+  ToolbarToggle,
 } from "./primitives/toolbar";
-export type { ToolbarSearchProps, SegmentedItem } from "./primitives/toolbar";
+export type {
+  ToolbarSearchProps,
+  SegmentedItem,
+  ToolbarSelectProps,
+  ToolbarToggleItem,
+} from "./primitives/toolbar";
 export type { TabsProps, TabItem } from "./primitives/tabs";
 export { Dialog } from "./primitives/dialog";
 export type { DialogProps } from "./primitives/dialog";

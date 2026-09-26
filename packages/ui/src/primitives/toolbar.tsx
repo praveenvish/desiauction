@@ -6,6 +6,7 @@ import {
   type AnchorHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type SelectHTMLAttributes,
 } from "react";
 
 import { IconChevronDown, IconClose, IconFilter, IconSearch } from "../icons/icons";
@@ -290,5 +291,94 @@ export function SegmentedTabs({
         );
       })}
     </nav>
+  );
+}
+
+export interface ToolbarSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> {
+  id: string;
+  /** Accessible name; drawn as a quiet prefix ("Sort") unless `hideLabel`. */
+  label: string;
+  hideLabel?: boolean;
+  options: readonly { value: string; label: string }[];
+  testId?: string;
+}
+
+/**
+ * A native select dressed as a toolbar control — "Sort: Newest ▾". Native on
+ * purpose: it works in a server GET form, on a phone it opens the OS picker,
+ * and e2e can `selectOption` it. Same 36px rung as the search and the menu.
+ */
+export function ToolbarSelect({
+  id,
+  label,
+  hideLabel = false,
+  options,
+  testId,
+  className,
+  ...select
+}: ToolbarSelectProps) {
+  return (
+    <span className={[styles["select"], className].filter(Boolean).join(" ")}>
+      <label htmlFor={id} className={hideLabel ? styles["srOnly"] : styles["selectLabel"]}>
+        {label}
+      </label>
+      <select id={id} className={styles["selectInput"]} data-testid={testId} {...select}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <IconChevronDown size={16} className={styles["selectCaret"]} />
+    </span>
+  );
+}
+
+export interface ToolbarToggleItem {
+  key: string;
+  /** Accessible name (visually hidden when an icon is given). */
+  label: string;
+  icon?: ReactNode;
+  active: boolean;
+  onSelect: () => void;
+  testId?: string;
+}
+
+/**
+ * Two or three states of one setting — List / Grid — as a pressed-button
+ * group, so a screen reader announces which is current.
+ */
+export function ToolbarToggle({
+  items,
+  label,
+  testId,
+}: {
+  items: ToolbarToggleItem[];
+  label: string;
+  testId?: string;
+}) {
+  return (
+    <div className={styles["toggle"]} role="group" aria-label={label} data-testid={testId}>
+      {items.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          className={styles["toggleBtn"]}
+          aria-pressed={item.active}
+          onClick={item.onSelect}
+          data-testid={item.testId}
+          data-icon={item.icon !== undefined || undefined}
+        >
+          {item.icon !== undefined ? (
+            <>
+              {item.icon}
+              <span className={styles["srOnly"]}>{item.label}</span>
+            </>
+          ) : (
+            item.label
+          )}
+        </button>
+      ))}
+    </div>
   );
 }

@@ -28,6 +28,12 @@ export type KitTone = "gold" | "green" | "blue" | "amber" | "purple" | "red" | "
  * seven tints rotated with no meaning. A tile, card or figure that names a
  * concept passes `concept` instead of `tone`, and the colour comes from here —
  * so the same idea reads the same colour on every screen.
+ *
+ * ROUND 2 (2026-09-26): one calm palette. Gold for the primary thing (the
+ * season, its money, its auction), neutral for information, and green / amber
+ * / red only when the tile states something true (done, waiting, wrong).
+ * `blue` and `purple` stay in the type for backwards compatibility but draw
+ * the neutral recipe — no screen gets a hue that means nothing.
  */
 export type KitConcept =
   | "season"
@@ -46,20 +52,24 @@ export type KitConcept =
   | "neutral";
 
 export const CONCEPT_TONE: Record<KitConcept, KitTone> = {
+  // Gold: the thing the product is about — the season and its money night.
   season: "gold",
   tournament: "gold",
   club: "gold",
-  teams: "blue",
-  players: "green",
   money: "gold",
-  auction: "purple",
-  fixtures: "amber",
-  venue: "amber",
-  results: "amber",
-  alert: "red",
-  done: "green",
+  auction: "gold",
+  // Neutral: information. A tile that only says "this card is about teams"
+  // is a label, and a label is not a colour.
+  teams: "neutral",
+  players: "neutral",
+  fixtures: "neutral",
+  venue: "neutral",
+  results: "neutral",
   activity: "neutral",
   neutral: "neutral",
+  // State, and only state, is coloured.
+  alert: "red",
+  done: "green",
 };
 
 /** The tone a concept stands for, else the explicit tone, else the fallback. */
