@@ -54,3 +54,28 @@
   box-sizing: border-box;
   width: 100%;
 }
+
+/* The seasons these grounds serve (round 5A). */
+.vn-seasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vn-seasons > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.vn-seasons .da-row {
+  padding-inline: var(--space-5);
+  color: inherit;
+  text-decoration: none;
+}
+
+.vn-seasons .da-row:hover {
+  background: var(--surface-sunken);
+}
+
+.vn-seasons .da-row-figure {
+  color: var(--text-muted);
+}

@@ -25,6 +25,7 @@ import {
   type SeasonRow,
 } from "../../../server/competition/tournament-actions";
 import { formatCount } from "../../../lib/plural";
+import { SquadsBySpend, spendNightOf } from "../../../components/team/squads-by-spend";
 import { CreateCompetitionForm } from "../../seasons/create-competition-form";
 import { SeasonCard, seasonStatusBadge } from "../season-card";
 import { TournamentsSkeleton } from "../tournament-accordion";
@@ -196,6 +197,13 @@ async function SeasonsSection({
   }
 
   const latest = seasons[0];
+  /* The next object (round 5A): the newest edition's auction night, told as
+     its squads by spend — the season card alone left ~300px of canvas beside
+     it. Gated like /auctions: no money sight, no block. */
+  const night =
+    latest !== undefined && latest.counts.auctionDone === true
+      ? await spendNightOf(latest.slug, latest.name)
+      : null;
   const matches = seasons.reduce((sum, season) => sum + season.counts.matches, 0);
   const firstYear = seasons
     .map((season) => season.startsOn?.slice(0, 4))
@@ -251,6 +259,13 @@ async function SeasonsSection({
               <SeasonCard key={season.id} season={season} />
             ))}
           </div>
+          {night !== null ? (
+            <SquadsBySpend
+              night={night}
+              testId="tournament-spend"
+              description={`${night.seasonName}'s auction · what each team spent, and its top buy`}
+            />
+          ) : null}
         </section>
         {latest !== undefined ? <LatestSeasonDesk season={latest} doors={canCreateSeason} /> : null}
       </div>

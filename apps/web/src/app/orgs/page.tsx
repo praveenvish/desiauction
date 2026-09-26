@@ -139,84 +139,89 @@ export default async function OrgsPage({
             reader's standing, then the three figures that say how big it is.
             One create door: the page's "+ New club" (round 2 dropped the
             dashed tile that repeated it). */}
-        <div className="org-cards da-stagger" data-testid="orgs-list">
-          {orgs.map((org) => (
-            <Link
-              key={org.id}
-              href={`/org/${org.slug}`}
-              className="org-card da-lift"
-              // Named for where it GOES; the figures inside are decoration for
-              // assistive technology (the old row read as one long sentence).
-              aria-label={`${org.name} — you are ${org.role === "Owner" ? "an owner" : `a ${org.role.toLowerCase()}`}`}
-            >
-              <span className="org-card-top" aria-hidden>
-                <span className="org-monogram">{monogram(org.name)}</span>
-                <span className="org-card-id">
-                  <strong>{org.name}</strong>
-                  <span className="org-slug">/{org.slug}</span>
+        {/* A club or two beside their latest seasons (round 5A): stacked, one
+            club card and a one-row list ended the page at y≈400 with the right
+            two-thirds of the canvas blank. Many clubs keep the full-width grid. */}
+        <div className="orgs-duo" data-duo={orgs.length <= 2 && recent.length > 0 ? "" : undefined}>
+          <div className="org-cards da-stagger" data-testid="orgs-list">
+            {orgs.map((org) => (
+              <Link
+                key={org.id}
+                href={`/org/${org.slug}`}
+                className="org-card da-lift"
+                // Named for where it GOES; the figures inside are decoration for
+                // assistive technology (the old row read as one long sentence).
+                aria-label={`${org.name} — you are ${org.role === "Owner" ? "an owner" : `a ${org.role.toLowerCase()}`}`}
+              >
+                <span className="org-card-top" aria-hidden>
+                  <span className="org-monogram">{monogram(org.name)}</span>
+                  <span className="org-card-id">
+                    <strong>{org.name}</strong>
+                    <span className="org-slug">/{org.slug}</span>
+                  </span>
+                  <Pill tone={org.role === "Owner" ? "gold" : "neutral"}>{org.role}</Pill>
                 </span>
-                <Pill tone={org.role === "Owner" ? "gold" : "neutral"}>{org.role}</Pill>
-              </span>
-              <span className="org-card-figures" aria-hidden>
-                <span className="org-card-figure">
-                  <IconCalendar size={16} />
-                  <b>{org.seasons}</b> {count(org.seasons, "season")}
+                <span className="org-card-figures" aria-hidden>
+                  <span className="org-card-figure">
+                    <IconCalendar size={16} />
+                    <b>{org.seasons}</b> {count(org.seasons, "season")}
+                  </span>
+                  <span className="org-card-figure">
+                    <IconShieldCheck size={16} />
+                    <b>{org.teams}</b> {count(org.teams, "team")}
+                  </span>
+                  <span className="org-card-figure">
+                    <IconUsers size={16} />
+                    <b>{org.members}</b> {count(org.members, "member")}
+                  </span>
+                  <span className="org-card-go">
+                    <IconChevronRight size={18} />
+                  </span>
                 </span>
-                <span className="org-card-figure">
-                  <IconShieldCheck size={16} />
-                  <b>{org.teams}</b> {count(org.teams, "team")}
-                </span>
-                <span className="org-card-figure">
-                  <IconUsers size={16} />
-                  <b>{org.members}</b> {count(org.members, "member")}
-                </span>
-                <span className="org-card-go">
-                  <IconChevronRight size={18} />
-                </span>
-              </span>
-            </Link>
-          ))}
-        </div>
-
-        {recent.length > 0 ? (
-          <SectionCard
-            icon={<IconTrophy />}
-            concept="season"
-            title="Latest seasons"
-            description={
-              seasons.length > recent.length
-                ? `The newest ${String(recent.length)} of ${String(seasons.length)} across your clubs`
-                : "Across your clubs"
-            }
-            action={
-              <Link href="/tournaments" className="orgs-more">
-                All tournaments
               </Link>
-            }
-            flush
-            data-testid="orgs-recent-seasons"
-          >
-            <ul className="orgs-seasons">
-              {recent.map((season) => (
-                <li key={season.id}>
-                  <ListRow
-                    href={`/seasons/${season.slug}`}
-                    linkComponent={Link}
-                    title={season.name}
-                    meta={[
-                      season.orgName,
-                      dateRange(season.startsOn, season.endsOn),
-                      season.location,
-                    ]
-                      .filter((part): part is string => part !== null && part !== "")
-                      .join(" · ")}
-                    figure={<IconChevronRight size={16} aria-hidden />}
-                  />
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
-        ) : null}
+            ))}
+          </div>
+
+          {recent.length > 0 ? (
+            <SectionCard
+              icon={<IconTrophy />}
+              concept="season"
+              title="Latest seasons"
+              description={
+                seasons.length > recent.length
+                  ? `The newest ${String(recent.length)} of ${String(seasons.length)} across your clubs`
+                  : "Across your clubs"
+              }
+              action={
+                <Link href="/tournaments" className="orgs-more">
+                  All tournaments
+                </Link>
+              }
+              flush
+              data-testid="orgs-recent-seasons"
+            >
+              <ul className="orgs-seasons">
+                {recent.map((season) => (
+                  <li key={season.id}>
+                    <ListRow
+                      href={`/seasons/${season.slug}`}
+                      linkComponent={Link}
+                      title={season.name}
+                      meta={[
+                        season.orgName,
+                        dateRange(season.startsOn, season.endsOn),
+                        season.location,
+                      ]
+                        .filter((part): part is string => part !== null && part !== "")
+                        .join(" · ")}
+                      figure={<IconChevronRight size={16} aria-hidden />}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          ) : null}
+        </div>
       </div>
     </main>
   );

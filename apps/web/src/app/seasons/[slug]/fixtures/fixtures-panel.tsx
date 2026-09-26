@@ -66,6 +66,7 @@ import {
 } from "../../../../lib/format-date";
 import { FixtureStatusPill } from "../_tabs/fixture-status";
 import { ScheduleViews } from "../sibling-link";
+import { RoundRobinPreview } from "../_tabs/round-robin-preview";
 import { TeamCrest } from "../_tabs/team-crest";
 import { ResultsCard } from "./results-card";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
@@ -1026,6 +1027,11 @@ export function FixturesPanel({
           so one added now is there for every season after this.
         </Notice>
       ) : null}
+
+      {/* The next object behind the gate (round 5A): what the generator will
+          make of these teams — every pairing, straight from the team list.
+          The notice alone left ~700px of blank page. */}
+      {needsGround ? <RoundRobinPreview teams={teams} /> : null}
 
       {/* The wrapper stays whatever is inside it: it is also the page's
           hydration mark (`data-hydrated`), which the suites wait on. */}

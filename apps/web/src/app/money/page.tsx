@@ -23,6 +23,7 @@ import { settlementOrgIds } from "../../server/settlement/actions";
 import { myDocuments } from "../../server/financial-operations/my-documents";
 import { formatDateTime } from "../../lib/format-date";
 import { DOC_KIND_LABEL } from "../../server/financial-operations/register";
+import { SquadsBySpend, spendNightOf } from "../../components/team/squads-by-spend";
 import "../seasons/[slug]/money/money.css";
 import "./my-money.css";
 
@@ -62,6 +63,15 @@ export default async function MoneyPage() {
     new Set(financeIds),
     new Set(roles.organizes.map((club) => club.orgId)),
   );
+
+  const pointsSeason = view.competitions
+    .filter(
+      (season) =>
+        season.auctionUnit === "points" && books.some((row) => row.key === `season-${season.slug}`),
+    )
+    .sort((a, b) => (b.startsOn ?? "").localeCompare(a.startsOn ?? ""))[0];
+  const night =
+    pointsSeason === undefined ? null : await spendNightOf(pointsSeason.slug, pointsSeason.name);
 
   return (
     <main className={books.length > 0 ? "my-money my-money--books" : "my-money"}>
@@ -153,6 +163,18 @@ export default async function MoneyPage() {
         </Card>
       )}
       {books.length > 0 ? <ClubBooks rows={books} /> : null}
+      {/* "See where the points went", answered on the page (round 5A): the
+          newest points season's squads by spend, full width under the two
+          cards — gated like /auctions, so no money sight, no block. */}
+      {night !== null ? (
+        <div className="my-money-night">
+          <SquadsBySpend
+            night={night}
+            testId="my-money-spend"
+            description={`${night.seasonName} ran on points · where each team's purse went, and its top buy`}
+          />
+        </div>
+      ) : null}
     </main>
   );
 }

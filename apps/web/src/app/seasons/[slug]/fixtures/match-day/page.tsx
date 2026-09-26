@@ -6,7 +6,8 @@ import { notFound } from "next/navigation";
 import { formatWallDate } from "../../../../../lib/format-date";
 import { calendarView, matchDayView } from "../../../../../server/competition/fixture-actions";
 import { nowWallClock } from "../../../../../server/competition/fixtures";
-import { emptyScheduleStep } from "../empty-schedule-step";
+import { RoundRobinPreview } from "../../_tabs/round-robin-preview";
+import { emptySchedule } from "../empty-schedule-step";
 import { EmptyWeek } from "../empty-week";
 import { ScheduleViews } from "../../sibling-link";
 import { MatchDayPanel } from "./match-day-panel";
@@ -40,8 +41,9 @@ export default async function MatchDayPage({
     upcoming
       .map((fixture) => fixture.kickoffAt?.slice(0, 10) ?? null)
       .find((day): day is string => day !== null && day > view.date) ?? null;
-  const step =
-    view.groundGroups.length === 0 && upcoming.length === 0 ? await emptyScheduleStep(slug) : null;
+  const emptyPlan =
+    view.groundGroups.length === 0 && upcoming.length === 0 ? await emptySchedule(slug) : null;
+  const step = emptyPlan?.step ?? null;
   const dayHref = (date: string) => `/seasons/${slug}/fixtures/match-day?date=${date}`;
   return (
     <ToastProvider>
@@ -75,31 +77,40 @@ export default async function MatchDayPage({
             groundGroups={view.groundGroups}
             canManage={view.viewer.canManage}
             empty={
-              <EmptyWeek
-                date={view.date}
-                today={today}
-                testId="match-day-empty"
-                title="No matches on this day"
-                body={
-                  nextDate !== null
-                    ? `The next match day is ${formatWallDate(nextDate)}.`
-                    : upcoming.length === 0
-                      ? `Nothing is scheduled yet. ${step?.why ?? ""} Each match day then gathers its grounds here.`
-                      : "No more match days after this one."
-                }
-                actions={
-                  nextDate !== null ? (
-                    <ButtonLink href={dayHref(nextDate)} size="sm">
-                      Next match day
-                      <IconArrowRight size={16} className="icon-trail" />
-                    </ButtonLink>
-                  ) : step !== null ? (
-                    <ButtonLink href={step.href} size="sm">
-                      {step.label}
-                    </ButtonLink>
-                  ) : undefined
-                }
-              />
+              <>
+                <EmptyWeek
+                  date={view.date}
+                  today={today}
+                  testId="match-day-empty"
+                  title="No matches on this day"
+                  body={
+                    nextDate !== null
+                      ? `The next match day is ${formatWallDate(nextDate)}.`
+                      : upcoming.length === 0
+                        ? `Nothing is scheduled yet. ${step?.why ?? ""} Each match day then gathers its grounds here.`
+                        : "No more match days after this one."
+                  }
+                  actions={
+                    nextDate !== null ? (
+                      <ButtonLink href={dayHref(nextDate)} size="sm">
+                        Next match day
+                        <IconArrowRight size={16} className="icon-trail" />
+                      </ButtonLink>
+                    ) : step !== null ? (
+                      <ButtonLink href={step.href} size="sm">
+                        {step.label}
+                      </ButtonLink>
+                    ) : undefined
+                  }
+                />
+                {emptyPlan !== null ? (
+                  <RoundRobinPreview
+                    teams={emptyPlan.teams}
+                    title="The matches each match day will hold"
+                    testId="match-day-pairings"
+                  />
+                ) : null}
+              </>
             }
           />
         </div>

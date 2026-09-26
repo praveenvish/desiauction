@@ -15,7 +15,8 @@ import { notFound } from "next/navigation";
 import { formatWallDate, formatWallTime } from "../../../../../lib/format-date";
 import { calendarView } from "../../../../../server/competition/fixture-actions";
 import { nowWallClock, type FixtureSnapshot } from "../../../../../server/competition/fixtures";
-import { emptyScheduleStep } from "../empty-schedule-step";
+import { RoundRobinPreview } from "../../_tabs/round-robin-preview";
+import { emptySchedule } from "../empty-schedule-step";
 import { EmptyWeek } from "../empty-week";
 import { FixtureStatusPill } from "../../_tabs/fixture-status";
 import { ScheduleViews } from "../../sibling-link";
@@ -119,7 +120,8 @@ export default async function CalendarPage({
     (fixture) => fixture.kickoffAt !== null && fixture.kickoffAt.slice(0, 10) > view.date,
   );
   const nextDate = next?.kickoffAt?.slice(0, 10) ?? null;
-  const nextStep = view.upcoming.length === 0 ? await emptyScheduleStep(slug) : null;
+  const empty = view.upcoming.length === 0 ? await emptySchedule(slug) : null;
+  const nextStep = empty?.step ?? null;
   const href = (patch: { view?: string; date?: string }) => {
     const next = new URLSearchParams();
     next.set("view", patch.view ?? view.view);
@@ -192,34 +194,43 @@ export default async function CalendarPage({
             ) : undefined}
           </SectionCard>
         ) : nothingHere ? (
-          <EmptyWeek
-            date={view.date}
-            today={today}
-            testId="calendar-empty"
-            title={view.view === "week" ? "Nothing this week" : "Nothing on this day"}
-            body={
-              nextDate !== null
-                ? `The next match is on ${formatWallDate(nextDate)}.`
-                : view.upcoming.length === 0
-                  ? `No matches are scheduled yet. ${nextStep?.why ?? ""} Every match then lands here by day.`
-                  : "No more matches after this date."
-            }
-            actions={
-              <>
-                {nextDate !== null ? (
-                  <ButtonLink href={href({ date: nextDate })} size="sm">
-                    Jump to {formatWallDate(nextDate)}
-                    <IconArrowRight size={16} className="icon-trail" />
-                  </ButtonLink>
-                ) : null}
-                {nextStep !== null ? (
-                  <ButtonLink href={nextStep.href} size="sm">
-                    {nextStep.label}
-                  </ButtonLink>
-                ) : null}
-              </>
-            }
-          />
+          <>
+            <EmptyWeek
+              date={view.date}
+              today={today}
+              testId="calendar-empty"
+              title={view.view === "week" ? "Nothing this week" : "Nothing on this day"}
+              body={
+                nextDate !== null
+                  ? `The next match is on ${formatWallDate(nextDate)}.`
+                  : view.upcoming.length === 0
+                    ? `No matches are scheduled yet. ${nextStep?.why ?? ""} Every match then lands here by day.`
+                    : "No more matches after this date."
+              }
+              actions={
+                <>
+                  {nextDate !== null ? (
+                    <ButtonLink href={href({ date: nextDate })} size="sm">
+                      Jump to {formatWallDate(nextDate)}
+                      <IconArrowRight size={16} className="icon-trail" />
+                    </ButtonLink>
+                  ) : null}
+                  {nextStep !== null ? (
+                    <ButtonLink href={nextStep.href} size="sm">
+                      {nextStep.label}
+                    </ButtonLink>
+                  ) : null}
+                </>
+              }
+            />
+            {empty !== null ? (
+              <RoundRobinPreview
+                teams={empty.teams}
+                title="The matches still to be dated"
+                testId="calendar-pairings"
+              />
+            ) : null}
+          </>
         ) : (
           view.days.map((day) => (
             /* A calendar that never names a weekday is not a calendar. */

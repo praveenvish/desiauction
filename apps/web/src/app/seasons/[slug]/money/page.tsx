@@ -11,6 +11,7 @@ import { currentSession } from "../../../../server/auth/actions";
 import { resolveMemberCompetition } from "../../../../server/competition/resolve";
 import { seasonUnit } from "../../../../server/competition/season-unit";
 import { settlementConsole } from "../../../../server/settlement/actions";
+import { SquadsBySpend, spendNightOf } from "../../../../components/team/squads-by-spend";
 import { MoneyPanel } from "./money-panel";
 import "../../seasons.css";
 import "../_tabs/tabs.css";
@@ -52,20 +53,36 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
     // and every settlement command refuses. An old link or a bookmark lands
     // here and is told why, rather than shown an empty console that invites
     // opening a case.
+    /* The points summary /money already draws (round 5A): what each team
+       spent of its purse. It replaces the lone "See the squads" button — the
+       block carries the same door. */
+    const night = await spendNightOf(slug, "This season");
     return (
       <main className="registrations-dash">
         <div className="dash-stack money-stack">
           <EmptyState
             headingLevel={2}
+            size={night !== null ? "compact" : "default"}
             title="Nothing to settle"
             description="This is a points season — the purses and prices are points, and no money changes hands. Registration fees, if any, are kept on the Players tab."
-            action={
-              <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
-                See the squads
-              </ButtonLink>
-            }
+            {...(night === null
+              ? {
+                  action: (
+                    <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
+                      See the squads
+                    </ButtonLink>
+                  ),
+                }
+              : {})}
             data-testid="points-no-settlement"
           />
+          {night !== null ? (
+            <SquadsBySpend
+              night={night}
+              testId="season-money-spend"
+              description="The points each team spent of its purse, and its top buy"
+            />
+          ) : null}
         </div>
       </main>
     );

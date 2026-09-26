@@ -621,3 +621,49 @@
     justify-content: flex-start;
   }
 }
+
+/* The round-robin these teams make, behind the "add a ground" gate (round 5A). */
+.fx-pairings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fx-pairings > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.fx-pair-side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.fx-pair-away {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.fx-pair-name {
+  overflow: hidden;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fx-pair-vs {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}

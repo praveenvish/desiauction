@@ -20,7 +20,8 @@ import { notFound } from "next/navigation";
 import { formatWallDate, formatWallTime } from "../../../../lib/format-date";
 import { lineupPageView } from "../../../../server/competition/lineup-actions";
 import type { LineupFixture } from "../../../../server/competition/lineups";
-import { emptyScheduleStep } from "../fixtures/empty-schedule-step";
+import { RoundRobinPreview } from "../_tabs/round-robin-preview";
+import { emptySchedule } from "../fixtures/empty-schedule-step";
 import { LineupSideEditor } from "./lineup-side-editor";
 import "../../seasons.css";
 import "../_tabs/tabs.css";
@@ -62,7 +63,8 @@ export default async function LineupsPage({
     notFound();
   }
   const { fixtures, selected, sides, announce } = view;
-  const step = fixtures.length === 0 ? await emptyScheduleStep(slug) : null;
+  const empty = fixtures.length === 0 ? await emptySchedule(slug) : null;
+  const step = empty?.step ?? null;
   const complete = fixtures.filter(
     (fixture) => fixture.recorded.home !== null && fixture.recorded.away !== null,
   ).length;
@@ -82,6 +84,7 @@ export default async function LineupsPage({
         {fixtures.length === 0 ? (
           <SectionCard title="Lineups" hideHeader size="feature">
             <EmptyState
+              size={(empty?.teams.length ?? 0) >= 2 ? "compact" : "default"}
               icon={<IconUsers />}
               title="No matches yet"
               headingLevel={3}
@@ -97,7 +100,15 @@ export default async function LineupsPage({
               }
             />
           </SectionCard>
-        ) : (
+        ) : null}
+        {fixtures.length === 0 && empty !== null ? (
+          <RoundRobinPreview
+            teams={empty.teams}
+            title="The matches you will record"
+            lede="Each gets a lineup for both sides."
+            testId="lineups-pairings"
+          />
+        ) : fixtures.length === 0 ? null : (
           <>
             <StatGrid>
               <StatCard

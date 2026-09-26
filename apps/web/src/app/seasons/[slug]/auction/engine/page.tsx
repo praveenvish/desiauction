@@ -1,6 +1,7 @@
 import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
+import { SquadsBySpend, spendNightOf } from "../../../../../components/team/squads-by-spend";
 import { cockpitView } from "../../../../../server/auction/conduct-actions";
 import { EnginePanel } from "./engine-panel";
 import "../../../seasons.css";
@@ -14,6 +15,14 @@ export default async function EnginePage({ params }: { params: Promise<{ slug: s
   if (view === null) {
     notFound();
   }
+  const status = view.view.auction.status;
+  /* The next object on a finished night (round 5A): what the engine's last
+     run settled — each team's spend and top buy — where ~600px of canvas sat
+     under the record strip. Gated like /auctions. */
+  const night =
+    status === "completed" || status === "reconciled"
+      ? await spendNightOf(slug, view.competition.name)
+      : null;
   return (
     <ToastProvider>
       <main className="registrations-dash">
@@ -29,6 +38,13 @@ export default async function EnginePage({ params }: { params: Promise<{ slug: s
               lots: view.view.lots.length,
             }}
           />
+          {night !== null ? (
+            <SquadsBySpend
+              night={night}
+              testId="engine-spend"
+              description="What the last run settled · each team's spend of its purse, and its top buy"
+            />
+          ) : null}
         </div>
       </main>
     </ToastProvider>
