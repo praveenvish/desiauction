@@ -1898,11 +1898,11 @@ a.admin-quiet-link:hover {
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: var(--border-strong);
+  background: var(--text-muted);
 }
 
 .admin-room[data-state="active"] .admin-room-dot {
-  background: var(--live);
+  background: var(--success-base);
   box-shadow: 0 0 0 3px var(--success-subtle, transparent);
 }
 
@@ -2847,8 +2847,10 @@ a.admin-quiet-link:hover {
 /* The one unpadded card in the product (round 3): the two panels inside sat
    flush to the frame. They take the console's card inset, and the burndown is
    parted from progress by a hairline rather than by a second frame. */
-.admin-watch-progress > [data-testid],
-.admin-watch-progress .auc-split > [data-testid] {
+/* Specific enough to beat the console surface's card rule, which trims a
+   card's inline padding (that trim is what left this block flush). */
+[data-surface="console"] .dash-stack.admin-stack .admin-watch-progress > [data-testid],
+[data-surface="console"] .dash-stack.admin-stack .admin-watch-progress .auc-split > [data-testid] {
   padding: var(--space-5) var(--space-6);
 }
 
@@ -2857,8 +2859,12 @@ a.admin-quiet-link:hover {
 }
 
 @media (max-width: 640px) {
-  .admin-watch-progress > [data-testid],
-  .admin-watch-progress .auc-split > [data-testid] {
+  [data-surface="console"] .dash-stack.admin-stack .admin-watch-progress > [data-testid],
+  [data-surface="console"]
+    .dash-stack.admin-stack
+    .admin-watch-progress
+    .auc-split
+    > [data-testid] {
     padding: var(--space-4);
   }
 }

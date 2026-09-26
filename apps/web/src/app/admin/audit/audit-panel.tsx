@@ -303,7 +303,7 @@ function AuditRow({ row }: { row: AuditEntry }) {
                 row: the summary names its fields, the panel shows it whole. */}
             <summary title={meta}>
               <span className="admin-sr-only">Evidence: </span>
-              Details <span className="admin-log-keys">{evidenceKeys(row.meta)}</span>
+              Details<span className="admin-log-keys"> · {evidenceKeys(row.meta)}</span>
             </summary>
             <pre className="admin-evidence">{JSON.stringify(row.meta, null, 2)}</pre>
           </details>
