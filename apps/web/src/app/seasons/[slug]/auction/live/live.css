@@ -479,3 +479,18 @@ button.paddle-chip:focus-visible {
 .live-main .squad-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
 }
+
+/* A conductor on a phone: the Conduct card leads the room, above the lot, so
+   Open next lot and the gavel are the first thing under the header (round 3C).
+   Visual order only, below 900px; the gavel's own box is untouched. */
+@media (max-width: 899px) {
+  .live-main > .live-controls[data-conduct="true"] {
+    order: -1;
+  }
+}
+
+/* Nothing to claim and nothing to conduct (a finished night): no empty grid
+   taking a gap at the top of a phone room. */
+.live-controls:empty {
+  display: none;
+}

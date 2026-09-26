@@ -602,24 +602,11 @@ export function LivePanel({
             </div>
           </div>
 
-          <div id="live-squads" className="live-anchor">
-            <SquadBoard
-              roles={view.roles}
-              teams={boardTeams}
-              lotMedia={view.lotMedia}
-              preSigned={view.preSigned}
-              resolved={feed.resolved}
-              snapshot={snapshot}
-              squadMax={view.rules.squadMax}
-              showPurse={view.viewer.canSeeAllPurses}
-              note={
-                view.viewer.canSeeAllSquads
-                  ? null
-                  : "Your squad. Every sale is called out in the room and appears in the bid feed."
-              }
-            />
-          </div>
-
+          {/* THE ROOM'S CONTROLS BEFORE ITS RECORD (round 3C): Conduct sat
+              under three full squads — y≈2900 on a laptop, the end of a
+              13,000px phone page. It follows the stage now, and on a phone a
+              conductor's card leads the room (live.css). Position only: the
+              gavel inside keeps its size, label and hold behaviour. */}
           <div className="live-controls" data-conduct={view.viewer.canConduct ? "true" : "false"}>
             {/* The claim door. Once a paddle is held, PaddleControl above owns
                 the "Your paddle" heading and states the same fact in its header,
@@ -862,6 +849,24 @@ export function LivePanel({
                 </div>
               </Card>
             ) : null}
+          </div>
+
+          <div id="live-squads" className="live-anchor">
+            <SquadBoard
+              roles={view.roles}
+              teams={boardTeams}
+              lotMedia={view.lotMedia}
+              preSigned={view.preSigned}
+              resolved={feed.resolved}
+              snapshot={snapshot}
+              squadMax={view.rules.squadMax}
+              showPurse={view.viewer.canSeeAllPurses}
+              note={
+                view.viewer.canSeeAllSquads
+                  ? null
+                  : "Your squad. Every sale is called out in the room and appears in the bid feed."
+              }
+            />
           </div>
 
           {/* THE ROOM'S BOTTOM BAR: the doors to the other views on the left,
