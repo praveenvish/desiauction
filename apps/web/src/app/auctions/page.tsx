@@ -77,7 +77,12 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
           <h2 className="ax-title">
             <Link href={`/seasons/${card.slug}/auction`}>{card.seasonName}</Link>
           </h2>
-          <p className="ax-org">{card.orgName}</p>
+          <p className="ax-org">
+            {card.orgName}
+            {/* The role is what this card is FOR — a chip by the name, not a
+                low-contrast caption in the footer. */}
+            <span className="ax-role">{card.roleLabel}</span>
+          </p>
         </div>
         <Pill tone={status.tone} dot testId={`auction-status-${card.slug}`}>
           {status.label}
@@ -131,7 +136,6 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
       )}
 
       <footer className="ax-foot">
-        <span className="ax-role">As {card.roleLabel.toLowerCase()}</span>
         <span className="ax-links">
           {/* A night with no auction offers an auctioneer nothing to open —
               the season page, where the dates and the organizer are, instead

@@ -356,3 +356,9 @@
   display: grid;
   gap: var(--space-2);
 }
+
+/* The state belongs to the title: the badge sits beside "My plan", not at
+   the far edge of the page. */
+.plan-panel .competition-title-row {
+  justify-content: flex-start;
+}

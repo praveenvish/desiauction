@@ -1287,3 +1287,32 @@
   padding-top: var(--space-3);
   border-top: 1px solid var(--border-subtle);
 }
+
+/* After the verdict: season, home and share as one quiet row of links. */
+.reg-status-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-5);
+  margin-top: calc(var(--space-2) * -1);
+}
+
+.reg-status-links > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.reg-status-links > a:hover {
+  text-decoration: underline;
+}
+
+.reg-status-links > button {
+  min-height: 44px;
+  padding-inline: 0;
+  font-size: var(--text-sm-size);
+}

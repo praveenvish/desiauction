@@ -335,26 +335,40 @@ export function RegistrationStatus({
         </div>
       ) : null}
 
-      <div className="reg-status-actions">
-        {listed ? (
+      {signed || passed ? (
+        /* After the verdict the two actions above are the page's job; the
+           rest is a quiet row of links, not three more buttons. */
+        <div className="reg-status-links">
+          {listed ? (
+            <Link href={`/c/${slug}`} data-testid="view-season">
+              Season page
+            </Link>
+          ) : null}
+          <Link href="/home">My home</Link>
+          {listed ? <ShareSeason path={`/c/${slug}`} title={competitionName} /> : null}
+        </div>
+      ) : (
+        <div className="reg-status-actions">
+          {listed ? (
+            <ButtonLink
+              href={`/c/${slug}`}
+              size="touch"
+              variant="primary"
+              data-testid="view-season"
+            >
+              View season page
+            </ButtonLink>
+          ) : null}
           <ButtonLink
-            href={`/c/${slug}`}
+            href="/home"
             size="touch"
-            variant={signed || passed ? "secondary" : "primary"}
-            data-testid="view-season"
+            variant={listed ? "secondary" : "primary"}
           >
-            View season page
+            Go to Home
           </ButtonLink>
-        ) : null}
-        <ButtonLink
-          href="/home"
-          size="touch"
-          variant={listed || signed || passed ? "secondary" : "primary"}
-        >
-          Go to Home
-        </ButtonLink>
-        {listed ? <ShareSeason path={`/c/${slug}`} title={competitionName} /> : null}
-      </div>
+          {listed ? <ShareSeason path={`/c/${slug}`} title={competitionName} /> : null}
+        </div>
+      )}
 
       {canWithdraw ? (
         <div className="reg-status-foot">

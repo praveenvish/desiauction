@@ -143,6 +143,10 @@
 }
 
 .ax-org {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
   margin: 2px 0 0;
   color: var(--text-secondary);
   font-size: var(--text-sm-size);
@@ -229,7 +233,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-3);
   margin-top: auto;
   padding-top: var(--space-4);
@@ -237,8 +241,16 @@
 }
 
 .ax-role {
-  color: var(--text-muted);
-  font-size: var(--text-sm-size);
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-full);
+  color: var(--accent-ink);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
 }
 
 .ax-links {
