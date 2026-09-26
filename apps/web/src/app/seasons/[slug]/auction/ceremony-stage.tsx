@@ -171,8 +171,10 @@ export function CeremonyStage({
           data-testid="ceremony"
           data-phase="completed"
         >
+          {/* The room's header already says COMPLETED; the stage names what
+              it is showing instead of saying it a second time. */}
           <p className="ceremony-title" data-testid="ceremony-title">
-            {PHASE_TITLE.completed}
+            THE NIGHT&rsquo;S TOP BUYS
           </p>
           <div className="ceremony-lot ceremony-waiting" data-testid="ceremony-finished">
             <Showcase
@@ -183,7 +185,7 @@ export function CeremonyStage({
               }
               ledger={money.ledger}
             />
-            <p className="ceremony-waiting-hint">Every lot is settled. Final squads below.</p>
+            <p className="ceremony-waiting-hint">Final squads below.</p>
           </div>
         </section>
       );
@@ -327,7 +329,7 @@ export function CeremonyStage({
               ledger={money.ledger}
             />
           ) : null}
-          <p className="ceremony-waiting-hint">Every lot is settled. Final squads below.</p>
+          <p className="ceremony-waiting-hint">Final squads below.</p>
         </div>
       ) : lot !== null ? (
         /* `ceremony-reveal`: a new lot enters line by line — name, then meta,

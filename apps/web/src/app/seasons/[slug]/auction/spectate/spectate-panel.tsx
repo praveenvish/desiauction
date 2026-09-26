@@ -247,6 +247,9 @@ export function SpectatePanel({
   const identity = [orgName, location].filter(
     (part): part is string => part !== null && part !== "",
   );
+  const shownStatus = snapshot?.auctionStatus ?? auctionStatus;
+  const finishedStatus =
+    (shownStatus === "completed" || shownStatus === "reconciled") && identity.length > 0;
 
   const liveBids = lot !== null && lot.bidHistory.length > 0 ? [...lot.bidHistory] : null;
   const heldBids =
@@ -298,8 +301,13 @@ export function SpectatePanel({
           way back out, and hiding the row's parent would hide that too. */}
       <div className="spectate-head">
         <p className="spectate-identity stage-hide" data-testid="spectate-identity">
-          {WATCHING[snapshot?.auctionStatus ?? auctionStatus]}
-          {identity.length > 0 ? ` · ${identity.join(" · ")}` : ""}
+          {/* A finished night is named once, by the room's COMPLETED pill:
+              the line keeps only who and where. */}
+          {finishedStatus
+            ? identity.join(" · ")
+            : `${WATCHING[snapshot?.auctionStatus ?? auctionStatus]}${
+                identity.length > 0 ? ` · ${identity.join(" · ")}` : ""
+              }`}
         </p>
         <div className="stage-toggle-row">
           <button

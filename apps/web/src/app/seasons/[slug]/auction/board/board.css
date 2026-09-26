@@ -158,7 +158,9 @@
 .board-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  align-items: start;
+  /* One height per row: "Most expensive" carries a face and a two-line name,
+     and its three neighbours stood shorter beside it. */
+  align-items: stretch;
   gap: 14px;
 }
 /* The unit rides as a suffix so the figure never wraps (see TileMoney). */
@@ -833,16 +835,36 @@
   .board-tile {
     padding: 14px;
   }
-  .board-tile:last-child {
-    grid-column: 1 / -1;
+  /* TWO BY TWO (round 5). "Most expensive" spanned a row and pushed "Passed"
+     onto a row of its own — 2 + 1 + 1. On a phone the top buy is its figure
+     and its name; the face stands down (Recent sales carries the faces). */
+  .board-tile-face {
+    display: none;
   }
-  /* With four tiles the wide "Most expensive" left "Passed" alone in half a
-     row above it; the third tile takes the row too. */
-  .board-tile:nth-child(3):nth-last-child(2) {
-    grid-column: 1 / -1;
+  .board-tile-label {
+    font-size: var(--text-sm-size);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  .board-tile-note {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: var(--text-sm-size);
+    line-height: var(--text-sm-line);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
   .board-tile-value {
     font-size: var(--text-2xl-size);
+  }
+  .board-tile-top {
+    font-size: var(--text-2xl-size);
+  }
+  /* The progress runs the page's width: at its own intrinsic width a
+     finished night's full bar read as ~60% on a phone. */
+  .board-progress {
+    width: 100%;
+    min-width: 0;
   }
   /* On a phone the brand leads the page (lockup left, sound right) and the
      progress follows the title, rather than a right-aligned column under it. */
@@ -857,12 +879,46 @@
   /* The buyer used to be dropped on a phone, leaving "Rahul Singh  ₹35,000" —
      a sale with no purchaser, which is half the news. It wraps under the name
      instead. */
+  /* ONE SALE, ONE LINE OF NAME (round 5): face, the name with its buyer
+     under it in small type, the price. The buyer took a full line of its own
+     and the name was cut to make room for nothing. */
   .board-recent-list li {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 0;
+    padding: 10px 14px;
+  }
+  .board-recent-who {
+    display: contents;
+  }
+  .board-recent-face {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 44px;
+    height: 44px;
+  }
+  .board-recent-name {
+    grid-column: 2;
+    grid-row: 1;
   }
   .board-recent-team {
-    grid-column: 1 / -1;
+    grid-column: 2;
     grid-row: 2;
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--text-sm-size);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .board-recent-swatch {
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+  }
+  .board-recent-price {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    font-size: var(--text-lg-size);
   }
   .board-block {
     grid-template-columns: 1fr;

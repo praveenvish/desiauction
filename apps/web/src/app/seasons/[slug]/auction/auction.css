@@ -270,6 +270,16 @@
   animation: ceremony-enter var(--duration-slow) var(--ease-out);
 }
 
+/* A FINISHED NIGHT HUGS ITS CONTENT (round 5). The measured height above
+   exists so the stage never moves between phases mid-auction; once the night
+   is complete no further phase follows, and the reserved box left the podium
+   floating in ~530px of dark on a laptop. The one shift this allows happens
+   once, as the last hammer falls. */
+.ceremony.ceremony-completed {
+  min-height: 0;
+  padding-block: var(--space-8);
+}
+
 /* The announced content always sits above the decorative SOLD celebration. */
 /* Below 400px the display-size player name wraps to two lines, which is 39px
    the wider viewports do not spend. Measured: sold is 406px here against 366px
@@ -3216,6 +3226,16 @@
 .share-auction-button--whatsapp:hover {
   background: var(--accent-hover);
   color: var(--text-on-accent);
+}
+
+/* PHONE: the two buttons share the card's full width, WhatsApp (the primary)
+   the wider half — they sat at intrinsic widths under a full-width lede. */
+@media (max-width: 519px) {
+  .share-auction-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    width: 100%;
+  }
 }
 
 /* THE CONVERSION ASK.
