@@ -115,7 +115,8 @@ export function OverviewPanel({
         />
       </StatGrid>
 
-      <AttentionStrip attentionGroups={attentionGroups} desks={desks} />
+      {/* The live board's own clock: one "now" for the whole overview. */}
+      <AttentionStrip attentionGroups={attentionGroups} desks={desks} nowMs={live.generatedAtMs} />
 
       <div className="adm-overview">
         <div className="adm-col">
@@ -374,13 +375,13 @@ function erasureOldestWords(askedMs: number, nowMs: number): string {
 function AttentionStrip({
   attentionGroups,
   desks,
+  nowMs,
 }: {
   attentionGroups: ReturnType<typeof groupAttention>;
   desks: { items: readonly DeskItem[]; desks: number };
+  nowMs: number;
 }) {
   const deskItems = desks.desks > 0 ? desks.items : [];
-  // A server render: one clock read for the request.
-  const nowMs = Date.now();
   const nothing = attentionGroups.groups.length === 0 && deskItems.length === 0;
   if (nothing) {
     return (

@@ -133,4 +133,3 @@ export function SquadsBySpend({
     </SectionCard>
   );
 }
-

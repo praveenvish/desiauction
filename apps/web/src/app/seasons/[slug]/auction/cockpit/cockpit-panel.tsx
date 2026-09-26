@@ -649,7 +649,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     <p className="cockpit-record-line" data-testid="cockpit-record-line">
                       <strong>{feed.resolved.filter((row) => row.status === "sold").length}</strong>{" "}
                       sold ·{" "}
-                      <strong>{feed.resolved.filter((row) => row.status === "unsold").length}</strong>{" "}
+                      <strong>
+                        {feed.resolved.filter((row) => row.status === "unsold").length}
+                      </strong>{" "}
                       unsold · every squad below is final
                     </p>
                   ) : null}

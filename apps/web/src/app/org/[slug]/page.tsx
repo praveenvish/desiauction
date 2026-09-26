@@ -315,9 +315,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     (b.startsOn ?? "").localeCompare(a.startsOn ?? ""),
   )[0];
   const latestNight =
-    latestEdition === undefined
-      ? null
-      : await spendNightOf(latestEdition.slug, latestEdition.name);
+    latestEdition === undefined ? null : await spendNightOf(latestEdition.slug, latestEdition.name);
 
   // Live & open now: an auction running, or a season taking entries.
   const liveOpen: { key: string; slug: string; name: string; tone: "live" | "open" }[] = [
@@ -588,9 +586,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       {/* The club's latest auction night, by what each team spent (round 5A):
           the overview ended at y≈540 under two half-empty cards. Gated like
           /auctions — no money sight, no block. */}
-      {latestNight !== null ? (
-        <SquadsBySpend night={latestNight} testId="org-spend" />
-      ) : null}
+      {latestNight !== null ? <SquadsBySpend night={latestNight} testId="org-spend" /> : null}
     </div>
   );
 

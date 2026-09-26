@@ -334,7 +334,8 @@ export function PoolSummary({
   // Queue + whatever is on the block right now.
   // `snapshot?.currentLot` is undefined — not null — with no snapshot, which
   // counted a phantom lot on the block: "Remaining 1" on a finished night.
-  const remaining = (snapshot?.queue.length ?? 0) + ((snapshot?.currentLot ?? null) === null ? 0 : 1);
+  const remaining =
+    (snapshot?.queue.length ?? 0) + ((snapshot?.currentLot ?? null) === null ? 0 : 1);
   const spend = sold.reduce((total, lot) => total + (lot.soldPrice ?? 0), 0);
   const top = sold.reduce<ResolvedLot | null>(
     (best, lot) => ((lot.soldPrice ?? 0) > (best?.soldPrice ?? 0) ? lot : best),

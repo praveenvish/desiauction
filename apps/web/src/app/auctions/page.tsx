@@ -10,7 +10,6 @@ import {
   IconWallet,
   type KitTone,
   Pill,
-  SectionCard,
 } from "@desiauction/ui";
 import Link from "next/link";
 
