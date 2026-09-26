@@ -359,11 +359,7 @@ export function RegistrationStatus({
               View season page
             </ButtonLink>
           ) : null}
-          <ButtonLink
-            href="/home"
-            size="touch"
-            variant={listed ? "secondary" : "primary"}
-          >
+          <ButtonLink href="/home" size="touch" variant={listed ? "secondary" : "primary"}>
             Go to Home
           </ButtonLink>
           {listed ? <ShareSeason path={`/c/${slug}`} title={competitionName} /> : null}
