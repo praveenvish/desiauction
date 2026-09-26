@@ -57,11 +57,11 @@ import { useMoney } from "../../../../../components/money-unit";
 // model) — and the engine enforces it regardless.
 
 const AUCTION_TONE = {
-  scheduled: "info",
+  scheduled: "neutral",
   live: "success",
   paused: "warning",
-  completed: "neutral",
-  reconciled: "neutral",
+  completed: "success",
+  reconciled: "success",
   abandoned: "danger",
 } as const;
 

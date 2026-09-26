@@ -34,8 +34,8 @@ import "./owner-home.css";
  * product as the club's, only narrower.
  */
 const STATUS: Record<string, { label: string; tone: Tone; dot?: boolean }> = {
-  scheduled: { label: "Auction coming up", tone: "blue" },
-  live: { label: "Auction live", tone: "red", dot: true },
+  scheduled: { label: "Auction coming up", tone: "neutral" },
+  live: { label: "Auction live", tone: "green", dot: true },
   paused: { label: "Auction paused", tone: "amber", dot: true },
   completed: { label: "Auction finished", tone: "green" },
   reconciled: { label: "Auction finished", tone: "green" },

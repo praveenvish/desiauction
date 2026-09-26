@@ -48,7 +48,7 @@ const TITLE_OF: Record<string, string> = {
 // Labels are the status words themselves (capitalized in CSS): the pill is
 // also the page's one machine-readable status, `auction-status`.
 const PILL_OF: Record<string, { label: string; tone: KitTone }> = {
-  scheduled: { label: "scheduled", tone: "blue" },
+  scheduled: { label: "scheduled", tone: "neutral" },
   live: { label: "live", tone: "green" },
   paused: { label: "paused", tone: "amber" },
   completed: { label: "completed", tone: "green" },

@@ -33,7 +33,7 @@ const TONES: Record<string, BadgeTone> = {
   // Competition (IP-3)
   draft: "neutral",
   setup: "neutral",
-  registration_open: "info",
+  registration_open: "success",
   registration_closed: "neutral",
 };
 

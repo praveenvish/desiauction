@@ -473,7 +473,7 @@ function LotBars({ sold, unsold, remaining }: { sold: number; unsold: number; re
           label: "Unsold",
           value: count(unsold),
           share: unsold / all,
-          tone: "amber",
+          tone: "neutral",
         },
         // "Still to go 0" after the night is a bar about nothing.
         ...(remaining > 0

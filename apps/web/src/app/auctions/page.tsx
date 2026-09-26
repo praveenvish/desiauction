@@ -31,11 +31,11 @@ export const metadata = { title: "Auctions · DesiAuction" };
 
 const STATUS: Record<AuctionNightStatus, { label: string; tone: KitTone }> = {
   none: { label: "Not set up", tone: "neutral" },
-  scheduled: { label: "Scheduled", tone: "blue" },
-  live: { label: "Live", tone: "red" },
+  scheduled: { label: "Scheduled", tone: "neutral" },
+  live: { label: "Live", tone: "green" },
   paused: { label: "Paused", tone: "amber" },
   completed: { label: "Completed", tone: "green" },
-  settled: { label: "Settled", tone: "gold" },
+  settled: { label: "Settled", tone: "green" },
 };
 
 function count(value: number): string {

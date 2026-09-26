@@ -262,7 +262,7 @@ const FEED_PILL: Partial<Record<FeedEvent["kind"], string>> = {
 };
 
 const FEED_TONE: Record<FeedEvent["kind"], KitTone> = {
-  sold: "blue",
+  sold: "green",
   unsold: "neutral",
   withdrawn: "red",
   held: "purple",

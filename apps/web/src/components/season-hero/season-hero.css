@@ -188,6 +188,16 @@ li:has(> .sh-figures) {
   white-space: nowrap;
 }
 
+/* State, not brand: live and done wear the product's state colours
+   (system.css), so "Auction done" is the same green here as everywhere. */
+.sh-status[data-state="live"] {
+  background: var(--state-live);
+}
+
+.sh-status[data-state="complete"] {
+  background: var(--state-complete);
+}
+
 .sh-status-dot {
   width: 7px;
   height: 7px;

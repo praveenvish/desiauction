@@ -484,8 +484,8 @@ export default async function MySportsPage({
 }
 
 const OWNED_STATUS: Record<string, { label: string; tone: KitTone }> = {
-  scheduled: { label: "Auction coming up", tone: "blue" },
-  live: { label: "Auction live", tone: "red" },
+  scheduled: { label: "Auction coming up", tone: "neutral" },
+  live: { label: "Auction live", tone: "green" },
   paused: { label: "Auction paused", tone: "amber" },
   completed: { label: "Auction finished", tone: "green" },
   reconciled: { label: "Auction finished", tone: "green" },

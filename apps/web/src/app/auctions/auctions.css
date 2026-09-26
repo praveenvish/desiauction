@@ -228,7 +228,8 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--success-base);
+  /* Progress is brand gold (system.css), never a state colour. */
+  background: var(--state-progress);
   transform-origin: left center;
 }
 

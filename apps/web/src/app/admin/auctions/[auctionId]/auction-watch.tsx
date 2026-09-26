@@ -33,9 +33,9 @@ const REFRESH_MS = 5_000;
 const STATUS_TONE: Record<string, KitTone> = {
   live: "green",
   paused: "amber",
-  scheduled: "blue",
-  completed: "neutral",
-  reconciled: "neutral",
+  scheduled: "neutral",
+  completed: "green",
+  reconciled: "green",
   abandoned: "red",
 };
 

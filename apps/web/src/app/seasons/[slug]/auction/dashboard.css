@@ -123,7 +123,7 @@
 
 .dash-progress-seg[data-kind="unsold"],
 .dash-key[data-kind="unsold"] {
-  background: var(--border-strong);
+  background: var(--state-unsold);
 }
 
 .dash-progress-foot {

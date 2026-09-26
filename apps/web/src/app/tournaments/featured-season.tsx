@@ -178,7 +178,12 @@ export function FeaturedSeason({
         sideAlign="start"
         eyebrow={
           <div className="sh-eyebrow-row">
-            <HeroStatus live={live}>{live ? "Auction live" : badge.label}</HeroStatus>
+            <HeroStatus
+              live={live}
+              done={badge.label === "Settled" || badge.label === "Auction done"}
+            >
+              {live ? "Auction live" : badge.label}
+            </HeroStatus>
             {season.running ? <HeroChip>Now running</HeroChip> : null}
           </div>
         }

@@ -30,8 +30,8 @@ import { formatDateRange } from "../../lib/format-date";
 export const STATUS_TONE = {
   draft: "neutral",
   setup: "neutral",
-  registration_open: "info",
-  registration_closed: "warning",
+  registration_open: "success",
+  registration_closed: "neutral",
 } as const;
 
 export const STATUS_LABEL = {

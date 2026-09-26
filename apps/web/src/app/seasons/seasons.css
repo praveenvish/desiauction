@@ -2526,7 +2526,7 @@ p + .date-row {
 }
 
 .auc-progress-seg.is-sold {
-  background: var(--success-base);
+  background: var(--state-sold);
 }
 
 .auc-progress-seg.is-block {
@@ -2534,7 +2534,7 @@ p + .date-row {
 }
 
 .auc-progress-seg.is-unsold {
-  background: var(--danger-base);
+  background: var(--state-unsold);
 }
 
 .auc-progress-foot {
@@ -2568,7 +2568,7 @@ p + .date-row {
 }
 
 .auc-key.is-sold {
-  background: var(--success-base);
+  background: var(--state-sold);
 }
 
 .auc-key.is-block {
@@ -2576,7 +2576,7 @@ p + .date-row {
 }
 
 .auc-key.is-unsold {
-  background: var(--danger-base);
+  background: var(--state-unsold);
 }
 
 .auc-money {

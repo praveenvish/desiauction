@@ -425,11 +425,11 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
 const SPEEDS = [1, 4, 16] as const;
 
 const STATUS_TONE = {
-  scheduled: "info",
+  scheduled: "neutral",
   live: "success",
   paused: "warning",
-  completed: "neutral",
-  reconciled: "neutral",
+  completed: "success",
+  reconciled: "success",
   abandoned: "danger",
 } as const;
 

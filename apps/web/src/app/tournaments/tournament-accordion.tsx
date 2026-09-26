@@ -42,9 +42,9 @@ const FOLD = 3;
 
 const STATUS_TONE = {
   draft: "neutral",
-  setup: "info",
+  setup: "neutral",
   registration_open: "success",
-  registration_closed: "warning",
+  registration_closed: "neutral",
 } as const;
 
 /** Short forms: the row is scanned, not read. */

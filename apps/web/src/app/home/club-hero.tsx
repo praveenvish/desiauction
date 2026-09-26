@@ -74,7 +74,14 @@ export function ClubHero({
         {...(footer !== undefined ? { footer } : {})}
         image={coverOf(season)}
         crest={<SeasonCrest name={season.name} logoUrl={overview.logoUrl} />}
-        eyebrow={<HeroStatus live={live}>{live ? "Auction live" : badge.label}</HeroStatus>}
+        eyebrow={
+          <HeroStatus
+            live={live}
+            done={badge.label === "Settled" || badge.label === "Auction done"}
+          >
+            {live ? "Auction live" : badge.label}
+          </HeroStatus>
+        }
         title={
           <Link href={`/seasons/${season.slug}`} className="home-hero-link">
             {season.name}
