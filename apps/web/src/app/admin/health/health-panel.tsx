@@ -77,7 +77,7 @@ export function HealthPanel({ health }: { health: PlatformHealth }) {
 
         <SectionCard
           icon={<IconClock />}
-          tone="blue"
+          tone="neutral"
           title="Schedules"
           description="When each registered slot last fired and is next due."
           flush
@@ -214,11 +214,26 @@ function OrgHealth({ org, hidden }: { org: OrgHealthRow; hidden: readonly string
         <div>
           <dt>Settlement ingest</dt>
           <dd>
-            <Pill tone={follower.current ? "green" : "amber"} dot>
-              {follower.current
-                ? `Current · ${String(follower.streams)} stream(s)`
-                : `${String(follower.totalBehind)} event(s) behind`}
-            </Pill>
+            {/* A healthy fact is a dot and a word; only a problem gets a pill.
+                Twenty-five green "Current · 3 stream(s)" pills said nothing. */}
+            {follower.current ? (
+              <span
+                className="admin-state"
+                data-tone="green"
+                title={`${String(follower.streams)} ${follower.streams === 1 ? "stream" : "streams"} followed`}
+              >
+                <span className="admin-state-dot" aria-hidden />
+                Current
+                <span className="admin-sr-only">
+                  {" "}
+                  · {follower.streams} {follower.streams === 1 ? "stream" : "streams"}
+                </span>
+              </span>
+            ) : (
+              <Pill tone="amber" dot>
+                {follower.totalBehind} {follower.totalBehind === 1 ? "event" : "events"} behind
+              </Pill>
+            )}
           </dd>
         </div>
         <div>
@@ -230,9 +245,16 @@ function OrgHealth({ org, hidden }: { org: OrgHealthRow; hidden: readonly string
               <Pill tone="neutral">Never certified</Pill>
             ) : (
               <span className="admin-follow-cert">
-                <Pill tone={certification.verdict === "PASS" ? "green" : "red"} dot>
-                  {certification.verdict} · {certification.at.toISOString().slice(0, 10)}
-                </Pill>
+                {certification.verdict === "PASS" ? (
+                  <span className="admin-state" data-tone="green">
+                    <span className="admin-state-dot" aria-hidden />
+                    Pass · {certification.at.toISOString().slice(0, 10)}
+                  </span>
+                ) : (
+                  <Pill tone="red" dot>
+                    {certification.verdict} · {certification.at.toISOString().slice(0, 10)}
+                  </Pill>
+                )}
                 {/* The digest is evidence, so it is all there — the first eight
                     characters drawn, the whole of it announced and on hover. */}
                 <span className="admin-id admin-digest" title={certification.digest}>
@@ -252,7 +274,13 @@ function OrgHealth({ org, hidden }: { org: OrgHealthRow; hidden: readonly string
                 <span key={channel.channel} className="admin-chan" data-state={state}>
                   <span className="admin-chan-dot" aria-hidden />
                   {channel.channel}
-                  <span className="admin-chan-n">
+                  <span
+                    className="admin-chan-n"
+                    data-zero={
+                      (channel.configured && channel.confirmed === 0 && channel.failed === 0) ||
+                      undefined
+                    }
+                  >
                     {channel.configured
                       ? `${String(channel.confirmed)}${channel.failed > 0 ? ` · ${String(channel.failed)} failed` : ""}`
                       : "off"}
@@ -274,7 +302,10 @@ function OrgHealth({ org, hidden }: { org: OrgHealthRow; hidden: readonly string
           <dt>Recent failures</dt>
           <dd>
             {queue.items.length === 0 ? (
-              <span className="admin-meta">None</span>
+              <span className="admin-zero" title="None">
+                <span aria-hidden>—</span>
+                <span className="admin-sr-only">None</span>
+              </span>
             ) : (
               <details className="admin-follow-fails">
                 <summary>
