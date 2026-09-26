@@ -381,11 +381,12 @@ export function LivePanel({
     view.plan === undefined ? "a player" : planNameOf(view.plan, registrationId);
   /** The auction is not taking bids — paused, or over. */
   const notTakingBids = snapshot !== null && snapshot.auctionStatus !== "live";
-  const finished =
-    snapshot !== null &&
-    (snapshot.auctionStatus === "completed" ||
-      snapshot.auctionStatus === "reconciled" ||
-      snapshot.auctionStatus === "abandoned");
+  // The snapshot is the truth once it arrives; until then (or with the engine
+  // away) the page's own server-rendered status decides — a completed room
+  // used to offer Close and Recover while the cockpit said there was nothing
+  // left to recover.
+  const status = snapshot?.auctionStatus ?? view.status;
+  const finished = status === "completed" || status === "reconciled" || status === "abandoned";
 
   return (
     <div

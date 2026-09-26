@@ -226,6 +226,12 @@ export interface LiveAuctionView {
   /** The season's roles as plain {key,label} pairs — see SpectatorView.roles. */
   roles: { key: string; label: string }[];
   auctionId: string;
+  /**
+   * The auction's status as the database last recorded it — the room's
+   * fallback until (or when never) the socket delivers a snapshot, so a
+   * finished auction never offers Close or Recover while the engine is away.
+   */
+  status: string;
   wsUrl: string;
   teams: {
     id: string;
@@ -442,6 +448,7 @@ export async function liveAuctionView(slug: string): Promise<LiveAuctionView | n
     competition: { name: gate.competition.name, slug: gate.competition.slug },
     roles: roleOptions(gate.competition.sport),
     auctionId: gate.auction.id,
+    status: gate.auction.status,
     /*
      * The room's socket carries every purse (D2).
      *
