@@ -1058,3 +1058,59 @@ a.acct-check-row:hover {
     gap: var(--space-2);
   }
 }
+
+/* Someone who runs, owns or conducts and does not play: the player forms,
+   folded under one line instead of three full cards asking how they bat. */
+.acct-fold {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.acct-fold > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-5);
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.acct-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.acct-fold > summary strong {
+  color: var(--text-heading);
+}
+
+.acct-fold > summary::after {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.acct-fold[open] > summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.acct-fold > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.acct-fold-body {
+  display: grid;
+  gap: var(--space-5);
+  padding: 0 var(--space-4) var(--space-4);
+}

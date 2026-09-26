@@ -5,6 +5,7 @@ import {
   IconCheckCircle,
   IconCog,
   IconGavel,
+  IconMegaphone,
   IconShieldCheck,
   IconUsers,
   SectionCard,
@@ -89,6 +90,15 @@ export default async function InboxPage() {
     rolesOf(session.personId),
   ]);
   const organizerOnly = roles.organizes.length > 0 && !roles.plays;
+  /*
+   * The rail says what lands for THIS person (round 4): an owner and an
+   * auctioneer were told "Which team bought you". Player kinds for someone who
+   * plays — or a brand-new account, which is most likely a player — owner and
+   * auctioneer kinds for those roles, account alerts for everyone.
+   */
+  const owner = roles.owns.length > 0;
+  const conductor = roles.conducts.length > 0;
+  const showPlayer = roles.plays || (!owner && !conductor && !organizerOnly);
   const named = await competitionsNamed(
     events.map((event) => competitionIdOf(event.meta) ?? "").filter((id) => id !== ""),
   );
@@ -166,7 +176,7 @@ export default async function InboxPage() {
           </p>
         ) : null}
         <ul className="inbox-kinds">
-          {organizerOnly ? null : (
+          {showPlayer ? (
             <>
               <li>
                 <IconCheckCircle size={20} aria-hidden />
@@ -190,7 +200,25 @@ export default async function InboxPage() {
                 </span>
               </li>
             </>
-          )}
+          ) : null}
+          {owner ? (
+            <li>
+              <IconUsers size={20} aria-hidden />
+              <span>
+                <strong>Your squad</strong>
+                The team you own — invites, and its squad sheet once the auction settles.
+              </span>
+            </li>
+          ) : null}
+          {conductor ? (
+            <li>
+              <IconMegaphone size={20} aria-hidden />
+              <span>
+                <strong>Auction nights you run</strong>
+                When a club names you its auctioneer, and changes to that night.
+              </span>
+            </li>
+          ) : null}
           <li>
             <IconShieldCheck size={20} aria-hidden />
             <span>

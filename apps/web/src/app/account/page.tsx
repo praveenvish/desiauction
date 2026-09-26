@@ -140,6 +140,25 @@ export default async function AccountPage() {
    * caught it, which is the whole argument for having one.
    */
   const sportsPlayed = sportForms.filter((form) => form.played).map((form) => form.spec.label);
+  /*
+   * ROLE-AWARE (round 4). An owner's /account asked for a playing role, a
+   * batting style and "How you play", and linked "My sports" from a page that
+   * is "My teams" everywhere else. Someone who runs, owns or conducts and has
+   * never played gets the account's own items; the player forms stay one
+   * click away, folded, for the day they enter a season.
+   */
+  const playsHere = entries.length > 0 || sportsPlayed.length > 0 || roles.plays;
+  const nonPlayer =
+    !playsHere &&
+    (roles.owns.length > 0 || roles.organizes.length > 0 || roles.conducts.length > 0);
+  const recordLink = playsHere
+    ? { href: "/me", label: "My sports" }
+    : roles.owns.length > 0
+      ? { href: "/me", label: "My teams" }
+      : null;
+  const sections = nonPlayer
+    ? ACCOUNT_SECTIONS.filter((section) => section.id !== "player" && section.id !== "sports")
+    : ACCOUNT_SECTIONS;
   return (
     <AnnouncerProvider>
       <ToastProvider>
@@ -195,6 +214,8 @@ export default async function AccountPage() {
               .filter((fact) => fact.value !== "0")
               .slice(0, 3)}
             signOut={<SignOutButton logout={logoutAction} />}
+            playerItems={!nonPlayer}
+            recordLink={recordLink}
           />
 
           {/* Settings read like settings: an index of the cards, then the cards —
@@ -204,7 +225,7 @@ export default async function AccountPage() {
           <div className="acct-body">
             <nav className="acct-nav" aria-label="Account sections">
               <ScrollStrip as="ul">
-                {ACCOUNT_SECTIONS.map((section) => (
+                {sections.map((section) => (
                   <li key={section.id}>
                     <a href={`#${section.id}`}>
                       <span aria-hidden>{section.icon}</span>
@@ -218,11 +239,28 @@ export default async function AccountPage() {
             <div className="acct-columns">
               <div className="acct-column">
                 <ProfilePanel phone={session.phone} name={session.name} email={email} />
-                {/* PI-1: the durable identity. Prefills every future registration. */}
-                <PersonProfilePanel profile={cricketProfile} />
-                {/* SP-1 Phase 3: "how you play" has a different answer in each
-                  sport — the ones this person plays, and the rest one at a time. */}
-                <SportProfiles forms={sportForms} />
+                {nonPlayer ? (
+                  <details className="acct-fold" data-testid="account-player-fold">
+                    <summary>
+                      <span>
+                        <strong>Playing too?</strong> Add a player profile — your next season
+                        registration starts filled in.
+                      </span>
+                    </summary>
+                    <div className="acct-fold-body">
+                      <PersonProfilePanel profile={cricketProfile} />
+                      <SportProfiles forms={sportForms} />
+                    </div>
+                  </details>
+                ) : (
+                  <>
+                    {/* PI-1: the durable identity. Prefills every future registration. */}
+                    <PersonProfilePanel profile={cricketProfile} />
+                    {/* SP-1 Phase 3: "how you play" has a different answer in each
+                      sport — the ones this person plays, and the rest one at a time. */}
+                    <SportProfiles forms={sportForms} />
+                  </>
+                )}
               </div>
 
               <div className="acct-column">

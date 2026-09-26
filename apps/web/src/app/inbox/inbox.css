@@ -241,16 +241,35 @@
     padding-inline: var(--space-4);
   }
 
+  /* The time goes UNDER the title: as a right column it squeezed titles to
+     three lines (review r2, r3). Tile, text, dot — and the time in the text
+     column's second row. */
   .inbox-row {
-    align-items: flex-start;
-    gap: var(--space-3);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: var(--space-3);
+    row-gap: 2px;
     padding: var(--space-3) var(--space-4);
   }
 
+  .inbox-row > :first-child {
+    grid-row: 1 / span 2;
+  }
+
   .inbox-side {
-    flex-direction: column-reverse;
-    align-items: flex-end;
-    gap: var(--space-1);
+    display: contents;
+  }
+
+  .inbox-when {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .inbox-dot {
+    grid-column: 3;
+    grid-row: 1;
+    margin-top: 6px;
   }
 }
 
