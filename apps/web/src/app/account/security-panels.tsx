@@ -397,13 +397,17 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                   setEventsShown(security.events.length);
                 }}
               >
-                Show all {String(security.events.length)} events
+                {/* "All" only when it is all: past the kept window the button
+                    says what it opens, so it agrees with the note beside it. */}
+                {security.eventsTotal > security.events.length
+                  ? `Show the ${String(security.events.length)} most recent`
+                  : `Show all ${String(security.events.length)} events`}
               </Button>
             ) : null}
             {/* Truncation is ADMITTED rather than performed silently. */}
             {security.eventsTotal > security.events.length ? (
               <p className="security-note" data-testid="events-truncated">
-                Showing the {String(security.events.length)} most recent of{" "}
+                This page keeps the {String(security.events.length)} most recent of your{" "}
                 {String(security.eventsTotal)} events. Need the full history?{" "}
                 <Link href="/support">Ask support</Link>.
               </p>
