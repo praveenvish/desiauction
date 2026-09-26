@@ -1,6 +1,7 @@
-const WALL = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+import { formatShortDate } from "./format-date";
+
 function wallDate(iso: string): string {
-  return WALL.format(new Date(`${iso}T00:00:00Z`));
+  return formatShortDate(iso);
 }
 
 /**

@@ -110,10 +110,11 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   await page.goto("/tournaments");
   const summary = page.getByTestId("tg-summary");
   await expect(summary).toBeVisible();
-  // Two tournaments, one season — the cards count what the page can actually
-  // see, not a global total; the tournament count rides the first card's hint.
-  await expect(summary).toContainText("Total seasons");
-  await expect(summary).toContainText("Across 2 tournaments");
+  // Two tournaments, one season — the status tabs count what the page can
+  // actually see, and the toolbar's count names both units.
+  await expect(summary).toContainText("All");
+  await expect(page.getByTestId("tg-status-all")).toContainText("1");
+  await expect(page.getByTestId("tg-results")).toHaveText("2 tournaments · 1 season");
   // The one season is featured above the list, and links into its workspace.
   await expect(page.getByTestId("tg-featured")).toContainText(`Alpha One ${STAMP}`);
 
@@ -151,13 +152,13 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   // group defaults to open, which under "Newest" is Zulu, not Alpha.
   await expect(alphaGroup.getByTestId("tg-season")).toBeHidden();
 
-  // --- status filter ------------------------------------------------------
+  // --- status filter (the status tabs) -------------------------------------
   // The new season is a draft, so "Registration open" must empty the list —
   // including the seasonless tournament, which cannot satisfy the filter.
-  await page.getByTestId("tg-status").selectOption("registration_open");
+  await page.getByTestId("tg-status-registration_open").click();
   await expect(page.getByTestId("tg-noresults")).toBeVisible();
 
-  await page.getByTestId("tg-status").selectOption("draft");
+  await page.getByTestId("tg-status-draft").click();
   await expect(alphaGroup).toBeVisible();
   await expect(zuluGroup).toHaveCount(0);
   // Filtered down, the sub-line and the header figure must still agree.

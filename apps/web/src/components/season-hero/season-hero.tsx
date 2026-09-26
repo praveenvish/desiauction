@@ -53,9 +53,22 @@ export function HeroChip({ children }: { children: ReactNode }) {
  * card and go dark-on-dark here, so the hero states its status on solid
  * ceremony gold with ink — the one treatment that reads in both themes.
  */
-export function HeroStatus({ children, live = false }: { children: ReactNode; live?: boolean }) {
+export function HeroStatus({
+  children,
+  live = false,
+  done = false,
+}: {
+  children: ReactNode;
+  live?: boolean;
+  /** A finished state ("Auction done", "Settled") wears the one "complete" colour. */
+  done?: boolean;
+}) {
   return (
-    <span className="sh-status" data-live={live ? "true" : undefined}>
+    <span
+      className="sh-status"
+      data-live={live ? "true" : undefined}
+      data-state={live ? "live" : done ? "complete" : undefined}
+    >
       {live ? <span className="sh-status-dot" aria-hidden /> : null}
       {children}
     </span>

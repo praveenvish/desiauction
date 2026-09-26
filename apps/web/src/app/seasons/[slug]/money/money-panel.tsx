@@ -5,6 +5,7 @@ import {
   Button,
   ButtonLink,
   Dialog,
+  EmptyState,
   Field,
   IconAlert,
   IconArrowRight,
@@ -20,6 +21,7 @@ import {
   IconShieldCheck,
   IconUsers,
   IconWallet,
+  type KitTone,
   Pill,
   SectionCard,
   Select,
@@ -28,7 +30,6 @@ import {
   useAnnouncer,
   useToast,
   VisuallyHidden,
-  type KitTone,
 } from "@desiauction/ui";
 import { useState, type ReactNode } from "react";
 
@@ -473,7 +474,7 @@ function CaseMoney({ settlementCase }: { settlementCase: CaseView }) {
       />
       <StatCard
         icon={<IconWallet />}
-        tone="green"
+        concept="money"
         value={<Amount value={financial.discharged} />}
         label="Collected"
         hint="Confirmed as received"
@@ -512,7 +513,7 @@ function CaseMoney({ settlementCase }: { settlementCase: CaseView }) {
   );
 }
 
-/** An empty state in the card language: a glyph, a sentence, a way on. */
+/** The product's one EmptyState, inside the Settlement card. */
 function EmptyCard({
   icon,
   title,
@@ -526,14 +527,12 @@ function EmptyCard({
 }) {
   return (
     <SectionCard icon={<IconRupee />} title="Settlement">
-      <div className="st-empty">
-        <span className="st-empty-glyph" aria-hidden>
-          {icon}
-        </span>
-        <h3>{title}</h3>
-        <p>{body}</p>
-        {action !== undefined ? <div className="st-empty-actions">{action}</div> : null}
-      </div>
+      <EmptyState
+        icon={icon}
+        title={title}
+        description={body}
+        {...(action !== undefined ? { action } : {})}
+      />
     </SectionCard>
   );
 }
@@ -744,7 +743,12 @@ function NextStep({
   if (settlementCase.status === "settled") {
     const blocked = readiness !== null && !readiness.ready;
     return (
-      <SectionCard icon={<IconLock />} tone="green" title="Close the case" className="mn-step-card">
+      <SectionCard
+        icon={<IconLock />}
+        concept="money"
+        title="Close the case"
+        className="mn-step-card"
+      >
         <p className="section-note">
           Closing runs the full financial verification and seals an evidence package that can be
           replayed for ever. Once closed, the auction reads as Reconciled.
@@ -1230,7 +1234,7 @@ function Collect({
   return (
     <SectionCard
       icon={<IconRupee />}
-      tone="green"
+      concept="money"
       title="Record a payment"
       description="Record the money as it arrives. It is confirmed once it is actually in hand — confirming puts it on the books and takes it off what the team owes."
     >

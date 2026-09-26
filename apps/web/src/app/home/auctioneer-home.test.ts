@@ -5,19 +5,18 @@ import { nightDate } from "./auctioneer-home";
 // 25 Sep 2026, midday in India.
 const NOW = new Date("2026-09-25T06:30:00Z");
 
-describe("nightDate — an auctioneer's queue says which night, and whether it has gone", () => {
-  it("a coming night this year is just the day and month", () => {
-    expect(nightDate("2026-10-03", false, NOW)).toBe("3 Oct");
+describe("nightDate — the queue says the season's dates, as /auctions does", () => {
+  it("a season still to come says when it starts", () => {
+    expect(nightDate("2026-10-03", false, NOW)).toBe("Season starts 3 Oct");
   });
 
-  it("a night in another year carries its year", () => {
-    expect(nightDate("2027-01-12T18:30", false, NOW)).toBe("12 Jan 2027");
+  it("a date in another year carries its year", () => {
+    expect(nightDate("2027-01-12T18:30", false, NOW)).toBe("Season starts 12 Jan 2027");
   });
 
-  it("a past date on a night that has not happened is said plainly, with the year", () => {
-    expect(nightDate("2026-08-01", false, NOW)).toBe(
-      "Date passed · 1 Aug 2026 — check with the organizer",
-    );
+  it("a season under way says it began — not that a night's date passed", () => {
+    // /auctions prints this season as "1 Aug – 31 Oct 2026": both must agree.
+    expect(nightDate("2026-08-01", false, NOW)).toBe("Season began 1 Aug");
   });
 
   it("a finished night keeps its plain date — the past is where it belongs", () => {

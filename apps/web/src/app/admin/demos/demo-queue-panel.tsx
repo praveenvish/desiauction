@@ -15,6 +15,7 @@ import { useState, useTransition } from "react";
 import { DEMAND_SPORTS, demandSportBadge } from "../../../content/demand-sports";
 import { answerDemoRequestAction, cancelDemoAction } from "../../../server/admin/demo-actions";
 import type { DemoQueue, DemoQueueRow } from "../../../server/admin/demo-views";
+import { formatDate } from "../../../lib/format-date";
 
 /**
  * ANSWERING, WITH THE FACTS IN FRONT OF YOU.
@@ -79,7 +80,7 @@ export function DemoQueuePanel({ queue }: { queue: DemoQueue }) {
                 <span className="admin-pills">
                   <Pill tone="neutral">{(row.outcome ?? "").replace("_", " ")}</Pill>
                   {row.contactedAt === null ? null : (
-                    <span className="admin-when">{row.contactedAt.toISOString().slice(0, 10)}</span>
+                    <span className="admin-when">{formatDate(row.contactedAt)}</span>
                   )}
                 </span>
               </li>

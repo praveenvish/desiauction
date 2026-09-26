@@ -87,113 +87,34 @@ export default function LandingPage() {
               </p>
               <div className={styles.actions}>
                 <Link className={styles.primary} href={SIGNUP.href} data-track="hero:signup">
-                  {SIGNUP.label} <IconArrowRight size={18} />
+                  {SIGNUP.label} <IconArrowRight size={20} />
                 </Link>
                 {/* Scrolls to the auction card itself, not the section top:
                     on a phone the sport picker sat between the click and the
                     thing the button promised. */}
                 <a className={styles.secondary} href="#demo-auction" data-track="hero:mock">
-                  <IconGavel size={15} /> Try a mock auction
+                  <IconGavel size={16} /> Try a mock auction
                 </a>
               </div>
+              {/* The proof strip that sat under the hero (four 12px facts in an
+                  80px band) is folded into this one line. */}
               <p className={styles.microcopy}>
-                <IconCheck size={14} /> Free during beta <span>·</span> No card required
+                <IconCheck size={16} /> Free during beta <span>·</span> No card required{" "}
+                <span>·</span> {sports.length} sports
               </p>
               {/* Many visitors arrive from a shared registration link: they
                   are players looking for a tournament, not organizers. */}
               <p className={styles.playerPath}>
                 Playing, not organizing?{" "}
                 <Link href="/c" data-track="hero:browse">
-                  Find a tournament <IconArrowRight size={14} />
+                  Find a tournament <IconArrowRight size={16} />
                 </Link>
               </p>
             </div>
           </div>
-          {/* WHAT A VISITOR CAN CHECK. This strip used to repeat the page's
-              three steps (they also sit under "How it works" below). It now
-              carries capabilities the platform verifiably has today — the
-              marketing no-fabrication rule applies: no counts, no customers. */}
-          <ul className={styles.heroFoot} aria-label="What you get">
-            <li>
-              <IconGavel size={20} />
-              <span>Owners bid from their phones</span>
-            </li>
-            <li>
-              <IconTv size={20} />
-              <span>Big-screen view for the room</span>
-            </li>
-            <li>
-              <IconTrophy size={20} />
-              <span>{sports.length} sports supported</span>
-            </li>
-            <li>
-              <IconCheck size={20} />
-              {/* "Free during beta" raises "and after?"; pricing answers it. */}
-              <Link href="/pricing" data-track="facts:pricing">
-                Beta tournaments stay free
-              </Link>
-            </li>
-          </ul>
         </section>
 
         <AuctionLab sports={sports} signupHref={SIGNUP.href} signupLabel={SIGNUP.label} />
-
-        {/* THE REAL PRODUCT. Every other picture on this page is an
-            illustration or a simulation; these are screenshots of the platform
-            itself, captured from a practice auction run end to end on it
-            (fictional names apart from the featured player — the caption says so). The only proof a product
-            with no public customers yet can honestly show is itself working. */}
-        <section className={styles.realProduct} aria-labelledby="real-title">
-          <div className={styles.container}>
-            <div className={styles.realHeading} data-reveal>
-              <p className={styles.eyebrow}>NOT A MOCKUP</p>
-              <h2 id="real-title">
-                This is auction night
-                <br />
-                <span>on DesiAuction.</span>
-              </h2>
-              <p>
-                Real screens from a practice auction on the platform. Owners bid from their phones,
-                the big screen keeps score, and every screen sees the gavel fall at the same moment.
-              </p>
-            </div>
-            <div className={styles.realGrid}>
-              <figure className={styles.realPhone} data-reveal>
-                <Image
-                  src="/marketing/product/owner-phone-bidding-v2.webp"
-                  alt="A team owner's phone during a live lot: Aniket Sawant on the block, a 26-second countdown, Voyagers leading at ₹80,000 and a Raise to ₹85,000 button"
-                  width={560}
-                  height={1212}
-                  sizes="(max-width: 767px) 45vw, 260px"
-                />
-                <figcaption>The owner&rsquo;s phone. One tap to raise.</figcaption>
-              </figure>
-              <figure className={styles.realScreen} data-reveal>
-                <Image
-                  src="/marketing/product/auction-board-v2.webp"
-                  alt="The big-screen board of a live auction: ₹1,60,000 spent on 5 players, Aniket Sawant the most expensive at ₹85,000, and each team's remaining purse and squad"
-                  width={1600}
-                  height={900}
-                  sizes="(max-width: 767px) 100vw, 640px"
-                />
-                <figcaption>The big screen. Purses, squads and every sale, live.</figcaption>
-              </figure>
-              <figure className={styles.realPhone} data-reveal>
-                <Image
-                  src="/marketing/product/owner-phone-sold-v2.webp"
-                  alt="The same phone as the gavel falls: a SOLD stamp, Aniket Sawant signed to Falcons for ₹85,000, and a notification reading You signed Aniket Sawant"
-                  width={560}
-                  height={933}
-                  sizes="(max-width: 767px) 45vw, 260px"
-                />
-                <figcaption>SOLD. On every screen at once.</figcaption>
-              </figure>
-            </div>
-            <p className={styles.realNote}>
-              Screenshots from a practice auction on DesiAuction. Teams and owners are fictional.
-            </p>
-          </div>
-        </section>
 
         {/* Proof sits right after the demo — the moment a visitor asks "is
             anyone actually using this?". Both render nothing without data. */}
@@ -224,6 +145,59 @@ export default function LandingPage() {
               </p>
             </div>
             <div className={styles.bento}>
+              {/* THE REAL PRODUCT, inside the bento. These used to be a
+                  ~1,000px standalone gallery ("This is auction night") that
+                  rendered as a black slab until scrolled into view. They are
+                  screenshots of the platform itself, captured from a practice
+                  auction run end to end on it (scripts/capture-marketing-screens.ts);
+                  the note says the teams are fictional. */}
+              <article
+                className={[styles.feature, styles.screenFeature].join(" ")}
+                data-reveal
+                data-spotlight
+              >
+                <div className={styles.screenCopy}>
+                  <span className={styles.iconTile}>
+                    <IconTv size={24} weight="duotone" />
+                  </span>
+                  <p className={styles.cardOverline}>01 / OWN THE ROOM · REAL SCREENS</p>
+                  <h3>
+                    Small screen.
+                    <br />
+                    Big moment.
+                  </h3>
+                  <p>
+                    Owners bid from their phones, the big screen keeps score, and every screen sees
+                    the gavel fall at the same moment.
+                  </p>
+                  <Link href="/help/screens-for-the-room">
+                    Set the stage <IconArrowRight size={16} />
+                  </Link>
+                </div>
+                <div className={styles.realShots}>
+                  <figure className={styles.realScreen}>
+                    <Image
+                      src="/marketing/product/auction-board-v2.webp"
+                      alt="The big-screen board of a live auction: ₹1,60,000 spent on 5 players, Aniket Sawant the most expensive at ₹85,000, and each team's remaining purse and squad"
+                      width={1600}
+                      height={900}
+                      sizes="(max-width: 767px) 100vw, 560px"
+                    />
+                  </figure>
+                  <figure className={styles.realPhone}>
+                    <Image
+                      src="/marketing/product/owner-phone-sold-v2.webp"
+                      alt="A team owner's phone as the gavel falls: a SOLD stamp, Aniket Sawant signed to Falcons for ₹85,000"
+                      width={560}
+                      height={933}
+                      sizes="(max-width: 767px) 30vw, 150px"
+                    />
+                  </figure>
+                  <p className={styles.realNote}>
+                    Real screens from a practice auction. Teams and owners are fictional.
+                  </p>
+                </div>
+              </article>
               <article
                 className={[styles.feature, styles.registration].join(" ")}
                 data-reveal
@@ -231,9 +205,9 @@ export default function LandingPage() {
               >
                 <div className={styles.featureCopy}>
                   <span className={styles.iconTile}>
-                    <IconUsers size={23} />
+                    <IconUsers size={24} weight="duotone" />
                   </span>
-                  <p className={styles.cardOverline}>01 / GET EVERYONE IN</p>
+                  <p className={styles.cardOverline}>02 / GET EVERYONE IN</p>
                   <h3>
                     One link.
                     <br />A whole player pool.
@@ -251,7 +225,7 @@ export default function LandingPage() {
                 >
                   <div className={styles.visualHeader}>
                     <span>Player registrations</span>
-                    <IconUsers size={17} />
+                    <IconUsers size={20} />
                   </div>
                   <div className={styles.rosterRow}>
                     <span className={styles.avatar}>AS</span>
@@ -260,7 +234,7 @@ export default function LandingPage() {
                       <small>Player application</small>
                     </div>
                     <span className={styles.approved}>
-                      <IconCheck size={12} /> Approved
+                      <IconCheck size={16} /> Approved
                     </span>
                   </div>
                   <div className={styles.rosterRow}>
@@ -270,7 +244,7 @@ export default function LandingPage() {
                       <small>Player application</small>
                     </div>
                     <span className={styles.approved}>
-                      <IconCheck size={12} /> Approved
+                      <IconCheck size={16} /> Approved
                     </span>
                   </div>
                   <div className={styles.rosterRow}>
@@ -285,48 +259,12 @@ export default function LandingPage() {
                 </div>
               </article>
               <article
-                className={[styles.feature, styles.screenFeature].join(" ")}
-                data-reveal
-                data-spotlight
-              >
-                <span className={styles.iconTile}>
-                  <IconTv size={23} />
-                </span>
-                <p className={styles.cardOverline}>02 / OWN THE ROOM</p>
-                <h3>
-                  Small screen.
-                  <br />
-                  Big moment.
-                </h3>
-                <p>Owners bid from their phones. The room follows on the big screen.</p>
-                <div className={styles.deviceVisual} aria-hidden="true">
-                  <div className={styles.monitor}>
-                    <span>THE WINNING MOMENT</span>
-                    <strong>
-                      SOLD<span>!</span>
-                    </strong>
-                    <small>YOUR NEXT TEAMMATE</small>
-                  </div>
-                  <div className={styles.phone}>
-                    <IconGavel size={21} />
-                    <span>YOUR BID</span>
-                    <strong>₹35,000</strong>
-                    <i>
-                      <IconCheck size={13} />
-                    </i>
-                  </div>
-                </div>
-                <Link href="/help/screens-for-the-room">
-                  Set the stage <IconArrowRight size={16} />
-                </Link>
-              </article>
-              <article
                 className={[styles.feature, styles.fixturesFeature].join(" ")}
                 data-reveal
                 data-spotlight
               >
                 <span className={styles.iconTile}>
-                  <IconCalendar size={23} />
+                  <IconCalendar size={24} weight="duotone" />
                 </span>
                 <p className={styles.cardOverline}>03 / GAME ON</p>
                 <h3>
@@ -358,7 +296,7 @@ export default function LandingPage() {
               >
                 <div className={styles.featureCopy}>
                   <span className={styles.iconTile}>
-                    <IconReceipt size={23} />
+                    <IconReceipt size={24} weight="duotone" />
                   </span>
                   <p className={styles.cardOverline}>04 / KEEP IT CLEAR</p>
                   <h3>
@@ -376,7 +314,7 @@ export default function LandingPage() {
                 </div>
                 <div className={styles.receiptVisual} aria-label="Illustrative receipt">
                   <span className={styles.receiptIcon}>
-                    <IconReceipt size={26} />
+                    <IconReceipt size={24} />
                   </span>
                   <small>COLLECTION RECORDED</small>
                   <strong>
@@ -392,58 +330,12 @@ export default function LandingPage() {
                     <b>#0001</b>
                   </div>
                   <p>
-                    <IconCheck size={14} /> Clear. Recorded. Organized.
+                    <IconCheck size={16} /> Clear. Recorded. Organized.
                   </p>
                   <small>EXAMPLE RECEIPT</small>
                 </div>
               </article>
             </div>
-          </div>
-        </section>
-
-        <section className={styles.journey} aria-labelledby="journey-title">
-          <div className={styles.container}>
-            <div className={styles.journeyIntro} data-reveal>
-              <p className={styles.eyebrow}>FROM “LET’S PLAY” TO GAME DAY</p>
-              <h2 id="journey-title">
-                {/* "from sign-up" hyphen-broke across three lines at phone widths;
-                    the shorter line keeps the two-line rhythm everywhere. */}
-                Three steps
-                <br />
-                <span>to auction night.</span>
-              </h2>
-              <Link className={styles.textLink} href="/help/getting-started">
-                Your getting-started guide <IconArrowRight size={17} />
-              </Link>
-            </div>
-            <ol className={styles.steps}>
-              <li data-reveal>
-                <span>01</span>
-                <div>
-                  <h3>Make it yours.</h3>
-                  <p>Choose your sport. Create your tournament, add teams and set the rules.</p>
-                </div>
-                <IconTrophy size={24} />
-              </li>
-              <li data-reveal>
-                <span>02</span>
-                <div>
-                  <h3>Bring your people.</h3>
-                  <p>
-                    Invite players to register and owners to join. Your auction pool comes together.
-                  </p>
-                </div>
-                <IconUsers size={24} />
-              </li>
-              <li data-reveal>
-                <span>03</span>
-                <div>
-                  <h3>Let the bidding begin.</h3>
-                  <p>Run the live auction, build the squads and get your tournament moving.</p>
-                </div>
-                <IconGavel size={24} />
-              </li>
-            </ol>
           </div>
         </section>
 
@@ -457,6 +349,37 @@ export default function LandingPage() {
             footer, and the page a visitor lands on is shorter for it: on a
             phone it was eleven screens tall. */}
         <section id="final-cta" className={styles.finalCta} aria-labelledby="final-title">
+          {/* THREE STEPS, as the strip the closing band stands on. They were a
+              520px band of their own for three one-line steps, directly above
+              this one; here they read as the path to the button below. */}
+          <ol className={styles.ctaSteps} aria-label="Three steps to auction night">
+            <li data-reveal>
+              <span className={styles.ctaStepNum}>01</span>
+              <span className={styles.ctaStepIcon} aria-hidden>
+                <IconTrophy size={24} weight="duotone" />
+              </span>
+              <h3>Make it yours.</h3>
+              <p>Choose your sport, create your tournament, add teams and set the rules.</p>
+            </li>
+            <li data-reveal>
+              <span className={styles.ctaStepNum}>02</span>
+              <span className={styles.ctaStepIcon} aria-hidden>
+                <IconUsers size={24} weight="duotone" />
+              </span>
+              <h3>Bring your people.</h3>
+              <p>
+                Invite players to register and owners to join. Your auction pool comes together.
+              </p>
+            </li>
+            <li data-reveal>
+              <span className={styles.ctaStepNum}>03</span>
+              <span className={styles.ctaStepIcon} aria-hidden>
+                <IconGavel size={24} weight="duotone" />
+              </span>
+              <h3>Let the bidding begin.</h3>
+              <p>Run the live auction, build the squads and get your tournament moving.</p>
+            </li>
+          </ol>
           <p className={styles.eyebrow}>YOUR SPORT. YOUR PEOPLE. YOUR MOMENT.</p>
           <h2 id="final-title">
             Let the games <span>begin.</span>
@@ -475,14 +398,14 @@ export default function LandingPage() {
           */}
           <div className={styles.actions}>
             <Link className={styles.primary} href={SIGNUP.href} data-track="final:signup">
-              {SIGNUP.label} <IconArrowRight size={18} />
+              {SIGNUP.label} <IconArrowRight size={20} />
             </Link>
             <Link
               className={styles.secondary}
               href={LANDING.beta.ctaSecondary.href}
               data-track="final:demo"
             >
-              <IconCalendar size={15} /> {LANDING.beta.ctaSecondary.label}
+              <IconCalendar size={16} /> {LANDING.beta.ctaSecondary.label}
             </Link>
           </div>
           {/* The last doubts before signing up, answered with things the
@@ -491,16 +414,19 @@ export default function LandingPage() {
               reaches the exporter yet. */}
           <ul className={styles.reassure} aria-label="Before you start">
             <li>
-              <IconCheck size={14} /> No app to install
+              <IconCheck size={16} /> No app to install
             </li>
             <li>
-              <IconCheck size={14} /> Big screen from any browser
+              <IconCheck size={16} /> Big screen from any browser
             </li>
             <li>
-              <IconCheck size={14} /> Every bid checked on the server
+              <IconCheck size={16} /> Every bid checked on the server
             </li>
           </ul>
-          <p>Built for the people who bring people together.</p>
+          <p>
+            Built for the people who bring people together.{" "}
+            <Link href="/help/getting-started">Read the getting-started guide</Link>
+          </p>
         </section>
         {/* Inside <main> so it inherits the floodlight theme. */}
         <StickyCta href={SIGNUP.href} label={SIGNUP.label} />

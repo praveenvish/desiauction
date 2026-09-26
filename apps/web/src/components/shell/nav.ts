@@ -160,8 +160,8 @@ export interface CompetitionTab {
   /**
    * Extra path suffixes this tab owns, beyond its own href.
    *
-   * A consolidated tab needs them: "Players" is Registrations AND Lineups, so
-   * standing on /lineups must still light Players rather than leaving the strip
+   * A consolidated tab needs them: "Schedule" is Fixtures, Lineups AND the
+   * Table, so standing on /lineups must still light Schedule rather than leaving the strip
    * blank or falling through to Overview — a strip that cannot say where you
    * are is worse than a longer one (LAW 2).
    */
@@ -355,7 +355,9 @@ const ADMIN_SECTIONS: readonly Omit<AdminSection, "dividerBefore">[] = [
   },
   {
     key: "reports",
-    label: "Reports",
+    // Not "Reports": the organizer console has a Reports page (figures), and
+    // this desk is people telling us something broke.
+    label: "Problem reports",
     href: "/admin/reports",
     capability: "platform.support",
     group: "commercial",
@@ -401,6 +403,70 @@ export function adminSectionsFor(held: readonly PlatformDoorCapability[]): Admin
     previous = section.group;
     return first ? { ...section, dividerBefore: true } : { ...section };
   });
+}
+
+/**
+ * HOW THE ADMIN STRIP FITS (wow pass, 2026-09-25).
+ *
+ * Sixteen sections do not fit one rail at 1440: "Messaging" clipped and
+ * "Notifications" sat off-screen, so on every notifications page NO tab looked
+ * active. The strip now shows the platform + people sections inline and folds
+ * the desks and comms into a "More" menu, grouped. The section you are on is
+ * ALWAYS drawn inline — pinned after the primaries when it lives in the menu —
+ * so the active state can never be hidden. An operator who holds only a few
+ * desks sees them all inline; the menu appears only when there is overflow.
+ */
+const ADMIN_PRIMARY_KEYS: ReadonlySet<string> = new Set([
+  "overview",
+  "live",
+  "health",
+  "audit",
+  "orgs",
+  "users",
+]);
+
+/** Inline when an operator holds this many sections or fewer. */
+const ADMIN_INLINE_MAX = 7;
+
+const ADMIN_MENU_GROUPS: readonly { label: string; keys: readonly string[] }[] = [
+  { label: "Trust & safety", keys: ["moderation", "erasure", "reports"] },
+  { label: "Growth", keys: ["passes", "demos", "reviews", "newsletter"] },
+  { label: "Comms", keys: ["messaging", "notifications"] },
+];
+
+export interface AdminNavLayout {
+  /** Drawn inline, in order. */
+  inline: AdminSection[];
+  /** The active section when it lives in the menu — drawn inline after `inline`. */
+  pinned: AdminSection | null;
+  /** The folded sections, grouped. Empty when everything fits inline. */
+  more: { label: string; items: AdminSection[] }[];
+}
+
+export function adminNavLayout(
+  sections: readonly AdminSection[],
+  activeKey: string,
+): AdminNavLayout {
+  if (sections.length <= ADMIN_INLINE_MAX) {
+    return { inline: [...sections], pinned: null, more: [] };
+  }
+  const inline = sections.filter((section) => ADMIN_PRIMARY_KEYS.has(section.key));
+  const folded = sections.filter((section) => !ADMIN_PRIMARY_KEYS.has(section.key));
+  const more = ADMIN_MENU_GROUPS.map((group) => ({
+    label: group.label,
+    items: folded.filter((section) => group.keys.includes(section.key)),
+  }));
+  // A section no group names still has to be reachable.
+  const named = new Set(ADMIN_MENU_GROUPS.flatMap((group) => group.keys));
+  const stray = folded.filter((section) => !named.has(section.key));
+  if (stray.length > 0) {
+    more.push({ label: "Other", items: stray });
+  }
+  return {
+    inline,
+    pinned: folded.find((section) => section.key === activeKey) ?? null,
+    more: more.filter((group) => group.items.length > 0),
+  };
 }
 
 export function activeAdminTab(pathname: string): string {
@@ -499,6 +565,9 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/^\/admin\/notifications\/suppressions$/, "Suppressions"],
   [/^\/admin\/notifications\/analytics$/, "Delivery analytics"],
   [/^\/admin\/notifications\/[^/]+\/email$/, "Email wording"],
+  // Was missing: the page titled itself "Platform admin" under a "Platform
+  // admin" crumb — the same defect Messaging had, one level down.
+  [/^\/admin\/notifications\/templates$/, "Message templates"],
   [/^\/admin\/notifications$/, "Notifications"],
   [/^\/admin\/passes$/, "Passes"],
   // Longest-first: availability must not be labelled "Demos".
@@ -506,7 +575,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/^\/admin\/demos$/, "Demos"],
   [/^\/admin\/erasure$/, "Erasure requests"],
   [/^\/admin\/newsletter$/, "Newsletter"],
-  [/^\/admin\/reports$/, "Reports"],
+  [/^\/admin\/reports$/, "Problem reports"],
   [/^\/admin\/reviews$/, "Reviews"],
   [/^\/admin\/live$/, "Live"],
   [/^\/admin\/auctions\/[^/]+$/, "Auction"],
@@ -523,10 +592,9 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/\/readiness$/, "Readiness"],
   /*
    * "Players", not "Registrations" — the tab that leads here is called Players
-   * (RN-1 Phase 4 consolidated Registrations + Lineups under it), and a tab
-   * whose page announces a different name is the shell contradicting itself
-   * one line apart. The CHILD keeps its own name: Lineups is Lineups, under a
-   * Players tab that stays lit. Same reasoning for Schedule below.
+   * (RN-1 Phase 4), and a tab whose page announces a different name is the
+   * shell contradicting itself one line apart. A CHILD keeps its own name:
+   * Lineups is Lineups, under a Schedule tab that stays lit.
    */
   [/\/registrations$/, "Players"],
   [/\/fixtures\/calendar$/, "Calendar"],
@@ -976,14 +1044,22 @@ export const RAIL_CAP = 5;
  * — the sixth item, and `mobile: false` besides — would otherwise get a bar
  * that lights nothing, and a menu that cannot say where you are is worse than
  * a short one. The claiming item displaces the last, and Home keeps slot one.
+ *
+ * An operator standing in administration is the one case where the page they
+ * are on lives in the UTILITY list, not the rail. Pass `utility` and the admin
+ * door claims the seat the same way (wow pass round 2): a phone in /admin used
+ * to show the organizer's five with nothing lit, and administration was only
+ * reachable through the drawer.
  */
-export function phoneBar(rail: NavItem[]): NavItem[] {
+export function phoneBar(rail: NavItem[], utility: readonly NavItem[] = []): NavItem[] {
   const eligible = rail.filter((item) => item.mobile !== false);
   const bar = eligible.slice(0, RAIL_CAP);
   if (bar.some((item) => item.active === true)) {
     return bar;
   }
-  const claiming = rail.find((item) => item.active === true);
+  const claiming =
+    rail.find((item) => item.active === true) ??
+    utility.find((item) => item.key === "admin" && item.active === true);
   return claiming === undefined ? bar : [...bar.slice(0, RAIL_CAP - 1), claiming];
 }
 
@@ -1364,8 +1440,8 @@ export function seasonRoleFor(facts: SeasonRoleFacts): SeasonRole {
  *
  * Two consolidations take the organizer from nine tabs to seven, each joining
  * surfaces that answer one question:
- *   · PLAYERS  = Registrations + Lineups — "who is in this season"
- *   · SCHEDULE = Fixtures + Table        — "when, and how it went"
+ *   · PLAYERS  = Registrations                    — "who is in this season"
+ *   · SCHEDULE = Fixtures + Lineups + Table       — "when, who played, how it went"
  *
  * The `testId`s are carried forward from `competitionTabs` unchanged: these
  * tabs ARE the navigation the e2e suite drives, and renaming a hook during a
@@ -1399,8 +1475,10 @@ export function seasonTabs(
     label: "Auction",
     href: `${base}/auction`,
     testId: "open-auction",
-    // Readiness is reached from the auction page and is not a tab of its own.
-    claims: ["/readiness"],
+    // Readiness and the result posters are reached from the auction page and
+    // are not tabs of their own; standing on either lights Auction (round 2:
+    // the posters studio lit nothing and read as a page outside the season).
+    claims: ["/readiness", "/posters"],
   };
   const teams: CompetitionTab = {
     key: "teams",
@@ -1419,9 +1497,7 @@ export function seasonTabs(
           label: "Players",
           href: `${base}/registrations`,
           testId: "open-dashboard",
-          // Who is IN this season: who applied and was approved, and who
-          // actually took the field. Lineups is reached from Registrations.
-          claims: ["/lineups"],
+          // Who is IN this season: who applied and was approved.
         },
         teams,
         {
@@ -1429,9 +1505,11 @@ export function seasonTabs(
           label: "Schedule",
           href: `${base}/fixtures`,
           testId: "open-fixtures",
-          // When it is played, and how it went — the table is derived from the
-          // fixtures beside it, so the two are one question.
-          claims: ["/standings"],
+          // When it is played, who played it, and how it went — lineups are
+          // recorded per match and the table is derived from the fixtures
+          // beside it, so all three are one question (round 2 moved Lineups
+          // here from Players).
+          claims: ["/standings", "/lineups"],
         },
         auction,
         // Absent without `settlement.view`, never disabled — the surface itself
@@ -1508,7 +1586,13 @@ export function activeSeasonTab(pathname: string, slug: string, tabs: Competitio
    * tabs, so nothing is lit rather than underlining a page you are not on.
    * `my-entry` IS /register for a player, and is caught by the loop above.
    */
-  if (pathname.startsWith(`${base}/posters`) || pathname.startsWith(`${base}/register`)) {
+  if (
+    pathname.startsWith(`${base}/posters`) ||
+    pathname.startsWith(`${base}/register`) ||
+    // The books without the Money tab 404; the strip must not claim Overview
+    // under a "not found" (round 2).
+    pathname.startsWith(`${base}/money`)
+  ) {
     return "";
   }
   return "overview";

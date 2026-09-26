@@ -1,12 +1,94 @@
 /* /auctions — one card per auction night. Tokens only; both themes. */
 
+/* The page's one-line summary (it replaced four stat tiles). */
+.ax-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ax-summary-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ax-summary-item svg {
+  color: var(--text-muted);
+}
+
+.ax-summary-item strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ax-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 25%, transparent);
+}
+
 .ax-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
-  gap: var(--space-5);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  gap: var(--space-4);
+}
+
+/* One night on the page: it takes the row, laid out wide, instead of a
+   half-width card beside 580px of nothing. */
+@media (min-width: 900px) {
+  .ax-grid:has(> .ax-card:only-child) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ax-card:only-child {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-areas:
+      "head progress"
+      "meta progress"
+      "foot foot";
+    column-gap: var(--space-8);
+  }
+
+  /* The status pill belongs to the whole card, so it takes the card's
+     top-right corner (round 2: beside the title it floated mid-card, aligned
+     to nothing). */
+  .ax-card:only-child > .ax-head {
+    grid-area: head;
+  }
+
+  .ax-card:only-child > .ax-head > :last-child {
+    position: absolute;
+    top: var(--space-5);
+    right: var(--space-5);
+  }
+
+  .ax-card:only-child > .ax-meta {
+    grid-area: meta;
+  }
+
+  .ax-card:only-child > .ax-progress,
+  .ax-card:only-child > .ax-note {
+    grid-area: progress;
+    align-self: center;
+  }
+
+  .ax-card:only-child > .ax-foot {
+    grid-area: foot;
+  }
 }
 
 .ax-card {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -64,6 +146,10 @@
 }
 
 .ax-org {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
   margin: 2px 0 0;
   color: var(--text-secondary);
   font-size: var(--text-sm-size);
@@ -142,7 +228,8 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--success-base);
+  /* Progress is brand gold (system.css), never a state colour. */
+  background: var(--state-progress);
   transform-origin: left center;
 }
 
@@ -150,7 +237,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-3);
   margin-top: auto;
   padding-top: var(--space-4);
@@ -158,11 +245,16 @@
 }
 
 .ax-role {
-  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-full);
+  color: var(--accent-ink);
   font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .ax-links {

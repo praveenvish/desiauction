@@ -276,3 +276,20 @@
   border-color: var(--accent-solid-edge);
   box-shadow: var(--shadow-2);
 }
+
+/* ==========================================================================
+   DISABLED PRIMARY — neutral, never pale gold. `.button:disabled` only faded
+   the gold to 55%, which read as a lighter gold button that ignores the click
+   (Suppress, Publish, Ask; round 2). A primary that can't be pressed wears the
+   field's disabled ink on a sunken face, on every surface. A loading primary is
+   disabled too, but it is working, not unavailable: it keeps its gold.
+   ========================================================================== */
+.primary:disabled:not(.loading),
+:global([data-surface]) .primary:disabled:not(.loading) {
+  background-color: var(--surface-sunken);
+  background-image: none;
+  border-color: var(--border-subtle);
+  color: var(--text-disabled);
+  box-shadow: none;
+  opacity: 1;
+}

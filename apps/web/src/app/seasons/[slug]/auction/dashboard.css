@@ -123,7 +123,7 @@
 
 .dash-progress-seg[data-kind="unsold"],
 .dash-key[data-kind="unsold"] {
-  background: var(--border-strong);
+  background: var(--state-unsold);
 }
 
 .dash-progress-foot {
@@ -236,9 +236,12 @@
 
 /* ---- Purses --------------------------------------------------------------- */
 
+/* One grid for every row (rows are subgrids), so the name track sizes to the
+   LONGEST name and the bars still line up: "Mumbai Mavericks" is no longer
+   "Mumbai Maveri…" beside a half-empty bar. */
 .dash-purses {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto minmax(4rem, max-content) minmax(6rem, 1fr) auto 4.5rem;
   gap: var(--space-3);
   margin: 0;
   padding: 0;
@@ -247,7 +250,8 @@
 
 .dash-purses li {
   display: grid;
-  grid-template-columns: auto minmax(4rem, 7rem) minmax(0, 1fr) auto 4.5rem;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   gap: var(--space-3);
   font-size: var(--text-sm-size);
@@ -598,6 +602,11 @@
     display: none;
   }
 
+  .dash-purses {
+    display: flex;
+    flex-direction: column;
+  }
+
   .dash-purses li {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
@@ -653,9 +662,12 @@
 
 /* ---- After the auction ---------------------------------------------------- */
 
+/* After the auction (wow pass): one row of compact doors — a duotone icon
+   tile, the title, one line of note — instead of 80px cards that wrapped a
+   fifth one alone onto a second row. `auto-fit` so five doors share the row. */
 .dash-after {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: var(--space-3);
   margin: 0;
   padding: 0;
@@ -663,22 +675,22 @@
 }
 
 .dash-after-link {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-1) var(--space-3);
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "icon title"
+    "icon note";
+  gap: 2px var(--space-3);
   align-items: center;
   height: 100%;
   box-sizing: border-box;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
+  background: var(--surface-raised);
   color: inherit;
   text-decoration: none;
-}
-
-.dash-after-link:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-sunken);
 }
 
 .dash-after-link:focus-visible {
@@ -686,20 +698,64 @@
   outline-offset: 2px;
 }
 
+.dash-after-icon {
+  grid-area: icon;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.dash-after-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--surface-raised);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
 .dash-after-link strong {
-  grid-column: 1;
+  grid-area: title;
   color: var(--text-heading);
   font-size: var(--text-sm-size);
+  line-height: 1.3;
 }
 
-.dash-after-link span {
-  grid-column: 1;
+/* Unclamped: the notes are one sentence each, and a two-line clamp cut them
+   mid-word ("who an…") in the narrower cards. */
+.dash-after-note {
+  grid-area: note;
+  display: block;
   color: var(--text-secondary);
   font-size: var(--text-xs-size);
+  line-height: 1.4;
 }
 
-.dash-after-link svg {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  color: var(--text-secondary);
+/* Phone: one 56px row per door — icon, title, chevron-weight; the note goes. */
+@media (max-width: 719px) {
+  .dash-after {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .dash-after-link {
+    grid-template-areas: "icon title";
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .dash-after-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .dash-after-note {
+    display: none;
+  }
 }

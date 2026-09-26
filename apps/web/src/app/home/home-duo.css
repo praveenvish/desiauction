@@ -1,0 +1,311 @@
+/* THE SECOND OBJECT (wow pass, round 2). Player and owner homes ended at the
+   hero and left half a laptop screen blank. Two cards under the hero carry the
+   next most useful facts — the squad, the top buys, the next match — from reads
+   the page already makes. Tokens only. */
+
+.hd-duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+@media (max-width: 899px) {
+  .hd-duo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.hd-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.hd-head {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.hd-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.hd-title > svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+
+.hd-title-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+.hd-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.hd-link:hover {
+  text-decoration: underline;
+}
+
+/* A ruled list of people: face · name/role · figure. */
+.hd-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hd-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.hd-row:first-child {
+  border-top: 0;
+}
+
+.hd-row[data-self="true"] .hd-name {
+  color: var(--text-accent);
+}
+
+.hd-rank {
+  width: 1.5rem;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.hd-row[data-rank="1"] .hd-rank {
+  color: var(--accent-ink);
+}
+
+.hd-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hd-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.hd-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+
+.hd-figure {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.hd-you {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs-size);
+  line-height: 18px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent-ink);
+  vertical-align: 1px;
+}
+
+.hd-figure[data-muted="true"] {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+/* Squad balance: a bar per role, gold only. */
+.hd-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hd-bar-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+}
+
+.hd-bar-line span:last-child {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.hd-bar {
+  display: block;
+  height: 6px;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.hd-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform-origin: left center;
+}
+
+.hd-foot {
+  margin: auto 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.hd-foot strong {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The next match: a date block and the two teams. */
+.hd-match {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.hd-date {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+  text-align: center;
+}
+
+.hd-date b {
+  display: block;
+  font-size: var(--text-xl-size);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.hd-date small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs-size);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hd-vs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.hd-vs strong {
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  color: var(--text-heading);
+}
+
+.hd-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.hd-empty > svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+
+.hd-rows[data-plain="true"] .hd-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+/* The auctioneer's "On the night" rows. */
+.home-kit {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-kit > li + li {
+  border-top: 1px solid var(--border-subtle);
+}

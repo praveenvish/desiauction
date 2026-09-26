@@ -1,7 +1,7 @@
 "use client";
 
 import { TARGET_PRIORITY_LABELS, type PlanReport, type ReportOutcome } from "@desiauction/core";
-import { Badge, Card, type BadgeTone } from "@desiauction/ui";
+import { Badge, Card, EmptyState, type BadgeTone } from "@desiauction/ui";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
 import { useMoney } from "../../../../../components/money-unit";
@@ -22,12 +22,87 @@ const OUTCOME: Record<ReportOutcome, { tone: BadgeTone; label: string }> = {
   open: { tone: "neutral", label: "Never came up" },
 };
 
-export function PlanReportCard({
+/**
+ * The players this team bought, as a list — name, role, price — never a
+ * comma paragraph ("Off-plan: A (5,000 pts), B (1,000 pts), …" ran to ten).
+ */
+function BoughtList({
+  rows,
+  lotsByRegistration,
+  labelOf,
+  testId,
+}: {
+  rows: PlanReport["outsidePlan"];
+  lotsByRegistration: Map<string, PlanLotRow>;
+  labelOf: (role: string | null) => string;
+  testId?: string;
+}) {
+  const money = useMoney();
+  return (
+    <ul className="plan-bought" data-testid={testId}>
+      {[...rows]
+        .sort((a, b) => b.paid - a.paid)
+        .map((row) => {
+          const lot = lotsByRegistration.get(row.registrationId);
+          return (
+            <li key={row.registrationId} className="plan-bought-row">
+              <span className="plan-bought-name">{lot?.playerName ?? "A player"}</span>
+              <span className="plan-bought-role">{labelOf(lot?.role ?? null)}</span>
+              <span className="plan-bought-price">{money.ledger(row.paid)}</span>
+            </li>
+          );
+        })}
+    </ul>
+  );
+}
+
+/**
+ * THE NIGHT WITHOUT A PLAN. A team that never planned used to get seven tiles
+ * of zeros ("0 of 0", "0 pts", "—") and only then "No targets yet". It gets
+ * one sentence and what it actually bought.
+ */
+export function NoPlanReport({
   report,
   lotsByRegistration,
+  labelOf,
 }: {
   report: PlanReport;
   lotsByRegistration: Map<string, PlanLotRow>;
+  labelOf: (role: string | null) => string;
+}) {
+  const money = useMoney();
+  const bought = report.outsidePlan;
+  return (
+    <Card data-testid="plan-report" className="plan-noplan">
+      <EmptyState
+        headingLevel={2}
+        title="You went in without a plan"
+        description={
+          bought.length === 0
+            ? "And the night passed without a signing for this team."
+            : `Bought ${String(bought.length)} ${bought.length === 1 ? "player" : "players"} for ${money.ledger(report.outsidePlanTotal)}.`
+        }
+      />
+      {bought.length > 0 ? (
+        <BoughtList
+          rows={bought}
+          lotsByRegistration={lotsByRegistration}
+          labelOf={labelOf}
+          testId="plan-report-outside-list"
+        />
+      ) : null}
+    </Card>
+  );
+}
+
+export function PlanReportCard({
+  report,
+  lotsByRegistration,
+  labelOf,
+}: {
+  report: PlanReport;
+  lotsByRegistration: Map<string, PlanLotRow>;
+  labelOf: (role: string | null) => string;
 }) {
   const money = useMoney();
   const name = (registrationId: string) =>
@@ -103,12 +178,15 @@ export function PlanReportCard({
         </ul>
       )}
       {report.outsidePlan.length > 0 ? (
-        <p className="plan-hint" data-testid="plan-report-outside-list">
-          Off-plan:{" "}
-          {report.outsidePlan
-            .map((row) => `${name(row.registrationId)} (${money.ledger(row.paid)})`)
-            .join(", ")}
-        </p>
+        <>
+          <h3 className="plan-bought-title">Bought off-plan</h3>
+          <BoughtList
+            rows={report.outsidePlan}
+            lotsByRegistration={lotsByRegistration}
+            labelOf={labelOf}
+            testId="plan-report-outside-list"
+          />
+        </>
       ) : null}
     </Card>
   );

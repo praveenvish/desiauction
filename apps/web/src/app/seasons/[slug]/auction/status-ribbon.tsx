@@ -17,11 +17,11 @@ import { useMoney } from "../../../../components/money-unit";
 // never receive engine internals).
 
 const AUCTION_TONE = {
-  scheduled: "info",
+  scheduled: "neutral",
   live: "success",
   paused: "warning",
-  completed: "neutral",
-  reconciled: "neutral",
+  completed: "success",
+  reconciled: "success",
   abandoned: "danger",
 } as const;
 
@@ -87,6 +87,13 @@ export function StatusRibbon({
   offline = false,
   /** Faces keyed by lot id (`lotMediaOf`) — the lot cell shows who is on the block. */
   lotMedia = {},
+  /**
+   * The server's record of the auction's status, for before (or without) a
+   * snapshot. /spectate staged "AUCTION COMPLETE" from it while this strip
+   * said "RECONNECTING…" beside it (round 2): a finished night states no
+   * socket state, whether or not the socket ever answered.
+   */
+  settledStatus,
 }: {
   snapshot: AuctionSnapshot | null;
   connection: ConnectionState;
@@ -96,14 +103,17 @@ export function StatusRibbon({
   audience?: "operator" | "public";
   offline?: boolean;
   lotMedia?: Readonly<Record<string, LotMedia>>;
+  settledStatus?: AuctionSnapshot["auctionStatus"] | undefined;
 }) {
   const money = useMoney();
   const lot = snapshot?.currentLot ?? null;
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
   const version = snapshot?.version ?? 0;
   const live = connection === "open" && !offline;
-  const finished =
-    snapshot?.auctionStatus === "completed" || snapshot?.auctionStatus === "reconciled";
+  const status = snapshot?.auctionStatus ?? settledStatus ?? null;
+  const over =
+    status === "completed" || status === "reconciled" || status === "abandoned" ? status : null;
+  const finished = over !== null;
   return (
     // `role="status"` makes the whole strip a polite live region, which is what
     // a spectator needs — the lot, the leading bid and the transport state are
@@ -131,7 +141,20 @@ export function StatusRibbon({
             <span className="ribbon-name">{snapshot.auctionName}</span>
           </>
         ) : (
-          <span className="ribbon-name">Connecting…</span>
+          // Before the first snapshot the feed badge on the right already says
+          // "Connecting…"/"Reconnecting…"; this cell said "Connecting…" too, so
+          // the strip read one state twice. It names the place instead.
+          <>
+            {over !== null ? (
+              <>
+                <Badge tone={AUCTION_TONE[over]} data-testid="ribbon-status">
+                  {over}
+                </Badge>
+                <RibbonGap />
+              </>
+            ) : null}
+            <span className="ribbon-name">Auction room</span>
+          </>
         )}
       </span>
       {lot !== null ? (

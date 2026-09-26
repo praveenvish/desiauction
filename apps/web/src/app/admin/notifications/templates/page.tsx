@@ -1,17 +1,14 @@
 import {
   EmptyState,
-  IconArrowLeft,
   IconClock,
   IconInfo,
   IconLock,
   IconMessageCircle,
   IconPhone,
   IconRefresh,
-  Notice,
   Pill,
   SectionCard,
   ToastProvider,
-  type KitTone,
 } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
@@ -24,7 +21,6 @@ import {
   type StatusView,
   type WhatsAppRow,
 } from "../../../../server/admin/provider-template-views";
-import { NavButton } from "../../../players/nav-button";
 import { RelativeTime } from "../../admin-ui";
 import {
   ClearTemplate,
@@ -34,6 +30,8 @@ import {
   SubmitTemplate,
   UseApprovedName,
 } from "./template-controls";
+import { AdminPageHead } from "../../admin-ui";
+import { NotifySubnav } from "../notify-subnav";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 import "../notifications.css";
@@ -67,19 +65,13 @@ export default async function ProviderTemplatesPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head tpl-page-head">
-            {/* NavButton, not buttonClassName(): a server component. */}
-            <NavButton href="/admin/notifications" variant="ghost" className="tpl-back">
-              <IconArrowLeft size={18} aria-hidden />
-              All notifications
-            </NavButton>
-            <p className="dash-hint">
-              WhatsApp sends only templates Meta has approved, by name. Here you choose which
-              approved name each message uses, see Meta&rsquo;s verdict on it, and submit our
-              wording for approval. A mapping here wins over the server setting; clearing it goes
-              back to the server setting. Every change is on the audit log and can be reverted.
-            </p>
-          </header>
+          <AdminPageHead>
+            <NotifySubnav current="templates" />
+          </AdminPageHead>
+          <p className="admin-lede admin-lede-under">
+            Which Meta-approved template each message uses. A mapping here wins over the server
+            setting; every change is audited.
+          </p>
 
           <SyncCard view={view} />
           <OtpCard view={view} />
@@ -92,17 +84,23 @@ export default async function ProviderTemplatesPage() {
   );
 }
 
-const SOURCE: Record<MappedView["source"], { label: string; tone: KitTone }> = {
-  admin: { label: "Mapped here", tone: "blue" },
-  env: { label: "Server setting", tone: "neutral" },
-  unset: { label: "Not set", tone: "amber" },
+const SOURCE_DOT: Record<MappedView["source"], string | undefined> = {
+  admin: "green",
+  env: undefined,
+  unset: undefined,
+};
+
+const SOURCE: Record<MappedView["source"], { label: string }> = {
+  admin: { label: "Mapped here" },
+  env: { label: "Server setting" },
+  unset: { label: "Not set" },
 };
 
 function SyncCard({ view }: { view: ProviderTemplatesView }) {
   return (
     <SectionCard
       icon={<IconRefresh />}
-      tone="blue"
+      tone="neutral"
       title="Meta status"
       description="What Meta last said about each template. Read on demand, and every six hours by the scheduled job."
       action={view.syncEnabled ? <RefreshFromMeta /> : undefined}
@@ -124,11 +122,16 @@ function SyncCard({ view }: { view: ProviderTemplatesView }) {
           )}
         </p>
       ) : (
-        <Notice tone="info" icon={<IconInfo size={20} />} testId="tpl-sync-disabled">
-          Status sync is off: set <code>WHATSAPP_BUSINESS_ACCOUNT_ID</code> (WhatsApp Manager →
-          Account tools) with the WhatsApp access token to read Meta&rsquo;s approvals and to submit
-          templates from here. Mapping names works without it; the status column stays empty.
-        </Notice>
+        // One quiet line, not a banner: the page had three stacked notices
+        // saying "not set up" in three shades before the first row.
+        <p className="ptpl-note" data-testid="tpl-sync-disabled">
+          <IconInfo size={16} />
+          <span>
+            Status sync is off: set <code>WHATSAPP_BUSINESS_ACCOUNT_ID</code> (WhatsApp Manager →
+            Account tools) with the WhatsApp access token to read Meta&rsquo;s approvals and to
+            submit templates from here. Mapping names works without it.
+          </span>
+        </p>
       )}
     </SectionCard>
   );
@@ -137,8 +140,9 @@ function SyncCard({ view }: { view: ProviderTemplatesView }) {
 function Statuses({ statuses, testId }: { statuses: readonly StatusView[]; testId: string }) {
   if (statuses.length === 0) {
     return (
-      <span className="admin-meta" data-testid={testId}>
-        No status from Meta
+      <span className="admin-zero ptpl-nostatus" data-testid={testId} title="No status from Meta">
+        <span aria-hidden>—</span>
+        <span className="admin-sr-only">No status from Meta</span>
       </span>
     );
   }
@@ -191,12 +195,25 @@ function Mapped({ mapped, testId }: { mapped: MappedView; testId: string }) {
   return (
     <span className="admin-cell-main">
       <span className="ptpl-row-head">
-        <span className="admin-name ptpl-handle" data-testid={testId}>
-          {mapped.handle ?? "None"}
-        </span>
-        <Pill tone={source.tone} testId={`${testId}-source`}>
+        {/* "None" beside "Not set" said one thing twice: with no template the
+            state alone is drawn, and the name is announced as none. */}
+        {mapped.handle === null ? (
+          <span className="admin-sr-only" data-testid={testId}>
+            None
+          </span>
+        ) : (
+          <span className="admin-name ptpl-handle" data-testid={testId}>
+            {mapped.handle}
+          </span>
+        )}
+        <span
+          className="admin-state"
+          data-tone={SOURCE_DOT[mapped.source]}
+          data-testid={`${testId}-source`}
+        >
+          <span className="admin-state-dot" aria-hidden />
           {source.label}
-        </Pill>
+        </span>
       </span>
       {mapped.source === "admin" ? (
         <span className="admin-meta">
@@ -211,8 +228,17 @@ function Mapped({ mapped, testId }: { mapped: MappedView; testId: string }) {
           {mapped.note === null ? null : ` · ${mapped.note}`}
         </span>
       ) : null}
-      <span className="admin-meta">
-        Server setting {mapped.envVar}: {mapped.envValue ?? "unset"}
+      <span
+        className="admin-meta ptpl-env"
+        title={`Server setting ${mapped.envVar}: ${mapped.envValue ?? "unset"}`}
+      >
+        <span className="admin-sr-only">Server setting </span>
+        <code className="admin-env">{mapped.envVar}</code>
+        {mapped.envValue === null ? (
+          <span className="admin-sr-only">: unset</span>
+        ) : (
+          <span>: {mapped.envValue}</span>
+        )}
       </span>
     </span>
   );
@@ -278,7 +304,7 @@ function WhatsAppCard({ view }: { view: ProviderTemplatesView }) {
   return (
     <SectionCard
       icon={<IconMessageCircle />}
-      tone="green"
+      tone="neutral"
       title="WhatsApp templates"
       description="One template name holds both languages. A reader gets their own language where it is approved, else English."
       flush
@@ -286,13 +312,16 @@ function WhatsAppCard({ view }: { view: ProviderTemplatesView }) {
     >
       {view.whatsappConfigured ? null : (
         <div className="ptpl-card-note">
-          <Notice tone="info" icon={<IconInfo size={20} />} testId="tpl-wa-unconfigured">
-            WhatsApp is not set up on this server (no phone number ID or token), so nothing goes on
-            WhatsApp whatever is mapped here.
-          </Notice>
+          <p className="ptpl-note" data-testid="tpl-wa-unconfigured">
+            <IconInfo size={16} />
+            <span>
+              WhatsApp is not set up on this server (no phone number ID or token), so nothing goes
+              on WhatsApp whatever is mapped here.
+            </span>
+          </p>
         </div>
       )}
-      <ul className="admin-rows is-stacked">
+      <ul className="admin-rows ptpl-grid">
         {view.whatsapp.map((row) => (
           <WhatsAppKindRow key={row.kind} row={row} view={view} />
         ))}
@@ -341,13 +370,16 @@ function SmsCard({ view }: { view: ProviderTemplatesView }) {
     >
       {view.smsGateway ? null : (
         <div className="ptpl-card-note">
-          <Notice tone="warning" icon={<IconInfo size={20} />} testId="tpl-sms-dormant">
-            SMS is dormant — DLT is not configured (no MSG91 key). IDs mapped here take effect once
-            it is.
-          </Notice>
+          <p className="ptpl-note" data-testid="tpl-sms-dormant">
+            <IconInfo size={16} />
+            <span>
+              SMS is dormant — DLT is not configured (no MSG91 key). IDs mapped here take effect
+              once it is.
+            </span>
+          </p>
         </div>
       )}
-      <ul className="admin-rows is-stacked">
+      <ul className="admin-rows ptpl-grid">
         {view.sms.map((row) => (
           <SmsKindRow key={row.kind} row={row} />
         ))}
@@ -369,13 +401,14 @@ function RecentCard({ view }: { view: ProviderTemplatesView }) {
       {view.recent.length === 0 ? (
         <div className="admin-card-empty">
           <EmptyState
+            size="compact"
             headingLevel={3}
             title="Nothing changed yet"
             description="Every template still uses the server setting. Mappings and submissions appear here with who made them."
           />
         </div>
       ) : (
-        <ul className="admin-rows is-stacked">
+        <ul className="admin-rows">
           {view.recent.map((change) => (
             <li key={change.id} data-testid={`tpl-change-${change.id}`}>
               <span className="admin-cell-main">

@@ -1,9 +1,9 @@
 import {
-  ButtonLink,
   CardGrid,
   EmptyState,
   IconArrowRight,
   IconClock,
+  IconExternal,
   IconKey,
   IconLedger,
   IconTrophy,
@@ -18,7 +18,15 @@ import Link from "next/link";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { formatCount, lifecycleLabel, maskPersonContact } from "../../../../server/admin/format";
 import type { OrgDetail } from "../../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime, absoluteIst, statusPillTone } from "../../admin-ui";
+import {
+  absoluteIst,
+  AdminPageHead,
+  foldRuns,
+  humanAction,
+  KpiValue,
+  RelativeTime,
+  statusPillTone,
+} from "../../admin-ui";
 
 /**
  * PX-9 §2 — the organization inspector.
@@ -36,47 +44,49 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
   return (
     <>
       <PageTitle title={org.name} />
-      <header className="dash-head admin-head">
-        <div className="admin-head-text">
-          <p className="dash-hint">
-            <span className="admin-id">{org.slug}</span> · created {absoluteIst(org.createdAt)}
-          </p>
-          <p className="admin-meta">
-            The console link needs organizer permissions on this organization; a platform grant
-            confers none.
-          </p>
-        </div>
-        <div className="admin-head-actions">
-          {/* Opens only for someone who also holds org capability HERE —
-              `platform:admin` confers none. Named beside the door rather than
-              discovered as a 404 behind it. */}
-          <ButtonLink href={`/org/${org.slug}`} variant="secondary" data-testid="admin-open-org">
-            Open console
-          </ButtonLink>
-          <ButtonLink href="/admin/orgs" variant="secondary">
-            All organizations
-          </ButtonLink>
-        </div>
-      </header>
-      <ReadOnlyNotice />
+      <AdminPageHead
+        readOnly
+        actions={
+          <>
+            {/* Opens only for someone who also holds org capability HERE —
+                `platform:admin` confers none. Named in its tooltip rather than
+                discovered as a 404 behind it. */}
+            <Link
+              href={`/org/${org.slug}`}
+              className="admin-head-button"
+              data-testid="admin-open-org"
+              title="Needs organizer permissions on this organization; a platform grant confers none."
+            >
+              Open console
+              <IconExternal size={16} />
+            </Link>
+            <Link href="/admin/orgs" className="admin-head-button">
+              All organizations
+            </Link>
+          </>
+        }
+      >
+        <span className="admin-id admin-chip-id">{org.slug}</span>
+        <span className="admin-meta"> · created {absoluteIst(org.createdAt)}</span>
+      </AdminPageHead>
 
       <StatGrid>
         <StatCard
           icon={<IconTrophy />}
-          tone="gold"
-          value={formatCount(competitions.length)}
+          concept="season"
+          value={<KpiValue n={competitions.length} />}
           label="Seasons"
         />
         <StatCard
           icon={<IconUsers />}
-          tone="blue"
-          value={formatCount(members.length)}
+          concept="neutral"
+          value={<KpiValue n={members.length} />}
           label="Members"
         />
         <StatCard
           icon={<IconKey />}
-          tone="purple"
-          value={formatCount(active.length)}
+          concept="neutral"
+          value={<KpiValue n={active.length} />}
           label="Active grants"
         />
         {/* A fact, not a figure: "Yes" in tabular digits read as a number that
@@ -84,8 +94,8 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         <StatCard
           icon={<IconLedger />}
           tone={finance.declared ? "green" : "neutral"}
-          value={finance.declared ? "Declared" : "Not declared"}
-          label="Finance"
+          value={finance.declared ? "Declared" : <span className="admin-zero">None</span>}
+          label="Finance profile"
           {...(finance.declared && finance.posture !== null
             ? { hint: `Posture: ${finance.posture}` }
             : {})}
@@ -101,6 +111,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         {competitions.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No seasons"
               description="This organization has not created one yet."
@@ -108,7 +119,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-org-competitions">
+            <table className="admin-table da-rows" data-testid="admin-org-competitions">
               <thead>
                 <tr>
                   <th scope="col">Season</th>
@@ -127,7 +138,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                         this reader: the public page when the season is public
                         (and not taken down), else the admin auction watch when
                         it has an auction, else just the name. */}
-                    <td data-label="Season">
+                    <td data-label="Season" data-cell="title">
                       {competition.visibility === "public" && !competition.held ? (
                         <Link href={`/c/${competition.slug}`} className="admin-name">
                           {competition.name}
@@ -142,12 +153,21 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                       ) : (
                         <span className="admin-name">{competition.name}</span>
                       )}
+                      {/* The phone's one line: the facts a laptop gives columns. */}
+                      <span className="da-row-meta">
+                        {[
+                          competition.held ? "Taken down" : lifecycleLabel(competition.visibility),
+                          competition.caseStatus === null
+                            ? "No case"
+                            : `Settlement ${lifecycleLabel(competition.caseStatus).toLowerCase()}`,
+                        ].join(" · ")}
+                      </span>
                     </td>
                     {/* Capability SETS are rendered verbatim on purpose; a
                         lifecycle state is not a set. "REGISTRATION_CLOSED" is
                         an un-translated database value, not a name anyone
                         needs to type back. */}
-                    <td data-label="Status">
+                    <td data-label="Status" data-cell="figure">
                       <Pill tone={statusPillTone(competition.status)} dot>
                         {lifecycleLabel(competition.status)}
                       </Pill>
@@ -161,7 +181,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                         </Pill>
                       )}
                     </td>
-                    <td data-label="Auction">
+                    <td data-label="Auction" data-cell="status">
                       {competition.auctionStatus === null || competition.auctionId === null ? (
                         <span className="admin-dash">No auction</span>
                       ) : (
@@ -203,6 +223,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         {grants.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No grants"
               description="Nobody holds authority on this organization."
@@ -210,7 +231,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-org-grants">
+            <table className="admin-table da-rows" data-testid="admin-org-grants">
               <thead>
                 <tr>
                   <th scope="col">Person</th>
@@ -221,15 +242,16 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               <tbody>
                 {grants.map((grant) => (
                   <tr key={grant.id}>
-                    <td data-label="Person">
+                    <td data-label="Person" data-cell="title">
                       <Link href={`/admin/users/${grant.personId}`} className="admin-name">
                         {grant.name ?? grant.personId.slice(-6)}
                       </Link>
+                      <span className="da-row-meta">{grant.capabilitySet}</span>
                     </td>
                     <td data-label="Capability set">
                       <span className="admin-action">{grant.capabilitySet}</span>
                     </td>
-                    <td data-label="State">
+                    <td data-label="State" data-cell="figure">
                       {grant.revokedAt === null ? (
                         <Pill tone="green" dot>
                           Active
@@ -250,7 +272,12 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         <SectionCard icon={<IconUsers />} tone="blue" title="Members" flush>
           {members.length === 0 ? (
             <div className="admin-card-empty">
-              <EmptyState headingLevel={3} title="No members" description="Nobody has joined." />
+              <EmptyState
+                size="compact"
+                headingLevel={3}
+                title="No members"
+                description="Nobody has joined."
+              />
             </div>
           ) : (
             <ul className="admin-rows" data-testid="admin-org-members">
@@ -297,22 +324,28 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
           {activity.length === 0 ? (
             <div className="admin-card-empty">
               <EmptyState
+                size="compact"
                 headingLevel={3}
                 title="Nothing yet"
                 description="No audited action on this organization."
               />
             </div>
           ) : (
-            <ul className="admin-rows">
-              {activity.map((row) => (
-                <li key={row.id}>
-                  <span>
-                    <span className="admin-action">{row.action}</span>
-                    <span className="admin-meta"> by {row.actorName ?? row.actor.slice(-6)}</span>
-                  </span>
-                  <RelativeTime at={row.at} />
-                </li>
-              ))}
+            <ul className="admin-rows admin-rows-dense">
+              {foldRuns(activity, (a, b) => a.action === b.action && a.actor === b.actor).map(
+                ({ row, count }) => (
+                  <li key={row.id}>
+                    <span className="admin-activity-line">
+                      <span className="admin-activity-what" title={row.action}>
+                        {humanAction(row.action)}
+                      </span>
+                      {count > 1 ? <span className="admin-times">×{count}</span> : null}
+                      <span className="admin-meta"> by {row.actorName ?? row.actor.slice(-6)}</span>
+                    </span>
+                    <RelativeTime at={row.at} />
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </SectionCard>

@@ -35,6 +35,9 @@ export interface PublicShellProps {
   headerAction?: ReactNode;
   /** Primary destination inside the small-screen navigation. */
   mobileAction?: PublicShellLink;
+  /** Site search, offered first in the small-screen navigation (the header's
+      search control is desktop-only). */
+  mobileSearchHref?: string;
   footerLinks?: PublicShellLink[];
   /** Columned footer (preferred). When present, `footerLinks` is ignored. */
   footerGroups?: PublicShellFooterGroup[];

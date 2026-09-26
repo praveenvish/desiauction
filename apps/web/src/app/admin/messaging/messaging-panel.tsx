@@ -1,9 +1,17 @@
-import { EmptyState, IconFileCheck, IconLock, IconSend, Pill, SectionCard } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconFileCheck,
+  IconLock,
+  IconMessageCircle,
+  IconSend,
+  Pill,
+  SectionCard,
+} from "@desiauction/ui";
 
-import { maskContact } from "../../../server/admin/format";
+import { formatCount, maskContact } from "../../../server/admin/format";
 import type { MessagingOverview } from "../../../server/admin/views";
 import { NavButton } from "../../players/nav-button";
-import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
+import { RelativeTime, TableCount } from "../admin-ui";
 
 /**
  * Can this deployment actually text anyone, and who must it never text?
@@ -24,13 +32,11 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
   const allConfigured = overview.configured === overview.total;
   return (
     <>
-      <ReadOnlyNotice />
-
       <SectionCard
         icon={<IconFileCheck />}
         tone={allConfigured ? "green" : "red"}
         title="Registered templates"
-        description="DLT registration for every message shape, and the sentence each one sends."
+        description="DLT registration per message shape; open a row for its exact text"
         action={
           <Pill tone={allConfigured ? "green" : "red"} dot testId="admin-templates-verdict">
             {allConfigured
@@ -47,7 +53,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
           </p>
         )}
         <div className="admin-table-wrap">
-          <table className="admin-table" data-testid="admin-template-table">
+          <table className="admin-table da-rows" data-testid="admin-template-table">
             <thead>
               <tr>
                 <th scope="col">Message</th>
@@ -58,26 +64,38 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
             <tbody>
               {overview.templates.map((row) => (
                 <tr key={row.key} data-testid={`admin-template-${row.key}`}>
-                  <td data-label="Message">
+                  <td data-label="Message" data-cell="title">
                     <span className="admin-cell-main">
-                      <span className="admin-name">{row.key}</span>
-                      <span className="admin-meta">
-                        {row.channel} · {row.category} · {row.locale}
-                      </span>
-                      {/* The registered sentence, verbatim. The gateway matches
-                          it character for character — a template whose text
-                          has drifted from its registration is rejected at the
-                          provider, not here. */}
-                      <span className="admin-meta">{row.body}</span>
+                      <span className="admin-name admin-mono-key">{row.key}</span>
+                      {/* The registered sentence, verbatim — folded behind the
+                          key. The gateway matches it character for character,
+                          so it is kept whole, one click away. */}
+                      <details className="admin-log-meta admin-tpl-body">
+                        <summary>
+                          <span className="admin-sr-only">Registered text: </span>
+                          {row.channel} · {row.category} · {row.locale} · {row.body}
+                        </summary>
+                        <p className="admin-meta">{row.body}</p>
+                        {/* A phone drops the variable column (round 3C: it ran
+                            three lines per row); opening the row names it. */}
+                        <p className="admin-meta admin-tpl-env-phone">
+                          Set by <code className="admin-env">{row.variable}</code>
+                        </p>
+                      </details>
                     </span>
                   </td>
-                  <td data-label="Status">
-                    <Pill tone={row.configured ? "green" : "red"} dot>
+                  <td data-label="Status" data-cell="figure">
+                    {/* The verdict pill in the card head already says how many;
+                        a row says its own state as a dot and a word. */}
+                    <span className="admin-state" data-tone={row.configured ? "green" : "red"}>
+                      <span className="admin-state-dot" aria-hidden />
                       {row.configured ? "Registered" : "Missing"}
-                    </Pill>
+                    </span>
                   </td>
                   <td data-label="Environment variable" className="is-wide">
-                    <code className="admin-meta">{row.variable}</code>
+                    <code className="admin-env" title={row.variable}>
+                      {row.variable}
+                    </code>
                   </td>
                 </tr>
               ))}
@@ -88,14 +106,15 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
 
       <SectionCard
         icon={<IconSend />}
-        tone="blue"
+        tone="neutral"
         title="Delivery by message"
-        description={`The last ${String(overview.deliveryWindowDays)} days, counted from the audit rows the sender writes — not from a separate counter that could drift from them.`}
+        description={`Last ${String(overview.deliveryWindowDays)} days, counted from the sender's own audit rows`}
         flush
       >
         {overview.delivery.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="Nothing sent yet"
               description="Decision notices appear here once an organizer approves, waitlists or declines somebody."
@@ -103,7 +122,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-stack="3" data-testid="admin-delivery-table">
+            <table className="admin-table da-rows" data-testid="admin-delivery-table">
               <thead>
                 <tr>
                   <th scope="col">Message</th>
@@ -121,21 +140,29 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
               <tbody>
                 {overview.delivery.map((row) => (
                   <tr key={row.template}>
-                    <td data-label="Message">
-                      <span className="admin-name">{row.template}</span>
+                    <td data-label="Message" data-cell="title">
+                      <span className="admin-name admin-mono-key">{row.template}</span>
+                      {/* The phone's one line under the key. */}
+                      <span className="da-row-meta">
+                        Failed {formatCount(row.failed)} · Suppressed {formatCount(row.suppressed)}
+                      </span>
                     </td>
-                    <td data-label="Sent" className="admin-count admin-num">
-                      {String(row.sent)}
+                    <td data-label="Sent" className="admin-count admin-num" data-cell="figure">
+                      <TableCount n={row.sent} />
                     </td>
                     {/* Failed is a delivery problem. Suppressed is the gate
                         working — somebody said stop, or a club switched the
                         topic off. Folding them together would send an operator
                         chasing an outage that is not happening. */}
                     <td data-label="Failed" className="admin-count admin-num">
-                      {row.failed === 0 ? "0" : <strong>{String(row.failed)}</strong>}
+                      {row.failed === 0 ? (
+                        <TableCount n={0} />
+                      ) : (
+                        <strong className="admin-bad">{formatCount(row.failed)}</strong>
+                      )}
                     </td>
                     <td data-label="Suppressed" className="admin-count admin-num">
-                      {String(row.suppressed)}
+                      <TableCount n={row.suppressed} />
                     </td>
                   </tr>
                 ))}
@@ -146,19 +173,19 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
       </SectionCard>
 
       <SectionCard
-        icon={<IconSend />}
-        tone={overview.whatsapp.failed > 0 ? "red" : "blue"}
+        icon={<IconMessageCircle />}
+        tone={overview.whatsapp.failed > 0 ? "red" : "neutral"}
         title="WhatsApp delivery"
-        description={`The last ${String(overview.deliveryWindowDays)} days, from Meta's own callbacks: what reached a phone, what was opened, what Meta gave up on. A pile of "awaiting" with nothing delivered means the callback URL is not subscribed.`}
+        description={`Last ${String(overview.deliveryWindowDays)} days, from Meta's callbacks. All "awaiting" and nothing delivered means the callback URL is not subscribed.`}
       >
         <div className="admin-chips" data-testid="admin-whatsapp-delivery">
           <Pill tone="neutral">
             awaiting <span className="admin-count">{String(overview.whatsapp.awaiting)}</span>
           </Pill>
-          <Pill tone="green">
+          <Pill tone={overview.whatsapp.delivered > 0 ? "green" : "neutral"}>
             delivered <span className="admin-count">{String(overview.whatsapp.delivered)}</span>
           </Pill>
-          <Pill tone="green">
+          <Pill tone={overview.whatsapp.read > 0 ? "green" : "neutral"}>
             read <span className="admin-count">{String(overview.whatsapp.read)}</span>
           </Pill>
           <Pill tone={overview.whatsapp.failed > 0 ? "red" : "neutral"}>
@@ -178,17 +205,20 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
         icon={<IconLock />}
         tone="neutral"
         title="Suppression list"
-        description="Contacts we must not send to."
-        action={
-          <span className="admin-chips">
-            <Pill tone="neutral" testId="admin-suppression-count">
+        description={
+          <>
+            <span className="admin-count" data-testid="admin-suppression-count">
               {String(overview.liveSuppressions)}
-            </Pill>
-            <NavButton href="/admin/notifications/suppressions" variant="ghost">
-              Manage
-              <span className="admin-sr-only"> suppressions</span>
-            </NavButton>
-          </span>
+            </span>{" "}
+            contacts we must not send to · newest {String(Math.min(5, overview.recent.length))}{" "}
+            shown
+          </>
+        }
+        action={
+          <NavButton href="/admin/notifications/suppressions" variant="ghost">
+            Manage all
+            <span className="admin-sr-only"> suppressions</span>
+          </NavButton>
         }
         flush
       >
@@ -211,6 +241,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
         {overview.recent.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="Nobody is suppressed"
               description="Numbers that text STOP, and addresses that bounce or complain, appear here."
@@ -218,7 +249,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-suppression-table">
+            <table className="admin-table da-rows" data-testid="admin-suppression-table">
               <thead>
                 <tr>
                   <th scope="col">Contact</th>
@@ -228,30 +259,36 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                 </tr>
               </thead>
               <tbody>
-                {overview.recent.map((row) => (
+                {/* The newest five; the desk owns the whole list. */}
+                {overview.recent.slice(0, 5).map((row) => (
                   <tr key={`${row.channel}:${row.contact}:${row.createdAt.toISOString()}`}>
                     {/* Masked, like every other contact on this surface.
                         Administration needs to see THAT a contact is
                         suppressed and why; it does not need the contact. */}
-                    <td data-label="Contact">
+                    <td data-label="Contact" data-cell="title">
                       <span className="admin-cell-main">
                         <span className="admin-name" data-private>
                           {maskContact(row.contact)}
                         </span>
-                        <span className="admin-meta">{row.channel}</span>
+                        <span className="admin-meta">
+                          {row.channel}
+                          <span className="da-row-meta admin-inline-meta"> · {row.scope}</span>
+                        </span>
                       </span>
                     </td>
-                    <td data-label="Reason">
-                      <Pill
-                        tone={
-                          row.reason === "bounce" || row.reason === "complaint" ? "red" : "neutral"
+                    <td data-label="Reason" data-cell="status">
+                      <span
+                        className="admin-state"
+                        data-tone={
+                          row.reason === "bounce" || row.reason === "complaint" ? "red" : undefined
                         }
                       >
+                        <span className="admin-state-dot" aria-hidden />
                         {row.reason}
-                      </Pill>
+                      </span>
                     </td>
                     <td data-label="Topic">{row.scope}</td>
-                    <td data-label="Since">
+                    <td data-label="Since" data-cell="figure">
                       <RelativeTime at={row.createdAt} />
                     </td>
                   </tr>

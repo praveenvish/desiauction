@@ -2,27 +2,21 @@
    the page frame; everything here is specific to booking. */
 
 .demo-steps {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin: var(--space-6) 0;
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
   padding: 0;
   list-style: none;
   counter-reset: demo-step;
 }
 
-/* The content layout indents every prose list (`.cl-prose ol`), which outranks
-   the bare class above and pushed the numbered steps right of the page's text. */
-.cl-prose .demo-steps {
-  padding-left: 0;
-}
-
+/* A vertical timeline: numbered discs joined by a hairline. */
 .demo-steps li {
   position: relative;
-  padding-left: var(--space-8);
+  padding-left: 40px;
   color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  line-height: 1.6;
+  font-size: 0.9375rem;
+  line-height: 1.55;
   counter-increment: demo-step;
 }
 
@@ -34,23 +28,45 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--accent-subtle);
-  color: var(--text-accent);
-  font-family: var(--font-display);
-  font-size: var(--text-xs-size);
+  color: var(--accent-ink);
+  font-family: var(--font-text);
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.demo-steps li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 32px;
+  bottom: calc(var(--space-4) * -1 + 4px);
+  width: 2px;
+  background: var(--border-subtle);
 }
 
 .demo-steps li strong {
-  color: var(--text-primary);
-  font-weight: 500;
+  display: block;
+  color: var(--text-heading);
+  font-weight: 600;
 }
 
 .demo-footnote {
-  margin-top: var(--space-8);
+  color: var(--text-muted);
   font-size: var(--text-sm-size);
+}
+
+/* The form is the page's one job: it sits on a raised card in the main
+   column, the timeline and the "just start" card beside it. */
+.demo-form-card {
+  padding: clamp(var(--space-5), 3vw, var(--space-8));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-2);
 }
 
 /* ---- The picker ------------------------------------------------------- */

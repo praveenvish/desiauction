@@ -5,6 +5,7 @@ import { recordAdminAccess } from "../../../server/admin/access-log";
 import { platformSupportGate } from "../../../server/admin/authz";
 import { reviewDesk } from "../../../server/admin/review-views";
 import { ReviewDeskPanel } from "./review-desk-panel";
+import { AdminPageHead } from "../admin-ui";
 import "../../seasons/seasons.css";
 import "../admin.css";
 import "./reviews.css";
@@ -30,14 +31,9 @@ export default async function AdminReviewsPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head">
-            <p className="dash-hint">
-              Ask the people who ran a tournament how it went, then publish the reviews worth
-              standing behind. A published review is only ever quoted if its author said we may —
-              and a published platform review that may be quoted appears on the home page, newest
-              first, exactly as written.
-            </p>
-          </header>
+          <AdminPageHead>
+            Ask organizers how it went, then publish the reviews worth standing behind.
+          </AdminPageHead>
           <ReviewDeskPanel desk={desk} />
         </div>
       </main>

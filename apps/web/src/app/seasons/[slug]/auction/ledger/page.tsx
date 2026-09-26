@@ -1,4 +1,15 @@
-import { ButtonLink, PlayerImage } from "@desiauction/ui";
+import {
+  ButtonLink,
+  EmptyState,
+  IconClock,
+  IconGavel,
+  Pager,
+  PlayerImage,
+  Toolbar,
+  ToolbarCount,
+  ToolbarSpacer,
+} from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ledgerView } from "../../../../../server/auction/conduct-actions";
@@ -17,17 +28,21 @@ export const metadata = { title: "Auction ledger · DesiAuction" };
 // Sequence · timestamp · actor · paddle · team · lot · bid · result · reason ·
 // correlation. Server-rendered; there is nothing to mutate.
 
-function resultClass(result: string): string {
+/** The result as a tone: a status pill's dot colour. Words stay in ink. */
+function resultTone(result: string): "sold" | "undo" | "rejected" | "unsold" | "neutral" {
   if (result === "SOLD") {
-    return "ledger-result-sold";
+    return "sold";
   }
   if (result.startsWith("UNDO") || result === "Bid voided") {
-    return "ledger-result-undo";
+    return "undo";
   }
   if (result === "Bid rejected") {
-    return "ledger-result-rejected";
+    return "rejected";
   }
-  return "";
+  if (result === "UNSOLD" || result === "Lot withdrawn") {
+    return "unsold";
+  }
+  return "neutral";
 }
 
 export default async function LedgerPage({
@@ -53,38 +68,61 @@ export default async function LedgerPage({
       page: String(n),
     }).toString()}`;
   return (
-    <main className="registrations-dash">
+    <main className="registrations-dash ledger-page">
       <div className="dash-stack">
-        <header className="dash-head">
-          <div className="competition-title-row title-row-actions">
-            <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="secondary">
+        {/* ONE ROW (wow pass). The head used to stack three bands: two buttons,
+            a technical sentence, then the chips. Now: the readings on the
+            left, the count and the audit switch, then the two sibling views. */}
+        <Toolbar className="ledger-toolbar">
+          <LedgerFilters
+            raw={rawFilter ?? ""}
+            active={view.filter}
+            counts={{ [view.filter]: view.filteredRows }}
+          />
+          <ToolbarSpacer />
+          <ToolbarCount>
+            <span
+              data-testid="ledger-meta"
+              title={`${view.auctionName} — regenerated from the event log in ${view.generationMs.toFixed(1)} ms`}
+            >
+              {view.filter === "all"
+                ? `${String(view.totalRows)} rows`
+                : `${String(view.filteredRows)} of ${String(view.totalRows)} rows`}{" "}
+              · as recorded
+            </span>
+          </ToolbarCount>
+          {/* Actor, paddle, reason and correlation are the DISPUTE columns,
+              read at a desk when a bid is contested. Off by default; a CSS-only
+              switch (no script), so the server page stays a server page. */}
+          <label className="ledger-audit-toggle">
+            <input type="checkbox" id="ledger-audit" className="ledger-audit-input" />
+            <span className="ledger-audit-track" aria-hidden />
+            Audit columns
+          </label>
+          <span className="ledger-views">
+            <ButtonLink href={`/seasons/${slug}/auction/cockpit`} variant="ghost" size="sm">
+              <IconGavel size={16} />
               Cockpit
             </ButtonLink>
             {/* The ledger and the replay viewer are two readings of the same
                 event log and neither knew the other existed. */}
-            <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="secondary">
+            <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="ghost" size="sm">
+              <IconClock size={16} />
               Replay viewer
             </ButtonLink>
-          </div>
-          <p className="competitions-hint" data-testid="ledger-meta">
-            {view.auctionName} · {view.totalRows} rows
-            {view.filter === "all" ? "" : ` (${String(view.filteredRows)} shown)`} · regenerated
-            from the event log in {view.generationMs.toFixed(1)} ms · immutable, append-only
-          </p>
-          <LedgerFilters raw={parseLedgerFilter(filter) ?? ""} active={view.filter} />
-        </header>
-        <div className="table-scroll">
-          <table className="reg-table" data-testid="ledger-table">
+          </span>
+        </Toolbar>
+        <div className="ledger-scroll">
+          <table className="ledger-grid" data-testid="ledger-table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Time</th>
+                <th className="ledger-c-seq">#</th>
+                <th className="ledger-c-time">Time</th>
                 <th className="ledger-col-minor">Actor</th>
-                <th className="ledger-col-minor">Paddle</th>
-                <th>Team</th>
-                <th>Lot</th>
-                <th>Bid</th>
-                <th>Result</th>
+                <th className="ledger-c-lot">Lot</th>
+                <th className="ledger-c-team">Team</th>
+                <th className="ledger-c-bid">Bid</th>
+                <th className="ledger-c-result">Result</th>
                 <th className="ledger-col-minor">Reason</th>
                 <th className="ledger-col-minor">Correlation</th>
               </tr>
@@ -92,32 +130,33 @@ export default async function LedgerPage({
             <tbody>
               {view.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} data-testid="ledger-empty">
-                    {view.filter === "bids"
-                      ? "No bids yet."
-                      : view.filter === "results"
-                        ? "No results yet — the first sale will land here."
-                        : "Nothing on the record yet."}
+                  <td colSpan={9} data-testid="ledger-empty" className="ledger-empty">
+                    <EmptyState
+                      size="compact"
+                      icon={<IconGavel />}
+                      title={
+                        view.filter === "bids"
+                          ? "No bids yet"
+                          : view.filter === "results"
+                            ? "No results yet"
+                            : "Nothing on the record yet"
+                      }
+                      {...(view.filter === "results"
+                        ? { description: "The first sale will land here." }
+                        : {})}
+                    />
                   </td>
                 </tr>
               ) : null}
               {view.rows.map((row) => (
-                /* `.reg-table` hides its `thead` below 1100px and restores the
-                   headings through `td::before { content: attr(data-label) }`
-                   (seasons.css). Ten unlabelled cells is an audit record nobody
-                   can read on a laptop — and this one is the evidence surface
-                   for a disputed bid. */
+                /* On a phone the row is a two-line list item (lot + result
+                   over time · team · bid) — never a stack of labelled cells:
+                   seven labels per row made a finished ledger ~125pt a row. */
                 <tr key={row.seq} data-testid={`ledger-row-${String(row.seq)}`}>
-                  <td data-label="#">{row.seq}</td>
-                  <td data-label="Time">{formatTime(row.atMs)}</td>
-                  <td data-label="Actor" className="ledger-col-minor">
-                    {row.actorName}
-                  </td>
-                  <td data-label="Paddle" className="ledger-col-minor">
-                    {row.paddleNumber ?? "—"}
-                  </td>
-                  <td data-label="Team">{row.teamName ?? "—"}</td>
-                  <td data-label="Lot">
+                  <td className="ledger-c-seq">{row.seq}</td>
+                  <td className="ledger-c-time">{formatTime(row.atMs)}</td>
+                  <td className="ledger-col-minor">{row.actorName}</td>
+                  <td className="ledger-c-lot">
                     {row.lotNumber !== null ? (
                       <span className="ledger-lot">
                         <PlayerImage
@@ -128,24 +167,39 @@ export default async function LedgerPage({
                           shape="round"
                           decorative
                         />
-                        {`${row.lotNumber} ${row.playerName ?? ""}`}
+                        <span className="ledger-lot-code">{row.lotNumber}</span>
+                        <span className="ledger-lot-name">{row.playerName ?? ""}</span>
                       </span>
                     ) : (
-                      "—"
+                      <span className="ledger-none">—</span>
                     )}
                   </td>
-                  <td data-label="Bid">{row.amount !== null ? money.ledger(row.amount) : "—"}</td>
-                  <td data-label="Result" className={resultClass(row.result)}>
-                    {row.result}
+                  <td className="ledger-c-team">
+                    {row.teamName !== null ? (
+                      <span className="ledger-team">
+                        {row.paddleNumber !== null ? (
+                          <span className="ledger-paddle">{row.paddleNumber}</span>
+                        ) : null}
+                        <span className="ledger-team-name">{row.teamName}</span>
+                      </span>
+                    ) : (
+                      <span className="ledger-none">—</span>
+                    )}
                   </td>
-                  <td data-label="Reason" className="ledger-col-minor">
-                    {row.reason ?? "—"}
+                  <td className="ledger-c-bid">
+                    {row.amount !== null ? (
+                      money.ledger(row.amount)
+                    ) : (
+                      <span className="ledger-none">—</span>
+                    )}
                   </td>
-                  <td
-                    data-label="Correlation"
-                    className="ledger-col-minor"
-                    title={row.correlationId}
-                  >
+                  <td className="ledger-c-result">
+                    <span className="ledger-result" data-tone={resultTone(row.result)}>
+                      {row.result}
+                    </span>
+                  </td>
+                  <td className="ledger-col-minor">{row.reason ?? "—"}</td>
+                  <td className="ledger-col-minor" title={row.correlationId}>
                     {row.correlationId.slice(-6)}
                   </td>
                 </tr>
@@ -158,25 +212,17 @@ export default async function LedgerPage({
             guarantee is that it regenerates from the log; only the render is
             bounded. */}
         {view.totalPages > 1 ? (
-          <nav className="pager" aria-label="Ledger pages">
-            {view.page > 1 ? (
-              <ButtonLink href={pageHref(view.page - 1)} variant="ghost">
-                Previous
-              </ButtonLink>
-            ) : (
-              <span />
-            )}
-            <span data-testid="ledger-page-indicator">
-              Page {view.page} of {view.totalPages}
-            </span>
-            {view.page < view.totalPages ? (
-              <ButtonLink href={pageHref(view.page + 1)} variant="ghost">
-                Next
-              </ButtonLink>
-            ) : (
-              <span />
-            )}
-          </nav>
+          <Pager
+            label="Ledger pages"
+            total={view.filteredRows}
+            page={view.page}
+            pageCount={view.totalPages}
+            shown={view.rows.length}
+            noun="rows"
+            hrefFor={pageHref}
+            linkComponent={Link}
+            summaryTestId="ledger-page-indicator"
+          />
         ) : null}
       </div>
     </main>

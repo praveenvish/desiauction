@@ -1,17 +1,12 @@
 import {
-  ButtonLink,
-  CardGrid,
   EmptyState,
   IconArrowRight,
   IconClock,
   IconKey,
   IconLayers,
-  IconLock,
   IconTrophy,
   Pill,
   SectionCard,
-  StatCard,
-  StatGrid,
 } from "@desiauction/ui";
 import { roleLabelIn, sportPackFor } from "@desiauction/core";
 import Link from "next/link";
@@ -20,7 +15,15 @@ import { PageTitle } from "../../../../components/shell/page-title";
 import { personContact } from "../../../../lib/person-label";
 import { formatCount } from "../../../../server/admin/format";
 import type { UserDetail } from "../../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime, absoluteIst } from "../../admin-ui";
+import {
+  AdminPageHead,
+  RelativeTime,
+  absoluteIst,
+  foldRuns,
+  humanAction,
+  monogram,
+} from "../../admin-ui";
+import { CopyId } from "../../copy-id";
 
 /**
  * PX-9 §3 — the user inspector.
@@ -38,48 +41,56 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
   return (
     <>
       <PageTitle title={person.name ?? "Unnamed"} />
-      <header className="dash-head admin-head">
-        <div className="admin-head-text">
+      <AdminPageHead
+        readOnly
+        actions={
+          <Link href="/admin/users" className="admin-head-button">
+            All users
+          </Link>
+        }
+      />
+
+      {/* One profile card instead of a grey lede plus three one-third tiles
+          (one of them a large "0"). */}
+      <section className="admin-profile" aria-label="Profile">
+        <span className="admin-monogram is-lg" aria-hidden>
+          {monogram(person.name)}
+        </span>
+        <span className="admin-profile-main">
           {/* The ONE surface that shows the whole number — an operator arrived
               here on purpose, for one person. The directory shows four digits.
               `data-private` paints it over in a Report-a-problem screenshot. */}
-          <p className="dash-hint">
-            <span data-private>{personContact(person)}</span> ·{" "}
-            <span className="admin-id">{person.id}</span> · joined {absoluteIst(person.createdAt)}
-          </p>
-        </div>
-        <div className="admin-head-actions">
-          <ButtonLink href="/admin/users" variant="secondary">
-            All users
-          </ButtonLink>
-        </div>
-      </header>
-      <ReadOnlyNotice />
-
-      <StatGrid>
-        <StatCard
-          icon={<IconLayers />}
-          tone="blue"
-          value={formatCount(orgs.length)}
-          label="Organizations"
-        />
-        <StatCard
-          icon={<IconKey />}
-          tone="green"
-          value={formatCount(active.length)}
-          label="Active grants"
-        />
-        <StatCard
-          icon={<IconLock />}
-          tone="neutral"
-          value={formatCount(grants.length - active.length)}
-          label="Revoked grants"
-        />
-      </StatGrid>
+          <span className="admin-profile-name">{person.name ?? "Unnamed"}</span>
+          <span className="admin-profile-contact" data-private>
+            {personContact(person)}
+          </span>
+          <span className="admin-meta admin-profile-id">
+            <span className="admin-id admin-chip-id">{person.id}</span>
+            <CopyId value={person.id} label="user id" />
+            <span>· joined {absoluteIst(person.createdAt)}</span>
+          </span>
+        </span>
+        <dl className="admin-profile-stats">
+          <div>
+            <dt>Organizations</dt>
+            <dd data-zero={orgs.length === 0 || undefined}>{formatCount(orgs.length)}</dd>
+          </div>
+          <div>
+            <dt>Active grants</dt>
+            <dd data-zero={active.length === 0 || undefined}>{formatCount(active.length)}</dd>
+          </div>
+          <div>
+            <dt>Revoked grants</dt>
+            <dd data-zero={grants.length === active.length || undefined}>
+              {formatCount(grants.length - active.length)}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       <SectionCard
         icon={<IconKey />}
-        tone="purple"
+        tone="neutral"
         title="Grants"
         description="Every grant this person holds, in every scope, as the capability set it is."
         flush
@@ -87,6 +98,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
         {grants.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No grants"
               description="This person holds no authority anywhere on the platform."
@@ -94,7 +106,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table" data-testid="admin-user-grants">
+            <table className="admin-table da-rows" data-testid="admin-user-grants">
               <thead>
                 <tr>
                   <th scope="col">Scope</th>
@@ -106,10 +118,14 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
               <tbody>
                 {grants.map((grant) => (
                   <tr key={grant.id}>
-                    <td data-label="Scope">
+                    <td data-label="Scope" data-cell="title">
                       <span className="admin-cell-main">
                         <span className="admin-name">{grant.scopeLabel}</span>
                         <span className="admin-meta">{grant.scopeType}</span>
+                      </span>
+                      {/* The phone's one line under the scope. */}
+                      <span className="da-row-meta">
+                        {grant.scopeType} · {grant.capabilitySet} · {absoluteIst(grant.createdAt)}
                       </span>
                     </td>
                     <td data-label="Capability set">
@@ -132,7 +148,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                         </span>
                       </span>
                     </td>
-                    <td data-label="State">
+                    <td data-label="State" data-cell="figure">
                       {grant.revokedAt === null ? (
                         <Pill tone="green" dot>
                           Active
@@ -149,61 +165,65 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
         )}
       </SectionCard>
 
-      {/* PI-1 P6: the person's participations — read-only, no prices (money
-          surfaces stay with the money capabilities). */}
-      <SectionCard icon={<IconTrophy />} title="Seasons played" flush>
-        {detail.seasons.length === 0 ? (
-          <div className="admin-card-empty">
-            <EmptyState
-              headingLevel={3}
-              title="No registrations"
-              description="This person has joined no season."
-            />
-          </div>
-        ) : (
-          <ul className="admin-rows" data-testid="admin-user-seasons">
-            {detail.seasons.map((season, index) => (
-              <li key={index}>
-                <span className="admin-cell-main">
-                  <span className="admin-name">{season.competitionName}</span>
-                  <span className="admin-meta">
-                    {season.orgName}
-                    {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
-                    {roleLabelIn(sportPackFor(season.sport), season.role)}
-                  </span>
-                </span>
-                <Pill tone="neutral">{season.status}</Pill>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
+      {/* Two columns that end together: what this person belongs to on the
+          left (seasons, then clubs), what they did on the right. */}
+      <div className="admin-split">
+        <div className="admin-split-col">
+          {/* PI-1 P6: the person's participations — read-only, no prices (money
+              surfaces stay with the money capabilities). */}
+          <SectionCard
+            icon={<IconTrophy />}
+            title="Seasons played"
+            description={
+              detail.seasons.length === 0 ? "None — this person has joined no season" : undefined
+            }
+            flush={detail.seasons.length > 0}
+          >
+            {detail.seasons.length === 0 ? undefined : (
+              <ul className="admin-rows" data-testid="admin-user-seasons">
+                {detail.seasons.map((season, index) => (
+                  <li key={index}>
+                    <span className="admin-cell-main">
+                      <span className="admin-name">{season.competitionName}</span>
+                      <span className="admin-meta">
+                        {season.orgName}
+                        {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
+                        {roleLabelIn(sportPackFor(season.sport), season.role)}
+                      </span>
+                    </span>
+                    <Pill tone="neutral">{season.status}</Pill>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
 
-      <CardGrid>
-        <SectionCard icon={<IconLayers />} tone="blue" title="Organizations" flush>
-          {orgs.length === 0 ? (
-            <div className="admin-card-empty">
-              <EmptyState
-                headingLevel={3}
-                title="No memberships"
-                description="This person belongs to no organization."
-              />
-            </div>
-          ) : (
-            <ul className="admin-rows" data-testid="admin-user-orgs">
-              {orgs.map((org) => (
-                <li key={org.slug}>
-                  <span>
-                    <Link href={`/admin/orgs/${org.slug}`} className="admin-name">
-                      {org.name}
-                    </Link>
-                  </span>
-                  <RelativeTime at={org.joinedAt} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
+          <SectionCard icon={<IconLayers />} tone="blue" title="Organizations" flush>
+            {orgs.length === 0 ? (
+              <div className="admin-card-empty">
+                <EmptyState
+                  size="compact"
+                  headingLevel={3}
+                  title="No memberships"
+                  description="This person belongs to no organization."
+                />
+              </div>
+            ) : (
+              <ul className="admin-rows" data-testid="admin-user-orgs">
+                {orgs.map((org) => (
+                  <li key={org.slug}>
+                    <span>
+                      <Link href={`/admin/orgs/${org.slug}`} className="admin-name">
+                        {org.name}
+                      </Link>
+                    </span>
+                    <RelativeTime at={org.joinedAt} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        </div>
         <SectionCard
           icon={<IconClock />}
           tone="neutral"
@@ -223,23 +243,29 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
           {activity.length === 0 ? (
             <div className="admin-card-empty">
               <EmptyState
+                size="compact"
                 headingLevel={3}
                 title="Nothing yet"
                 description="This person has taken no audited action."
               />
             </div>
           ) : (
-            <ul className="admin-rows">
-              {activity.map((row) => (
+            <ul className="admin-rows admin-rows-dense">
+              {foldRuns(activity, (a, b) => a.action === b.action).map(({ row, count }) => (
                 <li key={row.id}>
-                  <span className="admin-action">{row.action}</span>
+                  <span className="admin-activity-line">
+                    <span className="admin-activity-what" title={row.action}>
+                      {humanAction(row.action)}
+                    </span>
+                    {count > 1 ? <span className="admin-times">×{count}</span> : null}
+                  </span>
                   <RelativeTime at={row.at} />
                 </li>
               ))}
             </ul>
           )}
         </SectionCard>
-      </CardGrid>
+      </div>
     </>
   );
 }

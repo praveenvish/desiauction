@@ -42,13 +42,13 @@
   align-items: center;
   gap: var(--space-2);
   margin: 0 0 var(--space-4);
-  font-family: var(--font-mono);
+  color: var(--text-accent);
+  font-family: var(--font-text);
   font-size: var(--text-xs-size);
   line-height: var(--text-xs-line);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-accent);
 }
 
 .mk-kicker::before {
@@ -2091,7 +2091,8 @@ body:has(.landing.mk) .mk-hero {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  font-family: var(--font-mono);
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
   font-size: var(--text-xs-size);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -3652,3 +3653,418 @@ body:has(.landing.mk) .mk-hero {
  * hover state keeps the lift and the emblem's halo — polish that does not hide
  * anything to earn itself.
  */
+
+/* --- /pricing, wow pass (2026-09-25) -----------------------------------------------
+   ONE content width for the whole page (the container's), where the callout,
+   cards, table, pledge and FAQ used to sit at 760 / 1160 / 900 / 900 / 720 and
+   the left edge wandered four times. Tighter vertical rhythm, the pledge as a
+   slim row under the tiers, and the FAQ beside the committee notes. */
+
+.mk-pricing-page .mk-band:first-child {
+  padding-block: clamp(var(--space-8), 5vw, var(--space-12))
+    clamp(var(--space-10), 5vw, var(--space-16));
+}
+
+.mk-pricing-page .mk-promise {
+  max-width: none;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-xl);
+}
+
+.mk-pricing-page .mk-promise-body {
+  margin-top: var(--space-1);
+}
+
+.mk-pricing-page .mk-tiers {
+  margin-bottom: var(--space-4);
+}
+
+.mk-pricing-page .mk-pledge {
+  max-width: none;
+  align-items: center;
+  margin: 0 0 var(--space-10);
+  padding: var(--space-4) var(--space-5);
+}
+
+.mk-pricing-page .mk-pledge-title {
+  font-size: var(--text-md-size);
+}
+
+.mk-pricing-page .mk-pledge-note {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm-size);
+}
+
+.mk-pricing-page .mk-compare-wrap,
+.mk-pricing-page .mk-compare-note {
+  max-width: none;
+}
+
+.mk-pricing-page .mk-compare-note {
+  margin-bottom: var(--space-12);
+}
+
+/* The figure on its own line, the cadence under it: "Free" followed by a
+   three-line wrapped caption beside it read as a broken layout. */
+.mk-pricing-page .mk-tier-price {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.mk-pricing-h {
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-display);
+  font-size: clamp(1.875rem, 3vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.mk-pricing-more {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-10);
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .mk-pricing-more {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: var(--space-12);
+  }
+}
+
+/* Committee notes on the right, as a quiet stacked list — they were three
+   dense 12px cards stacked under their own display headline. */
+.mk-pricing-page .mk-procure {
+  order: 2;
+  max-width: none;
+  margin: 0;
+}
+
+.mk-pricing-page .mk-faq {
+  order: 1;
+  max-width: none;
+  margin: 0;
+}
+
+.mk-pricing-page .mk-procure-head {
+  margin-bottom: var(--space-4);
+}
+
+.mk-pricing-page .mk-procure-head .mk-kicker {
+  margin-bottom: var(--space-2);
+}
+
+.mk-procure-intro {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: 1.6;
+}
+
+.mk-pricing-page .mk-procure-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.mk-pricing-page .mk-procure-list li {
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.mk-pricing-page .mk-procure-list li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mk-pricing-page .mk-procure-list svg {
+  grid-row: 1 / span 2;
+  width: 24px;
+  height: 24px;
+}
+
+/* The FAQ toggle: a drawn chevron instead of a typed "+" glyph. */
+.mk-pricing-page .mk-faq-item summary::after {
+  content: "";
+  inline-size: 8px;
+  block-size: 8px;
+  margin-right: 4px;
+  border-right: 2px solid var(--text-accent);
+  border-bottom: 2px solid var(--text-accent);
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.mk-pricing-page .mk-faq-item[open] summary::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+
+/* PHONE: the comparison stops being a sideways-scrolling table (it clipped
+   "alway" at 390 and relied on a "swipe" hint). Each feature becomes a block —
+   its label, then the three tiers side by side, each cell captioned with its
+   tier. The table keeps its semantics (Chromium keeps table semantics under a display change). */
+@media (max-width: 699px) {
+  .mk-pricing-page .mk-compare-wrap {
+    overflow: visible;
+    contain: none;
+  }
+
+  .mk-pricing-page .mk-compare {
+    display: block;
+    min-width: 0;
+  }
+
+  .mk-pricing-page .mk-compare caption {
+    display: block;
+  }
+
+  .mk-pricing-page .mk-compare thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .mk-pricing-page .mk-compare tbody {
+    display: block;
+  }
+
+  .mk-pricing-page .mk-compare tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .mk-pricing-page .mk-compare tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .mk-pricing-page .mk-compare th[scope="row"] {
+    grid-column: 1 / -1;
+    width: auto;
+    padding: var(--space-3) var(--space-4) var(--space-1);
+    border: 0;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-heading);
+  }
+
+  .mk-pricing-page .mk-compare td {
+    display: grid;
+    align-content: start;
+    justify-items: center;
+    gap: 2px;
+    padding: var(--space-1) var(--space-2) var(--space-3);
+    border: 0;
+    font-size: var(--text-xs-size);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .mk-pricing-page .mk-compare td::before {
+    content: attr(data-tier);
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}
+
+/* --- /features, wow pass (2026-09-25) ----------------------------------------------
+   One floodlight surface top to bottom; the four zig-zag rows became a bento
+   of three capability cards with their surfaces inside; the duplicate trust
+   row is gone (the trust band below says it). */
+
+.mk-features-page {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.mk-features-hero {
+  padding-bottom: var(--space-6);
+}
+
+.mk-features-band {
+  padding-top: var(--space-4);
+  background: var(--surface);
+}
+
+.mk-fbento {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+@media (min-width: 900px) {
+  .mk-fbento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto;
+  }
+
+  /* The live auction — the night itself — is the wide tile across the top:
+     its checklist on the left, its surface on the right. */
+  .mk-fcard[data-feature="lead"] {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-template-areas:
+      "head visual"
+      "list visual";
+    align-content: center;
+    column-gap: var(--space-10);
+  }
+
+  .mk-fcard[data-feature="lead"] > .mk-fcard-head {
+    grid-area: head;
+    align-self: end;
+  }
+
+  .mk-fcard[data-feature="lead"] > .mk-fcard-visual {
+    grid-area: visual;
+  }
+
+  .mk-fcard[data-feature="lead"] > .mk-checklist {
+    grid-area: list;
+    align-self: start;
+  }
+}
+
+.mk-fcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: clamp(var(--space-5), 2.4vw, var(--space-8));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-2xl);
+  background:
+    radial-gradient(
+      60% 50% at 100% 0%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 70%
+    ),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.mk-fcard:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+  box-shadow: var(--shadow-2);
+}
+
+.mk-fcard-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mk-fcard-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text-accent);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.mk-fcard:hover .mk-fcard-tile {
+  transform: scale(1.06) rotate(-4deg);
+}
+
+.mk-fcard h2 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-2xl-size);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.mk-fcard-visual {
+  min-width: 0;
+}
+
+.mk-fcard .mk-vignette {
+  box-shadow: none;
+  transition: transform var(--duration-slow) var(--ease-out);
+}
+
+.mk-fcard:hover .mk-vignette {
+  transform: translateY(-2px);
+}
+
+.mk-features-trust {
+  background:
+    radial-gradient(
+      100% 130% at 85% -30%,
+      color-mix(in srgb, var(--accent) 7%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(180deg, var(--surface), var(--surface-sunken));
+}
+
+.mk-features-more {
+  margin: var(--space-8) 0 0;
+  text-align: center;
+}
+
+/* The arrow rides the text: an inline-flex link pinned it to the far edge of
+   a wrapped line on a phone (wow pass, round 2). */
+.mk-features-more a {
+  display: inline;
+  line-height: 2;
+  color: var(--text-accent);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.mk-features-more a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.mk-features-trust .mk-cta-actions--closing {
+  margin-top: var(--space-8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-fcard,
+  .mk-fcard-tile,
+  .mk-fcard .mk-vignette {
+    transition: none;
+  }
+
+  .mk-fcard:hover .mk-fcard-tile,
+  .mk-fcard:hover .mk-vignette {
+    transform: none;
+  }
+}
+
+.mk-fcard[data-feature="lead"] {
+  order: -1;
+}
+
+.mk-features-more a svg {
+  display: inline-block;
+  margin-left: var(--space-1);
+  vertical-align: -3px;
+}

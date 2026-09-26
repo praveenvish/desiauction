@@ -1,6 +1,14 @@
 "use client";
 
-import { Badge, Card, EmptyState, Field, Select, type BadgeTone } from "@desiauction/ui";
+import {
+  Badge,
+  type BadgeTone,
+  Card,
+  EmptyState,
+  Field,
+  ScrollStrip,
+  Select,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useFilterQuery } from "../../../../lib/use-filter-query";
@@ -101,7 +109,7 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
 
       <Card>
         <h2 className="visually-hidden-heading">Cases</h2>
-        <ul className="saved-views" data-testid="saved-views">
+        <ScrollStrip as="ul" className="saved-views" data-testid="saved-views">
           {SAVED_VIEWS.map((saved) => (
             <li key={saved.key}>
               <Link
@@ -114,7 +122,7 @@ export function SettlementPanel({ dashboard }: { dashboard: SettlementDashboard 
               </Link>
             </li>
           ))}
-        </ul>
+        </ScrollStrip>
 
         <div className="filter-bar">
           <Field

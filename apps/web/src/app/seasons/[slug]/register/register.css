@@ -1,8 +1,9 @@
 /* The player's door: a quiet floodlight wash behind one compact card, the
    season named above it. Tokens only, so Daylight and Floodlight both hold.
    Motion is colour/border/transform only — nothing animates text opacity. */
+/* No min-height: the public footer anchors the page. The old full-viewport
+   floor left ~700px of empty canvas under a closed notice. */
 .register {
-  min-height: calc(100dvh - 64px);
   background:
     radial-gradient(
       48rem 22rem at 85% -20%,
@@ -15,6 +16,202 @@
 .register-panel {
   max-width: 600px;
   gap: var(--space-4);
+}
+
+/* --- The sheet: season beside the wizard ---------------------------------- */
+.register-panel[data-layout="sheet"] {
+  max-width: 1040px;
+}
+
+.reg-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.reg-season {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Phone: one line of context, then the form — the first field must sit above
+   the fold on a 390×844 screen. */
+.reg-needs-line {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-needs-block {
+  display: none;
+}
+
+.reg-season .reg-preview-pitch {
+  display: none;
+}
+
+@media (width >= 960px) {
+  .register-panel[data-layout="sheet"] {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    column-gap: var(--space-8);
+    row-gap: var(--space-5);
+    align-items: start;
+  }
+
+  .register-panel[data-layout="sheet"] > .reg-hero {
+    grid-column: 1 / -1;
+  }
+
+  .reg-season {
+    position: sticky;
+    top: calc(var(--space-10) + 48px);
+    gap: var(--space-4);
+    padding-top: var(--space-2);
+  }
+
+  .reg-season .reg-preview-pitch {
+    display: block;
+  }
+
+  .reg-needs-line {
+    display: none;
+  }
+
+  .reg-needs-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .reg-season .reg-preview-foot {
+    text-align: left;
+  }
+}
+
+/* --- Step 1: verify -------------------------------------------------------- */
+.reg-method {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+}
+
+.reg-method-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.reg-method-option:hover {
+  color: var(--text-primary);
+}
+
+.reg-method-option[aria-pressed="true"] {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-1);
+}
+
+.reg-method-option[aria-pressed="true"] svg {
+  color: var(--text-accent);
+}
+
+.reg-method-option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.reg-verify-form {
+  gap: var(--space-3);
+}
+
+.reg-verify-submit {
+  width: 100%;
+  justify-content: center;
+}
+
+.reg-verify-sent {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-verify-sent strong {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* One field (SMS autofill and paste work reliably with one), drawn as six
+   boxes: a tabular face, wide tracking, and a ruled background under it. */
+.reg-card .reg-code-input {
+  height: 60px;
+  padding-inline: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 1.625rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.6em;
+  text-align: center;
+  text-indent: 0.6em;
+}
+
+.reg-card .reg-code-input::placeholder {
+  color: var(--text-muted);
+  letter-spacing: 0.6em;
+}
+
+.reg-verify-resend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.reg-verify-change {
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--text-accent);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.reg-verify .login-consent {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+}
+
+.reg-verify .login-consent a {
+  color: var(--text-secondary);
 }
 
 /* --- Page header: the season, not the form -------------------------------- */
@@ -198,7 +395,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);
@@ -251,6 +448,10 @@
 .reg-stepper-item.is-current .reg-stepper-label {
   flex: none;
   overflow: visible;
+}
+
+.reg-stepper-item.is-current {
+  flex-shrink: 0;
 }
 
 .reg-stepper-item.is-current {
@@ -870,6 +1071,13 @@
   gap: var(--space-4);
 }
 
+.reg-status-photo {
+  flex: none;
+  display: block;
+  width: 96px;
+  height: 96px;
+}
+
 .reg-status-title {
   display: flex;
   flex-direction: column;
@@ -955,6 +1163,47 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* The sold price as the card's hero figure: gold display numerals on a warm
+   wash, the sentence that used to carry it as its caption. */
+.reg-sold {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-5);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    135deg,
+    var(--accent-subtle),
+    color-mix(in srgb, var(--accent-subtle) 25%, transparent)
+  );
+}
+
+.reg-sold-label {
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reg-sold-figure {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 7vw, 3.5rem);
+  line-height: 1.05;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--accent-ink);
+}
+
+.reg-sold-note {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
 .reg-status-body {
   margin: 0;
   color: var(--text-secondary);
@@ -1004,9 +1253,11 @@
 }
 
 @media (width <= 480px) {
-  .reg-status-head {
-    flex-direction: column;
-    align-items: flex-start;
+  /* The avatar sits beside the name on a phone too, at a phone's size — it
+     used to stand alone on a 130px row of its own (round 2). */
+  .reg-status-photo {
+    width: 64px;
+    height: 64px;
   }
 
   .reg-status-actions > * {
@@ -1020,9 +1271,98 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  margin: 0;
+}
+
+/* Two equal buttons on one row, even on a phone. */
+.reg-closed-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+}
+
+.reg-closed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reg-closed-line {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+}
+
+/* In the narrow register card the podium reads as a ranked list. */
+.reg-closed .top-buys {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.reg-closed .top-buy-link {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "rank name price"
+    "rank team price";
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+}
+
+.reg-closed .top-buy-rank {
+  align-self: center;
+}
+
+/* One line per sale in a narrow card: the price steps down a size so the
+   name keeps its width and wraps by word, never letter by letter; the team
+   line ends in "…". */
+.reg-closed .top-buy-price {
+  font-family: var(--font-text);
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-bold, 700);
+}
+
+.reg-closed .top-buy-name {
+  min-width: 0;
+  overflow-wrap: normal;
+}
+
+.reg-closed .top-buy-team {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reg-status-foot {
   padding-top: var(--space-3);
   border-top: 1px solid var(--border-subtle);
+}
+
+/* After the verdict: season, home and share as one quiet row of links. */
+.reg-status-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-5);
+  margin-top: calc(var(--space-2) * -1);
+}
+
+.reg-status-links > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.reg-status-links > a:hover {
+  text-decoration: underline;
+}
+
+.reg-status-links > button {
+  min-height: 44px;
+  padding-inline: 0;
+  font-size: var(--text-sm-size);
 }

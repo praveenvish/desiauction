@@ -8,7 +8,7 @@ import type { FixtureStatus } from "@desiauction/core";
 // panel, the calendar and match day, so the three cannot disagree.
 export const FIXTURE_TONE: Record<FixtureStatus, KitTone> = {
   draft: "neutral",
-  scheduled: "blue",
+  scheduled: "neutral",
   published: "blue",
   in_progress: "red",
   completed: "green",

@@ -1,4 +1,4 @@
-import { IconBall, LoadingState, Pill, SectionCard } from "@desiauction/ui";
+import { IconBall, LoadingState, SectionCard } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -11,6 +11,7 @@ import {
 import { adminLiveNow } from "../../server/admin/live-watch";
 import { platformAdminPageGate } from "../../server/admin/authz";
 import type { SportCatalogueRow } from "../../server/admin/views";
+import { AdminPageHead } from "./admin-ui";
 import { OverviewPanel } from "./overview-panel";
 import "../seasons/seasons.css";
 import "./admin.css";
@@ -39,6 +40,9 @@ export default async function AdminPage() {
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
+        <AdminPageHead readOnly>
+          The whole platform at a glance, as each part reports itself.
+        </AdminPageHead>
         <Suspense fallback={<LoadingState variant="page" />}>
           <Board />
         </Suspense>
@@ -86,20 +90,32 @@ function SportCatalogue({ rows }: { rows: SportCatalogueRow[] }) {
   return (
     <SectionCard
       icon={<IconBall />}
-      tone="green"
+      concept="neutral"
       title="Sports"
-      description={`${String(live)} of ${String(rows.length)} shipped packs switched on. Seeded by migration — administration observes.`}
+      description={`${String(live)} of ${String(rows.length)} shipped packs switched on`}
     >
       <ul className="adm-sports">
         {rows.map((row) => (
           <li key={row.key}>
             <span className="adm-sport-name">{row.label}</span>
-            <span className="adm-sport-count">
-              {row.competitions} {row.competitions === 1 ? "season" : "seasons"}
+            <span className="adm-sport-count" data-zero={row.competitions === 0 || undefined}>
+              {row.competitions === 0
+                ? "—"
+                : `${String(row.competitions)} ${row.competitions === 1 ? "season" : "seasons"}`}
+              {row.competitions === 0 ? <span className="admin-sr-only">0 seasons</span> : null}
             </span>
-            <Pill tone={row.enabled ? "green" : "neutral"} dot>
-              {row.enabled ? "Live" : "Off"}
-            </Pill>
+            {/* Twelve green "Live" pills said one thing twelve times: the state
+                is a dot, and only an OFF sport spends a word. */}
+            <span
+              className="adm-sport-state"
+              data-on={row.enabled || undefined}
+              title={row.enabled ? "Live" : "Off"}
+            >
+              <span className="adm-sport-dot" aria-hidden />
+              <span className={row.enabled ? "admin-sr-only" : undefined}>
+                {row.enabled ? "Live" : "Off"}
+              </span>
+            </span>
           </li>
         ))}
       </ul>

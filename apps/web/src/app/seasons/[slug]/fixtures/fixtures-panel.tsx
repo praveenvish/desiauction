@@ -8,7 +8,6 @@ import {
   CardGrid,
   Dialog,
   Field,
-  Notice,
   IconAlert,
   IconArrowRight,
   IconBolt,
@@ -18,13 +17,14 @@ import {
   IconDownload,
   IconKebab,
   IconLayers,
-  IconMatch,
   IconPin,
   IconPlus,
   IconSearch,
   IconSpark,
   IconTrophy,
   IconUpload,
+  Notice,
+  Pager,
   Pill,
   PopoverMenu,
   SectionCard,
@@ -65,6 +65,7 @@ import {
   formatWallTime,
 } from "../../../../lib/format-date";
 import { FixtureStatusPill } from "../_tabs/fixture-status";
+import { ScheduleViews } from "../sibling-link";
 import { TeamCrest } from "../_tabs/team-crest";
 import { ResultsCard } from "./results-card";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
@@ -869,7 +870,7 @@ export function FixturesPanel({
     ) : latest !== undefined ? (
       <SectionCard
         icon={<IconTrophy />}
-        tone="green"
+        concept="results"
         title="Latest result"
         description={
           latest.round !== null ? `Round ${String(latest.round)} · ${latest.number}` : latest.number
@@ -927,18 +928,6 @@ export function FixturesPanel({
             </div>
           </dl>
           {bulkSteps}
-          {!isLobby ? (
-            <button
-              type="button"
-              className="st-link fx-regen"
-              onClick={() => {
-                setGenerateOpen(true);
-              }}
-            >
-              Generate a round robin
-              <IconArrowRight size={16} aria-hidden />
-            </button>
-          ) : null}
           {privateNote}
         </div>
       </SectionCard>
@@ -946,9 +935,11 @@ export function FixturesPanel({
 
   return (
     <>
-      {/* The page's actions: the other views of the schedule, and a match by
-          hand. The shell's page head carries the title above this row. */}
-      <div className="st-head">
+      {/* ONE ROW: the four faces of the Schedule tab (List | Calendar | Match
+          day | Table — it was a "Table →" band plus two more buttons), what
+          is here, and a match by hand. */}
+      <div className="st-head fx-head">
+        <ScheduleViews slug={slug} active="list" />
         <p className="st-head-lede">
           {stats.total > 0 ? (
             <>
@@ -961,30 +952,47 @@ export function FixturesPanel({
                 : ""}
             </>
           ) : canManage ? (
-            "No fixtures yet — generate a round robin or add a match by hand."
+            isLobby ? (
+              "No lobbies yet — add the first one by hand."
+            ) : needsGround ? null : ( // below says it, with its door; the lede would be the second of three. // ONE EMPTY STATEMENT (round 3C): the ground notice
+              "No fixtures yet — generate a round robin or add a match by hand."
+            )
           ) : (
             "The organizer hasn't published any matches yet."
           )}
         </p>
         <div className="st-actions">
-          <ButtonLink
-            href={`/seasons/${slug}/fixtures/calendar`}
-            variant="secondary"
-            size="sm"
-            data-testid="open-calendar"
-          >
-            <IconCalendar size={16} aria-hidden />
-            Calendar
-          </ButtonLink>
-          <ButtonLink
-            href={`/seasons/${slug}/fixtures/match-day`}
-            variant="secondary"
-            size="sm"
-            data-testid="open-match-day"
-          >
-            <IconMatch size={16} aria-hidden />
-            Match day
-          </ButtonLink>
+          {/* The generator's door once there is a schedule: it opens the same
+              form as a dialog. While the schedule is empty the form sits
+              inline below; with no ground it waits behind the notice. */}
+          {canManage && !isLobby && primary !== "generate" && grounds.length > 0 ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="open-generate-fixtures"
+              onClick={() => {
+                setGenerateOpen(true);
+              }}
+            >
+              <IconSpark size={16} aria-hidden />
+              Generate fixtures
+            </Button>
+          ) : null}
+          {/* An empty schedule has no card (below), so its import door sits
+              here with the other ways to add matches. */}
+          {canManage && empty ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="open-import"
+              onClick={() => {
+                setImportOpen(true);
+              }}
+            >
+              <IconUpload size={16} aria-hidden />
+              Import
+            </Button>
+          ) : null}
           {canManage ? (
             <Button
               size="sm"
@@ -1014,7 +1022,8 @@ export function FixturesPanel({
           }
           testId="fixtures-needs-ground"
         >
-          Grounds belong to the club, so one added now is there for every season after this.
+          Once one exists, the round-robin generator opens right here. Grounds belong to the club,
+          so one added now is there for every season after this.
         </Notice>
       ) : null}
 
@@ -1025,7 +1034,7 @@ export function FixturesPanel({
           <StatGrid>
             <StatCard
               icon={<IconCalendar />}
-              tone="gold"
+              concept="fixtures"
               value={stats.total}
               label={isLobby ? "Lobbies" : "Matches"}
               hint={
@@ -1048,7 +1057,7 @@ export function FixturesPanel({
             />
             <StatCard
               icon={<IconClock />}
-              tone="blue"
+              concept="season"
               value={upcoming}
               label="To play"
               hint={
@@ -1064,7 +1073,7 @@ export function FixturesPanel({
             />
             <StatCard
               icon={<IconPin />}
-              tone="purple"
+              concept="venue"
               value={stats.venues}
               label={stats.venues === 1 ? "Venue" : "Venues"}
               hint={`${String(stats.grounds)} ${terms.ground.toLowerCase()}${stats.grounds === 1 ? "" : "s"} in use`}
@@ -1113,7 +1122,10 @@ export function FixturesPanel({
         </SectionCard>
       ) : null}
 
-      {primary === "generate" ? (
+      {/* With no ground the generator cannot run, so it waits behind the
+          "Add a ground first" notice instead of a ~500px form with a pale,
+          disabled button. */}
+      {primary === "generate" && needsGround ? null : primary === "generate" ? (
         <SectionCard
           icon={<IconSpark />}
           title="Generate fixtures"
@@ -1392,22 +1404,28 @@ export function FixturesPanel({
         canManage={canManage}
       />
 
-      <SectionCard
-        icon={<IconCalendar />}
-        title="Schedule"
-        description={
-          page.total === 0
-            ? filtered
-              ? "No match fits these filters."
-              : "Nothing on the schedule yet."
-            : `${String(page.total)} match${page.total === 1 ? "" : "es"}${filtered ? " match these filters" : ""} · grouped by round`
-        }
-        flush
-        action={
-          canManage ? (
-            <>
-              {/* Nothing to export from an empty schedule. */}
-              {empty ? null : (
+      {/* An empty, unfiltered schedule draws no card: it was the third
+          "nothing yet" on one screen, under the head's line and the ground
+          notice (round 2). The table arrives with the first match. */}
+      {empty ? null : (
+        <SectionCard
+          icon={<IconCalendar />}
+          title="Schedule"
+          description={
+            // Empty and unfiltered, the page head already says so (round 2 counted
+            // three "nothing yet" lines on one screen); the card doesn't repeat it.
+            page.total === 0
+              ? filtered
+                ? "No match fits these filters."
+                : undefined
+              : `${String(page.total)} match${page.total === 1 ? "" : "es"}${filtered ? " match these filters" : ""} · grouped by round`
+          }
+          flush
+          action={
+            canManage ? (
+              <>
+                {/* The card only draws with a match in it, so there is always
+                    something to export. */}
                 <Button
                   size="sm"
                   variant="secondary"
@@ -1417,26 +1435,24 @@ export function FixturesPanel({
                   <IconDownload size={16} aria-hidden />
                   Export CSV
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="secondary"
-                data-testid="open-import"
-                onClick={() => {
-                  setImportOpen(true);
-                }}
-              >
-                <IconUpload size={16} aria-hidden />
-                Import
-              </Button>
-            </>
-          ) : undefined
-        }
-        data-testid="schedule-card"
-      >
-        {/* Seven chips reading 0 and a search box over nothing are furniture;
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  data-testid="open-import"
+                  onClick={() => {
+                    setImportOpen(true);
+                  }}
+                >
+                  <IconUpload size={16} aria-hidden />
+                  Import
+                </Button>
+              </>
+            ) : undefined
+          }
+          data-testid="schedule-card"
+        >
+          {/* Seven chips reading 0 and a search box over nothing are furniture;
             they arrive with the first match. */}
-        {empty ? null : (
           <>
             <ul className="st-chips" aria-label="Filter by status">
               <li>
@@ -1547,112 +1563,104 @@ export function FixturesPanel({
               </select>
             </form>
           </>
-        )}
-        <div className="st-table-wrap">
-          <table className="st-table fx-table" data-stack="" data-testid="fixtures-table">
-            <caption>
-              This season&apos;s fixtures, grouped by round — {page.total} match
-              {page.total === 1 ? "" : "es"} matching the current filters.
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">Fixture</th>
-                <th scope="col">Kickoff</th>
-                <th scope="col">{terms.ground}</th>
-                <th scope="col">Status</th>
-                <th scope="col">Result</th>
-                {canManage ? (
-                  <th scope="col">
-                    <VisuallyHidden>Actions</VisuallyHidden>
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {rounds.map(({ round, rows, when }) => (
-                <Fragment key={String(round)}>
-                  <tr data-group="">
-                    <th scope="rowgroup" colSpan={canManage ? 7 : 6}>
-                      {round !== null ? `Round ${String(round)}` : "Unscheduled"}
-                      {when !== null ? <span className="st-group-when">{when}</span> : null}
-                    </th>
+          <div className="st-table-wrap">
+            <table className="st-table fx-table" data-stack="" data-testid="fixtures-table">
+              <caption>
+                This season&apos;s fixtures, grouped by round — {page.total} match
+                {page.total === 1 ? "" : "es"} matching the current filters.
+              </caption>
+              {/* An empty schedule draws no column heads over its one sentence. */}
+              {page.total === 0 ? null : (
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Fixture</th>
+                    <th scope="col">Kickoff</th>
+                    <th scope="col">{terms.ground}</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Result</th>
+                    {canManage ? (
+                      <th scope="col">
+                        <VisuallyHidden>Actions</VisuallyHidden>
+                      </th>
+                    ) : null}
                   </tr>
-                  {rows.map((fixture) => (
-                    <FixtureRow
-                      key={fixture.id}
-                      fixture={fixture}
-                      result={results[fixture.id]}
-                      canManage={canManage}
-                      busy={busy}
-                      moving={moving === fixture.id}
-                      grounds={grounds}
-                      moveKickoff={moveKickoff}
-                      moveGround={moveGround}
-                      onMoveKickoff={setMoveKickoff}
-                      onMoveGround={setMoveGround}
-                      onLifecycle={(action) => void lifecycle(fixture.id, action)}
-                      onOpenMove={() => {
-                        setMoving(moving === fixture.id ? null : fixture.id);
-                        setMoveKickoff(fixture.kickoffAt ?? "");
-                        setMoveGround(fixture.groundId ?? "");
-                      }}
-                      onConfirmMove={() => void move(fixture.id)}
-                      onDetails={() => void openDetails(fixture.id)}
-                    />
-                  ))}
-                </Fragment>
-              ))}
-              {page.rows.length === 0 ? (
-                <tr>
-                  <td colSpan={canManage ? 7 : 6} data-span="full" className="fx-none">
-                    {/* Same DA-35 rule the registration desk follows: blaming
+                </thead>
+              )}
+              <tbody>
+                {rounds.map(({ round, rows, when }) => (
+                  <Fragment key={String(round)}>
+                    <tr data-group="">
+                      <th scope="rowgroup" colSpan={canManage ? 7 : 6}>
+                        {round !== null ? `Round ${String(round)}` : "Unscheduled"}
+                        {when !== null ? <span className="st-group-when">{when}</span> : null}
+                      </th>
+                    </tr>
+                    {rows.map((fixture) => (
+                      <FixtureRow
+                        key={fixture.id}
+                        fixture={fixture}
+                        result={results[fixture.id]}
+                        canManage={canManage}
+                        busy={busy}
+                        moving={moving === fixture.id}
+                        grounds={grounds}
+                        moveKickoff={moveKickoff}
+                        moveGround={moveGround}
+                        onMoveKickoff={setMoveKickoff}
+                        onMoveGround={setMoveGround}
+                        onLifecycle={(action) => void lifecycle(fixture.id, action)}
+                        onOpenMove={() => {
+                          setMoving(moving === fixture.id ? null : fixture.id);
+                          setMoveKickoff(fixture.kickoffAt ?? "");
+                          setMoveGround(fixture.groundId ?? "");
+                        }}
+                        onConfirmMove={() => void move(fixture.id)}
+                        onDetails={() => void openDetails(fixture.id)}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
+                {page.rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={canManage ? 7 : 6} data-span="full" className="fx-none">
+                      {/* Same DA-35 rule the registration desk follows: blaming
                         filters nobody applied is a dead end — a season with no
                         fixtures yet gets its actual next step instead. */}
-                    {filtered
-                      ? "No fixtures match these filters."
-                      : canManage
-                        ? isLobby
-                          ? "No lobbies yet — add the first one with “Add lobby”."
-                          : "No fixtures yet — generate a round robin above, or add one match at a time."
-                        : "No fixtures yet. The organizer hasn't scheduled any matches."}
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+                      {filtered
+                        ? "No fixtures match these filters."
+                        : canManage
+                          ? isLobby
+                            ? "No lobbies yet — add the first one with “Add lobby”."
+                            : "Generated and hand-added matches land here, grouped by round."
+                          : "No fixtures yet. The organizer hasn't scheduled any matches."}
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="st-pager">
-          <span data-testid="page-indicator">
-            Page {page.page} of {totalPages} · {page.total} total
-          </span>
-          <span className="st-actions fx-pager-actions">
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={page.page <= 1}
-              onClick={() => {
-                pushQuery({ page: String(page.page - 1) });
-              }}
-              data-testid="page-prev"
-            >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={page.page >= totalPages}
-              onClick={() => {
-                pushQuery({ page: String(page.page + 1) });
-              }}
-              data-testid="page-next"
-            >
-              Next
-            </Button>
-          </span>
-        </div>
-      </SectionCard>
+          {/* No pager for one page (it was "Page 1 of 1 · 0 total"). */}
+          {totalPages <= 1 ? null : (
+            <div className="st-pager">
+              <Pager
+                total={page.total}
+                page={page.page}
+                pageCount={totalPages}
+                pageSize={page.pageSize}
+                noun="fixtures"
+                onPage={(entry) => {
+                  pushQuery({ page: String(entry) });
+                }}
+                summaryTestId="page-indicator"
+                prevTestId="page-prev"
+                nextTestId="page-next"
+              />
+            </div>
+          )}
+        </SectionCard>
+      )}
 
       {expanded !== null ? (
         <SectionCard

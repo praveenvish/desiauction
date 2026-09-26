@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   Button,
   Dialog,
+  EmptyState,
   Field,
   IconClock,
   IconDevice,
@@ -32,8 +33,13 @@ import {
 import { formatDate, formatDateTime } from "../../lib/format-date";
 import { isKnownEvent, labelForEvent } from "../../lib/inbox-events";
 
-/** How many sessions and events render before "Show more". */
-const PAGE = 10;
+/**
+ * What renders first: this device and the two most recent others, and the
+ * last three security events; "Show all" opens the rest in one press. Ten of
+ * each ran the account page to ~700px of devices before anything else.
+ */
+const FIRST_SESSIONS = 3;
+const FIRST_EVENTS = 3;
 
 type Pending =
   | { kind: "revoke-session"; session: SessionView }
@@ -47,8 +53,8 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
   const [deviceName, setDeviceName] = useState("");
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [sessionsShown, setSessionsShown] = useState(PAGE);
-  const [eventsShown, setEventsShown] = useState(PAGE);
+  const [sessionsShown, setSessionsShown] = useState(FIRST_SESSIONS);
+  const [eventsShown, setEventsShown] = useState(FIRST_EVENTS);
   const [pending, setPending] = useState<Pending | null>(null);
   const [renameTo, setRenameTo] = useState("");
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -176,7 +182,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
       <SectionCard
         id="security"
         icon={<IconLock />}
-        tone="purple"
+        tone="gold"
         title="Sign-in & security"
         description="Passkeys let you in without a code. Every device signed in to your account is listed here."
         className="acct-card"
@@ -184,9 +190,13 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
         <div className="acct-block" data-testid="passkeys-panel">
           <h3 className="acct-block-title">Passkeys</h3>
           {security.passkeys.length === 0 ? (
-            <p className="acct-block-empty">
-              No passkeys yet. Add one to sign in with your fingerprint or face — no code needed.
-            </p>
+            <EmptyState
+              size="compact"
+              headingLevel={4}
+              icon={<IconKey />}
+              title="No passkeys yet"
+              description="Add one to sign in with your fingerprint or face — no code needed."
+            />
           ) : (
             <ul className="security-list">
               {security.passkeys.map((passkey) => (
@@ -336,10 +346,10 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                 variant="secondary"
                 data-testid="show-more-sessions"
                 onClick={() => {
-                  setSessionsShown((shown) => shown + PAGE);
+                  setSessionsShown(security.sessions.length);
                 }}
               >
-                Show more ({String(security.sessions.length - sessionsShown)} left)
+                Show all {String(security.sessions.length)} devices
               </Button>
             </div>
           ) : null}
@@ -381,10 +391,10 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                 variant="secondary"
                 data-testid="show-more-events"
                 onClick={() => {
-                  setEventsShown((shown) => shown + PAGE);
+                  setEventsShown(security.events.length);
                 }}
               >
-                Show more ({String(security.events.length - eventsShown)} left)
+                Show all {String(security.events.length)} events
               </Button>
             ) : null}
             {/* Truncation is ADMITTED rather than performed silently. */}

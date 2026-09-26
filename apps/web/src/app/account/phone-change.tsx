@@ -59,7 +59,7 @@ export function PhoneChange({ current }: { current: string | null }) {
   // opens the change. The form appears under it only when asked for.
   const head = (
     <div className="acct-contact-head">
-      <IconTile icon={<IconPhone />} tone="blue" size="sm" />
+      <IconTile icon={<IconPhone />} tone="gold" size="sm" />
       <div className="acct-contact-text">
         <span className="acct-contact-label">Mobile number</span>
         {attaching ? (

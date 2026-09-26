@@ -24,10 +24,6 @@
   letter-spacing: 0.08em;
 }
 
-.starsRest {
-  color: var(--border-strong);
-}
-
 .srOnly {
   position: absolute;
   width: 1px;

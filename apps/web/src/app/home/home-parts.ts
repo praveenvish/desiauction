@@ -109,7 +109,21 @@ const IST_HOUR = new Intl.DateTimeFormat("en-GB", {
 });
 
 export function greetingFor(now: Date, name: string | null): string {
+  const { lead, title } = greetingParts(now, name);
+  return lead !== null ? `${lead} ${title}` : title;
+}
+
+/**
+ * The greeting split in two: `lead` ("Good morning,") is what a narrow phone
+ * drops, so the person's own name is never the part that gets cut off.
+ */
+export function greetingParts(
+  now: Date,
+  name: string | null,
+): { lead: string | null; title: string } {
   const hour = Number(IST_HOUR.format(now));
   const daypart = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  return name !== null && name.trim() !== "" ? `${daypart}, ${name.trim()}` : daypart;
+  return name !== null && name.trim() !== ""
+    ? { lead: `${daypart},`, title: name.trim() }
+    : { lead: null, title: daypart };
 }

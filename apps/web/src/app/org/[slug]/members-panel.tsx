@@ -26,6 +26,7 @@ import {
 } from "../../../server/orgs/actions";
 import type { MemberRow } from "../../../server/orgs/orgs";
 import { personContact, personInitials } from "../../../lib/person-label";
+import { formatDate, formatMonthYear } from "../../../lib/format-date";
 
 /**
  * A capability set → the pill the row shows.
@@ -51,23 +52,12 @@ function rolePill(set: string): { key: string; label: string; technical: string 
 
 /** "Jan 2021" — the Joined column, month + year as the design shows. */
 function joinedLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", {
-    timeZone: "Asia/Kolkata", // PRR P2/F25: pin the zone or SSR/CSR disagree
-    month: "short",
-    year: "numeric",
-  });
+  return formatMonthYear(iso);
 }
 
 /** "24 Jul 2026" — precise enough for provenance, short enough for a tooltip. */
 function grantedLabel(iso: string | null): string | null {
-  return iso === null
-    ? null
-    : new Date(iso).toLocaleDateString("en-IN", {
-        timeZone: "Asia/Kolkata", // PRR P2/F25: pin the zone or SSR/CSR disagree
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
+  return iso === null ? null : formatDate(iso);
 }
 
 /** Invite dialog: the human name and one-line meaning of each joinable role. */

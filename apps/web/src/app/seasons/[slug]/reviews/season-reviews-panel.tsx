@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, IconSend, SectionCard, useToast } from "@desiauction/ui";
+import { Button, IconLock, IconSend, SectionCard, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -9,6 +9,7 @@ import {
   replyToReviewAction,
   type SeasonReviewsView,
 } from "../../../../server/reviews/season-actions";
+import { formatShortDate } from "../../../../lib/format-date";
 
 /**
  * The club's two controls (FR-1 Phase 4): ask for reviews, and answer one.
@@ -19,11 +20,7 @@ import {
  */
 
 function day(date: Date): string {
-  return date.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatShortDate(date);
 }
 
 export function AskReviewsCard({
@@ -43,12 +40,15 @@ export function AskReviewsCard({
   return (
     <SectionCard
       icon={<IconSend />}
-      tone="blue"
+      concept="season"
       title="Ask for reviews"
       description={`We email your players and team owners a link to review this season. What they write is read by DesiAuction before it appears${isPublic ? " on your public season page" : ""}; you can reply, but not edit or remove it.`}
       action={
         <Button
           loading={pending}
+          // A disabled PRIMARY read as a pale gold call to action. When there
+          // is nothing to press, the button says so in the neutral weight.
+          variant={manage.nextAskAt !== null || askable === 0 ? "secondary" : "primary"}
           disabled={manage.nextAskAt !== null || askable === 0}
           onClick={() => {
             start(async () => {
@@ -62,26 +62,30 @@ export function AskReviewsCard({
           }}
           data-testid="season-reviews-ask-button"
         >
-          <IconSend size={16} aria-hidden />
+          {manage.nextAskAt !== null || askable === 0 ? (
+            <IconLock size={16} aria-hidden />
+          ) : (
+            <IconSend size={16} aria-hidden />
+          )}
           {askable === 0 ? "Nobody left to ask" : `Ask ${String(askable)}`}
         </Button>
       }
       data-testid="season-reviews-ask"
     >
-      <dl className="rv-ask-stats">
-        <div>
-          <dt>Could be asked now</dt>
-          <dd>
-            {manage.askable.players} {manage.askable.players === 1 ? "player" : "players"},{" "}
-            {manage.askable.owners} {manage.askable.owners === 1 ? "owner" : "owners"}
-          </dd>
-        </div>
-      </dl>
-      <p className="st-note rv-ask-note">
-        Players are asked only if they&apos;re approved, have an email on file, and gave a date of
-        birth showing they&apos;re 18 or over. Anyone who has turned off feedback requests is
-        skipped.
+      {/* One line in one size — the grey slab mixed a label and a figure. */}
+      <p className="rv-ask-line">
+        <strong>Could be asked now:</strong> {manage.askable.players}{" "}
+        {manage.askable.players === 1 ? "player" : "players"}, {manage.askable.owners}{" "}
+        {manage.askable.owners === 1 ? "owner" : "owners"}
       </p>
+      <details className="rv-who">
+        <summary>Who is asked?</summary>
+        <p className="st-note rv-ask-note">
+          Players are asked only if they&apos;re approved, have an email on file, and gave a date of
+          birth showing they&apos;re 18 or over. Anyone who has turned off feedback requests is
+          skipped.
+        </p>
+      </details>
       {manage.nextAskAt !== null ? (
         <p className="st-note rv-ask-note" data-testid="season-reviews-next-ask">
           You asked on {day(manage.lastAskedAt ?? manage.nextAskAt)}. You can ask again from{" "}

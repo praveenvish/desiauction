@@ -1,11 +1,88 @@
 /* /inbox — one flush card, notices grouped by day, a tinted tile per kind.
    Tokens only; daylight + floodlight. */
 
+/* Left-aligned in the console column like every other console page — it
+   used to float centred at 960px. */
 .inbox {
   box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: var(--space-5);
   width: 100%;
-  max-width: 960px;
-  margin: 0 auto;
+  max-width: 1280px;
+  margin: 0;
+}
+
+.inbox-main {
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .inbox {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The rail: what kinds of notice arrive, and where sign-ins went. */
+.inbox-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+@media (min-width: 1024px) {
+  .inbox-rail {
+    position: sticky;
+    top: var(--space-6);
+  }
+}
+
+.inbox-rail-title {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.inbox-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inbox-kinds li {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.inbox-kinds svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent-ink);
+}
+
+.inbox-kinds strong {
+  display: block;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.inbox-rail .inbox-foot {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .inbox-settings {
@@ -53,12 +130,12 @@
   flex-direction: column;
 }
 
+/* A day is a quiet small-caps label, not a grey band. */
 .inbox-day-title {
   margin: 0;
-  padding: var(--space-2) var(--space-5);
-  background: var(--surface-sunken);
+  padding: var(--space-4) var(--space-5) var(--space-1);
+  background: none;
   border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-family: var(--font-text);
   font-size: var(--text-xs-size);
@@ -181,4 +258,21 @@
 .inbox-row[data-unread="true"] .inbox-when,
 .inbox-row[data-unread="true"] .inbox-subject {
   color: var(--text-secondary);
+}
+
+/* Phone: the settings door is a gear, not a row of its own in the header. */
+@media (max-width: 719px) {
+  .inbox-settings {
+    justify-content: center;
+    min-width: 44px;
+  }
+
+  .inbox-settings-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }

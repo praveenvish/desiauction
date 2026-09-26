@@ -328,7 +328,7 @@ export function AddSuppressionForm({ scopes }: { scopes: readonly string[] }) {
   const valid = contact.trim() !== "" && length >= REASON_MIN && length <= REASON_MAX;
   return (
     <form
-      className="spr-body"
+      className="spr-body spr-add"
       data-testid="suppression-add"
       onSubmit={(event) => {
         event.preventDefault();
@@ -350,7 +350,7 @@ export function AddSuppressionForm({ scopes }: { scopes: readonly string[] }) {
         required
         maxLength={320}
         autoComplete="off"
-        help="An email address stops email; a mobile number stops texts, on SMS and WhatsApp."
+        help="Email stops email; a number stops SMS and WhatsApp."
         data-testid="suppression-add-contact"
         onChange={(event) => {
           setContact(event.target.value);
@@ -378,13 +378,13 @@ export function AddSuppressionForm({ scopes }: { scopes: readonly string[] }) {
         required
         maxLength={REASON_MAX}
         autoComplete="off"
-        help={`Why, and who asked. At least ${String(REASON_MIN)} characters. Kept on the audit log.`}
+        help={`Why, and who asked — ${String(REASON_MIN)}+ characters, kept on the audit log.`}
         data-testid="suppression-add-reason"
         onChange={(event) => {
           setReason(event.target.value);
         }}
       />
-      <div>
+      <div className="spr-add-go">
         <Button
           type="submit"
           size="touch"
@@ -409,8 +409,8 @@ export function SuppressionRevertButton({
   const { pending, run } = useRun();
   return (
     <Button
-      variant="secondary"
-      size="touch"
+      variant="ghost"
+      size="sm"
       loading={pending}
       onClick={() => {
         run(() => revertSuppression(auditId));

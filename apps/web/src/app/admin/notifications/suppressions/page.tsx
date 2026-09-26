@@ -1,6 +1,5 @@
 import {
   EmptyState,
-  IconArrowLeft,
   IconClock,
   IconLock,
   IconPlus,
@@ -12,13 +11,14 @@ import { notFound } from "next/navigation";
 import { platformAdminPageGate } from "../../../../server/admin/authz";
 import { adminSuppressionDesk } from "../../../../server/admin/suppression-views";
 import { SUPPRESSION_SCOPES } from "../../../../server/messaging/suppression-contact";
-import { NavButton } from "../../../players/nav-button";
 import { RelativeTime } from "../../admin-ui";
 import {
   AddSuppressionForm,
   SuppressionRevertButton,
   SuppressionSearchPanel,
 } from "./suppression-desk";
+import { AdminPageHead } from "../../admin-ui";
+import { NotifySubnav } from "../notify-subnav";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 import "../notifications.css";
@@ -51,72 +51,70 @@ export default async function AdminSuppressionsPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head ntc-page-head">
-            <NavButton href="/admin/notifications" variant="ghost" className="ntc-back">
-              <IconArrowLeft size={18} aria-hidden />
-              All notifications
-            </NavButton>
-            <p className="dash-hint">
-              Contacts DesiAuction must not send to: people who texted STOP, addresses that bounced
-              or complained, and ones added by hand. A suppression stops queued messages on its
-              channel; sign-in codes still go. Every lift and addition is on the audit log with your
-              name and reason, and can be reverted below.
-            </p>
-          </header>
+          <AdminPageHead>
+            <NotifySubnav current="suppressions" />
+          </AdminPageHead>
+          <p className="admin-lede admin-lede-under">
+            Contacts we must not send to. Sign-in codes still go; every lift and addition is
+            audited, and can be reverted while nothing has changed since.
+          </p>
 
-          <SectionCard
-            icon={<IconLock />}
-            tone="neutral"
-            title="Look up a contact"
-            description="Is this address or number suppressed, and why? Only the contact you type is shown."
-            flush
-            data-testid="suppression-lookup"
-          >
-            <SuppressionSearchPanel />
-          </SectionCard>
+          {/* Look up, then suppress: two one-row forms, full width. Side by
+              side they were two cards of unequal height (420 vs 640px). */}
+          <div className="spr-stack">
+            <SectionCard
+              icon={<IconLock />}
+              tone="neutral"
+              title="Look up a contact"
+              description="Is it suppressed, and why? Only the contact you type is shown."
+              flush
+              data-testid="suppression-lookup"
+            >
+              <SuppressionSearchPanel />
+            </SectionCard>
 
-          <SectionCard
-            icon={<IconPlus />}
-            tone="neutral"
-            title="Suppress a contact"
-            description="For a request that did not come by STOP — an email to support, a call. It stops that channel until lifted."
-            flush
-            data-testid="suppression-add-card"
-          >
-            <AddSuppressionForm scopes={SUPPRESSION_SCOPES} />
-          </SectionCard>
+            <SectionCard
+              icon={<IconPlus />}
+              tone="neutral"
+              title="Suppress a contact"
+              description="A request that did not come by STOP. It stops that channel until lifted."
+              flush
+              data-testid="suppression-add-card"
+            >
+              <AddSuppressionForm scopes={SUPPRESSION_SCOPES} />
+            </SectionCard>
+          </div>
 
           <SectionCard
             icon={<IconClock />}
             tone="neutral"
             title="Recent changes"
-            description="The last twenty lifts and additions, newest first. Revert puts the suppression back as it was, and is itself recorded."
+            description="Last twenty lifts and additions · Revert shows while a change still stands"
             flush
             data-testid="suppression-recent"
           >
             {desk.recent.length === 0 ? (
               <div className="admin-card-empty">
                 <EmptyState
+                  size="compact"
                   headingLevel={3}
                   title="Nothing changed by hand yet"
                   description="Lifts and manual suppressions appear here with who made them and why."
                 />
               </div>
             ) : (
-              <ul className="admin-rows is-stacked">
+              <ul className="admin-rows ntc-recent">
                 {desk.recent.map((change) => (
                   <li key={change.id} data-testid={`suppression-change-${change.id}`}>
                     <span className="admin-cell-main">
-                      <span className="admin-name" data-private>
+                      <span className="ntc-recent-line" data-private>
                         {change.summary}
                       </span>
                       <span className="admin-meta">
                         {change.actorName ?? "An operator"} · <RelativeTime at={change.at} />
                         {change.revertOf === null ? null : " · a revert"}
+                        {change.reason === null ? null : ` · “${change.reason}”`}
                       </span>
-                      {change.reason === null ? null : (
-                        <span className="admin-meta">Reason: {change.reason}</span>
-                      )}
                     </span>
                     {change.revertable ? (
                       <SuppressionRevertButton auditId={change.id} summary={change.summary} />

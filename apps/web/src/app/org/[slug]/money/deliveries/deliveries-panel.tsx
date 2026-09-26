@@ -31,6 +31,7 @@ import type { DeliveryView } from "../../../../../server/financial-operations/vi
 import "../../../../seasons/[slug]/money/money.css";
 import "../finance.css";
 import { useHydrated } from "../../../../../lib/use-hydrated";
+import { formatDateTime } from "../../../../../lib/format-date";
 
 /**
  * PX-8 §2 — the Delivery workspace.
@@ -73,11 +74,7 @@ function waitedFor(ms: number): string {
 }
 
 function when(atMs: number): string {
-  return new Date(atMs).toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return formatDateTime(atMs);
 }
 
 export function DeliveriesPanel({

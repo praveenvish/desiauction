@@ -8,9 +8,13 @@ import {
   IconExternal,
   IconEyeOff,
   IconGlobe,
-  IconSearch,
+  Pager,
   Pill,
   SectionCard,
+  Toolbar,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSpacer,
   useToast,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -27,6 +31,8 @@ import type {
   ModerationDesk,
   PublicSeasonRow,
 } from "../../../server/admin/moderation-views";
+import { AdminFilterForm } from "../admin-filter-form";
+import { formatDate } from "../../../lib/format-date";
 
 const REASON_MIN = 10;
 const REASON_MAX = 500;
@@ -42,68 +48,71 @@ const REASON_MAX = 500;
 export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
   return (
     <>
-      <SectionCard
-        icon={<IconEyeOff />}
-        tone="red"
-        title="Taken down"
-        description={
-          desk.held.length === 0
-            ? "Held off the public web by DesiAuction"
-            : `${String(desk.held.length)} held off the public web by DesiAuction`
-        }
-        flush
-        data-testid="moderation-held"
-      >
-        {desk.held.length === 0 ? (
+      {desk.held.length === 0 ? (
+        <SectionCard
+          icon={<IconEyeOff />}
+          tone="neutral"
+          title="Taken down"
+          flush
+          data-testid="moderation-held"
+        >
           <div className="admin-card-empty">
             <EmptyState
-              headingLevel={3}
+              size="compact"
+              icon={<IconEyeOff />}
+              concept="done"
               title="Nothing is taken down"
-              description="Every season DesiAuction takes off the public web is listed here, with who did it and why."
+              description="Seasons DesiAuction takes off the public web are listed here, with who and why."
             />
           </div>
-        ) : (
+        </SectionCard>
+      ) : (
+        <SectionCard
+          icon={<IconEyeOff />}
+          tone="red"
+          title="Taken down"
+          description={`${String(desk.held.length)} held off the public web by DesiAuction`}
+          flush
+          data-testid="moderation-held"
+        >
           <ul className="admin-rows is-stacked">
             {desk.held.map((row) => (
               <HeldRow key={row.id} row={row} />
             ))}
           </ul>
-        )}
-      </SectionCard>
+        </SectionCard>
+      )}
       <SectionCard
         icon={<IconGlobe />}
-        tone="blue"
+        tone="neutral"
         title="On the public web"
-        description={
-          <span className="admin-count">
-            {desk.query === ""
-              ? `${String(desk.publishedTotal)} public`
-              : `${String(desk.publishedTotal)} matching`}
-          </span>
-        }
+        description="Every season a stranger can open, newest first"
         flush
         data-testid="moderation-public"
       >
-        <form className="admin-filters" method="get" role="search" data-testid="moderation-search">
-          <label className="admin-search" htmlFor="moderation-q">
-            <span className="admin-sr-only">Find a public season</span>
-            <IconSearch size={18} aria-hidden />
-            <input
+        <AdminFilterForm testId="moderation-search">
+          <Toolbar>
+            <ToolbarSearch
               id="moderation-q"
               name="q"
-              type="search"
-              defaultValue={desk.query}
+              label="Find a public season"
               placeholder="Season, slug or club"
-              className="admin-search-input"
+              defaultValue={desk.query}
+              submitLabel="Search"
             />
-          </label>
-          <button type="submit" className="admin-search-submit">
-            Search
-          </button>
-        </form>
+            <ToolbarSpacer />
+            <ToolbarCount testId="moderation-count">
+              {desk.published.length < desk.publishedTotal
+                ? `${String(desk.published.length)} of ${String(desk.publishedTotal)}`
+                : String(desk.publishedTotal)}{" "}
+              {desk.query === "" ? "public" : "matching"}
+            </ToolbarCount>
+          </Toolbar>
+        </AdminFilterForm>
         {desk.published.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title={desk.query === "" ? "No season is public" : "No public season matches"}
               description={
@@ -115,15 +124,22 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
           </div>
         ) : (
           <>
-            <ul className="admin-rows">
+            <ul className="admin-rows admin-mod-rows">
               {desk.published.map((row) => (
                 <PublicRow key={row.id} row={row} />
               ))}
             </ul>
             {desk.publishedTotal > desk.published.length ? (
-              <p className="admin-pagination admin-meta">
-                Showing the newest {String(desk.published.length)}. Search to reach the rest.
-              </p>
+              <div className="admin-pagination">
+                <Pager
+                  label="Public seasons"
+                  total={desk.publishedTotal}
+                  shown={desk.published.length}
+                  noun="public seasons"
+                >
+                  Search to reach the rest.
+                </Pager>
+              </div>
             ) : null}
           </>
         )}
@@ -159,37 +175,44 @@ function PublicRow({ row }: { row: PublicSeasonRow }) {
   const valid = length >= REASON_MIN && length <= REASON_MAX;
   return (
     <li className="pass-row" data-testid={`moderation-public-${row.slug}`}>
-      <span className="admin-cell-main">
+      <span className="admin-mod-main">
         <span className="pass-row-season">{row.name}</span>
         <span className="admin-meta">
-          <Link href={`/admin/orgs/${row.orgSlug}`} className="admin-inline-link">
+          <Link href={`/admin/orgs/${row.orgSlug}`} className="admin-quiet-link">
             {row.orgName}
-          </Link>{" "}
-          · {row.sport} · created {row.createdAt.toISOString().slice(0, 10)}
+          </Link>
+          <span aria-hidden> · </span>
+          <span className="admin-sport">{row.sport}</span>
+          <span aria-hidden> · </span>
+          created {formatDate(row.createdAt)}
         </span>
       </span>
       <div className="pass-row-actions">
         <a
-          className="admin-card-link"
+          className="admin-icon-link"
           href={`/c/${row.slug}`}
           target="_blank"
           rel="noopener noreferrer"
+          aria-label={`View the public page of ${row.name} (opens in a new tab)`}
+          title="View the public page"
           data-testid={`moderation-view-${row.slug}`}
         >
-          View the public page
-          <IconExternal size={14} className="icon-trail" />
+          <IconExternal size={16} />
         </a>
-        <Button
-          variant="danger"
-          size="sm"
+        {/* Fifty solid red buttons were a column of alarm. The row's button is
+            quiet; the dialog it opens is where the danger is said and done. */}
+        <button
+          type="button"
+          className="admin-quiet-danger"
           onClick={() => {
             setReason("");
             setOpen(true);
           }}
           data-testid={`take-down-${row.slug}`}
         >
-          Take down…
-        </Button>
+          <IconEyeOff size={16} />
+          <span className="admin-quiet-label">Take down…</span>
+        </button>
       </div>
       <Dialog
         open={open}
@@ -264,7 +287,7 @@ function HeldRow({ row }: { row: HeldSeasonRow }) {
         <Link href={`/admin/orgs/${row.orgSlug}`} className="admin-inline-link">
           {row.orgName}
         </Link>{" "}
-        · {row.heldAt.toISOString().slice(0, 10)}
+        · {formatDate(row.heldAt)}
         {row.heldByName === null ? "" : ` · by ${row.heldByName}`}
       </p>
       <blockquote className="pass-row-note">{row.reason}</blockquote>

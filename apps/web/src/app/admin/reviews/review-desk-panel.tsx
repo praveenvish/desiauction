@@ -11,6 +11,7 @@ import {
   IconStar,
   Pill,
   SectionCard,
+  StarGlyphs,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -24,6 +25,7 @@ import {
 } from "../../../server/admin/review-actions";
 import type { DeskAsk, DeskReview, ReviewDesk } from "../../../server/admin/review-views";
 import type { AskOutcome } from "../../../server/reviews/desk";
+import { formatDate } from "../../../lib/format-date";
 
 /**
  * ASK, THEN MODERATE (FR-1 Phase 2).
@@ -46,45 +48,51 @@ const DELIVERY_WORDS: Record<Extract<AskOutcome, { ok: true }>["delivery"], stri
 };
 
 function day(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return formatDate(date);
 }
 
 export function ReviewDeskPanel({ desk }: { desk: ReviewDesk }) {
   return (
     <>
       <AskCard />
-      <SectionCard
-        icon={<IconStar />}
-        tone="amber"
-        title="Waiting for a decision"
-        description={
-          desk.pending.length === 0
-            ? "Publish the ones worth standing behind; hide the rest"
-            : `${String(desk.pending.length)} to publish or hide`
-        }
-        flush
-        data-testid="review-desk-pending"
-      >
-        {desk.pending.length === 0 ? (
+      {desk.pending.length === 0 ? (
+        <SectionCard
+          icon={<IconStar />}
+          tone="gold"
+          title="Waiting for a decision"
+          flush
+          data-testid="review-desk-pending"
+        >
           <div className="admin-card-empty">
             <EmptyState
-              headingLevel={3}
+              size="compact"
+              icon={<IconStar />}
+              concept="done"
               title="Nothing waiting"
-              description="New reviews land here as people send them."
+              description={`New reviews land here as people send them · ${String(desk.published.length)} published · ${String(desk.hidden.length)} hidden`}
             />
           </div>
-        ) : (
+        </SectionCard>
+      ) : (
+        <SectionCard
+          icon={<IconStar />}
+          tone="gold"
+          title="Waiting for a decision"
+          description={`${String(desk.pending.length)} to publish or hide`}
+          flush
+          data-testid="review-desk-pending"
+        >
           <ul className="admin-rows is-stacked">
             {desk.pending.map((review) => (
               <ReviewRow key={review.id} review={review} />
             ))}
           </ul>
-        )}
-      </SectionCard>
+        </SectionCard>
+      )}
       {desk.published.length > 0 ? (
         <SectionCard
           icon={<IconGlobe />}
-          tone="green"
+          tone="neutral"
           title="Published"
           description={`${String(desk.published.length)} live`}
           flush
@@ -223,10 +231,7 @@ function ReviewRow({ review }: { review: DeskReview }) {
         <div>
           <p className="review-row-rating">
             <VisuallyHidden>{`${String(review.rating)} out of 5`}</VisuallyHidden>
-            <span aria-hidden="true">
-              {"★".repeat(review.rating)}
-              <span className="review-row-rating-rest">{"★".repeat(5 - review.rating)}</span>
-            </span>
+            <StarGlyphs rating={review.rating} />
           </p>
           <p className="pass-row-sub">
             {review.seasonName === null

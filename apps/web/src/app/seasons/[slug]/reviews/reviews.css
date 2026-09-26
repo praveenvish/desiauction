@@ -1,32 +1,16 @@
 /* REVIEWS (page.tsx, review-card.tsx, season-reviews-panel.tsx): the ask
    card, the rating summary, and one card per review. Tokens only. */
 
-.rv-ask-stats {
-  display: flex;
+.rv-ask-line {
   margin: 0;
-}
-
-.rv-ask-stats > div {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: var(--space-2);
-  gap: 2px;
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-
-.rv-ask-stats dt {
-  font-size: var(--text-xs-size);
+  font-size: var(--text-sm-size);
   color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-.rv-ask-stats dd {
-  margin: 0;
+.rv-ask-line strong {
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
 }
 
 .rv-ask-note {
@@ -206,4 +190,20 @@
     flex-basis: 100%;
     padding-inline-start: calc(40px + var(--space-3));
   }
+}
+
+/* The eligibility rules, one click away. */
+.rv-who > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-accent);
+  cursor: pointer;
+}
+
+.rv-who > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

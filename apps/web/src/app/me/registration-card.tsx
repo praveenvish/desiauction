@@ -61,7 +61,7 @@ export function RegistrationCard({
 }) {
   const verdict = verdictOf(season, money);
   return (
-    <Link href={`/seasons/${season.competitionSlug}/register`} className="me-reg">
+    <Link href={`/seasons/${season.competitionSlug}/register`} className="me-reg da-lift">
       <span className="me-reg-top">
         <span className="me-reg-when">{eyebrow}</span>
         <Pill tone={verdict.tone} dot>

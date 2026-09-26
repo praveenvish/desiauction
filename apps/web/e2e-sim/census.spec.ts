@@ -163,6 +163,8 @@ interface Row {
   ms: number;
   h1: string;
   overflowPx: number;
+  /** Up to five elements past the right edge, as tag.class@right. */
+  overflowBy: string[];
   pageErrors: string[];
   consoleErrors: string[];
   shot: string;
@@ -227,12 +229,56 @@ test("screen census", async ({ browser }) => {
           pageErrors.push(`NAV: ${String(e).slice(0, 150)}`);
         }
         const ms = Date.now() - t0;
+        // Overflow is measured against the DEVICE width, not `innerWidth`. On
+        // a mobile-emulated page Chrome widens the layout viewport to fit an
+        // overflowing page, so innerWidth grew with it and `scrollWidth -
+        // innerWidth` read 0 while organizer /home was 509pt wide on a 390pt
+        // phone (round 2). Element edges catch what a clipped root would hide:
+        // anything past the right edge that no scroll strip or clip contains.
+        const deviceWidth = page.viewportSize()?.width ?? 0;
         const info = await page
-          .evaluate(() => ({
-            h1: [...document.querySelectorAll("h1")].map((h) => h.textContent?.trim()).join(" | "),
-            overflowPx: document.documentElement.scrollWidth - window.innerWidth,
-          }))
-          .catch(() => ({ h1: "", overflowPx: 0 }));
+          .evaluate((vw) => {
+            const root = document.documentElement;
+            const contained = (el: Element): boolean => {
+              for (
+                let p = el.parentElement;
+                p !== null && p !== document.body;
+                p = p.parentElement
+              ) {
+                const style = getComputedStyle(p);
+                // A scroll strip or a clip counts only while it fits the screen
+                // itself; one that overflows is reported in its own right.
+                if (style.position === "fixed") return true;
+                if (style.overflowX !== "visible" && p.getBoundingClientRect().right <= vw + 1) {
+                  return true;
+                }
+              }
+              return false;
+            };
+            let widest = Math.max(root.scrollWidth, document.body.scrollWidth);
+            const offenders: string[] = [];
+            for (const el of document.body.querySelectorAll("*")) {
+              const rect = el.getBoundingClientRect();
+              if (rect.width === 0 || rect.right <= vw + 1 || contained(el)) continue;
+              const style = getComputedStyle(el);
+              if (style.visibility === "hidden" || style.position === "fixed") continue;
+              widest = Math.max(widest, Math.ceil(rect.right + window.scrollX));
+              if (offenders.length < 5) {
+                const cls = typeof el.className === "string" ? el.className.split(" ")[0] : "";
+                offenders.push(
+                  `${el.tagName.toLowerCase()}${cls ? `.${cls}` : ""}@${String(Math.ceil(rect.right))}`,
+                );
+              }
+            }
+            return {
+              h1: [...document.querySelectorAll("h1")]
+                .map((h) => h.textContent?.trim())
+                .join(" | "),
+              overflowPx: Math.max(0, widest - vw),
+              overflowBy: offenders,
+            };
+          }, deviceWidth)
+          .catch(() => ({ h1: "", overflowPx: 0, overflowBy: [] as string[] }));
         const file = `${device}-${route.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "") || "root"}.png`;
         await page.screenshot({ path: path.join(dir, file), fullPage: true }).catch(() => {});
         if ((route === "/home" || route === "/" || route === "/admin") && device === "laptop") {

@@ -14,6 +14,8 @@ import {
   type SelectHTMLAttributes,
 } from "react";
 
+import { IconChevronDown } from "../icons/icons";
+
 import styles from "./field.module.css";
 
 interface FieldChromeProps {
@@ -380,7 +382,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           {children}
         </select>
         <span className={styles["chevron"]} aria-hidden>
-          ▾
+          <IconChevronDown size={16} />
         </span>
       </div>
     </Chrome>

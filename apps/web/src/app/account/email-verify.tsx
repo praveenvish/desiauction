@@ -52,7 +52,7 @@ export function EmailVerify({ current, verified }: { current: string | null; ver
   return (
     <div className="email-verify acct-contact" data-testid="email-verify" id="email">
       <div className="acct-contact-head">
-        <IconTile icon={<IconMail />} tone="purple" size="sm" />
+        <IconTile icon={<IconMail />} tone="gold" size="sm" />
         <div className="acct-contact-text">
           <span className="acct-contact-label">Email</span>
           {confirmedAddress ? (

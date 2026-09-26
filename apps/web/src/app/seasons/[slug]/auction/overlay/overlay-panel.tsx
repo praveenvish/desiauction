@@ -30,6 +30,7 @@ export function OverlayPanel({
   sponsor,
   watchUrl,
   lotMedia,
+  auctionStatus,
 }: {
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
@@ -46,26 +47,42 @@ export function OverlayPanel({
    * case and the branded mark — not an empty slot — is what goes to air.
    */
   lotMedia: Record<string, LotMedia>;
+  /**
+   * The server's record of the auction's status, for before (or without) a
+   * snapshot: a finished night went to air as "Connecting…" and "No feed" for
+   * as long as the socket took to answer — for ever with the engine down.
+   */
+  auctionStatus?: string;
 }) {
   const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   // DA-20: this read `connection !== "open"` and ignored `stale`/`offline`
   // outright, so a device that went offline mid-auction kept broadcasting a
   // pulsing "Live" strip and a running price to air with no warning at all.
-  const { snapshot, remainingMs, ceremony, stale, offline } = useAuctionSocket(wsUrl);
+  const { snapshot, remainingMs, ceremony, stale: feedStale, offline } = useAuctionSocket(wsUrl);
   const feed = useLiveFeed(resolved, snapshot);
 
   const lot = snapshot?.currentLot ?? null;
   const outcome = snapshot?.lastOutcome ?? null;
-  const status = snapshot?.auctionStatus ?? null;
+  const status = snapshot?.auctionStatus ?? auctionStatus ?? null;
   const paused = status === "paused";
   const finished = status === "completed" || status === "reconciled" || status === "abandoned";
+  // A finished night has no feed to lose: "FEED LOST" / "NO FEED" over
+  // "Auction complete" was the overlay contradicting itself on air.
+  const stale = feedStale && !finished;
   const seconds = remainingMs === null ? null : Math.ceil(remainingMs / 1000);
   const showTimer = lot !== null && lot.endsAtMs !== null && seconds !== null && !paused && !stale;
 
   // The ticker: the auction's sold history, newest last. Falls back to a title
   // card before the first sale so the strip is never empty on air.
   const sold = feed.resolved.filter((entry) => entry.status === "sold");
+  // NEWEST FIRST, and after the night the headlines. The strip used to run
+  // oldest-first, so the frame on air (and the whole strip under reduced
+  // motion) opened on lot 1 — "SOLD Chirag Mehta" an hour after the hammer.
+  const ticker = finished
+    ? [...sold].sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0)).slice(0, 3)
+    : [...sold].reverse().slice(0, 12);
+  const tickerTag = finished ? "Top buy" : "Sold";
   const watchLabel = watchUrl.replace(/^https?:\/\//, "");
 
   // Which lower-third to show: the live lot, else the last outcome, else "up next".
@@ -124,10 +141,10 @@ export function OverlayPanel({
         </span>
         <div className="obs-ticker-track">
           <div className="obs-ticker-move">
-            {sold.length > 0
-              ? [...sold, ...sold].map((entry, index) => (
+            {ticker.length > 0
+              ? [...ticker, ...ticker].map((entry, index) => (
                   <span className="obs-ticker-item" key={`${entry.lotId}-${String(index)}`}>
-                    <span className="obs-ticker-tag">Sold</span>
+                    <span className="obs-ticker-tag">{tickerTag}</span>
                     <PlayerImage
                       name={entry.playerName ?? entry.lotNumber}
                       seed={entry.registrationId ?? lotSeed(entry.lotId, lotMedia)}

@@ -12,7 +12,6 @@
 /* /register is a PUBLIC surface with no identity bar above it, so it keeps the
    full opening measure. */
 .register {
-  min-height: 100vh;
   background: var(--surface);
   color: var(--text-primary);
   font-family: var(--font-text);
@@ -72,7 +71,7 @@
    single-competition and register surfaces that share this stylesheet. */
 .competitions .competitions-stack {
   max-width: 1280px;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .seasons-section {
@@ -88,17 +87,10 @@
 }
 
 .competition-link {
+  display: block;
   text-decoration: none;
   color: inherit;
   border-radius: var(--radius-lg);
-  transition:
-    transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out);
-}
-
-.competition-link:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-2);
 }
 
 .competition-link:focus-visible {
@@ -106,21 +98,19 @@
   outline-offset: 2px;
 }
 
-/* The gold hairline appears on hover only: at rest the grid is calm, and the
-   accent marks the one card the pointer is on. */
-.competition-link:hover .season-card {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+/* The card inside is the shared interactive Card (a surface at rest, the
+   da-lift recipe on hover) — the season card is a target, not a section. */
+.competition-link > * {
+  height: 100%;
 }
 
 .season-card {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   height: 100%;
-  padding: var(--space-5);
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  transition: border-color var(--duration-fast) var(--ease-out);
+  padding: var(--space-4) var(--space-5);
 }
 
 .season-card-top {
@@ -145,19 +135,20 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-6);
-  margin: var(--space-4) 0 0;
-  padding-top: var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border-subtle);
 }
 
 .season-card-meta div {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
 .season-card-meta dt {
+  display: inline-flex;
   font-size: var(--text-xs-size);
   line-height: var(--text-xs-line);
   letter-spacing: 0.06em;
@@ -343,7 +334,7 @@ p + .date-row {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 /* A flex item defaults to min-width:auto, so a card wrapping a wide table grew
@@ -501,16 +492,6 @@ p + .date-row {
   display: flex;
   gap: var(--space-2);
   justify-content: flex-end;
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
-  color: var(--text-muted);
-  font-size: var(--text-sm-size);
 }
 
 /* --- DA-35 registrations: honesty, reach and target size ------------------- */
@@ -2545,7 +2526,7 @@ p + .date-row {
 }
 
 .auc-progress-seg.is-sold {
-  background: var(--success-base);
+  background: var(--state-sold);
 }
 
 .auc-progress-seg.is-block {
@@ -2553,7 +2534,7 @@ p + .date-row {
 }
 
 .auc-progress-seg.is-unsold {
-  background: var(--danger-base);
+  background: var(--state-unsold);
 }
 
 .auc-progress-foot {
@@ -2587,7 +2568,7 @@ p + .date-row {
 }
 
 .auc-key.is-sold {
-  background: var(--success-base);
+  background: var(--state-sold);
 }
 
 .auc-key.is-block {
@@ -2595,7 +2576,7 @@ p + .date-row {
 }
 
 .auc-key.is-unsold {
-  background: var(--danger-base);
+  background: var(--state-unsold);
 }
 
 .auc-money {
@@ -2613,7 +2594,31 @@ p + .date-row {
 }
 
 .auc-block-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--text-accent);
+}
+
+.auc-live-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--live);
+  animation: auc-live-breath var(--duration-pulse) ease-in-out infinite;
+}
+
+@keyframes auc-live-breath {
+  50% {
+    transform: scale(0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auc-live-dot {
+    animation: none;
+  }
 }
 
 .auc-block-player {
@@ -2997,19 +3002,6 @@ p + .date-row {
     max-width: none;
     grid-column: 1 / -1;
     padding-top: 0;
-  }
-}
-
-/* Paging is a hand's job on a phone: 25 rows a page and 80 players means these
-   get tapped a lot, and they were the browser-small 32px. */
-@media (max-width: 640px) {
-  .pager {
-    gap: var(--space-2);
-  }
-
-  .pager > button {
-    min-height: 44px;
-    padding-inline: var(--space-3);
   }
 }
 

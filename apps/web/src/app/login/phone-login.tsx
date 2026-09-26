@@ -149,7 +149,7 @@ export function PhoneSignIn({
               ? "Register to play"
               : returning
                 ? "Welcome back"
-                : "Sign in"
+                : "Continue to DesiAuction"
           : "Enter your code"
       }
       sub={
@@ -162,7 +162,7 @@ export function PhoneSignIn({
                 ? "Sign in to continue where you were headed."
                 : returning
                   ? "Use your passkey, or we'll text you a code."
-                  : "We'll text you a 6-digit code — no password needed."
+                  : "New here or coming back — one code does both."
           : `We sent a 6-digit code to ${formatPhone(phone)}. It can take up to 30 seconds.`
       }
       method="phone"

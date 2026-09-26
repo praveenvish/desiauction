@@ -2,6 +2,7 @@ import { Badge, Card, IconCalendar, IconPin, VisuallyHidden } from "@desiauction
 import Link from "next/link";
 
 import type { CompetitionSummary } from "../../server/competition/competitions";
+import { formatDateRange } from "../../lib/format-date";
 
 // The season card, extracted so the tournaments index and the seasons index
 // render an edition identically. It was inline in /seasons; a second copy would
@@ -29,8 +30,8 @@ import type { CompetitionSummary } from "../../server/competition/competitions";
 export const STATUS_TONE = {
   draft: "neutral",
   setup: "neutral",
-  registration_open: "info",
-  registration_closed: "warning",
+  registration_open: "success",
+  registration_closed: "neutral",
 } as const;
 
 export const STATUS_LABEL = {
@@ -91,23 +92,7 @@ export function seasonStatusBadge(
 
 /** "1 Aug – 15 Aug 2026", or a single dated end, or nothing. Days arrive as ISO. */
 export function dateRange(startsOn: string | null, endsOn: string | null): string | null {
-  const day = (iso: string, withYear: boolean): string =>
-    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      ...(withYear ? { year: "numeric" } : {}),
-      timeZone: "UTC",
-    });
-  if (startsOn === null && endsOn === null) {
-    return null;
-  }
-  if (startsOn === null) {
-    return day(endsOn ?? "", true);
-  }
-  if (endsOn === null) {
-    return day(startsOn, true);
-  }
-  return `${day(startsOn, false)} – ${day(endsOn, true)}`;
+  return startsOn === null && endsOn === null ? null : formatDateRange(startsOn, endsOn);
 }
 
 export function SeasonCard({
@@ -125,7 +110,7 @@ export function SeasonCard({
   const badge = seasonStatusBadge(season.status, season.settlement, season.counts?.auctionDone);
   return (
     <Link href={`/seasons/${season.slug}`} className="competition-link">
-      <Card padding="none">
+      <Card padding="none" interactive>
         <article className="season-card">
           <div className="season-card-top">
             {/* "Which edition am I running?" is the question this page exists to
@@ -146,7 +131,7 @@ export function SeasonCard({
               {when !== null ? (
                 <div>
                   <dt>
-                    <IconCalendar width={14} height={14} aria-hidden />
+                    <IconCalendar size={16} aria-hidden />
                     <VisuallyHidden>When</VisuallyHidden>
                   </dt>
                   <dd>{when}</dd>
@@ -155,7 +140,7 @@ export function SeasonCard({
               {season.location !== null ? (
                 <div>
                   <dt>
-                    <IconPin width={14} height={14} aria-hidden />
+                    <IconPin size={16} aria-hidden />
                     <VisuallyHidden>Where</VisuallyHidden>
                   </dt>
                   <dd>{season.location}</dd>

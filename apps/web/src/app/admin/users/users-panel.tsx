@@ -1,12 +1,42 @@
-import { EmptyState, IconArrowRight, IconSearch, IconUsers, SectionCard } from "@desiauction/ui";
+import {
+  EmptyState,
+  Pager,
+  SegmentedTabs,
+  Toolbar,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSpacer,
+} from "@desiauction/ui";
 import Link from "next/link";
 
-import { formatCount, maskPersonContact } from "../../../server/admin/format";
+import { countNoun, formatCount, maskPersonContact } from "../../../server/admin/format";
 import type { UserDirectory } from "../../../server/admin/views";
-import { ReadOnlyNotice, RelativeTime } from "../admin-ui";
+import { AdminFilterForm } from "../admin-filter-form";
+import { RelativeTime, TableCount, monogram } from "../admin-ui";
+
+const USER_FILTERS: readonly { key: UserDirectory["filter"]; label: string }[] = [
+  { key: "all", label: "Everyone" },
+  { key: "players", label: "Players" },
+  { key: "profiled", label: "With a profile" },
+];
+
+function filterHref(query: string, filter: UserDirectory["filter"]): string {
+  const params = new URLSearchParams();
+  if (query !== "") params.set("q", query);
+  if (filter !== "all") params.set("filter", filter);
+  const qs = params.toString();
+  return qs === "" ? "/admin/users" : `/admin/users?${qs}`;
+}
 
 /** PX-9 §3 — the user directory. GET-form search, linkable results, no writes. */
-export function UsersPanel({ directory }: { directory: UserDirectory }) {
+export function UsersPanel({
+  directory,
+  paged = false,
+}: {
+  directory: UserDirectory;
+  /** On a later page (a cursor is set): the pager offers the way back. */
+  paged?: boolean;
+}) {
   const { rows, total, platformTotal, query, nextCursor } = directory;
   const nextHref =
     nextCursor === null
@@ -19,57 +49,45 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
         }).toString()}`;
   return (
     <>
-      <ReadOnlyNotice />
-      <SectionCard
-        icon={<IconUsers />}
-        tone="blue"
-        title="People"
-        description={
-          <span data-testid="admin-user-count">
-            {query === ""
-              ? `${formatCount(rows.length)} shown · ${formatCount(platformTotal)} user${platformTotal === 1 ? "" : "s"} on the platform`
-              : `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} on the platform`}
-          </span>
-        }
-        flush
-      >
-        <form className="admin-filters" method="get" role="search" data-testid="admin-user-search">
-          <label className="admin-search" htmlFor="admin-user-q">
-            <span className="admin-sr-only">Search users</span>
-            <IconSearch size={18} aria-hidden />
-            <input
+      <div className="admin-panel">
+        <AdminFilterForm testId="admin-user-search">
+          <Toolbar>
+            <ToolbarSearch
               id="admin-user-q"
               name="q"
-              type="search"
-              defaultValue={query}
+              label="Search users"
               placeholder="Name or mobile number"
-              className="admin-search-input"
+              defaultValue={query}
+              submitLabel="Search"
             />
-          </label>
-          {/* PI-1 P6: profile-aware facet. URL-driven like every admin filter. */}
-          <span className="admin-field">
-            <label className="admin-field-label" htmlFor="admin-user-filter">
-              Show
-            </label>
-            <select
-              id="admin-user-filter"
-              name="filter"
-              defaultValue={directory.filter}
-              className="admin-search-input"
-              data-testid="admin-user-filter"
-            >
-              <option value="all">Everyone</option>
-              <option value="players">Players (has a registration)</option>
-              <option value="profiled">With a cricket profile</option>
-            </select>
-          </span>
-          <button type="submit" className="admin-search-submit">
-            Search
-          </button>
-        </form>
+            {/* PI-1 P6: the profile-aware facet, as the same segmented links
+                the organizations directory uses — one filter look across
+                administration. URL-driven like every admin filter. */}
+            <SegmentedTabs
+              label="Show"
+              testId="admin-user-filter"
+              items={USER_FILTERS.map((option) => ({
+                key: option.key,
+                label: option.label,
+                active: option.key === directory.filter,
+                href: filterHref(query, option.key),
+              }))}
+            />
+            {directory.filter !== "all" ? (
+              <input type="hidden" name="filter" value={directory.filter} />
+            ) : null}
+            <ToolbarSpacer />
+            <ToolbarCount testId="admin-user-count">
+              {query === ""
+                ? `${formatCount(rows.length)} of ${formatCount(platformTotal)}`
+                : `${formatCount(rows.length)} shown · ${formatCount(total)} match · ${formatCount(platformTotal)} total`}
+            </ToolbarCount>
+          </Toolbar>
+        </AdminFilterForm>
         {rows.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No user matches"
               description={
@@ -82,7 +100,7 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
         ) : (
           <>
             <div className="admin-table-wrap">
-              <table className="admin-table" data-testid="admin-user-table">
+              <table className="admin-table is-linked da-rows" data-testid="admin-user-table">
                 <thead>
                   <tr>
                     <th scope="col">User</th>
@@ -92,15 +110,17 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                     <th scope="col" className="admin-num">
                       Active grants
                     </th>
-                    <th scope="col">Joined</th>
                     <th scope="col">Last activity</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td data-label="User">
-                        <span className="admin-cell-main">
+                      <td data-label="User" data-cell="title">
+                        <span className="admin-cell-main admin-person">
+                          <span className="admin-monogram" aria-hidden>
+                            {monogram(row.name)}
+                          </span>
                           <Link href={`/admin/users/${row.id}`} className="admin-name">
                             {row.name ?? "Unnamed"}
                           </Link>
@@ -115,19 +135,44 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                             {maskPersonContact(row)}
                           </span>
                         </span>
+                        {/* The phone row's one line of meta (the counts' columns step
+                            aside there); zeros say nothing, so they are left out. */}
+                        <span className="da-row-meta">
+                          <span data-private>{maskPersonContact(row)}</span>
+                          {[
+                            row.orgs > 0 ? countNoun(row.orgs, "organization") : null,
+                            row.activeGrants > 0
+                              ? countNoun(row.activeGrants, "active grant")
+                              : null,
+                          ]
+                            .filter((part) => part !== null)
+                            .map((part) => ` · ${part}`)
+                            .join("")}
+                        </span>
                       </td>
-                      <td data-label="Organizations" className="admin-count admin-num">
-                        {formatCount(row.orgs)}
+                      <td
+                        data-label="Organizations"
+                        className="admin-count admin-num"
+                        data-zero={row.orgs === 0 || undefined}
+                      >
+                        <TableCount n={row.orgs} />
                       </td>
-                      <td data-label="Active grants" className="admin-count admin-num">
-                        {formatCount(row.activeGrants)}
+                      <td
+                        data-label="Active grants"
+                        className="admin-count admin-num"
+                        data-zero={row.activeGrants === 0 || undefined}
+                      >
+                        <TableCount n={row.activeGrants} />
                       </td>
-                      <td data-label="Joined">
-                        <RelativeTime at={row.createdAt} />
-                      </td>
-                      <td data-label="Last activity">
+                      {/* Joined and Last activity were two columns saying the
+                          same "4m ago" for most people. One column: the last
+                          thing they did, and when they joined only when they
+                          have done nothing since. */}
+                      <td data-label="Last activity" className="is-side" data-cell="figure">
                         {row.lastActivityAt === null ? (
-                          <span className="admin-meta">Never</span>
+                          <span className="admin-meta">
+                            Joined <RelativeTime at={row.createdAt} />
+                          </span>
                         ) : (
                           <RelativeTime at={row.lastActivityAt} />
                         )}
@@ -137,19 +182,21 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                 </tbody>
               </table>
             </div>
-            <nav className="admin-pagination" aria-label="More users">
-              {nextHref === null ? (
-                <span className="admin-meta">End of the list.</span>
-              ) : (
-                <Link href={nextHref} data-testid="admin-user-next">
-                  Next 50
-                  <IconArrowRight size={16} className="icon-trail" />
-                </Link>
-              )}
-            </nav>
+            <div className="admin-pagination">
+              <Pager
+                label="More users"
+                total={total}
+                shown={rows.length}
+                noun="users"
+                firstHref={paged ? filterHref(query, directory.filter) : null}
+                nextHref={nextHref}
+                linkComponent={Link}
+                nextTestId="admin-user-next"
+              />
+            </div>
           </>
         )}
-      </SectionCard>
+      </div>
     </>
   );
 }

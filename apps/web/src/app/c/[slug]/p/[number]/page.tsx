@@ -197,19 +197,16 @@ export default async function PlayerProfilePage({
    * lead now; the number and the status stay in the hero where they were.
    */
   const pricePaise = poster?.input.outcome === "sold" ? poster.input.pricePaise : null;
+  const soldFor =
+    pricePaise !== null && poster !== null
+      ? formatAmount(paise(pricePaise), poster.input.unit)
+      : null;
+  /*
+   * WOW PASS: the price is why this link gets opened, so it is the hero's
+   * loudest figure, with the team beside it — and the strip below no longer
+   * repeats team, price, role or age, which the hero now says once.
+   */
   const facts: Stat[] = [
-    ...(player.teamName !== null ? [{ value: player.teamName, label: "Team" }] : []),
-    ...(pricePaise !== null && poster !== null
-      ? [
-          {
-            // In the season's own unit (0091): a points league reads "pts".
-            value: formatAmount(paise(pricePaise), poster.input.unit),
-            label: "Sold for",
-          },
-        ]
-      : []),
-    { value: roleLabelIn(sportPackFor(player.sport), player.role), label: "Role" },
-    ...(player.age !== null ? [{ value: `${String(player.age)} yrs`, label: "Age" }] : []),
     ...(batting !== null ? [{ value: batting, label: "Batting" }] : []),
     ...(bowling !== null ? [{ value: bowling, label: "Bowling" }] : []),
     // Whatever else this season's sport asks about, already labelled by its
@@ -220,36 +217,74 @@ export default async function PlayerProfilePage({
   return (
     <main className="public-page mk">
       <PageHero
-        sport={player.sport}
         /* The photograph IS the page — it is why the card gets forwarded — so
-           it sits in the hero rather than floating alone in a card below it,
-           which is where a 1440px-wide title band left it. The consent and
-           under-18 gates are upstream, in `publicPlayer`: a `photoUrl` of null
-           arrives here already decided and draws the initials portrait. */
-        art={
-          <div className="player-portrait">
-            <PlayerImage
-              name={player.name}
-              seed={player.registrationId}
-              size="hero"
-              src={player.photoUrl}
-              // The caller sizes the box (see `fluid` in player-image.tsx): at
-              // 160px fixed, the portrait sat like a thumbnail in a half-width
-              // hero column.
-              fluid
-              decorative
-            />
-          </div>
-        }
+           it sits in the hero rather than floating alone in a card below it.
+           The consent and under-18 gates are upstream, in `publicPlayer`.
+           Without a photo there is no portrait to show: a 200px "AD" card was
+           the biggest "no content yet" signal on a shareable page, so the
+           initials become a compact avatar beside the name instead (wow pass,
+           round 2). */
+        {...(player.photoUrl !== null
+          ? {
+              sport: player.sport,
+              art: (
+                <div className="player-portrait">
+                  <PlayerImage
+                    name={player.name}
+                    seed={player.registrationId}
+                    size="hero"
+                    src={player.photoUrl}
+                    // The caller sizes the box (see `fluid` in player-image.tsx).
+                    fluid
+                    decorative
+                  />
+                </div>
+              ),
+            }
+          : { watermark: player.sport })}
         status={
           <Badge tone={signed ? "neutral" : "success"} data-testid="player-status">
             {status}
           </Badge>
         }
-        eyebrow={<Link href={`/c/${slug}`}>{player.competitionName}</Link>}
-        title={player.name}
+        eyebrow={
+          <>
+            <Link href={`/c/${slug}`}>{player.competitionName}</Link> · #{player.number}
+          </>
+        }
+        title={
+          player.photoUrl === null ? (
+            <span className="player-title">
+              <span className="player-avatar" aria-hidden>
+                <PlayerImage
+                  name={player.name}
+                  seed={player.registrationId}
+                  size="xl"
+                  shape="round"
+                  src={null}
+                  fluid
+                  decorative
+                />
+              </span>
+              <span>{player.name}</span>
+            </span>
+          ) : (
+            player.name
+          )
+        }
         lede={roleAge}
-        meta={<HeroFact>#{player.number}</HeroFact>}
+        meta={
+          soldFor !== null ? (
+            <p className="player-sold" data-testid="player-sold">
+              <span className="player-sold-price">{soldFor}</span>
+              {player.teamName !== null ? (
+                <span className="player-sold-team">to {player.teamName}</span>
+              ) : null}
+            </p>
+          ) : player.teamName !== null ? (
+            <HeroFact>{player.teamName}</HeroFact>
+          ) : undefined
+        }
         actions={
           <>
             {player.competitionOpen ? (
@@ -272,7 +307,7 @@ export default async function PlayerProfilePage({
                 See the {player.teamName} squad
               </ButtonLink>
             ) : null}
-            <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg">
+            <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg" className="pk-hero-textlink">
               <IconArrowLeft size={18} /> Back to {player.competitionName}
             </ButtonLink>
           </>
@@ -280,7 +315,9 @@ export default async function PlayerProfilePage({
       />
 
       <PageBody>
-        <StatStrip label={`${player.name} — player details`} stats={facts} />
+        {facts.length > 0 ? (
+          <StatStrip label={`${player.name} — player details`} stats={facts} />
+        ) : null}
 
         {/* The page the OG route calls "the viral unit — a player posts their
             own card" had exactly one action on it: a back link. No way for the

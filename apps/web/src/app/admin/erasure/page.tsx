@@ -1,9 +1,10 @@
-import { EmptyState, IconTrash, SectionCard, ToastProvider } from "@desiauction/ui";
+import { IconTrash, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
 import { platformPrivacyGate } from "../../../server/admin/authz";
 import { erasureDesk } from "../../../server/privacy/desk";
+import { AdminEmpty, AdminPageHead } from "../admin-ui";
 import { ErasureDeskPanel } from "./erasure-desk-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
@@ -30,23 +31,20 @@ export default async function AdminErasurePage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head">
-            <p className="dash-hint">
-              Account deletion requests, oldest first. The account page promises a reply within
-              seven days. Erasing deletes the person&apos;s own profile and anonymizes them in every
-              shared record; declining needs a reason they will read.
-            </p>
-          </header>
+          <AdminPageHead>
+            Deletion requests, oldest first. Each is promised a reply within seven days.
+          </AdminPageHead>
           {desk.open.length === 0 && desk.decided.length === 0 ? (
-            <SectionCard icon={<IconTrash />} tone="neutral" title="Deletion requests">
-              <EmptyState
-                headingLevel={3}
-                title="Nobody has asked"
-                description="When somebody asks to delete their account from the account page, the request appears here."
-              />
-            </SectionCard>
+            <div className="admin-panel">
+              <AdminEmpty icon={<IconTrash size={24} weight="duotone" />} title="Nobody has asked">
+                When somebody asks to delete their account from the account page, the request
+                appears here.
+              </AdminEmpty>
+            </div>
           ) : (
-            <ErasureDeskPanel desk={desk} />
+            // A server render: the clock cannot disagree with a client pass.
+            // eslint-disable-next-line react-hooks/purity
+            <ErasureDeskPanel desk={desk} nowMs={Date.now()} />
           )}
         </div>
       </main>

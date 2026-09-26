@@ -97,4 +97,5 @@
   transform: translateY(-50%);
   pointer-events: none;
   color: var(--text-muted);
+  display: flex;
 }

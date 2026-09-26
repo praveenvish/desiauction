@@ -7,6 +7,7 @@ import {
   IconBolt,
   IconBroadcast,
   IconCheckCircle,
+  IconChevronDown,
   IconClock,
   IconGavel,
   IconUsers,
@@ -23,16 +24,19 @@ import { moneyFormat } from "../../../lib/money";
 import type { EngineRoom, LiveBoardView } from "../../../server/admin/live-watch";
 import { adminLiveBoard } from "../../../server/admin/live-watch";
 import type { LiveAuctionRow, RoomState } from "../../../server/admin/live-views";
+import { KpiValue } from "../admin-ui";
 import { LiveFreshness } from "../live-freshness";
 import { ageLabel, istWhen, usePolled } from "../use-polled";
 
 const REFRESH_MS = 10_000;
 /** "Never closed" is a backlog, not a feed: the longest-silent tail folds away. */
 const STALE_SHOWN = 10;
+/** The last day's closes: the newest few, the rest behind "Show all". */
+const ENDED_SHOWN = 5;
 
 const STATE_BADGE: Record<RoomState, { tone: KitTone; label: string }> = {
   active: { tone: "green", label: "Bidding" },
-  quiet: { tone: "blue", label: "Quiet" },
+  quiet: { tone: "neutral", label: "Quiet" },
   paused: { tone: "amber", label: "Paused" },
   stale: { tone: "neutral", label: "Silent" },
 };
@@ -65,31 +69,38 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         revoked={revoked}
       />
 
+      {/* The console's one KPI tile (StatCard), as on the overview. A zero is
+          the calm answer and reads muted; only trouble takes a colour. */}
       <StatGrid testId="live-summary">
         <StatCard
           icon={<IconGavel />}
-          tone="gold"
-          value={String(data.running.length)}
+          concept="auction"
+          value={<KpiValue n={data.running.length} />}
           label="Auctions running"
         />
-        <StatCard icon={<IconBolt />} tone="blue" value={String(pulse)} label="Bids · last 5 min" />
+        <StatCard
+          icon={<IconBolt />}
+          concept="neutral"
+          value={<KpiValue n={pulse} />}
+          label="Bids · last 5 min"
+        />
         <StatCard
           icon={<IconUsers />}
-          tone="green"
-          value={String(connected)}
+          concept="neutral"
+          value={<KpiValue n={connected} />}
           label="People connected"
         />
         <StatCard
           icon={<IconAlert />}
-          tone={troubled.length > 0 ? "red" : "neutral"}
-          value={String(troubled.length)}
+          concept={troubled.length > 0 ? "alert" : "neutral"}
+          value={<KpiValue n={troubled.length} />}
           label="Rooms with engine trouble"
         />
       </StatGrid>
 
       <SectionCard
         icon={<IconBroadcast />}
-        tone="red"
+        tone={data.running.length > 0 ? "green" : "neutral"}
         title="Running now"
         description={
           data.running.length === 0
@@ -102,13 +113,25 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         {data.running.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No auction is running"
               description={`When an organizer opens one, it appears here within ${String(REFRESH_MS / 1000)} seconds.`}
             />
           </div>
         ) : (
-          <ul className="admin-rows is-stacked">
+          <ul className="admin-rooms">
+            <li className="admin-room admin-room-head" aria-hidden>
+              <span>Auction</span>
+              <span className="admin-room-facts">
+                <span>Lots</span>
+                <span>Spent</span>
+                <span>Bids · 5 min</span>
+                <span>Last activity</span>
+                <span>Room</span>
+              </span>
+              <span />
+            </li>
             {data.running.map((row) => (
               <RoomRow
                 key={row.auctionId}
@@ -122,18 +145,21 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
       </SectionCard>
 
       {data.stale.length > 0 ? (
-        <SectionCard
-          icon={<IconClock />}
-          tone="amber"
-          title={
-            <>
-              Never closed <span className="admin-count">· {String(data.stale.length)}</span>
-            </>
-          }
-          description="Marked live, but nothing has happened in over twelve hours — an auction night that ended without anyone closing it. Only the organizer can close it, from their cockpit."
-          flush
-          data-testid="live-stale"
-        >
+        // A backlog, not a feed: one warning line, opened on demand.
+        <details className="admin-fold" data-testid="live-stale">
+          <summary>
+            <span className="admin-fold-icon" data-tone="warning" aria-hidden>
+              <IconClock size={16} />
+            </span>
+            <span className="admin-fold-title">
+              <strong>Silent over 12h · {String(data.stale.length)}</strong>
+              <span className="admin-meta">
+                Live or paused, with no event for over twelve hours — never closed. Only the
+                organizer can close one, from their cockpit.
+              </span>
+            </span>
+            <IconChevronDown size={16} className="admin-fold-caret" />
+          </summary>
           <ul className="admin-rows">
             {data.stale.slice(0, STALE_SHOWN).map((row) => (
               <StaleRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
@@ -149,39 +175,66 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
               </ul>
             </details>
           ) : null}
-        </SectionCard>
+        </details>
       ) : null}
 
       <SectionCard
         icon={<IconCheckCircle />}
         tone="neutral"
         title="Ended in the last 24 hours"
+        description={data.ended.length === 0 ? undefined : `${String(data.ended.length)} closed`}
         flush
         data-testid="live-ended"
       >
         {data.ended.length === 0 ? (
-          <p className="admin-card-empty">No auction has closed in the last day.</p>
+          <div className="admin-card-empty">
+            <EmptyState
+              size="compact"
+              icon={<IconGavel />}
+              title="No auction has closed in the last day"
+            />
+          </div>
         ) : (
-          <ul className="admin-rows">
-            {data.ended.map((row) => (
-              <li key={row.auctionId}>
-                <span className="admin-live-name">
-                  <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
-                  <span className="admin-meta">
-                    {row.orgName} · {row.status === "abandoned" ? "abandoned" : "closed"}{" "}
-                    {istWhen(row.endedAtMs, data.generatedAtMs)}
-                  </span>
-                </span>
-                <span className="admin-meta">
-                  {row.sold} sold · {row.unsold} unsold ·{" "}
-                  {moneyFormat(row.auctionUnit).compact(row.moneyMoved)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="admin-rows admin-rows-dense">
+              {data.ended.slice(0, ENDED_SHOWN).map((row) => (
+                <EndedRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
+              ))}
+            </ul>
+            {data.ended.length > ENDED_SHOWN ? (
+              // The last day's closes are a record, not a feed: the newest few
+              // are shown, the rest one click away.
+              <details className="admin-more">
+                <summary>Show all {String(data.ended.length)}</summary>
+                <ul className="admin-rows admin-rows-dense">
+                  {data.ended.slice(ENDED_SHOWN).map((row) => (
+                    <EndedRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </>
         )}
       </SectionCard>
     </>
+  );
+}
+
+function EndedRow({ row, nowMs }: { row: LiveBoardView["ended"][number]; nowMs: number }) {
+  return (
+    <li>
+      <span className="admin-live-name">
+        <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
+        <span className="admin-meta">
+          {row.orgName} · {row.status === "abandoned" ? "abandoned" : "closed"}{" "}
+          {istWhen(row.endedAtMs, nowMs)}
+        </span>
+      </span>
+      <span className="admin-meta admin-num-line">
+        {row.sold} sold · {row.unsold} unsold ·{" "}
+        {moneyFormat(row.auctionUnit).compact(row.moneyMoved)}
+      </span>
+    </li>
   );
 }
 
@@ -257,46 +310,81 @@ function RoomRow({
   const trouble = engineTrouble(engine);
   const pct = (n: number) => (row.lots.total > 0 ? (n / row.lots.total) * 100 : 0);
   return (
-    <li data-testid={`live-room-${row.auctionId}`}>
-      <div className="admin-live-head">
+    <li
+      className="admin-room"
+      data-state={row.state}
+      data-trouble={trouble !== null || undefined}
+      data-testid={`live-room-${row.auctionId}`}
+    >
+      <span className="admin-room-name">
+        <span className="admin-room-dot" aria-hidden />
         <span className="admin-live-name">
           <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
-          <span className="admin-meta">
+          {/* One line: the opening time is the hover, so "IST" can no longer
+              fall onto a third line and double the row. */}
+          <span
+            className="admin-meta admin-live-sub"
+            title={row.openedAtMs === null ? undefined : `Opened ${istWhen(row.openedAtMs, nowMs)}`}
+          >
             {row.orgName} · {row.sport}
-            {row.openedAtMs === null ? "" : ` · opened ${istWhen(row.openedAtMs, nowMs)}`}
+            {row.openedAtMs === null ? null : (
+              <span className="admin-sr-only"> · opened {istWhen(row.openedAtMs, nowMs)}</span>
+            )}
           </span>
         </span>
-        <Pill tone={badge.tone} dot>
-          {badge.label}
-        </Pill>
-      </div>
-
-      <span className="auc-progress" aria-hidden>
-        <span
-          className="auc-progress-seg is-sold"
-          style={{ width: `${String(pct(row.lots.sold))}%` }}
-        />
-        <span
-          className="auc-progress-seg is-unsold"
-          style={{ width: `${String(pct(row.lots.unsold))}%` }}
-        />
+        {/* "Quiet" on every row said nothing. The pill appears only when the
+            room is doing something worth a glance; the dot always carries it. */}
+        {row.state === "quiet" ? (
+          <span className="admin-sr-only">{badge.label}</span>
+        ) : (
+          <Pill tone={badge.tone} dot>
+            {badge.label}
+          </Pill>
+        )}
       </span>
 
-      <dl className="admin-live-facts">
+      <dl className="admin-room-facts">
         <div>
           <dt>Lots</dt>
-          <dd>
-            {row.lots.sold} sold · {row.lots.unsold} unsold · {row.lots.remaining} left
+          <dd className="admin-room-lots">
+            <span className="auc-progress" aria-hidden>
+              <span
+                className="auc-progress-seg is-sold"
+                style={{ width: `${String(pct(row.lots.sold))}%` }}
+              />
+              <span
+                className="auc-progress-seg is-unsold"
+                style={{ width: `${String(pct(row.lots.unsold))}%` }}
+              />
+            </span>
+            <span
+              title={`${String(row.lots.sold)} sold · ${String(row.lots.unsold)} unsold · ${String(row.lots.remaining)} left`}
+            >
+              {row.lots.sold}/{row.lots.total}
+              <span className="admin-sr-only">
+                {" "}
+                sold · {row.lots.unsold} unsold · {row.lots.remaining} left
+              </span>
+            </span>
           </dd>
         </div>
         <div>
           <dt>Spent</dt>
-          <dd>{moneyFormat(row.auctionUnit).compact(row.moneyMoved)}</dd>
+          <dd>
+            {row.moneyMoved === 0 ? (
+              <span data-zero>—</span>
+            ) : (
+              moneyFormat(row.auctionUnit).compact(row.moneyMoved)
+            )}
+          </dd>
         </div>
         <div>
           <dt>Bids</dt>
           <dd>
-            {row.bids.lastFiveMinutes} in 5 min · {row.bids.total} total
+            <span data-zero={row.bids.lastFiveMinutes === 0 || undefined}>
+              {row.bids.lastFiveMinutes}
+            </span>
+            <span className="admin-meta"> · {row.bids.total} total</span>
           </dd>
         </div>
         <div>
@@ -305,19 +393,26 @@ function RoomRow({
         </div>
         <div>
           <dt>Room</dt>
-          <dd>{engineLine(engine)}</dd>
+          {/* Trouble is said in the Room column, in words, where the eye
+              already looks — not as a second full-width strip per row. */}
+          {trouble !== null ? (
+            // The note role sits on a span inside the <dd>: a <dd> may not
+            // carry one (axe aria-allowed-role, and it breaks the <dl>).
+            <dd className="admin-room-trouble">
+              <span role="note" data-testid="live-room-trouble">
+                <IconAlert size={16} />
+                {trouble}
+              </span>
+            </dd>
+          ) : (
+            <dd className="admin-meta">{engineLine(engine)}</dd>
+          )}
         </div>
       </dl>
 
-      {trouble !== null ? (
-        <p className="admin-live-trouble" role="note" data-testid="live-room-trouble">
-          {trouble}
-        </p>
-      ) : null}
-
-      <Link href={`/admin/auctions/${row.auctionId}`} className="admin-card-link">
-        Watch this auction
-        <IconArrowRight size={16} className="icon-trail" />
+      <Link href={`/admin/auctions/${row.auctionId}`} className="admin-room-watch">
+        Watch<span className="admin-sr-only"> this auction</span>
+        <IconArrowRight size={16} />
       </Link>
     </li>
   );

@@ -1,6 +1,7 @@
-import { ButtonLink, IconGavel, IconHelp, IconTrophy } from "@desiauction/ui";
+import { ButtonLink, IconMessageCircle, IconSearch, IconTrophy } from "@desiauction/ui";
+import Link from "next/link";
 
-import { PageBody, PageHero, TopicCard, TopicGrid } from "../components/public/public-kit";
+import "../components/public/public-kit.css";
 import { PageTitleHidden } from "../components/shell/page-title";
 import { ThemeReplay } from "../components/shell/theme-replay";
 import "./marketing.css";
@@ -22,44 +23,39 @@ export default function NotFound() {
       {/* A dead end owns its heading: the console shell stands its title down
           rather than framing a page that isn't there. */}
       <PageTitleHidden />
-      <PageHero
-        size="compact"
-        eyebrow="Lost ball"
-        title="This page doesn't exist"
-        lede="It may have moved, the link was mistyped — or your account may not have access to it."
-        actions={
-          <>
+      {/* One centred composition: the numerals, the sentence, the ways out.
+          It used to be a band, then a cream body holding three cards in a
+          four-column grid (the right quarter empty), with a gavel standing in
+          for "search". */}
+      <header className="pk-hero pk-soon nf" data-theme="floodlight">
+        <div className="pk-soon-inner">
+          <p className="nf-code" aria-hidden>
+            4<span className="nf-ball" />4
+          </p>
+          <p className="pk-eyebrow">Lost ball</p>
+          <h1 className="pk-hero-title">This page doesn&apos;t exist</h1>
+          <p className="pk-hero-lede">
+            It may have moved, the link was mistyped — or your account may not have access to it.
+          </p>
+          <div className="pk-hero-actions pk-soon-actions">
             <ButtonLink href="/home">Go home</ButtonLink>
             <ButtonLink href="/help" variant="secondary">
               Get help
             </ButtonLink>
-          </>
-        }
-      />
-      <PageBody>
-        <TopicGrid>
-          <TopicCard
-            href="/c"
-            icon={<IconTrophy width={20} height={20} />}
-            title="Browse tournaments"
-            description="Every tournament published on DesiAuction, open to anyone."
-          />
-          <TopicCard
-            href="/help"
-            tone="blue"
-            icon={<IconHelp width={20} height={20} />}
-            title="Help centre"
-            description="Guides for organizers, players and team owners."
-          />
-          <TopicCard
-            href="/search"
-            tone="neutral"
-            icon={<IconGavel width={20} height={20} />}
-            title="Search the site"
-            description="Find a help article, a legal document or a page by name."
-          />
-        </TopicGrid>
-      </PageBody>
+          </div>
+          <nav className="nf-links" aria-label="Other ways in">
+            <Link href="/c" className="nf-link">
+              <IconTrophy size={20} weight="duotone" /> Browse tournaments
+            </Link>
+            <Link href="/search" className="nf-link">
+              <IconSearch size={20} weight="duotone" /> Search the site
+            </Link>
+            <Link href="/support" className="nf-link">
+              <IconMessageCircle size={20} weight="duotone" /> Contact support
+            </Link>
+          </nav>
+        </div>
+      </header>
     </main>
   );
 }

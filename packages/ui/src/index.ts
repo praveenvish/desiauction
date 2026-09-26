@@ -6,6 +6,7 @@ export { Button, ButtonLink, buttonClassName } from "./primitives/button";
 export type { ButtonProps, ButtonLinkProps, ButtonVariant, ButtonSize } from "./primitives/button";
 export { LinkComponentProvider, isRouterHref, useLinkComponent } from "./primitives/link-context";
 export { Badge } from "./primitives/badge";
+export { StarGlyphs } from "./primitives/star-glyphs";
 export type { BadgeProps, BadgeTone } from "./primitives/badge";
 export { Card, cardClassName } from "./primitives/card";
 export type { CardProps, CardElevation } from "./primitives/card";
@@ -15,12 +16,22 @@ export { Skeleton } from "./primitives/skeleton";
 export type { SkeletonProps } from "./primitives/skeleton";
 export { EmptyState } from "./primitives/empty-state";
 export type { EmptyStateProps } from "./primitives/empty-state";
+// The round-3B system: one pager, one list row, one eyebrow, one scroll strip.
+export { Pager, pageWindow } from "./primitives/pager";
+export type { PagerProps } from "./primitives/pager";
+export { ListRow, StateDot } from "./primitives/list-row";
+export type { ListRowProps } from "./primitives/list-row";
+export { Eyebrow } from "./primitives/eyebrow";
+export { ScrollStrip } from "./primitives/scroll-strip";
+export type { ScrollStripProps } from "./primitives/scroll-strip";
+export { useScrollStrip } from "./primitives/use-scroll-strip";
 export { Stat, StatRow } from "./primitives/stat";
 export type { StatProps, StatRowProps } from "./primitives/stat";
 export { Field, Select } from "./primitives/field";
 export type { FieldProps, SelectProps } from "./primitives/field";
 export {
   CardGrid,
+  CONCEPT_TONE,
   HeroBanner,
   IconTile,
   JourneyStepper,
@@ -30,18 +41,40 @@ export {
   StatCard,
   StatGrid,
   TeamChip,
+  kitTone,
+  statusState,
 } from "./primitives/console-kit";
+export { KitFigure } from "./primitives/console-kit-figure";
 export type {
   HeroBannerProps,
   IconTileProps,
   JourneyStep,
+  KitConcept,
   KitTone,
   NoticeProps,
   PillProps,
   SectionCardProps,
   StatCardProps,
+  StateKey,
 } from "./primitives/console-kit";
 export { Tabs } from "./primitives/tabs";
+export {
+  Toolbar,
+  ToolbarSpacer,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarChip,
+  FilterMenu,
+  SegmentedTabs,
+  ToolbarSelect,
+  ToolbarToggle,
+} from "./primitives/toolbar";
+export type {
+  ToolbarSearchProps,
+  SegmentedItem,
+  ToolbarSelectProps,
+  ToolbarToggleItem,
+} from "./primitives/toolbar";
 export type { TabsProps, TabItem } from "./primitives/tabs";
 export { Dialog } from "./primitives/dialog";
 export type { DialogProps } from "./primitives/dialog";
@@ -107,6 +140,7 @@ export type {
   QuickActionBarProps,
 } from "./shell/page-header";
 export { SubNavTabs } from "./shell/sub-nav-tabs";
+export { useActiveInView } from "./primitives/use-active-in-view";
 export type { SubNavTabsProps, SubNavTab } from "./shell/sub-nav-tabs";
 export { PopoverMenu } from "./shell/popover-menu";
 export type { PopoverMenuProps, PopoverMenuItem } from "./shell/popover-menu";

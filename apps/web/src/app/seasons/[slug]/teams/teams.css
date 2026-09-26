@@ -24,18 +24,30 @@
 
 /* The shell's page head ends with a gap sized for a card; the lede belongs to
    the title, so it closes most of it. */
+/* ONE ROW (wow pass): the count, the purse and its provenance, and the lock
+   as a pill — it was two lines of lede and a full-width 48px notice. */
 .tm-lede {
-  margin-top: calc(-1 * var(--space-5));
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
 }
 
 .tm-lede p {
   margin: 0;
-  font-size: var(--text-base-size);
-  line-height: var(--text-base-line);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
   color: var(--text-secondary);
+}
+
+.tm-lede .tm-lede-count {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-lock {
+  display: inline-flex;
+  margin-inline-start: auto;
 }
 
 .tm-lede .tm-lede-rules {
@@ -58,8 +70,8 @@
 }
 
 @media (max-width: 719px) {
-  .tm-lede {
-    margin-top: calc(-1 * var(--space-3));
+  .tm-lock {
+    margin-inline-start: 0;
   }
 }
 
@@ -104,7 +116,9 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  /* auto-fit: three teams share the row instead of leaving a fourth, empty
+     track; 280px keeps "Mumbai Mavericks" on one line beside its count. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: var(--space-4);
 }
 
@@ -131,7 +145,10 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
+  /* The team's own colour along the top edge: three cards, three clubs. */
+  box-shadow:
+    inset 0 3px 0 var(--team),
+    var(--shadow-1);
   transition:
     transform var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out);
@@ -457,7 +474,7 @@
 }
 
 [data-flush="true"] .tm-announce-foot {
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .tm-foot-note {
@@ -822,4 +839,301 @@
   .tm-grid .tm-card:has(.team-card-cover:hover) {
     transform: none;
   }
+}
+
+/* ---- Announce: the names fold behind a face stack ---- */
+.tm-announce-review {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tm-announce-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.tm-announce-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tm-announce-summary:hover .tm-announce-summary-text {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tm-announce-summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.tm-face-stack {
+  display: inline-flex;
+}
+
+.tm-face-stack > * {
+  box-shadow: 0 0 0 2px var(--surface-raised);
+  border-radius: var(--radius-full);
+}
+
+/* A 4px overlap: at 8px the next disc covered the first letter of every
+   monogram ("VR" read as "R"). */
+.tm-face-stack > * + * {
+  margin-inline-start: -4px;
+}
+
+.tm-announce-roles {
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+.tm-team-dot {
+  --team: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.tm-team-dot::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--team);
+}
+
+.tm-tell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+/* Side by side, the two action cards are one height and their buttons sit on
+   one line at the bottom (round 2: 225px beside 162px read as unfinished). */
+.tm-tell > section {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.tm-tell > section > div:last-child {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.tm-tell .tm-announce-foot {
+  margin-top: auto;
+}
+
+@media (min-width: 1100px) {
+  .tm-tell:has(> [data-testid="appointments-panel"]):has(> [data-testid="squad-sheets-panel"]) {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+}
+
+/* ---- The owner's own squad, inline (wow pass, round 2) ---- */
+
+.tm-grid .tm-card[data-own="true"] {
+  border-color: var(--accent-line);
+  box-shadow:
+    inset 0 3px 0 var(--team),
+    var(--shadow-2);
+}
+
+.tm-card-yours {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.tm-own {
+  --team: var(--accent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  overflow: hidden;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      50% 120% at 100% 0%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.tm-own::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--team);
+}
+
+.tm-own-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+}
+
+.tm-own-id {
+  min-width: 0;
+}
+
+.tm-own-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.tm-own-name {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-2xl-size);
+  line-height: 1.2;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-own-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+
+.tm-own-facts dt {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+
+.tm-own-facts dd {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.tm-own-facts dd span {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.tm-own-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-own-player {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.tm-own-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tm-own-player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-own-role {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+
+.tm-own-price {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+/* Pre-signed: the mark (Captain, Icon) in the accent ink, and the price slot
+   says how they joined instead of a figure. */
+.tm-own-mark {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.tm-own-price--signed {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.tm-own-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.tm-own-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.tm-own-link:hover {
+  text-decoration: underline;
 }

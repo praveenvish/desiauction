@@ -189,26 +189,25 @@ export default async function PublicTeamPage({
                       />
                     </span>
                     <span className="team-page-who">
-                      <strong>{member.name}</strong>
+                      <strong>
+                        {member.name}
+                        {/* The role on the sheet, as a badge after the name —
+                            not in the price slot, where gold italics read as
+                            a price. */}
+                        {member.marks.includes("captain") ? (
+                          <span className="team-page-badge">Captain</span>
+                        ) : member.marks.includes("icon") ? (
+                          <span className="team-page-badge">Icon</span>
+                        ) : null}
+                      </strong>
                       <span>{roleLabelIn(pack, member.role)}</span>
                     </span>
                     <span className="team-page-price">
                       {member.pricePaise !== null ? (
-                        member.marks.includes("captain") ? (
-                          <>
-                            <span className="team-page-mark">C</span>
-                            {formatPrice(member.pricePaise, team.unit)}
-                          </>
-                        ) : (
-                          formatPrice(member.pricePaise, team.unit)
-                        )
+                        formatPrice(member.pricePaise, team.unit)
                       ) : (
                         <span className="team-page-signed">
-                          {member.marks.includes("captain")
-                            ? "Captain"
-                            : member.marks.includes("icon")
-                              ? "Icon"
-                              : "Retained"}
+                          {member.marks.includes("retained") ? "Retained" : "Pre-signed"}
                         </span>
                       )}
                     </span>

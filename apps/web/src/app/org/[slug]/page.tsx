@@ -3,6 +3,7 @@ import {
   ButtonLink,
   Card,
   CardGrid,
+  EmptyState,
   IconArrowRight,
   IconBolt,
   IconBroadcast,
@@ -27,7 +28,7 @@ import type { ReactNode } from "react";
 
 import { FormDialog } from "../../../components/form-dialog";
 import { PageTitle } from "../../../components/shell/page-title";
-import { activityLabel as feedLabel, activityStyle } from "../../home/home-activity";
+import { activityLabel as feedLabel, activityStyle, groupActivity } from "../../home/home-activity";
 import { AboutBanner } from "./about-banner";
 import { OrgTabs } from "./org-tabs";
 import { financeAuthority } from "../../../server/financial-operations/actions";
@@ -115,7 +116,7 @@ function ago(iso: string): string {
  * no whom and no by-whom. The names arrive only for a reader who may hold the
  * directory (orgOverview gates them); everyone else still gets the event.
  */
-function ActivityRow({ row }: { row: OrgActivityRow }) {
+function ActivityRow({ row, times = 1 }: { row: OrgActivityRow; times?: number }) {
   const style = activityStyle(row.action);
   const who = [
     row.subjectName === null ? null : row.subjectName,
@@ -125,7 +126,10 @@ function ActivityRow({ row }: { row: OrgActivityRow }) {
     <li className="od-activity-row">
       <IconTile icon={style.icon} tone={style.tone} size="sm" />
       <span className="od-activity-text">
-        <strong>{activityLabel(row.action)}</strong>
+        <strong>
+          {activityLabel(row.action)}
+          {times > 1 ? <span className="home-feed-times"> ×{times}</span> : null}
+        </strong>
         {who.length > 0 ? <span>{who.join(" · ")}</span> : null}
       </span>
       <span className="od-activity-time">{ago(row.at)}</span>
@@ -416,7 +420,8 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   const tournamentsCard = (hint?: string) => (
     <StatCard
       icon={<IconTrophy />}
-      tone="gold"
+      concept="tournament"
+      rolling
       value={stats.tournaments}
       label={plural(stats.tournaments, "Tournament")}
       {...(hint !== undefined ? { hint } : {})}
@@ -426,7 +431,8 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   const seasonsCard = (
     <StatCard
       icon={<IconCalendar />}
-      tone="blue"
+      concept="season"
+      rolling
       value={stats.seasons}
       label={plural(stats.seasons, "Season")}
       href="#tournaments"
@@ -467,14 +473,16 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
         )}
         <StatCard
           icon={<IconUsers />}
-          tone="green"
+          concept="players"
+          rolling
           value={stats.members}
           label={plural(stats.members, "Member")}
           href="#members"
         />
         <StatCard
           icon={<IconShieldCheck />}
-          tone="purple"
+          concept="teams"
+          rolling
           value={stats.teams}
           label={`Active ${plural(stats.teams, "team")}`}
           hint="Across every season"
@@ -484,17 +492,49 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       <CardGrid>
         <SectionCard
           icon={<IconBroadcast />}
-          tone="red"
+          concept="auction"
           title="Live & open now"
           action={
-            <Link href={`/org/${slug}#tournaments`} className="od-more">
-              All tournaments
+            <Link
+              href={`/org/${slug}#tournaments`}
+              className="od-more"
+              aria-label="View all tournaments"
+            >
+              View all
               <IconArrowRight size={14} />
             </Link>
           }
         >
           {liveOpen.length === 0 ? (
-            <p className="od-empty">Nothing live or taking entries right now.</p>
+            editions.length === 0 ? (
+              <EmptyState
+                size="compact"
+                icon={<IconTrophy />}
+                title="Nothing live or taking entries right now"
+              />
+            ) : (
+              /* Nothing live: the club's latest seasons instead of one grey
+                 sentence in a full-height card (round 2). */
+              <>
+                <p className="od-empty">Nothing live or taking entries right now. Latest:</p>
+                <ul className="od-live-list">
+                  {editions.slice(0, 3).map((edition) => (
+                    <li key={edition.id}>
+                      <Link href={`/seasons/${edition.slug}`} className="od-live-row">
+                        <span className="od-live-name">{edition.name}</span>
+                        <span className="od-live-meta">
+                          {edition.teams} {edition.teams === 1 ? "team" : "teams"} ·{" "}
+                          {edition.players} {edition.players === 1 ? "player" : "players"}
+                        </span>
+                        <span className="od-live-go" aria-hidden>
+                          <IconChevronRight size={18} />
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )
           ) : (
             <ul className="od-live-list">
               {liveOpen.map((row) => (
@@ -506,7 +546,9 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                         Live
                       </Pill>
                     ) : (
-                      <Pill tone="blue">Registration open</Pill>
+                      <Pill tone="green" dot>
+                        Registration open
+                      </Pill>
                     )}
                     <span className="od-live-go" aria-hidden>
                       <IconChevronRight size={18} />
@@ -518,13 +560,16 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
           )}
         </SectionCard>
 
-        <SectionCard icon={<IconBolt />} tone="purple" title="Recent activity">
+        <SectionCard icon={<IconBolt />} concept="activity" title="Recent activity">
           {overview === null || overview.activity.length === 0 ? (
-            <p className="od-empty">No activity recorded yet.</p>
+            <EmptyState size="compact" icon={<IconBolt />} title="No activity recorded yet" />
           ) : (
             <ul className="od-activity-list">
-              {overview.activity.map((row) => (
-                <ActivityRow key={row.id} row={row} />
+              {groupActivity(
+                overview.activity,
+                (row) => `${row.action}|${row.subjectName ?? ""}|${row.actorName ?? ""}`,
+              ).map(({ row, times }) => (
+                <ActivityRow key={row.id} row={row} times={times} />
               ))}
             </ul>
           )}

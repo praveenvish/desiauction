@@ -82,6 +82,10 @@
 
 .pk-hero-copy {
   display: grid;
+  /* An explicit track, not the implicit auto one: an auto column grows to its
+     widest child's max-content, and a one-line scrolling chip strip then made
+     the whole hero wider than a phone (the /help search and lede clipped). */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   justify-items: start;
   min-width: 0;
@@ -95,11 +99,13 @@
 
 .pk-eyebrow {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
+  color: var(--text-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-accent);
 }
 
 /* The article pages put their way back ("← All help", "← All legal documents")
@@ -170,6 +176,24 @@
   gap: var(--space-3);
   margin-top: var(--space-2);
   width: 100%;
+}
+
+/* Phone: the lead action takes the row; the rest share one, and a "way
+   out" link is text, not a third stacked button (~220px of CTAs before). */
+@media (max-width: 640px) {
+  .pk-hero-actions > :first-child {
+    flex: 1 1 100%;
+  }
+
+  .pk-hero-actions > .pk-hero-textlink {
+    padding-inline: var(--space-2);
+  }
+
+  /* Alone on its row, the text link lines up with the copy above it. */
+  .pk-hero-actions > .pk-hero-textlink:first-child,
+  .pk-hero-actions > :nth-child(2):last-child.pk-hero-textlink {
+    margin-inline-start: calc(-1 * var(--space-2));
+  }
 }
 
 .pk-hero-art {
@@ -397,11 +421,38 @@
   }
 }
 
+/* The icon leads the figure (wow pass, round 2): it sat under the number,
+   in the label line, which reversed the reading order. It stays inside the
+   <dt> (axe: a <dl> row holds only dt/dd) and is placed as a tile to the
+   left of the whole cell. */
+.pk-stat:has(.pk-stat-icon) {
+  position: relative;
+  padding-left: 48px;
+}
+
 .pk-stat-icon {
-  flex: none;
-  display: inline-grid;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: grid;
   place-items: center;
-  color: var(--text-accent);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+  transform: translateY(-50%);
+}
+
+/* Two figures a row on a phone leave no room for a tile: the figure alone. */
+@media (max-width: 640px) {
+  .pk-stat:has(.pk-stat-icon) {
+    padding-left: 0;
+  }
+
+  .pk-stat-icon {
+    display: none;
+  }
 }
 
 .pk-stat-label {
@@ -425,7 +476,7 @@
 
 .pk-topic-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: var(--space-4);
 }
 
@@ -442,26 +493,9 @@
   box-shadow: var(--shadow-1);
 }
 
-.pk-topic[data-tone="green"] {
-  --pk-tile-bg: var(--success-subtle);
-  --pk-tile-fg: var(--success-strong);
-}
-
-.pk-topic[data-tone="blue"] {
-  --pk-tile-bg: var(--info-subtle);
-  --pk-tile-fg: var(--info-strong);
-}
-
-.pk-topic[data-tone="amber"] {
-  --pk-tile-bg: var(--warning-subtle);
-  --pk-tile-fg: var(--warning-strong);
-}
-
-.pk-topic[data-tone="purple"] {
-  --pk-tile-bg: var(--violet-subtle);
-  --pk-tile-fg: var(--violet-strong);
-}
-
+/* ONE tint for every tile (wow pass): per-category rainbow tiles (blue, green,
+   purple, amber) clashed with the gold brand. `neutral` stays for the rare
+   card that must read as secondary. The tone prop is kept for callers. */
 .pk-topic[data-tone="neutral"] {
   --pk-tile-bg: var(--surface-sunken);
   --pk-tile-fg: var(--text-secondary);
@@ -475,7 +509,7 @@
   margin-bottom: var(--space-1);
   border-radius: var(--radius-lg);
   background: var(--pk-tile-bg, var(--accent-subtle));
-  color: var(--pk-tile-fg, var(--text-accent));
+  color: var(--pk-tile-fg, var(--accent-ink));
 }
 
 .pk-topic-title {
@@ -497,28 +531,10 @@
   color: var(--text-muted);
 }
 
-.pk-topic:hover {
-  border-color: var(--border-interactive);
-}
-
 .pk-topic:focus-visible,
 .pk-chip:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .pk-topic {
-    transition:
-      transform 160ms ease,
-      box-shadow 160ms ease,
-      border-color 160ms ease;
-  }
-
-  .pk-topic:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-2);
-  }
 }
 
 /* ----------------------------------------------------------- count chips -- */
@@ -608,8 +624,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .pk-chip {
     transition:
-      background-color 140ms ease,
-      border-color 140ms ease;
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
   }
 }
 
@@ -624,6 +640,34 @@
 }
 
 /* ---- a player's portrait in the hero (c/[slug]/p/[number]) ---- */
+
+/* No photo: the initials as a compact avatar beside the name. */
+.player-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.player-avatar {
+  flex: none;
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 3px var(--accent-line);
+}
+
+@media (max-width: 640px) {
+  .player-title {
+    gap: var(--space-3);
+  }
+
+  .player-avatar {
+    width: 64px;
+    height: 64px;
+  }
+}
 
 .player-portrait {
   width: min(320px, 70vw);
@@ -642,4 +686,533 @@
   .content-page .pk-hero-art {
     display: none;
   }
+}
+
+/* ------------------------------------------------------- operator identity -- */
+/* See `operator-identity.tsx`: the statutory "who operates this" card. */
+
+.pk-operator {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.pk-operator-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.pk-operator-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.pk-operator-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--text-heading);
+}
+
+.pk-operator-lede {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.pk-operator-facts {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.pk-operator-facts > div {
+  display: grid;
+  gap: 2px;
+}
+
+.pk-operator-facts dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pk-operator-facts dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.pk-operator-facts a,
+.pk-operator-foot a {
+  color: var(--text-accent);
+  text-underline-offset: 3px;
+}
+
+.pk-operator-mono {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+}
+
+.pk-operator-foot {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* -------------------------------------------------------------- link rows -- */
+
+.pk-rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.pk-rows > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 64px;
+  padding: var(--space-3) var(--space-5);
+  box-sizing: border-box;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.pk-row:hover {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-raised));
+}
+
+.pk-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.pk-row-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.pk-row-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.pk-row-title {
+  font-weight: 600;
+  color: var(--text-heading);
+  line-height: 1.35;
+}
+
+.pk-row-desc {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.pk-row-meta {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pk-row-arrow {
+  flex: none;
+  color: var(--text-muted);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.pk-row:hover .pk-row-arrow {
+  color: var(--text-accent);
+  transform: translateX(3px);
+}
+
+@media (max-width: 640px) {
+  .pk-row {
+    gap: var(--space-3);
+    padding-inline: var(--space-4);
+    align-items: flex-start;
+  }
+
+  .pk-row-meta {
+    display: none;
+  }
+
+  .pk-row-arrow {
+    align-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-row,
+  .pk-row-arrow {
+    transition: none;
+  }
+
+  .pk-row:hover .pk-row-arrow {
+    transform: none;
+  }
+}
+
+/* -------------------------------------------------------------- side card -- */
+
+.pk-side-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.pk-side-card[data-tone="accent"] {
+  border-color: var(--accent-line);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--accent) 9%, var(--surface-raised)),
+    var(--surface-raised) 60%
+  );
+}
+
+.pk-side-card p {
+  margin: 0;
+}
+
+.pk-side-card a:not([class]) {
+  color: var(--text-accent);
+  text-underline-offset: 3px;
+}
+
+.pk-side-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pk-side-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.pk-side-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--text-heading);
+}
+
+.pk-side-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pk-side-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 32px;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.pk-side-list a:hover {
+  color: var(--text-accent);
+}
+
+/* A side list that is navigation: the current page is marked. */
+.pk-side-list--nav {
+  gap: var(--space-1);
+}
+
+.pk-side-list--nav a {
+  min-height: 36px;
+  margin-inline: calc(var(--space-2) * -1);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.pk-side-list--nav a:not([aria-current]) {
+  color: var(--text-primary);
+}
+
+.pk-side-list--nav a:not([aria-current]):hover {
+  color: var(--text-accent);
+}
+
+.pk-side-list--nav a[aria-current="page"] {
+  background: var(--accent-subtle);
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pk-side-facts {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.pk-side-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pk-side-facts > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.pk-side-facts dt {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.pk-side-facts dd {
+  margin: 0;
+  color: var(--text-heading);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+/* ------------------------------------------------------------ coming soon -- */
+
+.pk-soon {
+  display: grid;
+  place-items: center;
+  min-height: min(72svh, 640px);
+  text-align: center;
+}
+
+/* The stub fills the shell's content column down to the footer: shorter than
+   the viewport, the cream body showed through as a bright 2px rule above the
+   slim footer (wow pass, round 2). */
+#main-content:has(.pk-soon) {
+  display: flex;
+  flex-direction: column;
+}
+
+#main-content:has(.pk-soon) > main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+#main-content:has(.pk-soon) .pk-soon {
+  flex: 1;
+}
+
+.pk-soon-inner {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  max-width: 640px;
+}
+
+.pk-soon .pk-hero-lede {
+  max-width: 56ch;
+}
+
+.pk-soon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text-accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.pk-soon-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+.pk-soon-note a {
+  color: var(--text-accent);
+  text-underline-offset: 3px;
+}
+
+.pk-soon-actions {
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------------- the 404 -- */
+
+.nf-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08em;
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: clamp(4.5rem, 12vw, 7.5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text-heading);
+}
+
+/* The zero is a ball: a gold disc with a seam, and — where motion is welcome —
+   a slow bounce. Transform only; it is decoration (aria-hidden). */
+.nf-ball {
+  position: relative;
+  display: inline-block;
+  inline-size: 0.72em;
+  block-size: 0.72em;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 32% 30%,
+    color-mix(in srgb, var(--accent) 55%, var(--text-heading)),
+    var(--accent) 55%,
+    color-mix(in srgb, var(--accent) 60%, var(--surface-sunken))
+  );
+  box-shadow: 0 0.12em 0.4em color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.nf-ball::after {
+  content: "";
+  position: absolute;
+  inset: 12% 44%;
+  border-inline: 2px dashed color-mix(in srgb, var(--surface-sunken) 55%, transparent);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nf-ball {
+    animation: nf-bounce 2.6s ease-in-out infinite;
+  }
+}
+
+@keyframes nf-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-0.14em) rotate(160deg);
+  }
+}
+
+.nf-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-5);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.nf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.nf-link svg {
+  color: var(--text-accent);
+}
+
+.nf-link:hover {
+  color: var(--text-heading);
+}
+
+.nf-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* A season with no cover: its sport's glyph, large and faint, behind the band's
+   right side (decorative; the band's own gradient still carries the contrast). */
+.pk-hero-watermark {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  right: clamp(-80px, -4vw, -20px);
+  transform: translateY(-50%) rotate(-12deg);
+  color: color-mix(in srgb, var(--accent) 9%, transparent);
+  pointer-events: none;
+}
+
+.pk-hero-watermark svg {
+  display: block;
+  width: clamp(220px, 32vw, 380px);
+  height: auto;
+}
+
+.pk-operator-facts a[href^="tel:"] {
+  white-space: nowrap;
 }

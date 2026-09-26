@@ -188,9 +188,18 @@ test("player journey: discover → multi-step register with draft recovery → t
     // The name heads the page (the frame's h1); the card below says what is asked.
     await expect(player.getByRole("heading", { level: 1 })).toHaveText(`Monsoon Cup ${STAMP}`);
     await expect(player.getByTestId("register-preview")).toBeVisible();
+    // Inline verification: the code is step 1 of the register card itself —
+    // the visitor never leaves this URL for /login. The harness pins the
+    // phone door (LOGIN_DEFAULT_METHOD=phone).
+    const registerHere = player.url();
+    await player.getByLabel("Mobile number").fill(PLAYER);
     await player.getByTestId("register-verify-cta").click();
-    await expect(player).toHaveURL(/\/login\?next=/);
-    await otpLogin(player, PLAYER);
+    await expect(player.getByTestId("register-verify-form")).toHaveAttribute("data-step", "code", {
+      timeout: 30_000,
+    });
+    await player.getByLabel("6-digit code").fill(await latestOtp(PLAYER));
+    await player.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(player).toHaveURL(registerHere, { timeout: 30_000 });
 
     // Step 1: profile (nameless account) — name persists server-side.
     await expect(player.getByTestId("register-step-profile")).toBeVisible();
@@ -304,12 +313,11 @@ test("an email-only account adds its mobile in place and finishes — the share 
   const shared = `${registerUrl}?ref=whatsapp`;
   await inSecondBrowser(browser, async (player) => {
     await player.goto(shared);
-    const href = (await player.getByTestId("register-verify-cta").getAttribute("href")) ?? "";
-    expect(decodeURIComponent(href)).toContain("ref=whatsapp");
-    // The harness pins the phone door; the email door is production's default.
-    await player.goto(`${href}&method=email`);
+    // Inline: the email door is one tap away on the register card itself
+    // (the harness pins the phone door; email is production's default).
+    await player.getByTestId("register-method-email").click();
     await player.getByTestId("email-login-address").fill(address);
-    await player.getByTestId("email-login-send").click();
+    await player.getByTestId("register-verify-cta").click();
     await expect(player.getByTestId("email-login-code")).toBeVisible({ timeout: 20_000 });
     await player.getByTestId("email-login-code").fill(await latestOtp(address));
     await player.getByTestId("email-login-verify").click();

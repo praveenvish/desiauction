@@ -434,6 +434,26 @@
   color: var(--text-heading);
 }
 
+/* The finished stage's count: the figure stays display type, the words drop
+   to the text face so the line never breaks on a phone. */
+.ceremony-finished-count {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0 var(--space-3);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ceremony-finished-words {
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}
+
 /* --- the results showcase (the finished stage) -----------------------------
    The last frame of the night used to be 552px of black with "3/3 LOTS
    RESOLVED" floating in the middle of it — on the screen the product is most
@@ -787,6 +807,29 @@
   min-width: 0;
 }
 
+/* ROUND 2: the cockpit runs to the same 24px gutters as the room bar above it
+   (a centred 1240px column sat inset under a full-bleed bar), and the right
+   rail — purses, pool — stays in view while the left column scrolls. */
+.cockpit-page > .dash-stack,
+.cockpit-page [data-testid="cockpit-panel"] {
+  max-width: none;
+}
+
+@media (min-width: 901px) {
+  .cockpit-grid > .cockpit-col:last-child,
+  .live-grid > .live-col:last-child {
+    position: sticky;
+    top: 80px;
+  }
+}
+
+.live-exits-label {
+  align-self: center;
+  margin-inline-end: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
 /* --- the owner room grid -------------------------------------------------- */
 .live-grid {
   display: grid;
@@ -879,6 +922,16 @@
   .live-exits > :only-child,
   .live-exits > :nth-child(odd):last-child {
     grid-column: 1 / -1;
+  }
+
+  /* With its label first, the label takes a row and the parity flips. */
+  .live-exits > .live-exits-label,
+  .live-exits:has(> .live-exits-label) > :nth-child(even):last-child {
+    grid-column: 1 / -1;
+  }
+
+  .live-exits:has(> .live-exits-label) > :nth-child(odd):last-child:not(:only-child) {
+    grid-column: auto;
   }
 }
 
@@ -1436,9 +1489,12 @@
    leaves ~272px of track, so every squad column ran 5–8px past the right edge
    and the PAGE scrolled sideways (WCAG 1.4.10). `min(280px, 100%)` keeps the
    280px comfort where there is room and yields where there is not. */
+/* `auto-fit`, not `auto-fill`: three teams on a 1440 screen left an empty
+   fourth track (~260px) on the right. Collapsing the empty tracks lets the
+   squads that exist share the whole width. */
 .squad-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: var(--space-5);
   margin-top: var(--space-3);
 }
@@ -1487,26 +1543,33 @@
   min-width: 0;
 }
 
-/* Wraps rather than truncates. Ellipsising the name was the wrong trade: with
-   two badges beside it "Arjun Sharma" became "Arjun S…", and a squad board
-   whose whole job is naming players must never eat a name to fit a badge. */
+/* ONE 44px LINE (wow pass). The row used to `flex-wrap`, so a badge or a long
+   name dropped the price onto its own line — ~110px per row on a phone. Now a
+   grid: face · name+badges (truncates, full name on hover) · role · price.
+   Role and price keep their own tracks and never wrap. */
 .squad-row {
-  display: flex;
-  /* Centre, not baseline: the row now opens with the player's face, and a
-     baseline row sits a 24px image on the text's baseline, not beside it. */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 2px var(--space-2);
-  padding: var(--space-2) 0;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 6px 0;
   border-top: 1px solid var(--border-subtle);
   font-size: var(--text-sm-size);
 }
 
+.squad-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 .squad-name {
   min-width: 0;
-  /* A name is never ellipsised here (the board's whole job is naming players),
-     so a long one has to be allowed to break rather than widen the column. */
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-primary);
   font-weight: var(--font-weight-medium);
 }
@@ -1514,17 +1577,63 @@
 /* Same as `.lot-hero-role`: the shared `roleLabel` supplies the casing, and
    `capitalize` would turn its "All-rounder" into "All-Rounder". */
 .squad-role {
-  margin-left: auto;
-  flex: none;
+  white-space: nowrap;
   color: var(--text-muted);
   font-size: var(--text-xs-size);
 }
 
+/* Tabular display numerals, not the typewriter face: money reads as money.
+   Mono stays for IDs (L007, P01). */
 .squad-price {
-  flex: none;
-  font-family: var(--font-mono);
+  white-space: nowrap;
+  text-align: right;
   font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
   color: var(--money-value);
+}
+
+/* PHONE: the role drops under the name, so the name gets the width it lost
+   to "All-rounder" — "Rohan Kulk…" and "Kun…" clipped on a 390px screen.
+   Face and price span both lines; the row stays one player. */
+@media (max-width: 719px) {
+  .squad-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "face who price"
+      "face role price";
+    row-gap: 0;
+  }
+
+  .squad-row > :first-child {
+    grid-area: face;
+  }
+
+  .squad-who {
+    grid-area: who;
+    flex-wrap: wrap;
+  }
+
+  .squad-name {
+    white-space: normal;
+  }
+
+  .squad-role {
+    grid-area: role;
+  }
+
+  .squad-price {
+    grid-area: price;
+  }
+}
+
+/* The open-spots line is not a player: no grid tracks to honour. */
+.squad-row--open {
+  display: flex;
+}
+
+.squad-board-caption {
+  margin: calc(var(--space-1) * -1) 0 0;
+  font-size: var(--text-xs-size);
 }
 
 /* Pre-signed reads as a state, not a price: an icon cost this franchise no
@@ -1610,9 +1719,11 @@
   color: var(--text-secondary);
 }
 
+/* The text face with tabular figures: the mono face also set the top
+   buyer's NAME in typewriter type. Mono stays for IDs (L007). */
 .pool-money strong {
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1770,6 +1881,21 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+/* A finished night's conduct card holds no controls; the empty primary tier
+   must not keep its gap. */
+.cockpit-actions--primary:empty {
+  display: none;
+}
+
+.cockpit-record {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.cockpit-record .competitions-hint {
+  margin: 0;
 }
 
 /* The primary tier: the acts of the night proper, at full weight. */
@@ -1944,15 +2070,16 @@
 
 .diag-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
+  /* auto-fit: rows no longer end ragged with an empty track. */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-2);
 }
 
 .diag-tile {
-  padding: 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1960,7 +2087,7 @@
 
 .diag-value {
   font-family: var(--font-mono);
-  font-size: var(--text-lg-size);
+  font-size: var(--text-md-size);
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   word-break: break-all;
@@ -1987,26 +2114,649 @@
   font-size: var(--text-sm-size);
 }
 
-/* --- Replay viewer ------------------------------------------------------------ */
+/* --- the engine page's health card (wow pass) ---------------------------- */
+.engine-health {
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-4);
+}
 
-.replay-controls {
+.engine-health-tile {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.engine-health-tile[data-tone="danger"] {
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+}
+
+.engine-health-body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.engine-health-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.engine-health-title h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+}
+
+.engine-health-body .competitions-hint,
+.engine-health-explain {
+  margin: 0;
+}
+
+.engine-health-explain {
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.engine-health-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .engine-health {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .engine-health-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+.engine-details {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.engine-details > summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.engine-details > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.engine-details-hint {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-muted);
+}
+
+.engine-details-body {
+  display: grid;
+  gap: var(--space-5);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.engine-group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.engine-group h3 {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.engine-hashes {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0;
+}
+
+.engine-hashes div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.engine-hashes dt {
+  flex: none;
+  width: 9rem;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.engine-hashes dd {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+}
+
+/* --- Replay viewer ------------------------------------------------------------ */
+
+/* THE TRANSPORT (wow pass). A hairline slider and a sentence used to be the
+   whole viewer; it is now a player: start · previous result · play · next
+   result · end, the moment in words, a speed switch, and every hammer of the
+   night as a tick on the track (gold = sold, grey = passed). */
+.replay-transport {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.replay-transport-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
   flex-wrap: wrap;
 }
 
-.replay-slider {
+.replay-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.replay-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.replay-btn:hover:not(:disabled) {
+  border-color: var(--accent-line);
+}
+
+.replay-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.replay-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.replay-btn:focus-visible,
+.replay-speed-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.replay-btn--play {
+  width: 44px;
+  height: 44px;
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-2);
+}
+
+.replay-btn--play:hover:not(:disabled) {
+  border-color: transparent;
+  filter: brightness(1.05);
+}
+
+.replay-now {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
   flex: 1;
-  min-width: 200px;
+  min-width: 0;
+}
+
+.replay-event {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.replay-event-meta {
+  font-weight: var(--font-weight-regular);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.replay-speed {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.replay-speed-btn {
+  min-width: 40px;
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.replay-speed-btn[aria-pressed="true"] {
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  box-shadow: var(--shadow-1);
+}
+
+.replay-track {
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.replay-slider {
+  display: block;
+  width: 100%;
+  margin: 0;
   accent-color: var(--accent);
+}
+
+.replay-ticks {
+  position: absolute;
+  inset: auto 8px 0;
+  height: 8px;
+  pointer-events: none;
+}
+
+.replay-tick {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 8px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--border-strong);
+}
+
+.replay-tick[data-sold="true"] {
+  background: var(--accent-line);
+}
+
+.replay-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  flex-wrap: wrap;
+}
+
+.replay-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.replay-tick--key {
+  position: static;
+  display: inline-block;
+  margin: 0 0 0 var(--space-2);
+}
+
+.replay-tick--key:first-child {
+  margin-left: 0;
+}
+
+/* The proof, in sentence case and allowed to wrap: the old all-caps badge
+   ran past a phone's edge and scrolled the page sideways. */
+.replay-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm-size);
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}
+
+.replay-verified svg {
+  flex: none;
+  color: var(--success-base);
+}
+
+.replay-verified[data-converged="false"] {
+  color: var(--danger-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.replay-verified[data-converged="false"] svg {
+  color: var(--danger-base);
 }
 
 .replay-seq {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
   white-space: nowrap;
+}
+
+/* The frame: the moment on the left, every purse on the right. */
+.replay-grid {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .replay-grid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+
+  /* The purses stay beside the moment as the history scrolls (round 2: they
+     ended at y≈500 over 570px of empty column). */
+  .replay-grid > .replay-purses {
+    position: sticky;
+    top: 80px;
+  }
+}
+
+.replay-stage,
+.replay-purses {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.replay-stage h2,
+.replay-purses h2 {
+  margin: 0;
+  font-size: var(--text-md-size);
+}
+
+.replay-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.replay-progress-bar,
+.replay-purse-bar {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--border-subtle);
+}
+
+.replay-progress-bar > span,
+.replay-purse-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+.replay-progress-text {
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.replay-progress-text b {
+  color: var(--text-heading);
+}
+
+.replay-now-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.replay-now-card[data-kind="sold"] {
+  border-color: var(--accent-line);
+}
+
+.replay-subject-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.replay-kicker {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.replay-subject-name {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.replay-subject-figure {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.replay-bids,
+.replay-purse-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.replay-bids li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+}
+
+.replay-paddle {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.replay-bid-team,
+.replay-purse-team {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.replay-bid-amount,
+.replay-purse-left {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.replay-purse-list li {
+  display: grid;
+  gap: 6px;
+}
+
+.replay-purse-list li[data-released="true"] {
+  opacity: 0.6;
+}
+
+.replay-purse-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+}
+
+.replay-col {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.replay-history {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.replay-history h2 {
+  margin: 0;
+  font-size: var(--text-md-size);
+}
+
+.replay-history-list {
+  display: grid;
+  max-height: 420px;
+  margin: 0 calc(var(--space-2) * -1);
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.replay-history-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.replay-history-row:hover,
+.replay-history-row[aria-current="step"] {
+  background: var(--surface-sunken);
+}
+
+.replay-history-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.replay-history-who {
+  display: grid;
+  min-width: 0;
+}
+
+.replay-history-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.replay-history-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.replay-history-result {
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.replay-history-result[data-sold="true"] {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+@media (max-width: 640px) {
+  .replay-now {
+    order: -1;
+    flex-basis: 100%;
+  }
+
+  .replay-speed {
+    margin-left: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .replay-progress-bar > span,
+  .replay-purse-bar > span {
+    transition: none;
+  }
 }
 
 /* --- Ledger -------------------------------------------------------------------- */
@@ -2357,7 +3107,7 @@
 .share-auction-sub {
   color: var(--text-muted);
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-regular, 400);
+  font-weight: var(--font-weight-regular);
 }
 
 .share-auction-actions {
@@ -2473,6 +3223,37 @@
 .timeline--faces li,
 .my-squad-list li {
   align-items: center;
+}
+
+/* One line per signing, price on the right. `.conflict-list li` wraps and
+   `.registration-name` holds a 140px floor, so on a phone every price dropped
+   under its name (~90px rows; carried over from round 1). The name gives way
+   with an ellipsis; the lot chip, face and price keep their size. */
+.my-squad-list li {
+  flex-wrap: nowrap;
+}
+
+.my-squad-list li > * {
+  flex: none;
+}
+
+/* Lot chips share one width, so the faces and names line up down the list. */
+.my-squad-list li > :first-child {
+  min-width: 5ch;
+  justify-content: center;
+}
+
+.my-squad-list .registration-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-squad-list .registration-phone {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .up-next-list li:first-child {
@@ -2804,6 +3585,21 @@
   flex-wrap: wrap;
 }
 
+.replay-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.replay-title h1,
+.replay-title p {
+  margin: 0;
+}
+
+.replay-head .competition-title-row {
+  align-items: center;
+}
+
 /* --- the sound switch in the shell strip ---------------------------------- */
 .ribbon-sound {
   width: 32px;
@@ -3023,50 +3819,612 @@
   min-width: 0;
 }
 
-/* --- ledger: filter chips and the phone-width columns ---------------------- */
-
-.ledger-filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+/* --- the ledger (wow pass) ------------------------------------------------
+   One toolbar row, then a compact 44px table with tabular money and a result
+   pill. The dispute columns (actor, reason, correlation) sit behind a CSS-only
+   "Audit columns" switch; on a phone every row is a two-line list item. */
+.ledger-toolbar {
+  row-gap: var(--space-3);
 }
 
-.ledger-filter-chip {
+.ledger-views {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.ledger-audit-toggle {
+  position: relative;
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   min-height: 36px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
+  padding: 0 var(--space-2);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.ledger-filter-chip:hover {
-  border-color: var(--border-strong);
-  color: var(--text-primary);
+.ledger-audit-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
 }
 
-.ledger-filter-chip[aria-pressed="true"] {
-  border-color: var(--accent-line);
-  color: var(--text-heading);
+.ledger-audit-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-.ledger-filter-chip:focus-visible {
+.ledger-audit-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.ledger-audit-input:checked + .ledger-audit-track {
+  background: var(--accent);
+}
+
+.ledger-audit-input:checked + .ledger-audit-track::after {
+  transform: translateX(12px);
+}
+
+.ledger-audit-input:focus-visible + .ledger-audit-track {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
-/* On a phone every ledger row stacks its cells as labelled pairs, and ten of
-   them made a finished auction's ledger some 46,000px tall — "Correlation" and
-   "Reason —" on every row. Actor, paddle, reason and correlation are the
-   dispute columns, read at a desk; the phone keeps who, what and for how much. */
-@media (max-width: 640px) {
-  .reg-table .ledger-col-minor {
+.ledger-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.ledger-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.ledger-grid th,
+.ledger-grid td {
+  height: 44px;
+  padding: 0 var(--space-3);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ledger-grid th:first-child,
+.ledger-grid td:first-child {
+  padding-left: var(--space-4);
+}
+
+.ledger-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 36px;
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ledger-grid tbody tr {
+  border-top: 1px solid var(--border-subtle);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.ledger-grid tbody tr:first-child {
+  border-top: 0;
+}
+
+.ledger-grid tbody tr:hover {
+  background: var(--surface-sunken);
+}
+
+.ledger-c-seq,
+.ledger-c-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.ledger-c-seq {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  width: 1%;
+}
+
+.ledger-c-lot {
+  width: 40%;
+}
+
+.ledger-grid td.ledger-c-bid,
+.ledger-grid th.ledger-c-bid {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.ledger-lot {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ledger-lot-code,
+.ledger-paddle {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.ledger-paddle {
+  padding: 1px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.ledger-lot-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.ledger-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ledger-team-name {
+  color: var(--text-primary);
+}
+
+.ledger-none {
+  color: var(--text-muted);
+}
+
+/* Status colour in the dot, the words in ink (AA in both themes). */
+.ledger-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.ledger-result::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.ledger-result[data-tone="sold"] {
+  background: var(--success-subtle);
+}
+
+.ledger-result[data-tone="sold"]::before {
+  background: var(--success-base);
+}
+
+.ledger-result[data-tone="undo"] {
+  background: var(--warning-subtle);
+}
+
+.ledger-result[data-tone="undo"]::before {
+  background: var(--warning-base);
+}
+
+.ledger-result[data-tone="unsold"] {
+  background: var(--surface-sunken);
+}
+
+.ledger-result[data-tone="rejected"] {
+  color: var(--text-muted);
+}
+
+.ledger-empty {
+  padding: var(--space-2) var(--space-4) !important;
+  text-align: center !important;
+  color: var(--text-muted);
+  white-space: normal !important;
+}
+
+.ledger-col-minor {
+  display: none;
+  color: var(--text-muted);
+}
+
+.ledger-page:has(#ledger-audit:checked) .ledger-col-minor {
+  display: table-cell;
+}
+
+/* Phone: a two-line list row — lot + result on top, time · team · bid under. */
+@media (max-width: 719px) {
+  .ledger-views {
     display: none;
+  }
+
+  .ledger-audit-toggle {
+    display: none;
+  }
+
+  .ledger-scroll {
+    overflow: visible;
+  }
+
+  .ledger-grid,
+  .ledger-grid tbody {
+    display: block;
+  }
+
+  .ledger-grid thead {
+    display: none;
+  }
+
+  .ledger-grid tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "lot lot result"
+      "time team bid";
+    align-items: center;
+    gap: 2px var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .ledger-grid td {
+    display: block;
+    height: auto;
+    padding: 0;
+  }
+
+  .ledger-grid td:first-child {
+    padding-left: 0;
+  }
+
+  .ledger-grid tbody tr > .ledger-c-seq,
+  .ledger-grid tbody tr > .ledger-col-minor {
+    display: none;
+  }
+
+  .ledger-c-lot {
+    grid-area: lot;
+    width: auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .ledger-c-result {
+    grid-area: result;
+    justify-self: end;
+  }
+
+  .ledger-c-time {
+    grid-area: time;
+    font-size: var(--text-xs-size);
+  }
+
+  .ledger-c-team {
+    grid-area: team;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--text-xs-size);
+  }
+
+  .ledger-c-team .ledger-paddle {
+    padding: 0 4px;
+  }
+
+  .ledger-c-bid {
+    grid-area: bid;
+    justify-self: end;
+  }
+
+  .ledger-grid tbody tr:has(.ledger-empty) {
+    display: block;
+  }
+
+  .ledger-page:has(#ledger-audit:checked) .ledger-col-minor {
+    display: none;
+  }
+}
+
+/* Moved from live/live.css (wow pass): the wrap card also renders on
+   /spectate, which never imports live.css — loaded cold there, "Squads by
+   spend" was unstyled (a 150px pill, spend wrapped under it). */
+/* ---- That's a wrap -------------------------------------------------------- */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.wrap-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-8);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(120% 140% at 85% 20%, var(--hero-glow), transparent 55%),
+    linear-gradient(110deg, var(--hero-night-deep), var(--hero-night-mid) 60%, var(--hero-night));
+  color: var(--hero-ink);
+}
+
+.wrap-trophy {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+  background: var(--accent-subtle);
+  color: var(--accent-line);
+}
+
+.wrap-hero-text {
+  min-width: 0;
+}
+
+.wrap-hero-text h2 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  color: var(--hero-ink);
+}
+
+.wrap-hero-text p {
+  margin: var(--space-1) 0 0;
+  color: var(--hero-ink-soft);
+}
+
+.wrap-tag {
+  margin: 0 0 0 auto;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hero-ink-soft);
+}
+
+.wrap-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .wrap-body {
+    grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+  }
+}
+
+.wrap-spend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.wrap-spend-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wrap-spend-list li {
+  display: grid;
+  grid-template-columns: auto minmax(5rem, 8rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+}
+
+.wrap-spend-team {
+  overflow: hidden;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wrap-spend-bar {
+  --team: var(--accent);
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.wrap-spend-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--team);
+}
+
+.wrap-spend-figures {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wrap-spend-figures strong {
+  color: var(--text-heading);
+}
+
+.wrap-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.wrap-actions > a {
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .wrap-hero {
+    padding: var(--space-5);
+    gap: var(--space-4);
+  }
+
+  .wrap-trophy {
+    width: 48px;
+    height: 48px;
+  }
+
+  .wrap-tag {
+    display: none;
+  }
+
+  .wrap-spend-list li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .wrap-spend-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* --- the stage before the room answers (wow pass, round 2) ----------------- */
+/* A black box with one line in it read as broken. The stage keeps its measured
+   height (see `.ceremony`) and shows its own shape: a face and two lines,
+   pulsing quietly. Opacity on shapes only, never on text (axe samples it). */
+.ceremony-skel {
+  display: block;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  animation: ceremony-skel-pulse var(--duration-shimmer) var(--ease-out) infinite;
+}
+
+.ceremony-skel-face {
+  width: 112px;
+  height: 112px;
+  border-radius: var(--radius-full);
+}
+
+.ceremony-skel-line {
+  width: min(320px, 70%);
+  height: 20px;
+}
+
+.ceremony-skel-short {
+  width: min(200px, 45%);
+  height: 14px;
+}
+
+@keyframes ceremony-skel-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ceremony-skel {
+    animation: none;
+  }
+}
+
+/* ---- Engine: the record's own facts under the health card (round 2) ---- */
+.engine-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.engine-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+.engine-facts > div + div {
+  border-inline-start: 1px solid var(--border-subtle);
+}
+
+.engine-facts dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.engine-facts dd {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+@media (max-width: 719px) {
+  .engine-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .engine-facts > div:nth-child(3) {
+    border-inline-start: 0;
+  }
+
+  .engine-facts > div:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
   }
 }

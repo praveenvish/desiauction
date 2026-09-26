@@ -207,6 +207,15 @@ export function RegistrationStatus({
           },
         ]
       : stagesFor(status);
+  /*
+   * THE PRICE IS THE MOMENT (round 3C). "Sold for 50,000 pts" sat in body
+   * text under a three-step bar that was fully complete — the one number a
+   * player screenshots was the smallest thing on the card. A sold player now
+   * gets the price as the card's gold display figure, and the finished bar
+   * (which could only ever say "done, done, done") steps aside.
+   */
+  const soldPrice =
+    signed && result.outcome === "sold" && result.priceLabel !== null ? result.priceLabel : null;
   const facts = [roleLabel, number === null ? null : `Registration ${number}`].filter(
     (part): part is string => part !== null && part !== "",
   );
@@ -222,12 +231,15 @@ export function RegistrationStatus({
   return (
     <Card className="reg-status" data-testid="registration-status" elevation="floating">
       <div className="reg-status-head">
-        <PlayerImage
-          name={name}
-          size="xl"
-          shape="round"
-          {...(photoUrl !== null ? { src: photoUrl } : {})}
-        />
+        <span className="reg-status-photo">
+          <PlayerImage
+            name={name}
+            size="xl"
+            shape="round"
+            fluid
+            {...(photoUrl !== null ? { src: photoUrl } : {})}
+          />
+        </span>
         <div className="reg-status-title">
           <Badge
             tone={copy?.tone ?? "neutral"}
@@ -262,7 +274,18 @@ export function RegistrationStatus({
         </div>
       </div>
 
-      {stages !== null ? (
+      {soldPrice !== null ? (
+        <div className="reg-sold" data-testid="my-sold-price">
+          <span className="reg-sold-label">Your price</span>
+          <strong className="reg-sold-figure">{soldPrice}</strong>
+          {/* The price is the figure above; the caption says who paid it. */}
+          <span className="reg-sold-note">
+            Bought by {result?.teamName} at the {competitionName} auction.
+          </span>
+        </div>
+      ) : null}
+
+      {stages !== null && soldPrice === null ? (
         <ol className="reg-track" aria-label="Where your registration is">
           {stages.map((stage) => (
             <li
@@ -279,7 +302,7 @@ export function RegistrationStatus({
         </ol>
       ) : null}
 
-      <p className="reg-status-body">{copy?.body}</p>
+      {soldPrice === null ? <p className="reg-status-body">{copy?.body}</p> : null}
 
       {/* DA-35: the reason was captured, shipped and rendered nowhere. The
           caller resolves it to the category's player-facing words — never the
@@ -335,26 +358,36 @@ export function RegistrationStatus({
         </div>
       ) : null}
 
-      <div className="reg-status-actions">
-        {listed ? (
-          <ButtonLink
-            href={`/c/${slug}`}
-            size="touch"
-            variant={signed || passed ? "secondary" : "primary"}
-            data-testid="view-season"
-          >
-            View season page
+      {signed || passed ? (
+        /* After the verdict the two actions above are the page's job; the
+           rest is a quiet row of links, not three more buttons. */
+        <div className="reg-status-links">
+          {listed ? (
+            <Link href={`/c/${slug}`} data-testid="view-season">
+              Season page
+            </Link>
+          ) : null}
+          <Link href="/home">My home</Link>
+          {listed ? <ShareSeason path={`/c/${slug}`} title={competitionName} /> : null}
+        </div>
+      ) : (
+        <div className="reg-status-actions">
+          {listed ? (
+            <ButtonLink
+              href={`/c/${slug}`}
+              size="touch"
+              variant="primary"
+              data-testid="view-season"
+            >
+              View season page
+            </ButtonLink>
+          ) : null}
+          <ButtonLink href="/home" size="touch" variant={listed ? "secondary" : "primary"}>
+            Go to Home
           </ButtonLink>
-        ) : null}
-        <ButtonLink
-          href="/home"
-          size="touch"
-          variant={listed || signed || passed ? "secondary" : "primary"}
-        >
-          Go to Home
-        </ButtonLink>
-        {listed ? <ShareSeason path={`/c/${slug}`} title={competitionName} /> : null}
-      </div>
+          {listed ? <ShareSeason path={`/c/${slug}`} title={competitionName} /> : null}
+        </div>
+      )}
 
       {canWithdraw ? (
         <div className="reg-status-foot">

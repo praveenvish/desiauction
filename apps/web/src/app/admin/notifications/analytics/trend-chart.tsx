@@ -1,4 +1,5 @@
 import type { DayRow } from "../../../../server/admin/delivery-analytics-views";
+import { formatCount } from "../../../../lib/plural";
 
 /**
  * The daily trend, drawn on the server as plain SVG — no chart library, no
@@ -36,41 +37,67 @@ export function TrendChart({ days, windowDays }: { days: readonly DayRow[]; wind
     peak === null || max <= 1 ? "" : `; busiest day ${peak.day}`
   }.`;
   const scale = (n: number) => (n / max) * HEIGHT;
+  const first = days[0]?.day ?? null;
+  const last = days[days.length - 1]?.day ?? null;
+  const middle = days.length > 2 ? (days[Math.floor(days.length / 2)]?.day ?? null) : null;
   return (
     <div className="dla-trend" data-testid="analytics-trend">
-      <svg
-        viewBox={`0 0 ${String(width)} ${String(HEIGHT)}`}
-        preserveAspectRatio="none"
-        role="img"
-        aria-labelledby="analytics-trend-title"
-      >
-        <title id="analytics-trend-title">{summary}</title>
-        {days.map((d, i) => {
-          const x = i * (BAR + GAP);
-          const sent = scale(d.sent);
-          const suppressed = scale(d.suppressed);
-          const failed = scale(d.failed);
-          return (
-            <g key={d.day}>
-              <rect className="dla-bar-sent" x={x} y={HEIGHT - sent} width={BAR} height={sent} />
-              <rect
-                className="dla-bar-suppressed"
-                x={x}
-                y={HEIGHT - sent - suppressed}
-                width={BAR}
-                height={suppressed}
-              />
-              <rect
-                className="dla-bar-failed"
-                x={x}
-                y={HEIGHT - sent - suppressed - failed}
-                width={BAR}
-                height={failed}
-              />
-            </g>
-          );
-        })}
-      </svg>
+      {/* A scale to read the bars against: the peak and zero on the left, the
+          first, middle and last day underneath. HTML, not SVG text — the chart
+          stretches to the card, and stretched glyphs are unreadable. */}
+      <div className="dla-plot">
+        <span className="dla-axis-y" aria-hidden>
+          <span>
+            {max <= 1 && total.sent + total.failed + total.suppressed === 0
+              ? "0"
+              : formatCount(max)}
+          </span>
+          <span>{formatCount(Math.round(max / 2))}</span>
+          <span>0</span>
+        </span>
+        <svg
+          viewBox={`0 0 ${String(width)} ${String(HEIGHT)}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-labelledby="analytics-trend-title"
+        >
+          <title id="analytics-trend-title">{summary}</title>
+          <line className="dla-grid" x1={0} x2={width} y1={0.5} y2={0.5} />
+          <line className="dla-grid" x1={0} x2={width} y1={HEIGHT / 2} y2={HEIGHT / 2} />
+          {days.map((d, i) => {
+            const x = i * (BAR + GAP);
+            const sent = scale(d.sent);
+            const suppressed = scale(d.suppressed);
+            const failed = scale(d.failed);
+            return (
+              <g key={d.day}>
+                <rect className="dla-bar-sent" x={x} y={HEIGHT - sent} width={BAR} height={sent} />
+                <rect
+                  className="dla-bar-suppressed"
+                  x={x}
+                  y={HEIGHT - sent - suppressed}
+                  width={BAR}
+                  height={suppressed}
+                />
+                <rect
+                  className="dla-bar-failed"
+                  x={x}
+                  y={HEIGHT - sent - suppressed - failed}
+                  width={BAR}
+                  height={failed}
+                />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      {first === null || last === null ? null : (
+        <span className="dla-axis-x" aria-hidden>
+          <span>{first}</span>
+          {middle === null ? null : <span>{middle}</span>}
+          <span>{last}</span>
+        </span>
+      )}
       <ul className="dla-legend" aria-hidden>
         <li>
           <span className="dla-swatch dla-bar-sent" />

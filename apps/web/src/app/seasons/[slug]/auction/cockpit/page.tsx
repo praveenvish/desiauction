@@ -16,7 +16,7 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
   }
   return (
     <ToastProvider>
-      <main className="registrations-dash">
+      <main className="registrations-dash cockpit-page">
         <div className="dash-stack">
           {/* Eight chrome stops stood between the keyboard and the auctioneer's
               first control — five links to OTHER pages, ahead of the gavel. The
@@ -25,6 +25,9 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
           <h1 className="auction-sr-only">{view.auctionName} — cockpit</h1>
           <CockpitPanel slug={slug} view={view} />
           <nav className="live-exits" aria-label="Auction records and other views">
+            <span className="live-exits-label" aria-hidden>
+              Records &amp; other views
+            </span>
             <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
               Ledger
             </ButtonLink>

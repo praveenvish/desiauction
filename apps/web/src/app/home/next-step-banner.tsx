@@ -17,10 +17,24 @@ import type { NextStep } from "./next-step";
  * answer. For an organizer it leads the "Needs attention" card (`embedded`);
  * for everyone else it is the first card on the page.
  */
-export function NextStepBanner({ step, embedded = false }: { step: NextStep; embedded?: boolean }) {
+export function NextStepBanner({
+  step,
+  embedded = false,
+  hero = false,
+}: {
+  step: NextStep;
+  embedded?: boolean;
+  /**
+   * The page's hero: a home with no hero of its own (the auctioneer's) wears
+   * this banner as the same dark floodlight card the player's sold moment,
+   * the owner's team and the organizer's club hero wear (round 3C).
+   */
+  hero?: boolean;
+}) {
   return (
     <section
-      className={`home-next home-next--${step.tone}${embedded ? " home-next--embedded" : ""}`}
+      className={`home-next home-next--${step.tone}${embedded ? " home-next--embedded" : ""}${hero ? " home-next--hero" : ""}`}
+      {...(hero ? { "data-theme": "floodlight" } : {})}
       aria-labelledby="home-next-title"
       data-testid="home-next-step"
       data-step={step.key}

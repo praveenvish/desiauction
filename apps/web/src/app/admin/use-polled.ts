@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { formatShortDate, istCalendarDate } from "../../lib/format-date";
+
 /**
  * Keep a server read fresh on a timer — for the live board and the auction
  * watch, which an operator leaves open through an auction night.
@@ -142,20 +144,14 @@ export function istTime(ms: number): string {
   return `${istClock(ms)} IST`;
 }
 
-const IST_DAY = new Intl.DateTimeFormat("en-IN", {
-  timeZone: "Asia/Kolkata",
-  day: "numeric",
-  month: "short",
-});
-
 /**
  * The time, with the day when it is not the same day as `relativeToMs` — "18:53
  * IST" for tonight, "13 Sep, 18:53 IST" for an auction opened five days ago, so
  * an old instant never passes for a recent one.
  */
 export function istWhen(ms: number, relativeToMs: number): string {
-  const sameDay = IST_DAY.format(new Date(ms)) === IST_DAY.format(new Date(relativeToMs));
-  return sameDay ? istTime(ms) : `${IST_DAY.format(new Date(ms))}, ${istTime(ms)}`;
+  const sameDay = istCalendarDate(ms) === istCalendarDate(relativeToMs);
+  return sameDay ? istTime(ms) : `${formatShortDate(ms)}, ${istTime(ms)}`;
 }
 
 /** The same wall-clock time without the zone — for the first half of a range. */

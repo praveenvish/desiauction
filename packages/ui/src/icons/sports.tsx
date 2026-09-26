@@ -1,6 +1,14 @@
 /**
  * THE SPORT ICONS — one glyph per pack in `@desiauction/core`'s `SPORTS`.
  *
+ * ONE FAMILY WITH THE REST (wow pass, 2026-09-25). Every other icon in the
+ * product is Phosphor; these were hand-drawn and sat on every card and hero
+ * looking like a different hand had made them. Where Phosphor draws the sport
+ * it is used as-is (regular weight). The four it does not draw — box cricket,
+ * kabaddi, badminton, pickleball — are redrawn on Phosphor's own grid: a 256
+ * box with a 16-unit stroke, round caps and joins, which is what "regular"
+ * is, so they sit beside the others without a seam.
+ *
  * Deliberately its own module rather than more exports appended to
  * `icons.tsx`: that file is the tail two parallel streams both appended to,
  * and a bad merge there has already eaten the end of an icon once.
@@ -15,6 +23,14 @@
  * viewBox, decorative by default; a caller that needs it announced passes a
  * `title`.
  */
+import { SportGlyphBasketball } from "./glyphs/SportGlyphBasketball";
+import { SportGlyphCricket } from "./glyphs/SportGlyphCricket";
+import { SportGlyphCrosshair } from "./glyphs/SportGlyphCrosshair";
+import { SportGlyphGameController } from "./glyphs/SportGlyphGameController";
+import { SportGlyphHockey } from "./glyphs/SportGlyphHockey";
+import { SportGlyphPingPong } from "./glyphs/SportGlyphPingPong";
+import { SportGlyphSoccerBall } from "./glyphs/SportGlyphSoccerBall";
+import { SportGlyphVolleyball } from "./glyphs/SportGlyphVolleyball";
 import type { ReactNode, SVGProps } from "react";
 
 export interface SportIconProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
@@ -23,15 +39,37 @@ export interface SportIconProps extends Omit<SVGProps<SVGSVGElement>, "children"
   title?: string;
 }
 
+type PhosphorGlyph = typeof SportGlyphCricket;
+
+/** A Phosphor glyph behind the sport-icon contract (size, optional title). */
+function phosphor(
+  Glyph: PhosphorGlyph,
+  // `ref` and `color` differ in type between plain SVG props and Phosphor's;
+  // neither is passed by any caller, so they are not forwarded.
+  { size = 24, title, ...svg }: Omit<SportIconProps, "ref" | "color">,
+) {
+  return (
+    <Glyph
+      size={size}
+      weight="regular"
+      aria-hidden={title === undefined ? true : undefined}
+      role={title === undefined ? undefined : "img"}
+      {...(title === undefined ? {} : { alt: title })}
+      {...svg}
+    />
+  );
+}
+
+/** Phosphor's regular grid: 256 box, 16-unit stroke, round everything. */
 function Svg({ size = 24, title, children, ...rest }: SportIconProps & { children: ReactNode }) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 256 256"
       width={size}
       height={size}
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={16}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden={title === undefined ? true : undefined}
@@ -44,138 +82,92 @@ function Svg({ size = 24, title, children, ...rest }: SportIconProps & { childre
   );
 }
 
-/** Cricket: ball and seam, with a bat at rest. */
+/** Cricket: Phosphor's bat and ball. */
 export function IconSportCricket(props: SportIconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="7.5" cy="16.5" r="4" />
-      <path d="M5.2 13.2c1.6 1 2.6 2.7 2.7 4.6" />
-      <path d="m13 15 6.2-9.3a1.6 1.6 0 0 0-2.4-2L11 10" />
-      <path d="m10.4 12.6 2.9-2.2" />
-    </Svg>
-  );
+  return phosphor(SportGlyphCricket, props);
 }
 
-/** Box cricket: the same ball, inside the cage. */
+/** Box cricket: the ball, inside the cage's netting. */
 export function IconSportBoxCricket(props: SportIconProps) {
   return (
     <Svg {...props}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M9.6 9.8c1.4.8 2.3 2.3 2.4 3.9M3 9h18M3 15h18" />
+      <rect x="32" y="40" width="192" height="176" rx="16" />
+      <path d="M32 96h40M184 96h40M32 160h40M184 160h40" />
+      <circle cx="128" cy="128" r="40" />
+      <path d="M100 100c20 12 32 34 32 58" />
     </Svg>
   );
 }
 
-/** Football: the classic panelled ball. */
+/** Football: Phosphor's panelled ball. */
 export function IconSportFootball(props: SportIconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m12 7.5 3.6 2.6-1.4 4.3H9.8l-1.4-4.3z" />
-      <path d="M12 3v4.5M4.2 9.3l4.2.8M19.8 9.3l-4.2.8M7.4 19.7l2.4-5.3M16.6 19.7l-2.4-5.3" />
-    </Svg>
-  );
+  return phosphor(SportGlyphSoccerBall, props);
 }
 
-/** Basketball: ball with its two crossing seams. */
+/** Basketball: Phosphor's ball. */
 export function IconSportBasketball(props: SportIconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18M12 3v18" />
-      <path d="M5.6 5.6c3.6 3.5 3.6 9.3 0 12.8M18.4 5.6c-3.6 3.5-3.6 9.3 0 12.8" />
-    </Svg>
-  );
+  return phosphor(SportGlyphBasketball, props);
 }
 
-/** Hockey: stick and ball. */
+/** Hockey: Phosphor's stick and ball. */
 export function IconSportHockey(props: SportIconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M7 3v9.5A4.5 4.5 0 0 0 11.5 17H17" />
-      <path d="M17 17c1.4 0 2.4-1 2.4-2.2S18.4 12.6 17 12.6" />
-      <circle cx="5" cy="19" r="2" />
-      <path d="M7 3H5" />
-    </Svg>
-  );
+  return phosphor(SportGlyphHockey, props);
 }
 
-/** Kabaddi: two players, one reaching across the line. */
+/** Kabaddi: a raider reaching across the mid-line. */
 export function IconSportKabaddi(props: SportIconProps) {
   return (
     <Svg {...props}>
-      <circle cx="7" cy="5.5" r="2" />
-      <path d="M7 7.5v5l-2 4M7 12.5l3 1.5M5 16.5 3.5 20" />
-      <path d="M12 3v18" strokeDasharray="2 2.6" />
-      <circle cx="17.5" cy="6.5" r="2" />
-      <path d="M17.5 8.5V14l1.8 5M17.5 11l-3.5 1.8M19.3 19h-2" />
+      <circle cx="80" cy="56" r="20" />
+      <path d="M80 76v56l-24 48M80 132l32 16M56 180l-16 36" />
+      <path d="M128 32v192" strokeDasharray="16 20" />
+      <circle cx="184" cy="64" r="20" />
+      <path d="M184 84v60l20 64M184 112l-40 20M204 208h-24" />
     </Svg>
   );
 }
 
-/** Volleyball: ball with its curved seams. */
+/** Volleyball: Phosphor's ball. */
 export function IconSportVolleyball(props: SportIconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 3c-3 4.5-3 9 0 18M3.6 8.4c5 1.4 9.2 3.6 12.8 9.4M20.4 8.4c-5.4.2-9.7 1.6-14 6.6" />
-    </Svg>
-  );
+  return phosphor(SportGlyphVolleyball, props);
 }
 
-/** Badminton: shuttle in flight. */
+/** Badminton: a shuttlecock, cork down, feathers up. */
 export function IconSportBadminton(props: SportIconProps) {
   return (
     <Svg {...props}>
-      <path d="M13.8 4.4a2.6 2.6 0 0 1 3.7 3.7l-1.6 1.6-3.7-3.7z" />
-      <path d="m12.2 6 3.7 3.7-6.4 6.4a3 3 0 0 1-1.6.8l-3.6.7.7-3.6a3 3 0 0 1 .8-1.6z" />
-      <path d="m8.8 9.4 3.7 3.7M6.3 11.9l3.7 3.7" />
+      <path d="M100 176h56l32-120a16 16 0 0 0-16-16H84a16 16 0 0 0-16 16Z" />
+      <path d="M106 40l14 136M150 40l-14 136" />
+      <path d="M100 176v12a28 28 0 0 0 56 0v-12" />
     </Svg>
   );
 }
 
-/** Table tennis: bat and ball. */
+/** Table tennis: Phosphor's bat and ball. */
 export function IconSportTableTennis(props: SportIconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M14.8 3.6a5.6 5.6 0 0 0-7.9 7.9l1.8 1.8 7.9-7.9z" />
-      <path d="m8.7 13.3 2.5 2.5a1.8 1.8 0 0 1 0 2.5l-1.4 1.4a1.8 1.8 0 0 1-2.5 0l-2.5-2.5" />
-      <circle cx="18" cy="15" r="2" />
-    </Svg>
-  );
+  return phosphor(SportGlyphPingPong, props);
 }
 
-/** Pickleball: paddle with its drilled face. */
+/** Pickleball: the solid paddle with its drilled ball. */
 export function IconSportPickleball(props: SportIconProps) {
   return (
     <Svg {...props}>
-      <path d="M12.5 3a6.5 6.5 0 0 1 0 13 6.5 6.5 0 0 1 0-13z" />
-      <path d="M10.5 16v3.5a1.5 1.5 0 0 0 3 0V16" />
-      <path d="M10.6 7.8h.01M14.4 7.8h.01M10.6 11.4h.01M14.4 11.4h.01" />
+      <rect x="44" y="28" width="112" height="128" rx="48" />
+      <path d="M84 156v52a16 16 0 0 0 32 0v-52" />
+      <circle cx="192" cy="192" r="28" />
+      <path d="M186 184h.01M200 196h.01" />
     </Svg>
   );
 }
 
-/** Esports: a controller. */
+/** Esports: Phosphor's controller. */
 export function IconSportEsports(props: SportIconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M7.5 7h9a4.5 4.5 0 0 1 4.4 3.6l.8 4.3A2.6 2.6 0 0 1 19.2 18c-.9 0-1.7-.5-2.2-1.2L16 15.5H8l-1 1.3c-.5.7-1.3 1.2-2.2 1.2a2.6 2.6 0 0 1-2.5-3.1l.8-4.3A4.5 4.5 0 0 1 7.5 7z" />
-      <path d="M7 10.6v2.2M5.9 11.7h2.2M15.6 11h.01M17.8 12.6h.01" />
-    </Svg>
-  );
+  return phosphor(SportGlyphGameController, props);
 }
 
-/** Battle royale: the drop marker over a ring. */
+/** Battle royale: Phosphor's crosshair — the drop zone. */
 export function IconSportBattleRoyale(props: SportIconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="13.5" r="7.5" />
-      <circle cx="12" cy="13.5" r="3" />
-      <path d="M12 2.5v4M9.2 4.2 12 6.5l2.8-2.3" />
-    </Svg>
-  );
+  return phosphor(SportGlyphCrosshair, props);
 }
 
 /** Every sport we can draw, keyed by the pack key in `@desiauction/core`. */

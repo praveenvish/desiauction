@@ -1,0 +1,224 @@
+/* The owner's team hero (wow pass). Own file — home.css belongs to S3. */
+
+/* ONE FAMILY OF ROLE HEROES (round 3C): the owner's team wears the same dark
+   floodlight card as the player's sold moment and the organizer's club hero —
+   gold glow top right, the team's gold edge — instead of a pale day card. */
+.ow-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: clamp(var(--space-5), 3vw, var(--space-8));
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      50% 120% at 0% 100%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 65%
+    ),
+    var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
+}
+
+.ow-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.ow-crest {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  font-size: var(--text-lg-size);
+  box-shadow: 0 0 0 4px var(--accent-subtle);
+}
+
+.ow-id {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ow-kicker {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.ow-name {
+  margin: 0;
+  font-size: var(--text-2xl-size);
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.ow-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) clamp(var(--space-6), 5vw, var(--space-16));
+  align-items: center;
+}
+
+.ow-purse {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.ow-ring {
+  flex: none;
+}
+
+.ow-ring-track,
+.ow-ring-spent {
+  fill: none;
+  stroke-width: 8;
+}
+
+/* What is left: a quiet track. What was spent: the gold arc. */
+.ow-ring-track {
+  stroke: color-mix(in srgb, var(--text-muted) 30%, transparent);
+}
+
+.ow-ring-spent {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}
+
+.ow-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-05);
+  min-width: 0;
+}
+
+.ow-value {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl-size);
+  line-height: 1.1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.ow-of {
+  color: var(--text-muted);
+}
+
+.ow-label {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.ow-hint {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.ow-figure-link {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  text-decoration: none;
+}
+
+.ow-figure-link:hover {
+  border-color: var(--accent-line);
+}
+
+/* The squad's faces, one strip — a glance; "My squad" is the door. */
+.ow-squad {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.ow-faces {
+  display: flex;
+  margin: 0;
+  padding: 0 0 0 var(--space-2);
+  list-style: none;
+}
+
+.ow-faces li {
+  margin-left: calc(-1 * var(--space-2));
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 2px var(--surface-sunken);
+  display: flex;
+}
+
+.ow-squad-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ow-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 519px) {
+  /* The state pill leads on its own line, flush left, instead of hanging
+     under the name at an indent (round 2 "indents oddly"). */
+  .ow-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: var(--space-3);
+  }
+
+  .ow-head > :last-child {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  .ow-links > * {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .ow-head .ow-crest {
+    width: 44px;
+    height: 44px;
+  }
+}

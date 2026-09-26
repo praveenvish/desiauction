@@ -137,7 +137,7 @@ export function CasePanel({
         />
         <Tile
           icon={<IconWallet />}
-          tone="green"
+          tone="gold"
           label="Collected"
           value={settlementCase.financial.discharged}
           id="r-collected"

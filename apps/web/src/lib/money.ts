@@ -1,6 +1,7 @@
 import { formatAmount, paise as asPaise, type MoneyUnit } from "@desiauction/core";
 
 import { compactFloorINR, compactINR, exactINR, ledgerINR } from "./inr";
+import { formatCount } from "./plural";
 
 /**
  * AN AMOUNT IN ITS SEASON'S UNIT (0091) — rupees or points.
@@ -38,15 +39,13 @@ const INR: MoneyFormat = {
   word: "rupees",
 };
 
+/**
+ * Points are never abbreviated (round 3B): "1.75 L pts" read as lakhs of
+ * rupees and rounded 1,74,500 to a score no team ever had. The "compact" shape
+ * of a points amount is the whole number, Indian-grouped — "1,74,500 pts".
+ */
 function compactPoints(amount: number, round: (value: number) => number): string {
-  const points = amount / 100;
-  if (points >= 10_000_000) {
-    return `${String(round((points / 10_000_000) * 100) / 100)} Cr pts`;
-  }
-  if (points >= 100_000) {
-    return `${String(round((points / 100_000) * 100) / 100)} L pts`;
-  }
-  return `${round(points).toLocaleString("en-IN")} pts`;
+  return `${formatCount(round(amount / 100))} pts`;
 }
 
 const POINTS: MoneyFormat = {

@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { adminMessaging } from "../../../server/admin/actions";
 import { platformAdminPageGate } from "../../../server/admin/authz";
 import { MessagingPanel } from "./messaging-panel";
+import { AdminPageHead } from "../admin-ui";
 import "../../seasons/seasons.css";
 import "../admin.css";
 
@@ -32,12 +33,9 @@ export default async function AdminMessagingPage() {
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head">
-          <p className="dash-hint">
-            Which message shapes have a registered DLT id, the text each one sends, and the contacts
-            the platform must never send to.
-          </p>
-        </header>
+        <AdminPageHead readOnly>
+          Registered DLT ids, what each message says, and who must never be sent to.
+        </AdminPageHead>
         <Suspense fallback={<LoadingState variant="page" />}>
           <Messaging />
         </Suspense>

@@ -407,6 +407,34 @@
   }
 }
 
+/* The banner as a role hero (auctioneer home): the same dark floodlight card,
+   gold glow and gold edge as the player's sold moment and the owner's team. */
+.home-next--hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(var(--space-5), 3vw, var(--space-8));
+  border-color: var(--accent-line);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      50% 120% at 0% 100%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 65%
+    ),
+    var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
+}
+
+.home-next--hero .home-next-title {
+  font-size: var(--text-2xl-size);
+}
+
 /* The next step as the first item of the organizer's "Needs attention" card:
    a warm inset block rather than a card inside a card. */
 .home-next--embedded {
@@ -427,6 +455,14 @@
   font-size: var(--text-md-size);
 }
 
+/* Inside the card the eyebrow is where it is ("TPL 2026 · 6 not told yet"),
+   in sentence case — three shouted clauses competed with the title. */
+.home-next--embedded .home-next-eyebrow {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: var(--font-weight-medium);
+}
+
 .home-next--embedded .home-next-why {
   font-size: var(--text-sm-size);
 }
@@ -440,6 +476,26 @@
   .home-next--embedded .home-next-actions {
     flex: 1 1 100%;
     align-items: flex-start;
+  }
+}
+
+/* PHONE: tile, words, then a full-width CTA — one column. The wrap above is
+   for a row; on a phone `.home-next` is already a column, and wrapping a
+   column with a 100% basis threw the actions into a second column beside the
+   tile, pushing "Announce now" past the card and the page to 509px (round 2). */
+@media (max-width: 719px) {
+  .home-next--embedded {
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .home-next--embedded .home-next-actions {
+    flex: none;
+    align-items: stretch;
+  }
+
+  .home-next--embedded .home-next-buttons > * {
+    width: 100%;
   }
 }
 
@@ -467,7 +523,19 @@
   white-space: nowrap;
 }
 
-/* ---------- journey row ---------- */
+/* ---------- journey rail (inside the hero) ---------- */
+.home-hero .home-journey-count {
+  background: color-mix(in srgb, var(--hero-ink) 14%, transparent);
+  color: var(--hero-ink);
+}
+
+/* Repeated activity folds into one row: "Registration poster generated ×6". */
+.home-feed-times {
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
 .home-journey-count {
   display: inline-grid;
   place-items: center;
@@ -508,8 +576,7 @@
 
 .home-row-link,
 .home-feed,
-.home-clear,
-.home-blank {
+.home-clear {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -651,23 +718,6 @@
 }
 
 /* ---------- designed empty states ---------- */
-.home-blank {
-  flex-wrap: wrap;
-  padding: 0;
-}
-
-.home-blank .home-row-text {
-  flex: 1 1 12rem;
-}
-
-.home-blank .home-row-text strong,
-.home-blank .home-row-text > span {
-  white-space: normal;
-}
-
-.home-blank-cta {
-  flex: none;
-}
 
 /* ---------- crest (monogram) ---------- */
 .home-crest {
@@ -1162,6 +1212,7 @@
 .home-dot--accent {
   background: var(--accent);
 }
+
 .home-dot--muted {
   background: var(--text-muted);
 }

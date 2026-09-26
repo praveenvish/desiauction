@@ -1,6 +1,13 @@
 "use client";
 
-import { IconSearch } from "@desiauction/ui";
+import {
+  FilterMenu,
+  Toolbar,
+  ToolbarChip,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSpacer,
+} from "@desiauction/ui";
 
 import { useFilterQuery } from "../../lib/use-filter-query";
 
@@ -24,86 +31,137 @@ export function PlayersFilters({
   current,
   seasons,
   teams,
+  countLabel,
 }: {
   /** RAW filter values as of this render ("" means absent) — no `page`. */
   current: Readonly<Record<string, string>>;
   seasons: readonly { slug: string; name: string; orgName: string }[];
   teams: readonly { id: string; label: string }[];
+  /** "43 players" — the toolbar's quiet count. */
+  countLabel: string;
 }) {
   const { commit, search, setSearch } = useFilterQuery(current);
   const change = (patch: Record<string, string>) => {
     commit(patch);
   };
+  const season = current["season"] ?? "";
+  const status = current["status"] ?? "";
+  const team = current["team"] ?? "";
   const filtered =
     (current["q"] ?? "") !== "" ||
-    (current["season"] ?? "") !== "" ||
-    (current["status"] ?? "") !== "" ||
-    (current["team"] ?? "") !== "" ||
+    season !== "" ||
+    status !== "" ||
+    team !== "" ||
     (current["mark"] ?? "") !== "";
+  const menuCount = [season, status, team].filter((value) => value !== "").length;
+  const seasonName = seasons.find((entry) => entry.slug === season)?.name ?? season;
+  const teamName = teams.find((entry) => entry.id === team)?.label ?? team;
+  const statusName = STATUS_OPTIONS.find((entry) => entry.value === status)?.label ?? status;
+  /*
+   * ONE ROW (wow pass). Search, the filters that are set (as removable chips),
+   * the count, and the rest behind one "Filters" menu. It used to be a card
+   * header, then a search row, then a row of selects — three bands, ~250px,
+   * before the first player.
+   */
   return (
-    <div className="px-filters" role="search">
-      <label className="px-search">
-        <span className="px-visually-hidden">Search players</span>
-        <IconSearch size={18} aria-hidden />
-        <input
-          type="search"
-          value={search}
+    <div className="px-toolbar" role="search">
+      <Toolbar>
+        <ToolbarSearch
+          id="players-search"
+          label="Search players"
           placeholder="Search by name or reg. no."
+          value={search}
           onChange={(event) => {
             setSearch(event.target.value);
           }}
-          data-testid="players-search"
+          testId="players-search"
         />
-      </label>
-      {seasons.length > 1 ? (
-        <Select
-          label="Season"
-          value={current["season"] ?? ""}
-          onChange={(value) => {
-            // A team belongs to one season; switching season drops it.
-            change({ season: value, team: "" });
-          }}
-          options={[
-            { value: "", label: "All seasons" },
-            ...seasons.map((season) => ({ value: season.slug, label: season.name })),
-          ]}
-        />
-      ) : null}
-      <Select
-        label="Status"
-        value={current["status"] ?? ""}
-        onChange={(value) => {
-          change({ status: value });
-        }}
-        options={STATUS_OPTIONS}
-      />
-      {teams.length > 0 ? (
-        <Select
-          label="Team"
-          value={current["team"] ?? ""}
-          onChange={(value) => {
-            change({ team: value });
-          }}
-          options={[
-            { value: "", label: "All teams" },
-            ...teams.map((team) => ({ value: team.id, label: team.label })),
-          ]}
-        />
-      ) : null}
-      {filtered ? (
-        <button
-          type="button"
-          className="px-reset"
-          onClick={() => {
-            // No setSearch(""): its debounced write would land after this one,
-            // built from values that may still be the old ones. The box follows
-            // the URL once `q` clears (useFilterQuery's sync effect).
-            commit({ q: "", season: "", status: "", team: "", mark: "" });
-          }}
-        >
-          Reset
-        </button>
-      ) : null}
+        {season !== "" ? (
+          <ToolbarChip
+            removeLabel="Remove season filter"
+            onRemove={() => {
+              change({ season: "", team: "" });
+            }}
+          >
+            {seasonName}
+          </ToolbarChip>
+        ) : null}
+        {status !== "" ? (
+          <ToolbarChip
+            removeLabel="Remove status filter"
+            onRemove={() => {
+              change({ status: "" });
+            }}
+          >
+            {statusName}
+          </ToolbarChip>
+        ) : null}
+        {team !== "" ? (
+          <ToolbarChip
+            removeLabel="Remove team filter"
+            onRemove={() => {
+              change({ team: "" });
+            }}
+          >
+            {teamName}
+          </ToolbarChip>
+        ) : null}
+        {filtered ? (
+          <button
+            type="button"
+            className="px-reset"
+            onClick={() => {
+              // No setSearch(""): its debounced write would land after this one,
+              // built from values that may still be the old ones. The box follows
+              // the URL once `q` clears (useFilterQuery's sync effect).
+              commit({ q: "", season: "", status: "", team: "", mark: "" });
+            }}
+          >
+            Reset
+          </button>
+        ) : null}
+        <ToolbarSpacer />
+        <ToolbarCount testId="players-count">{countLabel}</ToolbarCount>
+        <FilterMenu activeCount={menuCount} testId="players-filter-menu">
+          <div className="px-menu-fields">
+            {seasons.length > 1 ? (
+              <Select
+                label="Season"
+                value={season}
+                onChange={(value) => {
+                  // A team belongs to one season; switching season drops it.
+                  change({ season: value, team: "" });
+                }}
+                options={[
+                  { value: "", label: "All seasons" },
+                  ...seasons.map((entry) => ({ value: entry.slug, label: entry.name })),
+                ]}
+              />
+            ) : null}
+            <Select
+              label="Status"
+              value={status}
+              onChange={(value) => {
+                change({ status: value });
+              }}
+              options={STATUS_OPTIONS}
+            />
+            {teams.length > 0 ? (
+              <Select
+                label="Team"
+                value={team}
+                onChange={(value) => {
+                  change({ team: value });
+                }}
+                options={[
+                  { value: "", label: "All teams" },
+                  ...teams.map((entry) => ({ value: entry.id, label: entry.label })),
+                ]}
+              />
+            ) : null}
+          </div>
+        </FilterMenu>
+      </Toolbar>
     </div>
   );
 }
@@ -122,7 +180,7 @@ function Select({
   const id = `px-filter-${label.toLowerCase()}`;
   return (
     <span className="px-select-wrap">
-      <label htmlFor={id} className="px-visually-hidden">
+      <label htmlFor={id} className="px-menu-label">
         {label}
       </label>
       <select

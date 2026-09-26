@@ -195,7 +195,7 @@ export function DemoRequestForm({ source }: { source: string }) {
           rows={3}
           maxLength={2000}
           className={styles["note"]}
-          placeholder="What you're worried about, what you tried last year, who else needs to see it. If you picked another sport, tell us which."
+          placeholder="What worries you — and which sport, if it's another one"
         />
       </div>
 

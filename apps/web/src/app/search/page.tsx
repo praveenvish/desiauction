@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { searchContent } from "../../content/search";
-import { PageBody, PageHero, SportMontage } from "../../components/public/public-kit";
+import { IconFile, IconHelp, IconPlay, IconRupee, IconSpark, IconTrophy } from "@desiauction/ui";
+
+import { LinkRow, LinkRows, PageBody, PageHero } from "../../components/public/public-kit";
 import "../content.css";
 
 export const metadata: Metadata = {
@@ -11,6 +13,46 @@ export const metadata: Metadata = {
   // Search results are not content to index.
   robots: { index: false },
 };
+
+/** What an empty search offers: the destinations visitors look for most. */
+const SUGGESTIONS = [
+  {
+    href: "/help/getting-started",
+    title: "A tour of DesiAuction",
+    description: "What the platform does, and where to go next.",
+    icon: <IconSpark size={20} weight="duotone" />,
+  },
+  {
+    href: "/c",
+    title: "Browse tournaments",
+    description: "Every tournament published on DesiAuction.",
+    icon: <IconTrophy size={20} weight="duotone" />,
+  },
+  {
+    href: "/pricing",
+    title: "Pricing",
+    description: "Free during beta — what the passes will include.",
+    icon: <IconRupee size={20} weight="duotone" />,
+  },
+  {
+    href: "/#playground",
+    title: "Try a mock auction",
+    description: "Bid against the clock in your browser, no sign-in.",
+    icon: <IconPlay size={20} weight="duotone" />,
+  },
+  {
+    href: "/help/faq",
+    title: "Frequently asked questions",
+    description: "Quick answers to the things people ask most.",
+    icon: <IconHelp size={20} weight="duotone" />,
+  },
+  {
+    href: "/legal",
+    title: "Legal centre",
+    description: "Terms, privacy, refunds and who operates the platform.",
+    icon: <IconFile size={20} weight="duotone" />,
+  },
+] as const;
 
 /** How many hits a first page shows before the reader has to ask for the rest. */
 const PAGE_SIZE = 12;
@@ -45,7 +87,6 @@ export default async function SearchPage({
         eyebrow="Find anything"
         title="Search"
         lede="Find help articles, legal documents, pricing and support."
-        art={<SportMontage />}
         actions={
           <form className="content-searchbar no-print" action="/search" method="get" role="search">
             <label className="visually-hidden-heading" htmlFor="search-q">
@@ -68,7 +109,26 @@ export default async function SearchPage({
 
       <PageBody>
         {query.length < 2 ? (
-          <p className="article-meta">Type at least two characters to search.</p>
+          // An empty search used to be one 13px line in a cream strip, which
+          // read as a broken page. Now it offers the places people go most.
+          <section className="search-suggest" aria-labelledby="popular">
+            <h2 id="popular" className="cl-list-title">
+              {query.length === 0
+                ? "Popular destinations"
+                : "Type at least two characters — or try"}
+            </h2>
+            <LinkRows labelledBy="popular" className="search-suggest-rows">
+              {SUGGESTIONS.map((item) => (
+                <LinkRow
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  title={item.title}
+                  description={item.description}
+                />
+              ))}
+            </LinkRows>
+          </section>
         ) : matches.length === 0 ? (
           <p className="article-meta" data-testid="search-empty">
             Nothing matches “{query}”. Try a different word, or browse{" "}

@@ -88,16 +88,6 @@
   min-width: 0;
 }
 
-.me-empty {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-}
-
-.me-empty a {
-  color: var(--text-accent);
-}
-
 /* ---- registrations as cards ---- */
 
 .me-regs {
@@ -121,14 +111,6 @@
   background: var(--surface-raised);
   color: inherit;
   text-decoration: none;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.me-reg:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
 }
 
 .me-reg-top {
@@ -353,7 +335,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--violet-base);
+  background: var(--accent);
 }
 
 .me-privacy {
@@ -431,4 +413,149 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Owned teams: the foot is the door. */
+.me-reg-go {
+  gap: var(--space-1);
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* "No matches yet" as one quiet line, not a full-weight card. */
+.me-quiet {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.me-quiet > svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+
+/* One season is not a grid: the lone card takes the row and lays its team
+   out beside the name instead of sitting in a third of the panel. */
+@media (min-width: 720px) {
+  .me-regs > li:only-child {
+    grid-column: 1 / -1;
+  }
+
+  .me-regs > li:only-child > .me-reg {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top foot"
+      "name foot"
+      "org foot";
+    align-items: center;
+    column-gap: var(--space-6);
+  }
+
+  .me-regs > li:only-child .me-reg-top {
+    grid-area: top;
+    justify-content: flex-start;
+  }
+
+  .me-regs > li:only-child .me-reg-name {
+    grid-area: name;
+  }
+
+  .me-regs > li:only-child .me-reg-org {
+    grid-area: org;
+  }
+
+  .me-regs > li:only-child .me-reg-foot {
+    grid-area: foot;
+    justify-content: flex-end;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.me-quiet a {
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The squad rail's season line, under its title. */
+.me-squad-season {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+/* An owned team: the owner home hero in miniature — crest, name, the purse
+   and squad figures, and the squad's door. */
+.me-regs > li > .me-reg.me-owned {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "crest body go";
+  align-items: center;
+  column-gap: var(--space-4);
+}
+
+.me-owned-crest {
+  grid-area: crest;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  box-shadow: 0 0 0 4px var(--accent-subtle);
+}
+
+.me-owned-body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.me-owned-body .me-reg-top {
+  justify-content: flex-start;
+  margin: 0;
+}
+
+.me-owned-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.me-owned-figures b {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.me-owned-go {
+  grid-area: go;
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 519px) {
+  .me-regs > li > .me-reg.me-owned {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "crest body"
+      "go go";
+    row-gap: var(--space-3);
+  }
 }

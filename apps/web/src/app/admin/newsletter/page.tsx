@@ -1,6 +1,5 @@
 import {
   ButtonLink,
-  EmptyState,
   IconCalendar,
   IconDownload,
   IconMail,
@@ -8,11 +7,13 @@ import {
   StatCard,
   StatGrid,
 } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { platformAdminPageGate } from "../../../server/admin/authz";
 import { newsletterSummary } from "../../../server/marketing/newsletter";
 import { asPerson } from "../../../server/tenant";
+import { AdminEmpty, AdminPageHead, KpiValue } from "../admin-ui";
 import "../../seasons/seasons.css";
 import "../admin.css";
 
@@ -34,41 +35,39 @@ export default async function AdminNewsletterPage() {
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <header className="dash-head">
-          <p className="dash-hint">
-            Addresses from the footer sign-up. Nothing sends to them yet. Each is deleted
-            twenty-four months after it was added, and anyone can remove theirs at
-            /newsletter/unsubscribe.
-          </p>
-        </header>
+        <AdminPageHead readOnly>
+          Footer sign-ups. Nothing sends yet; each address is deleted after 24 months.
+        </AdminPageHead>
         {summary.total === 0 ? (
-          <SectionCard icon={<IconMail />} tone="neutral" title="Newsletter list">
-            <EmptyState
-              headingLevel={3}
-              title="Nobody has signed up"
-              description="Addresses given in the site footer appear here."
-            />
-          </SectionCard>
+          <div className="admin-panel">
+            <AdminEmpty icon={<IconMail size={24} weight="duotone" />} title="Nobody has signed up">
+              Addresses given in the site footer appear here. Anyone can remove theirs on the{" "}
+              <Link href="/newsletter/unsubscribe" className="admin-inline-link">
+                unsubscribe page
+              </Link>
+              .
+            </AdminEmpty>
+          </div>
         ) : (
           <>
             <StatGrid testId="newsletter-summary">
               <StatCard
                 icon={<IconMail />}
-                tone="gold"
-                value={String(summary.total)}
+                concept="neutral"
+                value={<KpiValue n={summary.total} />}
                 label="Addresses"
                 hint="On the product-news list"
               />
               <StatCard
                 icon={<IconCalendar />}
-                tone="green"
-                value={String(summary.lastThirtyDays)}
+                concept="neutral"
+                value={<KpiValue n={summary.lastThirtyDays} />}
                 label="Added in the last 30 days"
               />
             </StatGrid>
             <SectionCard
               icon={<IconDownload />}
-              tone="blue"
+              tone="neutral"
               title="Export"
               description="Every address at once, as CSV. The download is its own line in the access log."
               action={

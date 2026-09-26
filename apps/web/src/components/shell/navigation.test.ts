@@ -270,6 +270,18 @@ describe("exactly one item is ever active", () => {
     expect(bar.find((item) => item.active)?.key).toBe("reports");
   });
 
+  it("administration takes the bar's last seat while an operator is in it", () => {
+    const inAdmin = navigationFor({ roles: busy, pathname: "/admin/health" });
+    const bar = phoneBar(inAdmin.rail, inAdmin.utility);
+    expect(bar).toHaveLength(RAIL_CAP);
+    expect(bar[0]?.key).toBe("home");
+    expect(bar.at(-1)?.key).toBe("admin");
+    expect(bar.at(-1)?.active).toBe(true);
+    // Anywhere else, the utility list never displaces a rail item.
+    const home = navigationFor({ roles: busy, pathname: "/home" });
+    expect(phoneBar(home.rail, home.utility).map((item) => item.key)).not.toContain("admin");
+  });
+
   it("desk surfaces ride the drawer, not the bar", () => {
     // premium-flow's ruling, kept: Organizations and Reports are laptop jobs.
     const bar = phoneBar(navigationFor({ roles: busy, pathname: "/home" }).rail);
@@ -546,7 +558,7 @@ describe("the strip always says where you are, whatever role you hold", () => {
     // before `claims`, /lineups fell through and underlined Overview, a page
     // the reader was demonstrably not on.
     expect(at("/seasons/demo-pl/registrations", "organizer")).toBe("players");
-    expect(at("/seasons/demo-pl/lineups", "organizer")).toBe("players");
+    expect(at("/seasons/demo-pl/lineups", "organizer")).toBe("schedule");
     expect(at("/seasons/demo-pl/fixtures", "organizer")).toBe("schedule");
     expect(at("/seasons/demo-pl/standings", "organizer")).toBe("schedule");
     expect(at("/seasons/demo-pl/fixtures/match-day", "organizer")).toBe("schedule");
@@ -573,12 +585,14 @@ describe("the strip always says where you are, whatever role you hold", () => {
   it("Money lights only for somebody who was given the tab", () => {
     expect(at("/seasons/demo-pl/money", "organizer", true)).toBe("money");
     // Without the books there is no Money tab, so the page 404s under a strip
-    // that is not claiming to hold it.
-    expect(at("/seasons/demo-pl/money", "organizer", false)).toBe("overview");
+    // that lights nothing at all — not Overview.
+    expect(at("/seasons/demo-pl/money", "organizer", false)).toBe("");
   });
 
   it("a page that is not a tab lights nothing rather than the wrong thing", () => {
-    expect(at("/seasons/demo-pl/posters", "organizer")).toBe("");
+    // The posters studio belongs to the auction's follow-through.
+    expect(at("/seasons/demo-pl/posters", "organizer")).toBe("auction");
+    expect(at("/seasons/demo-pl/register", "organizer")).toBe("");
     expect(at("/seasons/demo-pl", "organizer")).toBe("overview");
   });
 

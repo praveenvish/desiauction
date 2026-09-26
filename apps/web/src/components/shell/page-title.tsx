@@ -23,6 +23,11 @@ export interface ShellTitleOverride {
   testId?: string;
   /** The header's line two, where the lede is data rather than fixed copy. */
   subtitle?: string;
+  /**
+   * Words before the title that a narrow phone drops ("Good morning," before
+   * a name), so the part that matters is never the part that is cut off.
+   */
+  lead?: string;
 }
 
 export interface ShellTitleChannel {
@@ -50,22 +55,24 @@ export interface PageTitleProps {
   title: string;
   testId?: string;
   subtitle?: string;
+  lead?: string;
 }
 
 /** Renders nothing: it hands the page's name up to the identity bar. */
-export function PageTitle({ title, testId, subtitle }: PageTitleProps) {
+export function PageTitle({ title, testId, subtitle, lead }: PageTitleProps) {
   const { publish, retract } = useContext(ShellTitleContext);
   useEffect(() => {
     const token: ShellTitleOverride = {
       title,
       ...(testId !== undefined ? { testId } : {}),
       ...(subtitle !== undefined ? { subtitle } : {}),
+      ...(lead !== undefined ? { lead } : {}),
     };
     publish(token);
     return () => {
       retract(token);
     };
-  }, [publish, retract, title, testId, subtitle]);
+  }, [publish, retract, title, testId, subtitle, lead]);
   return null;
 }
 

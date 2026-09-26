@@ -28,6 +28,7 @@ import {
 } from "../../../server/player/profile";
 import { formatDate } from "../../../lib/format-date";
 import { RegistrationCard } from "../registration-card";
+import { LatestSquad } from "../squad-rail";
 import "../me.css";
 
 /**
@@ -143,13 +144,13 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             />
             <StatCard
               icon={<IconUsers />}
-              tone="blue"
+              tone="gold"
               value={String(career.totals.teams)}
               label={career.totals.teams === 1 ? "Team" : "Teams"}
             />
             <StatCard
               icon={<IconGavel />}
-              tone="purple"
+              tone="gold"
               value={String(career.totals.soldCount)}
               label="Times sold"
             />
@@ -157,7 +158,7 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
               // ₹ only over a rupee price: "Highest price 50,000 pts" beside a
               // rupee sign read as money to a points-league player (0091).
               icon={career.totals.highestUnit === "inr" ? <IconRupee /> : <IconWallet />}
-              tone="green"
+              tone="gold"
               value={
                 career.totals.highestPrice !== null
                   ? money(career.totals.highestPrice, career.totals.highestUnit)
@@ -167,27 +168,32 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             />
           </StatGrid>
 
-          <SectionCard
-            icon={<IconTrophy />}
-            title="Seasons"
-            description={`${String(career.seasons.length)} in ${pack.label.toLowerCase()}, oldest first`}
-            data-testid="career-seasons"
-          >
-            <ul className="me-regs">
-              {career.seasons.map((season) => (
-                <li key={season.registrationId}>
-                  <RegistrationCard
-                    season={season}
-                    eyebrow={season.startsOn !== null ? formatDate(season.startsOn) : pack.label}
-                    subline={[season.orgName, roleLabelIn(pack, season.role)]
-                      .filter((part) => part !== "")
-                      .join(" · ")}
-                    money={money}
-                  />
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
+          <div className="me-layout">
+            <SectionCard
+              icon={<IconTrophy />}
+              title="Seasons"
+              description={`${String(career.seasons.length)} in ${pack.label.toLowerCase()}, oldest first`}
+              data-testid="career-seasons"
+            >
+              <ul className="me-regs">
+                {career.seasons.map((season) => (
+                  <li key={season.registrationId}>
+                    <RegistrationCard
+                      season={season}
+                      eyebrow={season.startsOn !== null ? formatDate(season.startsOn) : pack.label}
+                      subline={[season.orgName, roleLabelIn(pack, season.role)]
+                        .filter((part) => part !== "")
+                        .join(" · ")}
+                      money={money}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+            <aside className="me-side" aria-label="Your squad">
+              <LatestSquad seasons={career.seasons} />
+            </aside>
+          </div>
         </>
       )}
     </main>

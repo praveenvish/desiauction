@@ -28,6 +28,13 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { inboxSeenKey, labelForEvent } from "../../lib/inbox-events";
 import { useHydrated } from "../../lib/use-hydrated";
+import {
+  formatDate,
+  formatDayDate,
+  formatShortDate,
+  formatTime,
+  istCalendarDate,
+} from "../../lib/format-date";
 
 export interface InboxEvent {
   action: string;
@@ -68,15 +75,7 @@ function formatWhen(iso: string, now: number | null): string {
   }
   // A notice from last August read exactly like one from this August.
   const sameYear = now !== null && date.getFullYear() === new Date(now).getFullYear();
-  return date.toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata", // PRR P2/F25: pin the zone or SSR/CSR disagree
-    day: "2-digit",
-    month: "short",
-    ...(now === null || sameYear ? {} : { year: "numeric" }),
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  return `${now === null || sameYear ? formatShortDate(date) : formatDate(date)}, ${formatTime(date)}`;
 }
 
 /**
@@ -119,7 +118,7 @@ const FALLBACK_ICON = { icon: <IconBell />, tone: "neutral" as KitTone };
 
 /** The calendar day in IST — the same on the server and in the browser. */
 function dayKey(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  return istCalendarDate(iso);
 }
 
 /**
@@ -133,16 +132,9 @@ function dayLabel(key: string, now: number | null): string {
     if (key === today) return "Today";
     if (key === yesterday) return "Yesterday";
   }
-  const date = new Date(`${key}T12:00:00+05:30`);
   const sameYear =
     now !== null && key.slice(0, 4) === dayKey(new Date(now).toISOString()).slice(0, 4);
-  return date.toLocaleDateString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    ...(now === null || sameYear ? {} : { year: "numeric" }),
-  });
+  return formatDayDate(key, !(now === null || sameYear));
 }
 
 /**

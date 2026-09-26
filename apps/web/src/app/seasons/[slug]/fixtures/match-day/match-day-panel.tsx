@@ -11,7 +11,7 @@ import {
   useToast,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { formatWallTime } from "../../../../../lib/format-date";
 import {
@@ -41,10 +41,13 @@ export function MatchDayPanel({
   slug,
   groundGroups,
   canManage,
+  empty,
 }: {
   slug: string;
   groundGroups: MatchDayView["groundGroups"];
   canManage: boolean;
+  /** What an empty day shows (the page draws the week around it). */
+  empty?: ReactNode;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -79,6 +82,9 @@ export function MatchDayPanel({
   };
 
   if (groundGroups.length === 0) {
+    if (empty !== undefined) {
+      return <>{empty}</>;
+    }
     return (
       <SectionCard
         icon={<IconPin />}
@@ -104,7 +110,7 @@ export function MatchDayPanel({
         <SectionCard
           key={group.groundId ?? "unassigned"}
           icon={<IconPin />}
-          tone="purple"
+          concept="venue"
           title={group.groundName}
           description={`${group.venueName} · ${String(group.fixtures.length)} match${group.fixtures.length === 1 ? "" : "es"}`}
           flush
@@ -205,7 +211,7 @@ export function MatchDayPanel({
             <p>
               {confirming.action === "cancel"
                 ? "Cancelling releases the ground and the slot. A cancelled fixture cannot be brought back — you would schedule a new one."
-                : "Completing is final: a completed fixture is immutable and has no way back. No score is recorded."}
+                : "Completing is final: a completed fixture cannot be reopened. No score is recorded."}
             </p>
             <Button
               onClick={() => void run(confirming.fixture.id, confirming.action)}

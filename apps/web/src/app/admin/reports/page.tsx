@@ -1,10 +1,12 @@
-import { EmptyState, IconFlag, SectionCard, ToastProvider } from "@desiauction/ui";
+import { IconFlag, ToastProvider } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
 import { platformSupportGate } from "../../../server/admin/authz";
 import { reportQueue } from "../../../server/admin/report-views";
 import { ReportQueuePanel } from "./report-queue-panel";
+import { AdminEmpty, AdminPageHead } from "../admin-ui";
 import "../../seasons/seasons.css";
 import "../admin.css";
 import "./reports.css";
@@ -32,21 +34,24 @@ export default async function AdminReportsPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
-          <header className="dash-head">
-            <p className="dash-hint">
-              Problems people reported from inside the product, newest first. Mark each one when you
-              pick it up and again when it&apos;s settled — a status is how &ldquo;somebody told
-              us&rdquo; becomes something we can check.
-            </p>
-          </header>
+          <AdminPageHead>
+            Problems people reported from inside the product, newest first.
+          </AdminPageHead>
           {queue.open.length === 0 && queue.closed.length === 0 ? (
-            <SectionCard icon={<IconFlag />} tone="neutral" title="Reports">
-              <EmptyState
-                headingLevel={3}
+            <div className="admin-panel">
+              <AdminEmpty
+                icon={<IconFlag size={24} weight="duotone" />}
                 title="No reports yet"
-                description="When somebody uses Report a problem, it lands here with the page they were on and, if they kept it, a screenshot."
-              />
-            </SectionCard>
+                actions={
+                  <Link href="/support" className="admin-head-button">
+                    Open the support page
+                  </Link>
+                }
+              >
+                When somebody uses Report a problem, it lands here with the page they were on and,
+                if they kept it, a screenshot.
+              </AdminEmpty>
+            </div>
           ) : (
             <ReportQueuePanel queue={queue} />
           )}

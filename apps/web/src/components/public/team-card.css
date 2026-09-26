@@ -7,9 +7,11 @@
  * why the name sits on a scrim rather than straight on the colour.
  */
 
+/* auto-FIT: three teams fill the row instead of leaving a dead fourth
+   column; more teams wrap at the same minimum. */
 .team-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: var(--space-5);
 }
 
@@ -210,4 +212,9 @@
 .team-card-link:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
+}
+
+/* One team alone is a card, not a banner. */
+.team-grid:has(> :only-child) {
+  grid-template-columns: minmax(0, 420px);
 }

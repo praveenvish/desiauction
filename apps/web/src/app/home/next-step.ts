@@ -50,8 +50,12 @@ export interface NextStepInput {
   } | null;
   /** A live auction in a season this person MANAGES (from the dashboard). */
   managedLive: { competitionSlug: string; competitionName: string } | null;
-  /** The organizer attention scan, most urgent first. */
-  attention: { label: string; detail: string; href: string }[];
+  /**
+   * The organizer attention scan, most urgent first. `verb` names the button
+   * when the destination alone cannot ("Announce captains & icons" lives on
+   * /teams, and a derived "Add teams" said the wrong thing).
+   */
+  attention: { label: string; detail: string; href: string; verb?: string }[];
   /** This person's newest registration, if they play. */
   latestEntry: { competitionName: string; status: string } | null;
   /** Holds no role anywhere: not a member, not an owner, not a player. */
@@ -116,13 +120,13 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
   if (first !== undefined) {
     return {
       key: "organizer-attention",
-      eyebrow: `${first.detail} · your next step`,
+      eyebrow: first.detail,
       title: first.label,
       why:
         input.attention.length > 1
           ? `${String(input.attention.length - 1)} more thing${input.attention.length === 2 ? " is" : "s are"} waiting below — this one is first.`
           : "Nothing else is waiting on you.",
-      cta: { label: attentionVerb(first.href), href: first.href },
+      cta: { label: first.verb ?? attentionVerb(first.href), href: first.href },
       tone: "action",
     };
   }
@@ -139,7 +143,9 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
         key: "auctioneer-prepare",
         eyebrow: `Auction night · ${night.competitionName}`,
         title: "You're the auctioneer for this season",
-        why: "The organizer hasn't set the auction up yet. You'll run it from the cockpit when they do.",
+        // The "Not set up yet" pill on the queue row below states the fact;
+        // this line says what it means for them rather than saying it again.
+        why: "You'll run it from the cockpit once the organizer builds it — nothing to do until then.",
         cta: { label: "See the season", href: `/seasons/${night.competitionSlug}` },
         tone: "calm",
       };

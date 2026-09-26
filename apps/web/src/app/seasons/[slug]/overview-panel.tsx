@@ -2,8 +2,10 @@
 
 import {
   Button,
+  buttonClassName,
   CardGrid,
   Dialog,
+  EmptyState,
   Field,
   HeroBanner,
   IconArrowRight,
@@ -16,6 +18,7 @@ import {
   IconExternal,
   IconEye,
   IconEyeOff,
+  IconGlobe,
   IconInfo,
   IconLayers,
   IconLock,
@@ -28,18 +31,17 @@ import {
   IconUser,
   IconUsers,
   IconWallet,
+  type JourneyStep,
   JourneyStepper,
+  type KitTone,
   Notice,
   Pill,
   SectionCard,
   Select,
   StatCard,
   StatGrid,
-  VisuallyHidden,
-  buttonClassName,
   useToast,
-  type JourneyStep,
-  type KitTone,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
@@ -318,13 +320,15 @@ function missingForRegistration(competition: SeasonOverviewView["competition"]):
  * and a plain person for every other sport's — a football pool drawn with
  * cricket kit would be the multi-sport defect again, in pictures.
  */
+// One calm tone for every role: the marks tell the roles apart, and four
+// tints (red, gold, purple, blue) said nothing but "template".
 const ROLE_MARK: Record<string, { icon: ReactNode; tone: KitTone }> = {
-  batter: { icon: <IconBat />, tone: "amber" },
-  bowler: { icon: <IconBall />, tone: "red" },
-  all_rounder: { icon: <IconStar />, tone: "purple" },
-  wicket_keeper: { icon: <IconShieldCheck />, tone: "blue" },
+  batter: { icon: <IconBat />, tone: "gold" },
+  bowler: { icon: <IconBall />, tone: "gold" },
+  all_rounder: { icon: <IconStar />, tone: "gold" },
+  wicket_keeper: { icon: <IconShieldCheck />, tone: "gold" },
 };
-const OTHER_ROLE_MARK = { icon: <IconUser />, tone: "neutral" as KitTone };
+const OTHER_ROLE_MARK = { icon: <IconUser />, tone: "gold" as KitTone };
 
 function percent(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
@@ -636,24 +640,10 @@ export function OverviewPanel({
     }
   }
 
-  // Someone who cannot run the season gets no next-step banner, and used to
-  // get nothing at all between the hammer and the last match — or, on a points
-  // season, a "Season complete" card the moment the auction ended. One quiet,
-  // true line instead.
-  if (!view.viewer.canManage && auctionDone && !finished) {
-    nextNotice = (
-      <Notice
-        tone="info"
-        icon={<IconCheckCircle size={20} />}
-        title={
-          view.fixtureCount === 0 || view.fixturesOpen > 0
-            ? "Auction done — fixtures are next."
-            : "Auction done — the books are being settled."
-        }
-        testId="season-auction-done"
-      />
-    );
-  }
+  // Someone who cannot run the season gets no next-step banner. A blue
+  // "Auction done — fixtures are next." used to sit here, under a hero that
+  // already says AUCTION DONE in its pill and "Fixtures · Step 5 of 5" on its
+  // rail: one state, said three times.
 
   // The figures. Before an auction exists there is no purse and there are no
   // lots — two cards of zeroes about a thing that has not been created — so the
@@ -730,7 +720,7 @@ export function OverviewPanel({
               <Link
                 href={secondary.href}
                 className={buttonClassName({ variant: "secondary" }, "ov-hero-btn")}
-                data-tone="solid"
+                data-tone="glass"
                 data-testid="season-secondary"
               >
                 {secondary.label}
@@ -747,20 +737,26 @@ export function OverviewPanel({
               ) : null}
             </>
           }
+          // The season's road rides the hero's bottom edge (it was a strip of
+          // its own under the hero, repeating the hero's status pill).
+          footer={
+            <div ref={journeyRef}>
+              <VisuallyHidden>
+                <p data-testid="lifecycle-summary">
+                  {activeIndex === -1
+                    ? `All ${steps.length === 5 ? "five" : "six"} steps complete`
+                    : `Step ${String(activeIndex + 1)} of ${String(steps.length)} · ${
+                        steps[activeIndex] ?? ""
+                      }`}
+                </p>
+              </VisuallyHidden>
+              <JourneyStepper variant="rail" steps={journey} linkComponent={Link} />
+            </div>
+          }
         />
       </div>
 
-      <div className="ov-journey" data-testid="lifecycle-panel" ref={journeyRef}>
-        <VisuallyHidden>
-          <p data-testid="lifecycle-summary">
-            {activeIndex === -1
-              ? `All ${steps.length === 5 ? "five" : "six"} steps complete`
-              : `Step ${String(activeIndex + 1)} of ${String(steps.length)} · ${
-                  steps[activeIndex] ?? ""
-                }`}
-          </p>
-        </VisuallyHidden>
-        <JourneyStepper steps={journey} linkComponent={Link} />
+      <div className="ov-journey" data-testid="lifecycle-panel">
         {finished ? (
           <Retrospective view={view} slug={slug} runAgain={runAgainButton(true)} />
         ) : (
@@ -792,7 +788,8 @@ export function OverviewPanel({
       <StatGrid testId="season-figures">
         <StatCard
           icon={<IconUser />}
-          tone="green"
+          concept="players"
+          rolling
           value={view.approvedPlayers}
           label="Approved players"
           {...(approvedHint !== undefined
@@ -804,7 +801,8 @@ export function OverviewPanel({
         {view.auctionStatus === null && view.pendingPlayers > 0 ? (
           <StatCard
             icon={<IconClock />}
-            tone="amber"
+            concept="alert"
+            rolling
             value={view.pendingPlayers}
             label="Awaiting your review"
             href={`/seasons/${slug}/registrations`}
@@ -814,7 +812,8 @@ export function OverviewPanel({
         ) : null}
         <StatCard
           icon={<IconUsers />}
-          tone="red"
+          concept="teams"
+          rolling
           value={view.teamCount}
           label={view.teamCount === 1 ? "Team" : "Teams"}
           testId="overview-teams"
@@ -822,7 +821,8 @@ export function OverviewPanel({
         {view.auctionStatus !== null && view.purseCommitted !== undefined ? (
           <StatCard
             icon={<IconWallet />}
-            tone="amber"
+            concept="money"
+            rolling
             value={points ? money.exact(view.purseCommitted) : money.compact(view.purseCommitted)}
             label="Purse committed"
             {...(view.pursePct !== undefined && view.pursePct !== null
@@ -834,7 +834,7 @@ export function OverviewPanel({
         {view.auctionStatus !== null ? (
           <StatCard
             icon={<IconLayers />}
-            tone="green"
+            concept="auction"
             value={
               <>
                 {view.lotsSold}
@@ -862,21 +862,25 @@ export function OverviewPanel({
             }
           >
             {view.topTeams.length === 0 ? (
-              <div className="ov-empty">
-                <p>
-                  No teams yet. The auction issues one paddle per team, so this is the first thing
-                  to build.
-                </p>
-                {view.viewer.canManage ? (
-                  <Link
-                    href={`/seasons/${slug}/teams`}
-                    className={buttonClassName({ variant: "secondary" })}
-                    data-testid="empty-add-teams"
-                  >
-                    Add teams
-                  </Link>
-                ) : null}
-              </div>
+              <EmptyState
+                size="compact"
+                icon={<IconUsers />}
+                title="No teams yet"
+                description="The auction issues one paddle per team, so this is the first thing to build."
+                {...(view.viewer.canManage
+                  ? {
+                      action: (
+                        <Link
+                          href={`/seasons/${slug}/teams`}
+                          className={buttonClassName({ variant: "secondary", size: "sm" })}
+                          data-testid="empty-add-teams"
+                        >
+                          Add teams
+                        </Link>
+                      ),
+                    }
+                  : {})}
+              />
             ) : (
               <ul className="ov-rows">
                 {view.topTeams.slice(0, 5).map((team) => {
@@ -954,26 +958,41 @@ export function OverviewPanel({
               : {})}
           >
             {view.poolByRole.length === 0 ? (
-              <div className="ov-empty">
-                <p>
-                  No approved players yet.{" "}
-                  {status === "registration_open"
+              <EmptyState
+                size="compact"
+                icon={<IconUsers />}
+                title="No approved players yet"
+                description={
+                  status === "registration_open"
                     ? "Share the registration link — every entry lands in the Registrations tab for you to approve."
-                    : "Players enter through the registration link once you open registration."}
-                </p>
-                {view.viewer.canReview && status === "registration_open" ? (
-                  <ShareRegistration slug={slug} open seasonName={view.competition.name} />
-                ) : null}
-                {view.viewer.canReview && view.pendingPlayers > 0 ? (
-                  <Link
-                    href={`/seasons/${slug}/registrations`}
-                    className={buttonClassName({ variant: "secondary" })}
-                    data-testid="empty-review-registrations"
-                  >
-                    Review {view.pendingPlayers} waiting
-                  </Link>
-                ) : null}
-              </div>
+                    : "Players enter through the registration link once you open registration."
+                }
+                {...(view.viewer.canReview &&
+                (status === "registration_open" || view.pendingPlayers > 0)
+                  ? {
+                      action: (
+                        <>
+                          {status === "registration_open" ? (
+                            <ShareRegistration
+                              slug={slug}
+                              open
+                              seasonName={view.competition.name}
+                            />
+                          ) : null}
+                          {view.pendingPlayers > 0 ? (
+                            <Link
+                              href={`/seasons/${slug}/registrations`}
+                              className={buttonClassName({ variant: "secondary", size: "sm" })}
+                              data-testid="empty-review-registrations"
+                            >
+                              Review {view.pendingPlayers} waiting
+                            </Link>
+                          ) : null}
+                        </>
+                      ),
+                    }
+                  : {})}
+              />
             ) : (
               <ul className="ov-rows">
                 {view.poolByRole.map((entry) => {
@@ -1021,18 +1040,19 @@ export function OverviewPanel({
               is the organizer's control panel. They get the one useful thing
               in it: the door to the public page, when there is one. */}
           {!view.viewer.canManage && isPublic && view.platformHold === null ? (
-            <SectionCard title="Public page" data-testid="visibility-row">
-              <div className="ov-public-actions">
-                <Link
-                  className={buttonClassName({ variant: "secondary" })}
-                  href={`/c/${slug}`}
-                  data-testid="open-public-page"
-                >
-                  View public page
-                  <IconArrowRight size={16} />
-                </Link>
-              </div>
-            </SectionCard>
+            /* One slim row across the grid, not a half-width card holding a
+               single button under Teams (wow pass, round 2). */
+            <p className="ov-public-strip" data-testid="visibility-row">
+              <IconGlobe size={20} aria-hidden />
+              <span>
+                <strong>The season&apos;s public page is live.</strong> Anyone with the link can
+                follow the squads and results.
+              </span>
+              <Link href={`/c/${slug}`} data-testid="open-public-page">
+                View public page
+                <IconArrowRight size={16} />
+              </Link>
+            </p>
           ) : null}
 
           {/* DA-12: publishing has a block of its own, not a ghost button in the

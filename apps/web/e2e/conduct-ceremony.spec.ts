@@ -362,7 +362,7 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   const ledgerPage = await organizerCtx.newPage();
   await ledgerPage.goto(`/seasons/${slug}/auction/ledger`);
   await expect(ledgerPage.getByTestId("ledger-table")).toBeVisible();
-  await expect(ledgerPage.getByTestId("ledger-meta")).toContainText("immutable, append-only");
+  await expect(ledgerPage.getByTestId("ledger-meta")).toContainText("rows · as recorded");
   const ledgerBody = ledgerPage.getByTestId("ledger-table");
   await expect(ledgerBody).toContainText("SOLD");
   await expect(ledgerBody).toContainText("UNDO — lot reopened");

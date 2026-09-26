@@ -1,10 +1,27 @@
+/* THE EMPTY STATE — see empty-state.tsx. One recipe on every surface:
+   centred, tile → title → one line → actions, sized to its container rather
+   than half a screen tall. */
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: var(--space-2);
-  padding: var(--space-10) var(--space-6);
+  padding: var(--space-8) var(--space-4);
+  min-width: 0;
+}
+
+.empty[data-size="compact"] {
+  gap: var(--space-1);
+  padding: var(--space-5) var(--space-3);
+}
+
+.empty > :first-child {
+  margin-bottom: var(--space-2);
+}
+
+.empty[data-size="compact"] > :first-child {
+  margin-bottom: var(--space-1);
 }
 
 .title {
@@ -13,34 +30,32 @@
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   margin: 0;
+  text-wrap: balance;
+}
+
+.empty[data-size="compact"] .title {
+  font-size: var(--text-base-size);
+  line-height: var(--text-base-line);
 }
 
 .description {
-  font-size: var(--text-base-size);
-  line-height: var(--text-base-line);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
   color: var(--text-secondary);
-  max-width: 48ch;
+  max-width: 52ch;
   margin: 0;
+  text-wrap: pretty;
 }
 
 .action {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
   margin-top: var(--space-3);
 }
 
-/* Console (launch polish, Phase 4): an empty state is a quiet, left-aligned
-   note with its action — a centred block half a screen tall read as a broken
-   page, and on a dense desk it pushed the real content below the fold. */
-:global([data-surface="console"]) .empty {
-  align-items: flex-start;
-  text-align: left;
-  padding: var(--space-4) 0;
-}
-
-:global([data-surface="console"]) .title {
-  font-size: var(--text-base-size);
-  line-height: var(--text-base-line);
-}
-
-:global([data-surface="console"]) .action {
-  margin-top: var(--space-1);
+.empty[data-size="compact"] .action {
+  margin-top: var(--space-2);
 }

@@ -1,5 +1,5 @@
 import {
-  IconBolt,
+  EmptyState,
   IconCalendar,
   IconCheckCircle,
   IconGavel,
@@ -8,10 +8,8 @@ import {
   IconTile,
   IconTrophy,
   IconWallet,
-  Pill,
-  StatCard,
-  StatGrid,
   type KitTone,
+  Pill,
 } from "@desiauction/ui";
 import Link from "next/link";
 
@@ -27,20 +25,21 @@ import { dateRange } from "../tournaments/season-card";
 import { NavButton } from "../players/nav-button";
 import "../players/players.css";
 import "./auctions.css";
+import { formatCount } from "../../lib/plural";
 
 export const metadata = { title: "Auctions · DesiAuction" };
 
 const STATUS: Record<AuctionNightStatus, { label: string; tone: KitTone }> = {
   none: { label: "Not set up", tone: "neutral" },
-  scheduled: { label: "Scheduled", tone: "blue" },
-  live: { label: "Live", tone: "red" },
+  scheduled: { label: "Scheduled", tone: "neutral" },
+  live: { label: "Live", tone: "green" },
   paused: { label: "Paused", tone: "amber" },
   completed: { label: "Completed", tone: "green" },
-  settled: { label: "Settled", tone: "gold" },
+  settled: { label: "Settled", tone: "green" },
 };
 
 function count(value: number): string {
-  return value.toLocaleString("en-IN");
+  return formatCount(value);
 }
 
 function nights(value: number): string {
@@ -70,17 +69,22 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
   const dates = dateRange(card.startsOn, card.endsOn);
   return (
     <article
-      className="ax-card"
+      className="ax-card da-lift"
       data-status={card.facts.status}
       data-testid={`auction-card-${card.slug}`}
     >
       <header className="ax-head">
-        <IconTile icon={<IconGavel />} tone={status.tone} />
+        <IconTile icon={<IconGavel weight="duotone" />} tone="gold" size="sm" />
         <div className="ax-titles">
           <h2 className="ax-title">
             <Link href={`/seasons/${card.slug}/auction`}>{card.seasonName}</Link>
           </h2>
-          <p className="ax-org">{card.orgName}</p>
+          <p className="ax-org">
+            {card.orgName}
+            {/* The role is what this card is FOR — a chip by the name, not a
+                low-contrast caption in the footer. */}
+            <span className="ax-role">{card.roleLabel}</span>
+          </p>
         </div>
         <Pill tone={status.tone} dot testId={`auction-status-${card.slug}`}>
           {status.label}
@@ -134,7 +138,6 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
       )}
 
       <footer className="ax-foot">
-        <span className="ax-role">{card.roleLabel}</span>
         <span className="ax-links">
           {/* A night with no auction offers an auctioneer nothing to open —
               the season page, where the dates and the organizer are, instead
@@ -189,22 +192,27 @@ export default async function AuctionsPage() {
     return (
       <main className="px-players">
         <section className="px-empty" data-testid="auctions-empty">
-          <span className="px-empty-glyph" aria-hidden>
-            <IconGavel size={30} />
-          </span>
-          <h2>No auction nights yet</h2>
-          <p>
-            Auctions you run, conduct or bid in appear here — with the right door for your role:
-            setup, the cockpit, the live room or your plan.
-          </p>
-          <div className="px-empty-actions">
-            <NavButton href="/tournaments" variant="primary" size="touch">
-              <IconTrophy size={18} aria-hidden /> Go to tournaments
-            </NavButton>
-            <NavButton href="/c" variant="secondary" size="touch">
-              <IconGlobe size={18} aria-hidden /> Find tournaments
-            </NavButton>
-          </div>
+          <EmptyState
+            icon={<IconGavel />}
+            title="No auction nights yet"
+            headingLevel={2}
+            description={
+              <>
+                Auctions you run, conduct or bid in appear here — with the right door for your role:
+                setup, the cockpit, the live room or your plan.
+              </>
+            }
+            action={
+              <>
+                <NavButton href="/tournaments" variant="primary" size="touch">
+                  <IconTrophy size={18} aria-hidden /> Go to tournaments
+                </NavButton>
+                <NavButton href="/c" variant="secondary" size="touch">
+                  <IconGlobe size={18} aria-hidden /> Find tournaments
+                </NavButton>
+              </>
+            }
+          />
         </section>
       </main>
     );
@@ -212,56 +220,62 @@ export default async function AuctionsPage() {
 
   return (
     <main className="px-players">
-      <StatGrid testId="auctions-stats">
-        <StatCard
-          icon={<IconCalendar />}
-          tone="blue"
-          value={count(upcoming)}
-          label="Upcoming"
-          hint={
-            notSetUp === 0
-              ? "Scheduled nights"
+      {/* ONE LINE, not four tiles (wow pass). "0 Upcoming" and "0 Live now"
+          took the fold to say nothing; a count appears here only when it is
+          not zero, and the spend keeps its own quiet figure. */}
+      <p className="ax-summary" data-testid="auctions-stats">
+        {totals.live > 0 ? (
+          <span className="ax-summary-item" data-tone="live">
+            <span className="ax-live-dot" aria-hidden />
+            <strong>{count(totals.live)}</strong> live now
+          </span>
+        ) : null}
+        {upcoming > 0 ? (
+          <span className="ax-summary-item">
+            <IconCalendar size={16} aria-hidden />
+            <strong>{count(upcoming)}</strong>{" "}
+            {notSetUp === 0
+              ? "upcoming"
               : notSetUp === upcoming
-                ? "Waiting to be set up"
-                : `${count(notSetUp)} still being set up`
-          }
-        />
-        <StatCard
-          icon={<IconBolt />}
-          tone={totals.live > 0 ? "red" : "neutral"}
-          value={count(totals.live)}
-          label="Live now"
-          hint={totals.live > 0 ? "In the room right now" : "Nothing running"}
-        />
-        <StatCard
-          icon={<IconCheckCircle />}
-          tone="green"
-          value={count(totals.completed)}
-          label="Completed"
-          hint="Hammer down"
-        />
-        <StatCard
-          icon={<IconWallet />}
-          tone="gold"
-          value={
-            totals.spend !== undefined
-              ? // rupees-always: the total adds rupee nights only; points are shown apart
-                compactINR(totals.spend)
-              : totals.pointsSpend !== undefined
-                ? moneyFormat("points").compact(totals.pointsSpend)
-                : "—"
-          }
-          label="Total spend"
-          hint={
+                ? "waiting to be set up"
+                : `upcoming · ${count(notSetUp)} still being set up`}
+          </span>
+        ) : null}
+        {totals.completed > 0 ? (
+          <span className="ax-summary-item">
+            <IconCheckCircle size={16} aria-hidden />
+            <strong>{count(totals.completed)}</strong> completed
+          </span>
+        ) : null}
+        <span
+          className="ax-summary-item"
+          data-testid="auctions-spend"
+          title={
             totals.spend === undefined && totals.pointsSpend === undefined
-              ? holdsMoneySight
-                ? "Nothing sold yet"
-                : "Shown to organizers and auctioneers"
+              ? undefined
               : spendHint(totals)
           }
-          testId="auctions-spend"
-        />
-      </StatGrid>
+        >
+          <IconWallet size={16} aria-hidden />
+          {totals.spend === undefined && totals.pointsSpend === undefined ? (
+            <span className="ax-muted">
+              {holdsMoneySight
+                ? "Nothing sold yet"
+                : "Spend is shown to organizers and auctioneers"}
+            </span>
+          ) : (
+            <span>
+              <strong>
+                {totals.spend !== undefined
+                  ? // rupees-always: the total adds rupee nights only; points are shown apart
+                    compactINR(totals.spend)
+                  : moneyFormat("points").compact(totals.pointsSpend ?? 0)}
+              </strong>{" "}
+              spent
+            </span>
+          )}
+        </span>
+      </p>
 
       <div className="ax-grid" data-testid="auctions-list">
         {view.cards.map((card) => (

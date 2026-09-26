@@ -14,8 +14,8 @@
 }
 
 @media (min-width: 1000px) {
-  .cl:has(.cl-aside) {
-    grid-template-columns: minmax(0, 1fr) 240px;
+  .cl[data-side] {
+    grid-template-columns: minmax(0, 1fr) 320px;
   }
 
   .cl-related {
@@ -32,7 +32,8 @@
 
 .cl-meta {
   margin: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
   font-size: 0.75rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -133,11 +134,25 @@
   border-top: 1px solid var(--border-subtle);
 }
 
+/* ---- the side column ---- */
+
+.cl-side {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  min-width: 0;
+}
+
+@media (min-width: 1000px) {
+  .cl-side {
+    position: sticky;
+    top: calc(64px + var(--space-6));
+  }
+}
+
 /* ---- on this page ---- */
 
 .cl-aside {
-  position: sticky;
-  top: var(--space-16);
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
@@ -148,11 +163,13 @@
 
 .cl-aside-title {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .cl-aside-list {
@@ -176,6 +193,22 @@
   color: var(--text-accent);
 }
 
+/* The section in view: a gold rule and heading ink. */
+.cl-aside-list a {
+  margin-left: calc(var(--space-3) * -1);
+  padding-left: calc(var(--space-3) - 2px);
+  border-left: 2px solid transparent;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.cl-aside-list a[aria-current="location"] {
+  border-left-color: var(--accent);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
 .cl-aside-list a:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -195,4 +228,28 @@
   font-family: var(--font-text);
   font-size: clamp(1.25rem, 2.2vw, 1.5rem);
   color: var(--text-heading);
+}
+
+/* A list's own heading in a non-prose main column (help categories, legal). */
+.cl-list-title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* A document rendered by `Prose` in a non-prose column keeps the measure. */
+.cl-prose-doc {
+  max-width: 72ch;
+}
+
+.cl-main > .content-section {
+  max-width: 72ch;
+}
+
+.cl-main > .content-section {
+  margin: 0 0 var(--space-4);
 }

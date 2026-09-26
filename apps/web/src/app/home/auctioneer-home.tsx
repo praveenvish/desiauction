@@ -1,8 +1,12 @@
 import {
   ButtonLink,
   IconArrowRight,
+  IconBroadcast,
   IconCalendar,
   IconCheckCircle,
+  IconGavel,
+  IconTile,
+  ListRow,
   Pill,
   SectionCard,
 } from "@desiauction/ui";
@@ -10,6 +14,8 @@ import Link from "next/link";
 
 import type { ConductedSeason } from "../../server/roles/roles";
 import { monogram, type Tone } from "./home-parts";
+import "./home-duo.css";
+import { formatDate, formatShortDate, istCalendarDate } from "../../lib/format-date";
 
 /**
  * THE AUCTIONEER'S HOME — and before RN-1 there was no such surface at all.
@@ -49,44 +55,25 @@ function readiness(season: ConductedSeason): { label: string; tone: Tone; dot?: 
   return { label: "Ready", tone: "blue" };
 }
 
-/** Today in India as "YYYY-MM-DD" — the seasons' dates are IST wall-clock. */
-const IST_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Kolkata",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
 /**
- * "2026-03-14T18:30" → "14 Mar" this year, "14 Mar 2025" in any other. Null
- * where the organizer has set no date.
+ * The season's start date, said AS the season's start. Null where the
+ * organizer has set no date.
  *
- * The year used to be dropped always, so a night still waiting in the queue
- * read "1 Aug" beside "Not set up yet" in late September — which August, and
- * is it coming or gone? A date in the past on a night that has not happened is
- * said plainly, with the one useful next step: it is the organizer's date, so
- * ask them. A finished night keeps its plain date; the past is where it belongs.
+ * `startsOn` is when the season begins, not when its auction night is — the
+ * product holds no separate night date. This line used to call it the night
+ * and say "Date passed · 1 Aug 2026 — check with the organizer" while /auctions
+ * printed the same season as "1 Aug – 31 Oct 2026", running (round 2). Both now
+ * say the season's dates: "Season starts 3 Oct", "Season began 1 Aug", and a
+ * finished night keeps its plain date. The year shows outside this one.
  */
 export function nightDate(startsOn: string | null, over: boolean, now = new Date()): string | null {
   if (startsOn === null) return null;
   const day = startsOn.slice(0, 10);
-  const parsed = new Date(`${day}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const today = IST_DAY.format(now);
-  const label = parsed.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }),
-  });
-  if (!over && day < today) {
-    const full = parsed.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-    return `Date passed · ${full} — check with the organizer`;
-  }
-  return label;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const today = istCalendarDate(now);
+  const label = day.slice(0, 4) === today.slice(0, 4) ? formatShortDate(day) : formatDate(day);
+  if (over) return label;
+  return day < today ? `Season began ${label}` : `Season starts ${label}`;
 }
 
 function Row({ season }: { season: ConductedSeason }) {
@@ -148,26 +135,29 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
       ) : null}
 
       {queue.length > 0 ? (
-        <SectionCard
-          data-testid="home-conduct-queue"
-          icon={<IconCalendar />}
-          tone="blue"
-          title={tonight === null ? "Your auction nights" : "Also coming up"}
-          description={`${String(queue.length)} in the queue`}
-        >
-          <ul className="home-list">
-            {queue.map((season) => (
-              <Row key={season.competitionSlug} season={season} />
-            ))}
-          </ul>
-        </SectionCard>
+        <div className="hd-duo">
+          <SectionCard
+            data-testid="home-conduct-queue"
+            icon={<IconCalendar />}
+            concept="fixtures"
+            title={tonight === null ? "Your auction nights" : "Also coming up"}
+            description={`${String(queue.length)} in the queue`}
+          >
+            <ul className="home-list">
+              {queue.map((season) => (
+                <Row key={season.competitionSlug} season={season} />
+              ))}
+            </ul>
+          </SectionCard>
+          <NightKit season={queue[0] ?? null} />
+        </div>
       ) : null}
 
       {done.length > 0 ? (
         <SectionCard
           data-testid="home-conduct-record"
           icon={<IconCheckCircle />}
-          tone="green"
+          concept="done"
           title="Nights you've run"
           description={`${String(done.length)} ${done.length === 1 ? "auction" : "auctions"} conducted`}
         >
@@ -179,5 +169,54 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
         </SectionCard>
       ) : null}
     </>
+  );
+}
+
+/**
+ * THE SECOND OBJECT (round 3C). The auctioneer's home ended after one queue
+ * row and left half a laptop blank. Beside the queue: the two rooms they will
+ * work in on the night, as doors once the auction exists — the cockpit where
+ * each lot is called, and the big screen for the venue. Before the organizer
+ * builds the auction, each says when it opens instead of linking to nothing.
+ */
+function NightKit({ season }: { season: ConductedSeason | null }) {
+  if (season === null) return null;
+  const built = season.auctionStatus !== null;
+  const base = `/seasons/${season.competitionSlug}/auction`;
+  return (
+    <SectionCard
+      data-testid="home-conduct-kit"
+      icon={<IconGavel />}
+      concept="auction"
+      title="On the night"
+      description={season.competitionName}
+    >
+      <ul className="home-kit">
+        <li>
+          <ListRow
+            lead={<IconTile icon={<IconGavel />} concept="auction" size="sm" />}
+            title="The cockpit"
+            meta={
+              built
+                ? "Put each lot on the block, and hold to close the sale"
+                : "Opens once the organizer builds the auction"
+            }
+            {...(built ? { href: `${base}/cockpit`, linkComponent: Link } : {})}
+          />
+        </li>
+        <li>
+          <ListRow
+            lead={<IconTile icon={<IconBroadcast />} concept="auction" size="sm" />}
+            title="The big screen"
+            meta={
+              built
+                ? "Put the live board on the venue's TV"
+                : "The venue board, ready when the auction is"
+            }
+            {...(built ? { href: `${base}/board`, linkComponent: Link } : {})}
+          />
+        </li>
+      </ul>
+    </SectionCard>
   );
 }
