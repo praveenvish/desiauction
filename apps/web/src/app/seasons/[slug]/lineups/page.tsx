@@ -20,6 +20,7 @@ import { notFound } from "next/navigation";
 import { formatWallDate, formatWallTime } from "../../../../lib/format-date";
 import { lineupPageView } from "../../../../server/competition/lineup-actions";
 import type { LineupFixture } from "../../../../server/competition/lineups";
+import { emptyScheduleStep } from "../fixtures/empty-schedule-step";
 import { LineupSideEditor } from "./lineup-side-editor";
 import "../../seasons.css";
 import "../_tabs/tabs.css";
@@ -61,6 +62,7 @@ export default async function LineupsPage({
     notFound();
   }
   const { fixtures, selected, sides, announce } = view;
+  const step = fixtures.length === 0 ? await emptyScheduleStep(slug) : null;
   const complete = fixtures.filter(
     (fixture) => fixture.recorded.home !== null && fixture.recorded.away !== null,
   ).length;
@@ -84,17 +86,14 @@ export default async function LineupsPage({
               title="No matches yet"
               headingLevel={3}
               description={
-                <>
-                  Lineups are recorded per match. Create the fixtures first, then come back after
-                  each game.
-                </>
+                <>Lineups are recorded per match, once there are fixtures. {step?.why}</>
               }
               action={
-                <>
-                  <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
-                    Build the schedule
+                step !== null ? (
+                  <ButtonLink href={step.href} size="sm">
+                    {step.label}
                   </ButtonLink>
-                </>
+                ) : undefined
               }
             />
           </SectionCard>

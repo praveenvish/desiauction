@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { formatWallDate } from "../../../../../lib/format-date";
 import { calendarView, matchDayView } from "../../../../../server/competition/fixture-actions";
 import { nowWallClock } from "../../../../../server/competition/fixtures";
+import { emptyScheduleStep } from "../empty-schedule-step";
 import { EmptyWeek } from "../empty-week";
 import { ScheduleViews } from "../../sibling-link";
 import { MatchDayPanel } from "./match-day-panel";
@@ -39,6 +40,8 @@ export default async function MatchDayPage({
     upcoming
       .map((fixture) => fixture.kickoffAt?.slice(0, 10) ?? null)
       .find((day): day is string => day !== null && day > view.date) ?? null;
+  const step =
+    view.groundGroups.length === 0 && upcoming.length === 0 ? await emptyScheduleStep(slug) : null;
   const dayHref = (date: string) => `/seasons/${slug}/fixtures/match-day?date=${date}`;
   return (
     <ToastProvider>
@@ -81,7 +84,7 @@ export default async function MatchDayPage({
                   nextDate !== null
                     ? `The next match day is ${formatWallDate(nextDate)}.`
                     : upcoming.length === 0
-                      ? "Nothing is scheduled yet. Build the schedule from the list; each match day then gathers its grounds here."
+                      ? `Nothing is scheduled yet. ${step?.why ?? ""} Each match day then gathers its grounds here.`
                       : "No more match days after this one."
                 }
                 actions={
@@ -90,9 +93,9 @@ export default async function MatchDayPage({
                       Next match day
                       <IconArrowRight size={16} className="icon-trail" />
                     </ButtonLink>
-                  ) : upcoming.length === 0 ? (
-                    <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
-                      Build the schedule
+                  ) : step !== null ? (
+                    <ButtonLink href={step.href} size="sm">
+                      {step.label}
                     </ButtonLink>
                   ) : undefined
                 }

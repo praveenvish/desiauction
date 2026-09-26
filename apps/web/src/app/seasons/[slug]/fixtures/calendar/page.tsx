@@ -15,6 +15,7 @@ import { notFound } from "next/navigation";
 import { formatWallDate, formatWallTime } from "../../../../../lib/format-date";
 import { calendarView } from "../../../../../server/competition/fixture-actions";
 import { nowWallClock, type FixtureSnapshot } from "../../../../../server/competition/fixtures";
+import { emptyScheduleStep } from "../empty-schedule-step";
 import { EmptyWeek } from "../empty-week";
 import { FixtureStatusPill } from "../../_tabs/fixture-status";
 import { ScheduleViews } from "../../sibling-link";
@@ -118,6 +119,7 @@ export default async function CalendarPage({
     (fixture) => fixture.kickoffAt !== null && fixture.kickoffAt.slice(0, 10) > view.date,
   );
   const nextDate = next?.kickoffAt?.slice(0, 10) ?? null;
+  const nextStep = view.upcoming.length === 0 ? await emptyScheduleStep(slug) : null;
   const href = (patch: { view?: string; date?: string }) => {
     const next = new URLSearchParams();
     next.set("view", patch.view ?? view.view);
@@ -199,7 +201,7 @@ export default async function CalendarPage({
               nextDate !== null
                 ? `The next match is on ${formatWallDate(nextDate)}.`
                 : view.upcoming.length === 0
-                  ? "No matches are scheduled yet. Build the schedule from the list, then every match lands here by day."
+                  ? `No matches are scheduled yet. ${nextStep?.why ?? ""} Every match then lands here by day.`
                   : "No more matches after this date."
             }
             actions={
@@ -210,9 +212,9 @@ export default async function CalendarPage({
                     <IconArrowRight size={16} className="icon-trail" />
                   </ButtonLink>
                 ) : null}
-                {view.upcoming.length === 0 ? (
-                  <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
-                    Build the schedule
+                {nextStep !== null ? (
+                  <ButtonLink href={nextStep.href} size="sm">
+                    {nextStep.label}
                   </ButtonLink>
                 ) : null}
               </>

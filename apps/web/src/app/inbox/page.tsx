@@ -17,6 +17,7 @@ import { detailOf } from "../../lib/inbox-events";
 import { currentSession } from "../../server/auth/actions";
 import { systemDb } from "../../server/db";
 import { listInboxEvents } from "../../server/auth/security-events";
+import { rolesOf } from "../../server/roles/roles";
 import { InboxList } from "./inbox-list";
 import "./inbox.css";
 
@@ -83,7 +84,11 @@ export default async function InboxPage() {
   if (session === null) {
     redirect("/login?next=/inbox");
   }
-  const events = await listInboxEvents(session.personId, WINDOW);
+  const [events, roles] = await Promise.all([
+    listInboxEvents(session.personId, WINDOW),
+    rolesOf(session.personId),
+  ]);
+  const organizerOnly = roles.organizes.length > 0 && !roles.plays;
   const named = await competitionsNamed(
     events.map((event) => competitionIdOf(event.meta) ?? "").filter((id) => id !== ""),
   );
@@ -150,28 +155,42 @@ export default async function InboxPage() {
         <h2 id="inbox-rail-title" className="inbox-rail-title">
           What lands here
         </h2>
+        {/* An organizer who does not play was told "which team bought you".
+            Their clubs' work lives on each season's tabs; the inbox is for
+            what happens to THEM — said so, with the door to the seasons. */}
+        {organizerOnly ? (
+          <p className="inbox-foot" data-testid="inbox-organizer-note">
+            Your clubs&apos; work — registrations, auction nights, fixtures — lives on each
+            season&apos;s own tabs. This inbox is for things that happen to you.{" "}
+            <Link href="/tournaments">Your tournaments</Link>
+          </p>
+        ) : null}
         <ul className="inbox-kinds">
-          <li>
-            <IconCheckCircle size={20} aria-hidden />
-            <span>
-              <strong>Registration decisions</strong>
-              The moment the organizer decides on your entry.
-            </span>
-          </li>
-          <li>
-            <IconGavel size={20} aria-hidden />
-            <span>
-              <strong>Auction results</strong>
-              Which team bought you, and for how much.
-            </span>
-          </li>
-          <li>
-            <IconUsers size={20} aria-hidden />
-            <span>
-              <strong>Your team</strong>
-              Named captain, squad set, picked in a lineup.
-            </span>
-          </li>
+          {organizerOnly ? null : (
+            <>
+              <li>
+                <IconCheckCircle size={20} aria-hidden />
+                <span>
+                  <strong>Registration decisions</strong>
+                  The moment the organizer decides on your entry.
+                </span>
+              </li>
+              <li>
+                <IconGavel size={20} aria-hidden />
+                <span>
+                  <strong>Auction results</strong>
+                  Which team bought you, and for how much.
+                </span>
+              </li>
+              <li>
+                <IconUsers size={20} aria-hidden />
+                <span>
+                  <strong>Your team</strong>
+                  Named captain, squad set, picked in a lineup.
+                </span>
+              </li>
+            </>
+          )}
           <li>
             <IconShieldCheck size={20} aria-hidden />
             <span>

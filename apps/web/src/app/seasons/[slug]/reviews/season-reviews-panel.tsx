@@ -67,7 +67,7 @@ export function AskReviewsCard({
           ) : (
             <IconSend size={16} aria-hidden />
           )}
-          {askable === 0 ? "Nobody left to ask" : `Ask ${String(askable)}`}
+          {askable === 0 ? "Nobody to ask yet" : `Ask ${String(askable)}`}
         </Button>
       }
       data-testid="season-reviews-ask"

@@ -676,7 +676,7 @@ const SURFACE_SUBTITLES: [string, string][] = [
   ["/account", "Your sign-in, profile and security."],
   ["/players", "Every player across the seasons you run — search, filter, open their sheet."],
   ["/auctions", "Every auction night you run, conduct, bid in or can watch."],
-  ["/reports", "Registrations, fees and auction spend for each season you run."],
+  ["/reports", "Registrations and the auction, season by season, for every season you run."],
   ["/me", "Every tournament, match and sport you've played — in one place."],
   ["/me/cricket", "Every season you've played, in one place."],
 ];
