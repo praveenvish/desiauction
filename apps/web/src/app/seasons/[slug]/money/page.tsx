@@ -7,6 +7,8 @@ import {
 } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
+import { currentSession } from "../../../../server/auth/actions";
+import { resolveMemberCompetition } from "../../../../server/competition/resolve";
 import { seasonUnit } from "../../../../server/competition/season-unit";
 import { settlementConsole } from "../../../../server/settlement/actions";
 import { MoneyPanel } from "./money-panel";
@@ -27,8 +29,22 @@ export const metadata = { title: "Money · DesiAuction" };
  */
 export default async function MoneyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [view, unit] = await Promise.all([settlementConsole(slug), seasonUnit(slug)]);
-  if (view === null) {
+  const [view, unit, session] = await Promise.all([
+    settlementConsole(slug),
+    seasonUnit(slug),
+    currentSession(),
+  ]);
+  // A points season has no books to keep private, so a MEMBER without the
+  // money grant is told what the season ran on — in the console, as /money
+  // says it — instead of being dropped onto the marketing 404. Everyone else
+  // (and every rupee season without the grant) still gets the 404: existence
+  // privacy is about the books, and a points season has none.
+  const pointsMember =
+    unit === "points" &&
+    view === null &&
+    session !== null &&
+    (await resolveMemberCompetition(session.personId, slug)) !== null;
+  if (view === null && !pointsMember) {
     notFound();
   }
   if (unit === "points") {
@@ -53,6 +69,9 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
         </div>
       </main>
     );
+  }
+  if (view === null) {
+    notFound();
   }
   return (
     /* The toast region is polite by design and queues. A REFUSED money command
