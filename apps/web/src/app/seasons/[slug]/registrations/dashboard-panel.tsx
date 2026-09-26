@@ -8,8 +8,6 @@ import {
   Dialog,
   FilterMenu,
   IconArrowRight,
-  IconChevronLeft,
-  IconChevronRight,
   IconCrown,
   IconDownload,
   IconGavel,
@@ -20,6 +18,8 @@ import {
   IconStar,
   IconUpload,
   IconWallet,
+  type KitTone,
+  Pager,
   Pill,
   PlayerImage,
   PopoverMenu,
@@ -31,7 +31,6 @@ import {
   ToolbarSpacer,
   useToast,
   VisuallyHidden,
-  type KitTone,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import {
@@ -1208,63 +1207,24 @@ export function RegistrationDashboardPanel({
           </div>
 
           {page.total > 0 ? (
-            <nav className="pd-pager" aria-label="Pages">
-              <span data-testid="page-indicator" className="pd-quiet">
-                {page.total} total · showing {firstOnPage + 1}–
-                {Math.min(page.total, firstOnPage + rows.length)}
-              </span>
-              <span className="pd-quiet pd-shortcuts">
-                <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>x</kbd> select
-              </span>
-              <span className="pd-pager-buttons">
-                <button
-                  type="button"
-                  className="rd-pagebtn"
-                  disabled={page.page <= 1}
-                  onClick={() => {
-                    pushQuery({ page: String(page.page - 1) });
-                  }}
-                  data-testid="page-prev"
-                  aria-label="Previous page"
-                >
-                  <IconChevronLeft size={16} aria-hidden />
-                </button>
-                {pageList(page.page, totalPages).map((entry, index) =>
-                  entry === null ? (
-                    <span key={`gap-${String(index)}`} className="rd-pagegap" aria-hidden>
-                      …
-                    </span>
-                  ) : (
-                    <button
-                      key={entry}
-                      type="button"
-                      className="rd-pagebtn"
-                      aria-current={entry === page.page ? "page" : undefined}
-                      aria-label={`Page ${String(entry)}`}
-                      onClick={() => {
-                        if (entry !== page.page) {
-                          pushQuery({ page: String(entry) });
-                        }
-                      }}
-                    >
-                      {entry}
-                    </button>
-                  ),
-                )}
-                <button
-                  type="button"
-                  className="rd-pagebtn"
-                  disabled={page.page >= totalPages}
-                  onClick={() => {
-                    pushQuery({ page: String(page.page + 1) });
-                  }}
-                  data-testid="page-next"
-                  aria-label="Next page"
-                >
-                  <IconChevronRight size={16} aria-hidden />
-                </button>
-              </span>
-            </nav>
+            <div className="pd-pager">
+              <Pager
+                total={page.total}
+                page={page.page}
+                pageCount={totalPages}
+                pageSize={page.pageSize}
+                onPage={(entry) => {
+                  pushQuery({ page: String(entry) });
+                }}
+                summaryTestId="page-indicator"
+                prevTestId="page-prev"
+                nextTestId="page-next"
+              >
+                <span className="pd-shortcuts">
+                  <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>x</kbd> select
+                </span>
+              </Pager>
+            </div>
           ) : null}
         </div>
       </SectionCard>
@@ -1911,27 +1871,6 @@ function PlayerRow({
       </td>
     </tr>
   );
-}
-
-/** Numbered pages around the current one — 1 … 4 5 6 … 12 — `null` is a gap. */
-function pageList(current: number, total: number): (number | null)[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, index) => index + 1);
-  }
-  const shown = new Set([1, total, current - 1, current, current + 1]);
-  const out: (number | null)[] = [];
-  let last = 0;
-  for (let entry = 1; entry <= total; entry += 1) {
-    if (!shown.has(entry)) {
-      continue;
-    }
-    if (entry - last > 1) {
-      out.push(null);
-    }
-    out.push(entry);
-    last = entry;
-  }
-  return out;
 }
 
 function FilterSelect({

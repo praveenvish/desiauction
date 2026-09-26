@@ -559,19 +559,6 @@
   cursor: default;
 }
 
-.pd-pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding-block: var(--space-3);
-}
-
-.pd-pager-buttons {
-  display: inline-flex;
-  gap: var(--space-1);
-}
-
 /* --- Bulk bar: floats over the foot of the page -------------------------- */
 
 .pd-bulk {

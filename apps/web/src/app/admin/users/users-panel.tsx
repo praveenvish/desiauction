@@ -1,6 +1,6 @@
 import {
   EmptyState,
-  IconArrowRight,
+  Pager,
   SegmentedTabs,
   Toolbar,
   ToolbarCount,
@@ -29,7 +29,14 @@ function filterHref(query: string, filter: UserDirectory["filter"]): string {
 }
 
 /** PX-9 §3 — the user directory. GET-form search, linkable results, no writes. */
-export function UsersPanel({ directory }: { directory: UserDirectory }) {
+export function UsersPanel({
+  directory,
+  paged = false,
+}: {
+  directory: UserDirectory;
+  /** On a later page (a cursor is set): the pager offers the way back. */
+  paged?: boolean;
+}) {
   const { rows, total, platformTotal, query, nextCursor } = directory;
   const nextHref =
     nextCursor === null
@@ -80,6 +87,7 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
         {rows.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No user matches"
               description={
@@ -160,16 +168,18 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                 </tbody>
               </table>
             </div>
-            <nav className="admin-pagination" aria-label="More users">
-              {nextHref === null ? (
-                <span className="admin-meta">End of the list.</span>
-              ) : (
-                <Link href={nextHref} data-testid="admin-user-next">
-                  Next 50
-                  <IconArrowRight size={16} className="icon-trail" />
-                </Link>
-              )}
-            </nav>
+            <div className="admin-pagination">
+              <Pager
+                label="More users"
+                total={total}
+                shown={rows.length}
+                noun="users"
+                firstHref={paged ? filterHref(query, directory.filter) : null}
+                nextHref={nextHref}
+                linkComponent={Link}
+                nextTestId="admin-user-next"
+              />
+            </div>
           </>
         )}
       </div>

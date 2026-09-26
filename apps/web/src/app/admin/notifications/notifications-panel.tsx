@@ -515,6 +515,7 @@ export function NotificationsPanel({ center }: { center: NotificationCenter }) {
         {center.recent.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="Nothing changed yet"
               description="Every switch here starts as the catalogue sets it. Changes appear here with who made them and why."

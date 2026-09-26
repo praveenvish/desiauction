@@ -2,16 +2,17 @@ import {
   IconGlobe,
   IconStar,
   IconUsers,
+  type KitTone,
+  Pager,
   Pill,
   PlayerImage,
   SegmentedTabs,
   TeamChip,
-  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 
 import { playersIndexView } from "../../server/console/views";
-import type { PlayerIndexRow } from "../../server/console/players-index";
+import { PLAYERS_PAGE_SIZE, type PlayerIndexRow } from "../../server/console/players-index";
 import { FEE_LABEL, STATUS_LABEL } from "../seasons/[slug]/_players/labels";
 import { NavButton } from "./nav-button";
 import { PlayersFilters } from "./players-filters";
@@ -290,36 +291,17 @@ export default async function PlayersPage({
           </div>
         )}
         {view.pageCount > 1 ? (
-          <nav className="px-pager" aria-label="Pages">
-            {view.page > 1 ? (
-              <Link
-                href={hrefWith(current, { page: view.page - 1 === 1 ? "" : String(view.page - 1) })}
-                className="px-page"
-              >
-                Previous
-              </Link>
-            ) : null}
-            {Array.from({ length: view.pageCount }, (_, index) => index + 1)
-              .filter(
-                (number) =>
-                  number === 1 || number === view.pageCount || Math.abs(number - view.page) <= 1,
-              )
-              .map((number) => (
-                <Link
-                  key={number}
-                  href={hrefWith(current, { page: number === 1 ? "" : String(number) })}
-                  className="px-page"
-                  aria-current={number === view.page ? "page" : undefined}
-                >
-                  {number}
-                </Link>
-              ))}
-            {view.page < view.pageCount ? (
-              <Link href={hrefWith(current, { page: String(view.page + 1) })} className="px-page">
-                Next
-              </Link>
-            ) : null}
-          </nav>
+          <div className="px-pager">
+            <Pager
+              total={result.total}
+              page={view.page}
+              pageCount={view.pageCount}
+              pageSize={PLAYERS_PAGE_SIZE}
+              noun="players"
+              hrefFor={(number) => hrefWith(current, { page: number === 1 ? "" : String(number) })}
+              linkComponent={Link}
+            />
+          </div>
         ) : null}
       </section>
     </main>

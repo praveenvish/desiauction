@@ -401,6 +401,7 @@ function RecentCard({ view }: { view: ProviderTemplatesView }) {
       {view.recent.length === 0 ? (
         <div className="admin-card-empty">
           <EmptyState
+            size="compact"
             headingLevel={3}
             title="Nothing changed yet"
             description="Every template still uses the server setting. Mappings and submissions appear here with who made them."

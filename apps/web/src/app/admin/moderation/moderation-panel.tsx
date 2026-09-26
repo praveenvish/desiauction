@@ -8,6 +8,7 @@ import {
   IconExternal,
   IconEyeOff,
   IconGlobe,
+  Pager,
   Pill,
   SectionCard,
   Toolbar,
@@ -47,14 +48,23 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
   return (
     <>
       {desk.held.length === 0 ? (
-        // Nothing held is the calm state — one line, not a 200px card.
-        <p className="admin-slim" data-testid="moderation-held">
-          <IconEyeOff size={16} />
-          <strong>Nothing is taken down.</strong>
-          <span className="admin-meta">
-            Seasons DesiAuction takes off the public web are listed here, with who and why.
-          </span>
-        </p>
+        <SectionCard
+          icon={<IconEyeOff />}
+          tone="neutral"
+          title="Taken down"
+          flush
+          data-testid="moderation-held"
+        >
+          <div className="admin-card-empty">
+            <EmptyState
+              size="compact"
+              icon={<IconEyeOff />}
+              concept="done"
+              title="Nothing is taken down"
+              description="Seasons DesiAuction takes off the public web are listed here, with who and why."
+            />
+          </div>
+        </SectionCard>
       ) : (
         <SectionCard
           icon={<IconEyeOff />}
@@ -101,6 +111,7 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
         {desk.published.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title={desk.query === "" ? "No season is public" : "No public season matches"}
               description={
@@ -118,9 +129,14 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
               ))}
             </ul>
             {desk.publishedTotal > desk.published.length ? (
-              <p className="admin-pagination admin-meta">
-                Showing the newest {String(desk.published.length)}. Search to reach the rest.
-              </p>
+              <div className="admin-pagination">
+                <Pager
+                  label="Public seasons"
+                  total={desk.publishedTotal}
+                  shown={desk.published.length}
+                  noun="· search to reach the rest"
+                />
+              </div>
             ) : null}
           </>
         )}

@@ -1,6 +1,6 @@
 import {
   EmptyState,
-  IconArrowRight,
+  Pager,
   Pill,
   SegmentedTabs,
   Toolbar,
@@ -40,7 +40,14 @@ function filterLabel(filter: OrgFilter): string {
   return FILTER_LABELS.find((option) => option.key === filter)?.label ?? "All";
 }
 
-export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
+export function OrgsPanel({
+  directory,
+  paged = false,
+}: {
+  directory: OrgDirectory;
+  /** On a later page (a cursor is set): the pager offers the way back. */
+  paged?: boolean;
+}) {
   const { rows, total, platformTotal, filter, query, nextCursor } = directory;
   const narrowed = query !== "" || filter !== "all";
   const nextHref = nextCursor === null ? null : pageHref({ query, filter, after: nextCursor });
@@ -84,6 +91,7 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
         {rows.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No organization matches"
               description={
@@ -210,16 +218,18 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
             {/* There was no pagination anywhere: 50 of 349 organizations, and
                 the other 299 were unreachable by browsing OR by any filter. A
                 LINK, not a button: administration submits nothing. */}
-            <nav className="admin-pagination" aria-label="More organizations">
-              {nextHref === null ? (
-                <span className="admin-meta">End of the list.</span>
-              ) : (
-                <Link href={nextHref} data-testid="admin-org-next">
-                  Next 50
-                  <IconArrowRight size={16} className="icon-trail" />
-                </Link>
-              )}
-            </nav>
+            <div className="admin-pagination">
+              <Pager
+                label="More organizations"
+                total={total}
+                shown={rows.length}
+                noun="organizations"
+                firstHref={paged ? filterHref(query, filter) : null}
+                nextHref={nextHref}
+                linkComponent={Link}
+                nextTestId="admin-org-next"
+              />
+            </div>
           </>
         )}
       </div>

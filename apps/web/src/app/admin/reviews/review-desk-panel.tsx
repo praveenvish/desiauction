@@ -2,6 +2,7 @@
 
 import {
   Button,
+  EmptyState,
   Field,
   IconEyeOff,
   IconGlobe,
@@ -54,16 +55,23 @@ export function ReviewDeskPanel({ desk }: { desk: ReviewDesk }) {
     <>
       <AskCard />
       {desk.pending.length === 0 ? (
-        // An empty queue is the calm state: one line, not a 300px card with a
-        // centred star in it. The counts of what was decided ride along.
-        <p className="admin-slim is-info" data-testid="review-desk-pending">
-          <IconStar size={16} />
-          <strong>Nothing waiting.</strong>
-          <span className="admin-meta">
-            New reviews land here as people send them · {String(desk.published.length)} published ·{" "}
-            {String(desk.hidden.length)} hidden
-          </span>
-        </p>
+        <SectionCard
+          icon={<IconStar />}
+          tone="gold"
+          title="Waiting for a decision"
+          flush
+          data-testid="review-desk-pending"
+        >
+          <div className="admin-card-empty">
+            <EmptyState
+              size="compact"
+              icon={<IconStar />}
+              concept="done"
+              title="Nothing waiting"
+              description={`New reviews land here as people send them · ${String(desk.published.length)} published · ${String(desk.hidden.length)} hidden`}
+            />
+          </div>
+        </SectionCard>
       ) : (
         <SectionCard
           icon={<IconStar />}

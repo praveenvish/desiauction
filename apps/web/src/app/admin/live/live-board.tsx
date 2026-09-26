@@ -113,6 +113,7 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         {data.running.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No auction is running"
               description={`When an organizer opens one, it appears here within ${String(REFRESH_MS / 1000)} seconds.`}
@@ -186,7 +187,13 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         data-testid="live-ended"
       >
         {data.ended.length === 0 ? (
-          <p className="admin-card-empty">No auction has closed in the last day.</p>
+          <div className="admin-card-empty">
+            <EmptyState
+              size="compact"
+              icon={<IconGavel />}
+              title="No auction has closed in the last day"
+            />
+          </div>
         ) : (
           <>
             <ul className="admin-rows admin-rows-dense">

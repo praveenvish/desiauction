@@ -2,8 +2,7 @@ import {
   ButtonLink,
   Card,
   EmptyState,
-  IconArrowLeft,
-  IconArrowRight,
+  Pager,
   SegmentedTabs,
   Toolbar,
   ToolbarChip,
@@ -103,21 +102,6 @@ function directoryHref(params: {
   }
   const query = search.toString();
   return query === "" ? "/c" : `/c?${query}`;
-}
-
-/** 1 … 4 5 6 … 12 — the current page, its neighbours and both ends. */
-function pageNumbers(current: number, total: number): (number | null)[] {
-  const wanted = new Set([1, total, current - 1, current, current + 1]);
-  const pages = [...wanted].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
-  const out: (number | null)[] = [];
-  for (const page of pages) {
-    const last = out.at(-1);
-    if (typeof last === "number" && page - last > 1) {
-      out.push(null);
-    }
-    out.push(page);
-  }
-  return out;
 }
 
 // PX-5 public discovery: only tournaments their organizers PUBLISHED
@@ -375,43 +359,18 @@ export default async function DirectoryPage({
           </section>
         )}
         {directory.totalPages > 1 ? (
-          <nav className="public-pagination" aria-label="Pagination">
-            {directory.page > 1 ? (
-              <Link
-                className="dir-page dir-page-step"
-                href={directoryHref({ q: term, filter, sort, page: directory.page - 1 })}
-                aria-label="Previous page"
-              >
-                <IconArrowLeft size={16} />
-              </Link>
-            ) : null}
-            {pageNumbers(directory.page, directory.totalPages).map((entry, index) =>
-              entry === null ? (
-                <span key={`gap-${String(index)}`} className="dir-page-gap" aria-hidden>
-                  …
-                </span>
-              ) : (
-                <Link
-                  key={entry}
-                  className="dir-page"
-                  href={directoryHref({ q: term, filter, sort, page: entry })}
-                  aria-current={entry === directory.page ? "page" : undefined}
-                  aria-label={`Page ${String(entry)}`}
-                >
-                  {entry}
-                </Link>
-              ),
-            )}
-            {directory.page < directory.totalPages ? (
-              <Link
-                className="dir-page dir-page-step"
-                href={directoryHref({ q: term, filter, sort, page: directory.page + 1 })}
-                aria-label="Next page"
-              >
-                <IconArrowRight size={16} />
-              </Link>
-            ) : null}
-          </nav>
+          <div className="public-pagination">
+            <Pager
+              label="Pagination"
+              total={directory.total}
+              page={directory.page}
+              pageCount={directory.totalPages}
+              shown={directory.entries.length}
+              noun={noun}
+              hrefFor={(entry) => directoryHref({ q: term, filter, sort, page: entry })}
+              linkComponent={Link}
+            />
+          </div>
         ) : null}
       </PageBody>
     </main>

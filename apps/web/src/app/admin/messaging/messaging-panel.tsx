@@ -109,6 +109,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
         {overview.delivery.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="Nothing sent yet"
               description="Decision notices appear here once an organizer approves, waitlists or declines somebody."
@@ -231,6 +232,7 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
         {overview.recent.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="Nobody is suppressed"
               description="Numbers that text STOP, and addresses that bounce or complain, appear here."

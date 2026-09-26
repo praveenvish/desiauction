@@ -111,6 +111,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         {competitions.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No seasons"
               description="This organization has not created one yet."
@@ -213,6 +214,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         {grants.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No grants"
               description="Nobody holds authority on this organization."
@@ -260,7 +262,12 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         <SectionCard icon={<IconUsers />} tone="blue" title="Members" flush>
           {members.length === 0 ? (
             <div className="admin-card-empty">
-              <EmptyState headingLevel={3} title="No members" description="Nobody has joined." />
+              <EmptyState
+                size="compact"
+                headingLevel={3}
+                title="No members"
+                description="Nobody has joined."
+              />
             </div>
           ) : (
             <ul className="admin-rows" data-testid="admin-org-members">
@@ -307,6 +314,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
           {activity.length === 0 ? (
             <div className="admin-card-empty">
               <EmptyState
+                size="compact"
                 headingLevel={3}
                 title="Nothing yet"
                 description="No audited action on this organization."

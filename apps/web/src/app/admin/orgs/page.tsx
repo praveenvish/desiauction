@@ -56,5 +56,5 @@ async function Directory({
   if (directory === null) {
     notFound();
   }
-  return <OrgsPanel directory={directory} />;
+  return <OrgsPanel directory={directory} paged={after !== undefined} />;
 }

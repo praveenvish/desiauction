@@ -98,6 +98,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
         {grants.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No grants"
               description="This person holds no authority anywhere on the platform."
@@ -197,6 +198,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
             {orgs.length === 0 ? (
               <div className="admin-card-empty">
                 <EmptyState
+                  size="compact"
                   headingLevel={3}
                   title="No memberships"
                   description="This person belongs to no organization."
@@ -237,6 +239,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
           {activity.length === 0 ? (
             <div className="admin-card-empty">
               <EmptyState
+                size="compact"
                 headingLevel={3}
                 title="Nothing yet"
                 description="This person has taken no audited action."

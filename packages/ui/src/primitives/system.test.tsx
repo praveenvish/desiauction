@@ -31,6 +31,13 @@ describe("Pager", () => {
     expect(screen.queryByRole("link", { name: "Next page" })).toBeNull();
   });
 
+  it("infers the window from the rows shown when the size is unknown", () => {
+    render(
+      <Pager total={30} page={3} pageCount={3} shown={6} hrefFor={(n) => `?p=${String(n)}`} />,
+    );
+    expect(screen.getByText("Showing 25–30 of 30")).toBeInTheDocument();
+  });
+
   it("drives a client desk through onPage", () => {
     const onPage = vi.fn();
     render(<Pager total={60} page={1} pageCount={3} pageSize={25} onPage={onPage} />);

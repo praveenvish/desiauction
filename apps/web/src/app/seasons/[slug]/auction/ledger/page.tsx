@@ -2,11 +2,13 @@ import {
   ButtonLink,
   IconClock,
   IconGavel,
+  Pager,
   PlayerImage,
   Toolbar,
   ToolbarCount,
   ToolbarSpacer,
 } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ledgerView } from "../../../../../server/auction/conduct-actions";
@@ -200,25 +202,17 @@ export default async function LedgerPage({
             guarantee is that it regenerates from the log; only the render is
             bounded. */}
         {view.totalPages > 1 ? (
-          <nav className="pager" aria-label="Ledger pages">
-            {view.page > 1 ? (
-              <ButtonLink href={pageHref(view.page - 1)} variant="secondary" size="sm">
-                Previous
-              </ButtonLink>
-            ) : (
-              <span />
-            )}
-            <span data-testid="ledger-page-indicator">
-              Page {view.page} of {view.totalPages}
-            </span>
-            {view.page < view.totalPages ? (
-              <ButtonLink href={pageHref(view.page + 1)} variant="secondary" size="sm">
-                Next
-              </ButtonLink>
-            ) : (
-              <span />
-            )}
-          </nav>
+          <Pager
+            label="Ledger pages"
+            total={view.filteredRows}
+            page={view.page}
+            pageCount={view.totalPages}
+            shown={view.rows.length}
+            noun="rows"
+            hrefFor={pageHref}
+            linkComponent={Link}
+            summaryTestId="ledger-page-indicator"
+          />
         ) : null}
       </div>
     </main>

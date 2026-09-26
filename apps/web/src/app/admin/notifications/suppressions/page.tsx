@@ -96,6 +96,7 @@ export default async function AdminSuppressionsPage() {
             {desk.recent.length === 0 ? (
               <div className="admin-card-empty">
                 <EmptyState
+                  size="compact"
                   headingLevel={3}
                   title="Nothing changed by hand yet"
                   description="Lifts and manual suppressions appear here with who made them and why."

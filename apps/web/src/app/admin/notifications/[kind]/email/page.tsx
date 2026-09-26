@@ -122,6 +122,7 @@ export default async function EmailWordingPage({ params }: { params: Promise<{ k
             {view.changes.length === 0 ? (
               <div className="admin-card-empty">
                 <EmptyState
+                  size="compact"
                   headingLevel={3}
                   title="Nothing changed yet"
                   description="This email still uses DesiAuction's default wording in every language."

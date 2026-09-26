@@ -28,7 +28,7 @@ export interface PagerProps {
   page?: number;
   pageCount?: number;
   pageSize?: number;
-  /** Cursor mode: rows on this page. */
+  /** Rows on this page (cursor mode; numbered mode when the size is unknown). */
   shown?: number;
   hrefFor?: (page: number) => string;
   onPage?: (page: number) => void;
@@ -82,9 +82,16 @@ export function Pager({
   const numbered = page !== undefined && pageCount !== undefined;
   const of = `${GROUPED.format(total)}${noun !== undefined ? ` ${noun}` : ""}`;
   let summary: string;
-  if (numbered && pageSize !== undefined) {
-    const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
-    const last = Math.min(total, page * pageSize);
+  if (numbered && (pageSize !== undefined || shown !== undefined)) {
+    // Without a page size, a full page's row count IS the size; the last page
+    // counts back from the total.
+    let first: number;
+    if (pageSize !== undefined) first = (page - 1) * pageSize + 1;
+    else if (page >= pageCount) first = total - (shown ?? 0) + 1;
+    else first = (page - 1) * (shown ?? 0) + 1;
+    if (total === 0) first = 0;
+    const last =
+      pageSize !== undefined ? Math.min(total, page * pageSize) : first + (shown ?? 0) - 1;
     summary = `Showing ${GROUPED.format(first)}–${GROUPED.format(last)} of ${of}`;
   } else {
     summary = `Showing ${GROUPED.format(shown ?? 0)} of ${of}`;

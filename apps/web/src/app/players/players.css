@@ -139,10 +139,8 @@
   background: var(--accent-subtle);
   color: var(--text-heading);
 }
-
 .px-select:focus-visible,
-.px-reset:focus-visible,
-.px-page:focus-visible {
+.px-reset:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -304,37 +302,11 @@
   color: var(--text-muted);
 }
 
-/* ---- pager ---- */
+/* ---- pager: the product's one <Pager>, on the card's floor ---- */
 
 .px-pager {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
+  padding: 0 var(--space-5) var(--space-3);
   border-top: 1px solid var(--border-subtle);
-}
-
-.px-page {
-  box-sizing: border-box;
-  display: inline-grid;
-  place-items: center;
-  min-width: 44px;
-  height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  color: var(--text-primary);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
-}
-
-.px-page[aria-current="page"] {
-  background: var(--accent-subtle);
-  border-color: var(--accent-line);
-  color: var(--text-heading);
-  font-weight: var(--font-weight-semibold);
 }
 
 /* ---- phone: a list row, not a card of labelled cells ----

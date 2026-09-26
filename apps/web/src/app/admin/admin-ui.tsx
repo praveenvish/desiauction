@@ -1,4 +1,4 @@
-import { IconEye, type BadgeTone, type KitTone } from "@desiauction/ui";
+import { EmptyState, IconEye, type BadgeTone, type KitTone } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
 /**
@@ -116,9 +116,9 @@ export function monogram(name: string | null): string {
 }
 
 /**
- * The empty-state recipe for administration's queues: centred, a duotone glyph
- * in a soft ring, a title, one line, and at most two doors. A queue at zero is
- * the GOOD state, so it should look settled rather than broken.
+ * Administration's queues at zero — the product's one EmptyState (round 3B),
+ * kept as a name so the queue pages read the same. A queue at zero is the GOOD
+ * state, so it looks settled rather than broken.
  */
 export function AdminEmpty({
   icon,
@@ -128,20 +128,20 @@ export function AdminEmpty({
   testId,
 }: {
   icon: ReactNode;
-  title: ReactNode;
+  title: string;
   children?: ReactNode;
   actions?: ReactNode;
   testId?: string;
 }) {
   return (
-    <div className="admin-empty" data-testid={testId}>
-      <span className="admin-empty-ring" aria-hidden>
-        {icon}
-      </span>
-      <p className="admin-empty-title">{title}</p>
-      {children !== undefined ? <p className="admin-empty-body">{children}</p> : null}
-      {actions !== undefined ? <div className="admin-empty-actions">{actions}</div> : null}
-    </div>
+    <EmptyState
+      icon={icon}
+      title={title}
+      headingLevel={2}
+      {...(children !== undefined ? { description: children } : {})}
+      {...(actions !== undefined ? { action: actions } : {})}
+      {...(testId !== undefined ? { testId } : {})}
+    />
   );
 }
 

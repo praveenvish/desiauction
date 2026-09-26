@@ -1,6 +1,6 @@
 import {
   EmptyState,
-  IconArrowRight,
+  Pager,
   Toolbar,
   ToolbarChip,
   ToolbarCount,
@@ -99,6 +99,7 @@ export function AuditPanel({ page }: { page: AuditPage }) {
         {rows.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={2}
               title="No matching events"
               description="Nothing in the audit log matches these filters."
@@ -124,16 +125,18 @@ export function AuditPanel({ page }: { page: AuditPage }) {
             </div>
             {/* Paging replaces "narrow the filters to see more" — which was the
                 only route past event 100 of 3,720. */}
-            <nav className="admin-pagination" aria-label="Older events">
-              {nextHref === null ? (
-                <span className="admin-meta">End of the matching events.</span>
-              ) : (
-                <Link href={nextHref} data-testid="admin-audit-next">
-                  Older 100
-                  <IconArrowRight size={16} className="icon-trail" />
-                </Link>
-              )}
-            </nav>
+            <div className="admin-pagination">
+              <Pager
+                label="Older events"
+                total={total}
+                shown={rows.length}
+                noun="events"
+                firstHref={filters.after !== undefined ? auditHref(filters, null) : null}
+                nextHref={nextHref}
+                linkComponent={Link}
+                nextTestId="admin-audit-next"
+              />
+            </div>
           </>
         )}
       </div>

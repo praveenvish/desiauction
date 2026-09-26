@@ -85,6 +85,7 @@ export function HealthPanel({ health }: { health: PlatformHealth }) {
           {schedules.length === 0 ? (
             <div className="admin-card-empty">
               <EmptyState
+                size="compact"
                 headingLevel={3}
                 title="No schedules"
                 description="The runner has no registered schedule."
@@ -170,6 +171,7 @@ export function HealthPanel({ health }: { health: PlatformHealth }) {
         {orgs.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No organization has declared finance"
               description="Storage, dispatch, exports and certification begin once an organization declares a financial profile."

@@ -221,6 +221,7 @@ export default async function AdminDeliveryAnalyticsPage({
           {view.reasons.length === 0 ? (
             <div className="admin-card-empty">
               <EmptyState
+                size="compact"
                 headingLevel={3}
                 title="Nothing failed or was suppressed"
                 description={`In the last ${String(windowDays)} days every queued message that settled was sent.`}
@@ -277,6 +278,7 @@ export default async function AdminDeliveryAnalyticsPage({
           {!anything ? (
             <div className="admin-card-empty">
               <EmptyState
+                size="compact"
                 headingLevel={3}
                 title="Nothing queued"
                 description={`No message went through the queue in the last ${String(windowDays)} days.`}

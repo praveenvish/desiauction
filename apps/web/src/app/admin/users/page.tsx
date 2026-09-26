@@ -51,5 +51,5 @@ async function Directory({
   if (directory === null) {
     notFound();
   }
-  return <UsersPanel directory={directory} />;
+  return <UsersPanel directory={directory} paged={after !== undefined} />;
 }

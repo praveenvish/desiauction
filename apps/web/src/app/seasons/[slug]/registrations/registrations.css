@@ -498,58 +498,8 @@ section.rd-card[data-flush="true"] {
 
 /* Pages. */
 .rd-card .pd-pager {
-  flex-wrap: wrap;
-  padding: var(--space-3) var(--space-4);
+  padding: 0 var(--space-4) var(--space-3);
   border-top: 1px solid var(--border-subtle);
-}
-
-.rd-card .pd-pager .pd-shortcuts {
-  margin-inline-end: auto;
-  margin-inline-start: var(--space-4);
-}
-
-.rd-pagebtn {
-  display: inline-grid;
-  place-items: center;
-  min-width: 36px;
-  height: 36px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: var(--text-sm-size);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-
-.rd-pagebtn:hover:not(:disabled) {
-  border-color: var(--border-strong);
-}
-
-.rd-pagebtn:disabled {
-  color: var(--text-disabled);
-  cursor: default;
-}
-
-.rd-pagebtn[aria-current="page"] {
-  border-color: var(--accent-line);
-  background: var(--accent-subtle);
-  color: var(--text-accent);
-  font-weight: var(--font-weight-semibold);
-}
-
-.rd-pagebtn:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.rd-pagegap {
-  display: inline-grid;
-  place-items: center;
-  min-width: 24px;
-  color: var(--text-muted);
 }
 
 /* Shed the columns the sheet repeats, widest screens keep all nine. */
@@ -637,20 +587,6 @@ section.rd-card[data-flush="true"] {
     width: 40px;
     height: 40px;
     opacity: 1;
-  }
-
-  .rd-card .pd-pager {
-    justify-content: center;
-    padding: var(--space-3) var(--space-4) var(--space-4);
-  }
-
-  .rd-card .pd-pager > [data-testid="page-indicator"] {
-    flex-basis: 100%;
-    text-align: center;
-  }
-
-  .rd-card .pd-pager .pd-shortcuts {
-    display: none;
   }
 }
 

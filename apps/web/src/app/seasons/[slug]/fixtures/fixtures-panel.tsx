@@ -8,7 +8,6 @@ import {
   CardGrid,
   Dialog,
   Field,
-  Notice,
   IconAlert,
   IconArrowRight,
   IconBolt,
@@ -24,6 +23,8 @@ import {
   IconSpark,
   IconTrophy,
   IconUpload,
+  Notice,
+  Pager,
   Pill,
   PopoverMenu,
   SectionCard,
@@ -1629,33 +1630,19 @@ export function FixturesPanel({
         {/* No pager for one page (it was "Page 1 of 1 · 0 total"). */}
         {totalPages <= 1 ? null : (
           <div className="st-pager">
-            <span data-testid="page-indicator">
-              Page {page.page} of {totalPages} · {page.total} total
-            </span>
-            <span className="st-actions fx-pager-actions">
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={page.page <= 1}
-                onClick={() => {
-                  pushQuery({ page: String(page.page - 1) });
-                }}
-                data-testid="page-prev"
-              >
-                Previous
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={page.page >= totalPages}
-                onClick={() => {
-                  pushQuery({ page: String(page.page + 1) });
-                }}
-                data-testid="page-next"
-              >
-                Next
-              </Button>
-            </span>
+            <Pager
+              total={page.total}
+              page={page.page}
+              pageCount={totalPages}
+              pageSize={page.pageSize}
+              noun="fixtures"
+              onPage={(entry) => {
+                pushQuery({ page: String(entry) });
+              }}
+              summaryTestId="page-indicator"
+              prevTestId="page-prev"
+              nextTestId="page-next"
+            />
           </div>
         )}
       </SectionCard>

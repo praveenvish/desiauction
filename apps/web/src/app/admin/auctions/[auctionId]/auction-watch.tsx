@@ -226,7 +226,9 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         data-testid="auction-watch-tape"
       >
         {pulse.tape.length === 0 ? (
-          <p className="admin-card-empty">No bids yet.</p>
+          <div className="admin-card-empty">
+            <EmptyState size="compact" icon={<IconGavel />} title="No bids yet" />
+          </div>
         ) : (
           <div className="admin-table-wrap">
             <table className="admin-table admin-tape">
@@ -281,7 +283,9 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         data-testid="auction-watch-teams"
       >
         {teams.length === 0 ? (
-          <p className="admin-card-empty">No paddles issued yet.</p>
+          <div className="admin-card-empty">
+            <EmptyState size="compact" icon={<IconUsers />} title="No paddles issued yet" />
+          </div>
         ) : (
           <div className="admin-table-wrap">
             <table className="admin-table">
@@ -346,6 +350,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         {overview.lots.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
+              size="compact"
               headingLevel={3}
               title="No lots yet"
               description="The organizer has not put any players into this auction."
@@ -415,7 +420,9 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         data-testid="auction-watch-events"
       >
         {overview.events.length === 0 ? (
-          <p className="admin-card-empty">Nothing has happened yet.</p>
+          <div className="admin-card-empty">
+            <EmptyState size="compact" icon={<IconClock />} title="Nothing has happened yet" />
+          </div>
         ) : (
           <ul className="admin-rows">
             {overview.events.map((event) => (
