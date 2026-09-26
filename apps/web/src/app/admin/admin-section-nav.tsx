@@ -1,6 +1,6 @@
 "use client";
 
-import { IconChevronDown, useActiveInView } from "@desiauction/ui";
+import { IconChevronDown, useScrollStrip } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -24,8 +24,9 @@ export function AdminSectionNav({ sections }: { sections: readonly AdminSection[
   const { inline, pinned, more } = adminNavLayout(sections, activeKey);
   const menuRef = useRef<HTMLDetailsElement>(null);
   const stripRef = useRef<HTMLElement>(null);
-  // A phone scrolls the strip; open it where the current section is.
-  useActiveInView(stripRef, activeKey);
+  // A phone scrolls the strip: open it where the current section is, and fade
+  // the edge that has more sections past it (the product's one scroll strip).
+  useScrollStrip(stripRef, activeKey);
 
   useEffect(() => {
     const menu = menuRef.current;
@@ -65,7 +66,7 @@ export function AdminSectionNav({ sections }: { sections: readonly AdminSection[
   };
 
   return (
-    <nav ref={stripRef} aria-label="Administration sections" className="adn">
+    <nav ref={stripRef} aria-label="Administration sections" className="adn da-scroll-strip">
       <ul className="adn-list">
         {inline.map((section) =>
           tab(section, section.dividerBefore === true ? "adn-group-start" : undefined),

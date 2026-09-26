@@ -51,15 +51,19 @@
   width: min(1200px, calc(100% - 96px));
   margin: auto;
 }
+/* The product's one eyebrow (system.css .da-eyebrow): UI sans, xs,
+   semibold, 0.14em caps, accent ink. */
 .eyebrow {
   display: flex;
   align-items: center;
   gap: 10px;
   color: var(--text-accent);
-  font-size: 10px;
-  font-weight: 650;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.6;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 .home h2 + p {
   color: var(--text-secondary);
@@ -1427,7 +1431,7 @@
     margin-right: 4px;
   }
   .eyebrow {
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 0.12em;
   }
   .sportsGrid {
@@ -1721,9 +1725,6 @@
 .cardOverline {
   font-size: 10px;
   font-weight: 600;
-}
-.eyebrow {
-  font-size: 11px;
 }
 
 /* The bento: the real screens lead (3 of 5 columns), registration beside them

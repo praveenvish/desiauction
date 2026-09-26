@@ -13,6 +13,7 @@ import {
   Notice,
   Pill,
   PlayerImage,
+  ScrollStrip,
   SectionCard,
   Select,
   type TabItem,
@@ -332,7 +333,7 @@ export function AuctionPanel({
           ) : undefined
         }
       >
-        <div className="auc-filter" role="group" aria-label="Show players">
+        <ScrollStrip className="auc-filter" role="group" aria-label="Show players">
           {LOT_FILTERS.map((option) => {
             const n = view.lots.filter((lot) => lotMatches(option.id, lot.status)).length;
             return (
@@ -350,7 +351,7 @@ export function AuctionPanel({
               </button>
             );
           })}
-        </div>
+        </ScrollStrip>
         <div className="auc-lots-head" aria-hidden>
           <span>#</span>
           <span>Player</span>

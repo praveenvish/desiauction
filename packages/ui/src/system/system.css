@@ -138,6 +138,13 @@
   display: none;
 }
 
+/* Nothing past either edge: no mask at all, so a menu or a focus ring that
+   leaves the strip's box is never clipped by it. */
+.da-scroll-strip:not([data-fade-start], [data-fade-end]) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
 .da-scroll-strip[data-fade-start] {
   --da-fade-start: 32px;
 }

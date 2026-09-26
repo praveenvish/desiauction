@@ -2,12 +2,13 @@
 
 import {
   Badge,
+  type BadgeTone,
   Card,
   EmptyState,
   Field,
+  ScrollStrip,
   Select,
   VisuallyHidden,
-  type BadgeTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -314,7 +315,7 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
       {/* --- The documents register ------------------------------------------- */}
       <Card>
         <h2>Documents</h2>
-        <ul className="saved-views" data-testid="finance-views">
+        <ScrollStrip as="ul" className="saved-views" data-testid="finance-views">
           {FINANCE_VIEWS.map((saved) => (
             <li key={saved.key}>
               <Link
@@ -327,7 +328,7 @@ export function FinancePanel({ slug, workspace }: { slug: string; workspace: Fin
               </Link>
             </li>
           ))}
-        </ul>
+        </ScrollStrip>
         <div className="filter-bar">
           <Field
             label="Search documents"

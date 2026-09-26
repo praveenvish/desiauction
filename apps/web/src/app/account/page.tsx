@@ -8,6 +8,7 @@ import {
   IconLock,
   IconShieldCheck,
   IconUser,
+  ScrollStrip,
   SectionCard,
   ToastProvider,
 } from "@desiauction/ui";
@@ -177,7 +178,7 @@ export default async function AccountPage() {
               two-column masonry left ~1,600px of blank left column. */}
           <div className="acct-body">
             <nav className="acct-nav" aria-label="Account sections">
-              <ul>
+              <ScrollStrip as="ul">
                 {ACCOUNT_SECTIONS.map((section) => (
                   <li key={section.id}>
                     <a href={`#${section.id}`}>
@@ -186,7 +187,7 @@ export default async function AccountPage() {
                     </a>
                   </li>
                 ))}
-              </ul>
+              </ScrollStrip>
             </nav>
 
             <div className="acct-columns">

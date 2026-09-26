@@ -42,13 +42,13 @@
   align-items: center;
   gap: var(--space-2);
   margin: 0 0 var(--space-4);
-  font-family: var(--font-mono);
+  color: var(--text-accent);
+  font-family: var(--font-text);
   font-size: var(--text-xs-size);
   line-height: var(--text-xs-line);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-accent);
 }
 
 .mk-kicker::before {
@@ -2091,7 +2091,8 @@ body:has(.landing.mk) .mk-hero {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  font-family: var(--font-mono);
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
   font-size: var(--text-xs-size);
   letter-spacing: 0.1em;
   text-transform: uppercase;

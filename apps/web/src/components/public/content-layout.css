@@ -32,7 +32,8 @@
 
 .cl-meta {
   margin: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
   font-size: 0.75rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -162,11 +163,13 @@
 
 .cl-aside-title {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .cl-aside-list {

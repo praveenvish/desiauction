@@ -10,7 +10,7 @@
  * Server components (no hooks, no state). Interactivity that a page needs —
  * the showcase filters, the sign-in form — stays in that page's client parts.
  */
-import { IconArrowRight, SportIcon } from "@desiauction/ui";
+import { IconArrowRight, ScrollStrip, SportIcon } from "@desiauction/ui";
 import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
@@ -408,7 +408,7 @@ export interface CountChip {
  */
 export function CountChips({ chips, label }: { chips: CountChip[]; label: string }) {
   return (
-    <nav className="pk-chips" aria-label={label}>
+    <ScrollStrip as="nav" className="pk-chips" aria-label={label}>
       {chips.map((chip) => (
         <Link
           key={chip.href + chip.label}
@@ -423,7 +423,7 @@ export function CountChips({ chips, label }: { chips: CountChip[]; label: string
           {chip.count === undefined ? null : <span className="pk-chip-count">{chip.count}</span>}
         </Link>
       ))}
-    </nav>
+    </ScrollStrip>
   );
 }
 

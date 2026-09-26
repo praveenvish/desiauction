@@ -85,7 +85,8 @@
   border-radius: var(--radius-full);
   background: var(--surface-overlay);
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--font-text);
+  font-weight: var(--font-weight-semibold);
   font-size: 0.6875rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;

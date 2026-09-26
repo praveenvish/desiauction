@@ -1,4 +1,6 @@
 "use client";
+
+import { ScrollStrip } from "@desiauction/ui";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconArrowRight, IconCheck, IconGavel, IconRefresh, IconTrophy } from "./icons";
@@ -282,7 +284,7 @@ export function AuctionLab({
             Pick yours, then run a mock auction.
           </p>
         </div>
-        <div
+        <ScrollStrip
           className={styles.sportsGrid}
           role="group"
           aria-label="Choose a sport for the auction demo"
@@ -306,7 +308,7 @@ export function AuctionLab({
               )}
             </button>
           ))}
-        </div>
+        </ScrollStrip>
         <div className={styles.demoLayout}>
           <div className={styles.demoCopy} data-reveal>
             <p className={styles.eyebrow}>

@@ -10,7 +10,8 @@ import { useEffect, type RefObject } from "react";
  * or the "Waitlisted" status tab, the one thing the strip exists to say (where
  * you are) was off the right edge. On mount, and whenever `activeKey` changes,
  * this scrolls the strip itself (never the page) just far enough to centre the
- * item marked `aria-current="page"` or `data-active`. A strip that fits does
+ * item marked `aria-current="page"`, `data-active`, `aria-selected="true"` or
+ * `aria-pressed="true"`. A strip that fits does
  * nothing.
  */
 export function useActiveInView(
@@ -20,7 +21,9 @@ export function useActiveInView(
   useEffect(() => {
     const strip = ref.current;
     if (strip === null || strip.scrollWidth <= strip.clientWidth + 1) return;
-    const candidates = strip.querySelectorAll<HTMLElement>('[aria-current="page"], [data-active]');
+    const candidates = strip.querySelectorAll<HTMLElement>(
+      '[aria-current="page"], [data-active], [aria-selected="true"], [aria-pressed="true"]',
+    );
     // Skip anything drawn in a closed menu: it has no box.
     const active = Array.from(candidates).find((el) => el.getBoundingClientRect().width > 0);
     if (active === undefined) return;

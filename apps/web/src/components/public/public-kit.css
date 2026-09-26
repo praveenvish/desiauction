@@ -99,11 +99,13 @@
 
 .pk-eyebrow {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
+  color: var(--text-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-accent);
 }
 
 /* The article pages put their way back ("← All help", "← All legal documents")
