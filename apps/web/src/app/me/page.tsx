@@ -311,7 +311,7 @@ export default async function MySportsPage({
       {/* An owner who does not play has one object — their team — and /teams
           holds the squad: the rail here was its fourth copy (review r3). One
           column at a reading measure, not a short card beside a tall rail. */}
-      <div className="me-layout" data-single={ownerOnly ? "" : undefined}>
+      <div className="me-layout">
         <div className="me-main">
           {owns.length > 0 ? <OwnedTeams teams={owns} /> : null}
           {seasons.length === 0 && owns.length > 0 ? (
@@ -436,7 +436,10 @@ export default async function MySportsPage({
           )}
         </div>
 
-        <aside className="me-side" aria-label="Coming up and career by sport">
+        <aside
+          className="me-side"
+          aria-label={ownerOnly ? "Your auction night" : "Coming up and career by sport"}
+        >
           {shownUpcoming.length === 0 ? null : (
             <SectionCard
               icon={<IconCalendar />}
@@ -496,6 +499,10 @@ export default async function MySportsPage({
           ) : null}
 
           {ownerOnly ? null : <LatestSquad seasons={career.seasons} limit={5} />}
+          {/* THE OWNER'S RECORD (round 5). Without the squad rail the page was
+              one card and ~55% blank on a laptop. An owner's record is the
+              night their team was built: what it cost and where it went. */}
+          {ownerOnly && owns[0] !== undefined ? <OwnerNight team={owns[0]} /> : null}
 
           <p className="me-privacy">
             <IconShieldCheck size={16} aria-hidden />
@@ -544,7 +551,12 @@ async function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
     <SectionCard
       icon={<IconUsers />}
       title="Teams I own"
-      description={`${String(teams.length)} ${teams.length === 1 ? "team" : "teams"} · as owner`}
+      // The title already says "own": the line under it says what the row holds.
+      description={
+        teams.length === 1
+          ? "Its purse, its squad and the way in."
+          : `${String(teams.length)} teams — their purses, squads and the way in.`
+      }
       data-testid="me-owned"
     >
       <ul className="me-regs">
@@ -593,6 +605,80 @@ async function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
           );
         })}
       </ul>
+    </SectionCard>
+  );
+}
+
+/**
+ * AUCTION NIGHT — one owned team's night in figures: spent, the squad's split,
+ * the average and the three dearest buys. Read from the same gated plan view
+ * the home hero and "Teams I own" use, so nothing appears here that the plan
+ * page would not show this owner.
+ */
+async function OwnerNight({ team }: { team: OwnedTeam }) {
+  const [plan, unit] = await Promise.all([
+    planView(team.competitionSlug, team.teamId),
+    seasonUnit(team.competitionSlug),
+  ]);
+  if (plan === null) return null;
+  const money = moneyFormat(unit);
+  const bought = plan.lots
+    .filter((lot) => lot.status === "sold" && lot.soldToTeamId === team.teamId)
+    .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0));
+  const spent = plan.rules.pursePerTeam - plan.standing.purseRemaining;
+  const preSigned = plan.preSignedPlayers.length;
+  if (bought.length === 0 && preSigned === 0) return null;
+  const average = bought.length === 0 ? 0 : Math.round(spent / bought.length);
+  return (
+    <SectionCard
+      icon={<IconGavel />}
+      tone="gold"
+      title="Auction night"
+      description={`${team.teamName} · ${team.competitionName}`}
+      data-testid="me-owner-night"
+    >
+      <dl className="me-night-facts">
+        <div>
+          <dt>Spent</dt>
+          <dd>{money.ledger(spent)}</dd>
+        </div>
+        <div>
+          <dt>Average buy</dt>
+          <dd>{bought.length === 0 ? "—" : money.ledger(average)}</dd>
+        </div>
+        <div>
+          <dt>Bought</dt>
+          <dd>{bought.length}</dd>
+        </div>
+        <div>
+          <dt>Pre-signed</dt>
+          <dd>{preSigned}</dd>
+        </div>
+      </dl>
+      {bought.length === 0 ? null : (
+        <ol className="me-night-top" aria-label="Dearest buys">
+          {bought.slice(0, 3).map((lot) => (
+            <li key={lot.lotId}>
+              <PlayerImage
+                name={lot.playerName ?? "Player"}
+                seed={lot.registrationId}
+                src={plan.lotMedia[lot.lotId]?.photoUrl ?? null}
+                size="sm"
+                shape="round"
+                decorative
+              />
+              <span className="me-night-name">{lot.playerName ?? "Player"}</span>
+              <span className="me-night-price">{money.ledger(lot.soldPrice ?? 0)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <Link
+        href={`/seasons/${team.competitionSlug}/auction/plan?team=${encodeURIComponent(team.teamId)}`}
+        className="me-link"
+      >
+        The night in full <IconArrowRight size={14} aria-hidden />
+      </Link>
     </SectionCard>
   );
 }
