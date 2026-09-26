@@ -33,7 +33,7 @@ export default function NotFound() {
             4<span className="nf-ball" />4
           </p>
           <p className="pk-eyebrow">Lost ball</p>
-          <h1 className="pk-hero-title">This page doesn&rsquo;t exist</h1>
+          <h1 className="pk-hero-title">This page doesn&apos;t exist</h1>
           <p className="pk-hero-lede">
             It may have moved, the link was mistyped — or your account may not have access to it.
           </p>
