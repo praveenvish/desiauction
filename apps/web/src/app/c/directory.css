@@ -1318,16 +1318,10 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  /* Three columns on a laptop (wow pass, round 2): four 280px tracks wrapped
+     two-word names ("Arjun / Deshmukh") beside the face and the price. */
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
   gap: var(--space-2);
-}
-
-/* Three columns at most below a wide desktop: four 280px cards on a 1280px
-   laptop left each name about 120px once the face and the price took theirs. */
-@media (width <= 1280px) {
-  .team-page-squad {
-    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
-  }
 }
 
 /* The ghost "Back to …" button's side padding (space-8 at lg) pushed its

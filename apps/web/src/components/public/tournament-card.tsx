@@ -26,6 +26,18 @@ import type { ReactNode } from "react";
 
 import "./tournament-card.css";
 
+/**
+ * Two letters for a phone-row thumb: the first letters of the first two WORDS
+ * ("Monsoon Cup 2026" → "MC"), skipping numbers, which made "M5" of a season
+ * named after its year. A single word gives its first two letters.
+ */
+export function thumbInitials(name: string): string {
+  const words = name.split(/\s+/).filter((word) => /^\p{L}/u.test(word));
+  if (words.length === 0) return name.trim().slice(0, 2).toUpperCase();
+  if (words.length === 1) return (words[0] ?? "").slice(0, 2).toUpperCase();
+  return `${(words[0] ?? "").charAt(0)}${(words[1] ?? "").charAt(0)}`.toUpperCase();
+}
+
 export interface TournamentCardData {
   name: string;
   slug: string;
@@ -159,6 +171,10 @@ export function TournamentCard({
           />
         ) : (
           <span className="tc-glyph" aria-hidden>
+            {/* On a phone row the thumb is the tournament's own initials with
+                the sport as a small badge — the same bat on every row read
+                as "no content yet". */}
+            <span className="tc-initials">{thumbInitials(name)}</span>
             <SportIcon sport={sport} size={28} />
           </span>
         )}
@@ -196,7 +212,7 @@ export function TournamentCard({
             <p className="tc-line">
               <span className="tc-line-dot" data-tone={tone} aria-hidden />
               <span className="tc-sr">{status}. </span>
-              {meta}
+              <span className="tc-line-text">{meta}</span>
             </p>
           </div>
           <IconChevronRight size={20} className="tc-chevron" />

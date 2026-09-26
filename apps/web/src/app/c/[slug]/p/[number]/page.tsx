@@ -217,27 +217,31 @@ export default async function PlayerProfilePage({
   return (
     <main className="public-page mk">
       <PageHero
-        sport={player.sport}
         /* The photograph IS the page — it is why the card gets forwarded — so
-           it sits in the hero rather than floating alone in a card below it,
-           which is where a 1440px-wide title band left it. The consent and
-           under-18 gates are upstream, in `publicPlayer`: a `photoUrl` of null
-           arrives here already decided and draws the initials portrait. */
-        art={
-          <div className="player-portrait">
-            <PlayerImage
-              name={player.name}
-              seed={player.registrationId}
-              size="hero"
-              src={player.photoUrl}
-              // The caller sizes the box (see `fluid` in player-image.tsx): at
-              // 160px fixed, the portrait sat like a thumbnail in a half-width
-              // hero column.
-              fluid
-              decorative
-            />
-          </div>
-        }
+           it sits in the hero rather than floating alone in a card below it.
+           The consent and under-18 gates are upstream, in `publicPlayer`.
+           Without a photo there is no portrait to show: a 200px "AD" card was
+           the biggest "no content yet" signal on a shareable page, so the
+           initials become a compact avatar beside the name instead (wow pass,
+           round 2). */
+        {...(player.photoUrl !== null
+          ? {
+              sport: player.sport,
+              art: (
+                <div className="player-portrait">
+                  <PlayerImage
+                    name={player.name}
+                    seed={player.registrationId}
+                    size="hero"
+                    src={player.photoUrl}
+                    // The caller sizes the box (see `fluid` in player-image.tsx).
+                    fluid
+                    decorative
+                  />
+                </div>
+              ),
+            }
+          : { watermark: player.sport })}
         status={
           <Badge tone={signed ? "neutral" : "success"} data-testid="player-status">
             {status}
@@ -248,7 +252,26 @@ export default async function PlayerProfilePage({
             <Link href={`/c/${slug}`}>{player.competitionName}</Link> · #{player.number}
           </>
         }
-        title={player.name}
+        title={
+          player.photoUrl === null ? (
+            <span className="player-title">
+              <span className="player-avatar" aria-hidden>
+                <PlayerImage
+                  name={player.name}
+                  seed={player.registrationId}
+                  size="xl"
+                  shape="round"
+                  src={null}
+                  fluid
+                  decorative
+                />
+              </span>
+              <span>{player.name}</span>
+            </span>
+          ) : (
+            player.name
+          )
+        }
         lede={roleAge}
         meta={
           soldFor !== null ? (
@@ -284,7 +307,7 @@ export default async function PlayerProfilePage({
                 See the {player.teamName} squad
               </ButtonLink>
             ) : null}
-            <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg">
+            <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg" className="pk-hero-textlink">
               <IconArrowLeft size={18} /> Back to {player.competitionName}
             </ButtonLink>
           </>

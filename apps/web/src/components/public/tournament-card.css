@@ -387,6 +387,25 @@
     box-shadow: none;
   }
 
+  /* The thumb: initials, the sport as a corner badge. */
+  .tc:not([data-feature]):not([data-cover]) .tc-initials {
+    display: block;
+    font-size: var(--text-lg-size);
+    line-height: 1;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--accent-ink);
+  }
+
+  .tc:not([data-feature]):not([data-cover]) .tc-glyph svg {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 16px;
+    height: 16px;
+    opacity: 0.8;
+  }
+
   .tc:not([data-feature]) .tc-status,
   .tc:not([data-feature]) .tc-facts,
   .tc:not([data-feature]) .tc-foot,
@@ -432,11 +451,22 @@
     text-overflow: ellipsis;
   }
 
+  .tc:not([data-feature]) .tc-line-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .tc:not([data-feature]) .tc-chevron {
     display: block;
     flex: none;
     color: var(--text-muted);
   }
+}
+
+.tc-initials {
+  display: none;
 }
 
 .tc-line-dot {

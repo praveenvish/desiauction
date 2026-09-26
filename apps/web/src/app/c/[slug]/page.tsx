@@ -298,7 +298,7 @@ export default async function PublicCompetitionPage({
                 See the squads
               </ButtonLink>
             ) : null}
-            <ButtonLink href="/c" variant="ghost" size="lg">
+            <ButtonLink href="/c" variant="ghost" size="lg" className="pk-hero-textlink">
               All tournaments
             </ButtonLink>
             {live ? (

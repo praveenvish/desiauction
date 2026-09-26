@@ -176,6 +176,24 @@
   width: 100%;
 }
 
+/* Phone: the lead action takes the row; the rest share one, and a "way
+   out" link is text, not a third stacked button (~220px of CTAs before). */
+@media (max-width: 640px) {
+  .pk-hero-actions > :first-child {
+    flex: 1 1 100%;
+  }
+
+  .pk-hero-actions > .pk-hero-textlink {
+    padding-inline: var(--space-2);
+  }
+
+  /* Alone on its row, the text link lines up with the copy above it. */
+  .pk-hero-actions > .pk-hero-textlink:first-child,
+  .pk-hero-actions > :nth-child(2):last-child.pk-hero-textlink {
+    margin-inline-start: calc(-1 * var(--space-2));
+  }
+}
+
 .pk-hero-art {
   position: relative;
   display: grid;
@@ -401,11 +419,38 @@
   }
 }
 
+/* The icon leads the figure (wow pass, round 2): it sat under the number,
+   in the label line, which reversed the reading order. It stays inside the
+   <dt> (axe: a <dl> row holds only dt/dd) and is placed as a tile to the
+   left of the whole cell. */
+.pk-stat:has(.pk-stat-icon) {
+  position: relative;
+  padding-left: 48px;
+}
+
 .pk-stat-icon {
-  flex: none;
-  display: inline-grid;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: grid;
   place-items: center;
-  color: var(--text-accent);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+  transform: translateY(-50%);
+}
+
+/* Two figures a row on a phone leave no room for a tile: the figure alone. */
+@media (max-width: 640px) {
+  .pk-stat:has(.pk-stat-icon) {
+    padding-left: 0;
+  }
+
+  .pk-stat-icon {
+    display: none;
+  }
 }
 
 .pk-stat-label {
@@ -593,6 +638,34 @@
 }
 
 /* ---- a player's portrait in the hero (c/[slug]/p/[number]) ---- */
+
+/* No photo: the initials as a compact avatar beside the name. */
+.player-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.player-avatar {
+  flex: none;
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 3px var(--accent-line);
+}
+
+@media (max-width: 640px) {
+  .player-title {
+    gap: var(--space-3);
+  }
+
+  .player-avatar {
+    width: 64px;
+    height: 64px;
+  }
+}
 
 .player-portrait {
   width: min(320px, 70vw);
@@ -904,6 +977,33 @@
   color: var(--text-accent);
 }
 
+/* A side list that is navigation: the current page is marked. */
+.pk-side-list--nav {
+  gap: var(--space-1);
+}
+
+.pk-side-list--nav a {
+  min-height: 36px;
+  margin-inline: calc(var(--space-2) * -1);
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.pk-side-list--nav a:not([aria-current]) {
+  color: var(--text-primary);
+}
+
+.pk-side-list--nav a:not([aria-current]):hover {
+  color: var(--text-accent);
+}
+
+.pk-side-list--nav a[aria-current="page"] {
+  background: var(--accent-subtle);
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
 .pk-side-facts {
   display: grid;
   gap: var(--space-3);
@@ -943,6 +1043,24 @@
   place-items: center;
   min-height: min(72svh, 640px);
   text-align: center;
+}
+
+/* The stub fills the shell's content column down to the footer: shorter than
+   the viewport, the cream body showed through as a bright 2px rule above the
+   slim footer (wow pass, round 2). */
+#main-content:has(.pk-soon) {
+  display: flex;
+  flex-direction: column;
+}
+
+#main-content:has(.pk-soon) > main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+#main-content:has(.pk-soon) .pk-soon {
+  flex: 1;
 }
 
 .pk-soon-inner {
