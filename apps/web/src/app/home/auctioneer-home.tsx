@@ -1,8 +1,12 @@
 import {
   ButtonLink,
   IconArrowRight,
+  IconBroadcast,
   IconCalendar,
   IconCheckCircle,
+  IconGavel,
+  IconTile,
+  ListRow,
   Pill,
   SectionCard,
 } from "@desiauction/ui";
@@ -10,6 +14,7 @@ import Link from "next/link";
 
 import type { ConductedSeason } from "../../server/roles/roles";
 import { monogram, type Tone } from "./home-parts";
+import "./home-duo.css";
 import { formatDate, formatShortDate, istCalendarDate } from "../../lib/format-date";
 
 /**
@@ -130,26 +135,29 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
       ) : null}
 
       {queue.length > 0 ? (
-        <SectionCard
-          data-testid="home-conduct-queue"
-          icon={<IconCalendar />}
-          tone="blue"
-          title={tonight === null ? "Your auction nights" : "Also coming up"}
-          description={`${String(queue.length)} in the queue`}
-        >
-          <ul className="home-list">
-            {queue.map((season) => (
-              <Row key={season.competitionSlug} season={season} />
-            ))}
-          </ul>
-        </SectionCard>
+        <div className="hd-duo">
+          <SectionCard
+            data-testid="home-conduct-queue"
+            icon={<IconCalendar />}
+            concept="fixtures"
+            title={tonight === null ? "Your auction nights" : "Also coming up"}
+            description={`${String(queue.length)} in the queue`}
+          >
+            <ul className="home-list">
+              {queue.map((season) => (
+                <Row key={season.competitionSlug} season={season} />
+              ))}
+            </ul>
+          </SectionCard>
+          <NightKit season={queue[0] ?? null} />
+        </div>
       ) : null}
 
       {done.length > 0 ? (
         <SectionCard
           data-testid="home-conduct-record"
           icon={<IconCheckCircle />}
-          tone="green"
+          concept="done"
           title="Nights you've run"
           description={`${String(done.length)} ${done.length === 1 ? "auction" : "auctions"} conducted`}
         >
@@ -161,5 +169,54 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
         </SectionCard>
       ) : null}
     </>
+  );
+}
+
+/**
+ * THE SECOND OBJECT (round 3C). The auctioneer's home ended after one queue
+ * row and left half a laptop blank. Beside the queue: the two rooms they will
+ * work in on the night, as doors once the auction exists — the cockpit where
+ * each lot is called, and the big screen for the venue. Before the organizer
+ * builds the auction, each says when it opens instead of linking to nothing.
+ */
+function NightKit({ season }: { season: ConductedSeason | null }) {
+  if (season === null) return null;
+  const built = season.auctionStatus !== null;
+  const base = `/seasons/${season.competitionSlug}/auction`;
+  return (
+    <SectionCard
+      data-testid="home-conduct-kit"
+      icon={<IconGavel />}
+      concept="auction"
+      title="On the night"
+      description={season.competitionName}
+    >
+      <ul className="home-kit">
+        <li>
+          <ListRow
+            lead={<IconTile icon={<IconGavel />} concept="auction" size="sm" />}
+            title="The cockpit"
+            meta={
+              built
+                ? "Put each lot on the block, and hold to close the sale"
+                : "Opens once the organizer builds the auction"
+            }
+            {...(built ? { href: `${base}/cockpit`, linkComponent: Link } : {})}
+          />
+        </li>
+        <li>
+          <ListRow
+            lead={<IconTile icon={<IconBroadcast />} concept="auction" size="sm" />}
+            title="The big screen"
+            meta={
+              built
+                ? "Put the live board on the venue's TV"
+                : "The venue board, ready when the auction is"
+            }
+            {...(built ? { href: `${base}/board`, linkComponent: Link } : {})}
+          />
+        </li>
+      </ul>
+    </SectionCard>
   );
 }

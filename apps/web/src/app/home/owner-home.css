@@ -1,20 +1,32 @@
 /* The owner's team hero (wow pass). Own file — home.css belongs to S3. */
 
+/* ONE FAMILY OF ROLE HEROES (round 3C): the owner's team wears the same dark
+   floodlight card as the player's sold moment and the organizer's club hero —
+   gold glow top right, the team's gold edge — instead of a pale day card. */
 .ow-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   padding: clamp(var(--space-5), 3vw, var(--space-8));
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--accent-line);
   border-radius: var(--radius-xl);
   background:
     radial-gradient(
-      50% 120% at 100% 0%,
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      50% 120% at 0% 100%,
       color-mix(in srgb, var(--accent) 12%, transparent),
       transparent 65%
     ),
-    var(--surface-raised);
-  box-shadow: var(--shadow-1);
+    var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
 }
 
 .ow-head {
@@ -81,21 +93,17 @@
 }
 
 .ow-ring-track,
-.ow-ring-spent,
-.ow-ring-left {
+.ow-ring-spent {
   fill: none;
   stroke-width: 8;
 }
 
+/* What is left: a quiet track. What was spent: the gold arc. */
 .ow-ring-track {
-  stroke: var(--surface-sunken);
+  stroke: color-mix(in srgb, var(--text-muted) 30%, transparent);
 }
 
 .ow-ring-spent {
-  stroke: color-mix(in srgb, var(--text-muted) 45%, transparent);
-}
-
-.ow-ring-left {
   stroke: var(--accent);
   stroke-linecap: round;
 }
@@ -188,12 +196,19 @@
 }
 
 @media (max-width: 519px) {
+  /* The state pill leads on its own line, flush left, instead of hanging
+     under the name at an indent (round 2 "indents oddly"). */
   .ow-head {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: var(--space-3);
   }
 
   .ow-head > :last-child {
-    margin-left: calc(44px + var(--space-4));
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: start;
   }
 
   .ow-links > * {

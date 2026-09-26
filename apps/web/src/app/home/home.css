@@ -407,6 +407,34 @@
   }
 }
 
+/* The banner as a role hero (auctioneer home): the same dark floodlight card,
+   gold glow and gold edge as the player's sold moment and the owner's team. */
+.home-next--hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(var(--space-5), 3vw, var(--space-8));
+  border-color: var(--accent-line);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      50% 120% at 0% 100%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 65%
+    ),
+    var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
+}
+
+.home-next--hero .home-next-title {
+  font-size: var(--text-2xl-size);
+}
+
 /* The next step as the first item of the organizer's "Needs attention" card:
    a warm inset block rather than a card inside a card. */
 .home-next--embedded {

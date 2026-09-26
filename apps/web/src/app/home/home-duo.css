@@ -298,3 +298,14 @@
 .hd-rows[data-plain="true"] .hd-row {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
+
+/* The auctioneer's "On the night" rows. */
+.home-kit {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-kit > li + li {
+  border-top: 1px solid var(--border-subtle);
+}

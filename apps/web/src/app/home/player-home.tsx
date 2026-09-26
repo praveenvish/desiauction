@@ -411,7 +411,7 @@ export async function PlayerHome({
         <SectionCard
           data-testid="home-registrations"
           icon={<IconFileCheck />}
-          tone="green"
+          concept="season"
           title="My seasons"
           action={
             <Link href={`/me/${pack.key}`} className="home-more" data-testid="home-career-link">

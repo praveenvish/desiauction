@@ -52,7 +52,11 @@ export function squadHint(size: number, min: number, max: number): string {
   return `at least ${String(min)}`;
 }
 
-/** The purse as one graphic: the gold arc is what is LEFT. */
+/**
+ * The purse as one graphic: the gold arc is what was SPENT, the quiet track
+ * what is left. It drew the left share in gold, so a finished night (10% left)
+ * was a ring 90% grey that read as a loading spinner (round 2).
+ */
 function PurseRing({ left, whole }: { left: number; whole: number }) {
   const share = whole <= 0 ? 0 : Math.max(0, Math.min(1, left / whole));
   const r = 30;
@@ -60,21 +64,12 @@ function PurseRing({ left, whole }: { left: number; whole: number }) {
   return (
     <svg className="ow-ring" viewBox="0 0 72 72" width="72" height="72" aria-hidden>
       <circle cx="36" cy="36" r={r} className="ow-ring-track" />
-      {/* What is spent, drawn quietly; what is left, in gold, after it. */}
       <circle
         cx="36"
         cy="36"
         r={r}
         className="ow-ring-spent"
         strokeDasharray={`${String(c * (1 - share))} ${String(c)}`}
-        transform={`rotate(${String(-90 + 360 * share)} 36 36)`}
-      />
-      <circle
-        cx="36"
-        cy="36"
-        r={r}
-        className="ow-ring-left"
-        strokeDasharray={`${String(c * share)} ${String(c)}`}
         transform="rotate(-90 36 36)"
       />
     </svg>
@@ -120,7 +115,12 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
   const titleId = `ow-${team.teamId}`;
   return (
     <>
-      <section className="ow-hero" data-testid="home-owner" aria-labelledby={titleId}>
+      <section
+        className="ow-hero"
+        data-theme="floodlight"
+        data-testid="home-owner"
+        aria-labelledby={titleId}
+      >
         <header className="ow-head">
           <span className="ow-crest" aria-hidden>
             {crestOf(team.teamName)}

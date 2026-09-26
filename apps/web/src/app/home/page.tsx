@@ -218,7 +218,13 @@ async function HomeBody({
       />
       {/* Said once, when the menu actually changed under them (RN-1 §3.6). */}
       <RoleChangeNotice held={heldRoles} />
-      {standaloneStep !== null ? <NextStepBanner step={standaloneStep} /> : null}
+      {standaloneStep !== null ? (
+        <NextStepBanner
+          step={standaloneStep}
+          // The auctioneer's home has no hero of its own; its step is it.
+          hero={standaloneStep.key.startsWith("auctioneer-")}
+        />
+      ) : null}
       {sections.has("newcomer") ? <NewcomerHome startClub={startClub} /> : null}
       {sections.has("owner") ? <OwnerHome teams={roles.owns} /> : null}
       {sections.has("auctioneer") ? <AuctioneerHome seasons={roles.conducts} /> : null}
