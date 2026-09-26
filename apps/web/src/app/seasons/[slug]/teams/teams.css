@@ -1097,6 +1097,20 @@
   white-space: nowrap;
 }
 
+/* Pre-signed: the mark (Captain, Icon) in the accent ink, and the price slot
+   says how they joined instead of a figure. */
+.tm-own-mark {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.tm-own-price--signed {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
 .tm-own-empty {
   margin: 0;
   font-size: var(--text-sm-size);

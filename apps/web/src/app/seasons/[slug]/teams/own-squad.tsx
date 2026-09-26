@@ -37,7 +37,14 @@ export async function OwnSquad({
     .filter((lot) => lot.status === "sold" && lot.soldToTeamId === teamId)
     .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0));
   const spent = plan.rules.pursePerTeam - plan.standing.purseRemaining;
-  const preSigned = plan.preSignedRoles.length;
+  // Pre-signed first (captain, icon, retained): they are the squad's first
+  // names and they count in "Players n/max" above, so they are cards too.
+  const preSigned = plan.preSignedPlayers;
+  const marksOf = (player: (typeof preSigned)[number]): string =>
+    [player.isIcon ? "Icon" : null, player.isCaptain ? "Captain" : null]
+      .concat(player.isRetained ? ["Retained"] : [])
+      .filter((word): word is string => word !== null)
+      .join(" · ");
   return (
     <section
       className="tm-own"
@@ -73,12 +80,36 @@ export async function OwnSquad({
           </div>
         </dl>
       </div>
-      {bought.length === 0 ? (
+      {bought.length === 0 && preSigned.length === 0 ? (
         <p className="tm-own-empty">
           No buys yet. The players you win in the auction line up here, dearest first.
         </p>
       ) : (
         <ol className="tm-own-grid">
+          {preSigned.map((player) => (
+            <li
+              key={player.registrationId}
+              className="tm-own-player tm-own-player--signed"
+              data-testid="teams-own-presigned"
+            >
+              <PlayerImage
+                name={player.playerName ?? "Player"}
+                seed={player.registrationId}
+                src={player.photoUrl}
+                size="md"
+                shape="round"
+                decorative
+              />
+              <span className="tm-own-who">
+                <span className="tm-own-player-name">{player.playerName ?? "Player"}</span>
+                <span className="tm-own-role">
+                  <span className="tm-own-mark">{marksOf(player)}</span>
+                  {player.role !== null ? ` · ${labelOf(player.role)}` : ""}
+                </span>
+              </span>
+              <span className="tm-own-price tm-own-price--signed">Pre-signed</span>
+            </li>
+          ))}
           {bought.map((lot) => (
             <li key={lot.lotId} className="tm-own-player">
               <PlayerImage
@@ -100,8 +131,8 @@ export async function OwnSquad({
       )}
       <div className="tm-own-foot">
         <span>
-          {preSigned > 0
-            ? `Plus ${String(preSigned)} signed before the auction.`
+          {preSigned.length > 0
+            ? "Signed before the auction first, then bought on the night, dearest first."
             : "Bought on the night, dearest first."}
         </span>
         <Link href={`/seasons/${slug}/auction/plan`} className="tm-own-link">

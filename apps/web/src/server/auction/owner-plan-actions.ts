@@ -23,6 +23,7 @@ import {
   rulesOf,
   type AuctionRules,
   type LotMedia,
+  type PreSignedPlayer,
 } from "./live-summary";
 import {
   addTarget,
@@ -97,6 +98,13 @@ export interface PlanView {
   /** Roles of the pre-signed players already on this team (icons, retained). */
   preSignedRoles: string[];
   /**
+   * This team's own pre-signed players (captain, icon, retained) — the rows
+   * `preSignedRoles` is counted from, already read above. The Teams tab's own
+   * squad counted them in "12/12" and then showed only the ten bought on the
+   * night; the same players are public on /spectate and /c/[slug]/t/[team].
+   */
+  preSignedPlayers: PreSignedPlayer[];
+  /**
    * THE SEASON'S ROLES, in the pack's own order, as plain {key,label} pairs.
    *
    * `roleFacts` seeded its buckets from `REGISTRATION_ROLES` — cricket's four —
@@ -166,8 +174,8 @@ export async function planView(
             ]).then(([revisions, sales]) => ({ revisions, sales }))),
           })
         : null;
-      const preSignedRoles = preSigned
-        .filter((player) => player.teamId === gated.teamId)
+      const ownPreSigned = preSigned.filter((player) => player.teamId === gated.teamId);
+      const preSignedRoles = ownPreSigned
         .map((player) => player.role)
         // A sport with no roles contributes none to the plan's tally.
         .filter((role): role is string => role !== null);
@@ -199,6 +207,7 @@ export async function planView(
         lotMedia,
         targets,
         preSignedRoles,
+        preSignedPlayers: ownPreSigned,
         roles: sportPackFor(gate.competition.sport).roles.values.map((value) => ({
           key: value.key,
           label: value.label,
