@@ -64,7 +64,7 @@ export function OverviewPanel({
   desks: { items: readonly DeskItem[]; desks: number };
 }) {
   const { totals, runnerVerdict, followers, attention, recent, liveAuctions } = overview;
-  const attentionGroups = groupAttention(attention);
+  const attentionGroups = groupAttention(attention, { stuckLiveTotal: liveAuctions.stale });
   return (
     <>
       <StatGrid testId="admin-totals">
@@ -103,8 +103,9 @@ export function OverviewPanel({
           value={<KpiValue n={totals.auctions} />}
           label="Auctions"
           hint={
-            liveAuctions.total > 0
-              ? `${formatCount(liveAuctions.total - liveAuctions.stale)} live now`
+            // The Live now card's own count (the board's rule), not a second one.
+            live.running.length > 0
+              ? `${formatCount(live.running.length)} live now`
               : "None live now"
           }
           href="/admin/live"
@@ -321,7 +322,7 @@ function LiveNow({ live }: { live: LiveBoard }) {
         shown.length === 0
           ? `No auction is running right now.${
               live.stale.length > 0
-                ? ` ${countNoun(live.stale.length, "auction")} marked live ${live.stale.length === 1 ? "was" : "were"} never closed.`
+                ? ` ${countNoun(live.stale.length, "auction")} marked live or paused ${live.stale.length === 1 ? "has" : "have"} been silent for over 12 hours.`
                 : ""
             }`
           : `${countNoun(live.running.length, "auction")} running`
@@ -529,11 +530,11 @@ function StatusList({
             <span key={line.status} className="adm-chips">
               {running > 0 ? (
                 <Pill tone="green" dot>
-                  Live now · {formatCount(running)}
+                  Live under 12h · {formatCount(running)}
                 </Pill>
               ) : null}
               <Pill tone="red" dot testId="admin-stuck-live">
-                Stuck in live · {formatCount(liveAuctions.stale)}
+                Live over 12h · {formatCount(liveAuctions.stale)}
               </Pill>
             </span>
           );

@@ -23,8 +23,26 @@ describe("attention queue grouping", () => {
     const { groups, more } = groupAttention(rows);
     expect(more).toBe(0);
     expect(groups).toHaveLength(1);
-    expect(groups[0]?.title).toBe("4 auctions stuck in live across 3 clubs · oldest 6 days");
+    expect(groups[0]?.title).toBe(
+      "4 auctions live for over 12 hours across 3 clubs · oldest 6 days",
+    );
     expect(groups[0]?.href).toBe("/admin/live");
+  });
+
+  it("states the platform-wide total when the per-club list was cut at 20 clubs", () => {
+    const rows = Array.from({ length: 20 }, (_, i) => stuck(`o${String(i)}`, 1, 3 + (i % 5)));
+    const { groups } = groupAttention(rows, { stuckLiveTotal: 116 });
+    expect(groups[0]?.title).toBe(
+      "116 auctions live for over 12 hours across 20+ clubs · oldest 7 days",
+    );
+    // A complete list keeps its own sum and club count.
+    const whole = groupAttention([stuck("a", 1, 5), stuck("b", 2, 6)], { stuckLiveTotal: 3 });
+    expect(whole.groups[0]?.title).toBe(
+      "3 auctions live for over 12 hours across 2 clubs · oldest 6 days",
+    );
+    // A lone listed club that isn't the whole story is still grouped.
+    const lone = groupAttention([stuck("a", 1, 5)], { stuckLiveTotal: 4 });
+    expect(lone.groups[0]?.href).toBe("/admin/live");
   });
 
   it("keeps a lone row's own sentence and deep link", () => {

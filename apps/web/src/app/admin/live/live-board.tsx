@@ -151,10 +151,10 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
               <IconClock size={16} />
             </span>
             <span className="admin-fold-title">
-              <strong>Never closed · {String(data.stale.length)}</strong>
+              <strong>Silent over 12h · {String(data.stale.length)}</strong>
               <span className="admin-meta">
-                Marked live, silent for over twelve hours. Only the organizer can close one, from
-                their cockpit.
+                Live or paused, with no event for over twelve hours — never closed. Only the
+                organizer can close one, from their cockpit.
               </span>
             </span>
             <IconChevronDown size={16} className="admin-fold-caret" />
