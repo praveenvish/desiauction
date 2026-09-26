@@ -130,24 +130,30 @@ export default async function PublicTeamPage({
 
   return (
     <main className="public-page mk">
+      {/* No `sport`: the crest rides the title, and the sport's stock glyph
+          would take the right half back as decoration. */}
       <PageHero
-        sport={team.sport}
-        art={
-          <div className="team-page-crest" style={{ "--team": colour } as CSSProperties}>
-            {team.team.crestUrl === null ? (
-              crestFallback
-            ) : (
-              <CrestImage
-                src={team.team.crestUrl}
-                fallback={crestFallback}
-                width={160}
-                height={160}
-              />
-            )}
-          </div>
-        }
         eyebrow={<Link href={`/c/${slug}`}>{team.competitionName}</Link>}
-        title={team.team.name}
+        /* THE CREST BESIDE THE NAME (round 5): a 220px disc filled the hero's
+           right half with decoration and no information; at 96px beside the
+           title it identifies the team the way the player page's avatar does. */
+        title={
+          <span className="player-title team-page-title">
+            <span className="team-page-crest" style={{ "--team": colour } as CSSProperties}>
+              {team.team.crestUrl === null ? (
+                crestFallback
+              ) : (
+                <CrestImage
+                  src={team.team.crestUrl}
+                  fallback={crestFallback}
+                  width={160}
+                  height={160}
+                />
+              )}
+            </span>
+            <span>{team.team.name}</span>
+          </span>
+        }
         /* "Our squad" spoke as the team, on a page anyone can land on from a
            forwarded link; the season's name says whose squad it is. */
         lede={

@@ -181,7 +181,9 @@
 /* Phone: the lead action takes the row; the rest share one, and a "way
    out" link is text, not a third stacked button (~220px of CTAs before). */
 @media (max-width: 640px) {
-  .pk-hero-actions > :first-child {
+  /* Every button takes the row (round 5): a full-width primary over an
+     intrinsic-width secondary read as two sizes of the same thing. */
+  .pk-hero-actions > :not(.pk-hero-textlink, p) {
     flex: 1 1 100%;
   }
 
@@ -672,6 +674,37 @@
   .player-avatar {
     width: 64px;
     height: 64px;
+  }
+}
+
+.player-card-preview {
+  display: grid;
+  gap: var(--space-2);
+  width: min(460px, 100%);
+  margin: 0;
+}
+
+.player-card-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1200 / 630;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  background: var(--surface-sunken);
+}
+
+.player-card-preview figcaption {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  text-align: center;
+}
+
+/* A phone has the share sheet right below; the preview stands down. */
+@media (max-width: 640px) {
+  .player-card-preview {
+    display: none;
   }
 }
 

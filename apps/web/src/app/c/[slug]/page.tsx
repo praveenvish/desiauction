@@ -298,9 +298,9 @@ export default async function PublicCompetitionPage({
                 See the squads
               </ButtonLink>
             ) : null}
-            <ButtonLink href="/c" variant="ghost" size="lg" className="pk-hero-textlink">
-              All tournaments
-            </ButtonLink>
+            {/* "All tournaments" left the hero's button row (round 5): the
+                header's "Browse tournaments" is the way back, and a third
+                action beside the page's two diluted them. */}
             {live ? (
               <p className="public-live-note" data-testid="public-watch-note">
                 No account needed — watching is open to anyone.

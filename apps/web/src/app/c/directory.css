@@ -1253,27 +1253,22 @@
 
 /* The crest as a coin in the team's own colour — the page's one piece of art. */
 .team-page-crest {
+  flex: none;
   display: grid;
   place-items: center;
-  width: min(220px, 60vw);
+  width: 96px;
   aspect-ratio: 1;
-  margin-inline: auto;
   border-radius: 50%;
   /* A flat disc in the team's colour: the glossy 3D sphere was the one
      skeuomorphic object in a flat kit (review r2, r3). */
   background: var(--team);
-  box-shadow:
-    0 0 0 6px color-mix(in srgb, var(--team) 22%, transparent),
-    var(--shadow-2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--team) 40%, transparent);
   overflow: hidden;
 }
 
-/* On a phone the coin was a 220px block above the squad name — most of the
-   first screen spent on a badge. Smaller, and set to the text's left edge. */
 @media (width <= 640px) {
   .team-page-crest {
-    width: 96px;
-    margin-inline: 0;
+    width: 64px;
   }
 }
 
@@ -1284,7 +1279,7 @@
 }
 
 .team-page-crest-mark {
-  font-size: clamp(48px, 12vw, 76px);
+  font-size: clamp(30px, 6vw, 36px);
   font-weight: var(--font-weight-bold, 700);
   letter-spacing: 0.02em;
   color: #fff;

@@ -113,7 +113,7 @@
 
   .top-buy-link,
   .top-buy[data-rank="1"] .top-buy-link {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
     grid-template-areas:
       "rank name price"
       "rank team price";
@@ -126,12 +126,19 @@
     background: transparent;
   }
 
+  /* One size of rank for all three: the crown made #1's pill wider than
+     #2's and #3's. On a phone the gold disc says "first"; the crown rests. */
   .top-buy-rank {
     align-self: center;
     justify-content: center;
-    width: 40px;
+    width: 28px;
+    height: 28px;
     box-sizing: border-box;
-    padding: 2px 0;
+    padding: 0;
+  }
+
+  .top-buy-rank svg {
+    display: none;
   }
 
   .top-buy-price {
@@ -141,11 +148,11 @@
     font-weight: var(--font-weight-semibold);
   }
 
+  /* Names take two lines rather than an ellipsis (round 5): "Arjun Deshm…"
+     and "to Mumbai Maveri…" on the one list people read for a name. */
   .top-buy-name,
   .top-buy-team {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     overflow-wrap: normal;
+    text-wrap: balance;
   }
 }

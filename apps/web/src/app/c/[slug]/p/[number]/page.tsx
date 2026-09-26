@@ -181,7 +181,10 @@ export default async function PlayerProfilePage({
   // Signed, not sold: a retained player is on a team sheet too, so the neutral
   // "already has a squad" treatment has to cover both.
   const signed = player.status !== "available";
-  const status = statusText(player);
+  // On the page the team is named once — beside the price — so a sold pill
+  // says only the verdict (round 5: pill, price caption and button all named
+  // it). The metadata keeps the full sentence.
+  const status = player.status === "sold" ? "Sold" : statusText(player);
   const batting = styleLabel(player.battingStyle);
   const bowling = styleLabel(player.bowlingStyle);
   const roleAge =
@@ -242,8 +245,25 @@ export default async function PlayerProfilePage({
               ),
             }
           : // No 360px ghost glyph behind the name: decoration without a job,
-            // it competed with the price for the eye (review r2, r3).
-            {})}
+            // it competed with the price for the eye (review r2, r3). The
+            // right half shows the card this page's link unfurls into — the
+            // thing a player came here to share (round 5).
+            {
+              art: (
+                <figure className="player-card-preview">
+                  {/* The route's own OG image, already sized: next/image
+                      would proxy a generated PNG for nothing. */}
+                  <img
+                    src={`/c/${slug}/p/${encodeURIComponent(player.number)}/opengraph-image`}
+                    alt=""
+                    width={1200}
+                    height={630}
+                    decoding="async"
+                  />
+                  <figcaption>The card your link shows on WhatsApp</figcaption>
+                </figure>
+              ),
+            })}
         status={
           <Badge tone={signed ? "neutral" : "success"} data-testid="player-status">
             {status}
@@ -306,7 +326,7 @@ export default async function PlayerProfilePage({
                 size="lg"
                 data-testid="player-team-link"
               >
-                See the {player.teamName} squad
+                See the squad
               </ButtonLink>
             ) : null}
             <ButtonLink href={`/c/${slug}`} variant="ghost" size="lg" className="pk-hero-textlink">

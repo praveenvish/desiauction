@@ -375,7 +375,9 @@ a.content-card:focus-visible {
   max-width: 620px;
   padding: var(--space-2);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
+  /* The site's field radius, not a pill: the search bar was the one
+     rounded-full input on the site (round 5). */
+  border-radius: var(--radius-lg);
   background: var(--surface-raised);
   box-shadow: var(--shadow-1);
   transition:
@@ -395,7 +397,7 @@ a.content-card:focus-visible {
   min-width: 0;
   padding: var(--space-2) var(--space-4);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-primary);
   font: inherit;
@@ -409,7 +411,7 @@ a.content-card:focus-visible {
 .content-searchbar button {
   padding: var(--space-2) var(--space-6);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: var(--accent);
   color: var(--text-on-accent, #06210a);
   font: inherit;
@@ -806,12 +808,14 @@ a.content-card:focus-visible {
 
 /* ---- help index: one card per guide (wow pass) ---- */
 
-/* Cards take their own height (wow pass, round 2): a two-article guide
-   stretched to its five-article neighbour left ~110px of blank card. */
+/* EQUAL ROWS (round 5). Cards at their own height left a ~200px hole under
+   the short guide and ragged bottoms across the grid; a row now shares one
+   height, and each card's list takes the slack so its "View all" sits on the
+   row's common baseline. */
 .help-index {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  align-items: start;
+  align-items: stretch;
   gap: var(--space-5);
 }
 
@@ -1211,6 +1215,9 @@ a.content-card:focus-visible {
 }
 
 .support-foot {
+  /* The column's one measure (round 5): the rule ran 960px under an
+     893px accordion and paragraph. */
+  max-width: 68ch;
   margin: 0;
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-subtle);

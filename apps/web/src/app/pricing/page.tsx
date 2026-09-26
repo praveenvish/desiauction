@@ -82,6 +82,12 @@ function CompareCell({ value }: { value: string | boolean }) {
  * does it cost → what do I lose on the cheap tier → how do I buy → what if →
  * start.
  */
+/** "in beta · a per-tournament price at launch" → "A per-tournament price at launch". */
+function launchNote(cadence: string): string {
+  const rest = cadence.replace(/^in beta\s*·\s*/i, "");
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
 export default function PricingPage() {
   return (
     <main className="mk mk-pricing-page">
@@ -134,14 +140,20 @@ export default function PricingPage() {
                         scale dwarfs the tiers that do quote a number. */}
                     {/* Only a real figure takes display type: "₹0 / Free / Free"
                         read as three free prices at the same size. The future
-                        passes say "Free" in the text face, beside their
-                        at-launch note. */}
-                    <span
-                      className={`mk-tier-amount${/\d/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
-                    >
-                      {tier.price}
-                    </span>
-                    <span className="mk-tier-cadence">{tier.cadence}</span>
+                        passes say what changes at launch, in the text face. */}
+                    {/\d/.test(tier.price) ? (
+                      <>
+                        <span className="mk-tier-amount">{tier.price}</span>
+                        <span className="mk-tier-cadence">{tier.cadence}</span>
+                      </>
+                    ) : (
+                      // ONE PRICE STORY (round 5): the band above says every
+                      // tier is free in beta, so a future pass does not say
+                      // "Free" a second and third time — it says what changes.
+                      <span className="mk-tier-amount mk-tier-amount--note">
+                        {launchNote(tier.cadence)}
+                      </span>
+                    )}
                   </p>
                   <p className="mk-tier-limits">{tier.limits}</p>
                   <ul className="mk-checklist">
@@ -164,20 +176,6 @@ export default function PricingPage() {
               );
             })}
           </div>
-
-          {/* The load-bearing sentence of the pricing model, directly under the
-              tiers it explains — a slim accent row, not a third slab. */}
-          <section className="mk-pledge" aria-labelledby="pricing-pledge">
-            <span className="mk-pledge-icon" aria-hidden>
-              <IconShieldCheck weight="duotone" />
-            </span>
-            <div>
-              <h2 id="pricing-pledge" className="mk-pledge-title">
-                {PRICING.trustLine}
-              </h2>
-              <p className="mk-pledge-note">{PRICING.trustLineNote}</p>
-            </div>
-          </section>
 
           {/* Three cards are three pitches; a table is one decision. The wrapper
               scrolls on its own rather than pushing the document sideways, and
@@ -216,6 +214,14 @@ export default function PricingPage() {
               </tbody>
             </table>
           </div>
+          {/* The trust line folded into the table it describes (round 5): it
+              was a sixth stacked container between the cards and the table. */}
+          <p className="mk-compare-trust">
+            <IconShieldCheck size={20} weight="duotone" aria-hidden />
+            <span>
+              <strong>{PRICING.trustLine}</strong> {PRICING.trustLineNote}
+            </span>
+          </p>
           <p className="mk-compare-note">{PRICING.comparison.note}</p>
 
           <div className="mk-pricing-more">

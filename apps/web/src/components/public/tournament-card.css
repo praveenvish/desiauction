@@ -316,6 +316,31 @@
   outline-offset: 2px;
 }
 
+/* ONE SLAB PER PAGE, NOT TWELVE (round 5). A grid card's action is a quiet
+   text link on a hairline foot; the filled button belongs to the featured
+   card alone. Twelve identical 58px gold slabs read as a wall of ads. */
+.tc:not([data-feature]) .tc-foot {
+  justify-content: flex-start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tc:not([data-feature]) .tc-action,
+.tc:not([data-feature]) .tc-action[data-primary] {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+}
+
+.tc:not([data-feature]) .tc-action:hover,
+.tc:not([data-feature]) .tc-action[data-primary]:hover {
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* ---- the featured card (landing) ---- */
 
 @media (min-width: 760px) {
