@@ -1586,10 +1586,15 @@
 
 .squad-team-purse {
   margin: 0 0 var(--space-2);
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
   color: var(--money-remaining);
+}
+
+/* What a squad SPENT is a fact, not a balance: ink, not the remaining-purse green. */
+.squad-team-purse[data-spent] {
+  color: var(--text-secondary);
 }
 
 .squad-list {
@@ -1952,6 +1957,18 @@
 
 .cockpit-record .competitions-hint {
   margin: 0;
+}
+
+.cockpit-record-line {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.cockpit-record-line strong {
+  color: var(--text-primary);
+  font-size: var(--text-lg-size);
 }
 
 /* The primary tier: the acts of the night proper, at full weight. */

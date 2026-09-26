@@ -1,6 +1,7 @@
 import type { KitTone } from "@desiauction/ui";
 
 import type { LiveBoard, RoomState } from "../../server/admin/live-views";
+import type { EngineRoom } from "../../server/admin/live-watch";
 
 /**
  * ONE RULE, ONE COLOUR, ON EVERY ADMIN SURFACE THAT DRAWS A ROOM.
@@ -46,4 +47,44 @@ export function stuckSummary(board: Pick<LiveBoard, "stale" | "generatedAtMs">):
     clubs: new Set(board.stale.map((row) => row.orgSlug)).size,
     longestSilentMs: silences.length > 0 ? Math.max(...silences) : null,
   };
+}
+
+/** A sentence when the engine's view of a room is a problem; null when it is fine. */
+export function engineTrouble(room: EngineRoom | undefined): string | null {
+  if (room === undefined) {
+    return null;
+  }
+  switch (room.state) {
+    case "unreachable":
+      return "Engine not answering";
+    case "loaded":
+      if (room.halted !== null) {
+        return `Engine halted this room: ${room.halted}`;
+      }
+      if (room.watchdogStalled) {
+        return "Engine timer watchdog stalled";
+      }
+      if (room.queueDepth > 5) {
+        return `${String(room.queueDepth)} commands waiting in the engine`;
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * The pill a room row wears. The database's state ("Bidding" — bids in the
+ * last five minutes) sat on the same row as the engine's "Engine not
+ * answering": two claims about one room, the green one wrong. When the engine
+ * reports trouble, the row says so and nothing greener.
+ */
+export function roomBadge(
+  state: RoomState,
+  trouble: string | null,
+): { readonly tone: KitTone; readonly label: string; readonly dotState: RoomState } {
+  if (trouble !== null) {
+    return { tone: ROOM_TONE.stale, label: "Engine trouble", dotState: "stale" };
+  }
+  return { tone: ROOM_TONE[state], label: ROOM_LABEL[state], dotState: state };
 }

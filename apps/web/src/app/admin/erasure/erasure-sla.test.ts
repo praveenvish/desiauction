@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { erasureDaysLeft, istDate } from "./erasure-sla";
+import { erasureDaysLeft, erasureSlaWords, istDate } from "./erasure-sla";
 
 // 2026-09-18 15:00 IST
 const ASKED = Date.parse("2026-09-18T09:30:00Z");
@@ -29,5 +29,21 @@ describe("erasureDaysLeft", () => {
   it("prints the India date the SLA counts from", () => {
     expect(istDate(Date.parse("2026-09-18T19:40:26Z"))).toBe("2026-09-19");
     expect(istDate(Date.parse("2026-09-18T09:30:00Z"))).toBe("2026-09-18");
+  });
+});
+
+describe("erasureSlaWords", () => {
+  it("says the same thing the desk and the overview both print", () => {
+    expect(erasureSlaWords(-1)).toBe("Overdue by 1 day");
+    expect(erasureSlaWords(-3)).toBe("Overdue by 3 days");
+    expect(erasureSlaWords(0)).toBe("Due today");
+    expect(erasureSlaWords(1)).toBe("1 day left");
+    expect(erasureSlaWords(5)).toBe("5 days left");
+  });
+
+  it("calls an 8-day-old request overdue, not '7d ago'", () => {
+    const asked = Date.parse("2026-09-19T06:00:00Z");
+    const now = Date.parse("2026-09-27T06:00:00Z");
+    expect(erasureSlaWords(erasureDaysLeft(asked, now))).toBe("Overdue by 1 day");
   });
 });

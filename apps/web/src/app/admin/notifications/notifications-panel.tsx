@@ -20,7 +20,7 @@ import type {
   NotificationCenter,
 } from "../../../server/admin/notification-views";
 import type { WordingSummary } from "../../../server/admin/template-views";
-import { RelativeTime } from "../admin-ui";
+import { RecentFold, RelativeTime } from "../admin-ui";
 import { ChannelControl, ControlToggle, RevertButton, SwitchToggle } from "./notification-controls";
 import { formatCount } from "../../../lib/plural";
 
@@ -509,7 +509,7 @@ export function NotificationsPanel({ center }: { center: NotificationCenter }) {
         icon={<IconClock />}
         tone="neutral"
         title="Recent changes"
-        description="Last twenty, newest first · a revert is itself recorded"
+        description="Newest first · a revert is itself recorded"
         flush
         data-testid="notify-recent"
       >
@@ -523,8 +523,8 @@ export function NotificationsPanel({ center }: { center: NotificationCenter }) {
             />
           </div>
         ) : (
-          <ul className="admin-rows ntc-recent">
-            {center.recent.map((change) => (
+          <RecentFold items={center.recent} className="admin-rows ntc-recent">
+            {(change) => (
               <li key={change.id} data-testid={`notify-change-${change.id}`}>
                 <span className="admin-cell-main">
                   <span className="ntc-recent-line">{change.summary}</span>
@@ -538,8 +538,8 @@ export function NotificationsPanel({ center }: { center: NotificationCenter }) {
                   <RevertButton auditId={change.id} summary={change.summary} />
                 ) : null}
               </li>
-            ))}
-          </ul>
+            )}
+          </RecentFold>
         )}
       </SectionCard>
     </>

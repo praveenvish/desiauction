@@ -21,6 +21,7 @@ import type { OrgDetail } from "../../../../server/admin/views";
 import {
   absoluteIst,
   AdminPageHead,
+  capabilityLabel,
   foldRuns,
   humanAction,
   KpiValue,
@@ -217,7 +218,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         icon={<IconKey />}
         tone="purple"
         title="Grants"
-        description="Who can do what here — each capability set exactly as it is held."
+        description="Who can do what here, one row for each role held."
         flush
       >
         {grants.length === 0 ? (
@@ -235,7 +236,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               <thead>
                 <tr>
                   <th scope="col">Person</th>
-                  <th scope="col">Capability set</th>
+                  <th scope="col">Role</th>
                   <th scope="col">State</th>
                 </tr>
               </thead>
@@ -246,10 +247,12 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                       <Link href={`/admin/users/${grant.personId}`} className="admin-name">
                         {grant.name ?? grant.personId.slice(-6)}
                       </Link>
-                      <span className="da-row-meta">{grant.capabilitySet}</span>
+                      <span className="da-row-meta">{capabilityLabel(grant.capabilitySet)}</span>
                     </td>
-                    <td data-label="Capability set">
-                      <span className="admin-action">{grant.capabilitySet}</span>
+                    <td data-label="Role">
+                      <span className="admin-action" title={grant.capabilitySet}>
+                        {capabilityLabel(grant.capabilitySet)}
+                      </span>
                     </td>
                     <td data-label="State" data-cell="figure">
                       {grant.revokedAt === null ? (

@@ -329,11 +329,15 @@ function AuditRow({ row }: { row: AuditEntry }) {
   );
 }
 
-/** "{name, slug, auctionUnit}" — the evidence's shape, for the summary. */
+/**
+ * How much evidence the row carries, for the summary. It listed the raw keys
+ * ("reason · source · eventSeq · correlationId") — field names, not words;
+ * the fields themselves are one press away, verbatim.
+ */
 function evidenceKeys(meta: unknown): string {
   if (meta !== null && typeof meta === "object" && !Array.isArray(meta)) {
-    const keys = Object.keys(meta);
-    return keys.length === 0 ? "none" : keys.join(" · ");
+    const count = Object.keys(meta).length;
+    return count === 0 ? "none" : `${String(count)} field${count === 1 ? "" : "s"}`;
   }
-  return JSON.stringify(meta);
+  return "1 value";
 }

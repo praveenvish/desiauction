@@ -369,6 +369,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   const queue = useMemo(() => snapshot?.queue ?? [], [snapshot?.queue]);
   const live = status === "live";
   const finished = status === "completed" || status === "reconciled" || status === "abandoned";
+  /*
+   * Finished, and read from the server's record because the engine never
+   * answered. The live room has said "This auction is over" in this state since
+   * round 4; the cockpit still spent its first screen on a "Connecting…" stage
+   * skeleton under a RECONNECTING chip, beside a card saying the night was over.
+   */
+  const overOffline = finished && snapshot === null;
   /**
    * Nothing told the auctioneer that NOBODY was holding a paddle. Opening the
    * first lot into an empty room is a mistake you only discover from silence.
@@ -481,6 +488,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
           variant="shell"
           offline={offline}
           lotMedia={view.lotMedia}
+          settledStatus={overOffline ? status : undefined}
         />
       </PageStatus>
 
@@ -503,15 +511,17 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               gavel at the same time. The lot and the controls that act on it now
               travel together down the page. */}
           <div className="cockpit-dock">
-            <CeremonyStage
-              roles={view.roles}
-              snapshot={snapshot}
-              ceremony={ceremony}
-              remainingMs={remainingMs}
-              lotMedia={view.lotMedia}
-              resolved={feed.resolved}
-              teams={view.teams}
-            />
+            {overOffline ? null : (
+              <CeremonyStage
+                roles={view.roles}
+                snapshot={snapshot}
+                ceremony={ceremony}
+                remainingMs={remainingMs}
+                lotMedia={view.lotMedia}
+                resolved={feed.resolved}
+                teams={view.teams}
+              />
+            )}
 
             {/* THE CONDUCT CARD, in three tiers.
               It used to be one flat row at equal weight — Pause · Queue lots ·
@@ -635,6 +645,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     This auction is {status}. Nothing here can be opened, undone or recovered — the
                     ledger and the replay are the record now.
                   </p>
+                  {overOffline ? (
+                    <p className="cockpit-record-line" data-testid="cockpit-record-line">
+                      <strong>{feed.resolved.filter((row) => row.status === "sold").length}</strong>{" "}
+                      sold ·{" "}
+                      <strong>{feed.resolved.filter((row) => row.status === "unsold").length}</strong>{" "}
+                      unsold · every squad below is final
+                    </p>
+                  ) : null}
                   <div className="cockpit-actions">
                     <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
                       <IconList size={16} />
@@ -860,7 +878,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                   <ol className="cockpit-queue">
                     {needsResolution.map((entry) => (
                       <li key={entry.id} data-testid={`resolve-${entry.lotNumber}`}>
-                        <Badge tone="warning">{entry.lotNumber}</Badge>
+                        <Badge tone={finished ? "neutral" : "warning"}>{entry.lotNumber}</Badge>
                         <PlayerImage
                           name={entry.playerName ?? "Unnamed"}
                           seed={lotSeed(entry.id, view.lotMedia)}
@@ -932,7 +950,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         <div className="cockpit-col">
           {/* Same reason as the live room: the component renders its own
               connecting state, and guarding it here reintroduces the re-flow. */}
-          <AuctionProgress snapshot={snapshot} />
+          {/* A finished night read from the record has no progress to report:
+              the bar printed "— / — lots · — in queue" over the result. */}
+          {overOffline ? null : <AuctionProgress snapshot={snapshot} />}
 
           {/* One panel at a time on the right: purses while the room is live,
               owners while it is being set up, and the two broadcast screens
@@ -949,12 +969,16 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     {/* The auctioneer's board carries every purse — and the
                         split the engine will enforce on the next bid, the
                         question they are asked between lots. */}
-                    <PurseBoard
-                      snapshot={snapshot}
-                      teams={view.teams}
-                      rules={view.rules}
-                      squadSizes={squadSizesOf(view.teams, view.preSigned, feed.resolved)}
-                    />
+                    {/* Without the engine a purse is a column of dashes; the
+                        squads below already say what each team spent. */}
+                    {overOffline ? null : (
+                      <PurseBoard
+                        snapshot={snapshot}
+                        teams={view.teams}
+                        rules={view.rules}
+                        squadSizes={squadSizesOf(view.teams, view.preSigned, feed.resolved)}
+                      />
+                    )}
                     <PoolSummary
                       snapshot={snapshot}
                       resolved={feed.resolved}

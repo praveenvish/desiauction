@@ -19,9 +19,11 @@ import {
   AdminPageHead,
   RelativeTime,
   absoluteIst,
+  capabilityLabel,
   foldRuns,
   humanAction,
   monogram,
+  scopeTypeLabel,
 } from "../../admin-ui";
 import { CopyId } from "../../copy-id";
 
@@ -92,7 +94,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
         icon={<IconKey />}
         tone="neutral"
         title="Grants"
-        description="Every grant this person holds, in every scope, as the capability set it is."
+        description="Every role this person holds, in every club and on the platform."
         flush
       >
         {grants.length === 0 ? (
@@ -110,7 +112,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
               <thead>
                 <tr>
                   <th scope="col">Scope</th>
-                  <th scope="col">Capability set</th>
+                  <th scope="col">Role</th>
                   <th scope="col">Granted</th>
                   <th scope="col">State</th>
                 </tr>
@@ -121,15 +123,18 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                     <td data-label="Scope" data-cell="title">
                       <span className="admin-cell-main">
                         <span className="admin-name">{grant.scopeLabel}</span>
-                        <span className="admin-meta">{grant.scopeType}</span>
+                        <span className="admin-meta">{scopeTypeLabel(grant.scopeType)}</span>
                       </span>
                       {/* The phone's one line under the scope. */}
                       <span className="da-row-meta">
-                        {grant.scopeType} · {grant.capabilitySet} · {absoluteIst(grant.createdAt)}
+                        {scopeTypeLabel(grant.scopeType)} · {capabilityLabel(grant.capabilitySet)} ·{" "}
+                        {absoluteIst(grant.createdAt)}
                       </span>
                     </td>
-                    <td data-label="Capability set">
-                      <span className="admin-action">{grant.capabilitySet}</span>
+                    <td data-label="Role">
+                      <span className="admin-action" title={grant.capabilitySet}>
+                        {capabilityLabel(grant.capabilitySet)}
+                      </span>
                     </td>
                     {/* `createdAt` was queried and never rendered, so a grant —
                         the record of who trusted whom — had no date at all.
@@ -143,7 +148,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                         <span className="admin-meta">{absoluteIst(grant.createdAt)}</span>
                         <span className="admin-meta">
                           {grant.grantedBy === person.id
-                            ? "installed out-of-band (self-referencing grantor)"
+                            ? "set up when the platform was installed"
                             : `by ${grant.grantedByName ?? grant.grantedBy.slice(-6)}`}
                         </span>
                       </span>

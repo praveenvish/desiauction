@@ -43,8 +43,10 @@
   margin: 0;
 }
 
-.orgs h2,
-.org-home h2 {
+/* Zero-specificity scope: a card's own heading (SectionCard's title) keeps its
+   kit margins. At (0,1,1) this rule pushed "Latest seasons"' description 36px
+   under its title and floated the header's action. */
+:where(.orgs, .org-home) h2 {
   font-size: var(--text-lg-size);
   line-height: var(--text-lg-line);
   font-weight: var(--font-weight-semibold);
@@ -86,9 +88,9 @@
   letter-spacing: 0.02em;
 }
 
+/* The address is a secondary line in the UI font, not a code sample. */
 .org-slug {
   color: var(--text-muted);
-  font-family: var(--font-mono);
   font-size: var(--text-sm-size);
 }
 

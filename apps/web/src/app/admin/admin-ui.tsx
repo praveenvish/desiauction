@@ -1,4 +1,5 @@
 import { EmptyState, IconEye, type BadgeTone, type KitTone } from "@desiauction/ui";
+import { isNotificationKind, notificationOf } from "@desiauction/messaging/catalogue";
 import type { ReactNode } from "react";
 
 import { formatDate, relativeAge } from "../../lib/format-date";
@@ -307,6 +308,10 @@ export function humanAction(action: string): string {
  */
 export function messageKeyLabel(key: string): string {
   const [base = key, version] = key.split("@");
+  // The catalogue's own name first: the key `registration.rejected` read
+  // "Registration rejected" here while Notifications, Analytics and Templates
+  // (which read the catalogue) called the same message "Registration declined".
+  const named = isNotificationKind(base) ? notificationOf(base).label : null;
   const words = base
     .split(/[._:]/)
     .filter((part) => part !== "")
@@ -317,7 +322,8 @@ export function messageKeyLabel(key: string): string {
         .toLowerCase(),
     )
     .join(" ");
-  const sentence = words === "" ? base : words.charAt(0).toUpperCase() + words.slice(1);
+  const sentence =
+    named ?? (words === "" ? base : words.charAt(0).toUpperCase() + words.slice(1));
   return version !== undefined && version !== "" ? `${sentence} · v${version}` : sentence;
 }
 
@@ -365,4 +371,79 @@ export function foldRuns<T>(
     }
   }
   return out;
+}
+
+/** How many rows of a change log show before "Show all". */
+export const RECENT_SHOWN = 5;
+
+/**
+ * A change log: the newest few, the rest one press away. Twenty rows of mostly
+ * on→off→on churn doubled three admin pages on a phone (Notifications 19k px);
+ * the newest change — the one an operator came to revert — is always shown.
+ */
+export function RecentFold<T>({
+  items,
+  className,
+  children,
+  keep = RECENT_SHOWN,
+}: {
+  items: readonly T[];
+  className: string;
+  children: (item: T) => ReactNode;
+  keep?: number;
+}) {
+  return (
+    <>
+      <ul className={className}>{items.slice(0, keep).map(children)}</ul>
+      {items.length > keep ? (
+        <details className="admin-more">
+          <summary>Show all {String(items.length)}</summary>
+          <ul className={className}>{items.slice(keep).map(children)}</ul>
+        </details>
+      ) : null}
+    </>
+  )
+}
+
+const CAPABILITY_WORDS: Readonly<Record<string, string>> = {
+  "org:owner": "Club owner",
+  "org:staff": "Club staff",
+  "org:superadmin": "Club superadmin",
+  "auction:conductor": "Auctioneer",
+  "settlement:controller": "Settlement controller",
+  "finops:controller": "Finance controller",
+  "platform:admin": "Platform admin",
+};
+
+/**
+ * A capability set in words. The pages printed the key itself (`org:owner`)
+ * as the grant's name; the key stays on the hover for anyone who needs it.
+ */
+export function capabilityLabel(set: string): string {
+  const known = CAPABILITY_WORDS[set];
+  if (known !== undefined) {
+    return known;
+  }
+  const words = set
+    .split(/[:_-]/)
+    .filter((part) => part !== "")
+    .join(" ")
+    .toLowerCase();
+  return words === "" ? set : words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** A grant's scope type ("org", "platform") as a reader says it. */
+export function scopeTypeLabel(scopeType: string): string {
+  switch (scopeType) {
+    case "org":
+      return "Club";
+    case "platform":
+      return "Platform";
+    case "competition":
+      return "Season";
+    case "auction":
+      return "Auction";
+    default:
+      return scopeType.charAt(0).toUpperCase() + scopeType.slice(1);
+  }
 }

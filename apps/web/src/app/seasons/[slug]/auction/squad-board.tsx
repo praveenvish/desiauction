@@ -245,7 +245,10 @@ export function SquadBoard({
                   prices printed on the rows below it, so that is what the line
                   says; only a line still waiting for the socket stays a dash. */}
               {showPurse ? (
-                <p className="squad-team-purse">
+                <p
+                  className="squad-team-purse"
+                  data-spent={remaining !== undefined && remaining !== null ? undefined : ""}
+                >
                   {/* Before (or without) the socket, what a squad SPENT is still
                       known — it is the prices on the rows below — so the line
                       says it rather than a lone dash. */}
@@ -329,7 +332,9 @@ export function PoolSummary({
   const unsold = resolved.filter((lot) => lot.status === "unsold").length;
   const withdrawn = resolved.filter((lot) => lot.status === "withdrawn").length;
   // Queue + whatever is on the block right now.
-  const remaining = (snapshot?.queue.length ?? 0) + (snapshot?.currentLot === null ? 0 : 1);
+  // `snapshot?.currentLot` is undefined — not null — with no snapshot, which
+  // counted a phantom lot on the block: "Remaining 1" on a finished night.
+  const remaining = (snapshot?.queue.length ?? 0) + ((snapshot?.currentLot ?? null) === null ? 0 : 1);
   const spend = sold.reduce((total, lot) => total + (lot.soldPrice ?? 0), 0);
   const top = sold.reduce<ResolvedLot | null>(
     (best, lot) => ((lot.soldPrice ?? 0) > (best?.soldPrice ?? 0) ? lot : best),

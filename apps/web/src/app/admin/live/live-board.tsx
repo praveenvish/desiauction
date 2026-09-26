@@ -25,7 +25,7 @@ import { adminLiveBoard } from "../../../server/admin/live-watch";
 import type { LiveAuctionRow } from "../../../server/admin/live-views";
 import { KpiValue } from "../admin-ui";
 import { LiveFreshness } from "../live-freshness";
-import { ROOM_LABEL, ROOM_TONE, STUCK_LABEL } from "../room-state";
+import { STUCK_LABEL, engineTrouble, roomBadge } from "../room-state";
 import { ageLabel, istWhen, usePolled } from "../use-polled";
 
 const REFRESH_MS = 10_000;
@@ -252,30 +252,6 @@ function StaleRow({ row, nowMs }: { row: LiveAuctionRow; nowMs: number }) {
   );
 }
 
-/** A sentence when the engine's view of a room is a problem; null when it is fine. */
-function engineTrouble(room: EngineRoom | undefined): string | null {
-  if (room === undefined) {
-    return null;
-  }
-  switch (room.state) {
-    case "unreachable":
-      return "Engine not answering";
-    case "loaded":
-      if (room.halted !== null) {
-        return `Engine halted this room: ${room.halted}`;
-      }
-      if (room.watchdogStalled) {
-        return "Engine timer watchdog stalled";
-      }
-      if (room.queueDepth > 5) {
-        return `${String(room.queueDepth)} commands waiting in the engine`;
-      }
-      return null;
-    default:
-      return null;
-  }
-}
-
 function engineLine(room: EngineRoom | undefined): string {
   if (room === undefined || room.state === "not_checked") {
     // Each refresh asks the engine about the busiest rooms only.
@@ -301,13 +277,13 @@ function RoomRow({
   engine: EngineRoom | undefined;
   nowMs: number;
 }) {
-  const badge = { tone: ROOM_TONE[row.state], label: ROOM_LABEL[row.state] };
   const trouble = engineTrouble(engine);
+  const badge = roomBadge(row.state, trouble);
   const pct = (n: number) => (row.lots.total > 0 ? (n / row.lots.total) * 100 : 0);
   return (
     <li
       className="admin-room"
-      data-state={row.state}
+      data-state={badge.dotState}
       data-trouble={trouble !== null || undefined}
       data-testid={`live-room-${row.auctionId}`}
     >
@@ -329,7 +305,7 @@ function RoomRow({
         </span>
         {/* "Quiet" on every row said nothing. The pill appears only when the
             room is doing something worth a glance; the dot always carries it. */}
-        {row.state === "quiet" ? (
+        {badge.dotState === "quiet" ? (
           <span className="admin-sr-only">{badge.label}</span>
         ) : (
           <Pill tone={badge.tone} dot>

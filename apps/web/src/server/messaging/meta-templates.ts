@@ -211,7 +211,7 @@ export async function fetchTemplateStatuses(config: MetaConfig): Promise<MetaTem
  */
 export function submitRefusal(template: WhatsAppTemplate): string | null {
   if (template.header === "image") {
-    return "This template has a picture at the top, and Meta needs a sample image uploaded with it. Submit it in WhatsApp Manager (docs/messaging/WHATSAPP_TEMPLATES.md), then map the approved name here.";
+    return "This template has a picture at the top, and Meta needs a sample image uploaded with it. Submit it in WhatsApp Manager, then map the approved name here.";
   }
   return null;
 }

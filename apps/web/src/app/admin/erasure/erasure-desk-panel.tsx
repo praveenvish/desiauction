@@ -17,7 +17,7 @@ import { useState, useTransition } from "react";
 import { formatPhone } from "../../../lib/format-phone";
 import { declineErasureAction, eraseAccountAction } from "../../../server/admin/erasure-actions";
 import type { DeskRow, ErasureDesk } from "../../../server/privacy/desk";
-import { ERASURE_PROMISE_DAYS, erasureDaysLeft } from "./erasure-sla";
+import { ERASURE_PROMISE_DAYS, erasureDaysLeft, erasureSlaWords } from "./erasure-sla";
 import { formatDate } from "../../../lib/format-date";
 
 /**
@@ -101,16 +101,9 @@ export function ErasureDeskPanel({ desk, nowMs }: { desk: ErasureDesk; nowMs: nu
 /** The account page's promise, drawn: how long this request has left. */
 function SlaPill({ requestedAt, nowMs }: { requestedAt: Date; nowMs: number }) {
   const left = erasureDaysLeft(requestedAt.getTime(), nowMs);
-  if (left < 0) {
-    return (
-      <Pill tone="red" dot testId="erasure-sla">
-        Overdue by {String(-left)} day{left === -1 ? "" : "s"}
-      </Pill>
-    );
-  }
   return (
-    <Pill tone={left <= 2 ? "amber" : "neutral"} dot testId="erasure-sla">
-      {left === 0 ? "Due today" : `${String(left)} day${left === 1 ? "" : "s"} left`}
+    <Pill tone={left < 0 ? "red" : left <= 2 ? "amber" : "neutral"} dot testId="erasure-sla">
+      {erasureSlaWords(left)}
     </Pill>
   );
 }

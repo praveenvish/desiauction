@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LiveAuctionRow } from "../../server/admin/live-views";
-import { ROOM_LABEL, ROOM_TONE, stuckSummary } from "./room-state";
+import { ROOM_LABEL, ROOM_TONE, engineTrouble, roomBadge, stuckSummary } from "./room-state";
 
 const NOW = 1_000_000_000_000;
 const HOUR = 3_600_000;
@@ -33,5 +33,26 @@ describe("room state, one rule for every admin surface", () => {
       clubs: 0,
       longestSilentMs: null,
     });
+  });
+});
+
+describe("a room's pill never contradicts the engine", () => {
+  it("drops 'Bidding' for a room the engine is not answering for", () => {
+    const trouble = engineTrouble({ state: "unreachable" });
+    expect(trouble).toBe("Engine not answering");
+    expect(roomBadge("active", trouble)).toEqual({
+      tone: "red",
+      label: "Engine trouble",
+      dotState: "stale",
+    });
+  });
+
+  it("keeps the database's word when the engine is fine or unchecked", () => {
+    expect(roomBadge("active", engineTrouble({ state: "not_checked" }))).toEqual({
+      tone: "green",
+      label: "Bidding",
+      dotState: "active",
+    });
+    expect(roomBadge("paused", engineTrouble(undefined)).label).toBe("Paused");
   });
 });

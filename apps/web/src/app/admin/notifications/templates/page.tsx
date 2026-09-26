@@ -21,7 +21,7 @@ import {
   type StatusView,
   type WhatsAppRow,
 } from "../../../../server/admin/provider-template-views";
-import { RelativeTime } from "../../admin-ui";
+import { RecentFold, RelativeTime } from "../../admin-ui";
 import {
   ClearTemplate,
   MapTemplate,
@@ -394,7 +394,7 @@ function RecentCard({ view }: { view: ProviderTemplatesView }) {
       icon={<IconClock />}
       tone="neutral"
       title="Recent changes"
-      description="The last twenty mappings and submissions, newest first. Revert re-applies what a mapping replaced, and is itself recorded."
+      description="Mappings and submissions, newest first. Revert re-applies what a mapping replaced, and is itself recorded."
       flush
       data-testid="tpl-recent"
     >
@@ -408,8 +408,8 @@ function RecentCard({ view }: { view: ProviderTemplatesView }) {
           />
         </div>
       ) : (
-        <ul className="admin-rows">
-          {view.recent.map((change) => (
+        <RecentFold items={view.recent} className="admin-rows">
+          {(change) => (
             <li key={change.id} data-testid={`tpl-change-${change.id}`}>
               <span className="admin-cell-main">
                 <span className="admin-name">{change.summary}</span>
@@ -422,8 +422,8 @@ function RecentCard({ view }: { view: ProviderTemplatesView }) {
                 <RevertTemplate auditId={change.id} summary={change.summary} />
               ) : null}
             </li>
-          ))}
-        </ul>
+          )}
+        </RecentFold>
       )}
     </SectionCard>
   );

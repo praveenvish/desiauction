@@ -33,6 +33,7 @@ import type { LiveBoard } from "../../server/admin/live-views";
 import type { PlatformOverview } from "../../server/admin/views";
 import { humanAction, KpiValue, RelativeTime, statusPillTone } from "./admin-ui";
 import { groupAttention } from "./attention-groups";
+import { erasureDaysLeft, erasureSlaWords } from "./erasure/erasure-sla";
 import { ROOM_LABEL, ROOM_TONE, STUCK_LABEL, stuckSummary } from "./room-state";
 
 function pct(rate: number): number {
@@ -40,8 +41,8 @@ function pct(rate: number): number {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  direct: "no share link",
-  other: "unrecognised link",
+  direct: "typed in or bookmarked",
+  other: "other links",
 };
 
 /**
@@ -364,6 +365,12 @@ function LiveNow({ live }: { live: LiveBoard }) {
  * at (red). It replaces an "Attention queue" card and a "Waiting on your desks"
  * card that each spent a header and a paragraph on one or two rows.
  */
+function erasureOldestWords(askedMs: number, nowMs: number): string {
+  const left = erasureDaysLeft(askedMs, nowMs);
+  const words = erasureSlaWords(left).toLowerCase();
+  return left > 0 ? `has ${words}` : words;
+}
+
 function AttentionStrip({
   attentionGroups,
   desks,
@@ -372,6 +379,8 @@ function AttentionStrip({
   desks: { items: readonly DeskItem[]; desks: number };
 }) {
   const deskItems = desks.desks > 0 ? desks.items : [];
+  // A server render: one clock read for the request.
+  const nowMs = Date.now();
   const nothing = attentionGroups.groups.length === 0 && deskItems.length === 0;
   if (nothing) {
     return (
@@ -404,12 +413,19 @@ function AttentionStrip({
               <span className="adm-row-main">
                 <span className="adm-row-title">
                   {countNoun(item.count, item.label[0], item.label[1])}
-                  {item.oldestAt !== null ? (
+                  {item.oldestAt === null ? null : item.key === "erasure" ? (
+                    // The erasure desk's own promise words, not an age: "7d"
+                    // floored an overdue request into looking on time.
+                    <span className="adm-row-sub" data-testid="admin-erasure-sla">
+                      {" "}
+                      · oldest {erasureOldestWords(item.oldestAt.getTime(), nowMs)}
+                    </span>
+                  ) : (
                     <span className="adm-row-sub">
                       {" "}
                       · oldest <RelativeTime at={item.oldestAt} />
                     </span>
-                  ) : null}
+                  )}
                 </span>
               </span>
               <Link href={item.href} className="adm-link">

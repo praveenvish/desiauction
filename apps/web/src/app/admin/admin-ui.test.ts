@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { foldRuns, humanAction, messageKeyLabel, relativeAge } from "./admin-ui";
+import {
+  capabilityLabel,
+  foldRuns,
+  humanAction,
+  messageKeyLabel,
+  relativeAge,
+  scopeTypeLabel,
+} from "./admin-ui";
 
 describe("humanAction", () => {
   it("reads a known code as the sentence an operator would say", () => {
@@ -19,6 +26,11 @@ describe("messageKeyLabel", () => {
     expect(messageKeyLabel("registration.approved@2")).toBe("Registration approved · v2");
     expect(messageKeyLabel("auction.owner_invite")).toBe("Auction owner invite");
     expect(messageKeyLabel("")).toBe("");
+  });
+
+  it("uses the catalogue's name, so one message has one name everywhere", () => {
+    expect(messageKeyLabel("registration.rejected")).toBe("Registration declined");
+    expect(messageKeyLabel("registration.rejected@1")).toBe("Registration declined · v1");
   });
 });
 
@@ -47,5 +59,19 @@ describe("relativeAge", () => {
   it("keeps the short and the future forms", () => {
     expect(relativeAge(now - 20_000, now)).toBe("just now");
     expect(relativeAge(now + 3 * 24 * HOUR, now)).toBe("in 3d");
+  });
+});
+
+describe("capabilityLabel", () => {
+  it("names the sets people hold, not their keys", () => {
+    expect(capabilityLabel("org:owner")).toBe("Club owner");
+    expect(capabilityLabel("finops:controller")).toBe("Finance controller");
+    expect(capabilityLabel("platform:admin")).toBe("Platform admin");
+    expect(capabilityLabel("platform:moderation")).toBe("Platform moderation");
+  });
+
+  it("names scopes the way the product does", () => {
+    expect(scopeTypeLabel("org")).toBe("Club");
+    expect(scopeTypeLabel("platform")).toBe("Platform");
   });
 });

@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 import { platformAdminPageGate } from "../../../../server/admin/authz";
 import { adminSuppressionDesk } from "../../../../server/admin/suppression-views";
 import { SUPPRESSION_SCOPES } from "../../../../server/messaging/suppression-contact";
-import { RelativeTime } from "../../admin-ui";
+import { RecentFold, RelativeTime } from "../../admin-ui";
 import {
   AddSuppressionForm,
   SuppressionRevertButton,
@@ -89,7 +89,7 @@ export default async function AdminSuppressionsPage() {
             icon={<IconClock />}
             tone="neutral"
             title="Recent changes"
-            description="Last twenty lifts and additions · Revert shows while a change still stands"
+            description="Lifts and additions, newest first · Revert shows while a change still stands"
             flush
             data-testid="suppression-recent"
           >
@@ -103,8 +103,8 @@ export default async function AdminSuppressionsPage() {
                 />
               </div>
             ) : (
-              <ul className="admin-rows ntc-recent">
-                {desk.recent.map((change) => (
+              <RecentFold items={desk.recent} className="admin-rows ntc-recent">
+                {(change) => (
                   <li key={change.id} data-testid={`suppression-change-${change.id}`}>
                     <span className="admin-cell-main">
                       <span className="ntc-recent-line" data-private>
@@ -120,8 +120,8 @@ export default async function AdminSuppressionsPage() {
                       <SuppressionRevertButton auditId={change.id} summary={change.summary} />
                     ) : null}
                   </li>
-                ))}
-              </ul>
+                )}
+              </RecentFold>
             )}
           </SectionCard>
         </div>

@@ -28,3 +28,19 @@ function istDayNumber(ms: number): number {
 export function erasureDaysLeft(requestedAtMs: number, nowMs: number): number {
   return istDayNumber(requestedAtMs) + ERASURE_PROMISE_DAYS - istDayNumber(nowMs);
 }
+
+/**
+ * The promise in words — one sentence for the desk's pill AND the overview's
+ * "oldest" line. The overview printed "oldest 7d ago" (a floor of elapsed
+ * time) beside a desk that said "Overdue by 1 day": an SLA breach hidden by
+ * rounding on the one surface every operator opens first.
+ */
+export function erasureSlaWords(daysLeft: number): string {
+  if (daysLeft < 0) {
+    return `Overdue by ${String(-daysLeft)} day${daysLeft === -1 ? "" : "s"}`;
+  }
+  if (daysLeft === 0) {
+    return "Due today";
+  }
+  return `${String(daysLeft)} day${daysLeft === 1 ? "" : "s"} left`;
+}
