@@ -47,6 +47,7 @@ export default async function BoardPage({ params }: { params: Promise<{ slug: st
         teamIdentities={view.teams}
         lotMedia={view.lotMedia}
         pursePerTeam={view.rules.pursePerTeam}
+        settledStatus={view.auctionStatus}
         preSignedByTeam={view.preSigned.reduce<Record<string, number>>((counts, player) => {
           counts[player.teamId] = (counts[player.teamId] ?? 0) + 1;
           return counts;

@@ -410,6 +410,7 @@ export function LivePanel({
           variant="shell"
           offline={offline}
           lotMedia={view.lotMedia}
+          settledStatus={overOffline ? status : undefined}
         />
       </PageStatus>
 
@@ -457,10 +458,7 @@ export function LivePanel({
 
           {/* Two columns, as the Owner Room comp has it: the lot and the paddle
               on the left where the eye lives, the board on the right. */}
-          <div
-            className="live-grid"
-            data-single={overOffline && myPaddle === null ? "" : undefined}
-          >
+          <div className="live-grid" data-single={overOffline ? "" : undefined}>
             <div className="live-col" id="live-stage">
               {overOffline ? (
                 /* The stage used to hold a "Connecting to the auction room…"
@@ -583,7 +581,10 @@ export function LivePanel({
                   claimed — lot or no lot. Bidding (PaddleControl, left) comes
                   and goes with the lot; "what have I got and what can I spend"
                   does not. */}
-              {myPaddle !== null ? (
+              {/* Over and read from the record: the squad board below holds
+                  all twelve with their badges — a second, shorter copy of the
+                  same squad here said "10" beside "12/12". */}
+              {myPaddle !== null && !overOffline ? (
                 <MyTeamCard
                   snapshot={snapshot}
                   myTeamId={myPaddle.teamId}
@@ -914,35 +915,48 @@ export function LivePanel({
           <div className="live-bottombar">
             {exits}
             <div className="live-diagnostics" data-testid="live-diagnostics">
-              <span className="live-diagnostics-label">Feed diagnostics</span>
-              <span className="live-substatus-meta">
-                <ConnectionQuality
-                  connection={connection}
-                  drift={drift}
-                  stale={stale}
-                  offline={offline}
-                />
-                <span className="competitions-hint" data-testid="snapshot-version">
-                  v{version}
-                </span>
-                {snapshot !== null ? (
-                  <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
-                    {snapshot.auctionStatus}
+              <span className="live-diagnostics-label">
+                {overOffline ? "Auction" : "Feed diagnostics"}
+              </span>
+              {/* A finished night the engine never answered for has no feed
+                  to diagnose: /spectate says COMPLETED, so does this room —
+                  once, from the server's record, with no socket word beside it. */}
+              {overOffline ? (
+                <span className="live-substatus-meta">
+                  <Badge tone={AUCTION_TONE[status]} data-testid="live-status">
+                    {status}
                   </Badge>
-                ) : null}
-                {/* The raw socket word ("open") read like a status of the
+                </span>
+              ) : (
+                <span className="live-substatus-meta">
+                  <ConnectionQuality
+                    connection={connection}
+                    drift={drift}
+                    stale={stale}
+                    offline={offline}
+                  />
+                  <span className="competitions-hint" data-testid="snapshot-version">
+                    v{version}
+                  </span>
+                  {snapshot !== null ? (
+                    <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
+                      {snapshot.auctionStatus}
+                    </Badge>
+                  ) : null}
+                  {/* The raw socket word ("open") read like a status of the
                     AUCTION — it sat beside COMPLETED as "OPEN". Say what it is
                     about: the link to the room. The raw value stays on
                     data-connection for anything that needs to tell
                     "connecting" from "reconnecting". */}
-                <Badge
-                  tone={connection === "open" ? "success" : "warning"}
-                  data-testid="connection-state"
-                  data-connection={connection}
-                >
-                  {connection === "open" ? "Connected" : "Reconnecting"}
-                </Badge>
-              </span>
+                  <Badge
+                    tone={connection === "open" ? "success" : "warning"}
+                    data-testid="connection-state"
+                    data-connection={connection}
+                  >
+                    {connection === "open" ? "Connected" : "Reconnecting"}
+                  </Badge>
+                </span>
+              )}
             </div>
           </div>
         </div>

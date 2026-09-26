@@ -761,6 +761,71 @@
 }
 
 @media (max-width: 560px) {
+  /* The header spent ~350px before the first number: the kicker wrapped
+     ("CONNECTING TO THE / AUCTION ROOM") and the identity line ran at 2xl. */
+  .board-kicker {
+    font-size: var(--text-sm-size);
+    line-height: var(--text-sm-line);
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .board-sub {
+    font-size: var(--text-base-size);
+    line-height: var(--text-base-line);
+  }
+  .board-head {
+    gap: 12px;
+  }
+  /* A team standing is a compact card: name over one row of purse, spent and
+     squad (~120px, from ~280px). The faces stand down — Recent sales, below,
+     carries them. */
+  .board-team {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top top"
+      "mid stats";
+    align-items: end;
+    gap: 10px 16px;
+    padding: 14px 16px;
+  }
+  .board-team-top {
+    grid-area: top;
+  }
+  .board-team-mid {
+    grid-area: mid;
+  }
+  .board-team-faces {
+    display: none;
+  }
+  .board-purse-value {
+    font-size: var(--text-2xl-size);
+  }
+  .board-purse-label,
+  .board-team-stats dt {
+    font-size: var(--text-xs-size);
+  }
+  .board-team-stats {
+    grid-area: stats;
+    grid-template-columns: auto auto;
+    gap: 16px;
+    padding-top: 0;
+    border-top: 0;
+    text-align: end;
+  }
+  .board-team-stats dd {
+    font-size: var(--text-lg-size);
+  }
+  .board-recent-who {
+    min-width: 0;
+  }
+  .board-recent-name {
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--text-lg-size);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   /* 2×2 headline tiles on a phone, not four full-width slabs (~560px). */
   .board-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));

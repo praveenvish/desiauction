@@ -228,7 +228,9 @@ export function StatusRibbon({
           data-version={String(version)}
           title={`Snapshot v${String(version)}`}
         >
-          {audience === "operator" ? `v${String(version)}` : null}
+          {/* No snapshot, no version: a finished room read from the record
+              printed "v0" beside COMPLETED. */}
+          {audience === "operator" && snapshot !== null ? `v${String(version)}` : null}
         </span>
       </span>
     </div>

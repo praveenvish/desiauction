@@ -512,6 +512,45 @@
   color: var(--text-secondary);
 }
 
+/* A phone podium: three columns at 390 wrapped every name and every price
+   ("50,000 / pts"). The top buy stands alone, large; #2 and #3 share a row,
+   small. The finished stage has no phase after it, so it hugs its content
+   instead of keeping the live stage's measured height. */
+@media (max-width: 640px) {
+  .ceremony:has(.ceremony-showcase) {
+    min-height: 0;
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .ceremony-showcase {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4) var(--space-3);
+  }
+
+  .ceremony-showcase-item:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .ceremony-showcase-item:not(:first-child) .ceremony-showcase-face {
+    width: 56px;
+    height: 56px;
+    margin-bottom: var(--space-1);
+  }
+
+  .ceremony-showcase-item:not(:first-child) .ceremony-showcase-price {
+    font-size: var(--text-md-size);
+  }
+
+  .ceremony-showcase-name,
+  .ceremony-showcase-price,
+  .ceremony-showcase-team {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .ceremony-waiting-hint {
   max-width: 42ch;
   color: var(--text-muted);
@@ -2890,6 +2929,13 @@
 .stage-toggle-row {
   display: flex;
   justify-content: flex-end;
+}
+
+/* A phone is already the small screen: "Big screen" has nowhere to go. */
+@media (max-width: 640px) {
+  .stage-toggle-row {
+    display: none;
+  }
 }
 
 .stage-toggle {
