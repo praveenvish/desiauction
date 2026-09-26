@@ -886,7 +886,7 @@ export function ProductShell({
    * everything, which is what the founder's 2026-09-19 mockups assumed when
    * they asked for seven items on a laptop.
    */
-  const bottomNav: ShellNavItem[] = phoneBar(menu.rail).map(toShellItem);
+  const bottomNav: ShellNavItem[] = phoneBar(menu.rail, menu.utility).map(toShellItem);
 
   // Identity: one derivation for every console route (nav.ts), overridden only
   // where the name is page data the shell cannot hold.

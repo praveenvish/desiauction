@@ -270,6 +270,18 @@ describe("exactly one item is ever active", () => {
     expect(bar.find((item) => item.active)?.key).toBe("reports");
   });
 
+  it("administration takes the bar's last seat while an operator is in it", () => {
+    const inAdmin = navigationFor({ roles: busy, pathname: "/admin/health" });
+    const bar = phoneBar(inAdmin.rail, inAdmin.utility);
+    expect(bar).toHaveLength(RAIL_CAP);
+    expect(bar[0]?.key).toBe("home");
+    expect(bar.at(-1)?.key).toBe("admin");
+    expect(bar.at(-1)?.active).toBe(true);
+    // Anywhere else, the utility list never displaces a rail item.
+    const home = navigationFor({ roles: busy, pathname: "/home" });
+    expect(phoneBar(home.rail, home.utility).map((item) => item.key)).not.toContain("admin");
+  });
+
   it("desk surfaces ride the drawer, not the bar", () => {
     // premium-flow's ruling, kept: Organizations and Reports are laptop jobs.
     const bar = phoneBar(navigationFor({ roles: busy, pathname: "/home" }).rail);

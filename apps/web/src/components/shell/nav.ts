@@ -1042,14 +1042,22 @@ export const RAIL_CAP = 5;
  * — the sixth item, and `mobile: false` besides — would otherwise get a bar
  * that lights nothing, and a menu that cannot say where you are is worse than
  * a short one. The claiming item displaces the last, and Home keeps slot one.
+ *
+ * An operator standing in administration is the one case where the page they
+ * are on lives in the UTILITY list, not the rail. Pass `utility` and the admin
+ * door claims the seat the same way (wow pass round 2): a phone in /admin used
+ * to show the organizer's five with nothing lit, and administration was only
+ * reachable through the drawer.
  */
-export function phoneBar(rail: NavItem[]): NavItem[] {
+export function phoneBar(rail: NavItem[], utility: readonly NavItem[] = []): NavItem[] {
   const eligible = rail.filter((item) => item.mobile !== false);
   const bar = eligible.slice(0, RAIL_CAP);
   if (bar.some((item) => item.active === true)) {
     return bar;
   }
-  const claiming = rail.find((item) => item.active === true);
+  const claiming =
+    rail.find((item) => item.active === true) ??
+    utility.find((item) => item.key === "admin" && item.active === true);
   return claiming === undefined ? bar : [...bar.slice(0, RAIL_CAP - 1), claiming];
 }
 
