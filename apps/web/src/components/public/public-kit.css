@@ -185,7 +185,13 @@
     flex: 1 1 100%;
   }
 
+  /* The way out is a text line UNDER the actions, not a third button
+     sharing their row ("All tournaments" beside "See the squads"). */
   .pk-hero-actions > .pk-hero-textlink {
+    flex: 0 0 100%;
+    justify-content: flex-start;
+    min-height: 32px;
+    margin-inline-start: calc(-1 * var(--space-2));
     padding-inline: var(--space-2);
   }
 
@@ -704,7 +710,7 @@
 .pk-operator-head {
   display: flex;
   gap: var(--space-3);
-  align-items: flex-start;
+  align-items: center;
 }
 
 .pk-operator-tile {
@@ -728,7 +734,7 @@
 }
 
 .pk-operator-lede {
-  margin: 2px 0 0;
+  margin: calc(var(--space-2) * -1) 0 0;
   color: var(--text-secondary);
   font-size: 0.875rem;
 }
@@ -1103,6 +1109,14 @@
 
 .pk-soon-actions {
   justify-content: center;
+}
+
+/* Phone: both doors one width — a full-width primary over an intrinsic
+   secondary read as a mistake. */
+@media (max-width: 640px) {
+  .pk-soon-actions > * {
+    flex: 1 1 100%;
+  }
 }
 
 /* ---------------------------------------------------------------- the 404 -- */

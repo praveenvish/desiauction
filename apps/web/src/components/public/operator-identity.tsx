@@ -46,15 +46,15 @@ export function OperatorIdentityCard({
         <span className="pk-operator-tile" aria-hidden>
           <IconShieldCheck size={24} weight="duotone" />
         </span>
-        <div>
-          <h2 className="pk-operator-title" id={headingId}>
-            {title}
-          </h2>
-          <p className="pk-operator-lede">
-            {id.tradingName ?? "DesiAuction"} is a product of {id.legalName}.
-          </p>
-        </div>
+        <h2 className="pk-operator-title" id={headingId}>
+          {title}
+        </h2>
       </div>
+      {/* Under the head, full width: beside the tile it wrapped into a
+          cramped two-line column (review r2, r3). */}
+      <p className="pk-operator-lede">
+        {id.tradingName ?? "DesiAuction"} is a product of {id.legalName}.
+      </p>
       <dl className="pk-operator-facts">
         {compact ? null : (
           <div>

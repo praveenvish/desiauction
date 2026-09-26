@@ -274,6 +274,13 @@
   margin: var(--space-6) 0;
 }
 
+/* In a side card the actions share one width: a primary and a secondary of
+   different intrinsic widths read as a mistake on a phone. */
+.cl-side .content-actions > * {
+  flex: 1 1 100%;
+  justify-content: center;
+}
+
 .content-card {
   display: flex;
   flex-direction: column;
@@ -656,17 +663,26 @@ a.content-card:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* The area, as a quiet label rather than a pill: six identical gold-outline
+   pills read as decoration, not as categories — the TOC is where they're
+   navigated; here they only name the area. */
 .release-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--accent-line);
-  background: var(--accent-subtle);
-  color: var(--accent-ink);
+  gap: var(--space-2);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.release-chip::before {
+  content: "";
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent-line);
 }
 
 .release h2 {
@@ -802,6 +818,14 @@ a.content-card:focus-visible {
 @media (min-width: 1000px) {
   .help-index {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* A phone gets each guide's first three articles and its "View all": the
+   full lists ran ~9,000px under the search. */
+@media (max-width: 639px) {
+  .help-guide-list > li:nth-child(n + 4) {
+    display: none;
   }
 }
 
@@ -984,6 +1008,19 @@ a.content-card:focus-visible {
   color: var(--text-heading);
 }
 
+/* On a phone the display-size quote ran six lines (~250px). It steps down to
+   the text face — the display face is for 30px and up (type-scale.test.ts). */
+@media (max-width: 719px) {
+  .about-quote p {
+    max-width: none;
+    font-family: var(--font-text);
+    font-size: 1.375rem;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+}
+
 .cl-prose .about-principles {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1127,6 +1164,29 @@ a.content-card:focus-visible {
   line-height: 1.55;
 }
 
+/* On a phone each card is an icon-left row: the stacked tile, title and
+   text ran ~280px a card, four tall cards for four sentences. */
+@media (max-width: 639px) {
+  .feature-card {
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: var(--space-1);
+    padding: var(--space-4);
+  }
+
+  .feature-card-tile {
+    grid-row: 1 / span 2;
+    inline-size: 40px;
+    block-size: 40px;
+    margin-bottom: 0;
+  }
+
+  .feature-card h3,
+  .feature-card p {
+    grid-column: 2;
+  }
+}
+
 /* ---- /support (wow pass) ---- */
 .support-issues .faq-item p + p {
   padding-top: 0;
@@ -1152,7 +1212,6 @@ a.content-card:focus-visible {
 
 .support-foot {
   margin: 0;
-  max-width: 72ch;
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-subtle);
   color: var(--text-muted);
@@ -1183,4 +1242,64 @@ a.content-card:focus-visible {
   .search-suggest-rows > li:nth-child(odd) {
     border-right: 1px solid var(--border-subtle);
   }
+}
+
+/* A rule the index jumps to lands clear of the sticky header. */
+.feature-card[id] {
+  scroll-margin-top: calc(64px + var(--space-6));
+}
+
+/* /legal: a document revised since launch — the dot carries the colour, the
+   label stays in primary ink. */
+.legal-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.legal-updated::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* /search, empty: the words people search for, as quiet chips. */
+.search-common-title {
+  margin-top: var(--space-4);
+}
+
+.search-common {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-common a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.search-common a:hover {
+  border-color: var(--accent-line);
+}
+
+.search-common a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

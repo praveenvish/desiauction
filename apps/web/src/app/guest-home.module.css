@@ -1895,11 +1895,32 @@
   .registration {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* A phone cannot read the whole board at ~300px: it is cropped to its
+     left half at twice the scale (the spend and top-buy tiles, one team),
+     and the SOLD phone grows to carry the moment. */
   .realShots {
-    padding-right: 40px;
+    padding-right: 0;
+  }
+  .realScreen {
+    overflow: hidden;
+    width: 78%;
+    aspect-ratio: 4 / 3;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+  }
+  .realScreen img {
+    width: 180%;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+  }
+  .realPhone {
+    width: 40%;
+    max-width: 170px;
+    bottom: 32px;
   }
   .realNote {
-    max-width: 62%;
+    max-width: 56%;
   }
   .ctaSteps {
     grid-template-columns: minmax(0, 1fr);

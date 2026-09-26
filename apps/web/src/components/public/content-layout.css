@@ -214,6 +214,68 @@
   outline-offset: 2px;
 }
 
+/* ---- on this page, phone: a disclosure above the text ---- */
+
+.cl-toc-phone {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.cl-toc-phone > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cl-toc-phone > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cl-toc-phone > summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.cl-toc-phone[open] > summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.cl-toc-phone-count {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.cl-toc-phone > .cl-aside-list {
+  padding: 0 var(--space-4) var(--space-4) var(--space-5);
+}
+
+@media (min-width: 1000px) {
+  .cl-toc-phone {
+    display: none;
+  }
+}
+
+@media (max-width: 999px) {
+  .cl-side > .cl-aside {
+    display: none;
+  }
+}
+
 /* ---- related ---- */
 
 .cl-related {

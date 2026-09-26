@@ -132,8 +132,12 @@ export default function PricingPage() {
                     {/* The figure slot is set for a numeral. A tier with no
                         published price puts a sentence there, which at display
                         scale dwarfs the tiers that do quote a number. */}
+                    {/* Only a real figure takes display type: "₹0 / Free / Free"
+                        read as three free prices at the same size. The future
+                        passes say "Free" in the text face, beside their
+                        at-launch note. */}
                     <span
-                      className={`mk-tier-amount${/\d|^Free$/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
+                      className={`mk-tier-amount${/\d/.test(tier.price) ? "" : " mk-tier-amount--note"}`}
                     >
                       {tier.price}
                     </span>

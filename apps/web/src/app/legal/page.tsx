@@ -1,4 +1,3 @@
-import { IconFile } from "@desiauction/ui";
 import type { Metadata } from "next";
 
 import { env } from "../../env";
@@ -13,6 +12,12 @@ export const metadata: Metadata = {
   description: "Terms, privacy, refunds and the other documents that govern using DesiAuction.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/legal` },
 };
+
+/** The date every document first took effect; a later date is a revision. */
+const LAUNCH_EFFECTIVE = LEGAL_DOCUMENTS.reduce(
+  (earliest, doc) => (Date.parse(doc.effective) < Date.parse(earliest) ? doc.effective : earliest),
+  LEGAL_DOCUMENTS[0]?.effective ?? "",
+);
 
 /**
  * PX-10 P-04 — the Legal Centre index. Public, no auth, printable documents.
@@ -38,15 +43,23 @@ export default function LegalIndexPage() {
       <h2 id="documents" className="cl-list-title">
         The documents
       </h2>
+      {/* No glyph per row (nine identical file icons), and the documents
+          revised since launch say so: the recent dates used to carry the same
+          weight as the rest, so a returning reader could not see what moved. */}
       <LinkRows labelledBy="documents">
         {LEGAL_DOCUMENTS.map((doc) => (
           <LinkRow
             key={doc.slug}
             href={`/legal/${doc.slug}`}
-            icon={<IconFile size={20} weight="duotone" />}
             title={doc.title}
             description={doc.summary}
-            meta={doc.effective}
+            meta={
+              doc.effective === LAUNCH_EFFECTIVE ? (
+                doc.effective
+              ) : (
+                <span className="legal-updated">Updated {doc.effective}</span>
+              )
+            }
           />
         ))}
       </LinkRows>

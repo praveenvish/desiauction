@@ -835,8 +835,10 @@ export function ProductShell({
           {
             label: "Tournaments",
             links: [
-              { label: "Browse tournaments", href: "/c" },
-              { label: "Try a mock auction", href: "/#playground" },
+              // Two words at most: the three columns share 358px on a phone,
+              // and "Browse / tournaments" and "Try a mock / auction" wrapped.
+              { label: "Browse all", href: "/c" },
+              { label: "Mock auction", href: "/#playground" },
               { label: "Help centre", href: "/help" },
             ],
           },

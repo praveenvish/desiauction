@@ -7,7 +7,7 @@ import { env } from "../../env";
 import { currentSession } from "../../server/auth/actions";
 import { RETURNING_COOKIE } from "../../server/auth/sessions";
 import { safeNext } from "../../server/auth/redirect";
-import { ScriptTag, SportMontage } from "../../components/public/public-kit";
+import { SportMontage } from "../../components/public/public-kit";
 import { LoginPanel } from "./login-form";
 import type { ReactNode } from "react";
 
@@ -135,14 +135,9 @@ export default async function LoginPage({
             ))}
           </ul>
           <div className="login-scene-art" aria-hidden="true">
+            {/* The glyph card alone: a "Play Bid Belong" script lockup floated
+                beside it, detached from anything (review r2, r3). */}
             <SportMontage />
-            <ScriptTag>
-              Play
-              <br />
-              Bid
-              <br />
-              Belong
-            </ScriptTag>
           </div>
           <ul className="login-facts" aria-label="About DesiAuction">
             {GATE_FACTS.map((fact) => (

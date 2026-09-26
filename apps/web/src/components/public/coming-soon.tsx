@@ -13,12 +13,15 @@ import type { ReactNode } from "react";
 import "./public-kit.css";
 
 export function ComingSoon({
-  eyebrow,
   title,
   lede,
   note,
 }: {
-  eyebrow: ReactNode;
+  /**
+   * Kept for the callers, no longer drawn: the "Not published yet" badge and
+   * a "JOIN US" eyebrow stacked two labels over one title (review r2, r3).
+   */
+  eyebrow?: ReactNode;
   title: ReactNode;
   lede: ReactNode;
   /** One more line under the lede — a way to reach us about this. */
@@ -31,7 +34,6 @@ export function ComingSoon({
           <span className="pk-soon-badge">
             <IconClock size={16} /> Not published yet
           </span>
-          <p className="pk-eyebrow">{eyebrow}</p>
           <h1 className="pk-hero-title">{title}</h1>
           <p className="pk-hero-lede">{lede}</p>
           {note === undefined ? null : <p className="pk-soon-note">{note}</p>}

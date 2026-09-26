@@ -97,6 +97,7 @@ export function DemoRequestForm({ source }: { source: string }) {
           autoComplete="name"
           required
           maxLength={120}
+          placeholder="e.g. Rohan Kulkarni"
           error={errorFor("name")}
         />
         <Field
@@ -178,6 +179,7 @@ export function DemoRequestForm({ source }: { source: string }) {
           name="email"
           type="email"
           autoComplete="email"
+          placeholder="e.g. you@yourclub.in"
           help="For a written confirmation."
           error={errorFor("email")}
         />

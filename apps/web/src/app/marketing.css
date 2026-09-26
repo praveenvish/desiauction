@@ -2213,6 +2213,18 @@ body:has(.landing.mk) .mk-hero {
   white-space: nowrap;
 }
 
+/* One grid for the table: the Feature header sits over its left-aligned
+   cells, and the three tiers share equal columns (the Free column used to
+   take twice the width because its longest cell said so). */
+.mk-compare {
+  table-layout: fixed;
+}
+
+.mk-compare thead th:first-child {
+  width: 40%;
+  text-align: left;
+}
+
 /* A fixed 260px row label, on top of the table's own 640px floor, left the tier
    columns too little room on a phone and clipped them. A share of the table
    keeps the labels readable and lets the tier columns keep theirs. */
@@ -3921,13 +3933,16 @@ body:has(.landing.mk) .mk-hero {
     grid-template-areas:
       "head visual"
       "list visual";
-    align-content: center;
+    /* Top-aligned: the copy used to centre against the taller mock and left
+       an unbalanced gap above the heading. The list row takes the slack. */
+    grid-template-rows: auto 1fr;
+    align-content: start;
     column-gap: var(--space-10);
   }
 
   .mk-fcard[data-feature="lead"] > .mk-fcard-head {
     grid-area: head;
-    align-self: end;
+    align-self: start;
   }
 
   .mk-fcard[data-feature="lead"] > .mk-fcard-visual {

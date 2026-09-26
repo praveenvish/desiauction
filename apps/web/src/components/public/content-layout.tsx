@@ -51,6 +51,25 @@ export function ContentLayout({
   const hasSide = anchors.length > 0 || aside !== undefined;
   return (
     <div className="cl" data-side={hasSide ? "" : undefined}>
+      {/* On a phone the side column stacks AFTER the article, so its "On this
+          page" arrived when there was nothing left to jump to. The phone gets
+          the list as a closed disclosure above the text instead; the side
+          copy stands down below 1000px (content-layout.css). */}
+      {anchors.length === 0 ? null : (
+        <details className="cl-toc-phone">
+          <summary>
+            On this page
+            <span className="cl-toc-phone-count">{anchors.length} sections</span>
+          </summary>
+          <ol className="cl-aside-list">
+            {anchors.map((anchor) => (
+              <li key={anchor.id}>
+                <a href={`#${anchor.id}`}>{anchor.label}</a>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
       <div className="cl-main">
         {meta === undefined ? null : <p className="cl-meta">{meta}</p>}
         {prose ? <div className="cl-prose">{children}</div> : children}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { IconArrowLeft, IconFile } from "@desiauction/ui";
+import { IconArrowLeft } from "@desiauction/ui";
 
 import { ContentLayout } from "../../../../components/public/content-layout";
 import {
@@ -88,12 +88,13 @@ export default async function HelpCategoryPage({ params }: { params: Promise<{ s
           <h2 id="articles" className="cl-list-title">
             {articles.length} {articles.length === 1 ? "article" : "articles"} in this guide
           </h2>
+          {/* No icon per row: five identical file glyphs made the list
+              monotone — the titles are the faces here. */}
           <LinkRows labelledBy="articles">
             {articles.map((article) => (
               <LinkRow
                 key={article.slug}
                 href={`/help/${article.slug}`}
-                icon={<IconFile size={20} weight="duotone" />}
                 title={article.title}
                 description={article.summary}
                 meta={`${String(article.readMinutes)} min read`}

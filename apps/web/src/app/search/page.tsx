@@ -54,6 +54,18 @@ const SUGGESTIONS = [
   },
 ] as const;
 
+/** Words people search for, each a real query with results behind it. */
+const COMMON_SEARCHES = [
+  "paddle",
+  "registration",
+  "icon player",
+  "points",
+  "receipt",
+  "refund",
+  "passkey",
+  "big screen",
+] as const;
+
 /** How many hits a first page shows before the reader has to ask for the rest. */
 const PAGE_SIZE = 12;
 
@@ -128,6 +140,19 @@ export default async function SearchPage({
                 />
               ))}
             </LinkRows>
+            {/* The page used to stop dead after the destinations. A reader
+                who came to search gets the words others search for, each a
+                real query with results behind it. */}
+            <h2 id="common-searches" className="cl-list-title search-common-title">
+              People also search for
+            </h2>
+            <ul className="search-common" aria-labelledby="common-searches">
+              {COMMON_SEARCHES.map((term) => (
+                <li key={term}>
+                  <Link href={`/search?q=${encodeURIComponent(term)}`}>{term}</Link>
+                </li>
+              ))}
+            </ul>
           </section>
         ) : matches.length === 0 ? (
           <p className="article-meta" data-testid="search-empty">

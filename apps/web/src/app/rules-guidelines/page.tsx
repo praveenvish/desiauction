@@ -49,6 +49,9 @@ export default function RulesGuidelinesPage() {
         </>
       }
       prose={false}
+      // A sticky index beside the four rules on a laptop, a disclosure above
+      // them on a phone — the reader sees the whole set before reading one.
+      anchors={RULES.map((rule, index) => ({ id: `rule-${String(index + 1)}`, label: rule.title }))}
       aside={
         <SideCard
           headingId="your-rules"
@@ -71,7 +74,7 @@ export default function RulesGuidelinesPage() {
       </h2>
       <ol className="feature-cards da-stagger" aria-labelledby="ground-rules">
         {RULES.map((rule, index) => (
-          <li key={rule.title} className="feature-card">
+          <li key={rule.title} id={`rule-${String(index + 1)}`} className="feature-card">
             <span className="feature-card-tile" aria-hidden>
               {rule.icon}
             </span>
