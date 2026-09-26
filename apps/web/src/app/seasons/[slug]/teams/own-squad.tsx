@@ -1,4 +1,4 @@
-import { IconArrowRight, IconUsers, PlayerImage } from "@desiauction/ui";
+import { EmptyState, IconArrowRight, IconGavel, IconUsers, PlayerImage } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
@@ -81,9 +81,12 @@ export async function OwnSquad({
         </dl>
       </div>
       {bought.length === 0 && preSigned.length === 0 ? (
-        <p className="tm-own-empty">
-          No buys yet. The players you win in the auction line up here, dearest first.
-        </p>
+        <EmptyState
+          size="compact"
+          icon={<IconGavel />}
+          title="No buys yet"
+          description="The players you win in the auction line up here, dearest first."
+        />
       ) : (
         <ol className="tm-own-grid">
           {preSigned.map((player) => (

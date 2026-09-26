@@ -1,4 +1,5 @@
 import {
+  EmptyState,
   IconGlobe,
   IconStar,
   IconUsers,
@@ -92,37 +93,42 @@ export default async function PlayersPage({
     return (
       <main className="px-players">
         <section className="px-empty" data-testid="players-empty">
-          <span className="px-empty-glyph" aria-hidden>
-            <IconUsers size={30} />
-          </span>
-          <h2>No players to manage yet</h2>
-          <p>
-            This page lists every player in the seasons you run — as a club owner or staff. You
-            don&rsquo;t review registrations for any season yet.
-          </p>
-          <div className="px-empty-actions">
-            {view.ownsTeam !== null ? (
-              <NavButton
-                href={`/seasons/${view.ownsTeam.seasonSlug}/teams`}
-                variant="primary"
-                size="touch"
-              >
-                Your squad · {view.ownsTeam.name}
-              </NavButton>
-            ) : null}
-            <NavButton
-              href="/c"
-              variant={view.ownsTeam === null ? "primary" : "secondary"}
-              size="touch"
-            >
-              <IconGlobe size={18} aria-hidden /> Find tournaments
-            </NavButton>
-            {view.plays ? (
-              <NavButton href="/me" variant="secondary" size="touch">
-                <IconStar size={18} aria-hidden /> My sports
-              </NavButton>
-            ) : null}
-          </div>
+          <EmptyState
+            icon={<IconUsers />}
+            title="No players to manage yet"
+            headingLevel={2}
+            description={
+              <>
+                This page lists every player in the seasons you run — as a club owner or staff. You
+                don&rsquo;t review registrations for any season yet.
+              </>
+            }
+            action={
+              <>
+                {view.ownsTeam !== null ? (
+                  <NavButton
+                    href={`/seasons/${view.ownsTeam.seasonSlug}/teams`}
+                    variant="primary"
+                    size="touch"
+                  >
+                    Your squad · {view.ownsTeam.name}
+                  </NavButton>
+                ) : null}
+                <NavButton
+                  href="/c"
+                  variant={view.ownsTeam === null ? "primary" : "secondary"}
+                  size="touch"
+                >
+                  <IconGlobe size={18} aria-hidden /> Find tournaments
+                </NavButton>
+                {view.plays ? (
+                  <NavButton href="/me" variant="secondary" size="touch">
+                    <IconStar size={18} aria-hidden /> My sports
+                  </NavButton>
+                ) : null}
+              </>
+            }
+          />
         </section>
       </main>
     );

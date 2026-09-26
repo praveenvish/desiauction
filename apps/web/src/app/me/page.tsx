@@ -1,5 +1,6 @@
 import { SPORTS, sportPackFor } from "@desiauction/core";
 import {
+  EmptyState,
   HeroBanner,
   IconArrowRight,
   IconCalendar,
@@ -10,6 +11,7 @@ import {
   IconShieldCheck,
   IconTrophy,
   IconUsers,
+  type KitTone,
   Notice,
   Pill,
   PlayerImage,
@@ -17,7 +19,6 @@ import {
   StatCard,
   StatGrid,
   TeamChip,
-  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -315,10 +316,12 @@ export default async function MySportsPage({
               data-testid="me-tournaments"
             >
               {seasons.length === 0 ? (
-                <p className="me-empty">
-                  No registrations as a player yet. <Link href="/c">Find a tournament to play</Link>
-                  .
-                </p>
+                <EmptyState
+                  size="compact"
+                  icon={<IconTrophy />}
+                  title="No registrations as a player yet"
+                  description="Find a tournament from the link above and your entries line up here."
+                />
               ) : (
                 <ul className="me-regs">
                   {seasons.map((season) => {

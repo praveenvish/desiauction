@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   Button,
   Dialog,
+  EmptyState,
   Field,
   IconClock,
   IconDevice,
@@ -189,9 +190,13 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
         <div className="acct-block" data-testid="passkeys-panel">
           <h3 className="acct-block-title">Passkeys</h3>
           {security.passkeys.length === 0 ? (
-            <p className="acct-block-empty">
-              No passkeys yet. Add one to sign in with your fingerprint or face — no code needed.
-            </p>
+            <EmptyState
+              size="compact"
+              headingLevel={4}
+              icon={<IconKey />}
+              title="No passkeys yet"
+              description="Add one to sign in with your fingerprint or face — no code needed."
+            />
           ) : (
             <ul className="security-list">
               {security.passkeys.map((passkey) => (

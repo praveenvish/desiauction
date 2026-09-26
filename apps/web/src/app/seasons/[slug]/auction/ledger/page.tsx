@@ -1,5 +1,6 @@
 import {
   ButtonLink,
+  EmptyState,
   IconClock,
   IconGavel,
   Pager,
@@ -130,11 +131,20 @@ export default async function LedgerPage({
               {view.rows.length === 0 ? (
                 <tr>
                   <td colSpan={9} data-testid="ledger-empty" className="ledger-empty">
-                    {view.filter === "bids"
-                      ? "No bids yet."
-                      : view.filter === "results"
-                        ? "No results yet — the first sale will land here."
-                        : "Nothing on the record yet."}
+                    <EmptyState
+                      size="compact"
+                      icon={<IconGavel />}
+                      title={
+                        view.filter === "bids"
+                          ? "No bids yet"
+                          : view.filter === "results"
+                            ? "No results yet"
+                            : "Nothing on the record yet"
+                      }
+                      {...(view.filter === "results"
+                        ? { description: "The first sale will land here." }
+                        : {})}
+                    />
                   </td>
                 </tr>
               ) : null}

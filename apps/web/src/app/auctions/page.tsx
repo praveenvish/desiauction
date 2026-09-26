@@ -1,4 +1,5 @@
 import {
+  EmptyState,
   IconCalendar,
   IconCheckCircle,
   IconGavel,
@@ -7,8 +8,8 @@ import {
   IconTile,
   IconTrophy,
   IconWallet,
-  Pill,
   type KitTone,
+  Pill,
 } from "@desiauction/ui";
 import Link from "next/link";
 
@@ -190,22 +191,27 @@ export default async function AuctionsPage() {
     return (
       <main className="px-players">
         <section className="px-empty" data-testid="auctions-empty">
-          <span className="px-empty-glyph" aria-hidden>
-            <IconGavel size={30} />
-          </span>
-          <h2>No auction nights yet</h2>
-          <p>
-            Auctions you run, conduct or bid in appear here — with the right door for your role:
-            setup, the cockpit, the live room or your plan.
-          </p>
-          <div className="px-empty-actions">
-            <NavButton href="/tournaments" variant="primary" size="touch">
-              <IconTrophy size={18} aria-hidden /> Go to tournaments
-            </NavButton>
-            <NavButton href="/c" variant="secondary" size="touch">
-              <IconGlobe size={18} aria-hidden /> Find tournaments
-            </NavButton>
-          </div>
+          <EmptyState
+            icon={<IconGavel />}
+            title="No auction nights yet"
+            headingLevel={2}
+            description={
+              <>
+                Auctions you run, conduct or bid in appear here — with the right door for your role:
+                setup, the cockpit, the live room or your plan.
+              </>
+            }
+            action={
+              <>
+                <NavButton href="/tournaments" variant="primary" size="touch">
+                  <IconTrophy size={18} aria-hidden /> Go to tournaments
+                </NavButton>
+                <NavButton href="/c" variant="secondary" size="touch">
+                  <IconGlobe size={18} aria-hidden /> Find tournaments
+                </NavButton>
+              </>
+            }
+          />
         </section>
       </main>
     );

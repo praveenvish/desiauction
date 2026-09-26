@@ -1,6 +1,7 @@
 import {
   ButtonLink,
   CardGrid,
+  EmptyState,
   IconAlert,
   IconArrowRight,
   IconBolt,
@@ -17,6 +18,7 @@ import {
   IconUser,
   IconUsers,
   IconWallet,
+  type JourneyStep,
   JourneyStepper,
   Money,
   Pill,
@@ -25,7 +27,6 @@ import {
   StatCard,
   StatGrid,
   VisuallyHidden,
-  type JourneyStep,
 } from "@desiauction/ui";
 import type { GrantLike } from "@desiauction/core";
 import Link from "next/link";
@@ -1257,16 +1258,17 @@ function PanelEmpty({
   ctaLabel: string;
 }) {
   return (
-    <div className="home-blank">
-      <IconTile icon={icon} tone="gold" size="md" />
-      <span className="home-row-text">
-        <strong>{title}</strong>
-        <span>{text}</span>
-      </span>
-      <ButtonLink href={ctaHref} variant="secondary" size="sm" className="home-blank-cta">
-        {ctaLabel}
-      </ButtonLink>
-    </div>
+    <EmptyState
+      size="compact"
+      icon={icon}
+      title={title.replace(/\.$/, "")}
+      description={text}
+      action={
+        <ButtonLink href={ctaHref} variant="secondary" size="sm">
+          {ctaLabel}
+        </ButtonLink>
+      }
+    />
   );
 }
 

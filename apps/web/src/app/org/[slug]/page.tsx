@@ -3,6 +3,7 @@ import {
   ButtonLink,
   Card,
   CardGrid,
+  EmptyState,
   IconArrowRight,
   IconBolt,
   IconBroadcast,
@@ -506,7 +507,11 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
         >
           {liveOpen.length === 0 ? (
             editions.length === 0 ? (
-              <p className="od-empty">Nothing live or taking entries right now.</p>
+              <EmptyState
+                size="compact"
+                icon={<IconTrophy />}
+                title="Nothing live or taking entries right now"
+              />
             ) : (
               /* Nothing live: the club's latest seasons instead of one grey
                  sentence in a full-height card (round 2). */
@@ -557,7 +562,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
 
         <SectionCard icon={<IconBolt />} concept="activity" title="Recent activity">
           {overview === null || overview.activity.length === 0 ? (
-            <p className="od-empty">No activity recorded yet.</p>
+            <EmptyState size="compact" icon={<IconBolt />} title="No activity recorded yet" />
           ) : (
             <ul className="od-activity-list">
               {groupActivity(

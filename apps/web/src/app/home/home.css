@@ -548,8 +548,7 @@
 
 .home-row-link,
 .home-feed,
-.home-clear,
-.home-blank {
+.home-clear {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -691,23 +690,6 @@
 }
 
 /* ---------- designed empty states ---------- */
-.home-blank {
-  flex-wrap: wrap;
-  padding: 0;
-}
-
-.home-blank .home-row-text {
-  flex: 1 1 12rem;
-}
-
-.home-blank .home-row-text strong,
-.home-blank .home-row-text > span {
-  white-space: normal;
-}
-
-.home-blank-cta {
-  flex: none;
-}
 
 /* ---------- crest (monogram) ---------- */
 .home-crest {
@@ -1202,6 +1184,7 @@
 .home-dot--accent {
   background: var(--accent);
 }
+
 .home-dot--muted {
   background: var(--text-muted);
 }

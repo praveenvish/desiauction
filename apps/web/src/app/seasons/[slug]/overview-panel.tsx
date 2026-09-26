@@ -2,8 +2,10 @@
 
 import {
   Button,
+  buttonClassName,
   CardGrid,
   Dialog,
+  EmptyState,
   Field,
   HeroBanner,
   IconArrowRight,
@@ -29,18 +31,17 @@ import {
   IconUser,
   IconUsers,
   IconWallet,
+  type JourneyStep,
   JourneyStepper,
+  type KitTone,
   Notice,
   Pill,
   SectionCard,
   Select,
   StatCard,
   StatGrid,
-  VisuallyHidden,
-  buttonClassName,
   useToast,
-  type JourneyStep,
-  type KitTone,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
@@ -861,21 +862,25 @@ export function OverviewPanel({
             }
           >
             {view.topTeams.length === 0 ? (
-              <div className="ov-empty">
-                <p>
-                  No teams yet. The auction issues one paddle per team, so this is the first thing
-                  to build.
-                </p>
-                {view.viewer.canManage ? (
-                  <Link
-                    href={`/seasons/${slug}/teams`}
-                    className={buttonClassName({ variant: "secondary" })}
-                    data-testid="empty-add-teams"
-                  >
-                    Add teams
-                  </Link>
-                ) : null}
-              </div>
+              <EmptyState
+                size="compact"
+                icon={<IconUsers />}
+                title="No teams yet"
+                description="The auction issues one paddle per team, so this is the first thing to build."
+                {...(view.viewer.canManage
+                  ? {
+                      action: (
+                        <Link
+                          href={`/seasons/${slug}/teams`}
+                          className={buttonClassName({ variant: "secondary", size: "sm" })}
+                          data-testid="empty-add-teams"
+                        >
+                          Add teams
+                        </Link>
+                      ),
+                    }
+                  : {})}
+              />
             ) : (
               <ul className="ov-rows">
                 {view.topTeams.slice(0, 5).map((team) => {
@@ -953,26 +958,41 @@ export function OverviewPanel({
               : {})}
           >
             {view.poolByRole.length === 0 ? (
-              <div className="ov-empty">
-                <p>
-                  No approved players yet.{" "}
-                  {status === "registration_open"
+              <EmptyState
+                size="compact"
+                icon={<IconUsers />}
+                title="No approved players yet"
+                description={
+                  status === "registration_open"
                     ? "Share the registration link — every entry lands in the Registrations tab for you to approve."
-                    : "Players enter through the registration link once you open registration."}
-                </p>
-                {view.viewer.canReview && status === "registration_open" ? (
-                  <ShareRegistration slug={slug} open seasonName={view.competition.name} />
-                ) : null}
-                {view.viewer.canReview && view.pendingPlayers > 0 ? (
-                  <Link
-                    href={`/seasons/${slug}/registrations`}
-                    className={buttonClassName({ variant: "secondary" })}
-                    data-testid="empty-review-registrations"
-                  >
-                    Review {view.pendingPlayers} waiting
-                  </Link>
-                ) : null}
-              </div>
+                    : "Players enter through the registration link once you open registration."
+                }
+                {...(view.viewer.canReview &&
+                (status === "registration_open" || view.pendingPlayers > 0)
+                  ? {
+                      action: (
+                        <>
+                          {status === "registration_open" ? (
+                            <ShareRegistration
+                              slug={slug}
+                              open
+                              seasonName={view.competition.name}
+                            />
+                          ) : null}
+                          {view.pendingPlayers > 0 ? (
+                            <Link
+                              href={`/seasons/${slug}/registrations`}
+                              className={buttonClassName({ variant: "secondary", size: "sm" })}
+                              data-testid="empty-review-registrations"
+                            >
+                              Review {view.pendingPlayers} waiting
+                            </Link>
+                          ) : null}
+                        </>
+                      ),
+                    }
+                  : {})}
+              />
             ) : (
               <ul className="ov-rows">
                 {view.poolByRole.map((entry) => {

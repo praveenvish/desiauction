@@ -1,6 +1,7 @@
 import {
   ButtonLink,
   CardGrid,
+  EmptyState,
   IconArrowRight,
   IconChart,
   IconCheckCircle,
@@ -11,6 +12,7 @@ import {
   IconStar,
   IconUsers,
   IconWallet,
+  type KitTone,
   Notice,
   PlayerImage,
   SectionCard,
@@ -18,7 +20,6 @@ import {
   StatGrid,
   Toolbar,
   ToolbarSpacer,
-  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
@@ -121,19 +122,24 @@ export default async function ReportsPage({
     return (
       <main className="px-players">
         <section className="px-empty" data-testid="reports-empty">
-          <span className="px-empty-glyph" aria-hidden>
-            <IconChart size={30} />
-          </span>
-          <h2>No reports yet</h2>
-          <p>
-            Reports summarise the seasons you run — registrations, fees and auction spend. Once you
-            review registrations for a season, its report appears here.
-          </p>
-          <div className="px-empty-actions">
-            <NavButton href="/tournaments" variant="primary" size="touch">
-              Go to tournaments
-            </NavButton>
-          </div>
+          <EmptyState
+            icon={<IconChart />}
+            title="No reports yet"
+            headingLevel={2}
+            description={
+              <>
+                Reports summarise the seasons you run — registrations, fees and auction spend. Once
+                you review registrations for a season, its report appears here.
+              </>
+            }
+            action={
+              <>
+                <NavButton href="/tournaments" variant="primary" size="touch">
+                  Go to tournaments
+                </NavButton>
+              </>
+            }
+          />
         </section>
       </main>
     );
@@ -344,7 +350,11 @@ export default async function ReportsPage({
           data-testid="report-teams"
         >
           {report.teams.length === 0 ? (
-            <p className="rp-empty">Teams appear here once they are created.</p>
+            <EmptyState
+              size="compact"
+              icon={<IconUsers />}
+              title="Teams appear here once they are created"
+            />
           ) : (
             <Bars
               label={money ? "Spend by team" : "Squad size by team"}
@@ -390,7 +400,7 @@ export default async function ReportsPage({
             data-testid="report-top-buys"
           >
             {(report.topBuys ?? []).length === 0 ? (
-              <p className="rp-empty">Nobody has been sold yet.</p>
+              <EmptyState size="compact" icon={<IconGavel />} title="Nobody has been sold yet" />
             ) : (
               <ol className="rp-buys">
                 {(report.topBuys ?? []).map((buy, index) => (

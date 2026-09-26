@@ -6,10 +6,13 @@ import {
   Button,
   ButtonLink,
   Dialog,
+  EmptyState,
   FilterMenu,
+  IconAlert,
   IconArrowRight,
   IconCrown,
   IconDownload,
+  IconFilter,
   IconGavel,
   IconKebab,
   IconLock,
@@ -17,6 +20,7 @@ import {
   IconSearch,
   IconStar,
   IconUpload,
+  IconUsers,
   IconWallet,
   type KitTone,
   Pager,
@@ -1163,41 +1167,46 @@ export function RegistrationDashboardPanel({
                   <tr>
                     <td colSpan={feesInUse ? 9 : 8} className="pd-empty" data-testid="reg-empty">
                       {!filtersApplied && stats.total > 0 ? (
-                        <>
-                          <strong>
-                            {stats.total} registration{stats.total === 1 ? "" : "s"} exist
-                            {stats.total === 1 ? "s" : ""} but none can be displayed.
-                          </strong>{" "}
-                          This usually means the underlying player records are incomplete — contact
-                          support with this season&rsquo;s name.
-                        </>
+                        <EmptyState
+                          size="compact"
+                          icon={<IconAlert />}
+                          concept="error"
+                          title={`${String(stats.total)} registration${stats.total === 1 ? " exists" : "s exist"} but none can be displayed`}
+                          description="This usually means the underlying player records are incomplete — contact support with this season’s name."
+                        />
                       ) : filtersApplied ? (
-                        <>
-                          <strong>No registrations match these filters.</strong>{" "}
-                          <button
-                            type="button"
-                            className="pd-link"
-                            onClick={() => {
-                              setSearch("");
-                              changeFilter({
-                                q: "",
-                                status: "",
-                                fee: "",
-                                team: "",
-                                role: "",
-                                sort: "",
-                              });
-                            }}
-                          >
-                            Clear the filters
-                          </button>{" "}
-                          to see all {stats.total} registration{stats.total === 1 ? "" : "s"}.
-                        </>
+                        <EmptyState
+                          size="compact"
+                          icon={<IconFilter />}
+                          title="No registrations match these filters"
+                          description={`Clear them to see all ${String(stats.total)} registration${stats.total === 1 ? "" : "s"}.`}
+                          action={
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setSearch("");
+                                changeFilter({
+                                  q: "",
+                                  status: "",
+                                  fee: "",
+                                  team: "",
+                                  role: "",
+                                  sort: "",
+                                });
+                              }}
+                            >
+                              Clear the filters
+                            </Button>
+                          }
+                        />
                       ) : (
-                        <>
-                          <strong>Nobody has registered yet.</strong> Share the registration link —
-                          that&apos;s how players arrive — or add players yourself, or import a CSV.
-                        </>
+                        <EmptyState
+                          size="compact"
+                          icon={<IconUsers />}
+                          title="Nobody has registered yet"
+                          description="Share the registration link — that’s how players arrive — or add players yourself, or import a CSV."
+                        />
                       )}
                     </td>
                   </tr>

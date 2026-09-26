@@ -26,55 +26,11 @@
 
 .px-empty {
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-12) var(--space-5);
-  text-align: center;
+  padding: var(--space-4);
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-1);
-}
-
-.px-empty-glyph {
-  display: inline-grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-full);
-  background: var(--accent-subtle);
-  color: var(--text-accent);
-}
-
-.px-empty h2 {
-  margin: 0;
-  font-size: var(--text-xl-size);
-  line-height: var(--text-xl-line);
-  color: var(--text-heading);
-}
-
-.px-empty p {
-  margin: 0;
-  max-width: 48ch;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
-}
-
-.px-empty-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.px-empty-actions a {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 /* ---- the card: one toolbar row, then the table (wow pass) ---- */
@@ -139,6 +95,7 @@
   background: var(--accent-subtle);
   color: var(--text-heading);
 }
+
 .px-select:focus-visible,
 .px-reset:focus-visible {
   outline: 2px solid var(--focus-ring);

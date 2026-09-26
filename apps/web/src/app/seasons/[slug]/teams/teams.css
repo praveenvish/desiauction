@@ -1111,13 +1111,6 @@
   color: var(--text-secondary);
 }
 
-.tm-own-empty {
-  margin: 0;
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
-  color: var(--text-secondary);
-}
-
 .tm-own-foot {
   display: flex;
   flex-wrap: wrap;

@@ -3,6 +3,7 @@
 import {
   Button,
   ButtonLink,
+  EmptyState,
   IconAlert,
   IconClock,
   IconCog,
@@ -14,9 +15,9 @@ import {
   PlayerImage,
   SectionCard,
   Select,
+  type TabItem,
   TeamChip,
   useToast,
-  type TabItem,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -406,7 +407,13 @@ export function AuctionPanel({
           })}
           {visibleLots.length === 0 ? (
             <li className="auc-empty">
-              {view.lots.length === 0 ? "No players in this auction." : "No players here yet."}
+              <EmptyState
+                size="compact"
+                icon={<IconUsers />}
+                title={
+                  view.lots.length === 0 ? "No players in this auction" : "No players here yet"
+                }
+              />
             </li>
           ) : null}
         </ul>
@@ -441,7 +448,7 @@ export function AuctionPanel({
         }
       >
         {view.paddles.length === 0 ? (
-          <p className="auc-empty">No paddles yet.</p>
+          <EmptyState size="compact" icon={<IconUsers />} title="No paddles yet" />
         ) : (
           <>
             <div className="auc-pad-head" aria-hidden>

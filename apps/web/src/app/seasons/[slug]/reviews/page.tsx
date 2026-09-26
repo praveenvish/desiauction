@@ -1,4 +1,5 @@
 import {
+  EmptyState,
   IconEye,
   IconMessageCircle,
   IconSend,
@@ -106,21 +107,22 @@ export default async function SeasonReviewsPage({ params }: { params: Promise<{ 
             data-testid="season-reviews"
           >
             {shown === null ? (
-              <div className="st-empty">
-                <span className="st-empty-glyph" aria-hidden>
-                  <IconStar size={26} />
-                </span>
-                <h3>No reviews to show yet</h3>
-                <p>
-                  {view.canManage
-                    ? view.manage !== null &&
-                      view.manage.askable.players + view.manage.askable.owners === 0 &&
-                      view.manage.asked === 0
-                      ? "Reviews appear here once DesiAuction has read them. Nobody can be asked yet — a player needs an approved entry, an email and a date of birth on file."
-                      : "Reviews appear here once DesiAuction has read them."
-                    : `Reviews appear once at least ${String(view.publicThreshold)} have been published.`}
-                </p>
-              </div>
+              <EmptyState
+                icon={<IconStar />}
+                title="No reviews to show yet"
+                headingLevel={3}
+                description={
+                  <>
+                    {view.canManage
+                      ? view.manage !== null &&
+                        view.manage.askable.players + view.manage.askable.owners === 0 &&
+                        view.manage.asked === 0
+                        ? "Reviews appear here once DesiAuction has read them. Nobody can be asked yet — a player needs an approved entry, an email and a date of birth on file."
+                        : "Reviews appear here once DesiAuction has read them."
+                      : `Reviews appear once at least ${String(view.publicThreshold)} have been published.`}
+                  </>
+                }
+              />
             ) : (
               <div className="rv-body">
                 <p className="rv-summary" data-testid="season-review-summary">

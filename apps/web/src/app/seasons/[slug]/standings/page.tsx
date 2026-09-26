@@ -1,4 +1,4 @@
-import { IconTrophy, IconUsers, Pill, SectionCard } from "@desiauction/ui";
+import { EmptyState, IconTrophy, IconUsers, Pill, SectionCard } from "@desiauction/ui";
 
 import { ScheduleViews } from "../sibling-link";
 import { notFound } from "next/navigation";
@@ -72,13 +72,12 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
           flush={standings.rows.length > 0}
         >
           {standings.rows.length === 0 ? (
-            <div className="st-empty">
-              <span className="st-empty-glyph" aria-hidden>
-                <IconUsers size={26} />
-              </span>
-              <h3>No teams yet</h3>
-              <p>The table appears once this season has teams.</p>
-            </div>
+            <EmptyState
+              icon={<IconUsers />}
+              title="No teams yet"
+              headingLevel={3}
+              description={<>The table appears once this season has teams.</>}
+            />
           ) : (
             <>
               <div className="st-table-wrap">

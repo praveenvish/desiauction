@@ -553,7 +553,7 @@
 }
 
 .pd-empty {
-  padding: var(--space-10) var(--space-4) !important;
+  padding: var(--space-2) var(--space-4) !important;
   text-align: center;
   color: var(--text-secondary);
   cursor: default;

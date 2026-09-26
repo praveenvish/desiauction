@@ -1,5 +1,5 @@
 import { addDays } from "@desiauction/core";
-import { IconCalendar, SectionCard } from "@desiauction/ui";
+import { EmptyState, IconCalendar, SectionCard } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
 /**
@@ -50,14 +50,13 @@ export function EmptyWeek({
           </li>
         ))}
       </ol>
-      <div className="st-empty cal-week-empty">
-        <span className="st-empty-glyph" aria-hidden>
-          <IconCalendar size={24} weight="duotone" />
-        </span>
-        <h3>{title}</h3>
-        <p>{body}</p>
-        {actions !== undefined ? <div className="st-empty-actions">{actions}</div> : null}
-      </div>
+      <EmptyState
+        className="cal-week-empty"
+        icon={<IconCalendar />}
+        title={title}
+        description={body}
+        {...(actions !== undefined ? { action: actions } : {})}
+      />
     </SectionCard>
   );
 }

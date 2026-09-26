@@ -1,5 +1,6 @@
 import {
   ButtonLink,
+  EmptyState,
   IconCalendar,
   IconCheckCircle,
   IconClock,
@@ -78,21 +79,24 @@ export default async function LineupsPage({
 
         {fixtures.length === 0 ? (
           <SectionCard title="Lineups" hideHeader size="feature">
-            <div className="st-empty">
-              <span className="st-empty-glyph" aria-hidden>
-                <IconUsers size={24} weight="duotone" />
-              </span>
-              <h3>No matches yet</h3>
-              <p>
-                Lineups are recorded per match. Create the fixtures first, then come back after each
-                game.
-              </p>
-              <div className="st-empty-actions">
-                <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
-                  Build the schedule
-                </ButtonLink>
-              </div>
-            </div>
+            <EmptyState
+              icon={<IconUsers />}
+              title="No matches yet"
+              headingLevel={3}
+              description={
+                <>
+                  Lineups are recorded per match. Create the fixtures first, then come back after
+                  each game.
+                </>
+              }
+              action={
+                <>
+                  <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
+                    Build the schedule
+                  </ButtonLink>
+                </>
+              }
+            />
           </SectionCard>
         ) : (
           <>

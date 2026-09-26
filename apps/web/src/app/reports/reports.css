@@ -170,12 +170,6 @@
   font-weight: var(--font-weight-regular);
 }
 
-.rp-empty {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-}
-
 /* ---- top buys ---- */
 
 .rp-buys {

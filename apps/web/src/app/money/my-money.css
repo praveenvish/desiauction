@@ -1,30 +1,12 @@
 /* /money — the personal receipts page. Tokens only; both themes. */
 
-/* One axis: the tile is centred, so the title, the sentence and the button
-   are too (they sat left under a centred icon and read as a bug). */
-section.my-money-empty .my-money-empty-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
+/* The empty page: the product's one EmptyState on a card, full width like
+   every other signed-in empty page (it was capped at 560px and floated left). */
 .my-money-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  max-width: 560px;
-  padding: var(--space-8) var(--space-6);
+  box-sizing: border-box;
+  padding: var(--space-4);
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-1);
-  text-align: center;
-}
-
-@media (max-width: 719px) {
-  .my-money-empty {
-    padding: var(--space-6) var(--space-4);
-  }
 }

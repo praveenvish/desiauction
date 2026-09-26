@@ -88,16 +88,6 @@
   min-width: 0;
 }
 
-.me-empty {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-}
-
-.me-empty a {
-  color: var(--text-accent);
-}
-
 /* ---- registrations as cards ---- */
 
 .me-regs {

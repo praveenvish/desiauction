@@ -1,12 +1,5 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
-import {
-  ButtonLink,
-  Card,
-  EmptyState,
-  IconReceipt,
-  IconTile,
-  VisuallyHidden,
-} from "@desiauction/ui";
+import { ButtonLink, Card, EmptyState, IconReceipt, VisuallyHidden } from "@desiauction/ui";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../server/auth/actions";
@@ -44,14 +37,13 @@ export default async function MoneyPage() {
            white. It says who this page is for and where a club's own money
            lives instead. */
         <section className="my-money-empty" data-testid="my-money-empty">
-          <IconTile icon={<IconReceipt weight="duotone" />} tone="gold" />
           <EmptyState
-            className="my-money-empty-body"
+            icon={<IconReceipt />}
             headingLevel={2}
             title="No receipts yet"
             description="When you own a team and a club records your payment, its receipt lands here. Running a club? A rupee season's fees and settlement are on your club's money desk; a points season has nothing to settle."
             action={
-              <ButtonLink href="/tournaments" variant="secondary" size="sm">
+              <ButtonLink href="/tournaments" size="sm">
                 Go to your tournaments
               </ButtonLink>
             }

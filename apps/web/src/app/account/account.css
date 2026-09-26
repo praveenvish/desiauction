@@ -614,7 +614,6 @@ a.acct-check-row:hover {
   color: var(--text-heading);
 }
 
-.acct-block-empty,
 .security-intro,
 .security-note {
   margin: 0;

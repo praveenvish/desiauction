@@ -168,14 +168,6 @@ a.ov-hero-club:focus-visible {
   border-radius: var(--radius-sm);
 }
 
-.ov-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-
-.ov-empty p,
 .ov-muted {
   margin: 0;
   font-size: var(--text-sm-size);
