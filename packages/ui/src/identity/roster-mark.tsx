@@ -26,10 +26,7 @@ export interface RosterMarkProps {
  */
 export function RosterMark({ kind, className }: RosterMarkProps) {
   return (
-    <span
-      className={className === undefined ? styles["mark"] : `${styles["mark"]} ${className}`}
-      data-mark={kind}
-    >
+    <span className={[styles["mark"], className].filter(Boolean).join(" ")} data-mark={kind}>
       {LABEL[kind]}
     </span>
   );

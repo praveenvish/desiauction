@@ -1006,48 +1006,35 @@ export function LivePanel({
                 bar keeps only its doors. */}
             {overOffline ? null : (
               <div className="live-diagnostics" data-testid="live-diagnostics">
-                <span className="live-diagnostics-label">
-                  {overOffline ? "Auction" : "Feed diagnostics"}
-                </span>
-                {/* A finished night the engine never answered for has no feed
-                  to diagnose: /spectate says COMPLETED, so does this room —
-                  once, from the server's record, with no socket word beside it. */}
-                {overOffline ? (
-                  <span className="live-substatus-meta">
-                    <Badge tone={AUCTION_TONE[status]} data-testid="live-status">
-                      {status}
-                    </Badge>
+                <span className="live-diagnostics-label">Feed diagnostics</span>
+                <span className="live-substatus-meta">
+                  <ConnectionQuality
+                    connection={connection}
+                    drift={drift}
+                    stale={stale}
+                    offline={offline}
+                  />
+                  <span className="competitions-hint" data-testid="snapshot-version">
+                    v{version}
                   </span>
-                ) : (
-                  <span className="live-substatus-meta">
-                    <ConnectionQuality
-                      connection={connection}
-                      drift={drift}
-                      stale={stale}
-                      offline={offline}
-                    />
-                    <span className="competitions-hint" data-testid="snapshot-version">
-                      v{version}
-                    </span>
-                    {snapshot !== null ? (
-                      <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
-                        {snapshot.auctionStatus}
-                      </Badge>
-                    ) : null}
-                    {/* The raw socket word ("open") read like a status of the
+                  {snapshot !== null ? (
+                    <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
+                      {snapshot.auctionStatus}
+                    </Badge>
+                  ) : null}
+                  {/* The raw socket word ("open") read like a status of the
                     AUCTION — it sat beside COMPLETED as "OPEN". Say what it is
                     about: the link to the room. The raw value stays on
                     data-connection for anything that needs to tell
                     "connecting" from "reconnecting". */}
-                    <Badge
-                      tone={connection === "open" ? "success" : "warning"}
-                      data-testid="connection-state"
-                      data-connection={connection}
-                    >
-                      {connection === "open" ? "Connected" : "Reconnecting"}
-                    </Badge>
-                  </span>
-                )}
+                  <Badge
+                    tone={connection === "open" ? "success" : "warning"}
+                    data-testid="connection-state"
+                    data-connection={connection}
+                  >
+                    {connection === "open" ? "Connected" : "Reconnecting"}
+                  </Badge>
+                </span>
               </div>
             )}
           </div>
