@@ -9,6 +9,7 @@ import {
   IconList,
   IconRupee,
   IconUsers,
+  IconWallet,
   Pill,
   SectionCard,
   StatCard,
@@ -190,7 +191,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             value={String(pulse.activeBidders)}
           />
           <StatCard
-            icon={<IconRupee />}
+            // A ₹ glyph sat over "12,000 pts" on a points room (round 2).
+            icon={header.auctionUnit === "points" ? <IconWallet /> : <IconRupee />}
             tone="green"
             label="Average sale"
             value={averageSale === null ? "—" : money.compact(averageSale)}
