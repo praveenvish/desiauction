@@ -485,3 +485,77 @@
   color: var(--text-accent);
   font-weight: var(--font-weight-semibold);
 }
+
+/* The squad rail's season line, under its title. */
+.me-squad-season {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+/* An owned team: the owner home hero in miniature — crest, name, the purse
+   and squad figures, and the squad's door. */
+.me-regs > li > .me-reg.me-owned {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "crest body go";
+  align-items: center;
+  column-gap: var(--space-4);
+}
+
+.me-owned-crest {
+  grid-area: crest;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  box-shadow: 0 0 0 4px var(--accent-subtle);
+}
+
+.me-owned-body {
+  grid-area: body;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.me-owned-body .me-reg-top {
+  justify-content: flex-start;
+  margin: 0;
+}
+
+.me-owned-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.me-owned-figures b {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.me-owned-go {
+  grid-area: go;
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 519px) {
+  .me-regs > li > .me-reg.me-owned {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "crest body"
+      "go go";
+    row-gap: var(--space-3);
+  }
+}

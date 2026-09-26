@@ -24,7 +24,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { HeroChip, HeroStatus } from "../../components/season-hero/season-hero";
+import { PageTitle } from "../../components/shell/page-title";
 import { moneyFormat } from "../../lib/money";
+import { planView } from "../../server/auction/owner-plan-actions";
+import { seasonUnit } from "../../server/competition/season-unit";
 import { currentSession } from "../../server/auth/actions";
 import {
   playerCareer,
@@ -35,6 +38,7 @@ import {
 import { ownPhotoUrl, playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
 import { rolesOf, type OwnedTeam } from "../../server/roles/roles";
 import { RegistrationCard } from "./registration-card";
+import { LatestSquad } from "./squad-rail";
 import "./me.css";
 import { formatDate, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
 import { formatCount } from "../../lib/plural";
@@ -156,6 +160,14 @@ export default async function MySportsPage({
 
   return (
     <main className="me">
+      {/* Somebody who owns a team and has never played was greeted "My
+          sports" (round 2); their record here is the team. */}
+      {career.totals.seasons === 0 && owns.length > 0 ? (
+        <PageTitle
+          title="My teams"
+          subtitle="The teams you own — and your seasons, once you play."
+        />
+      ) : null}
       {/* Their own face when they have uploaded one; the branded initials mark
           (C-25) until then — the same mark every season surface shows. */}
       <HeroBanner
@@ -222,13 +234,17 @@ export default async function MySportsPage({
                 : "None entered yet"
             }
           />
-          <StatCard
-            icon={<IconMatch />}
-            tone="gold"
-            value={formatCount(matchesPlayed)}
-            label="Matches played"
-            hint={matchesPlayed > 0 ? `${String(wins)} won` : "From recorded lineups"}
-          />
+          {/* A "0 Matches played" tile advertised nothing (round 2): the
+              matches line below already says when they arrive. */}
+          {matchesPlayed > 0 ? (
+            <StatCard
+              icon={<IconMatch />}
+              tone="gold"
+              value={formatCount(matchesPlayed)}
+              label="Matches played"
+              hint={`${String(wins)} won`}
+            />
+          ) : null}
           <StatCard
             icon={<IconUsers />}
             tone="gold"
@@ -470,6 +486,15 @@ export default async function MySportsPage({
             </SectionCard>
           ) : null}
 
+          <LatestSquad
+            seasons={career.seasons}
+            owned={
+              owns[0] === undefined
+                ? null
+                : { competitionSlug: owns[0].competitionSlug, teamName: owns[0].teamName }
+            }
+          />
+
           <p className="me-privacy">
             <IconShieldCheck size={16} aria-hidden />
             <span>
@@ -496,7 +521,23 @@ const OWNED_STATUS: Record<string, { label: string; tone: KitTone }> = {
  * "No tournaments yet" while running a squad in one. Ownership is part of the
  * record, so it is a row here — from the same roles read the rail uses.
  */
-function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
+async function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
+  // The same gated read the owner's home hero uses, so this card shows no
+  // figure the plan page would not (null when planning is off: no figures).
+  const figures = await Promise.all(
+    teams.map(async (team) => {
+      const [plan, unit] = await Promise.all([
+        planView(team.competitionSlug, team.teamId),
+        seasonUnit(team.competitionSlug),
+      ]);
+      return plan === null
+        ? null
+        : {
+            purseLeft: moneyFormat(unit).compactFloor(plan.standing.purseRemaining),
+            squad: `${String(plan.standing.squadSize)}/${String(plan.rules.squadMax)}`,
+          };
+    }),
+  );
   return (
     <SectionCard
       icon={<IconUsers />}
@@ -505,26 +546,43 @@ function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
       data-testid="me-owned"
     >
       <ul className="me-regs">
-        {teams.map((team) => {
+        {teams.map((team, index) => {
           const status = OWNED_STATUS[team.auctionStatus] ?? {
             label: "Auction being set up",
             tone: "neutral" as KitTone,
           };
+          const figure = figures[index] ?? null;
           return (
             <li key={`${team.auctionId}:${team.teamId}`}>
               <Link
                 href={`/seasons/${team.competitionSlug}/teams?team=${encodeURIComponent(team.teamId)}`}
-                className="me-reg da-lift"
+                className="me-reg me-owned da-lift"
               >
-                <span className="me-reg-top">
-                  <span className="me-reg-when">Owner</span>
-                  <Pill tone={status.tone} dot>
-                    {status.label}
-                  </Pill>
+                {/* The home hero's mini version (round 2: "no monogram, colour,
+                    purse or squad count"). */}
+                <span className="me-owned-crest" aria-hidden>
+                  {teamMonogram(team.teamName)}
                 </span>
-                <strong className="me-reg-name">{team.teamName}</strong>
-                <span className="me-reg-org">{team.competitionName}</span>
-                <span className="me-reg-foot me-reg-go">
+                <span className="me-owned-body">
+                  <span className="me-reg-top">
+                    <span className="me-reg-when">Owner · {team.competitionName}</span>
+                    <Pill tone={status.tone} dot>
+                      {status.label}
+                    </Pill>
+                  </span>
+                  <strong className="me-reg-name">{team.teamName}</strong>
+                  {figure !== null ? (
+                    <span className="me-owned-figures">
+                      <span>
+                        <b>{figure.purseLeft}</b> purse left
+                      </span>
+                      <span>
+                        <b>{figure.squad}</b> squad
+                      </span>
+                    </span>
+                  ) : null}
+                </span>
+                <span className="me-reg-go me-owned-go">
                   My squad
                   <IconArrowRight size={16} aria-hidden />
                 </span>
@@ -535,4 +593,14 @@ function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
       </ul>
     </SectionCard>
   );
+}
+
+/** Two letters for a team's crest. */
+function teamMonogram(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("");
 }
