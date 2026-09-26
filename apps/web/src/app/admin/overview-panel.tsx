@@ -29,12 +29,12 @@ import {
   lifecycleLabel,
   waitedFor,
 } from "../../server/admin/format";
-import type { LiveBoard } from "../../server/admin/live-views";
+import type { LiveBoardView } from "../../server/admin/live-watch";
 import type { PlatformOverview } from "../../server/admin/views";
 import { humanAction, KpiValue, RelativeTime, statusPillTone } from "./admin-ui";
 import { groupAttention } from "./attention-groups";
 import { erasureDaysLeft, erasureSlaWords } from "./erasure/erasure-sla";
-import { ROOM_LABEL, ROOM_TONE, STUCK_LABEL, stuckSummary } from "./room-state";
+import { ROOM_TONE, STUCK_LABEL, engineTrouble, roomBadge, stuckSummary } from "./room-state";
 
 function pct(rate: number): number {
   return Math.round(rate * 100);
@@ -61,7 +61,7 @@ export function OverviewPanel({
 }: {
   overview: PlatformOverview;
   outcomes: OutcomeMetrics;
-  live: LiveBoard;
+  live: LiveBoardView;
   desks: { items: readonly DeskItem[]; desks: number };
 }) {
   const { totals, runnerVerdict, followers, attention, recent, liveAuctions } = overview;
@@ -297,7 +297,7 @@ export function OverviewPanel({
  * What is live, first — before totals, before outcomes. On an auction night it
  * is the only question; on any other day it answers itself in one line.
  */
-function LiveNow({ live }: { live: LiveBoard }) {
+function LiveNow({ live }: { live: LiveBoardView }) {
   const shown = live.running.slice(0, 5);
   return (
     <SectionCard
@@ -325,29 +325,34 @@ function LiveNow({ live }: { live: LiveBoard }) {
       {shown.length === 0 ? undefined : (
         <>
           <ul className="adm-rows">
-            {shown.map((row) => (
-              <li key={row.auctionId} className="adm-row">
-                <span className="adm-row-dot" data-tone={ROOM_TONE[row.state]} aria-hidden />
-                <span className="adm-row-main">
-                  <Link href={`/admin/auctions/${row.auctionId}`} className="adm-row-title">
-                    {row.seasonName}
-                  </Link>
-                  <span className="adm-row-sub">{row.orgName}</span>
-                </span>
-                <span className="adm-row-side">
-                  {/* "quiet" on every row said nothing; the dot carries it. */}
-                  {row.state === "quiet" ? (
-                    <span className="admin-sr-only">{ROOM_LABEL[row.state]}</span>
-                  ) : (
-                    <Pill tone={ROOM_TONE[row.state]}>{ROOM_LABEL[row.state]}</Pill>
-                  )}
-                  <span className="adm-row-sub">
-                    {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in 5
-                    min
+            {shown.map((row) => {
+              /* The live board's own pill rule (room-state.ts roomBadge): a
+                 room the engine is in trouble with is never "Bidding" here. */
+              const badge = roomBadge(row.state, engineTrouble(live.engine[row.auctionId]));
+              return (
+                <li key={row.auctionId} className="adm-row">
+                  <span className="adm-row-dot" data-tone={badge.tone} aria-hidden />
+                  <span className="adm-row-main">
+                    <Link href={`/admin/auctions/${row.auctionId}`} className="adm-row-title">
+                      {row.seasonName}
+                    </Link>
+                    <span className="adm-row-sub">{row.orgName}</span>
                   </span>
-                </span>
-              </li>
-            ))}
+                  <span className="adm-row-side">
+                    {/* "quiet" on every row said nothing; the dot carries it. */}
+                    {badge.dotState === "quiet" ? (
+                      <span className="admin-sr-only">{badge.label}</span>
+                    ) : (
+                      <Pill tone={badge.tone}>{badge.label}</Pill>
+                    )}
+                    <span className="adm-row-sub">
+                      {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in
+                      5 min
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
           {live.running.length > shown.length ? (
             <p className="adm-foot">
