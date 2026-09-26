@@ -23,11 +23,11 @@
   "dependencies": {
     "@fontsource/anek-devanagari": "5.2.7",
     "@fontsource/geist-mono": "5.2.8",
-    "@fontsource/geist-sans": "5.2.5",
-    "@phosphor-icons/react": "^2.1.10"
+    "@fontsource/geist-sans": "5.2.5"
   },
   "devDependencies": {
     "@desiauction/config": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
