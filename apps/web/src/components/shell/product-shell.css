@@ -384,3 +384,12 @@
 [data-theme="daylight"] .shell-railuser-text span {
   color: var(--text-secondary);
 }
+
+/* A phone's icon row leaves the title about 130px: "Good morning, Praveen"
+   clamped to "Good morning,…" and cut off the one word that was theirs.
+   Under 480px the lead goes and the name stays (still read in full above). */
+@media (max-width: 479px) {
+  .shell-title-lead {
+    display: none;
+  }
+}

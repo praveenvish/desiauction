@@ -122,6 +122,7 @@ export type {
   QuickActionBarProps,
 } from "./shell/page-header";
 export { SubNavTabs } from "./shell/sub-nav-tabs";
+export { useActiveInView } from "./primitives/use-active-in-view";
 export type { SubNavTabsProps, SubNavTab } from "./shell/sub-nav-tabs";
 export { PopoverMenu } from "./shell/popover-menu";
 export type { PopoverMenuProps, PopoverMenuItem } from "./shell/popover-menu";

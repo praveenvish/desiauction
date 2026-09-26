@@ -722,15 +722,25 @@ a.journey-link:focus-visible {
     display: inline;
   }
 
-  .journey[data-variant="rail"] .journey-step + .journey-step::before {
+  /* The rail's steps are flex: 1 1 0 on a laptop; on a phone that squeezed
+     every mark to zero width so the dots overlapped their connectors. Here
+     the marks sit at their own size, with no connectors, and only the focus
+     step grows. */
+  .journey[data-variant="rail"] {
+    gap: 6px;
+  }
+
+  .journey[data-variant="rail"] .journey-step {
     flex: none;
-    width: 10px;
-    min-width: 0;
-    margin-inline: 3px;
+  }
+
+  .journey[data-variant="rail"] .journey-step + .journey-step::before {
+    content: none;
   }
 
   .journey[data-variant="rail"] .journey-step[data-focus="true"] {
     flex: 1 1 auto;
+    min-width: 0;
   }
 }
 

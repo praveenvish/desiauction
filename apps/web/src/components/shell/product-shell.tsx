@@ -898,6 +898,16 @@ export function ProductShell({
     ...(adminDoor !== undefined ? { adminHome: adminDoor } : {}),
   });
   const title = titleOverride === null ? identity.title : titleOverride.title;
+  const titleLead = titleOverride?.lead;
+  const titleNode: ReactNode =
+    title !== null && titleLead !== undefined ? (
+      <>
+        <span className="shell-title-lead">{titleLead} </span>
+        {title}
+      </>
+    ) : (
+      title
+    );
   const titleTestId = titleOverride?.testId;
   const subtitle = titleOverride?.subtitle ?? identity.subtitle;
 
@@ -997,7 +1007,7 @@ export function ProductShell({
           wordmark={<BrandWordmark tone="rail" />}
           wordmarkHref="/home"
           glyph={<BrandMark size={32} />}
-          {...(title !== null ? { pageTitle: title } : {})}
+          {...(title !== null ? { pageTitle: titleNode } : {})}
           {...(titleTestId !== undefined ? { pageTitleAttrs: { "data-testid": titleTestId } } : {})}
           {...(identity.crumbs.length > 0
             ? {

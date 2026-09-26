@@ -1232,6 +1232,18 @@ p.admin-warning {
     font-size: var(--text-xs-size);
   }
 
+  /* A lede that is a section rail (notifications) takes the whole row, and
+     the page's own control (the period switch) gets the row under it — the
+     two used to share 358px and the rail collapsed to a clipped "C". */
+  .admin-lede:has(> nav) {
+    flex-basis: 100%;
+  }
+
+  .admin-lede:has(> nav) + .admin-pagehead-end {
+    margin-inline-start: 0;
+    justify-content: flex-start;
+  }
+
   a.admin-name {
     min-height: 32px;
   }

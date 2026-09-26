@@ -1,6 +1,6 @@
 "use client";
 
-import { IconChevronDown } from "@desiauction/ui";
+import { IconChevronDown, useActiveInView } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -23,6 +23,9 @@ export function AdminSectionNav({ sections }: { sections: readonly AdminSection[
   const activeKey = activeAdminTab(pathname);
   const { inline, pinned, more } = adminNavLayout(sections, activeKey);
   const menuRef = useRef<HTMLDetailsElement>(null);
+  const stripRef = useRef<HTMLElement>(null);
+  // A phone scrolls the strip; open it where the current section is.
+  useActiveInView(stripRef, activeKey);
 
   useEffect(() => {
     const menu = menuRef.current;
@@ -62,7 +65,7 @@ export function AdminSectionNav({ sections }: { sections: readonly AdminSection[
   };
 
   return (
-    <nav aria-label="Administration sections" className="adn">
+    <nav ref={stripRef} aria-label="Administration sections" className="adn">
       <ul className="adn-list">
         {inline.map((section) =>
           tab(section, section.dividerBefore === true ? "adn-group-start" : undefined),

@@ -10,6 +10,7 @@ import {
 
 import { IconChevronDown, IconClose, IconFilter, IconSearch } from "../icons/icons";
 import { useLinkComponent } from "./link-context";
+import { useActiveInView } from "./use-active-in-view";
 import styles from "./toolbar.module.css";
 
 /*
@@ -247,8 +248,10 @@ export function SegmentedTabs({
   testId?: string;
 }) {
   const LinkComponent = useLinkComponent();
+  const ref = useRef<HTMLElement>(null);
+  useActiveInView(ref, items.find((item) => item.active === true)?.key);
   return (
-    <nav className={styles["segmented"]} aria-label={label} data-testid={testId}>
+    <nav ref={ref} className={styles["segmented"]} aria-label={label} data-testid={testId}>
       {items.map((item) => {
         const inner = (
           <>

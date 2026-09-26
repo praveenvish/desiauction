@@ -927,18 +927,6 @@ export function FixturesPanel({
             </div>
           </dl>
           {bulkSteps}
-          {!isLobby ? (
-            <button
-              type="button"
-              className="st-link fx-regen"
-              onClick={() => {
-                setGenerateOpen(true);
-              }}
-            >
-              Generate a round robin
-              <IconArrowRight size={16} aria-hidden />
-            </button>
-          ) : null}
           {privateNote}
         </div>
       </SectionCard>
@@ -963,12 +951,34 @@ export function FixturesPanel({
                 : ""}
             </>
           ) : canManage ? (
-            "No fixtures yet — generate a round robin or add a match by hand."
+            isLobby ? (
+              "No lobbies yet — add the first one by hand."
+            ) : needsGround ? (
+              "No fixtures yet — add a ground, then generate the schedule."
+            ) : (
+              "No fixtures yet — generate a round robin or add a match by hand."
+            )
           ) : (
             "The organizer hasn't published any matches yet."
           )}
         </p>
         <div className="st-actions">
+          {/* The generator's door once there is a schedule: it opens the same
+              form as a dialog. While the schedule is empty the form sits
+              inline below; with no ground it waits behind the notice. */}
+          {canManage && !isLobby && primary !== "generate" && grounds.length > 0 ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="open-generate-fixtures"
+              onClick={() => {
+                setGenerateOpen(true);
+              }}
+            >
+              <IconSpark size={16} aria-hidden />
+              Generate fixtures
+            </Button>
+          ) : null}
           {canManage ? (
             <Button
               size="sm"
@@ -998,7 +1008,8 @@ export function FixturesPanel({
           }
           testId="fixtures-needs-ground"
         >
-          Grounds belong to the club, so one added now is there for every season after this.
+          Once one exists, the round-robin generator opens right here. Grounds belong to the club,
+          so one added now is there for every season after this.
         </Notice>
       ) : null}
 
@@ -1604,7 +1615,9 @@ export function FixturesPanel({
                       : canManage
                         ? isLobby
                           ? "No lobbies yet — add the first one with “Add lobby”."
-                          : "No fixtures yet — generate a round robin above, or add one match at a time."
+                          : needsGround
+                            ? "Matches land here once a ground is added and the schedule is generated."
+                            : "Generated and hand-added matches land here."
                         : "No fixtures yet. The organizer hasn't scheduled any matches."}
                   </td>
                 </tr>

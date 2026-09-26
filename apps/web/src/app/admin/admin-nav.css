@@ -9,6 +9,23 @@
   scrollbar-width: none;
 }
 
+/* Under 1024px the strip scrolls: scroll shadows (the SubNavTabs recipe) say
+   so, only at an end with more sections past it. It used to hard-cut at
+   "Organizat" with no hint there was more. */
+@media (max-width: 1023px) {
+  .adn {
+    background:
+      linear-gradient(to right, var(--surface-raised) 60%, transparent) left center / 20px 100%
+        no-repeat local,
+      linear-gradient(to left, var(--surface-raised) 60%, transparent) right center / 20px 100%
+        no-repeat local,
+      linear-gradient(to right, var(--border-strong), transparent) left center / 12px 100% no-repeat
+        scroll,
+      linear-gradient(to left, var(--border-strong), transparent) right center / 12px 100% no-repeat
+        scroll;
+  }
+}
+
 /* Wide enough for the strip: no scroll box, so the menu is not clipped. */
 @media (min-width: 1024px) {
   .adn {
