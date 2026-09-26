@@ -88,7 +88,16 @@ function Row({ season }: { season: ConductedSeason }) {
         </span>
         <span className="home-row-text">
           <strong>{season.competitionName}</strong>
-          <span>{date === null ? "No date set" : date}</span>
+          {/* Not built yet: the row says whose move it is, not a season date
+              beside "Not set up yet" (round 5: "Season began 1 Aug" read as
+              an alarm the auctioneer could do nothing about). */}
+          <span>
+            {season.auctionStatus === null
+              ? "Waiting on the organizer's setup"
+              : date === null
+                ? "No date set"
+                : date}
+          </span>
         </span>
         <Pill tone={state.tone} dot={state.dot === true}>
           {state.label}
@@ -136,9 +145,15 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
       ) : null}
 
       {queue.length > 0 ? (
-        // Each card its own height: the one-row queue stretched to match the
-        // kit and left ~80px of empty card (review r3).
-        <div className="hd-duo hd-duo--start">
+        // Each card its own height when the queue is a bare row (review r3);
+        // with the setup steps under it the two stand level (round 5).
+        <div
+          className={
+            queue[0] !== undefined && queue[0].auctionStatus === null
+              ? "hd-duo"
+              : "hd-duo hd-duo--start"
+          }
+        >
           <SectionCard
             data-testid="home-conduct-queue"
             icon={<IconCalendar />}
@@ -151,6 +166,7 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
                 <Row key={season.competitionSlug} season={season} />
               ))}
             </ul>
+            {queue[0] !== undefined && queue[0].auctionStatus === null ? <SetupSteps /> : null}
           </SectionCard>
           <NightKit season={queue[0] ?? null} />
         </div>
@@ -172,6 +188,25 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
         </SectionCard>
       ) : null}
     </>
+  );
+}
+
+/**
+ * WHAT HAS TO HAPPEN FIRST (round 5). A queue row that said "Not set up yet"
+ * and nothing more left the auctioneer guessing what "set up" means and how
+ * far off it is. These are the three things the organizer builds before the
+ * cockpit opens — said as the organizer's list, not the auctioneer's chores.
+ */
+function SetupSteps() {
+  return (
+    <div className="home-setup">
+      <p className="home-setup-title">Before the cockpit opens, the organizer adds</p>
+      <ol className="home-setup-list">
+        <li>The teams and their owners</li>
+        <li>The pool of players, as lots</li>
+        <li>A paddle for each team</li>
+      </ol>
+    </div>
   );
 }
 

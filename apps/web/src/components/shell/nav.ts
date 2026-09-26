@@ -1524,7 +1524,10 @@ export function seasonTabs(
       // who is bidding. No registrations, no money, no reviews.
       return [overview, teams, auction];
     case "owner":
+      // Overview leads (round 5): an owner standing on the season's own page
+      // saw four tabs and none of them lit.
       return [
+        overview,
         {
           key: "my-team",
           label: "My team",

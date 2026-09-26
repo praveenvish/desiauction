@@ -430,7 +430,9 @@ describe("the season's tabs, by role", () => {
 
   it("an owner's My team opens their own squad when the season knows it", () => {
     const tabs = seasonTabs("demo-pl", "owner", { ownTeamId: "01TEAM" });
-    expect(tabs[0]?.href).toBe("/seasons/demo-pl/teams?team=01TEAM");
+    expect(tabs.find((tab) => tab.key === "my-team")?.href).toBe(
+      "/seasons/demo-pl/teams?team=01TEAM",
+    );
     // The query is not part of the path it claims: /teams still lights it.
     expect(activeSeasonTab("/seasons/demo-pl/teams", "demo-pl", tabs)).toBe("my-team");
   });
@@ -447,8 +449,9 @@ describe("the season's tabs, by role", () => {
   });
 
   it("a team owner finally gets the two surfaces they came for", () => {
-    expect(labels("owner")).toEqual(["My team", "My plan", "Auction room", "Table"]);
+    expect(labels("owner")).toEqual(["Overview", "My team", "My plan", "Auction room", "Table"]);
     expect(seasonTabs("demo-pl", "owner").map((tab) => tab.href)).toEqual([
+      "/seasons/demo-pl",
       "/seasons/demo-pl/teams",
       "/seasons/demo-pl/auction/plan",
       "/seasons/demo-pl/auction/live",
