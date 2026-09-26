@@ -371,34 +371,40 @@ export default async function AuctionsPage() {
             <strong>{count(totals.completed)}</strong> completed
           </span>
         ) : null}
-        <span
-          className="ax-summary-item"
-          data-testid="auctions-spend"
-          title={
-            totals.spend === undefined && totals.pointsSpend === undefined
-              ? undefined
-              : spendHint(totals)
-          }
-        >
-          <IconWallet size={16} aria-hidden />
-          {totals.spend === undefined && totals.pointsSpend === undefined ? (
-            <span className="ax-muted">
-              {holdsMoneySight
-                ? "Nothing sold yet"
-                : "Spend is shown to organizers and auctioneers"}
-            </span>
-          ) : (
-            <span>
-              <strong>
-                {totals.spend !== undefined
-                  ? // rupees-always: the total adds rupee nights only; points are shown apart
-                    compactINR(totals.spend)
-                  : moneyFormat("points").compact(totals.pointsSpend ?? 0)}
-              </strong>{" "}
-              spent
-            </span>
-          )}
-        </span>
+        {/* "₹0 spent" says nothing — an auctioneer whose nights have sold
+            nothing yet sees the counts, not an empty money figure (r3). */}
+        {(totals.spend ?? 0) === 0 &&
+        (totals.pointsSpend ?? 0) === 0 &&
+        (totals.spend !== undefined || totals.pointsSpend !== undefined) ? null : (
+          <span
+            className="ax-summary-item"
+            data-testid="auctions-spend"
+            title={
+              totals.spend === undefined && totals.pointsSpend === undefined
+                ? undefined
+                : spendHint(totals)
+            }
+          >
+            <IconWallet size={16} aria-hidden />
+            {totals.spend === undefined && totals.pointsSpend === undefined ? (
+              <span className="ax-muted">
+                {holdsMoneySight
+                  ? "Nothing sold yet"
+                  : "Spend is shown to organizers and auctioneers"}
+              </span>
+            ) : (
+              <span>
+                <strong>
+                  {totals.spend !== undefined
+                    ? // rupees-always: the total adds rupee nights only; points are shown apart
+                      compactINR(totals.spend)
+                    : moneyFormat("points").compact(totals.pointsSpend ?? 0)}
+                </strong>{" "}
+                spent
+              </span>
+            )}
+          </span>
+        )}
       </p>
 
       <div className="ax-grid" data-testid="auctions-list">

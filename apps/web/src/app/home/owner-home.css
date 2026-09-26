@@ -181,6 +181,14 @@
   display: flex;
 }
 
+/* Pre-signed (captain, icon) lead the strip, ringed in gold. */
+.ow-faces li[data-presigned="true"] {
+  box-shadow:
+    0 0 0 2px var(--surface-sunken),
+    0 0 0 4px var(--accent);
+  margin-right: var(--space-1);
+}
+
 .ow-squad-more {
   display: inline-flex;
   align-items: center;

@@ -5,6 +5,7 @@ import {
   IconCalendar,
   IconCheckCircle,
   IconGavel,
+  IconList,
   IconTile,
   ListRow,
   Pill,
@@ -135,7 +136,9 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
       ) : null}
 
       {queue.length > 0 ? (
-        <div className="hd-duo">
+        // Each card its own height: the one-row queue stretched to match the
+        // kit and left ~80px of empty card (review r3).
+        <div className="hd-duo hd-duo--start">
           <SectionCard
             data-testid="home-conduct-queue"
             icon={<IconCalendar />}
@@ -186,7 +189,9 @@ function NightKit({ season }: { season: ConductedSeason | null }) {
   return (
     <SectionCard
       data-testid="home-conduct-kit"
-      icon={<IconGavel />}
+      // The cockpit row below carries the gavel; the card's own mark is the
+      // night's checklist, so one glyph is not said twice (review r3).
+      icon={<IconList />}
       concept="auction"
       title="On the night"
       description={season.competitionName}

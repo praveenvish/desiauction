@@ -10,6 +10,7 @@ import Link from "next/link";
 
 import { moneyFormat } from "../../lib/money";
 import { planView } from "../../server/auction/owner-plan-actions";
+import { publicTeam, teamSlugOf } from "../../server/competition/public";
 import { seasonUnit } from "../../server/competition/season-unit";
 import type { OwnedTeam } from "../../server/roles/roles";
 import type { Tone } from "./home-parts";
@@ -94,9 +95,13 @@ function crestOf(name: string): string {
  * squad's faces as a strip; and the doors. No card inside a card.
  */
 export async function OwnerSection({ team }: { team: OwnedTeam }) {
-  const [plan, unit] = await Promise.all([
+  const [plan, unit, squad] = await Promise.all([
     planView(team.competitionSlug, team.teamId),
     seasonUnit(team.competitionSlug),
+    // The whole squad, pre-signed included, from the read the season's public
+    // team page publishes (null for a private season — the strip then shows
+    // the night's buys, as before).
+    publicTeam(team.competitionSlug, teamSlugOf(team.teamName)),
   ]);
   // The purse counts in the season's own unit — rupees or points (0091).
   const money = moneyFormat(unit);
@@ -111,7 +116,29 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
       : plan.lots
           .filter((lot) => lot.status === "sold" && lot.soldToTeamId === team.teamId)
           .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0));
-  const shown = bought.slice(0, 12);
+  /*
+   * EVERY FACE THE "12/12" COUNTS (round 4): the strip showed the ten bought
+   * beside a "12/12 Squad" figure. Pre-signed players lead, ringed, the way
+   * /teams puts them first.
+   */
+  const faces =
+    squad !== null && squad.members.length > 0
+      ? squad.members.map((member) => ({
+          key: member.registrationId,
+          name: member.name,
+          seed: member.registrationId,
+          photoUrl: member.photoUrl,
+          preSigned: member.pricePaise === null,
+        }))
+      : bought.map((lot) => ({
+          key: lot.lotId,
+          name: lot.playerName ?? "Player",
+          seed: lot.registrationId,
+          photoUrl: plan?.lotMedia[lot.lotId]?.photoUrl ?? null,
+          preSigned: false,
+        }));
+  const shown = faces.slice(0, 12);
+  const preSignedCount = faces.filter((face) => face.preSigned).length;
   const titleId = `ow-${team.teamId}`;
   return (
     <>
@@ -182,12 +209,16 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
           // squad" button below; the faces are a glance, not a second link.
           <div className="ow-squad">
             <ul className="ow-faces">
-              {shown.map((lot) => (
-                <li key={lot.lotId} title={lot.playerName ?? ""}>
+              {shown.map((face) => (
+                <li
+                  key={face.key}
+                  title={face.preSigned ? `${face.name} · pre-signed` : face.name}
+                  data-presigned={face.preSigned ? "true" : undefined}
+                >
                   <PlayerImage
-                    name={lot.playerName ?? "Player"}
-                    seed={lot.registrationId}
-                    src={plan?.lotMedia[lot.lotId]?.photoUrl ?? null}
+                    name={face.name}
+                    seed={face.seed}
+                    src={face.photoUrl}
                     size="sm"
                     shape="round"
                     decorative
@@ -196,9 +227,11 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
               ))}
             </ul>
             <span className="ow-squad-more">
-              {bought.length > shown.length
-                ? `+${String(bought.length - shown.length)} more`
-                : `${String(bought.length)} bought`}
+              {faces.length > shown.length
+                ? `+${String(faces.length - shown.length)} more`
+                : preSignedCount > 0
+                  ? `${String(faces.length - preSignedCount)} bought · ${String(preSignedCount)} pre-signed`
+                  : `${String(faces.length)} bought`}
             </span>
           </div>
         ) : null}

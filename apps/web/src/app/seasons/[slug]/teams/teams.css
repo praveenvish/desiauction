@@ -944,8 +944,10 @@
 
 /* ---- The owner's own squad, inline (wow pass, round 2) ---- */
 
+/* One mark, not two: the team's own top edge (every card has it) and the
+   "Your team" words — a gold outline on top of the colour gave the card two
+   competing borders (review r2, r3). */
 .tm-grid .tm-card[data-own="true"] {
-  border-color: var(--accent-line);
   box-shadow:
     inset 0 3px 0 var(--team),
     var(--shadow-2);
@@ -964,7 +966,8 @@
   gap: var(--space-4);
   padding: var(--space-5);
   overflow: hidden;
-  border: 1px solid var(--accent-line);
+  /* The team's rail (::before) is the one edge; the outline stays quiet. */
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   background:
     radial-gradient(
@@ -1064,6 +1067,26 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface);
+}
+
+/* Phone: one ruled list, not twelve bordered tiles of ~108px each. */
+@media (max-width: 639px) {
+  .tm-own-grid {
+    gap: 0;
+  }
+
+  .tm-own-player {
+    min-height: 52px;
+    padding: var(--space-2) 0;
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .tm-own-player:first-child {
+    border-top: 0;
+  }
 }
 
 .tm-own-who {
