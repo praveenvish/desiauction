@@ -258,7 +258,7 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             <dl className="me-play">
               <div>
                 <dt>Role</dt>
-                <dd>{role ?? "Not set"}</dd>
+                <dd data-empty={role === null ? "true" : undefined}>{role ?? "Not set"}</dd>
               </div>
               {pack.attributes.map((attribute) => {
                 const value = sportProfile.attributes[attribute.key];
