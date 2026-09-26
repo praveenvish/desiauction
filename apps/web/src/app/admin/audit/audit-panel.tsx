@@ -5,10 +5,12 @@ import {
   ToolbarChip,
   ToolbarCount,
   ToolbarSearch,
+  ToolbarSelect,
   ToolbarSpacer,
 } from "@desiauction/ui";
 import Link from "next/link";
 
+import { ADMIN_ACCESS_ACTION } from "../../../server/admin/capabilities";
 import { actorLabel, formatCount, isSystemActor } from "../../../server/admin/format";
 import type { AuditEntry, AuditFilters, AuditPage } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
@@ -39,17 +41,16 @@ export function AuditPanel({ page }: { page: AuditPage }) {
               defaultValue={filters.q ?? ""}
               submitLabel="Filter"
             />
-            <span className="admin-select">
-              <label htmlFor="admin-audit-action">Action</label>
-              <select id="admin-audit-action" name="action" defaultValue={filters.action ?? ""}>
-                <option value="">All actions</option>
-                {actions.map((action) => (
-                  <option key={action} value={action}>
-                    {action}
-                  </option>
-                ))}
-              </select>
-            </span>
+            <ToolbarSelect
+              id="admin-audit-action"
+              name="action"
+              label="Action"
+              defaultValue={filters.action ?? ""}
+              options={[
+                { value: "", label: "All actions" },
+                ...actions.map((action) => ({ value: action, label: action })),
+              ]}
+            />
             <span className="admin-select admin-select-date">
               <label htmlFor="admin-audit-from">From</label>
               <input
@@ -110,9 +111,13 @@ export function AuditPanel({ page }: { page: AuditPage }) {
                 <section key={day.key} className="admin-log-day" aria-label={day.label}>
                   <h2 className="admin-log-date">{day.label}</h2>
                   <ul className="admin-log-rows">
-                    {day.rows.map((row) => (
-                      <AuditRow key={row.id} row={row} />
-                    ))}
+                    {runs(day.rows, filters.action !== ADMIN_ACCESS_ACTION).map((run) =>
+                      run.length === 1 ? (
+                        <AuditRow key={run[0]?.id} row={run[0] as AuditEntry} />
+                      ) : (
+                        <AccessRun key={run[0]?.id} rows={run} />
+                      ),
+                    )}
                   </ul>
                 </section>
               ))}
@@ -185,6 +190,77 @@ function groupByDay(
   return groups;
 }
 
+/**
+ * Administration records its own page views, so an operator's browsing sat
+ * between every real event as five, ten, twenty "admin.accessed" rows. A run of
+ * them by one person folds into ONE row that says so and opens to the list.
+ * Nothing is dropped or reordered: the rows are all still here, in order.
+ * Filtered to the access log itself, nothing folds — there it IS the record.
+ */
+function runs(rows: readonly AuditEntry[], fold: boolean): AuditEntry[][] {
+  if (!fold) return rows.map((row) => [row]);
+  const out: AuditEntry[][] = [];
+  for (const row of rows) {
+    const last = out[out.length - 1];
+    const head = last?.[0];
+    if (
+      last !== undefined &&
+      head !== undefined &&
+      row.action === ADMIN_ACCESS_ACTION &&
+      head.action === ADMIN_ACCESS_ACTION &&
+      head.actor === row.actor
+    ) {
+      last.push(row);
+    } else {
+      out.push([row]);
+    }
+  }
+  return out;
+}
+
+function surfaceOf(row: AuditEntry): string | null {
+  const meta = row.meta as { surface?: unknown } | null | undefined;
+  return meta !== null && meta !== undefined && typeof meta.surface === "string"
+    ? meta.surface
+    : null;
+}
+
+function AccessRun({ rows }: { rows: readonly AuditEntry[] }) {
+  const first = rows[0] as AuditEntry;
+  const last = rows[rows.length - 1] as AuditEntry;
+  const surfaces = [...new Set(rows.map(surfaceOf).filter((name) => name !== null))];
+  return (
+    <li className="admin-log-row admin-log-run">
+      <time
+        className="admin-log-time"
+        dateTime={first.at.toISOString()}
+        title={`${absoluteIst(last.at)} – ${absoluteIst(first.at)}`}
+      >
+        <span className="admin-sr-only">{absoluteIst(first.at)}</span>
+        <span aria-hidden>{CLOCK.format(first.at)}</span>
+      </time>
+      <details className="admin-log-main admin-log-runbody">
+        <summary>
+          <span className="admin-log-line">
+            <span className="admin-log-by">
+              {actorLabel(first.actor, first.actorName)} viewed {rows.length} administration pages
+            </span>
+            {surfaces.length > 0 ? (
+              <span className="admin-log-keys"> · {surfaces.join(", ")}</span>
+            ) : null}
+          </span>
+        </summary>
+        <ul className="admin-log-runlist">
+          {rows.map((row) => (
+            <AuditRow key={row.id} row={row} />
+          ))}
+        </ul>
+      </details>
+      <span className="admin-log-scope">platform</span>
+    </li>
+  );
+}
+
 function AuditRow({ row }: { row: AuditEntry }) {
   const meta = row.meta !== null && row.meta !== undefined ? JSON.stringify(row.meta) : null;
   return (
@@ -222,9 +298,11 @@ function AuditRow({ row }: { row: AuditEntry }) {
         </span>
         {meta !== null ? (
           <details className="admin-log-meta">
-            <summary>
+            {/* The evidence is one click away, not a second line on every
+                row: the summary names its fields, the panel shows it whole. */}
+            <summary title={meta}>
               <span className="admin-sr-only">Evidence: </span>
-              <code>{meta}</code>
+              <code>{evidenceKeys(row.meta)}</code>
             </summary>
             <pre className="admin-evidence">{JSON.stringify(row.meta, null, 2)}</pre>
           </details>
@@ -248,4 +326,13 @@ function AuditRow({ row }: { row: AuditEntry }) {
       </span>
     </li>
   );
+}
+
+/** "{name, slug, auctionUnit}" — the evidence's shape, for the summary. */
+function evidenceKeys(meta: unknown): string {
+  if (meta !== null && typeof meta === "object" && !Array.isArray(meta)) {
+    const keys = Object.keys(meta);
+    return keys.length === 0 ? "{}" : `{${keys.join(", ")}}`;
+  }
+  return JSON.stringify(meta);
 }
