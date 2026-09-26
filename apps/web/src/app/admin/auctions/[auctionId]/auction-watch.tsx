@@ -10,7 +10,9 @@ import {
   IconRupee,
   IconUsers,
   IconWallet,
+  ListRow,
   Pill,
+  StateDot,
   SectionCard,
   StatCard,
   StatGrid,
@@ -49,6 +51,14 @@ const LOT_STATUS_TONE: Record<string, KitTone> = {
   on_block: "gold",
   closing_soon: "amber",
   frozen: "red",
+};
+
+/** The phone row's dot: the ui kit's shared state palette. */
+const LOT_STATUS_DOT: Record<string, string | null> = {
+  sold: "sold",
+  on_block: "live",
+  closing_soon: "pending",
+  frozen: "error",
 };
 
 const LOT_STATUS_LABEL: Record<string, string> = {
@@ -360,70 +370,98 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             />
           </div>
         ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table admin-lots da-rows">
-              <thead>
-                <tr>
-                  <th scope="col">Player</th>
-                  <th scope="col">Lot</th>
-                  <th scope="col">Status</th>
-                  {sameBase ? null : (
-                    <th scope="col" className="admin-num">
-                      Base
-                    </th>
-                  )}
-                  <th scope="col" className="admin-num">
-                    Final
-                  </th>
-                  <th scope="col">Paddle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.lots.map((lot) => (
-                  <tr key={lot.lotId}>
-                    <td data-label="Player" data-cell="title">
-                      <span className="admin-cell-main">
-                        <span className="admin-name">{lot.playerName ?? "Unnamed"}</span>
-                        {lot.role !== null ? (
-                          <span className="admin-meta">{labelOf(lot.role)}</span>
-                        ) : null}
-                      </span>
-                      <span className="da-row-meta">
-                        {[
-                          `Lot ${lot.lotNumber}`,
-                          lot.role !== null ? labelOf(lot.role) : null,
-                          lot.paddleNumber,
-                        ]
-                          .filter((part) => part !== null)
-                          .join(" · ")}
-                      </span>
-                    </td>
-                    <td data-label="Lot" className="admin-count">
-                      {lot.lotNumber}
-                    </td>
-                    <td data-label="Status" data-cell="status">
-                      <Pill tone={LOT_STATUS_TONE[lot.status] ?? "neutral"}>
+          <>
+            {/* A phone reads one ListRow per lot — name over "lot · role ·
+              paddle", price over a dot and a word — instead of the table's
+              three-tier card (~107pt a lot, 22,000px for 37 lots). */}
+            <ul className="admin-lot-list" data-testid="auction-watch-lot-rows">
+              {overview.lots.map((lot) => (
+                <li key={lot.lotId}>
+                  <ListRow
+                    title={lot.playerName ?? "Unnamed"}
+                    meta={[
+                      `Lot ${lot.lotNumber}`,
+                      lot.role !== null ? labelOf(lot.role) : null,
+                      lot.paddleNumber,
+                    ]
+                      .filter((part) => part !== null)
+                      .join(" · ")}
+                    figure={lot.soldPrice === null ? "—" : money.compact(lot.soldPrice)}
+                    status={
+                      <span className="admin-lot-state">
+                        <StateDot state={LOT_STATUS_DOT[lot.status] ?? null} />
                         {LOT_STATUS_LABEL[lot.status] ?? lot.status}
-                      </Pill>
-                    </td>
+                      </span>
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+            <div className="admin-table-wrap admin-lots-wrap">
+              <table className="admin-table admin-lots da-rows">
+                <thead>
+                  <tr>
+                    <th scope="col">Player</th>
+                    <th scope="col">Lot</th>
+                    <th scope="col">Status</th>
                     {sameBase ? null : (
-                      <td data-label="Base" className="admin-num admin-count">
-                        {money.compact(lot.basePrice)}
-                      </td>
+                      <th scope="col" className="admin-num">
+                        Base
+                      </th>
                     )}
-                    <td
-                      data-label="Final"
-                      className="admin-num admin-count is-side"
-                      data-cell="figure"
-                    >
-                      {lot.soldPrice === null ? "—" : money.compact(lot.soldPrice)}
-                    </td>
-                    <td data-label="Paddle">{lot.paddleNumber ?? "—"}</td>
+                    <th scope="col" className="admin-num">
+                      Final
+                    </th>
+                    <th scope="col">Paddle</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {overview.lots.map((lot) => (
+                    <tr key={lot.lotId}>
+                      <td data-label="Player" data-cell="title">
+                        <span className="admin-cell-main">
+                          <span className="admin-name">{lot.playerName ?? "Unnamed"}</span>
+                          {lot.role !== null ? (
+                            <span className="admin-meta">{labelOf(lot.role)}</span>
+                          ) : null}
+                        </span>
+                        <span className="da-row-meta">
+                          {[
+                            `Lot ${lot.lotNumber}`,
+                            lot.role !== null ? labelOf(lot.role) : null,
+                            lot.paddleNumber,
+                          ]
+                            .filter((part) => part !== null)
+                            .join(" · ")}
+                        </span>
+                      </td>
+                      <td data-label="Lot" className="admin-count">
+                        {lot.lotNumber}
+                      </td>
+                      <td data-label="Status" data-cell="status">
+                        <Pill tone={LOT_STATUS_TONE[lot.status] ?? "neutral"}>
+                          {LOT_STATUS_LABEL[lot.status] ?? lot.status}
+                        </Pill>
+                      </td>
+                      {sameBase ? null : (
+                        <td data-label="Base" className="admin-num admin-count">
+                          {money.compact(lot.basePrice)}
+                        </td>
+                      )}
+                      <td
+                        data-label="Final"
+                        className="admin-num admin-count is-side"
+                        data-cell="figure"
+                      >
+                        {lot.soldPrice === null ? "—" : money.compact(lot.soldPrice)}
+                      </td>
+                      <td data-label="Paddle">{lot.paddleNumber ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </SectionCard>
 

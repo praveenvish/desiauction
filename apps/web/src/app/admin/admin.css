@@ -1911,7 +1911,7 @@ a.admin-quiet-link:hover {
 }
 
 .admin-room[data-state="stale"] .admin-room-dot {
-  background: var(--text-muted);
+  background: var(--danger-base);
 }
 
 .admin-room-facts {
@@ -1997,9 +1997,8 @@ a.admin-quiet-link:hover {
   flex: none;
 }
 
-.admin-room[data-trouble] .admin-room-dot {
-  background: var(--danger-base);
-}
+/* The dot is the room's STATE (room-state.ts) — the overview draws the same
+   room the same colour. Engine trouble is said in words in the Room column. */
 
 .admin-room-watch {
   justify-self: end;
@@ -2078,6 +2077,12 @@ a.admin-quiet-link:hover {
 .admin-fold-icon[data-tone="warning"] {
   background: var(--warning-subtle, var(--surface-sunken));
   color: var(--warning-strong);
+}
+
+/* A silent room is the stuck state: red here as in the overview's line. */
+.admin-fold-icon[data-tone="danger"] {
+  background: var(--danger-subtle, var(--surface-sunken));
+  color: var(--danger-strong);
 }
 
 .admin-fold-title {
@@ -2832,9 +2837,30 @@ a.admin-quiet-link:hover {
   box-shadow: var(--shadow-1);
 }
 
-.admin-watch-progress > * {
+.admin-watch-progress > *,
+.admin-watch-progress .auc-split > * {
   border: 0;
+  border-radius: 0;
   box-shadow: none;
+}
+
+/* The one unpadded card in the product (round 3): the two panels inside sat
+   flush to the frame. They take the console's card inset, and the burndown is
+   parted from progress by a hairline rather than by a second frame. */
+.admin-watch-progress > [data-testid],
+.admin-watch-progress .auc-split > [data-testid] {
+  padding: var(--space-5) var(--space-6);
+}
+
+.admin-watch-progress .auc-split {
+  border-top: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 640px) {
+  .admin-watch-progress > [data-testid],
+  .admin-watch-progress .auc-split > [data-testid] {
+    padding: var(--space-4);
+  }
 }
 
 .admin-bad {
@@ -2906,6 +2932,41 @@ a.admin-quiet-link:hover {
 @media (max-width: 719px) {
   /* The scope type rides the row's one meta line on a phone. */
   [data-testid="admin-user-grants"] [data-cell="title"] .admin-cell-main > .admin-meta {
+    display: none;
+  }
+}
+
+/* Admin auction lots: the table on a laptop, one ListRow per lot on a phone. */
+.admin-lot-list {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-lot-list > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-lot-list .da-row-figure {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.admin-lot-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs-size);
+  color: var(--text-primary);
+}
+
+@media (max-width: 719px) {
+  .admin-lot-list {
+    display: block;
+  }
+
+  .admin-lots-wrap {
     display: none;
   }
 }

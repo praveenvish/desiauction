@@ -2580,7 +2580,7 @@ p + .date-row {
 }
 
 .auc-money {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
 }
 
@@ -2681,7 +2681,8 @@ p + .date-row {
 }
 
 .auc-paddle-no {
-  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-xs-size);
   color: var(--text-muted);
   flex-shrink: 0;
@@ -2689,7 +2690,7 @@ p + .date-row {
 
 .auc-paddle-left {
   margin-inline-start: auto;
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
   white-space: nowrap;
 }
