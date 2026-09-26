@@ -988,11 +988,13 @@ a.journey-link:focus-visible {
 
 /* ---- Card grid ---- */
 
+/* Cards in a row share one height (round 2): ragged bottoms read as
+   unfinished — "Purse by team" ended 140px above "Top buys". */
 .card-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (min-width: 1024px) {
