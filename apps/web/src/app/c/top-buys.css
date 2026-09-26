@@ -22,6 +22,7 @@
     "team team";
   row-gap: var(--space-1);
   column-gap: var(--space-3);
+  box-sizing: border-box;
   height: 100%;
   padding: var(--space-4) var(--space-5);
   border: 1px solid var(--border-subtle);

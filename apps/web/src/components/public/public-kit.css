@@ -82,6 +82,10 @@
 
 .pk-hero-copy {
   display: grid;
+  /* An explicit track, not the implicit auto one: an auto column grows to its
+     widest child's max-content, and a one-line scrolling chip strip then made
+     the whole hero wider than a phone (the /help search and lede clipped). */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   justify-items: start;
   min-width: 0;
