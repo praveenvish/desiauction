@@ -1,6 +1,7 @@
 import {
   EmptyState,
   IconArrowRight,
+  SegmentedTabs,
   Toolbar,
   ToolbarCount,
   ToolbarSearch,
@@ -11,7 +12,21 @@ import Link from "next/link";
 import { formatCount, maskPersonContact } from "../../../server/admin/format";
 import type { UserDirectory } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
-import { RelativeTime, monogram } from "../admin-ui";
+import { RelativeTime, TableCount, monogram } from "../admin-ui";
+
+const USER_FILTERS: readonly { key: UserDirectory["filter"]; label: string }[] = [
+  { key: "all", label: "Everyone" },
+  { key: "players", label: "Players" },
+  { key: "profiled", label: "With a profile" },
+];
+
+function filterHref(query: string, filter: UserDirectory["filter"]): string {
+  const params = new URLSearchParams();
+  if (query !== "") params.set("q", query);
+  if (filter !== "all") params.set("filter", filter);
+  const qs = params.toString();
+  return qs === "" ? "/admin/users" : `/admin/users?${qs}`;
+}
 
 /** PX-9 §3 — the user directory. GET-form search, linkable results, no writes. */
 export function UsersPanel({ directory }: { directory: UserDirectory }) {
@@ -38,20 +53,22 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
               defaultValue={query}
               submitLabel="Search"
             />
-            {/* PI-1 P6: profile-aware facet. URL-driven like every admin filter. */}
-            <span className="admin-select">
-              <label htmlFor="admin-user-filter">Show</label>
-              <select
-                id="admin-user-filter"
-                name="filter"
-                defaultValue={directory.filter}
-                data-testid="admin-user-filter"
-              >
-                <option value="all">Everyone</option>
-                <option value="players">Players (has a registration)</option>
-                <option value="profiled">With a cricket profile</option>
-              </select>
-            </span>
+            {/* PI-1 P6: the profile-aware facet, as the same segmented links
+                the organizations directory uses — one filter look across
+                administration. URL-driven like every admin filter. */}
+            <SegmentedTabs
+              label="Show"
+              testId="admin-user-filter"
+              items={USER_FILTERS.map((option) => ({
+                key: option.key,
+                label: option.label,
+                active: option.key === directory.filter,
+                href: filterHref(query, option.key),
+              }))}
+            />
+            {directory.filter !== "all" ? (
+              <input type="hidden" name="filter" value={directory.filter} />
+            ) : null}
             <ToolbarSpacer />
             <ToolbarCount testId="admin-user-count">
               {query === ""
@@ -85,7 +102,6 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                     <th scope="col" className="admin-num">
                       Active grants
                     </th>
-                    <th scope="col">Joined</th>
                     <th scope="col">Last activity</th>
                   </tr>
                 </thead>
@@ -117,21 +133,24 @@ export function UsersPanel({ directory }: { directory: UserDirectory }) {
                         className="admin-count admin-num"
                         data-zero={row.orgs === 0 || undefined}
                       >
-                        {formatCount(row.orgs)}
+                        <TableCount n={row.orgs} />
                       </td>
                       <td
                         data-label="Active grants"
                         className="admin-count admin-num"
                         data-zero={row.activeGrants === 0 || undefined}
                       >
-                        {formatCount(row.activeGrants)}
+                        <TableCount n={row.activeGrants} />
                       </td>
-                      <td data-label="Joined">
-                        <RelativeTime at={row.createdAt} />
-                      </td>
+                      {/* Joined and Last activity were two columns saying the
+                          same "4m ago" for most people. One column: the last
+                          thing they did, and when they joined only when they
+                          have done nothing since. */}
                       <td data-label="Last activity" className="is-side">
                         {row.lastActivityAt === null ? (
-                          <span className="admin-meta">Never</span>
+                          <span className="admin-meta">
+                            Joined <RelativeTime at={row.createdAt} />
+                          </span>
                         ) : (
                           <RelativeTime at={row.lastActivityAt} />
                         )}

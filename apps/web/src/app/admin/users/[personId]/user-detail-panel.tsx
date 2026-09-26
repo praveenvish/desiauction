@@ -1,5 +1,4 @@
 import {
-  CardGrid,
   EmptyState,
   IconArrowRight,
   IconClock,
@@ -16,7 +15,15 @@ import { PageTitle } from "../../../../components/shell/page-title";
 import { personContact } from "../../../../lib/person-label";
 import { formatCount } from "../../../../server/admin/format";
 import type { UserDetail } from "../../../../server/admin/views";
-import { AdminPageHead, RelativeTime, absoluteIst, monogram } from "../../admin-ui";
+import {
+  AdminPageHead,
+  RelativeTime,
+  absoluteIst,
+  foldRuns,
+  humanAction,
+  monogram,
+} from "../../admin-ui";
+import { CopyId } from "../../copy-id";
 
 /**
  * PX-9 §3 — the user inspector.
@@ -53,12 +60,14 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
           {/* The ONE surface that shows the whole number — an operator arrived
               here on purpose, for one person. The directory shows four digits.
               `data-private` paints it over in a Report-a-problem screenshot. */}
+          <span className="admin-profile-name">{person.name ?? "Unnamed"}</span>
           <span className="admin-profile-contact" data-private>
             {personContact(person)}
           </span>
-          <span className="admin-meta">
-            <span className="admin-id admin-chip-id">{person.id}</span> · joined{" "}
-            {absoluteIst(person.createdAt)}
+          <span className="admin-meta admin-profile-id">
+            <span className="admin-id admin-chip-id">{person.id}</span>
+            <CopyId value={person.id} label="user id" />
+            <span>· joined {absoluteIst(person.createdAt)}</span>
           </span>
         </span>
         <dl className="admin-profile-stats">
@@ -81,7 +90,7 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
 
       <SectionCard
         icon={<IconKey />}
-        tone="purple"
+        tone="neutral"
         title="Grants"
         description="Every grant this person holds, in every scope, as the capability set it is."
         flush
@@ -151,60 +160,64 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
         )}
       </SectionCard>
 
-      {/* PI-1 P6: the person's participations — read-only, no prices (money
-          surfaces stay with the money capabilities). */}
-      <SectionCard
-        icon={<IconTrophy />}
-        title="Seasons played"
-        description={
-          detail.seasons.length === 0 ? "None — this person has joined no season" : undefined
-        }
-        flush={detail.seasons.length > 0}
-      >
-        {detail.seasons.length === 0 ? undefined : (
-          <ul className="admin-rows" data-testid="admin-user-seasons">
-            {detail.seasons.map((season, index) => (
-              <li key={index}>
-                <span className="admin-cell-main">
-                  <span className="admin-name">{season.competitionName}</span>
-                  <span className="admin-meta">
-                    {season.orgName}
-                    {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
-                    {roleLabelIn(sportPackFor(season.sport), season.role)}
-                  </span>
-                </span>
-                <Pill tone="neutral">{season.status}</Pill>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
+      {/* Two columns that end together: what this person belongs to on the
+          left (seasons, then clubs), what they did on the right. */}
+      <div className="admin-split">
+        <div className="admin-split-col">
+          {/* PI-1 P6: the person's participations — read-only, no prices (money
+              surfaces stay with the money capabilities). */}
+          <SectionCard
+            icon={<IconTrophy />}
+            title="Seasons played"
+            description={
+              detail.seasons.length === 0 ? "None — this person has joined no season" : undefined
+            }
+            flush={detail.seasons.length > 0}
+          >
+            {detail.seasons.length === 0 ? undefined : (
+              <ul className="admin-rows" data-testid="admin-user-seasons">
+                {detail.seasons.map((season, index) => (
+                  <li key={index}>
+                    <span className="admin-cell-main">
+                      <span className="admin-name">{season.competitionName}</span>
+                      <span className="admin-meta">
+                        {season.orgName}
+                        {season.startsOn !== null ? ` · ${season.startsOn.slice(0, 4)}` : ""} ·{" "}
+                        {roleLabelIn(sportPackFor(season.sport), season.role)}
+                      </span>
+                    </span>
+                    <Pill tone="neutral">{season.status}</Pill>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
 
-      <CardGrid>
-        <SectionCard icon={<IconLayers />} tone="blue" title="Organizations" flush>
-          {orgs.length === 0 ? (
-            <div className="admin-card-empty">
-              <EmptyState
-                headingLevel={3}
-                title="No memberships"
-                description="This person belongs to no organization."
-              />
-            </div>
-          ) : (
-            <ul className="admin-rows" data-testid="admin-user-orgs">
-              {orgs.map((org) => (
-                <li key={org.slug}>
-                  <span>
-                    <Link href={`/admin/orgs/${org.slug}`} className="admin-name">
-                      {org.name}
-                    </Link>
-                  </span>
-                  <RelativeTime at={org.joinedAt} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
+          <SectionCard icon={<IconLayers />} tone="blue" title="Organizations" flush>
+            {orgs.length === 0 ? (
+              <div className="admin-card-empty">
+                <EmptyState
+                  headingLevel={3}
+                  title="No memberships"
+                  description="This person belongs to no organization."
+                />
+              </div>
+            ) : (
+              <ul className="admin-rows" data-testid="admin-user-orgs">
+                {orgs.map((org) => (
+                  <li key={org.slug}>
+                    <span>
+                      <Link href={`/admin/orgs/${org.slug}`} className="admin-name">
+                        {org.name}
+                      </Link>
+                    </span>
+                    <RelativeTime at={org.joinedAt} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        </div>
         <SectionCard
           icon={<IconClock />}
           tone="neutral"
@@ -230,17 +243,22 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
               />
             </div>
           ) : (
-            <ul className="admin-rows">
-              {activity.map((row) => (
+            <ul className="admin-rows admin-rows-dense">
+              {foldRuns(activity, (a, b) => a.action === b.action).map(({ row, count }) => (
                 <li key={row.id}>
-                  <span className="admin-action">{row.action}</span>
+                  <span className="admin-activity-line">
+                    <span className="admin-activity-what" title={row.action}>
+                      {humanAction(row.action)}
+                    </span>
+                    {count > 1 ? <span className="admin-times">×{count}</span> : null}
+                  </span>
                   <RelativeTime at={row.at} />
                 </li>
               ))}
             </ul>
           )}
         </SectionCard>
-      </CardGrid>
+      </div>
     </>
   );
 }

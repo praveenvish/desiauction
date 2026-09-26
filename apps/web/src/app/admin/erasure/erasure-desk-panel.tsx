@@ -34,13 +34,13 @@ export function ErasureDeskPanel({ desk, nowMs }: { desk: ErasureDesk; nowMs: nu
       {desk.open.length > 0 ? (
         <SectionCard
           icon={<IconTrash />}
-          tone="red"
+          tone="neutral"
           title="Open requests"
           description={`${String(desk.open.length)} waiting, oldest first · a reply is promised within ${String(ERASURE_PROMISE_DAYS)} days`}
           flush
           data-testid="erasure-open"
         >
-          <ul className="admin-rows is-stacked">
+          <ul className="admin-rows">
             {desk.open.map((row) => (
               <ErasureRow key={row.id} row={row} nowMs={nowMs} />
             ))}
@@ -139,81 +139,93 @@ function ErasureRow({ row, nowMs }: { row: DeskRow; nowMs: number }) {
 
   const who = row.name ?? (row.phone !== null ? formatPhone(row.phone) : (row.email ?? "Unnamed"));
   return (
-    <li className="pass-row" data-testid={`erasure-request-${row.personId}`}>
-      <div className="pass-row-head">
-        {/* With no name on file, `who` IS the number or the address. */}
-        <span className="pass-row-season" {...(row.name === null ? { "data-private": "" } : {})}>
-          {who}
+    <li className="pass-row admin-erase-row" data-testid={`erasure-request-${row.personId}`}>
+      {/* One request, two lines: who and how long is left, then the decision
+          on the same row — not a card with a labelled field and a help
+          paragraph under every request. */}
+      <div className="admin-erase-who">
+        <span className="pass-row-head">
+          {/* With no name on file, `who` IS the number or the address. */}
+          <span className="pass-row-season" {...(row.name === null ? { "data-private": "" } : {})}>
+            {who}
+          </span>
+          <SlaPill requestedAt={row.requestedAt} nowMs={nowMs} />
+          {row.blocked === null ? null : (
+            <Pill tone="amber" dot>
+              Cannot erase yet
+            </Pill>
+          )}
         </span>
-        {row.blocked === null ? (
-          <Pill tone="blue">
-            {row.clubs === 0
-              ? "No clubs"
-              : `${String(row.clubs)} club${row.clubs === 1 ? "" : "s"}`}
-          </Pill>
-        ) : (
-          <Pill tone="amber" dot>
-            Cannot erase yet
-          </Pill>
-        )}
-        <SlaPill requestedAt={row.requestedAt} nowMs={nowMs} />
+        <span className="pass-row-sub">
+          asked {istDate(row.requestedAt.getTime())}
+          {" · "}
+          {row.clubs === 0 ? "no clubs" : `${String(row.clubs)} club${row.clubs === 1 ? "" : "s"}`}
+          {row.phone !== null ? (
+            <>
+              {" · "}
+              <span data-private>{formatPhone(row.phone)}</span>
+            </>
+          ) : null}
+          {row.email !== null ? (
+            <>
+              {" · "}
+              <span data-private>{row.email}</span>
+            </>
+          ) : null}
+        </span>
+        {row.reason !== null ? (
+          <blockquote className="pass-row-note">{row.reason}</blockquote>
+        ) : null}
+        {row.blocked !== null ? (
+          <p className="pass-row-sub admin-warning" role="note" data-testid="erasure-blocked">
+            {row.blocked}
+          </p>
+        ) : null}
       </div>
-      <p className="pass-row-sub">
-        asked {istDate(row.requestedAt.getTime())}
-        {row.phone !== null ? (
-          <>
-            {" · "}
-            <span data-private>{formatPhone(row.phone)}</span>
-          </>
-        ) : null}
-        {row.email !== null ? (
-          <>
-            {" · "}
-            <span data-private>{row.email}</span>
-          </>
-        ) : null}
-      </p>
-      {row.reason !== null ? <blockquote className="pass-row-note">{row.reason}</blockquote> : null}
-      {row.blocked !== null ? (
-        <p className="pass-row-sub admin-warning" role="note" data-testid="erasure-blocked">
-          {row.blocked}
-        </p>
-      ) : null}
-      <div className="admin-decide">
-        <div className="pass-row-field">
-          <Field
-            label="Note"
-            name={`note-${row.id}`}
-            value={note}
-            onChange={(event) => {
-              setNote(event.target.value);
-            }}
-            help="Required to decline — the person reads it on their account page. Optional when erasing."
-          />
-        </div>
-        <div className="pass-row-actions is-pair">
-          <Button
-            variant="danger"
-            disabled={row.blocked !== null}
-            onClick={() => {
-              setConfirmation("");
-              setConfirmOpen(true);
-            }}
-            data-testid={`erase-${row.personId}`}
-          >
-            Erase account…
-          </Button>
-          <Button
-            variant="secondary"
-            loading={pending}
-            onClick={() => {
-              run(() => declineErasureAction(row.id, note));
-            }}
-            data-testid={`decline-erasure-${row.personId}`}
-          >
-            Decline
-          </Button>
-        </div>
+      <div className="admin-erase-decide">
+        <label className="admin-sr-only" htmlFor={`note-${row.id}`}>
+          Note
+        </label>
+        <input
+          id={`note-${row.id}`}
+          name={`note-${row.id}`}
+          className="admin-erase-note"
+          value={note}
+          placeholder="Note — needed to decline"
+          aria-describedby={`note-help-${row.id}`}
+          autoComplete="off"
+          onChange={(event) => {
+            setNote(event.target.value);
+          }}
+        />
+        <span id={`note-help-${row.id}`} className="admin-sr-only">
+          Required to decline — the person reads it on their account page. Optional when erasing.
+        </span>
+        {/* Quiet in the row; the danger is said, in red, in the dialog. */}
+        <button
+          type="button"
+          className="admin-quiet-danger"
+          disabled={row.blocked !== null}
+          onClick={() => {
+            setConfirmation("");
+            setConfirmOpen(true);
+          }}
+          data-testid={`erase-${row.personId}`}
+        >
+          <IconTrash size={16} />
+          Erase account…
+        </button>
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={pending}
+          onClick={() => {
+            run(() => declineErasureAction(row.id, note));
+          }}
+          data-testid={`decline-erasure-${row.personId}`}
+        >
+          Decline
+        </Button>
       </div>
       <Dialog
         open={confirmOpen}

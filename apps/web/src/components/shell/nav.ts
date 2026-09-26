@@ -355,7 +355,9 @@ const ADMIN_SECTIONS: readonly Omit<AdminSection, "dividerBefore">[] = [
   },
   {
     key: "reports",
-    label: "Reports",
+    // Not "Reports": the organizer console has a Reports page (figures), and
+    // this desk is people telling us something broke.
+    label: "Problem reports",
     href: "/admin/reports",
     capability: "platform.support",
     group: "commercial",
@@ -573,7 +575,7 @@ const SECTION_LABELS: [RegExp, string][] = [
   [/^\/admin\/demos$/, "Demos"],
   [/^\/admin\/erasure$/, "Erasure requests"],
   [/^\/admin\/newsletter$/, "Newsletter"],
-  [/^\/admin\/reports$/, "Reports"],
+  [/^\/admin\/reports$/, "Problem reports"],
   [/^\/admin\/reviews$/, "Reviews"],
   [/^\/admin\/live$/, "Live"],
   [/^\/admin\/auctions\/[^/]+$/, "Auction"],

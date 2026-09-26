@@ -13,7 +13,7 @@ import Link from "next/link";
 import { formatCount } from "../../../server/admin/format";
 import type { OrgDirectory, OrgFilter } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
-import { RelativeTime } from "../admin-ui";
+import { RelativeTime, TableCount } from "../admin-ui";
 
 /**
  * PX-9 §2 — the organization directory.
@@ -142,21 +142,21 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                         className="admin-count admin-num"
                         data-zero={row.competitions === 0 || undefined}
                       >
-                        {formatCount(row.competitions)}
+                        <TableCount n={row.competitions} />
                       </td>
                       <td
                         data-label="Members"
                         className="admin-count admin-num"
                         data-zero={row.members === 0 || undefined}
                       >
-                        {formatCount(row.members)}
+                        <TableCount n={row.members} />
                       </td>
                       <td
                         data-label="Auctions"
                         className="admin-count admin-num"
                         data-zero={row.auctions === 0 || undefined}
                       >
-                        {formatCount(row.auctions)}
+                        <TableCount n={row.auctions} />
                       </td>
                       <td data-label="Cases" data-empty={row.cases === 0 || undefined}>
                         {/* `settled` is counted as unfinished — it can still be
@@ -164,16 +164,20 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                             a case that settled correctly reads as a problem
                             that is not there. */}
                         <span className="admin-pills">
-                          <span className="admin-count" data-zero={row.cases === 0 || undefined}>
-                            {row.cases === 0 ? "—" : formatCount(row.cases)}
-                          </span>
+                          {/* One figure, not "1" beside "● 1 open": the total
+                              only when it says more than its parts. */}
+                          {row.cases === 0 ? (
+                            <TableCount n={0} />
+                          ) : row.cases > row.openCases + row.settledCases ? (
+                            <span className="admin-count">{formatCount(row.cases)}</span>
+                          ) : null}
                           {row.openCases > 0 ? (
                             <Pill tone="amber" dot>
                               {row.openCases} open
                             </Pill>
                           ) : null}
                           {row.settledCases > 0 ? (
-                            <Pill tone="green">{row.settledCases} settled</Pill>
+                            <Pill tone="neutral">{row.settledCases} settled</Pill>
                           ) : null}
                         </span>
                       </td>
@@ -181,7 +185,10 @@ export function OrgsPanel({ directory }: { directory: OrgDirectory }) {
                         {/* "Not declared" 49 times down a column drowned the one
                             org that had. The dash is named for assistive tech. */}
                         {row.financeDeclared ? (
-                          <Pill tone="blue">Declared</Pill>
+                          <span className="admin-state" data-tone="green">
+                            <span className="admin-state-dot" aria-hidden />
+                            Declared
+                          </span>
                         ) : (
                           <span className="admin-dash" title="Not declared">
                             —<span className="admin-sr-only">Not declared</span>

@@ -2425,3 +2425,400 @@ a.admin-quiet-link:hover {
 .admin-zero {
   font-weight: var(--font-weight-regular, 400);
 }
+
+/* A healthy fact: a dot in the state's colour, the word in ink. Only a
+   problem is a pill. */
+.admin-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.admin-state-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+}
+
+.admin-state[data-tone="green"] .admin-state-dot {
+  background: var(--success-strong);
+}
+
+.admin-state[data-tone="amber"] .admin-state-dot {
+  background: var(--warning-strong);
+}
+
+.admin-state[data-tone="red"] .admin-state-dot {
+  background: var(--danger-strong);
+}
+
+/* Health on a phone: the org, then its facts as ONE wrapping line — no
+   labelled two-by-two card per club. */
+@media (max-width: 719px) {
+  .admin-follow-row {
+    gap: 4px;
+    padding-block: 10px;
+  }
+
+  .admin-follow-org {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .admin-follow-org .admin-id {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--text-xs-size);
+  }
+
+  .admin-follow-facts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px var(--space-3);
+  }
+
+  .admin-follow-facts > div {
+    flex-direction: row;
+  }
+
+  .admin-follow-row:not(.admin-follow-head) .admin-follow-facts dt {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .admin-follow-facts .admin-digest {
+    display: none;
+  }
+}
+
+/* ---- Audit, round 2: one line per event; evidence and runs on demand ---- */
+
+.admin-log-row .admin-log-main {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+}
+
+.admin-log-row .admin-log-meta {
+  min-width: 0;
+  max-width: 22rem;
+}
+
+.admin-log-row .admin-log-meta[open] {
+  flex-basis: 100%;
+  max-width: none;
+}
+
+.admin-log-row .admin-log-meta > summary {
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.admin-log-keys {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.admin-log-runbody > summary {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  list-style: none;
+  cursor: pointer;
+}
+
+.admin-log-runbody {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.admin-log-runbody > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-log-runbody > summary:hover .admin-log-by {
+  color: var(--text-accent);
+}
+
+.admin-log-runbody > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.admin-log-run .admin-log-by {
+  color: var(--text-muted);
+}
+
+.admin-log-runlist {
+  flex-basis: 100%;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.admin-log-runlist .admin-log-row {
+  padding-inline: 0;
+}
+
+@media (max-width: 719px) {
+  .admin-log-row .admin-log-meta {
+    max-width: 100%;
+  }
+
+  .admin-log-scope {
+    font-size: 11px;
+  }
+}
+
+/* Moderation on a phone: one row, the name beside its two quiet doors — the
+   take-down keeps its words for assistive tech and the dialog. */
+@media (max-width: 719px) {
+  .admin-mod-rows > li {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .admin-mod-rows .admin-mod-main .admin-meta {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .admin-mod-rows .admin-quiet-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* ---- Erasure: one request per row, the decision beside it ---- */
+
+.admin-erase-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.admin-erase-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.admin-erase-who .pass-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
+.admin-erase-decide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-erase-note {
+  box-sizing: border-box;
+  width: 15rem;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+}
+
+.admin-erase-note::placeholder {
+  color: var(--text-muted);
+}
+
+.admin-erase-note:focus-visible {
+  outline: none;
+  border-color: var(--border-interactive);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.admin-quiet-danger:disabled {
+  cursor: not-allowed;
+  color: var(--text-disabled);
+  border-color: var(--border-subtle);
+  background: transparent;
+}
+
+@media (max-width: 719px) {
+  .admin-erase-decide {
+    width: 100%;
+  }
+
+  .admin-erase-note {
+    flex: 1 1 100%;
+    width: auto;
+  }
+}
+
+/* The one primary door of an empty queue: the gold fill, the rim for daylight. */
+.admin-head-button.is-primary {
+  border-color: var(--accent-line);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.admin-head-button.is-primary:hover {
+  color: var(--text-on-accent);
+  filter: brightness(1.04);
+}
+
+.admin-inline-link {
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* An activity line: what happened (a sentence), how many times, by whom. */
+.admin-activity-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+}
+
+.admin-activity-what {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.admin-times {
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Two columns that end together (user inspector). */
+.admin-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.admin-split-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@media (max-width: 899px) {
+  .admin-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.admin-profile-name {
+  color: var(--text-heading);
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.25;
+}
+
+.admin-profile-main .admin-profile-contact {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.admin-profile-id {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.admin-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.admin-copy:hover {
+  background: var(--surface-sunken);
+  color: var(--text-accent);
+}
+
+.admin-copy:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The audit filters on a phone: search, then the action, then the two dates
+   side by side — three rows, not five. */
+@media (max-width: 719px) {
+  [data-testid="admin-audit-search"] .admin-select-date {
+    flex: 1 1 calc(50% - var(--space-2));
+    min-width: 0;
+  }
+
+  [data-testid="admin-audit-search"] .admin-select-date input {
+    max-width: none;
+    width: 100%;
+  }
+
+  [data-testid="admin-audit-search"] [data-testid="admin-audit-count"] {
+    display: none;
+  }
+}
+
+.admin-erase-who .pass-row-head > .pass-row-season {
+  margin-inline-end: 0;
+}
+
+.admin-rows > li.admin-erase-row > :first-child {
+  flex: 1 1 18rem;
+}

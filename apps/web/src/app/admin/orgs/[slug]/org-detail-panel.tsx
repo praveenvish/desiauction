@@ -18,7 +18,15 @@ import Link from "next/link";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { formatCount, lifecycleLabel, maskPersonContact } from "../../../../server/admin/format";
 import type { OrgDetail } from "../../../../server/admin/views";
-import { AdminPageHead, RelativeTime, absoluteIst, statusPillTone } from "../../admin-ui";
+import {
+  absoluteIst,
+  AdminPageHead,
+  foldRuns,
+  humanAction,
+  KpiValue,
+  RelativeTime,
+  statusPillTone,
+} from "../../admin-ui";
 
 /**
  * PX-9 §2 — the organization inspector.
@@ -65,20 +73,20 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
       <StatGrid>
         <StatCard
           icon={<IconTrophy />}
-          tone="gold"
-          value={formatCount(competitions.length)}
+          concept="season"
+          value={<KpiValue n={competitions.length} />}
           label="Seasons"
         />
         <StatCard
           icon={<IconUsers />}
-          tone="blue"
-          value={formatCount(members.length)}
+          concept="neutral"
+          value={<KpiValue n={members.length} />}
           label="Members"
         />
         <StatCard
           icon={<IconKey />}
-          tone="purple"
-          value={formatCount(active.length)}
+          concept="neutral"
+          value={<KpiValue n={active.length} />}
           label="Active grants"
         />
         {/* A fact, not a figure: "Yes" in tabular digits read as a number that
@@ -86,13 +94,11 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
         <StatCard
           icon={<IconLedger />}
           tone={finance.declared ? "green" : "neutral"}
-          value={finance.declared ? "Declared" : "—"}
-          label="Finance"
+          value={finance.declared ? "Declared" : <span className="admin-zero">None</span>}
+          label="Finance profile"
           {...(finance.declared && finance.posture !== null
             ? { hint: `Posture: ${finance.posture}` }
-            : finance.declared
-              ? {}
-              : { hint: "Not declared" })}
+            : {})}
         />
       </StatGrid>
 
@@ -307,16 +313,21 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
               />
             </div>
           ) : (
-            <ul className="admin-rows">
-              {activity.map((row) => (
-                <li key={row.id}>
-                  <span>
-                    <span className="admin-action">{row.action}</span>
-                    <span className="admin-meta"> by {row.actorName ?? row.actor.slice(-6)}</span>
-                  </span>
-                  <RelativeTime at={row.at} />
-                </li>
-              ))}
+            <ul className="admin-rows admin-rows-dense">
+              {foldRuns(activity, (a, b) => a.action === b.action && a.actor === b.actor).map(
+                ({ row, count }) => (
+                  <li key={row.id}>
+                    <span className="admin-activity-line">
+                      <span className="admin-activity-what" title={row.action}>
+                        {humanAction(row.action)}
+                      </span>
+                      {count > 1 ? <span className="admin-times">×{count}</span> : null}
+                      <span className="admin-meta"> by {row.actorName ?? row.actor.slice(-6)}</span>
+                    </span>
+                    <RelativeTime at={row.at} />
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </SectionCard>

@@ -1,4 +1,5 @@
 import { IconFlag, ToastProvider } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
@@ -38,7 +39,15 @@ export default async function AdminReportsPage() {
           </AdminPageHead>
           {queue.open.length === 0 && queue.closed.length === 0 ? (
             <div className="admin-panel">
-              <AdminEmpty icon={<IconFlag size={24} weight="duotone" />} title="No reports yet">
+              <AdminEmpty
+                icon={<IconFlag size={24} weight="duotone" />}
+                title="No reports yet"
+                actions={
+                  <Link href="/support" className="admin-head-button">
+                    Open the support page
+                  </Link>
+                }
+              >
                 When somebody uses Report a problem, it lands here with the page they were on and,
                 if they kept it, a screenshot.
               </AdminEmpty>

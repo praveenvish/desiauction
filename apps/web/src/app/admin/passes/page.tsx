@@ -1,4 +1,5 @@
 import { IconWallet, ToastProvider } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../server/admin/access-log";
@@ -45,7 +46,15 @@ export default async function AdminPassesPage() {
           </AdminPageHead>
           {queue.open.length === 0 && queue.recent.length === 0 ? (
             <div className="admin-panel">
-              <AdminEmpty icon={<IconWallet size={24} weight="duotone" />} title="No pass requests">
+              <AdminEmpty
+                icon={<IconWallet size={24} weight="duotone" />}
+                title="No pass requests"
+                actions={
+                  <Link href="/pricing" className="admin-head-button">
+                    What a pass includes
+                  </Link>
+                }
+              >
                 When an organizer runs out of room on their pass and asks for more, it appears here.
               </AdminEmpty>
             </div>

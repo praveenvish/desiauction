@@ -11,7 +11,9 @@ import {
   Pill,
   SectionCard,
   Toolbar,
+  ToolbarCount,
   ToolbarSearch,
+  ToolbarSpacer,
   useToast,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -71,15 +73,9 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
       )}
       <SectionCard
         icon={<IconGlobe />}
-        tone="blue"
+        tone="neutral"
         title="On the public web"
-        description={
-          <span className="admin-count">
-            {desk.query === ""
-              ? `${String(desk.publishedTotal)} public`
-              : `${String(desk.publishedTotal)} matching`}
-          </span>
-        }
+        description="Every season a stranger can open, newest first"
         flush
         data-testid="moderation-public"
       >
@@ -93,6 +89,13 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
               defaultValue={desk.query}
               submitLabel="Search"
             />
+            <ToolbarSpacer />
+            <ToolbarCount testId="moderation-count">
+              {desk.published.length < desk.publishedTotal
+                ? `${String(desk.published.length)} of ${String(desk.publishedTotal)}`
+                : String(desk.publishedTotal)}{" "}
+              {desk.query === "" ? "public" : "matching"}
+            </ToolbarCount>
           </Toolbar>
         </AdminFilterForm>
         {desk.published.length === 0 ? (
@@ -189,7 +192,7 @@ function PublicRow({ row }: { row: PublicSeasonRow }) {
           data-testid={`take-down-${row.slug}`}
         >
           <IconEyeOff size={16} />
-          Take down…
+          <span className="admin-quiet-label">Take down…</span>
         </button>
       </div>
       <Dialog

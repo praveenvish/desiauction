@@ -42,12 +42,18 @@ export default async function AdminDemosPage() {
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
+          {/* The door is said once: in the head when there is a queue to work,
+              in the empty state (as its primary action) when there is not. */}
           <AdminPageHead
-            actions={
-              <Link href="/admin/demos/availability" className="admin-head-button">
-                Publish availability
-              </Link>
-            }
+            {...(queue.open.length === 0 && queue.answered.length === 0
+              ? {}
+              : {
+                  actions: (
+                    <Link href="/admin/demos/availability" className="admin-head-button">
+                      Publish availability
+                    </Link>
+                  ),
+                })}
           >
             People who asked for a demo. Answer them, then record what happened.
           </AdminPageHead>
@@ -58,7 +64,7 @@ export default async function AdminDemosPage() {
                 title="Nobody has asked yet"
                 actions={
                   <>
-                    <Link href="/admin/demos/availability" className="admin-head-button">
+                    <Link href="/admin/demos/availability" className="admin-head-button is-primary">
                       Publish availability
                     </Link>
                     <a
