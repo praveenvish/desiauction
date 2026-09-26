@@ -4,6 +4,7 @@ import { commandRefusalMessage } from "@desiauction/core";
 import {
   Badge,
   Button,
+  ButtonLink,
   Card,
   Dialog,
   Field,
@@ -387,6 +388,8 @@ export function LivePanel({
   // left to recover.
   const status = snapshot?.auctionStatus ?? view.status;
   const finished = status === "completed" || status === "reconciled" || status === "abandoned";
+  /** Over, and the engine never answered: say so from the record, not a skeleton. */
+  const overOffline = finished && snapshot === null;
 
   return (
     <div
@@ -454,9 +457,40 @@ export function LivePanel({
 
           {/* Two columns, as the Owner Room comp has it: the lot and the paddle
               on the left where the eye lives, the board on the right. */}
-          <div className="live-grid">
+          <div
+            className="live-grid"
+            data-single={overOffline && myPaddle === null ? "" : undefined}
+          >
             <div className="live-col" id="live-stage">
-              {lot !== null ? (
+              {overOffline ? (
+                /* The stage used to hold a "Connecting to the auction room…"
+                   skeleton over a finished night, and the purses a column of
+                   dashes: the socket is not what a finished room needs. The
+                   record is — sold and unsold from the server's own read, and
+                   the doors to the full story. */
+                <Card className="live-card live-over" data-testid="live-over">
+                  <h2>This auction is over</h2>
+                  <p className="competitions-hint">
+                    {feed.resolved.filter((row) => row.status === "sold").length} sold ·{" "}
+                    {feed.resolved.filter((row) => row.status === "unsold").length} unsold. Every
+                    squad below is final.
+                  </p>
+                  <div className="live-over-actions">
+                    {view.viewer.canConduct ? (
+                      <ButtonLink
+                        href={`/seasons/${slug}/auction/ledger`}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Read the ledger
+                      </ButtonLink>
+                    ) : null}
+                    <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
+                      See the squads
+                    </ButtonLink>
+                  </div>
+                </Card>
+              ) : lot !== null ? (
                 <>
                   <LotHero
                     roles={view.roles}
@@ -573,22 +607,24 @@ export function LivePanel({
                   rival's remaining money. Decided on the server
                   (`viewer.canSeeAllPurses`) and obeyed here; the conductor's
                   board is unchanged. */}
-              <div id="live-purses" className="live-anchor">
-                <PurseBoard
-                  snapshot={snapshot}
-                  teams={view.teams}
-                  myPaddleNumber={myPaddle?.paddleNumber ?? null}
-                  visibleTeamIds={view.viewer.canSeeAllPurses ? null : view.myTeamIds}
-                  heading={view.viewer.canSeeAllPurses ? "Purses" : "Your purse"}
-                  rules={view.rules}
-                  squadSizes={squadSizes}
-                  note={
-                    view.viewer.canSeeAllPurses
-                      ? null
-                      : "Rivals' remaining purses are sealed — you see your own."
-                  }
-                />
-              </div>
+              {overOffline ? null : (
+                <div id="live-purses" className="live-anchor">
+                  <PurseBoard
+                    snapshot={snapshot}
+                    teams={view.teams}
+                    myPaddleNumber={myPaddle?.paddleNumber ?? null}
+                    visibleTeamIds={view.viewer.canSeeAllPurses ? null : view.myTeamIds}
+                    heading={view.viewer.canSeeAllPurses ? "Purses" : "Your purse"}
+                    rules={view.rules}
+                    squadSizes={squadSizes}
+                    note={
+                      view.viewer.canSeeAllPurses
+                        ? null
+                        : "Rivals' remaining purses are sealed — you see your own."
+                    }
+                  />
+                </div>
+              )}
               {/* Sold / passed / spend / top buy are the summary's tiles once the
                   night is over — a second copy here said them all again. */}
               {finished ? null : (

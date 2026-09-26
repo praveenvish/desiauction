@@ -838,6 +838,23 @@
   align-items: start;
 }
 
+/* A finished room read without the engine: one card, full width. */
+.live-grid[data-single] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.live-over {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.live-over-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
 @media (max-width: 900px) {
   .live-grid {
     grid-template-columns: minmax(0, 1fr);

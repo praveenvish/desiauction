@@ -246,13 +246,14 @@ export function SquadBoard({
                   says; only a line still waiting for the socket stays a dash. */}
               {showPurse ? (
                 <p className="squad-team-purse">
+                  {/* Before (or without) the socket, what a squad SPENT is still
+                      known — it is the prices on the rows below — so the line
+                      says it rather than a lone dash. */}
                   {remaining !== undefined && remaining !== null
                     ? `${money.ledger(remaining)} left`
-                    : snapshot === null
-                      ? "\u2014"
-                      : `${money.ledger(
-                          members.reduce((sum, member) => sum + (member.price ?? 0), 0),
-                        )} spent`}
+                    : `${money.ledger(
+                        members.reduce((sum, member) => sum + (member.price ?? 0), 0),
+                      )} spent`}
                 </p>
               ) : null}
               {members.length === 0 ? (
