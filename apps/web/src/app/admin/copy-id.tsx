@@ -17,15 +17,21 @@ export function CopyId({ value, label }: { value: string; label: string }) {
       aria-label={copied ? `${label} copied` : `Copy ${label}`}
       title={copied ? "Copied" : "Copy"}
       onClick={() => {
-        void navigator.clipboard
-          ?.writeText(value)
-          .then(() => {
-            setCopied(true);
-            setTimeout(() => {
-              setCopied(false);
-            }, 1600);
-          })
-          .catch(() => undefined);
+        // No clipboard over plain http (or a refused permission): the id is
+        // still selectable text beside the button, so failing quietly is fine.
+        try {
+          void navigator.clipboard
+            .writeText(value)
+            .then(() => {
+              setCopied(true);
+              setTimeout(() => {
+                setCopied(false);
+              }, 1600);
+            })
+            .catch(() => undefined);
+        } catch {
+          // Unavailable in this context.
+        }
       }}
     >
       {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
