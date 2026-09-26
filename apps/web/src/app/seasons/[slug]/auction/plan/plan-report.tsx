@@ -1,9 +1,10 @@
 "use client";
 
 import { TARGET_PRIORITY_LABELS, type PlanReport, type ReportOutcome } from "@desiauction/core";
-import { Badge, Card, EmptyState, PlayerImage, type BadgeTone } from "@desiauction/ui";
+import { Badge, Card, EmptyState, PlayerImage, RosterMark, type BadgeTone } from "@desiauction/ui";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
+import type { PreSignedPlayer } from "../../../../../server/auction/live-summary";
 import { useMoney } from "../../../../../components/money-unit";
 
 /**
@@ -71,29 +72,99 @@ function BoughtList({
  * THE NIGHT WITHOUT A PLAN. A team that never planned used to get seven tiles
  * of zeros ("0 of 0", "0 pts", "—") and only then "No targets yet". It gets
  * one sentence and what it actually bought.
+ *
+ * Round 5: the empty-state tray and headline sat on top of a ten-row list, so
+ * the page said "nothing here" and then showed something. The empty state is
+ * for an empty night only; a night with a squad leads with the squad's sums
+ * and lists everyone in it — the pre-signed first, as /teams does.
  */
 export function NoPlanReport({
   report,
   lotsByRegistration,
   labelOf,
+  preSigned = [],
+  squadSize,
+  squadMax,
+  purseRemaining,
 }: {
   report: PlanReport;
   lotsByRegistration: Map<string, PlanLotRow>;
   labelOf: (role: string | null) => string;
+  /** This team's pre-signed players — they count in the squad, so they are listed. */
+  preSigned?: PreSignedPlayer[];
+  squadSize?: number;
+  squadMax?: number;
+  purseRemaining?: number;
 }) {
   const money = useMoney();
   const bought = report.outsidePlan;
+  if (bought.length === 0 && preSigned.length === 0) {
+    return (
+      <Card data-testid="plan-report" className="plan-noplan">
+        <EmptyState
+          headingLevel={2}
+          title="You went in without a plan"
+          description="And the night passed without a signing for this team."
+        />
+      </Card>
+    );
+  }
+  const size = squadSize ?? bought.length + preSigned.length;
   return (
-    <Card data-testid="plan-report" className="plan-noplan">
-      <EmptyState
-        headingLevel={2}
-        title="You went in without a plan"
-        description={
-          bought.length === 0
-            ? "And the night passed without a signing for this team."
-            : `Bought ${String(bought.length)} ${bought.length === 1 ? "player" : "players"} on the night for ${money.ledger(report.outsidePlanTotal)}.`
-        }
-      />
+    <Card data-testid="plan-report" className="plan-noplan plan-squad">
+      <div className="plan-squad-head">
+        <h2>Your squad</h2>
+        <p className="plan-hint">No plan was set for this night — this is what the team signed.</p>
+      </div>
+      <dl className="plan-squad-facts">
+        <div>
+          <dt>Squad</dt>
+          <dd>
+            {size}
+            {squadMax === undefined ? null : <span>/{squadMax}</span>}
+          </dd>
+          <dd className="plan-squad-sub">
+            {bought.length} bought
+            {preSigned.length > 0 ? ` + ${String(preSigned.length)} pre-signed` : ""}
+          </dd>
+        </div>
+        <div>
+          <dt>Spent</dt>
+          <dd>{money.ledger(report.outsidePlanTotal)}</dd>
+        </div>
+        {purseRemaining === undefined ? null : (
+          <div>
+            <dt>Purse left</dt>
+            <dd>{money.ledger(purseRemaining)}</dd>
+          </div>
+        )}
+      </dl>
+      {preSigned.length > 0 ? (
+        <ul className="plan-bought" data-testid="plan-report-presigned-list">
+          {preSigned.map((player) => (
+            <li key={player.registrationId} className="plan-bought-row">
+              <PlayerImage
+                name={player.playerName ?? "A player"}
+                seed={player.registrationId}
+                src={player.photoUrl}
+                size="sm"
+                shape="round"
+                decorative
+              />
+              <span className="plan-bought-who">
+                <span className="plan-bought-line">
+                  <span className="plan-bought-name">{player.playerName ?? "A player"}</span>
+                  {player.isCaptain ? <RosterMark kind="captain" /> : null}
+                  {player.isIcon ? <RosterMark kind="icon" /> : null}
+                  {player.isRetained ? <RosterMark kind="retained" /> : null}
+                </span>
+                <span className="plan-bought-role">{labelOf(player.role)}</span>
+              </span>
+              <span className="plan-bought-price plan-bought-price--signed">Pre-signed</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {bought.length > 0 ? (
         <BoughtList
           rows={bought}

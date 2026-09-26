@@ -179,6 +179,19 @@
   border-radius: var(--radius-full);
   box-shadow: 0 0 0 2px var(--surface-sunken);
   display: flex;
+  inline-size: 40px;
+  block-size: 40px;
+}
+
+/* The fold chip: shown only where the strip folds (phone). */
+.ow-faces .ow-faces-fold {
+  display: none;
+  place-items: center;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Pre-signed (captain, icon) lead the strip, ringed in gold. */
@@ -204,6 +217,21 @@
 }
 
 @media (max-width: 519px) {
+  /* EIGHT FACES AND "+4" (round 5): twelve 32px faces ran past the strip's
+     right edge on a 390px phone and clipped the twelfth. */
+  .ow-faces li {
+    inline-size: 32px;
+    block-size: 32px;
+  }
+
+  .ow-faces li[data-fold="true"] {
+    display: none;
+  }
+
+  .ow-faces .ow-faces-fold {
+    display: grid;
+  }
+
   /* The state pill leads on its own line, flush left, instead of hanging
      under the name at an indent (round 2 "indents oddly"). */
   .ow-head {

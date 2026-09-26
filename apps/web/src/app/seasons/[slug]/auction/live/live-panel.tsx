@@ -76,6 +76,40 @@ const ROOM_NAV = [
   { href: "#live-timeline", label: "Timeline", icon: <IconClock size={18} /> },
 ];
 
+/**
+ * WHERE YOU ARE IN THE ROOM. The rail listed the room's sections with none
+ * marked, so it read as a menu of other pages. The section nearest the top of
+ * the viewport is the current one — "Overview" until anything else is.
+ */
+function useActiveAnchor(hrefs: string): string {
+  const first = hrefs.split(" ")[0] ?? "";
+  const [active, setActive] = useState(first);
+  useEffect(() => {
+    const targets = hrefs
+      .split(" ")
+      .map((href) => document.getElementById(href.slice(1)))
+      .filter((node): node is HTMLElement => node !== null);
+    if (targets.length === 0 || typeof IntersectionObserver === "undefined") return undefined;
+    const visible = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) visible.set(entry.target.id, entry.boundingClientRect.top);
+          else visible.delete(entry.target.id);
+        }
+        const inView = targets.find((node) => visible.has(node.id));
+        setActive(inView === undefined ? first : `#${inView.id}`);
+      },
+      { rootMargin: "0px 0px -60% 0px" },
+    );
+    for (const node of targets) observer.observe(node);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hrefs, first]);
+  return active;
+}
+
 export function LivePanel({
   slug,
   view,
@@ -390,6 +424,28 @@ export function LivePanel({
   const finished = status === "completed" || status === "reconciled" || status === "abandoned";
   /** Over, and the engine never answered: say so from the record, not a skeleton. */
   const overOffline = finished && snapshot === null;
+  // The anchors this room actually draws: the timeline and pool stand down
+  // once the night is over, and a room read without the engine has no purses.
+  const roomNav = ROOM_NAV.filter(
+    (item) =>
+      (!finished || (item.href !== "#live-timeline" && item.href !== "#live-pool")) &&
+      (!overOffline || item.href !== "#live-purses"),
+  );
+  const roomNavKey = roomNav.map((item) => item.href).join(" ");
+  const activeAnchor = useActiveAnchor(roomNavKey);
+  const soldCount = feed.resolved.filter((row) => row.status === "sold").length;
+  const unsoldCount = feed.resolved.filter((row) => row.status === "unsold").length;
+  /** The viewer's own team on a finished night: its squad and what it spent. */
+  const myOutcome =
+    myPaddle === null
+      ? null
+      : {
+          teamName: myPaddle.teamName,
+          squad: squadSizes[myPaddle.teamId] ?? 0,
+          spent: feed.resolved
+            .filter((row) => row.status === "sold" && row.teamId === myPaddle.teamId)
+            .reduce((sum, row) => sum + (row.soldPrice ?? 0), 0),
+        };
 
   return (
     <div
@@ -428,11 +484,12 @@ export function LivePanel({
           <ul>
             {/* The timeline and pool cards stand down once the night is over,
                 so their anchors do too. */}
-            {ROOM_NAV.filter(
-              (item) => !finished || (item.href !== "#live-timeline" && item.href !== "#live-pool"),
-            ).map((item) => (
+            {roomNav.map((item) => (
               <li key={item.href}>
-                <a href={item.href}>
+                <a
+                  href={item.href}
+                  aria-current={activeAnchor === item.href ? "location" : undefined}
+                >
                   {item.icon}
                   {item.label}
                 </a>
@@ -468,13 +525,43 @@ export function LivePanel({
                    the doors to the full story. */
                 <Card className="live-card live-over" data-testid="live-over">
                   <h2>This auction is over</h2>
-                  <p className="competitions-hint">
-                    {feed.resolved.filter((row) => row.status === "sold").length} sold ·{" "}
-                    {feed.resolved.filter((row) => row.status === "unsold").length} unsold. Every
-                    squad below is final.
-                  </p>
-                  <div className="live-over-actions">
-                    {view.viewer.canConduct ? (
+                  {myOutcome !== null ? (
+                    /* AN OWNER'S RESULT, not a pointer to the squads. The card
+                       held two lines and a "See the squads" button that led to
+                       the list directly beneath it; what an owner opens a
+                       finished room for is where their own team landed. */
+                    <>
+                      <p className="competitions-hint">
+                        {myOutcome.teamName} · {soldCount} sold · {unsoldCount} unsold across the
+                        night. Every squad below is final.
+                      </p>
+                      <dl className="live-over-figures" data-testid="live-over-mine">
+                        <div>
+                          <dt>Squad</dt>
+                          <dd>
+                            {myOutcome.squad}
+                            <span>/{view.rules.squadMax}</span>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Spent</dt>
+                          <dd>{money.ledger(myOutcome.spent)}</dd>
+                        </div>
+                        <div>
+                          <dt>Purse left</dt>
+                          <dd>
+                            {money.ledger(Math.max(0, view.rules.pursePerTeam - myOutcome.spent))}
+                          </dd>
+                        </div>
+                      </dl>
+                    </>
+                  ) : (
+                    <p className="competitions-hint">
+                      {soldCount} sold · {unsoldCount} unsold. Every squad below is final.
+                    </p>
+                  )}
+                  {view.viewer.canConduct ? (
+                    <div className="live-over-actions">
                       <ButtonLink
                         href={`/seasons/${slug}/auction/ledger`}
                         variant="secondary"
@@ -482,11 +569,11 @@ export function LivePanel({
                       >
                         Read the ledger
                       </ButtonLink>
-                    ) : null}
-                    <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
-                      See the squads
-                    </ButtonLink>
-                  </div>
+                      <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
+                        See the squads
+                      </ButtonLink>
+                    </div>
+                  ) : null}
                 </Card>
               ) : lot !== null ? (
                 <>
@@ -914,50 +1001,55 @@ export function LivePanel({
               ribbon already says in the room's own language. */}
           <div className="live-bottombar">
             {exits}
-            <div className="live-diagnostics" data-testid="live-diagnostics">
-              <span className="live-diagnostics-label">
-                {overOffline ? "Auction" : "Feed diagnostics"}
-              </span>
-              {/* A finished night the engine never answered for has no feed
+            {/* A finished night the engine never answered for has no feed to
+                diagnose, and the room's header already says COMPLETED — the
+                bar keeps only its doors. */}
+            {overOffline ? null : (
+              <div className="live-diagnostics" data-testid="live-diagnostics">
+                <span className="live-diagnostics-label">
+                  {overOffline ? "Auction" : "Feed diagnostics"}
+                </span>
+                {/* A finished night the engine never answered for has no feed
                   to diagnose: /spectate says COMPLETED, so does this room —
                   once, from the server's record, with no socket word beside it. */}
-              {overOffline ? (
-                <span className="live-substatus-meta">
-                  <Badge tone={AUCTION_TONE[status]} data-testid="live-status">
-                    {status}
-                  </Badge>
-                </span>
-              ) : (
-                <span className="live-substatus-meta">
-                  <ConnectionQuality
-                    connection={connection}
-                    drift={drift}
-                    stale={stale}
-                    offline={offline}
-                  />
-                  <span className="competitions-hint" data-testid="snapshot-version">
-                    v{version}
-                  </span>
-                  {snapshot !== null ? (
-                    <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
-                      {snapshot.auctionStatus}
+                {overOffline ? (
+                  <span className="live-substatus-meta">
+                    <Badge tone={AUCTION_TONE[status]} data-testid="live-status">
+                      {status}
                     </Badge>
-                  ) : null}
-                  {/* The raw socket word ("open") read like a status of the
+                  </span>
+                ) : (
+                  <span className="live-substatus-meta">
+                    <ConnectionQuality
+                      connection={connection}
+                      drift={drift}
+                      stale={stale}
+                      offline={offline}
+                    />
+                    <span className="competitions-hint" data-testid="snapshot-version">
+                      v{version}
+                    </span>
+                    {snapshot !== null ? (
+                      <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
+                        {snapshot.auctionStatus}
+                      </Badge>
+                    ) : null}
+                    {/* The raw socket word ("open") read like a status of the
                     AUCTION — it sat beside COMPLETED as "OPEN". Say what it is
                     about: the link to the room. The raw value stays on
                     data-connection for anything that needs to tell
                     "connecting" from "reconnecting". */}
-                  <Badge
-                    tone={connection === "open" ? "success" : "warning"}
-                    data-testid="connection-state"
-                    data-connection={connection}
-                  >
-                    {connection === "open" ? "Connected" : "Reconnecting"}
-                  </Badge>
-                </span>
-              )}
-            </div>
+                    <Badge
+                      tone={connection === "open" ? "success" : "warning"}
+                      data-testid="connection-state"
+                      data-connection={connection}
+                    >
+                      {connection === "open" ? "Connected" : "Reconnecting"}
+                    </Badge>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

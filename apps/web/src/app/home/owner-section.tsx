@@ -77,6 +77,9 @@ function PurseRing({ left, whole }: { left: number; whole: number }) {
   );
 }
 
+/** Faces a phone strip holds before the rest fold into "+N". */
+const PHONE_FACES = 8;
+
 /** Two letters for the crest. */
 function crestOf(name: string): string {
   return name
@@ -138,6 +141,7 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
           preSigned: false,
         }));
   const shown = faces.slice(0, 12);
+  const topBuy = bought[0];
   const preSignedCount = faces.filter((face) => face.preSigned).length;
   const titleId = `ow-${team.teamId}`;
   return (
@@ -192,6 +196,15 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
                 </span>
               </span>
             </div>
+            {over && topBuy !== undefined && topBuy.soldPrice !== null ? (
+              <div className="ow-figure" data-testid="home-owner-top-buy">
+                <span className="ow-value">{money.compact(topBuy.soldPrice)}</span>
+                <span className="ow-label">
+                  Top buy
+                  <span className="ow-hint">{topBuy.playerName ?? "Player"}</span>
+                </span>
+              </div>
+            ) : null}
             {over ? null : (
               <Link className="ow-figure ow-figure-link" href={`${base}/auction/plan`}>
                 <span className="ow-value">{String(plan.targets.length)}</span>
@@ -209,22 +222,30 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
           // squad" button below; the faces are a glance, not a second link.
           <div className="ow-squad">
             <ul className="ow-faces">
-              {shown.map((face) => (
+              {shown.map((face, index) => (
                 <li
                   key={face.key}
                   title={face.preSigned ? `${face.name} · pre-signed` : face.name}
                   data-presigned={face.preSigned ? "true" : undefined}
+                  // A phone strip holds eight faces; the rest fold into "+N".
+                  data-fold={index >= PHONE_FACES ? "true" : undefined}
                 >
                   <PlayerImage
                     name={face.name}
                     seed={face.seed}
                     src={face.photoUrl}
-                    size="sm"
+                    size="md"
                     shape="round"
+                    fluid
                     decorative
                   />
                 </li>
               ))}
+              {shown.length > PHONE_FACES ? (
+                <li className="ow-faces-fold" aria-hidden>
+                  +{String(shown.length - PHONE_FACES)}
+                </li>
+              ) : null}
             </ul>
             <span className="ow-squad-more">
               {faces.length > shown.length

@@ -392,6 +392,10 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
             report={view.report}
             lotsByRegistration={lotsByRegistration}
             labelOf={labelOf}
+            preSigned={view.preSignedPlayers}
+            squadSize={view.standing.squadSize}
+            squadMax={view.rules.squadMax}
+            purseRemaining={view.standing.purseRemaining}
           />
         ) : (
           <PlanReportCard

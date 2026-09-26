@@ -42,11 +42,29 @@ export default async function PlanPage({
           <PlanPanel slug={slug} view={view} />
         </AnnouncerProvider>
         <nav className="live-exits" aria-label="Other auction views">
-          <ButtonLink href={`/seasons/${slug}/auction/live`} data-testid="plan-open-live">
-            Back to the owner room
+          <ButtonLink
+            href={`/seasons/${slug}/auction/live`}
+            data-testid="plan-open-live"
+            aria-label="Back to the owner room"
+          >
+            <span className="plan-exit-long" aria-hidden>
+              Back to the owner room
+            </span>
+            <span className="plan-exit-short" aria-hidden>
+              Owner room
+            </span>
           </ButtonLink>
-          <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
-            Auction overview
+          <ButtonLink
+            href={`/seasons/${slug}/auction`}
+            variant="secondary"
+            aria-label="Auction overview"
+          >
+            <span className="plan-exit-long" aria-hidden>
+              Auction overview
+            </span>
+            <span className="plan-exit-short" aria-hidden>
+              Overview
+            </span>
           </ButtonLink>
         </nav>
       </div>
