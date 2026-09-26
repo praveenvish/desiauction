@@ -13,25 +13,30 @@ import {
   IconUsers,
   Pill,
   SectionCard,
+  StatCard,
+  StatGrid,
   type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
-import { useCallback, type ReactNode } from "react";
+import { useCallback } from "react";
 
 import { moneyFormat } from "../../../lib/money";
 import type { EngineRoom, LiveBoardView } from "../../../server/admin/live-watch";
 import { adminLiveBoard } from "../../../server/admin/live-watch";
 import type { LiveAuctionRow, RoomState } from "../../../server/admin/live-views";
+import { KpiValue } from "../admin-ui";
 import { LiveFreshness } from "../live-freshness";
 import { ageLabel, istWhen, usePolled } from "../use-polled";
 
 const REFRESH_MS = 10_000;
 /** "Never closed" is a backlog, not a feed: the longest-silent tail folds away. */
 const STALE_SHOWN = 10;
+/** The last day's closes: the newest few, the rest behind "Show all". */
+const ENDED_SHOWN = 5;
 
 const STATE_BADGE: Record<RoomState, { tone: KitTone; label: string }> = {
   active: { tone: "green", label: "Bidding" },
-  quiet: { tone: "blue", label: "Quiet" },
+  quiet: { tone: "neutral", label: "Quiet" },
   paused: { tone: "amber", label: "Paused" },
   stale: { tone: "neutral", label: "Silent" },
 };
@@ -64,35 +69,38 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         revoked={revoked}
       />
 
-      {/* One quiet strip, not four tall tiles. A zero is the calm answer and
-          reads muted; only trouble takes a colour. */}
-      <dl className="admin-kpis" data-testid="live-summary">
-        <Kpi
-          icon={<IconGavel size={20} weight="duotone" />}
-          value={data.running.length}
+      {/* The console's one KPI tile (StatCard), as on the overview. A zero is
+          the calm answer and reads muted; only trouble takes a colour. */}
+      <StatGrid testId="live-summary">
+        <StatCard
+          icon={<IconGavel />}
+          concept="auction"
+          value={<KpiValue n={data.running.length} />}
           label="Auctions running"
         />
-        <Kpi
-          icon={<IconBolt size={20} weight="duotone" />}
-          value={pulse}
+        <StatCard
+          icon={<IconBolt />}
+          concept="neutral"
+          value={<KpiValue n={pulse} />}
           label="Bids · last 5 min"
         />
-        <Kpi
-          icon={<IconUsers size={20} weight="duotone" />}
-          value={connected}
+        <StatCard
+          icon={<IconUsers />}
+          concept="neutral"
+          value={<KpiValue n={connected} />}
           label="People connected"
         />
-        <Kpi
-          icon={<IconAlert size={20} weight="duotone" />}
-          value={troubled.length}
+        <StatCard
+          icon={<IconAlert />}
+          concept={troubled.length > 0 ? "alert" : "neutral"}
+          value={<KpiValue n={troubled.length} />}
           label="Rooms with engine trouble"
-          tone={troubled.length > 0 ? "danger" : undefined}
         />
-      </dl>
+      </StatGrid>
 
       <SectionCard
         icon={<IconBroadcast />}
-        tone="red"
+        tone={data.running.length > 0 ? "green" : "neutral"}
         title="Running now"
         description={
           data.running.length === 0
@@ -180,26 +188,46 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         {data.ended.length === 0 ? (
           <p className="admin-card-empty">No auction has closed in the last day.</p>
         ) : (
-          <ul className="admin-rows">
-            {data.ended.map((row) => (
-              <li key={row.auctionId}>
-                <span className="admin-live-name">
-                  <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
-                  <span className="admin-meta">
-                    {row.orgName} · {row.status === "abandoned" ? "abandoned" : "closed"}{" "}
-                    {istWhen(row.endedAtMs, data.generatedAtMs)}
-                  </span>
-                </span>
-                <span className="admin-meta">
-                  {row.sold} sold · {row.unsold} unsold ·{" "}
-                  {moneyFormat(row.auctionUnit).compact(row.moneyMoved)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="admin-rows admin-rows-dense">
+              {data.ended.slice(0, ENDED_SHOWN).map((row) => (
+                <EndedRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
+              ))}
+            </ul>
+            {data.ended.length > ENDED_SHOWN ? (
+              // The last day's closes are a record, not a feed: the newest few
+              // are shown, the rest one click away.
+              <details className="admin-more">
+                <summary>Show all {String(data.ended.length)}</summary>
+                <ul className="admin-rows admin-rows-dense">
+                  {data.ended.slice(ENDED_SHOWN).map((row) => (
+                    <EndedRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </>
         )}
       </SectionCard>
     </>
+  );
+}
+
+function EndedRow({ row, nowMs }: { row: LiveBoardView["ended"][number]; nowMs: number }) {
+  return (
+    <li>
+      <span className="admin-live-name">
+        <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
+        <span className="admin-meta">
+          {row.orgName} · {row.status === "abandoned" ? "abandoned" : "closed"}{" "}
+          {istWhen(row.endedAtMs, nowMs)}
+        </span>
+      </span>
+      <span className="admin-meta admin-num-line">
+        {row.sold} sold · {row.unsold} unsold ·{" "}
+        {moneyFormat(row.auctionUnit).compact(row.moneyMoved)}
+      </span>
+    </li>
   );
 }
 
@@ -285,9 +313,16 @@ function RoomRow({
         <span className="admin-room-dot" aria-hidden />
         <span className="admin-live-name">
           <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
-          <span className="admin-meta">
+          {/* One line: the opening time is the hover, so "IST" can no longer
+              fall onto a third line and double the row. */}
+          <span
+            className="admin-meta admin-live-sub"
+            title={row.openedAtMs === null ? undefined : `Opened ${istWhen(row.openedAtMs, nowMs)}`}
+          >
             {row.orgName} · {row.sport}
-            {row.openedAtMs === null ? "" : ` · opened ${istWhen(row.openedAtMs, nowMs)}`}
+            {row.openedAtMs === null ? null : (
+              <span className="admin-sr-only"> · opened {istWhen(row.openedAtMs, nowMs)}</span>
+            )}
           </span>
         </span>
         {/* "Quiet" on every row said nothing. The pill appears only when the
@@ -328,7 +363,13 @@ function RoomRow({
         </div>
         <div>
           <dt>Spent</dt>
-          <dd>{moneyFormat(row.auctionUnit).compact(row.moneyMoved)}</dd>
+          <dd>
+            {row.moneyMoved === 0 ? (
+              <span data-zero>—</span>
+            ) : (
+              moneyFormat(row.auctionUnit).compact(row.moneyMoved)
+            )}
+          </dd>
         </div>
         <div>
           <dt>Bids</dt>
@@ -363,27 +404,5 @@ function RoomRow({
         <IconArrowRight size={16} />
       </Link>
     </li>
-  );
-}
-
-function Kpi({
-  icon,
-  value,
-  label,
-  tone,
-}: {
-  icon: ReactNode;
-  value: number;
-  label: string;
-  tone?: "danger" | undefined;
-}) {
-  return (
-    <div className="admin-kpi" data-zero={value === 0 || undefined} data-tone={tone}>
-      <span className="admin-kpi-icon" aria-hidden>
-        {icon}
-      </span>
-      <dt>{label}</dt>
-      <dd>{value.toLocaleString("en-IN")}</dd>
-    </div>
   );
 }

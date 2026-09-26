@@ -1,4 +1,4 @@
-import { IconBall, LoadingState, Pill, SectionCard } from "@desiauction/ui";
+import { IconBall, LoadingState, SectionCard } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -90,7 +90,7 @@ function SportCatalogue({ rows }: { rows: SportCatalogueRow[] }) {
   return (
     <SectionCard
       icon={<IconBall />}
-      tone="green"
+      concept="neutral"
       title="Sports"
       description={`${String(live)} of ${String(rows.length)} shipped packs switched on`}
     >
@@ -98,12 +98,24 @@ function SportCatalogue({ rows }: { rows: SportCatalogueRow[] }) {
         {rows.map((row) => (
           <li key={row.key}>
             <span className="adm-sport-name">{row.label}</span>
-            <span className="adm-sport-count">
-              {row.competitions} {row.competitions === 1 ? "season" : "seasons"}
+            <span className="adm-sport-count" data-zero={row.competitions === 0 || undefined}>
+              {row.competitions === 0
+                ? "—"
+                : `${String(row.competitions)} ${row.competitions === 1 ? "season" : "seasons"}`}
+              {row.competitions === 0 ? <span className="admin-sr-only">0 seasons</span> : null}
             </span>
-            <Pill tone={row.enabled ? "green" : "neutral"} dot>
-              {row.enabled ? "Live" : "Off"}
-            </Pill>
+            {/* Twelve green "Live" pills said one thing twelve times: the state
+                is a dot, and only an OFF sport spends a word. */}
+            <span
+              className="adm-sport-state"
+              data-on={row.enabled || undefined}
+              title={row.enabled ? "Live" : "Off"}
+            >
+              <span className="adm-sport-dot" aria-hidden />
+              <span className={row.enabled ? "admin-sr-only" : undefined}>
+                {row.enabled ? "Live" : "Off"}
+              </span>
+            </span>
           </li>
         ))}
       </ul>

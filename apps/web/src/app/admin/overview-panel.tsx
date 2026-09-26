@@ -32,7 +32,7 @@ import {
 } from "../../server/admin/format";
 import type { LiveBoard } from "../../server/admin/live-views";
 import type { PlatformOverview } from "../../server/admin/views";
-import { RelativeTime, statusPillTone } from "./admin-ui";
+import { humanAction, KpiValue, RelativeTime, statusPillTone } from "./admin-ui";
 import { groupAttention } from "./attention-groups";
 
 function pct(rate: number): number {
@@ -70,8 +70,8 @@ export function OverviewPanel({
       <StatGrid testId="admin-totals">
         <StatCard
           icon={<IconFlag />}
-          tone="gold"
-          value={formatCount(totals.orgs)}
+          concept="club"
+          value={<KpiValue n={totals.orgs} />}
           label="Organizations"
           hint="All clubs"
           href="/admin/orgs"
@@ -79,8 +79,8 @@ export function OverviewPanel({
         />
         <StatCard
           icon={<IconTrophy />}
-          tone="blue"
-          value={formatCount(totals.competitions)}
+          concept="season"
+          value={<KpiValue n={totals.competitions} />}
           label="Seasons"
           hint="Across every club"
           // The one tile without a door. Seasons are listed per club, and the
@@ -90,8 +90,8 @@ export function OverviewPanel({
         />
         <StatCard
           icon={<IconUser />}
-          tone="green"
-          value={formatCount(totals.people)}
+          concept="players"
+          value={<KpiValue n={totals.people} />}
           label="Users"
           hint="With an account"
           href="/admin/users"
@@ -99,8 +99,8 @@ export function OverviewPanel({
         />
         <StatCard
           icon={<IconGavel />}
-          tone="purple"
-          value={formatCount(totals.auctions)}
+          concept="auction"
+          value={<KpiValue n={totals.auctions} />}
           label="Auctions"
           hint={
             liveAuctions.total > 0
@@ -139,7 +139,9 @@ export function OverviewPanel({
                   {recent.map((row) => (
                     <li key={row.id} className="adm-feed-row">
                       <RelativeTime at={row.at} />
-                      <span className="adm-feed-action">{row.action}</span>
+                      <span className="adm-feed-action" title={row.action}>
+                        {humanAction(row.action)}
+                      </span>
                       <span className="adm-feed-actor">{actorLabel(row.actor, row.actorName)}</span>
                     </li>
                   ))}
@@ -226,7 +228,7 @@ export function OverviewPanel({
             </p>
           </SectionCard>
 
-          <SectionCard icon={<IconGavel />} tone="purple" title="Auctions by status">
+          <SectionCard icon={<IconGavel />} concept="auction" title="Auctions by status">
             <StatusList
               lines={overview.auctionsByStatus}
               liveAuctions={liveAuctions}
@@ -236,7 +238,7 @@ export function OverviewPanel({
 
           <SectionCard
             icon={<IconLedger />}
-            tone="blue"
+            concept="money"
             title="Settlements"
             description={`${countNoun(totals.cases, "settlement case")} · ${countNoun(totals.financeOrgs, "finance org")}`}
             action={
@@ -254,7 +256,7 @@ export function OverviewPanel({
 
           <SectionCard
             icon={<IconChart />}
-            tone="green"
+            concept="results"
             title={`Outcomes · last ${String(outcomes.windowDays)} days`}
           >
             <dl className="adm-figures" data-testid="admin-outcomes">
@@ -313,7 +315,7 @@ function LiveNow({ live }: { live: LiveBoard }) {
   return (
     <SectionCard
       icon={<IconBroadcast />}
-      tone={shown.length > 0 ? "red" : "neutral"}
+      tone={shown.length > 0 ? "green" : "neutral"}
       title="Live now"
       description={
         shown.length === 0
@@ -406,8 +408,8 @@ function AttentionStrip({
           Needs attention
         </h2>
         {/* Administration cannot act on the red rows; the gold ones are this
-            operator's own desks. */}
-        <span className="admin-meta">Red: fixed in the owning console · Gold: your desks</span>
+            operator's own desks — said by the dots and the doors ("Open" on a
+            desk, the board's name on the rest), not by a colour legend. */}
       </div>
       {deskItems.length > 0 ? (
         <ul className="adm-rows adm-alert-rows" data-testid="admin-desks">
@@ -439,9 +441,16 @@ function AttentionStrip({
             <li key={group.kind} className="adm-row">
               <span className="adm-row-dot" data-tone="red" aria-hidden />
               <span className="adm-row-main">
-                <span className="adm-row-title">
+                <span className="adm-row-title" title={group.kind}>
                   {group.title}
-                  <span className="adm-row-code"> {group.sub}</span>
+                  {/* The kind's code ("auction:stuck-live") is the hover, not
+                      the copy; only what follows it (the club, the count) is. */}
+                  {group.sub.startsWith(`${group.kind} · `) ? (
+                    <span className="adm-row-code">
+                      {" "}
+                      · {group.sub.slice(group.kind.length + 3)}
+                    </span>
+                  ) : null}
                 </span>
               </span>
               {group.href !== null ? (
@@ -482,7 +491,7 @@ function Figure({
     <div className="adm-figure">
       <dt>{label}</dt>
       {/* 1539 and 1558 were four unbroken digits the eye has to count. */}
-      <dd>
+      <dd data-zero={value === 0 || undefined}>
         {formatCount(value)}
         {suffix ?? ""}
       </dd>

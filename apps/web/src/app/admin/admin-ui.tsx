@@ -240,3 +240,32 @@ function distance(at: Date): string {
   }
   return at.toISOString().slice(0, 10);
 }
+
+/**
+ * An audit action code, as a sentence an operator reads — "tournament.created"
+ * → "Tournament created", "finops.CertificationDerived" → "Finops · certification
+ * derived". Presentation only: the code itself stays the record (the audit
+ * explorer shows and filters by it) and rides along as the tooltip.
+ */
+export function humanAction(action: string): string {
+  const words = action
+    .split(/[._:]/)
+    .filter((part) => part !== "")
+    .map((part) =>
+      part
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/-/g, " ")
+        .toLowerCase(),
+    );
+  if (words.length === 0) return action;
+  const sentence = words.join(" ");
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+/**
+ * A KPI tile's figure. A zero is the calm answer and reads muted; every other
+ * figure is grouped the Indian way ("1,06,700" is what an operator here reads).
+ */
+export function KpiValue({ n }: { n: number }) {
+  return n === 0 ? <span className="admin-zero">0</span> : <>{n.toLocaleString("en-IN")}</>;
+}

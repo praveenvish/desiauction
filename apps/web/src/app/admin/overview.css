@@ -266,9 +266,41 @@ a.adm-row-title:hover {
 }
 
 .adm-sport-count {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs-size);
   font-variant-numeric: tabular-nums;
+}
+
+.adm-sport-count[data-zero] {
+  color: var(--text-muted);
+}
+
+.adm-sport-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.adm-sport-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+}
+
+.adm-sport-state[data-on] .adm-sport-dot {
+  background: var(--success-strong);
+}
+
+.adm-figure dd[data-zero] {
+  color: var(--text-muted);
+}
+
+.adm-feed-row .adm-feed-action {
+  font-family: inherit;
+  font-size: var(--text-sm-size);
 }
 
 @media (max-width: 599px) {

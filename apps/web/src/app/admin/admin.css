@@ -2392,3 +2392,36 @@ a.admin-quiet-link:hover {
     display: none;
   }
 }
+
+/* ══ wow pass, round 2 ═══════════════════════════════════════════════════ */
+
+/* A row's second line stays one line: the rest is its hover. */
+.admin-live-sub {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-rows-dense > li {
+  min-height: 48px;
+  box-sizing: border-box;
+  padding-block: 6px;
+}
+
+.admin-rows-dense .admin-live-name > a {
+  font-size: var(--text-sm-size);
+}
+
+.admin-num-line {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.admin-room-facts dd [data-zero] {
+  color: var(--text-muted);
+}
+
+/* In a KPI figure, a zero also steps down a weight — calm, not missing. */
+.admin-zero {
+  font-weight: var(--font-weight-regular, 400);
+}
