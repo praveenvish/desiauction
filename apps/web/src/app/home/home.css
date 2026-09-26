@@ -529,7 +529,7 @@
   color: var(--hero-ink);
 }
 
-/* Repeated activity folds into one row: "Registration poster generated ×6". */
+/* Repeated activity folds into one row: "Made a player poster ×6". */
 .home-feed-times {
   font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;

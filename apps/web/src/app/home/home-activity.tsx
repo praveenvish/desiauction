@@ -12,6 +12,8 @@ import {
 } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
+import { SHARED_EVENT_NAMES } from "../../lib/event-names";
+
 /**
  * The feed is read by organizers, not operators, so the raw event name is the
  * wrong thing to print: "finops.PeriodClosed" is a fact about our ledger
@@ -20,6 +22,7 @@ import type { ReactNode } from "react";
  * internal domain word translated so "Finops" never reaches a screen.
  */
 const ACTIVITY_PHRASE: Record<string, string> = {
+  ...SHARED_EVENT_NAMES,
   "auction.BidAccepted": "Bid accepted",
   "auction.AuctionAborted": "Auction stopped",
   "auction.conduct": "Auction conducted",
@@ -138,7 +141,7 @@ export function ago(iso: string): string {
 
 /**
  * Consecutive events that say the same thing about the same place fold into
- * one row with a count: six "Registration poster generated · Thane Sports
+ * one row with a count: six "Made a player poster · Thane Sports
  * Club" lines were ~360px of one fact. The newest of the run stands for it.
  */
 export function groupActivity<T extends { action: string }>(

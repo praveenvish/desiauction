@@ -2,6 +2,7 @@ import { EmptyState, IconEye, type BadgeTone, type KitTone } from "@desiauction/
 import { isNotificationKind, notificationOf } from "@desiauction/messaging/catalogue";
 import type { ReactNode } from "react";
 
+import { SHARED_EVENT_NAMES } from "../../lib/event-names";
 import { formatDate, relativeAge } from "../../lib/format-date";
 import { formatCount } from "../../lib/plural";
 
@@ -223,13 +224,13 @@ function distance(at: Date): string {
  * explorer shows and filters by it) and rides along as the tooltip.
  */
 const ACTION_WORDS: Readonly<Record<string, string>> = {
+  ...SHARED_EVENT_NAMES,
   "auth.login.otp": "Signed in with a code",
   "auth.otp.requested": "Asked for a sign-in code",
   "profile.name.set": "Set their name",
   "org.created": "Created a club",
   "tournament.created": "Created a tournament",
   "competition.created": "Created a season",
-  "registration.poster_generated": "Made a player poster",
   "registration.imported": "Imported players",
   "registration.approved": "Approved a registration",
   "registration.approve": "Approved a registration",
