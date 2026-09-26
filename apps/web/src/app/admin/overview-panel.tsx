@@ -17,7 +17,6 @@ import {
   SectionCard,
   StatCard,
   StatGrid,
-  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 

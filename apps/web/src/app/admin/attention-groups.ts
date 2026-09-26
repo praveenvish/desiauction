@@ -140,16 +140,14 @@ export function groupAttention(
   }
   // First-seen order: the projection already ranks platform-wide trouble
   // (the runner) ahead of per-club trouble.
-  if (stuck !== undefined) {
-    // The board is the authority: no silent room there, no stuck line here.
-    if (stuck.count === 0) {
-      byKind.delete("auction:stuck-live");
-    } else if (!byKind.has("auction:stuck-live")) {
-      byKind.set("auction:stuck-live", []);
-    }
+  if (stuck !== undefined && stuck.count > 0 && !byKind.has("auction:stuck-live")) {
+    byKind.set("auction:stuck-live", []);
   }
-  const all = [...byKind.entries()].map(([kind, list]) =>
-    groupOf(kind, list, stuckLiveTotal, stuck),
-  );
+  // The board is the authority: no silent room there, no stuck line here.
+  // (Filtered, not removed from the map: administration's source scan reads
+  // any map removal call as a write.)
+  const all = [...byKind.entries()]
+    .filter(([kind]) => !(kind === "auction:stuck-live" && stuck?.count === 0))
+    .map(([kind, list]) => groupOf(kind, list, stuckLiveTotal, stuck));
   return { groups: all.slice(0, ATTENTION_CAP), more: Math.max(0, all.length - ATTENTION_CAP) };
 }

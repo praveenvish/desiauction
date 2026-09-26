@@ -24,16 +24,14 @@ describe("ledger re-runs", () => {
     ];
     const out = ledgerOutcomes(rows);
     expect(out).toMatchObject({ lots: 3, sold: 2, unsold: 1, reRuns: 2 });
-    const firstL003 = rows[2]!;
-    const saleL003 = rows[7]!;
-    const secondL009 = rows[8]!;
-    expect(out.bySeq.get(firstL003.seq)).toEqual({ pass: 1, superseded: true });
-    expect(out.bySeq.get(saleL003.seq)).toEqual({ pass: 2, superseded: false });
-    expect(passNote("UNSOLD", out.bySeq.get(firstL003.seq))).toBe("Went back in");
-    expect(passNote("SOLD", out.bySeq.get(saleL003.seq))).toBe("Re-run · sold");
-    expect(passNote("UNSOLD", out.bySeq.get(secondL009.seq))).toBe("Re-run · unsold");
+    const at = (i: number) => out.bySeq.get(rows[i]?.seq ?? -1);
+    expect(at(2)).toEqual({ pass: 1, superseded: true });
+    expect(at(7)).toEqual({ pass: 2, superseded: false });
+    expect(passNote("UNSOLD", at(2))).toBe("Went back in");
+    expect(passNote("SOLD", at(7))).toBe("Re-run · sold");
+    expect(passNote("UNSOLD", at(8))).toBe("Re-run · unsold");
     // A lot sold on its first pass needs no note.
-    expect(passNote("SOLD", out.bySeq.get(rows[1]!.seq))).toBe(null);
+    expect(passNote("SOLD", at(1))).toBe(null);
   });
 
   it("does not call an undone-and-resold lot a re-run", () => {
@@ -43,8 +41,9 @@ describe("ledger re-runs", () => {
       row("L002", "SOLD"),
     ];
     const out = ledgerOutcomes(rows);
+    const at = (i: number) => out.bySeq.get(rows[i]?.seq ?? -1);
     expect(out).toMatchObject({ lots: 1, sold: 1, reRuns: 0 });
-    expect(passNote("SOLD", out.bySeq.get(rows[0]!.seq))).toBe("Not final");
-    expect(passNote("SOLD", out.bySeq.get(rows[2]!.seq))).toBe(null);
+    expect(passNote("SOLD", at(0))).toBe("Not final");
+    expect(passNote("SOLD", at(2))).toBe(null);
   });
 });
