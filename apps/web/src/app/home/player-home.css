@@ -183,3 +183,15 @@
   font-size: var(--text-sm-size);
   line-height: var(--text-sm-line);
 }
+
+/* Phone: the season's text takes the row so the verdict pill drops under it
+   (beside it, the club and team were cut to "Thane Sport…" / "Mumbai Ma…"). */
+@media (max-width: 559px) {
+  .home-reg > .home-row-link > .home-row-text {
+    flex: 1 1 calc(100% - 40px - var(--space-3));
+  }
+
+  .home-reg > .home-row-link {
+    row-gap: var(--space-2);
+  }
+}
