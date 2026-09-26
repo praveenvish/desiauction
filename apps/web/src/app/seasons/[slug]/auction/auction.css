@@ -810,7 +810,8 @@
 /* ROUND 2: the cockpit runs to the same 24px gutters as the room bar above it
    (a centred 1240px column sat inset under a full-bleed bar), and the right
    rail — purses, pool — stays in view while the left column scrolls. */
-.cockpit-page > .dash-stack {
+.cockpit-page > .dash-stack,
+.cockpit-page [data-testid="cockpit-panel"] {
   max-width: none;
 }
 
@@ -2498,6 +2499,13 @@
 @media (min-width: 900px) {
   .replay-grid {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+
+  /* The purses stay beside the moment as the history scrolls (round 2: they
+     ended at y≈500 over 570px of empty column). */
+  .replay-grid > .replay-purses {
+    position: sticky;
+    top: 80px;
   }
 }
 

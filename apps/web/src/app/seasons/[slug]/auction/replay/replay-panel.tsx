@@ -353,9 +353,18 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
             <Card className="replay-history">
               <div className="competition-head">
                 <h2>Hammer history</h2>
+                {/* Counted per LOT, by its latest hammer: a lot passed in round
+                    one and sold in round two is one sale, not a sale and a pass
+                    ("30 sold · 18 passed" beside "7 unsold", round 2). */}
                 <span className="competitions-hint">
-                  {hammers.filter((row) => row.sold).length} sold ·{" "}
-                  {hammers.filter((row) => !row.sold).length} passed
+                  {(() => {
+                    const latest = new Map<string, boolean>();
+                    for (const row of hammers) {
+                      if (!latest.has(row.lotId)) latest.set(row.lotId, row.sold);
+                    }
+                    const sold = [...latest.values()].filter(Boolean).length;
+                    return `${String(sold)} sold · ${String(latest.size - sold)} unsold`;
+                  })()}
                 </span>
               </div>
               {hammers.length === 0 ? (
