@@ -132,6 +132,8 @@ export default async function MySportsPage({
     .filter((season) => filter === undefined || season.sport === filter)
     .slice()
     .reverse();
+  /** Owns a team and has never entered as a player. */
+  const ownerOnly = career.seasons.length === 0 && owns.length > 0;
   const shownMatches = matches.filter((match) => filter === undefined || match.sport === filter);
   const shownUpcoming = upcomingMatches.filter(
     (match) => filter === undefined || match.sport === filter,
@@ -210,9 +212,13 @@ export default async function MySportsPage({
         ]}
         actions={
           <Link href="/account" className="sh-ghost">
-            {completeness.done < completeness.total
-              ? `Profile ${String(completeness.done)} of ${String(completeness.total)} — finish it`
-              : "Edit profile"}
+            {/* A player-profile count means nothing to an owner who does not
+                play (their /account asks for no playing role). */}
+            {ownerOnly
+              ? "Account settings"
+              : completeness.done < completeness.total
+                ? `Profile ${String(completeness.done)} of ${String(completeness.total)} — finish it`
+                : "Edit profile"}
             <IconArrowRight size={14} />
           </Link>
         }
@@ -302,7 +308,10 @@ export default async function MySportsPage({
         </nav>
       ) : null}
 
-      <div className="me-layout">
+      {/* An owner who does not play has one object — their team — and /teams
+          holds the squad: the rail here was its fourth copy (review r3). One
+          column at a reading measure, not a short card beside a tall rail. */}
+      <div className="me-layout" data-single={ownerOnly ? "" : undefined}>
         <div className="me-main">
           {owns.length > 0 ? <OwnedTeams teams={owns} /> : null}
           {seasons.length === 0 && owns.length > 0 ? (
@@ -486,14 +495,7 @@ export default async function MySportsPage({
             </SectionCard>
           ) : null}
 
-          <LatestSquad
-            seasons={career.seasons}
-            owned={
-              owns[0] === undefined
-                ? null
-                : { competitionSlug: owns[0].competitionSlug, teamName: owns[0].teamName }
-            }
-          />
+          {ownerOnly ? null : <LatestSquad seasons={career.seasons} limit={5} />}
 
           <p className="me-privacy">
             <IconShieldCheck size={16} aria-hidden />

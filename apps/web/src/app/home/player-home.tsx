@@ -6,7 +6,6 @@ import {
   IconFileCheck,
   IconTrophy,
   IconUser,
-  IconUsers,
   Pill,
   PlayerImage,
   SectionCard,
@@ -17,6 +16,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 
 import { monogram } from "../../components/season-hero/season-hero";
+import { SquadList } from "../../components/team/squad-list";
 import { moneyFormat } from "../../lib/money";
 import {
   myRegistrations,
@@ -92,13 +92,7 @@ function verdictFor(registration: MyRegistration): {
  * the page as a floodlit card: the team, the price as the loudest figure on
  * screen, and the two things a sold player does next.
  */
-function SoldMoment({
-  registration,
-  completeness,
-}: {
-  registration: MyRegistration;
-  completeness: { done: number; total: number } | null;
-}) {
+function SoldMoment({ registration }: { registration: MyRegistration }) {
   const auction = registration.auction;
   if (auction?.kind !== "sold" || registration.teamName === null) {
     return null;
@@ -142,18 +136,6 @@ function SoldMoment({
           </ButtonLink>
         )}
       </div>
-      {completeness !== null ? (
-        <p className="pm-moment-foot">
-          <span>
-            Profile {String(completeness.done)}/{String(completeness.total)} — the next registration
-            form starts filled in.
-          </span>
-          <Link href="/account">
-            Finish it
-            <IconArrowRight size={16} />
-          </Link>
-        </p>
-      ) : null}
     </section>
   );
 }
@@ -184,13 +166,6 @@ function SoldDuo({
   topBuys: PublicTopBuy[];
 }) {
   const money = moneyFormat(registration.auctionUnit);
-  // Five faces, and always their own among them.
-  const selfRow = team?.members.find((m) => m.registrationId === registration.registrationId);
-  const firstFive = team === null ? [] : team.members.slice(0, 5);
-  const mates =
-    selfRow === undefined || firstFive.includes(selfRow)
-      ? firstFive
-      : [selfRow, ...firstFive.slice(0, 4)];
   const next = upcoming.find((match) => match.competitionSlug === registration.competitionSlug);
   const when = next === undefined ? null : dateBlock(next.kickoffAt);
   const seasonHref = `/c/${registration.competitionSlug}`;
@@ -198,51 +173,13 @@ function SoldDuo({
   return (
     <div className="hd-duo" data-testid="home-player-duo">
       {team !== null ? (
-        <section className="hd-card" aria-labelledby="hd-squad-title">
-          <div className="hd-head">
-            <h2 id="hd-squad-title" className="hd-title">
-              <IconUsers size={20} />
-              My squad
-              <span className="hd-title-sub">· {String(team.members.length)} players</span>
-            </h2>
-            <Link className="hd-link" href={`${seasonHref}/t/${team.team.slug}`}>
-              See all
-              <IconArrowRight size={16} />
-            </Link>
-          </div>
-          <ul className="hd-rows" data-plain="true">
-            {mates.map((member) => {
-              const self = member.registrationId === registration.registrationId;
-              return (
-                <li key={member.registrationId} className="hd-row" data-self={self}>
-                  <PlayerImage
-                    name={member.name}
-                    seed={member.registrationId}
-                    src={member.photoUrl}
-                    size="sm"
-                    shape="round"
-                    decorative
-                  />
-                  <span className="hd-who">
-                    <span className="hd-name">
-                      {member.name}
-                      {self ? <span className="hd-you">You</span> : null}
-                    </span>
-                    <span className="hd-meta">
-                      {roleLabelIn(sportPackFor(team.sport), member.role) || "Player"}
-                    </span>
-                  </span>
-                  <span
-                    className="hd-figure"
-                    data-muted={member.pricePaise === null ? "true" : undefined}
-                  >
-                    {member.pricePaise === null ? "Pre-signed" : money.ledger(member.pricePaise)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        <SquadList
+          team={team}
+          selfId={registration.registrationId}
+          title="My squad"
+          limit={5}
+          headingId="hd-squad-title"
+        />
       ) : null}
 
       {next !== undefined ? (
@@ -385,12 +322,15 @@ export async function PlayerHome({
   return (
     <>
       {moment !== null ? (
-        <SoldMoment registration={moment} completeness={showNudge ? completeness : null} />
+        // The premium hero carries the sale and nothing else: the profile
+        // nudge under its rule diluted it (review r2, r3) — it follows the
+        // duo below as its own quiet line.
+        <SoldMoment registration={moment} />
       ) : null}
       {moment !== null ? (
         <SoldDuo registration={moment} team={team} upcoming={upcoming} topBuys={topBuys} />
       ) : null}
-      {showNudge && moment === null ? (
+      {showNudge ? (
         <p className="pm-nudge" data-testid="home-profile-nudge">
           <IconUser size={20} />
           {/* "Profile N of M" — the one way /home, /me and /account all say it. */}

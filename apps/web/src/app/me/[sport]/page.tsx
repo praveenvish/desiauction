@@ -10,9 +10,11 @@ import {
   IconUsers,
   IconWallet,
   PlayerImage,
+  Pill,
   SectionCard,
   StatCard,
   StatGrid,
+  TeamChip,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -27,8 +29,7 @@ import {
   sportProfileFor,
 } from "../../../server/player/profile";
 import { formatDate } from "../../../lib/format-date";
-import { RegistrationCard } from "../registration-card";
-import { LatestSquad } from "../squad-rail";
+import { verdictOf } from "../registration-card";
 import "../me.css";
 
 /**
@@ -95,9 +96,11 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
         }
         eyebrow={<HeroStatus>{pack.label}</HeroStatus>}
         title={session.name ?? "—"}
+        // Nothing to show is nothing shown: "Add your role and city…" said
+        // what the "Profile N of M" action beside it already says.
         meta={
           role === null && profile.location === null
-            ? [<>Add your role and city on the Account page.</>]
+            ? []
             : [
                 ...(role !== null ? [<HeroChip key="role">{role}</HeroChip>] : []),
                 ...(profile.location !== null
@@ -168,32 +171,110 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             />
           </StatGrid>
 
-          <div className="me-layout">
-            <SectionCard
-              icon={<IconTrophy />}
-              title="Seasons"
-              description={`${String(career.seasons.length)} in ${pack.label.toLowerCase()}, oldest first`}
-              data-testid="career-seasons"
-            >
-              <ul className="me-regs">
-                {career.seasons.map((season) => (
-                  <li key={season.registrationId}>
-                    <RegistrationCard
-                      season={season}
-                      eyebrow={season.startsOn !== null ? formatDate(season.startsOn) : pack.label}
-                      subline={[season.orgName, roleLabelIn(pack, season.role)]
-                        .filter((part) => part !== "")
-                        .join(" · ")}
-                      money={money}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </SectionCard>
-            <aside className="me-side" aria-label="Your squad">
-              <LatestSquad seasons={career.seasons} />
-            </aside>
-          </div>
+          {/* THE CAREER, AS A RECORD (round 4). This page had become a copy
+              of /me — same hero, same cards, the same squad rail beside them.
+              /me is the overview across sports; this is one sport's ledger:
+              one line per season, the team, the role, the price and the
+              armband, full width, oldest first. The squad lives on /home and
+              /me. */}
+          <SectionCard
+            icon={<IconTrophy />}
+            title="Season by season"
+            description={`${String(career.seasons.length)} in ${pack.label.toLowerCase()}, oldest first`}
+            flush
+            data-testid="career-seasons"
+          >
+            <div className="me-career" role="table" aria-label={`${pack.label} seasons`}>
+              <div className="me-career-row me-career-head" role="row">
+                <span role="columnheader">Season</span>
+                <span role="columnheader">Team</span>
+                <span role="columnheader">Role</span>
+                <span role="columnheader">Auction</span>
+                <span role="columnheader">Armband</span>
+              </div>
+              {career.seasons.map((season) => {
+                const verdict = verdictOf(season, money);
+                const armband =
+                  season.isCaptain || season.auction?.kind === "captain"
+                    ? "Captain"
+                    : season.isViceCaptain
+                      ? "Vice-captain"
+                      : null;
+                return (
+                  <div key={season.registrationId} className="me-career-row" role="row">
+                    <span className="me-career-season" role="cell">
+                      <Link href={`/seasons/${season.competitionSlug}/register`}>
+                        {season.tournamentName !== null &&
+                        season.tournamentName !== season.competitionName
+                          ? `${season.tournamentName} · ${season.competitionName}`
+                          : season.competitionName}
+                      </Link>
+                      <span className="me-career-sub">
+                        {[
+                          season.orgName,
+                          season.startsOn !== null ? formatDate(season.startsOn) : null,
+                        ]
+                          .filter((part): part is string => part !== null && part !== "")
+                          .join(" · ")}
+                      </span>
+                    </span>
+                    <span role="cell" data-label="Team">
+                      {season.teamName !== null ? (
+                        <TeamChip color={season.teamColor}>{season.teamName}</TeamChip>
+                      ) : (
+                        <span className="me-career-none">No team</span>
+                      )}
+                    </span>
+                    <span role="cell" data-label="Role" className="me-career-role">
+                      {roleLabelIn(pack, season.role) || "—"}
+                    </span>
+                    <span role="cell" data-label="Auction">
+                      <Pill tone={verdict.tone} dot>
+                        {verdict.label}
+                      </Pill>
+                    </span>
+                    <span role="cell" data-label="Armband" className="me-career-armband">
+                      {armband ?? <span className="me-career-none">—</span>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
+
+          {/* HOW YOU PLAY — this sport's own answers (role and styles), the
+              second thing a career page holds that /me does not. */}
+          <SectionCard
+            icon={<IconUsers />}
+            title="How you play"
+            description={`Your ${pack.label.toLowerCase()} profile — every new registration starts from it.`}
+            action={
+              <Link href="/account#sports" className="me-link">
+                Edit <IconArrowRight size={14} aria-hidden />
+              </Link>
+            }
+            data-testid="career-profile"
+          >
+            <dl className="me-play">
+              <div>
+                <dt>Role</dt>
+                <dd>{role ?? "Not set"}</dd>
+              </div>
+              {pack.attributes.map((attribute) => {
+                const value = sportProfile.attributes[attribute.key];
+                const label =
+                  value === undefined
+                    ? null
+                    : (attribute.options.find((option) => option.key === value)?.label ?? null);
+                return (
+                  <div key={attribute.key}>
+                    <dt>{attribute.label}</dt>
+                    <dd data-empty={label === null ? "true" : undefined}>{label ?? "Not set"}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </SectionCard>
         </>
       )}
     </main>

@@ -80,6 +80,10 @@
   }
 }
 
+.me-layout[data-single] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .me-main,
 .me-side {
   display: flex;
@@ -106,9 +110,10 @@
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-4);
-  border: 1px solid var(--border-subtle);
+  /* A well inside its section, not a second bordered card in a card. */
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--surface-raised);
+  background: var(--surface-sunken);
   color: inherit;
   text-decoration: none;
 }
@@ -557,5 +562,144 @@
       "crest body"
       "go go";
     row-gap: var(--space-3);
+  }
+}
+
+/* ---- /me/[sport]: the career as a record, one line per season ---- */
+.me-career {
+  display: grid;
+}
+
+.me-career-row {
+  display: grid;
+  grid-template-columns: 2.2fr 1.4fr 1fr 1.4fr 0.9fr;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+}
+
+.me-career-row > * {
+  min-width: 0;
+}
+
+.me-career-head {
+  border-top: 0;
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.me-career-season {
+  display: grid;
+  min-width: 0;
+}
+
+.me-career-season a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  text-decoration: none;
+}
+
+.me-career-season a:hover {
+  color: var(--text-accent);
+}
+
+.me-career-season a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.me-career-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.me-career-role,
+.me-career-armband {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-career-none {
+  color: var(--text-muted);
+}
+
+/* Phone: the season on its own line, its four facts in a two-by-two under it. */
+@media (max-width: 759px) {
+  .me-career-head {
+    display: none;
+  }
+
+  .me-career-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .me-career-head + .me-career-row {
+    border-top: 0;
+  }
+
+  .me-career-season {
+    grid-column: 1 / -1;
+  }
+
+  .me-career-row > [data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: var(--text-xs-size);
+    color: var(--text-muted);
+  }
+}
+
+/* /me/[sport] "How you play": the sport's own answers, as a row of facts. */
+.me-play {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.me-play > div {
+  display: grid;
+  gap: 2px;
+}
+
+.me-play dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.me-play dd {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.me-play dd[data-empty="true"] {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+/* Phone: an odd tile out takes the whole row instead of sitting alone in
+   half of it (the 2 + 1 break). */
+@media (max-width: 639px) {
+  .me [data-testid="me-figures"] > :last-child:nth-child(odd),
+  .me [data-testid="career-totals"] > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }
