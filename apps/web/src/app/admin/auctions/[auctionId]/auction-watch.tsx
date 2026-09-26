@@ -390,7 +390,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                       </span>
                       <span className="da-row-meta">
                         {[
-                          `Lot ${String(lot.lotNumber)}`,
+                          `Lot ${lot.lotNumber}`,
                           lot.role !== null ? labelOf(lot.role) : null,
                           lot.paddleNumber,
                         ]
