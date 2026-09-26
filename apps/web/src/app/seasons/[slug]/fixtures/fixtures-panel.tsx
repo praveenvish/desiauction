@@ -954,9 +954,7 @@ export function FixturesPanel({
           ) : canManage ? (
             isLobby ? (
               "No lobbies yet — add the first one by hand."
-            ) : needsGround ? (
-              "No fixtures yet — add a ground, then generate the schedule."
-            ) : (
+            ) : needsGround ? null : ( // below says it, with its door; the lede would be the second of three. // ONE EMPTY STATEMENT (round 3C): the ground notice
               "No fixtures yet — generate a round robin or add a match by hand."
             )
           ) : (
@@ -978,6 +976,21 @@ export function FixturesPanel({
             >
               <IconSpark size={16} aria-hidden />
               Generate fixtures
+            </Button>
+          ) : null}
+          {/* An empty schedule has no card (below), so its import door sits
+              here with the other ways to add matches. */}
+          {canManage && empty ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="open-import"
+              onClick={() => {
+                setImportOpen(true);
+              }}
+            >
+              <IconUpload size={16} aria-hidden />
+              Import
             </Button>
           ) : null}
           {canManage ? (
@@ -1391,24 +1404,28 @@ export function FixturesPanel({
         canManage={canManage}
       />
 
-      <SectionCard
-        icon={<IconCalendar />}
-        title="Schedule"
-        description={
-          // Empty and unfiltered, the page head already says so (round 2 counted
-          // three "nothing yet" lines on one screen); the card doesn't repeat it.
-          page.total === 0
-            ? filtered
-              ? "No match fits these filters."
-              : undefined
-            : `${String(page.total)} match${page.total === 1 ? "" : "es"}${filtered ? " match these filters" : ""} · grouped by round`
-        }
-        flush
-        action={
-          canManage ? (
-            <>
-              {/* Nothing to export from an empty schedule. */}
-              {empty ? null : (
+      {/* An empty, unfiltered schedule draws no card: it was the third
+          "nothing yet" on one screen, under the head's line and the ground
+          notice (round 2). The table arrives with the first match. */}
+      {empty ? null : (
+        <SectionCard
+          icon={<IconCalendar />}
+          title="Schedule"
+          description={
+            // Empty and unfiltered, the page head already says so (round 2 counted
+            // three "nothing yet" lines on one screen); the card doesn't repeat it.
+            page.total === 0
+              ? filtered
+                ? "No match fits these filters."
+                : undefined
+              : `${String(page.total)} match${page.total === 1 ? "" : "es"}${filtered ? " match these filters" : ""} · grouped by round`
+          }
+          flush
+          action={
+            canManage ? (
+              <>
+                {/* The card only draws with a match in it, so there is always
+                    something to export. */}
                 <Button
                   size="sm"
                   variant="secondary"
@@ -1418,26 +1435,24 @@ export function FixturesPanel({
                   <IconDownload size={16} aria-hidden />
                   Export CSV
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="secondary"
-                data-testid="open-import"
-                onClick={() => {
-                  setImportOpen(true);
-                }}
-              >
-                <IconUpload size={16} aria-hidden />
-                Import
-              </Button>
-            </>
-          ) : undefined
-        }
-        data-testid="schedule-card"
-      >
-        {/* Seven chips reading 0 and a search box over nothing are furniture;
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  data-testid="open-import"
+                  onClick={() => {
+                    setImportOpen(true);
+                  }}
+                >
+                  <IconUpload size={16} aria-hidden />
+                  Import
+                </Button>
+              </>
+            ) : undefined
+          }
+          data-testid="schedule-card"
+        >
+          {/* Seven chips reading 0 and a search box over nothing are furniture;
             they arrive with the first match. */}
-        {empty ? null : (
           <>
             <ul className="st-chips" aria-label="Filter by status">
               <li>
@@ -1548,104 +1563,104 @@ export function FixturesPanel({
               </select>
             </form>
           </>
-        )}
-        <div className="st-table-wrap">
-          <table className="st-table fx-table" data-stack="" data-testid="fixtures-table">
-            <caption>
-              This season&apos;s fixtures, grouped by round — {page.total} match
-              {page.total === 1 ? "" : "es"} matching the current filters.
-            </caption>
-            {/* An empty schedule draws no column heads over its one sentence. */}
-            {page.total === 0 ? null : (
-              <thead>
-                <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Fixture</th>
-                  <th scope="col">Kickoff</th>
-                  <th scope="col">{terms.ground}</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Result</th>
-                  {canManage ? (
-                    <th scope="col">
-                      <VisuallyHidden>Actions</VisuallyHidden>
-                    </th>
-                  ) : null}
-                </tr>
-              </thead>
-            )}
-            <tbody>
-              {rounds.map(({ round, rows, when }) => (
-                <Fragment key={String(round)}>
-                  <tr data-group="">
-                    <th scope="rowgroup" colSpan={canManage ? 7 : 6}>
-                      {round !== null ? `Round ${String(round)}` : "Unscheduled"}
-                      {when !== null ? <span className="st-group-when">{when}</span> : null}
-                    </th>
+          <div className="st-table-wrap">
+            <table className="st-table fx-table" data-stack="" data-testid="fixtures-table">
+              <caption>
+                This season&apos;s fixtures, grouped by round — {page.total} match
+                {page.total === 1 ? "" : "es"} matching the current filters.
+              </caption>
+              {/* An empty schedule draws no column heads over its one sentence. */}
+              {page.total === 0 ? null : (
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Fixture</th>
+                    <th scope="col">Kickoff</th>
+                    <th scope="col">{terms.ground}</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Result</th>
+                    {canManage ? (
+                      <th scope="col">
+                        <VisuallyHidden>Actions</VisuallyHidden>
+                      </th>
+                    ) : null}
                   </tr>
-                  {rows.map((fixture) => (
-                    <FixtureRow
-                      key={fixture.id}
-                      fixture={fixture}
-                      result={results[fixture.id]}
-                      canManage={canManage}
-                      busy={busy}
-                      moving={moving === fixture.id}
-                      grounds={grounds}
-                      moveKickoff={moveKickoff}
-                      moveGround={moveGround}
-                      onMoveKickoff={setMoveKickoff}
-                      onMoveGround={setMoveGround}
-                      onLifecycle={(action) => void lifecycle(fixture.id, action)}
-                      onOpenMove={() => {
-                        setMoving(moving === fixture.id ? null : fixture.id);
-                        setMoveKickoff(fixture.kickoffAt ?? "");
-                        setMoveGround(fixture.groundId ?? "");
-                      }}
-                      onConfirmMove={() => void move(fixture.id)}
-                      onDetails={() => void openDetails(fixture.id)}
-                    />
-                  ))}
-                </Fragment>
-              ))}
-              {page.rows.length === 0 ? (
-                <tr>
-                  <td colSpan={canManage ? 7 : 6} data-span="full" className="fx-none">
-                    {/* Same DA-35 rule the registration desk follows: blaming
+                </thead>
+              )}
+              <tbody>
+                {rounds.map(({ round, rows, when }) => (
+                  <Fragment key={String(round)}>
+                    <tr data-group="">
+                      <th scope="rowgroup" colSpan={canManage ? 7 : 6}>
+                        {round !== null ? `Round ${String(round)}` : "Unscheduled"}
+                        {when !== null ? <span className="st-group-when">{when}</span> : null}
+                      </th>
+                    </tr>
+                    {rows.map((fixture) => (
+                      <FixtureRow
+                        key={fixture.id}
+                        fixture={fixture}
+                        result={results[fixture.id]}
+                        canManage={canManage}
+                        busy={busy}
+                        moving={moving === fixture.id}
+                        grounds={grounds}
+                        moveKickoff={moveKickoff}
+                        moveGround={moveGround}
+                        onMoveKickoff={setMoveKickoff}
+                        onMoveGround={setMoveGround}
+                        onLifecycle={(action) => void lifecycle(fixture.id, action)}
+                        onOpenMove={() => {
+                          setMoving(moving === fixture.id ? null : fixture.id);
+                          setMoveKickoff(fixture.kickoffAt ?? "");
+                          setMoveGround(fixture.groundId ?? "");
+                        }}
+                        onConfirmMove={() => void move(fixture.id)}
+                        onDetails={() => void openDetails(fixture.id)}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
+                {page.rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={canManage ? 7 : 6} data-span="full" className="fx-none">
+                      {/* Same DA-35 rule the registration desk follows: blaming
                         filters nobody applied is a dead end — a season with no
                         fixtures yet gets its actual next step instead. */}
-                    {filtered
-                      ? "No fixtures match these filters."
-                      : canManage
-                        ? isLobby
-                          ? "No lobbies yet — add the first one with “Add lobby”."
-                          : "Generated and hand-added matches land here, grouped by round."
-                        : "No fixtures yet. The organizer hasn't scheduled any matches."}
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-
-        {/* No pager for one page (it was "Page 1 of 1 · 0 total"). */}
-        {totalPages <= 1 ? null : (
-          <div className="st-pager">
-            <Pager
-              total={page.total}
-              page={page.page}
-              pageCount={totalPages}
-              pageSize={page.pageSize}
-              noun="fixtures"
-              onPage={(entry) => {
-                pushQuery({ page: String(entry) });
-              }}
-              summaryTestId="page-indicator"
-              prevTestId="page-prev"
-              nextTestId="page-next"
-            />
+                      {filtered
+                        ? "No fixtures match these filters."
+                        : canManage
+                          ? isLobby
+                            ? "No lobbies yet — add the first one with “Add lobby”."
+                            : "Generated and hand-added matches land here, grouped by round."
+                          : "No fixtures yet. The organizer hasn't scheduled any matches."}
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
-        )}
-      </SectionCard>
+
+          {/* No pager for one page (it was "Page 1 of 1 · 0 total"). */}
+          {totalPages <= 1 ? null : (
+            <div className="st-pager">
+              <Pager
+                total={page.total}
+                page={page.page}
+                pageCount={totalPages}
+                pageSize={page.pageSize}
+                noun="fixtures"
+                onPage={(entry) => {
+                  pushQuery({ page: String(entry) });
+                }}
+                summaryTestId="page-indicator"
+                prevTestId="page-prev"
+                nextTestId="page-next"
+              />
+            </div>
+          )}
+        </SectionCard>
+      )}
 
       {expanded !== null ? (
         <SectionCard
