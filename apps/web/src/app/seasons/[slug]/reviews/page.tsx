@@ -96,7 +96,7 @@ export default async function SeasonReviewsPage({ params }: { params: Promise<{ 
 
           <SectionCard
             icon={<IconMessageCircle />}
-            tone="green"
+            concept="neutral"
             title="What players and owners said"
             description={
               shown === null
@@ -113,7 +113,11 @@ export default async function SeasonReviewsPage({ params }: { params: Promise<{ 
                 <h3>No reviews to show yet</h3>
                 <p>
                   {view.canManage
-                    ? "Reviews appear here once our team has read them. Ask your players and owners once the season is done."
+                    ? view.manage !== null &&
+                      view.manage.askable.players + view.manage.askable.owners === 0 &&
+                      view.manage.asked === 0
+                      ? "Reviews appear here once DesiAuction has read them. Nobody can be asked yet — a player needs an approved entry, an email and a date of birth on file."
+                      : "Reviews appear here once DesiAuction has read them."
                     : `Reviews appear once at least ${String(view.publicThreshold)} have been published.`}
                 </p>
               </div>

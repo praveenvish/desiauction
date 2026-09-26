@@ -92,14 +92,6 @@
   font-size: var(--text-sm-size);
 }
 
-.org-add-plus {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  font-size: var(--text-lg-size);
-}
-
 .create-org {
   display: flex;
   flex-direction: column;
@@ -516,46 +508,4 @@ a.cat-group-head:hover {
   display: inline-flex;
   margin-inline-start: auto;
   color: var(--text-muted);
-}
-
-/* The last card: a dashed FormDialog trigger. */
-.org-card--add {
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  border: 1.5px dashed var(--border-strong);
-  background: none;
-  box-shadow: none;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-
-.org-card--add:hover {
-  border-color: var(--accent-line);
-}
-
-.org-card--add .org-add-plus {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-}
-
-.org-add-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.org-add-text strong {
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.org-add-text span {
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
 }

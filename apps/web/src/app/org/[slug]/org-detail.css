@@ -225,6 +225,17 @@
   color: var(--text-heading);
 }
 
+.od-live-meta {
+  flex: none;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-empty + .od-live-list {
+  margin-top: var(--space-3);
+}
+
 .od-live-go {
   flex: none;
   color: var(--text-muted);

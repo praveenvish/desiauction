@@ -43,7 +43,7 @@ export function AskReviewsCard({
   return (
     <SectionCard
       icon={<IconSend />}
-      tone="blue"
+      concept="season"
       title="Ask for reviews"
       description={`We email your players and team owners a link to review this season. What they write is read by DesiAuction before it appears${isPublic ? " on your public season page" : ""}; you can reply, but not edit or remove it.`}
       action={
@@ -81,11 +81,14 @@ export function AskReviewsCard({
         {manage.askable.players === 1 ? "player" : "players"}, {manage.askable.owners}{" "}
         {manage.askable.owners === 1 ? "owner" : "owners"}
       </p>
-      <p className="st-note rv-ask-note">
-        Players are asked only if they&apos;re approved, have an email on file, and gave a date of
-        birth showing they&apos;re 18 or over. Anyone who has turned off feedback requests is
-        skipped.
-      </p>
+      <details className="rv-who">
+        <summary>Who is asked?</summary>
+        <p className="st-note rv-ask-note">
+          Players are asked only if they&apos;re approved, have an email on file, and gave a date of
+          birth showing they&apos;re 18 or over. Anyone who has turned off feedback requests is
+          skipped.
+        </p>
+      </details>
       {manage.nextAskAt !== null ? (
         <p className="st-note rv-ask-note" data-testid="season-reviews-next-ask">
           You asked on {day(manage.lastAskedAt ?? manage.nextAskAt)}. You can ask again from{" "}

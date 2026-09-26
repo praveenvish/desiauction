@@ -531,7 +531,9 @@ export async function OrganizerHome({
             auctionUnit: focusOverview.competition.auctionUnit,
             fixtures: focusOverview.fixtureCount,
           },
-          { withTeams: false },
+          // The same five rungs /tournaments and the season overview draw
+          // (round 2: /home folded Teams into "Set up" and drew four).
+          { withTeams: true },
         );
   // With several seasons, each stage also says how many of them sit there —
   // the portfolio figures the old lifecycle strip carried.
@@ -542,7 +544,8 @@ export async function OrganizerHome({
     settlement: dash.stages.settlement.competitions,
   };
   const journeyHref: Record<string, string | undefined> = {
-    setup: `${focusBase}/teams`,
+    setup: focusBase,
+    teams: `${focusBase}/teams`,
     registration: `${focusBase}/registrations`,
     auction: `${focusBase}/auction`,
     // The Money tab 404s without `settlement.view`: no link beats a dead end.
@@ -551,6 +554,7 @@ export async function OrganizerHome({
   };
   const journeyIcon: Record<string, ReactNode> = {
     setup: <IconTrophy size={14} />,
+    teams: <IconUsers size={14} />,
     registration: <IconFileCheck size={14} />,
     auction: <IconGavel size={14} />,
     settlement: <IconRupee size={14} />,
@@ -1088,10 +1092,8 @@ export async function OrganizerHome({
                 // organizer whose night had ended an hour earlier.
                 <PanelEmpty
                   icon={<IconGavel />}
-                  title={`${lastDone.competitionName}'s auction is done · ${String(
-                    lastDone.lotsSold,
-                  )} of ${String(lastDone.lotsTotal)} sold`}
-                  text="Every squad and every price is on the results page."
+                  title={`${lastDone.competitionName}'s auction is done`}
+                  text={`${String(lastDone.lotsSold)} of ${String(lastDone.lotsTotal)} sold. Every squad and every price is on the results page.`}
                   ctaHref={`/seasons/${lastDone.competitionSlug}/auction`}
                   ctaLabel="See results"
                 />

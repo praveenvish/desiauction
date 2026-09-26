@@ -75,12 +75,35 @@
   list-style: none;
 }
 
+/* Name and figure on one line, the bar full width under them (round 2): with
+   the note beside it the bar was squeezed to ~50px, and on a phone the name
+   was cut to "Mum…". */
 .rp-bar-row {
   display: grid;
-  grid-template-columns: minmax(88px, 34%) 1fr auto;
-  align-items: center;
-  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label value"
+    "track track";
+  align-items: baseline;
+  gap: 6px var(--space-3);
   font-size: var(--text-sm-size);
+}
+
+.rp-bar-row > .rp-bar-label {
+  grid-area: label;
+  font-weight: var(--font-weight-medium);
+}
+
+.rp-bar-row > .rp-bar-track {
+  grid-area: track;
+}
+
+.rp-bar-row > .rp-bar-value {
+  grid-area: value;
+}
+
+.rp-bars {
+  gap: var(--space-4);
 }
 
 .rp-bar-label {
@@ -230,6 +253,10 @@
      90% · 10,500 left · 12 players" cut every team to "Mum…/Pune…". */
   .rp-bar-row {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "label"
+      "track"
+      "value";
     gap: var(--space-1);
   }
 

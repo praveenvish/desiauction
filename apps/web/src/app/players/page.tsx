@@ -172,12 +172,13 @@ export default async function PlayersPage({
 
   return (
     <main className="px-players">
-      {/* The four count tiles are now the tabs they always were (each one
-          filtered the list) — the same numbers, one 36px row instead of a
-          110px band, and 520pt less on a phone. */}
-      <SegmentedTabs label="Show players" items={segments} testId="players-stats" />
-
       <section className="px-card" data-testid="players-card" aria-label="All players">
+        {/* The shared list head (round 2): the status tabs are the card's
+            first row and the toolbar its second — the same geometry as the
+            season's Registrations desk, so the two lists read as one kit. */}
+        <div className="px-tabs">
+          <SegmentedTabs label="Show players" items={segments} testId="players-stats" />
+        </div>
         <PlayersFilters
           current={filters}
           seasons={view.seasons}

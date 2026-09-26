@@ -1017,3 +1017,29 @@ a.acct-check-row:hover {
     text-align: start;
   }
 }
+
+/* ROUND 2: a single fact ("16 devices signed in") sat in a 90px tile under
+   an otherwise empty band. One fact is a line, not a tile. */
+.acct-id-facts:has(> li:only-child) {
+  display: flex;
+}
+
+.acct-id-facts > li:only-child {
+  padding: 0;
+  background: none;
+}
+
+.acct-id-facts > li:only-child .acct-id-fact-text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.acct-id-facts > li:only-child .acct-id-fact-value {
+  font-size: var(--text-md-size);
+}
+
+.acct-id-facts > li:only-child .acct-id-fact-label {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}

@@ -494,14 +494,42 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
           concept="auction"
           title="Live & open now"
           action={
-            <Link href={`/org/${slug}#tournaments`} className="od-more">
-              All tournaments
+            <Link
+              href={`/org/${slug}#tournaments`}
+              className="od-more"
+              aria-label="View all tournaments"
+            >
+              View all
               <IconArrowRight size={14} />
             </Link>
           }
         >
           {liveOpen.length === 0 ? (
-            <p className="od-empty">Nothing live or taking entries right now.</p>
+            editions.length === 0 ? (
+              <p className="od-empty">Nothing live or taking entries right now.</p>
+            ) : (
+              /* Nothing live: the club's latest seasons instead of one grey
+                 sentence in a full-height card (round 2). */
+              <>
+                <p className="od-empty">Nothing live or taking entries right now. Latest:</p>
+                <ul className="od-live-list">
+                  {editions.slice(0, 3).map((edition) => (
+                    <li key={edition.id}>
+                      <Link href={`/seasons/${edition.slug}`} className="od-live-row">
+                        <span className="od-live-name">{edition.name}</span>
+                        <span className="od-live-meta">
+                          {edition.teams} {edition.teams === 1 ? "team" : "teams"} ·{" "}
+                          {edition.players} {edition.players === 1 ? "player" : "players"}
+                        </span>
+                        <span className="od-live-go" aria-hidden>
+                          <IconChevronRight size={18} />
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )
           ) : (
             <ul className="od-live-list">
               {liveOpen.map((row) => (
@@ -513,7 +541,9 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                         Live
                       </Pill>
                     ) : (
-                      <Pill tone="blue">Registration open</Pill>
+                      <Pill tone="green" dot>
+                        Registration open
+                      </Pill>
                     )}
                     <span className="od-live-go" aria-hidden>
                       <IconChevronRight size={18} />

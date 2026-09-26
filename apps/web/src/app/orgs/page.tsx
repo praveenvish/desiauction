@@ -2,7 +2,6 @@ import {
   Card,
   IconCalendar,
   IconChevronRight,
-  IconPlus,
   IconShieldCheck,
   IconUsers,
   Pill,
@@ -124,7 +123,8 @@ export default async function OrgsPage({
 
         {/* One card per club (founder mockups): the crest, the name and the
             reader's standing, then the three figures that say how big it is.
-            The create affordance is the last card of the same grid. */}
+            One create door: the page's "+ New club" (round 2 dropped the
+            dashed tile that repeated it). */}
         <div className="org-cards da-stagger" data-testid="orgs-list">
           {orgs.map((org) => (
             <Link
@@ -162,26 +162,6 @@ export default async function OrgsPage({
               </span>
             </Link>
           ))}
-          {/* One click opens the modal rather than scrolling to a pinned card. */}
-          <FormDialog
-            title="New club"
-            triggerLabel={
-              <>
-                <span className="org-add-plus" aria-hidden>
-                  <IconPlus size={20} />
-                </span>
-                <span className="org-add-text">
-                  <strong>Create a club</strong>
-                  <span>A club or academy of your own.</span>
-                </span>
-              </>
-            }
-            triggerAsLink
-            triggerClassName="org-card org-card--add"
-            triggerTestId="create-org-row"
-          >
-            <CreateOrgForm />
-          </FormDialog>
         </div>
       </div>
     </main>

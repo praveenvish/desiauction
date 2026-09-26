@@ -59,14 +59,17 @@
     column-gap: var(--space-8);
   }
 
-  /* In the wide card the pill sat at the end of the left column — mid-card,
-     aligned to nothing. Here it sits beside the title it qualifies. */
+  /* The status pill belongs to the whole card, so it takes the card's
+     top-right corner (round 2: beside the title it floated mid-card, aligned
+     to nothing). */
   .ax-card:only-child > .ax-head {
     grid-area: head;
   }
 
-  .ax-card:only-child .ax-titles {
-    flex: 0 1 auto;
+  .ax-card:only-child > .ax-head > :last-child {
+    position: absolute;
+    top: var(--space-5);
+    right: var(--space-5);
   }
 
   .ax-card:only-child > .ax-meta {
