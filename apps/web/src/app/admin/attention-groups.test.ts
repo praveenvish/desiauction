@@ -45,6 +45,22 @@ describe("attention queue grouping", () => {
     expect(lone.groups[0]?.href).toBe("/admin/live");
   });
 
+  it("takes the live board's count and rule when it is given", () => {
+    const rows = Array.from({ length: 20 }, (_, i) => stuck(`o${String(i)}`, 1, 3));
+    const board = { count: 117, clubs: 23, longestSilentMs: 7 * DAY };
+    const { groups } = groupAttention(rows, { stuckLiveTotal: 116, stuck: board });
+    expect(groups[0]?.title).toBe(
+      "117 auctions silent for over 12 hours across 23 clubs · longest 7 days",
+    );
+    expect(groups[0]?.href).toBe("/admin/live");
+    // Silent rooms the projection missed still get their line…
+    expect(groupAttention([], { stuck: board }).groups).toHaveLength(1);
+    // …and none on the board means none here.
+    expect(
+      groupAttention(rows, { stuck: { count: 0, clubs: 0, longestSilentMs: null } }).groups,
+    ).toHaveLength(0);
+  });
+
   it("keeps a lone row's own sentence and deep link", () => {
     const { groups } = groupAttention([stuck("a", 1, 5)]);
     expect(groups[0]?.title).toBe("1 auction still live");

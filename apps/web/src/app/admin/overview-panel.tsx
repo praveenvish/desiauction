@@ -34,6 +34,7 @@ import type { LiveBoard } from "../../server/admin/live-views";
 import type { PlatformOverview } from "../../server/admin/views";
 import { humanAction, KpiValue, RelativeTime, statusPillTone } from "./admin-ui";
 import { groupAttention } from "./attention-groups";
+import { ROOM_LABEL, ROOM_TONE, STUCK_LABEL, stuckSummary } from "./room-state";
 
 function pct(rate: number): number {
   return Math.round(rate * 100);
@@ -64,7 +65,10 @@ export function OverviewPanel({
   desks: { items: readonly DeskItem[]; desks: number };
 }) {
   const { totals, runnerVerdict, followers, attention, recent, liveAuctions } = overview;
-  const attentionGroups = groupAttention(attention, { stuckLiveTotal: liveAuctions.stale });
+  const attentionGroups = groupAttention(attention, {
+    stuckLiveTotal: liveAuctions.stale,
+    stuck: stuckSummary(live),
+  });
   return (
     <>
       <StatGrid testId="admin-totals">
@@ -230,7 +234,10 @@ export function OverviewPanel({
           <SectionCard icon={<IconGavel />} concept="auction" title="Auctions by status">
             <StatusList
               lines={overview.auctionsByStatus}
-              liveAuctions={liveAuctions}
+              rooms={{
+                running: live.running.filter((row) => row.status === "live").length,
+                silent: live.stale.length,
+              }}
               empty="No auction has been created yet."
             />
           </SectionCard>
@@ -285,20 +292,6 @@ export function OverviewPanel({
   );
 }
 
-const ROOM_TONE: Record<LiveBoard["running"][number]["state"], KitTone> = {
-  active: "green",
-  quiet: "neutral",
-  paused: "amber",
-  stale: "red",
-};
-
-const ROOM_WORDS: Record<LiveBoard["running"][number]["state"], string> = {
-  active: "bidding",
-  quiet: "quiet",
-  paused: "paused",
-  stale: "silent",
-};
-
 /**
  * What is live, first — before totals, before outcomes. On an auction night it
  * is the only question; on any other day it answers itself in one line.
@@ -343,9 +336,9 @@ function LiveNow({ live }: { live: LiveBoard }) {
                 <span className="adm-row-side">
                   {/* "quiet" on every row said nothing; the dot carries it. */}
                   {row.state === "quiet" ? (
-                    <span className="admin-sr-only">{ROOM_WORDS[row.state]}</span>
+                    <span className="admin-sr-only">{ROOM_LABEL[row.state]}</span>
                   ) : (
-                    <Pill tone={ROOM_TONE[row.state]}>{ROOM_WORDS[row.state]}</Pill>
+                    <Pill tone={ROOM_TONE[row.state]}>{ROOM_LABEL[row.state]}</Pill>
                   )}
                   <span className="adm-row-sub">
                     {row.lots.sold} of {row.lots.total} sold · {row.bids.lastFiveMinutes} bids in 5
@@ -503,11 +496,12 @@ function Figure({
  */
 function StatusList({
   lines,
-  liveAuctions,
+  rooms,
   empty,
 }: {
   lines: readonly { status: string; count: number }[];
-  liveAuctions?: { total: number; stale: number };
+  /** The live board's split of the `live` status (room-state.ts): one rule, both surfaces. */
+  rooms?: { running: number; silent: number };
   empty: string;
 }) {
   if (lines.length === 0) {
@@ -516,17 +510,16 @@ function StatusList({
   return (
     <div className="adm-chips">
       {lines.map((line) => {
-        if (line.status === "live" && liveAuctions !== undefined && liveAuctions.stale > 0) {
-          const running = liveAuctions.total - liveAuctions.stale;
+        if (line.status === "live" && rooms !== undefined && rooms.silent > 0) {
           return (
             <span key={line.status} className="adm-chips">
-              {running > 0 ? (
-                <Pill tone="green" dot>
-                  Live under 12h · {formatCount(running)}
+              {rooms.running > 0 ? (
+                <Pill tone={ROOM_TONE.active} dot>
+                  Running · {formatCount(rooms.running)}
                 </Pill>
               ) : null}
-              <Pill tone="red" dot testId="admin-stuck-live">
-                Live over 12h · {formatCount(liveAuctions.stale)}
+              <Pill tone={ROOM_TONE.stale} dot testId="admin-stuck-live">
+                {STUCK_LABEL} · {formatCount(rooms.silent)}
               </Pill>
             </span>
           );

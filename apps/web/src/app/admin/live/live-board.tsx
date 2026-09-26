@@ -15,7 +15,6 @@ import {
   SectionCard,
   StatCard,
   StatGrid,
-  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { useCallback } from "react";
@@ -23,9 +22,10 @@ import { useCallback } from "react";
 import { moneyFormat } from "../../../lib/money";
 import type { EngineRoom, LiveBoardView } from "../../../server/admin/live-watch";
 import { adminLiveBoard } from "../../../server/admin/live-watch";
-import type { LiveAuctionRow, RoomState } from "../../../server/admin/live-views";
+import type { LiveAuctionRow } from "../../../server/admin/live-views";
 import { KpiValue } from "../admin-ui";
 import { LiveFreshness } from "../live-freshness";
+import { ROOM_LABEL, ROOM_TONE, STUCK_LABEL } from "../room-state";
 import { ageLabel, istWhen, usePolled } from "../use-polled";
 
 const REFRESH_MS = 10_000;
@@ -33,13 +33,6 @@ const REFRESH_MS = 10_000;
 const STALE_SHOWN = 10;
 /** The last day's closes: the newest few, the rest behind "Show all". */
 const ENDED_SHOWN = 5;
-
-const STATE_BADGE: Record<RoomState, { tone: KitTone; label: string }> = {
-  active: { tone: "green", label: "Bidding" },
-  quiet: { tone: "neutral", label: "Quiet" },
-  paused: { tone: "amber", label: "Paused" },
-  stale: { tone: "neutral", label: "Silent" },
-};
 
 /**
  * Every room, on one screen, refreshing itself.
@@ -148,11 +141,13 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
         // A backlog, not a feed: one warning line, opened on demand.
         <details className="admin-fold" data-testid="live-stale">
           <summary>
-            <span className="admin-fold-icon" data-tone="warning" aria-hidden>
+            <span className="admin-fold-icon" data-tone="danger" aria-hidden>
               <IconClock size={16} />
             </span>
             <span className="admin-fold-title">
-              <strong>Silent over 12h · {String(data.stale.length)}</strong>
+              <strong>
+                {STUCK_LABEL} · {String(data.stale.length)}
+              </strong>
               <span className="admin-meta">
                 Live or paused, with no event for over twelve hours — never closed. Only the
                 organizer can close one, from their cockpit.
@@ -306,7 +301,7 @@ function RoomRow({
   engine: EngineRoom | undefined;
   nowMs: number;
 }) {
-  const badge = STATE_BADGE[row.state];
+  const badge = { tone: ROOM_TONE[row.state], label: ROOM_LABEL[row.state] };
   const trouble = engineTrouble(engine);
   const pct = (n: number) => (row.lots.total > 0 ? (n / row.lots.total) * 100 : 0);
   return (
