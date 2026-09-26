@@ -289,6 +289,7 @@ export function SpectatePanel({
           audience="public"
           offline={offline}
           lotMedia={lotMedia}
+          settledStatus={auctionStatus}
         />
       </PageStatus>
       <SaleAnnouncer snapshot={snapshot} />

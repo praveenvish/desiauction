@@ -53,6 +53,7 @@ export default async function OverlayPage({
         sponsor={sponsorName}
         watchUrl={`${env.PUBLIC_BASE_URL}/c/${slug}`}
         lotMedia={view.lotMedia}
+        auctionStatus={view.auctionStatus}
       />
     </main>
   );

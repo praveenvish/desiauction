@@ -3225,6 +3225,37 @@
   align-items: center;
 }
 
+/* One line per signing, price on the right. `.conflict-list li` wraps and
+   `.registration-name` holds a 140px floor, so on a phone every price dropped
+   under its name (~90px rows; carried over from round 1). The name gives way
+   with an ellipsis; the lot chip, face and price keep their size. */
+.my-squad-list li {
+  flex-wrap: nowrap;
+}
+
+.my-squad-list li > * {
+  flex: none;
+}
+
+/* Lot chips share one width, so the faces and names line up down the list. */
+.my-squad-list li > :first-child {
+  min-width: 5ch;
+  justify-content: center;
+}
+
+.my-squad-list .registration-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-squad-list .registration-phone {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .up-next-list li:first-child {
   border-top: 0;
 }
