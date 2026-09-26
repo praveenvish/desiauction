@@ -5,8 +5,12 @@ import {
   IconBroadcast,
   IconChart,
   IconClock,
+  IconLock,
+  IconSend,
   Pill,
   SectionCard,
+  StatCard,
+  StatGrid,
 } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
@@ -19,7 +23,8 @@ import {
   type ReasonRow,
 } from "../../../../server/admin/delivery-analytics-views";
 import { TrendChart } from "./trend-chart";
-import { AdminPageHead } from "../../admin-ui";
+import { AdminPageHead, humanAction, KpiValue, TableCount } from "../../admin-ui";
+import { formatCount } from "../../../../server/admin/format";
 import { NotifySubnav } from "../notify-subnav";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
@@ -68,6 +73,15 @@ export default async function AdminDeliveryAnalyticsPage({
     notFound();
   }
   const anything = view.channels.some((c) => c.sent + c.failed + c.suppressed + c.pending > 0);
+  const totals = view.channels.reduce(
+    (acc, c) => ({
+      queued: acc.queued + c.sent + c.failed + c.suppressed + c.pending,
+      sent: acc.sent + c.sent,
+      suppressed: acc.suppressed + c.suppressed,
+      failed: acc.failed + c.failed,
+    }),
+    { queued: 0, sent: 0, suppressed: 0, failed: 0 },
+  );
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
@@ -92,9 +106,41 @@ export default async function AdminDeliveryAnalyticsPage({
           codes, receipts and security emails are not counted. Days are India time.
         </p>
 
+        {/* The headline first: how much went out and how much did not, in
+            the console's one KPI tile — the channel cards break it down. */}
+        <StatGrid testId="analytics-headline">
+          <StatCard
+            icon={<IconBroadcast />}
+            concept="neutral"
+            value={<KpiValue n={totals.queued} />}
+            label="Queued"
+            hint={`Last ${String(windowDays)} days`}
+          />
+          <StatCard
+            icon={<IconSend />}
+            concept={totals.sent > 0 ? "done" : "neutral"}
+            value={<KpiValue n={totals.sent} />}
+            label="Sent"
+            hint={`${rate(totals.failed, totals.sent + totals.failed)} failure rate`}
+          />
+          <StatCard
+            icon={<IconLock />}
+            concept="neutral"
+            value={<KpiValue n={totals.suppressed} />}
+            label="Suppressed"
+            hint="Held back on purpose"
+          />
+          <StatCard
+            icon={<IconAlert />}
+            concept={totals.failed > 0 ? "alert" : "neutral"}
+            value={<KpiValue n={totals.failed} />}
+            label="Failed"
+          />
+        </StatGrid>
+
         <SectionCard
           icon={<IconBroadcast />}
-          tone="blue"
+          tone="neutral"
           title="By channel"
           description={`The last ${String(windowDays)} days, from ${istDay(view.since)}, India time.`}
           flush
@@ -115,13 +161,20 @@ export default async function AdminDeliveryAnalyticsPage({
                   </h3>
                   <dl>
                     <dt>Sent</dt>
-                    <dd data-testid={`analytics-${c.channel}-sent`}>{String(c.sent)}</dd>
+                    <dd data-testid={`analytics-${c.channel}-sent`} data-zero={zero(c.sent)}>
+                      {formatCount(c.sent)}
+                    </dd>
                     <dt>Suppressed</dt>
-                    <dd data-testid={`analytics-${c.channel}-suppressed`}>
-                      {String(c.suppressed)}
+                    <dd
+                      data-testid={`analytics-${c.channel}-suppressed`}
+                      data-zero={zero(c.suppressed)}
+                    >
+                      {formatCount(c.suppressed)}
                     </dd>
                     <dt>Failed</dt>
-                    <dd data-testid={`analytics-${c.channel}-failed`}>{String(c.failed)}</dd>
+                    <dd data-testid={`analytics-${c.channel}-failed`} data-zero={zero(c.failed)}>
+                      {formatCount(c.failed)}
+                    </dd>
                     {c.pending > 0 ? (
                       <>
                         <dt>Still queued</dt>
@@ -181,14 +234,18 @@ export default async function AdminDeliveryAnalyticsPage({
                     <th scope="col">Reason</th>
                     <th scope="col">Outcome</th>
                     <th scope="col">Channels</th>
-                    <th scope="col">Count</th>
+                    <th scope="col" className="admin-num">
+                      Count
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {view.reasons.map((r) => (
                     <tr key={`${r.status}|${r.label}`} data-testid={`analytics-reason-${r.label}`}>
                       <td data-label="Reason">
-                        <span className="dla-code">{r.label}</span>
+                        <span className="dla-code" title={r.label}>
+                          {humanAction(r.label)}
+                        </span>
                       </td>
                       <td data-label="Outcome">
                         <Pill tone={STATUS_LABEL[r.status].tone}>
@@ -199,7 +256,7 @@ export default async function AdminDeliveryAnalyticsPage({
                         {r.channels.map((c) => CHANNEL_LABEL[c]).join(", ")}
                       </td>
                       <td data-label="Count" className="admin-count admin-num">
-                        {String(r.count)}
+                        {formatCount(r.count)}
                       </td>
                     </tr>
                   ))}
@@ -232,10 +289,18 @@ export default async function AdminDeliveryAnalyticsPage({
                   <tr>
                     <th scope="col">Kind</th>
                     <th scope="col">Channel</th>
-                    <th scope="col">Sent</th>
-                    <th scope="col">Suppressed</th>
-                    <th scope="col">Failed</th>
-                    <th scope="col">Failure rate</th>
+                    <th scope="col" className="admin-num">
+                      Sent
+                    </th>
+                    <th scope="col" className="admin-num">
+                      Suppressed
+                    </th>
+                    <th scope="col" className="admin-num">
+                      Failed
+                    </th>
+                    <th scope="col" className="admin-num">
+                      Failure rate
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -249,13 +314,13 @@ export default async function AdminDeliveryAnalyticsPage({
                       </td>
                       <td data-label="Channel">{CHANNEL_LABEL[k.channel]}</td>
                       <td data-label="Sent" className="admin-num">
-                        {String(k.sent)}
+                        <TableCount n={k.sent} />
                       </td>
                       <td data-label="Suppressed" className="admin-num">
-                        {String(k.suppressed)}
+                        <TableCount n={k.suppressed} />
                       </td>
                       <td data-label="Failed" className="admin-num">
-                        {String(k.failed)}
+                        <TableCount n={k.failed} />
                       </td>
                       <td data-label="Failure rate" className="admin-num">
                         {rate(k.failed, k.sent + k.failed)}
@@ -270,4 +335,9 @@ export default async function AdminDeliveryAnalyticsPage({
       </div>
     </main>
   );
+}
+
+/** A zero is the calm answer: drawn muted. */
+function zero(n: number): true | undefined {
+  return n === 0 || undefined;
 }

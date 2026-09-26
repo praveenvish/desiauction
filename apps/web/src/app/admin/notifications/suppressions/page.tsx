@@ -59,8 +59,9 @@ export default async function AdminSuppressionsPage() {
             and revertible.
           </p>
 
-          {/* Look up and suppress, side by side: two short forms, one glance. */}
-          <div className="admin-two-col">
+          {/* Look up, then suppress: two one-row forms, full width. Side by
+              side they were two cards of unequal height (420 vs 640px). */}
+          <div className="spr-stack">
             <SectionCard
               icon={<IconLock />}
               tone="neutral"

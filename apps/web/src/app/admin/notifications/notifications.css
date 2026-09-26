@@ -850,3 +850,81 @@
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
 }
+
+/* ── wow pass round 2: a chart with a scale ── */
+.dla-plot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.dla-axis-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 2rem;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.dla-axis-x {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-inline-start: calc(2rem + var(--space-2));
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dla-trend .dla-grid {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.dla-trend svg {
+  height: 10rem;
+  max-height: none;
+}
+
+.dla-code {
+  font-family: inherit;
+}
+
+/* ── wow pass round 2: the suppression desk's forms, one row each ── */
+.spr-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.spr-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.spr-add-go {
+  margin-top: calc(var(--text-sm-size) * 1.5 + var(--space-1));
+}
+
+@media (max-width: 899px) {
+  .spr-add {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .spr-add-go {
+    margin-top: 0;
+  }
+}
+
+.dla-channel dd[data-zero] {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
