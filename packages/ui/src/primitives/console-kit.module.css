@@ -776,6 +776,21 @@ a.journey-link:focus-visible {
     flex: 1 1 auto;
     min-width: 0;
   }
+
+  /* The focus pill shrinks with its step. The rail's link was flex: none, so
+     "Registration 1 Step 3 of 5" kept its width while the step shrank, and the
+     pill was drawn over the marks after it (round 2). Now the label ellipsizes
+     and "Step 3 of 5" drops to its own line when the words don't fit. */
+  .journey-step[data-focus="true"] .journey-link,
+  .journey[data-variant="rail"] .journey-step[data-focus="true"] .journey-link {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .journey-step[data-focus="true"] .journey-label {
+    min-width: 0;
+    max-width: 100%;
+  }
 }
 
 /* ---- Hero banner ---- */

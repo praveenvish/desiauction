@@ -451,6 +451,26 @@
   }
 }
 
+/* PHONE: tile, words, then a full-width CTA — one column. The wrap above is
+   for a row; on a phone `.home-next` is already a column, and wrapping a
+   column with a 100% basis threw the actions into a second column beside the
+   tile, pushing "Announce now" past the card and the page to 509px (round 2). */
+@media (max-width: 719px) {
+  .home-next--embedded {
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .home-next--embedded .home-next-actions {
+    flex: none;
+    align-items: stretch;
+  }
+
+  .home-next--embedded .home-next-buttons > * {
+    width: 100%;
+  }
+}
+
 /* ---------- club hero ---------- */
 .home-hero-link {
   color: inherit;
