@@ -300,6 +300,10 @@
   border-top: 0;
 }
 
+.ax-spend-team .ax-muted {
+  white-space: nowrap;
+}
+
 .ax-spend-team {
   display: flex;
   align-items: baseline;
@@ -386,5 +390,12 @@
 
   .ax-spend-top {
     grid-area: top;
+  }
+
+  /* The name wins the row on a phone: the purse total and the count step
+     aside (the bar already says how much of it went). */
+  .ax-spend-figure .ax-muted,
+  .ax-spend-team .ax-muted {
+    display: none;
   }
 }
