@@ -60,13 +60,3 @@
   border-top: 1px solid var(--border-subtle);
 }
 
-/* The points night under the two cards spans both columns (round 5A). */
-.my-money-night {
-  min-width: 0;
-}
-
-@media (min-width: 1024px) {
-  .my-money--books > .my-money-night {
-    grid-column: 1 / -1;
-  }
-}

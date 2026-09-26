@@ -46,7 +46,7 @@ import {
 import { ENTRY_CATEGORIES, entryCategoryLabel, roleOptions } from "@desiauction/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { roleLabeller } from "../../../lib/role-label";
 import { useMoney } from "../../../components/money-unit";
@@ -861,7 +861,7 @@ export function OverviewPanel({
       <div className="ov-grid">
         <CardGrid>
           <SectionCard
-            title={view.lotsSold > 0 && view.viewer.canSeeMoney ? "Top teams by spend" : "Teams"}
+            title="Teams"
             data-testid="team-spend-card"
             action={
               <Link className="ov-card-link" href={`/seasons/${slug}/teams`}>
@@ -894,20 +894,8 @@ export function OverviewPanel({
               <ul className="ov-rows">
                 {view.topTeams.slice(0, 5).map((team) => {
                   const spent = team.spend !== undefined && view.lotsSold > 0;
-                  const pct =
-                    team.spend !== undefined && team.purse !== undefined
-                      ? percent(team.spend, team.purse)
-                      : null;
                   return (
-                    <li
-                      key={team.teamId}
-                      className="ov-team"
-                      style={
-                        team.color !== null
-                          ? ({ "--team": team.color } as CSSProperties)
-                          : undefined
-                      }
-                    >
+                    <li key={team.teamId} className="ov-team">
                       {/* The same crest every other tab draws — its logo, or two
                           initials — rather than a one-letter tile of its own. */}
                       <span className="ov-team-tile" aria-hidden>
@@ -938,18 +926,7 @@ export function OverviewPanel({
                         {/* Before a hammer has fallen every team has spent ₹0, and
                           a column of "₹0" is furniture, not a reading. */}
                         {spent ? <span>{money.exact(team.spend ?? 0)}</span> : null}
-                        {spent && pct !== null ? (
-                          <span className="ov-team-pct">
-                            {shareLabel(team.spend ?? 0, pct)}
-                            <VisuallyHidden> of the purse</VisuallyHidden>
-                          </span>
-                        ) : null}
                       </span>
-                      {spent && pct !== null && (team.spend ?? 0) > 0 ? (
-                        <span className="ov-bar ov-team-bar" aria-hidden>
-                          <span className="ov-bar-fill" style={{ width: `${String(pct)}%` }} />
-                        </span>
-                      ) : null}
                     </li>
                   );
                 })}

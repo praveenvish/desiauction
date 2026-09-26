@@ -200,22 +200,18 @@ a.ov-hero-club:focus-visible {
   border-radius: inherit;
 }
 
-/* A team: its letter on its own colour, the name, then squad · spend · share,
-   with the bar under the name in the team's colour. */
+/* A team: its crest, the name, then squad · spend. The share-of-purse bar
+   lives on the season's money tab and /auctions, not here too. */
 .ov-team {
-  --team: var(--text-muted);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
   column-gap: var(--space-3);
-  row-gap: var(--space-1);
   align-items: center;
 }
 
 .ov-team-tile {
   /* Only a grid seat now: the crest inside is the shared TeamCrest (st-crest in
      _tabs/tabs.css), so a team looks the same here as on every other tab. */
-  grid-row: 1 / span 2;
   display: inline-flex;
 }
 
@@ -237,20 +233,6 @@ a.ov-hero-club:focus-visible {
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
   white-space: nowrap;
-}
-
-.ov-team-pct {
-  min-width: 4ch;
-  text-align: end;
-  color: var(--text-primary);
-}
-
-.ov-team-bar {
-  grid-column: 2 / span 2;
-}
-
-.ov-team-bar .ov-bar-fill {
-  background: var(--team);
 }
 
 /* A role: its mark, its name and count, and the bar under them. */

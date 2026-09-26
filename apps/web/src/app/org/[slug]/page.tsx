@@ -30,7 +30,6 @@ import { FormDialog } from "../../../components/form-dialog";
 import { PageTitle } from "../../../components/shell/page-title";
 import { activityLabel as feedLabel, activityStyle, groupActivity } from "../../home/home-activity";
 import { AboutBanner } from "./about-banner";
-import { SquadsBySpend, spendNightOf } from "../../../components/team/squads-by-spend";
 import { OrgTabs } from "./org-tabs";
 import { financeAuthority } from "../../../server/financial-operations/actions";
 import { orgOverview, orgView, type OrgActivityRow } from "../../../server/orgs/actions";
@@ -311,12 +310,6 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
       : []),
   ];
 
-  const latestEdition = [...editions].sort((a, b) =>
-    (b.startsOn ?? "").localeCompare(a.startsOn ?? ""),
-  )[0];
-  const latestNight =
-    latestEdition === undefined ? null : await spendNightOf(latestEdition.slug, latestEdition.name);
-
   // Live & open now: an auction running, or a season taking entries.
   const liveOpen: { key: string; slug: string; name: string; tone: "live" | "open" }[] = [
     ...(overview?.liveAuctions.map((auction) => ({
@@ -582,11 +575,6 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
           )}
         </SectionCard>
       </CardGrid>
-
-      {/* The club's latest auction night, by what each team spent (round 5A):
-          the overview ended at y≈540 under two half-empty cards. Gated like
-          /auctions — no money sight, no block. */}
-      {latestNight !== null ? <SquadsBySpend night={latestNight} testId="org-spend" /> : null}
     </div>
   );
 

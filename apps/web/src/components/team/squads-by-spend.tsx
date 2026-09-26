@@ -8,8 +8,9 @@ import "./squads-by-spend.css";
 
 /*
  * SQUADS BY SPEND — a finished auction night's teams, what each spent of its
- * purse and its top buy. Born on /auctions (round 4A); shared so every page
- * whose next object is "how did the night go" draws the same block. Read
+ * purse and its top buy. Lives on /auctions and on a points season's money
+ * tab only — the two pages whose subject it is. Pasted onto every short page
+ * it read as filler (round-5 review), so keep it off the rest. Read
  * through the hub's own gated read (auctionDashboard): a viewer without money
  * sight gets no figures and the block does not render.
  */
