@@ -77,6 +77,16 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
 
   const role =
     sportProfile.defaultRole !== null ? roleLabelIn(pack, sportProfile.defaultRole) : null;
+  const attributeLabel = (attribute: (typeof pack.attributes)[number]): string | null => {
+    const value = sportProfile.attributes[attribute.key];
+    return value === undefined
+      ? null
+      : (attribute.options.find((option) => option.key === value)?.label ?? null);
+  };
+  const playUnset = role === null && pack.attributes.every((a) => attributeLabel(a) === null);
+  const hasArmband = career.seasons.some(
+    (season) => season.isCaptain || season.isViceCaptain || season.auction?.kind === "captain",
+  );
 
   return (
     <main className="me">
@@ -184,13 +194,20 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             flush
             data-testid="career-seasons"
           >
-            <div className="me-career" role="table" aria-label={`${pack.label} seasons`}>
+            <div
+              className="me-career"
+              role="table"
+              aria-label={`${pack.label} seasons`}
+              // No armband ever worn: the column stands down rather than
+              // printing a dash down every row (round 5).
+              data-armband={hasArmband ? "" : undefined}
+            >
               <div className="me-career-row me-career-head" role="row">
                 <span role="columnheader">Season</span>
                 <span role="columnheader">Team</span>
                 <span role="columnheader">Role</span>
                 <span role="columnheader">Auction</span>
-                <span role="columnheader">Armband</span>
+                {hasArmband ? <span role="columnheader">Armband</span> : null}
               </div>
               {career.seasons.map((season) => {
                 const verdict = verdictOf(season, money);
@@ -233,9 +250,11 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
                         {verdict.label}
                       </Pill>
                     </span>
-                    <span role="cell" data-label="Armband" className="me-career-armband">
-                      {armband ?? <span className="me-career-none">—</span>}
-                    </span>
+                    {hasArmband ? (
+                      <span role="cell" data-label="Armband" className="me-career-armband">
+                        {armband ?? <span className="me-career-none">—</span>}
+                      </span>
+                    ) : null}
                   </div>
                 );
               })}
@@ -248,32 +267,45 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
             icon={<IconUsers />}
             title="How you play"
             description={`Your ${pack.label.toLowerCase()} profile — every new registration starts from it.`}
-            action={
-              <Link href="/account#sports" className="me-link">
-                Edit <IconArrowRight size={14} aria-hidden />
-              </Link>
-            }
+            {...(playUnset
+              ? {}
+              : {
+                  action: (
+                    <Link href="/account#sports" className="me-link">
+                      Edit <IconArrowRight size={14} aria-hidden />
+                    </Link>
+                  ),
+                })}
             data-testid="career-profile"
           >
-            <dl className="me-play">
-              <div>
-                <dt>Role</dt>
-                <dd data-empty={role === null ? "true" : undefined}>{role ?? "Not set"}</dd>
+            {playUnset ? (
+              // Nothing set: one line and one way to set it, not "Not set"
+              // three times over (round 5).
+              <div className="me-play-empty">
+                <p>
+                  Nothing set yet. Your role and styles fill in every registration form for you.
+                </p>
+                <Link href="/account#sports" className="me-link">
+                  Add how you play <IconArrowRight size={14} aria-hidden />
+                </Link>
               </div>
-              {pack.attributes.map((attribute) => {
-                const value = sportProfile.attributes[attribute.key];
-                const label =
-                  value === undefined
-                    ? null
-                    : (attribute.options.find((option) => option.key === value)?.label ?? null);
-                return (
-                  <div key={attribute.key}>
-                    <dt>{attribute.label}</dt>
-                    <dd data-empty={label === null ? "true" : undefined}>{label ?? "Not set"}</dd>
-                  </div>
-                );
-              })}
-            </dl>
+            ) : (
+              <dl className="me-play">
+                <div>
+                  <dt>Role</dt>
+                  <dd data-empty={role === null ? "true" : undefined}>{role ?? "Not set"}</dd>
+                </div>
+                {pack.attributes.map((attribute) => {
+                  const label = attributeLabel(attribute);
+                  return (
+                    <div key={attribute.key}>
+                      <dt>{attribute.label}</dt>
+                      <dd data-empty={label === null ? "true" : undefined}>{label ?? "Not set"}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            )}
           </SectionCard>
         </>
       )}

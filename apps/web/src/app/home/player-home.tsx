@@ -178,7 +178,10 @@ function SoldDuo({
           team={team}
           selfId={registration.registrationId}
           title="My squad"
-          limit={5}
+          // Three rows and "+N more" stand level with the three top buys and
+          // their note beside it (round 5: five rows left ~150px of stretch
+          // above the neighbour's foot).
+          limit={3}
           headingId="hd-squad-title"
         />
       ) : null}

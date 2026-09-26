@@ -38,7 +38,6 @@ import {
 import { ownPhotoUrl, playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
 import { rolesOf, type OwnedTeam } from "../../server/roles/roles";
 import { RegistrationCard } from "./registration-card";
-import { LatestSquad } from "./squad-rail";
 import "./me.css";
 import { formatDate, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
 import { formatCount } from "../../lib/plural";
@@ -159,6 +158,13 @@ export default async function MySportsPage({
     (season) => season.status === "approved" && season.auction === null && season.teamName === null,
   );
   const upcoming = waiting ?? inPool;
+  /*
+   * A player's rail held a copy of the squad their home already shows (round
+   * 5: dropped — /me/cricket carries the season table). With no fixtures and
+   * one sport, the rail has nothing but its privacy note, so the page is one
+   * column instead of a short card beside a near-empty rail.
+   */
+  const asideEmpty = !ownerOnly && shownUpcoming.length === 0 && bySport.length <= 1;
 
   return (
     <main className="me">
@@ -311,7 +317,7 @@ export default async function MySportsPage({
       {/* An owner who does not play has one object — their team — and /teams
           holds the squad: the rail here was its fourth copy (review r3). One
           column at a reading measure, not a short card beside a tall rail. */}
-      <div className="me-layout">
+      <div className="me-layout" data-single={asideEmpty ? "" : undefined}>
         <div className="me-main">
           {owns.length > 0 ? <OwnedTeams teams={owns} /> : null}
           {seasons.length === 0 && owns.length > 0 ? (
@@ -498,7 +504,6 @@ export default async function MySportsPage({
             </SectionCard>
           ) : null}
 
-          {ownerOnly ? null : <LatestSquad seasons={career.seasons} limit={5} />}
           {/* THE OWNER'S RECORD (round 5). Without the squad rail the page was
               one card and ~55% blank on a laptop. An owner's record is the
               night their team was built: what it cost and where it went. */}
