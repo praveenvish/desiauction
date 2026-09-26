@@ -4263,3 +4263,47 @@
     grid-row: 2;
   }
 }
+
+/* --- the stage before the room answers (wow pass, round 2) ----------------- */
+/* A black box with one line in it read as broken. The stage keeps its measured
+   height (see `.ceremony`) and shows its own shape: a face and two lines,
+   pulsing quietly. Opacity on shapes only, never on text (axe samples it). */
+.ceremony-skel {
+  display: block;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  animation: ceremony-skel-pulse var(--duration-shimmer) var(--ease-out) infinite;
+}
+
+.ceremony-skel-face {
+  width: 112px;
+  height: 112px;
+  border-radius: var(--radius-full);
+}
+
+.ceremony-skel-line {
+  width: min(320px, 70%);
+  height: 20px;
+}
+
+.ceremony-skel-short {
+  width: min(200px, 45%);
+  height: 14px;
+}
+
+@keyframes ceremony-skel-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ceremony-skel {
+    animation: none;
+  }
+}

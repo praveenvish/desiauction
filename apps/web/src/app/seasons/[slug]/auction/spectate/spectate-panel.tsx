@@ -347,6 +347,7 @@ export function SpectatePanel({
           stampSize={stage ? "stage" : "lg"}
           resolved={feed.resolved}
           teams={teams}
+          serverStatus={auctionStatus}
         />
       ) : (
         <div className="stage-hide">

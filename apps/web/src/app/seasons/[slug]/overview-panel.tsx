@@ -16,6 +16,7 @@ import {
   IconExternal,
   IconEye,
   IconEyeOff,
+  IconGlobe,
   IconInfo,
   IconLayers,
   IconLock,
@@ -1019,18 +1020,19 @@ export function OverviewPanel({
               is the organizer's control panel. They get the one useful thing
               in it: the door to the public page, when there is one. */}
           {!view.viewer.canManage && isPublic && view.platformHold === null ? (
-            <SectionCard title="Public page" data-testid="visibility-row">
-              <div className="ov-public-actions">
-                <Link
-                  className={buttonClassName({ variant: "secondary" })}
-                  href={`/c/${slug}`}
-                  data-testid="open-public-page"
-                >
-                  View public page
-                  <IconArrowRight size={16} />
-                </Link>
-              </div>
-            </SectionCard>
+            /* One slim row across the grid, not a half-width card holding a
+               single button under Teams (wow pass, round 2). */
+            <p className="ov-public-strip" data-testid="visibility-row">
+              <IconGlobe size={20} aria-hidden />
+              <span>
+                <strong>The season&apos;s public page is live.</strong> Anyone with the link can
+                follow the squads and results.
+              </span>
+              <Link href={`/c/${slug}`} data-testid="open-public-page">
+                View public page
+                <IconArrowRight size={16} />
+              </Link>
+            </p>
           ) : null}
 
           {/* DA-12: publishing has a block of its own, not a ghost button in the

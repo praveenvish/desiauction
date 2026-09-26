@@ -117,12 +117,19 @@ export function CeremonyStage({
    */
   resolved = [],
   teams = [],
+  serverStatus,
 }: {
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
   snapshot: AuctionSnapshot | null;
   ceremony: CeremonyState;
   remainingMs: number | null;
+  /**
+   * The auction's status as the page was rendered. Before the room answers,
+   * a finished auction shows its result instead of a black "connecting" box —
+   * presentation only; the socket is untouched.
+   */
+  serverStatus?: string;
   lotMedia?: Readonly<Record<string, LotMedia>>;
   stampSize?: StampSize;
   resolved?: readonly ResolvedLot[];
@@ -148,9 +155,50 @@ export function CeremonyStage({
   }, [snapshot]);
 
   if (snapshot === null) {
+    const settled = serverStatus === "completed" || serverStatus === "reconciled";
+    const top = settled
+      ? [...resolved]
+          .filter((entry) => entry.status === "sold")
+          .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0))
+          .slice(0, SHOWCASE)
+      : [];
+    if (top.length > 0) {
+      /* A finished night does not need the room to say how it ended: the
+         result is already on the page, so it leads while the socket connects. */
+      return (
+        <section
+          className="ceremony ceremony-completed"
+          data-testid="ceremony"
+          data-phase="completed"
+        >
+          <p className="ceremony-title" data-testid="ceremony-title">
+            {PHASE_TITLE.completed}
+          </p>
+          <div className="ceremony-lot ceremony-waiting" data-testid="ceremony-finished">
+            <Showcase
+              entries={top}
+              lotMedia={lotMedia}
+              colorOf={(teamName) =>
+                teams.find((team) => team.name === teamName)?.primaryColor ?? undefined
+              }
+              ledger={money.ledger}
+            />
+            <p className="ceremony-waiting-hint">Every lot is settled. Final squads below.</p>
+          </div>
+        </section>
+      );
+    }
+    /* Anything else: the stage's own shape as a quiet skeleton, not a black box. */
     return (
-      <section className="ceremony ceremony-idle" data-testid="ceremony" data-phase="connecting">
-        <p className="ceremony-title">
+      <section
+        className="ceremony ceremony-idle ceremony-skeleton"
+        data-testid="ceremony"
+        data-phase="connecting"
+      >
+        <span className="ceremony-skel ceremony-skel-face" aria-hidden />
+        <span className="ceremony-skel ceremony-skel-line" aria-hidden />
+        <span className="ceremony-skel ceremony-skel-line ceremony-skel-short" aria-hidden />
+        <p className="ceremony-waiting-hint">
           {patienceSpent ? "Not connected" : "Connecting to the auction room…"}
         </p>
         {patienceSpent ? (
@@ -272,33 +320,12 @@ export function CeremonyStage({
           {showcase.length > 0 ? (
             /* THE NIGHT'S HEADLINES — the biggest buys, by face, each ringed in
                the colours of the franchise that won them. */
-            <ol className="ceremony-showcase" data-testid="ceremony-showcase">
-              {showcase.map((entry, index) => (
-                <li key={entry.lotId} className="ceremony-showcase-item">
-                  <span className="ceremony-showcase-face">
-                    <PlayerImage
-                      name={entry.playerName ?? entry.lotNumber}
-                      seed={entry.registrationId ?? lotSeed(entry.lotId, lotMedia)}
-                      src={lotMedia[entry.lotId]?.photoUrl ?? null}
-                      size="hero"
-                      shape="round"
-                      fluid
-                      decorative
-                      teamColor={colorOf(entry.teamName)}
-                      ring
-                    />
-                  </span>
-                  <span className="ceremony-showcase-rank">
-                    {index === 0 ? "Top buy" : `#${String(index + 1)}`}
-                  </span>
-                  <b className="ceremony-showcase-name">{entry.playerName ?? entry.lotNumber}</b>
-                  <span className="ceremony-showcase-price">
-                    {money.ledger(entry.soldPrice ?? 0)}
-                  </span>
-                  <span className="ceremony-showcase-team">{entry.teamName ?? "—"}</span>
-                </li>
-              ))}
-            </ol>
+            <Showcase
+              entries={showcase}
+              lotMedia={lotMedia}
+              colorOf={colorOf}
+              ledger={money.ledger}
+            />
           ) : null}
           <p className="ceremony-waiting-hint">Every lot is settled. Final squads below.</p>
         </div>
@@ -427,5 +454,50 @@ export function CeremonyStage({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * THE NIGHT'S HEADLINES — the biggest buys, by face, each ringed in the colours
+ * of the franchise that won them. Shared by the finished phase and by the
+ * stage a guest sees before the room answers on a finished auction.
+ */
+function Showcase({
+  entries,
+  lotMedia,
+  colorOf,
+  ledger,
+}: {
+  entries: readonly ResolvedLot[];
+  lotMedia: Readonly<Record<string, LotMedia>>;
+  colorOf: (teamName: string | null) => string | undefined;
+  ledger: (amount: number) => string;
+}) {
+  return (
+    <ol className="ceremony-showcase" data-testid="ceremony-showcase">
+      {entries.map((entry, index) => (
+        <li key={entry.lotId} className="ceremony-showcase-item">
+          <span className="ceremony-showcase-face">
+            <PlayerImage
+              name={entry.playerName ?? entry.lotNumber}
+              seed={entry.registrationId ?? lotSeed(entry.lotId, lotMedia)}
+              src={lotMedia[entry.lotId]?.photoUrl ?? null}
+              size="hero"
+              shape="round"
+              fluid
+              decorative
+              teamColor={colorOf(entry.teamName)}
+              ring
+            />
+          </span>
+          <span className="ceremony-showcase-rank">
+            {index === 0 ? "Top buy" : `#${String(index + 1)}`}
+          </span>
+          <b className="ceremony-showcase-name">{entry.playerName ?? entry.lotNumber}</b>
+          <span className="ceremony-showcase-price">{ledger(entry.soldPrice ?? 0)}</span>
+          <span className="ceremony-showcase-team">{entry.teamName ?? "—"}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
