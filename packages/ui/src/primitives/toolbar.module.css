@@ -292,20 +292,9 @@ button.searchIcon:hover {
   overflow-x: auto;
   scrollbar-width: none;
   border-radius: var(--radius-md, 12px);
-  /* Scroll shadows (the SubNavTabs recipe): the `local` layers are the
-     strip's own ground and travel with the content, the `scroll` layers stay
-     pinned — so a fade shows only at an end with more tabs past it
-     ("All · To review · Approved · Waitlis…" gave no hint it scrolled). */
-  background:
-    linear-gradient(to right, var(--surface-sunken) 60%, transparent) left center / 20px 100%
-      no-repeat local,
-    linear-gradient(to left, var(--surface-sunken) 60%, transparent) right center / 20px 100%
-      no-repeat local,
-    linear-gradient(to right, var(--border-strong), transparent) left center / 12px 100% no-repeat
-      scroll,
-    linear-gradient(to left, var(--border-strong), transparent) right center / 12px 100% no-repeat
-      scroll,
-    var(--surface-sunken);
+  /* It is a `da-scroll-strip` (system.css): the end with more tabs past it
+     fades out ("Waitlis…" gave no hint it scrolled). */
+  background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
 }
 

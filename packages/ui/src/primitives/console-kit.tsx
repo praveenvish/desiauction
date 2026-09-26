@@ -49,7 +49,9 @@ export type KitConcept =
   | "alert"
   | "done"
   | "activity"
-  | "neutral";
+  | "neutral"
+  // States (round 3B): one colour per state across the product.
+  | StateKey;
 
 export const CONCEPT_TONE: Record<KitConcept, KitTone> = {
   // Gold: the thing the product is about — the season and its money night.
@@ -70,7 +72,64 @@ export const CONCEPT_TONE: Record<KitConcept, KitTone> = {
   // State, and only state, is coloured.
   alert: "red",
   done: "green",
+  complete: "green",
+  live: "green",
+  sold: "green",
+  unsold: "neutral",
+  pending: "amber",
+  error: "red",
 };
+
+/**
+ * THE STATES (round 3B). Six things a pill, a dot or a bar can say is TRUE,
+ * each with one colour everywhere — mirrored as `--state-*` tokens in
+ * system.css for CSS that draws its own dots and bars. Progress ("how far
+ * along") is not a state: it is brand gold (`--state-progress`).
+ */
+export type StateKey = "complete" | "live" | "sold" | "unsold" | "pending" | "error";
+
+const STATUS_STATE: Readonly<Record<string, StateKey>> = {
+  // done
+  complete: "complete",
+  completed: "complete",
+  done: "complete",
+  settled: "complete",
+  reconciled: "complete",
+  closed: "complete",
+  approved: "complete",
+  confirmed: "complete",
+  paid: "complete",
+  published: "complete",
+  // now
+  live: "live",
+  running: "live",
+  registration_open: "live",
+  // lots
+  sold: "sold",
+  retained: "sold",
+  unsold: "unsold",
+  passed: "unsold",
+  // waiting
+  pending: "pending",
+  paused: "pending",
+  waitlisted: "pending",
+  submitted: "pending",
+  settling: "pending",
+  due: "pending",
+  unpaid: "pending",
+  // wrong
+  error: "error",
+  failed: "error",
+  rejected: "error",
+  abandoned: "error",
+  discrepant: "error",
+  overdue: "error",
+};
+
+/** The state a domain status stands for, or null when it states nothing. */
+export function statusState(status: string): StateKey | null {
+  return STATUS_STATE[status.toLowerCase()] ?? null;
+}
 
 /** The tone a concept stands for, else the explicit tone, else the fallback. */
 export function kitTone(

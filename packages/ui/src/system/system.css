@@ -1,0 +1,327 @@
+/*
+ * THE SYSTEM LAYER (round 3B, 2026-09-26) — the handful of global rules every
+ * page shares so pages built by different hands read as one product. Tokens
+ * only; loaded once by the app's root layout after the theme sheets.
+ *
+ *  1. State colours — one colour per state, everywhere.
+ *  2. The eyebrow — one small-caps label style.
+ *  3. Figures — tabular UI-font numbers (never mono for data).
+ *  4. Scroll strips — edge fades on every horizontal scroller.
+ */
+
+/* ---- 1. State colours ------------------------------------------------------
+ * Six states, six colours, one definition. A pill, a dot or a bar that states
+ * one of these reads its colour from here, so "done" is never green on one
+ * page and gold on the next. Progress (how far along) is BRAND gold; state
+ * (what is true) is semantic.
+ *
+ *   complete — done, settled, closed, approved     green
+ *   live     — happening now                        green (the live token)
+ *   sold     — a lot that sold                      green
+ *   unsold   — a lot that did not                   neutral
+ *   pending  — waiting on someone                   amber
+ *   error    — wrong, failed, rejected              red
+ */
+:root,
+[data-theme] {
+  --state-complete: var(--success-base);
+  --state-complete-ink: var(--success-strong);
+  --state-complete-bg: var(--success-subtle);
+  --state-live: var(--live);
+  --state-live-ink: var(--success-strong);
+  --state-live-bg: var(--success-subtle);
+  --state-sold: var(--success-base);
+  --state-sold-ink: var(--success-strong);
+  --state-sold-bg: var(--success-subtle);
+  --state-unsold: var(--text-muted);
+  --state-unsold-ink: var(--text-secondary);
+  --state-unsold-bg: var(--surface-sunken);
+  --state-pending: var(--warning-base);
+  --state-pending-ink: var(--warning-strong);
+  --state-pending-bg: var(--warning-subtle);
+  --state-error: var(--danger-base);
+  --state-error-ink: var(--danger-strong);
+  --state-error-bg: var(--danger-subtle);
+  /* Progress bars fill in brand gold; their track is the sunken ground. */
+  --state-progress: var(--accent);
+  --state-progress-track: var(--surface-sunken);
+}
+
+/* A status dot: `<span class="da-dot" data-state="pending">`. The label beside
+   it stays in primary ink (axe: colour is never the only carrier). */
+.da-dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--state-unsold);
+}
+
+.da-dot[data-state="complete"] {
+  background: var(--state-complete);
+}
+
+.da-dot[data-state="live"] {
+  background: var(--state-live);
+}
+
+.da-dot[data-state="sold"] {
+  background: var(--state-sold);
+}
+
+.da-dot[data-state="pending"] {
+  background: var(--state-pending);
+}
+
+.da-dot[data-state="error"] {
+  background: var(--state-error);
+}
+
+/* ---- 2. The eyebrow -------------------------------------------------------
+ * One label style over a heading, on every content and public page: the UI
+ * sans, small, semibold, letter-spaced caps, in accent ink. (It used to be
+ * mono on half the pages and sans on the other half.)
+ */
+.da-eyebrow {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+/* ---- 3. Figures -----------------------------------------------------------
+ * Data figures are UI-font tabular numbers, so a column lines up without the
+ * typewriter look mono gave the ledger and the burndown.
+ */
+.da-num {
+  font-family: var(--font-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 4. Scroll strips -----------------------------------------------------
+ * Every horizontal scroller (tabs, chips, sport rows, facets) hides its
+ * scrollbar, so it must SAY it scrolls: the edge with more content past it
+ * fades out. `useScrollStrip` (or <ScrollStrip>) sets data-fade-start /
+ * data-fade-end from the scroll position; without script the strip is a plain
+ * scroller with no fades, never a clipped one.
+ */
+.da-scroll-strip {
+  --da-fade-start: 0px;
+  --da-fade-end: 0px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--da-fade-start),
+    black calc(100% - var(--da-fade-end)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--da-fade-start),
+    black calc(100% - var(--da-fade-end)),
+    transparent 100%
+  );
+}
+
+.da-scroll-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.da-scroll-strip[data-fade-start] {
+  --da-fade-start: 32px;
+}
+
+.da-scroll-strip[data-fade-end] {
+  --da-fade-end: 32px;
+}
+
+/* ---- 5. The phone list row -------------------------------------------------
+ * One compact row for every list and every table that collapses on a phone:
+ *
+ *   [lead]  Title that ellipsizes…            figure
+ *           one-line meta that ellipsizes…    status
+ *
+ * 56–72px tall, no labelled cells. Lists use <ListRow>. A table opts in with
+ * class `da-rows` and marks its cells: data-cell="lead" (avatar/tile),
+ * "title" (name; put the phone's one-line summary in a `.da-row-meta` span
+ * inside it), "figure" (the right-aligned number) and "status" (pill/dot).
+ * Every other cell is the laptop's detail and steps aside on a phone.
+ */
+.da-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "lead title figure"
+    "lead meta status";
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.da-row:hover .da-row-title {
+  color: var(--text-accent);
+}
+
+.da-row-lead {
+  grid-area: lead;
+  display: inline-flex;
+}
+
+.da-row-title,
+.da-row-meta {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.da-row-title {
+  grid-area: title;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.da-row-meta {
+  grid-area: meta;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+}
+
+.da-row-figure {
+  grid-area: figure;
+  justify-self: end;
+  font-family: var(--font-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-sm-size);
+  white-space: nowrap;
+}
+
+.da-row-status {
+  grid-area: status;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+/* Without a lead, the text takes the first column. */
+.da-row:not(:has(> .da-row-lead)) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title figure"
+    "meta status";
+}
+
+/* The table form: the phone meta line is hidden on a laptop, where the
+   columns already say it. */
+table.da-rows .da-row-meta {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  table.da-rows,
+  table.da-rows tbody {
+    display: block;
+    width: 100%;
+  }
+
+  table.da-rows thead {
+    display: none;
+  }
+
+  table.da-rows tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: 2px;
+    min-height: 56px;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  table.da-rows tr:not(:has(> [data-cell="lead"])) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  table.da-rows td,
+  table.da-rows th {
+    display: none;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  table.da-rows [data-cell] {
+    display: block;
+  }
+
+  table.da-rows [data-cell]::before {
+    content: none;
+  }
+
+  table.da-rows [data-cell="lead"] {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  table.da-rows [data-cell="title"] {
+    grid-column: -3;
+    grid-row: 1 / span 2;
+    overflow: hidden;
+  }
+
+  table.da-rows [data-cell="title"] > * {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  table.da-rows [data-cell="figure"] {
+    grid-column: -2;
+    grid-row: 1;
+    justify-self: end;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  table.da-rows [data-cell="status"] {
+    grid-column: -2;
+    grid-row: 2;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  table.da-rows tr:not(:has(> [data-cell="figure"])) [data-cell="status"] {
+    grid-row: 1 / span 2;
+  }
+
+  table.da-rows .da-row-meta {
+    display: block;
+  }
+}

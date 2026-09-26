@@ -16,6 +16,15 @@ export { Skeleton } from "./primitives/skeleton";
 export type { SkeletonProps } from "./primitives/skeleton";
 export { EmptyState } from "./primitives/empty-state";
 export type { EmptyStateProps } from "./primitives/empty-state";
+// The round-3B system: one pager, one list row, one eyebrow, one scroll strip.
+export { Pager, pageWindow } from "./primitives/pager";
+export type { PagerProps } from "./primitives/pager";
+export { ListRow, StateDot } from "./primitives/list-row";
+export type { ListRowProps } from "./primitives/list-row";
+export { Eyebrow } from "./primitives/eyebrow";
+export { ScrollStrip } from "./primitives/scroll-strip";
+export type { ScrollStripProps } from "./primitives/scroll-strip";
+export { useScrollStrip } from "./primitives/use-scroll-strip";
 export { Stat, StatRow } from "./primitives/stat";
 export type { StatProps, StatRowProps } from "./primitives/stat";
 export { Field, Select } from "./primitives/field";
@@ -33,6 +42,7 @@ export {
   StatGrid,
   TeamChip,
   kitTone,
+  statusState,
 } from "./primitives/console-kit";
 export { KitFigure } from "./primitives/console-kit-figure";
 export type {
@@ -45,6 +55,7 @@ export type {
   PillProps,
   SectionCardProps,
   StatCardProps,
+  StateKey,
 } from "./primitives/console-kit";
 export { Tabs } from "./primitives/tabs";
 export {

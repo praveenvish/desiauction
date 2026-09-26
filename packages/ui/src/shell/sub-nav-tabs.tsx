@@ -2,7 +2,7 @@
 
 import { useRef, type ElementType } from "react";
 
-import { useActiveInView } from "../primitives/use-active-in-view";
+import { useScrollStrip } from "../primitives/use-scroll-strip";
 
 import styles from "./sub-nav-tabs.module.css";
 
@@ -45,9 +45,9 @@ export interface SubNavTabsProps {
 
 export function SubNavTabs({ label, tabs, linkComponent: Link = "a" }: SubNavTabsProps) {
   const ref = useRef<HTMLElement>(null);
-  useActiveInView(ref, tabs.find((tab) => tab.active === true)?.key);
+  useScrollStrip(ref, tabs.find((tab) => tab.active === true)?.key);
   return (
-    <nav ref={ref} aria-label={label} className={styles["tabs"]}>
+    <nav ref={ref} aria-label={label} className={`${styles["tabs"] ?? ""} da-scroll-strip`}>
       <ul className={styles["list"]}>
         {tabs.map((tab) => (
           <li key={tab.key} {...(tab.dividerBefore === true ? { "data-group-start": "" } : {})}>

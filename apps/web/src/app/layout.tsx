@@ -3,6 +3,7 @@ import "@desiauction/ui/styles/primitives.css";
 import "@desiauction/ui/styles/floodlight.css";
 import "@desiauction/ui/styles/daylight.css";
 import "@desiauction/ui/styles/motion.css";
+import "@desiauction/ui/styles/system.css";
 import "./base.css";
 
 import type { Metadata } from "next";
