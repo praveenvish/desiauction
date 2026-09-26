@@ -13,12 +13,9 @@ import type { ReactNode } from "react";
 
 import "./content-layout.css";
 import { TopicCard, TopicGrid } from "./public-kit";
-import { TocNav } from "./toc-nav";
+import { TocNav, type ContentAnchor } from "./toc-nav";
 
-export interface ContentAnchor {
-  id: string;
-  label: string;
-}
+export type { ContentAnchor };
 
 export function ContentLayout({
   children,

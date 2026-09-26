@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-import type { ContentAnchor } from "./content-layout";
+/** A heading a content page can jump to. Lives here, not in content-layout,
+    so the two modules do not import each other. */
+export interface ContentAnchor {
+  id: string;
+  label: string;
+}
 
 /**
  * "ON THIS PAGE", WITH THE CURRENT SECTION MARKED (wow pass, round 2).
