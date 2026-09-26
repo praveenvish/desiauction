@@ -183,7 +183,9 @@ export default async function MySportsPage({
             : []),
           ...(sports.length > 0
             ? sports.map((pack) => <HeroChip key={pack.key}>{pack.label}</HeroChip>)
-            : [<>Your record starts with your first tournament.</>]),
+            : // This is the PLAYING record: a team owner with no registrations
+              // was told they had no tournaments while running a squad in one.
+              [<>Your playing record starts with your first registration.</>]),
         ]}
         actions={
           <Link href="/account" className="sh-ghost">
@@ -294,7 +296,7 @@ export default async function MySportsPage({
           >
             {seasons.length === 0 ? (
               <p className="me-empty">
-                No tournaments yet. <Link href="/c">Find one to play</Link>.
+                No registrations as a player yet. <Link href="/c">Find a tournament to play</Link>.
               </p>
             ) : (
               <ul className="me-regs">

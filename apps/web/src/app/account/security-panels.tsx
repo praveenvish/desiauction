@@ -183,7 +183,7 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
       <SectionCard
         id="security"
         icon={<IconLock />}
-        tone="purple"
+        tone="gold"
         title="Sign-in & security"
         description="Passkeys let you in without a code. Every device signed in to your account is listed here."
         className="acct-card"

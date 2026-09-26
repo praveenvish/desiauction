@@ -131,7 +131,10 @@ export function StatusRibbon({
             <span className="ribbon-name">{snapshot.auctionName}</span>
           </>
         ) : (
-          <span className="ribbon-name">Connecting…</span>
+          // Before the first snapshot the feed badge on the right already says
+          // "Connecting…"/"Reconnecting…"; this cell said "Connecting…" too, so
+          // the strip read one state twice. It names the place instead.
+          <span className="ribbon-name">Auction room</span>
         )}
       </span>
       {lot !== null ? (

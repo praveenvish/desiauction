@@ -46,7 +46,7 @@ export function SportProfiles({ forms }: { forms: readonly SportProfileForm[] })
     <SectionCard
       id="sports"
       icon={<IconBall />}
-      tone="green"
+      tone="gold"
       title="How you play"
       description={
         shown.length === 0

@@ -292,23 +292,7 @@ a.ov-hero-club:focus-visible {
   grid-column: 2 / span 2;
 }
 
-.ov-role[data-tone="amber"] .ov-bar-fill {
-  background: var(--warning-base);
-}
-
-.ov-role[data-tone="red"] .ov-bar-fill {
-  background: var(--danger-base);
-}
-
-.ov-role[data-tone="purple"] .ov-bar-fill {
-  background: var(--violet-base);
-}
-
-.ov-role[data-tone="blue"] .ov-bar-fill {
-  background: var(--info-base);
-}
-
-.ov-role[data-tone="neutral"] .ov-bar-fill {
+.ov-role .ov-bar-fill {
   background: var(--accent);
 }
 

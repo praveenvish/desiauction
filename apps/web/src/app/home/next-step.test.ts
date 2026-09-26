@@ -122,7 +122,7 @@ describe("the one next step /home leads with", () => {
     expect(waiting?.key).toBe("auctioneer-prepare");
     expect(waiting?.tone).toBe("calm");
     expect(waiting?.cta).toEqual({ label: "See the season", href: "/seasons/pl" });
-    expect(waiting?.why).toContain("hasn't set the auction up yet");
+    expect(waiting?.why).toContain("once the organizer builds it");
   });
 
   it("someone with nothing waiting gets no banner rather than a filler one", () => {

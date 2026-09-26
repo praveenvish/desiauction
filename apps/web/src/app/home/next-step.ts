@@ -143,7 +143,9 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
         key: "auctioneer-prepare",
         eyebrow: `Auction night · ${night.competitionName}`,
         title: "You're the auctioneer for this season",
-        why: "The organizer hasn't set the auction up yet. You'll run it from the cockpit when they do.",
+        // The "Not set up yet" pill on the queue row below states the fact;
+        // this line says what it means for them rather than saying it again.
+        why: "You'll run it from the cockpit once the organizer builds it — nothing to do until then.",
         cta: { label: "See the season", href: `/seasons/${night.competitionSlug}` },
         tone: "calm",
       };

@@ -212,7 +212,7 @@ export default async function AccountPage() {
                 <SectionCard
                   id="notifications"
                   icon={<IconBell />}
-                  tone="blue"
+                  tone="gold"
                   title="Notifications"
                   description="Switch any of these off and we stop sending it, by text and by email."
                   className="acct-card"
@@ -255,7 +255,7 @@ export default async function AccountPage() {
                 <SectionCard
                   id="data"
                   icon={<IconShieldCheck />}
-                  tone="red"
+                  tone="gold"
                   title="Privacy & data"
                   description="Ask us to delete your account. Your own profile is deleted; shared records — an auction you bid in, a receipt issued to you — keep the history but lose your name and number."
                   className="acct-card"

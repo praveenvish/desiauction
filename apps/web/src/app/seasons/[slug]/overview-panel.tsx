@@ -318,13 +318,15 @@ function missingForRegistration(competition: SeasonOverviewView["competition"]):
  * and a plain person for every other sport's — a football pool drawn with
  * cricket kit would be the multi-sport defect again, in pictures.
  */
+// One calm tone for every role: the marks tell the roles apart, and four
+// tints (red, gold, purple, blue) said nothing but "template".
 const ROLE_MARK: Record<string, { icon: ReactNode; tone: KitTone }> = {
-  batter: { icon: <IconBat />, tone: "amber" },
-  bowler: { icon: <IconBall />, tone: "red" },
-  all_rounder: { icon: <IconStar />, tone: "purple" },
-  wicket_keeper: { icon: <IconShieldCheck />, tone: "blue" },
+  batter: { icon: <IconBat />, tone: "gold" },
+  bowler: { icon: <IconBall />, tone: "gold" },
+  all_rounder: { icon: <IconStar />, tone: "gold" },
+  wicket_keeper: { icon: <IconShieldCheck />, tone: "gold" },
 };
-const OTHER_ROLE_MARK = { icon: <IconUser />, tone: "neutral" as KitTone };
+const OTHER_ROLE_MARK = { icon: <IconUser />, tone: "gold" as KitTone };
 
 function percent(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
@@ -636,24 +638,10 @@ export function OverviewPanel({
     }
   }
 
-  // Someone who cannot run the season gets no next-step banner, and used to
-  // get nothing at all between the hammer and the last match — or, on a points
-  // season, a "Season complete" card the moment the auction ended. One quiet,
-  // true line instead.
-  if (!view.viewer.canManage && auctionDone && !finished) {
-    nextNotice = (
-      <Notice
-        tone="info"
-        icon={<IconCheckCircle size={20} />}
-        title={
-          view.fixtureCount === 0 || view.fixturesOpen > 0
-            ? "Auction done — fixtures are next."
-            : "Auction done — the books are being settled."
-        }
-        testId="season-auction-done"
-      />
-    );
-  }
+  // Someone who cannot run the season gets no next-step banner. A blue
+  // "Auction done — fixtures are next." used to sit here, under a hero that
+  // already says AUCTION DONE in its pill and "Fixtures · Step 5 of 5" on its
+  // rail: one state, said three times.
 
   // The figures. Before an auction exists there is no purse and there are no
   // lots — two cards of zeroes about a thing that has not been created — so the
