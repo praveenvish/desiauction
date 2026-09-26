@@ -199,7 +199,7 @@ export default async function PublicTeamPage({
                     </span>
                     <span className="team-page-who">
                       <strong>
-                        {member.name}
+                        <span className="team-page-name">{member.name}</span>
                         {/* The role on the sheet, as a badge after the name —
                             not in the price slot, where gold italics read as
                             a price. */}

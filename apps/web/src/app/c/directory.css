@@ -1345,14 +1345,24 @@
 /* Two lines, not one: at four columns on a laptop "Siddharth Kulkarni"
    became "Siddharth Ku…". A name is the row's whole point; it may wrap once
    before it is clipped. */
+/* The badge rides the name's line and never takes one of its own (round-5
+   review): the name wraps (then clamps) beside it instead. */
 .team-page-who > strong {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-heading);
+}
+
+.team-page-name {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+  min-width: 0;
   overflow: hidden;
   overflow-wrap: anywhere;
-  color: var(--text-heading);
 }
 
 .team-page-who > span {
@@ -1377,7 +1387,7 @@
 }
 
 .team-page-badge {
-  margin-left: var(--space-2);
+  flex: none;
 }
 
 /* Phone: one grouped list with hairlines, not twelve bordered cards. */

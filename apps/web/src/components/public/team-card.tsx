@@ -101,7 +101,7 @@ export function TeamCard({
                   two lines on a phone and said less ("pre-signed" — as
                   what?). */}
               <span className="team-card-player-name">
-                {player.name}
+                <span className="team-card-player-text">{player.name}</span>
                 {(player.mark ?? (player.preSigned === true ? "retained" : null)) ===
                 null ? null : (
                   <RosterMark kind={player.mark ?? "retained"} className="team-card-mark" />

@@ -64,6 +64,10 @@
   min-width: 0;
 }
 
+.sq-line > :not(.hd-name) {
+  flex: none;
+}
+
 .sq-more {
   margin: 0;
   padding-top: var(--space-2);

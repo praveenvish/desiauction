@@ -138,16 +138,28 @@
 
 /* A person's name wraps rather than being cut: "Aniket Saw…" is worse than
    two lines, and a squad list is exactly where people look for their own. */
+/* The badge never takes a line of its own (round-5 review): the name and its
+   badge share one line, and a long name truncates before the badge drops —
+   so every row in a squad keeps one height. */
 .team-card-player-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
-  overflow-wrap: anywhere;
   font-size: 0.9375rem;
   line-height: 1.3;
   color: var(--text-primary);
 }
 
+.team-card-player-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .team-card-mark {
-  margin-left: var(--space-2);
+  flex: none;
 }
 
 .team-card-number {
