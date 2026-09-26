@@ -2,11 +2,13 @@ import {
   AnnouncerProvider,
   IconBall,
   IconBell,
-  IconDevice,
   IconFile,
   IconKey,
   IconLock,
   IconShieldCheck,
+  IconTrophy,
+  IconUsers,
+  IconFlag,
   IconUser,
   ScrollStrip,
   SectionCard,
@@ -33,6 +35,7 @@ import {
 } from "../../server/player/profile";
 import { WHATSAPP_CONSENT_LABEL } from "../../lib/whatsapp-consent";
 import { myRegistrations } from "../../server/competition/public";
+import { rolesOf } from "../../server/roles/roles";
 import { AccountHero } from "./account-hero";
 import {
   MessageLanguageChoice,
@@ -79,6 +82,7 @@ export default async function AccountPage() {
     played,
     photoUrl,
     entries,
+    roles,
   ] = await Promise.all([
     accountSecurity(),
     notificationSettings(),
@@ -101,6 +105,9 @@ export default async function AccountPage() {
     // hero promised a photo "with your first registration" to people who
     // had already made one. `cache`d, and the shell reads it too.
     myRegistrations(session.personId),
+    // The clubs they run and the teams they own — identity facts for the
+    // hero (cached; the shell reads it too).
+    rolesOf(session.personId),
   ]);
   const sportForms = SPORTS.map((pack) => {
     const held = sportProfiles.find((profile) => profile.sport === pack.key);
@@ -162,13 +169,31 @@ export default async function AccountPage() {
                 value: String(security?.passkeys.length ?? 0),
                 label: security?.passkeys.length === 1 ? "Passkey" : "Passkeys",
               },
+              // Identity, not a worry stat: "25 devices signed in" led the
+              // hero (round 2); the device list lives under Sign-in & security.
               {
-                key: "devices",
-                icon: <IconDevice />,
-                value: String(security?.sessions.length ?? 1),
-                label: security?.sessions.length === 1 ? "Device signed in" : "Devices signed in",
+                key: "seasons",
+                icon: <IconTrophy />,
+                value: String(entries.length),
+                label: entries.length === 1 ? "Season entered" : "Seasons entered",
               },
-            ].filter((fact) => fact.value !== "0")}
+              // Who they are here beyond playing: an organizer's hero was a
+              // name and an empty band (every fact above is zero for them).
+              {
+                key: "clubs",
+                icon: <IconFlag />,
+                value: String(roles.organizes.length),
+                label: roles.organizes.length === 1 ? "Club you run" : "Clubs you run",
+              },
+              {
+                key: "teams",
+                icon: <IconUsers />,
+                value: String(roles.owns.length),
+                label: roles.owns.length === 1 ? "Team you own" : "Teams you own",
+              },
+            ]
+              .filter((fact) => fact.value !== "0")
+              .slice(0, 3)}
             signOut={<SignOutButton logout={logoutAction} />}
           />
 

@@ -1,8 +1,24 @@
 import { formatPaiseINR, paise } from "@desiauction/core";
-import { ButtonLink, Card, EmptyState, IconReceipt, VisuallyHidden } from "@desiauction/ui";
+import {
+  ButtonLink,
+  Card,
+  EmptyState,
+  IconReceipt,
+  IconTile,
+  IconTrophy,
+  IconWallet,
+  ListRow,
+  VisuallyHidden,
+} from "@desiauction/ui";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../../server/auth/actions";
+import { competitionsView } from "../../server/competition/actions";
+import { finopsOrgIds } from "../../server/financial-operations/actions";
+import { myOrgs } from "../../server/orgs/actions";
+import { rolesOf } from "../../server/roles/roles";
+import { settlementOrgIds } from "../../server/settlement/actions";
 import { myDocuments } from "../../server/financial-operations/my-documents";
 import { formatDateTime } from "../../lib/format-date";
 import { DOC_KIND_LABEL } from "../../server/financial-operations/register";
@@ -28,10 +44,26 @@ export default async function MoneyPage() {
   if (session === null) {
     redirect("/login?next=/money");
   }
-  const documents = await myDocuments(session.personId);
+  // The shell already read these four for its menus (each is deduped per
+  // request), so the clubs' books below cost no new query.
+  const [documents, orgs, view, settleIds, financeIds, roles] = await Promise.all([
+    myDocuments(session.personId),
+    myOrgs(),
+    competitionsView(),
+    settlementOrgIds(),
+    finopsOrgIds(),
+    rolesOf(session.personId),
+  ]);
+  const books = clubBooks(
+    orgs,
+    view.competitions,
+    new Set(settleIds),
+    new Set(financeIds),
+    new Set(roles.organizes.map((club) => club.orgId)),
+  );
 
   return (
-    <main>
+    <main className={books.length > 0 ? "my-money my-money--books" : "my-money"}>
       {documents.length === 0 ? (
         /* A designed empty state, not an h2 over a sentence over 700px of
            white. It says who this page is for and where a club's own money
@@ -41,12 +73,20 @@ export default async function MoneyPage() {
             icon={<IconReceipt />}
             headingLevel={2}
             title="No receipts yet"
-            description="A receipt lands here once a club records a payment from your team. A club's own fees and settlement live on its money desk."
-            action={
-              <ButtonLink href="/tournaments" size="sm">
-                Go to your tournaments
-              </ButtonLink>
+            description={
+              books.length > 0
+                ? "A receipt lands here once a club records a payment from your team."
+                : "A receipt lands here once a club records a payment from your team. A club's own fees and settlement live on its money desk."
             }
+            {...(books.length > 0
+              ? {}
+              : {
+                  action: (
+                    <ButtonLink href="/tournaments" size="sm">
+                      Go to your tournaments
+                    </ButtonLink>
+                  ),
+                })}
           />
         </section>
       ) : (
@@ -111,6 +151,117 @@ export default async function MoneyPage() {
           </>
         </Card>
       )}
+      {books.length > 0 ? <ClubBooks rows={books} /> : null}
     </main>
+  );
+}
+
+interface BookRow {
+  key: string;
+  title: string;
+  meta: string;
+  href?: string;
+  kind: "desk" | "points" | "season";
+}
+
+/**
+ * THE SECOND OBJECT (round 3C). An organizer opened "Money" and met one empty
+ * card and a blank canvas, although the clubs they run have books. These are
+ * the doors to them: each club's settlement and finance desk the reader holds
+ * the key to, and each season in the clubs they run or hold a desk in, with a
+ * points season saying plainly that it has nothing to settle (its money tab no
+ * longer exists).
+ * Built only from capabilities the shell already proved — no desk is shown to
+ * someone who would meet a 404 behind it.
+ */
+function clubBooks(
+  orgs: { id: string; name: string; slug: string }[],
+  competitions: { orgId: string; name: string; slug: string; auctionUnit: string }[],
+  settle: Set<string>,
+  finance: Set<string>,
+  /** Clubs this person runs: their seasons' standing is theirs to know. */
+  runs: Set<string>,
+): BookRow[] {
+  const rows: BookRow[] = [];
+  for (const org of orgs) {
+    if (!settle.has(org.id) && !finance.has(org.id) && !runs.has(org.id)) continue;
+    if (settle.has(org.id)) {
+      rows.push({
+        key: `settle-${org.id}`,
+        title: `${org.name} — settlement`,
+        meta: "What each team owes, what came in, what closed",
+        href: `/org/${org.slug}/settlement`,
+        kind: "desk",
+      });
+    }
+    if (finance.has(org.id)) {
+      rows.push({
+        key: `finance-${org.id}`,
+        title: `${org.name} — finance`,
+        meta: "Receipts and invoices the club issues",
+        href: `/org/${org.slug}/money`,
+        kind: "desk",
+      });
+    }
+    for (const season of competitions.filter((c) => c.orgId === org.id)) {
+      rows.push(
+        season.auctionUnit === "points"
+          ? {
+              key: `season-${season.slug}`,
+              title: season.name,
+              meta: "Ran on points — nothing to settle",
+              kind: "points",
+            }
+          : settle.has(org.id)
+            ? {
+                key: `season-${season.slug}`,
+                title: season.name,
+                meta: "Fees and settlement for this season",
+                href: `/seasons/${season.slug}/money`,
+                kind: "season",
+              }
+            : {
+                key: `season-${season.slug}`,
+                title: season.name,
+                meta: "Rupee season — its books are on the club desk",
+                kind: "season",
+              },
+      );
+    }
+  }
+  return rows;
+}
+
+function ClubBooks({ rows }: { rows: BookRow[] }) {
+  return (
+    <section className="my-money-books" aria-labelledby="my-money-books-title">
+      <h2 id="my-money-books-title" className="my-money-books-title">
+        Your clubs&rsquo; books
+      </h2>
+      <p className="my-money-books-lede">
+        {rows.some((row) => row.kind === "desk")
+          ? "The money desks you hold a key to, and where each season’s money stands."
+          : "Where each season’s money stands in the clubs you run."}
+      </p>
+      <ul className="my-money-books-list">
+        {rows.map((row) => (
+          <li key={row.key}>
+            <ListRow
+              lead={
+                <IconTile
+                  icon={row.kind === "desk" ? <IconWallet /> : <IconTrophy />}
+                  concept={row.kind === "desk" ? "money" : "season"}
+                  size="sm"
+                />
+              }
+              title={row.title}
+              meta={row.meta}
+              {...(row.href !== undefined ? { href: row.href, linkComponent: Link } : {})}
+              {...(row.kind === "points" ? { status: "Points" } : {})}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

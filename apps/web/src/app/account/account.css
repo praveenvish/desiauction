@@ -78,6 +78,9 @@
 
 .acct-id-main {
   position: relative;
+  /* The card stretches to the checklist beside it on a laptop; the identity
+     takes the spare height (centred) instead of a band of blank above the foot. */
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-5);
@@ -161,7 +164,10 @@
   position: relative;
   margin-top: auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* One to three facts share the full width, on a phone too (they used to
+     fill two of three fixed columns). */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: var(--space-3);
   margin-bottom: 0;
   padding: 0;
@@ -1041,4 +1047,14 @@ a.acct-check-row:hover {
 .acct-id-facts > li:only-child .acct-id-fact-label {
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
+}
+
+/* Three facts on a 390 phone: icon over figure, so "Seasons entered" keeps
+   one line instead of wrapping beside a 32px tile. */
+@media (max-width: 479px) {
+  .acct-id-facts li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
 }
