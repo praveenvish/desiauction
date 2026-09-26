@@ -334,9 +334,7 @@ export function VenuesPanel({
             <Button
               onClick={() => void addVenue()}
               loading={busy}
-              // A disabled primary read as a pale, broken gold; until there is
-              // a name it is the neutral weight, on the inputs' 44px rung.
-              variant={venueName.trim().length < 3 ? "secondary" : "primary"}
+              // Neutral until there is a name: the primitive's disabled primary.
               size="touch"
               disabled={venueName.trim().length < 3}
               data-testid="add-venue"
