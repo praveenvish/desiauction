@@ -693,8 +693,8 @@ p.admin-warning {
 /* ---- Text roles ---- */
 
 .admin-action {
-  font-family: var(--font-mono);
   font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
   color: var(--text-primary);
   word-break: break-word;
 }
@@ -1367,8 +1367,8 @@ p.admin-warning {
   display: none;
 }
 
-.admin-log-meta > summary code {
-  font-family: var(--font-mono);
+.admin-log-keys {
+  color: var(--text-muted);
 }
 
 .admin-log-meta > summary:hover {
@@ -1381,7 +1381,7 @@ p.admin-warning {
   border-radius: var(--radius-sm);
 }
 
-.admin-log-meta[open] > summary code {
+.admin-log-meta[open] > summary .admin-log-keys {
   display: none;
 }
 
@@ -2969,4 +2969,12 @@ a.admin-quiet-link:hover {
   .admin-lots-wrap {
     display: none;
   }
+}
+
+/* An environment variable is pasted into a deploy, not read: copy is one tap. */
+.admin-env-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
 }

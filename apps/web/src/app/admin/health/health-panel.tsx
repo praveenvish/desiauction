@@ -2,7 +2,7 @@ import { EmptyState, IconClock, IconCog, IconLedger, Pill, SectionCard } from "@
 
 import { formatCount, waitedFor } from "../../../server/admin/format";
 import type { OrgHealthRow, PlatformHealth } from "../../../server/admin/views";
-import { RelativeTime } from "../admin-ui";
+import { humanAction, RelativeTime } from "../admin-ui";
 import { formatDate } from "../../../lib/format-date";
 
 /**
@@ -29,6 +29,8 @@ export function HealthPanel({ health }: { health: PlatformHealth }) {
       org.provider.channels.every((channel) => channel.channel !== name || !channel.configured),
     ),
   );
+  // Said once in the card's head, not as a red chip on every club's row.
+  const failing = orgs.filter((org) => org.queue.items.length > 0).length;
   return (
     <>
       <div className="admin-health-top">
@@ -106,7 +108,10 @@ export function HealthPanel({ health }: { health: PlatformHealth }) {
                   {schedules.map((schedule) => (
                     <tr key={schedule.slot}>
                       <td data-label="Slot">
-                        <span className="admin-action">{schedule.slot}</span>
+                        {/* The slot's name as words; its key is the hover. */}
+                        <span className="admin-action" title={schedule.slot}>
+                          {humanAction(schedule.slot)}
+                        </span>
                       </td>
                       <td data-label="Last fired">
                         {schedule.lastFiredMs === null ? (
@@ -118,7 +123,7 @@ export function HealthPanel({ health }: { health: PlatformHealth }) {
                               the FUTURE. Administration cannot fix the clock,
                               but it must not present the value as evidence. */}
                             {schedule.lastFiredMs > now ? (
-                              <Pill tone="amber">recorded in the future</Pill>
+                              <Pill tone="amber">clock ahead — check server time</Pill>
                             ) : null}
                           </span>
                         )}
@@ -160,6 +165,12 @@ export function HealthPanel({ health }: { health: PlatformHealth }) {
             <span data-zero={followers.totalBehind === 0 || undefined}>
               <strong>{formatCount(followers.totalBehind)}</strong> events behind
             </span>
+            {failing > 0 ? (
+              <span data-testid="admin-follower-failing">
+                <strong>{formatCount(failing)}</strong> {failing === 1 ? "club has" : "clubs have"}{" "}
+                failures to recover
+              </span>
+            ) : null}
             {unconfigured.length > 0 ? (
               <span className="admin-meta">
                 Not set up on this server: {unconfigured.join(", ")}
@@ -311,10 +322,13 @@ function OrgHealth({ org, hidden }: { org: OrgHealthRow; hidden: readonly string
               </span>
             ) : (
               <details className="admin-follow-fails">
+                {/* A dot and a count, not a red pill on every club: the card's
+                    head says how many clubs this is, once. */}
                 <summary>
-                  <Pill tone="red" dot>
+                  <span className="admin-state" data-tone="red">
+                    <span className="admin-state-dot" aria-hidden />
                     {queue.items.length} to recover
-                  </Pill>
+                  </span>
                 </summary>
                 <ul>
                   {queue.items.map((item, index) => (

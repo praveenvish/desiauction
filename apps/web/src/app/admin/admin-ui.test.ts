@@ -1,15 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { foldRuns, humanAction, relativeAge } from "./admin-ui";
+import { foldRuns, humanAction, messageKeyLabel, relativeAge } from "./admin-ui";
 
 describe("humanAction", () => {
   it("reads a known code as the sentence an operator would say", () => {
     expect(humanAction("auth.login.otp")).toBe("Signed in with a code");
+    expect(humanAction("finops.CertificationDerived")).toBe("Finance books checked");
   });
 
   it("spells an unknown code out, splitting dots and camel case", () => {
-    expect(humanAction("finops.CertificationDerived")).toBe("Finops certification derived");
+    expect(humanAction("finops.SomethingNew")).toBe("Finops something new");
     expect(humanAction("auction:stuck-live")).toBe("Auction stuck live");
+  });
+});
+
+describe("messageKeyLabel", () => {
+  it("reads a message key and its version as words", () => {
+    expect(messageKeyLabel("registration.approved@2")).toBe("Registration approved · v2");
+    expect(messageKeyLabel("auction.owner_invite")).toBe("Auction owner invite");
+    expect(messageKeyLabel("")).toBe("");
   });
 });
 

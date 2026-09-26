@@ -335,7 +335,7 @@ export async function runnerVerdictOf(
     // Not a health failure of its own, but it must be SAID: a last-fire in the
     // future means the recorded time cannot be trusted as evidence either way.
     reasons.push(
-      `${countNoun(futureSchedules, "schedule")} report${futureSchedules === 1 ? "s" : ""} a last fire in the future`,
+      `Clock skew — ${countNoun(futureSchedules, "schedule")} ${futureSchedules === 1 ? "is" : "are"} dated ahead of now; check the server time`,
     );
   }
   return {

@@ -229,6 +229,59 @@ const ACTION_WORDS: Readonly<Record<string, string>> = {
   "tournament.created": "Created a tournament",
   "competition.created": "Created a season",
   "registration.poster_generated": "Made a player poster",
+  "registration.imported": "Imported players",
+  "registration.approved": "Approved a registration",
+  "registration.approve": "Approved a registration",
+  "registration.notified": "Told a player their result",
+  "registration.marks_set": "Marked a player icon or captain",
+  "registration.submitted": "Registered for a season",
+  "registration.updated": "Updated a registration",
+  "registration.details_edited": "Edited a player's details",
+  "registration.exported": "Exported the player list",
+  "registration.added": "Added a player",
+  "admin.accessed": "Opened an admin page",
+  "finops.CertificationDerived": "Finance books checked",
+  "competition.status_changed": "Moved a season to its next stage",
+  "competition.visibility_changed": "Changed who can see a season",
+  "team.created": "Created a team",
+  "auth.phone.changed": "Changed their phone number",
+  "auth.signup.email": "Signed up with email",
+  "auth.logout": "Signed out",
+  "grant.issued": "Gave someone access",
+  "grant.revoked": "Took away someone's access",
+  "invite.created": "Sent an invitation",
+  "invite.accepted": "Accepted an invitation",
+  "fixture.schedule": "Scheduled a match",
+  "fixture.publish": "Published the fixtures",
+  "fixture.generated": "Generated the fixtures",
+  "ground.created": "Added a ground",
+  "venue.created": "Added a venue",
+  "profile.player.updated": "Updated their player profile",
+  "auction.owner_join": "A team owner joined the auction",
+  "auction.sold": "Sold a player",
+  "auction.unsold": "A player went unsold",
+  "auction.feature_toggled": "Switched an auction feature",
+  "auction.AuctionCreated": "Created an auction",
+  "auction.AuctionOpened": "Opened the auction",
+  "auction.AuctionClosed": "Closed the auction",
+  "auction.LotPrepared": "Prepared a lot",
+  "auction.LotQueued": "Queued a lot",
+  "auction.LotOpened": "Put a lot on the block",
+  "auction.LotClosingSoon": "Lot closing soon",
+  "auction.LotSold": "Lot sold",
+  "auction.LotUnsold": "Lot unsold",
+  "auction.LotRequeued": "Sent a lot back into the queue",
+  "auction.BidAccepted": "Bid accepted",
+  "auction.TimerExtended": "Timer extended",
+  "auction.PaddleIssued": "Issued a paddle",
+  "auction.PaddleGranted": "Granted a paddle",
+  "auction.OwnerInvited": "Invited a team owner",
+  "auction.OwnerAccepted": "Owner accepted the invitation",
+  "settlement.JournalPosted": "Posted to the settlement journal",
+  "settlement.PaymentCaptured": "Payment received",
+  "settlement.PaymentInitiated": "Payment started",
+  "settlement.CaseOpened": "Opened a settlement case",
+  "settlement.ObligationDischarged": "A payment obligation was met",
 };
 
 export function humanAction(action: string): string {
@@ -246,6 +299,26 @@ export function humanAction(action: string): string {
   if (words.length === 0) return action;
   const sentence = words.join(" ");
   return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+/**
+ * A message shape's key as words: "registration.approved@2" reads
+ * "Registration approved · v2". The key stays the row's hover and test id.
+ */
+export function messageKeyLabel(key: string): string {
+  const [base = key, version] = key.split("@");
+  const words = base
+    .split(/[._:]/)
+    .filter((part) => part !== "")
+    .map((part) =>
+      part
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/[-_]/g, " ")
+        .toLowerCase(),
+    )
+    .join(" ");
+  const sentence = words === "" ? base : words.charAt(0).toUpperCase() + words.slice(1);
+  return version !== undefined && version !== "" ? `${sentence} · v${version}` : sentence;
 }
 
 /**

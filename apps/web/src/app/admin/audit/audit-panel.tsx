@@ -14,7 +14,7 @@ import { ADMIN_ACCESS_ACTION } from "../../../server/admin/capabilities";
 import { actorLabel, formatCount, isSystemActor } from "../../../server/admin/format";
 import type { AuditEntry, AuditFilters, AuditPage } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
-import { absoluteIst } from "../admin-ui";
+import { absoluteIst, humanAction } from "../admin-ui";
 import { formatDayDate } from "../../../lib/format-date";
 
 /**
@@ -49,7 +49,7 @@ export function AuditPanel({ page }: { page: AuditPage }) {
               defaultValue={filters.action ?? ""}
               options={[
                 { value: "", label: "All actions" },
-                ...actions.map((action) => ({ value: action, label: action })),
+                ...actions.map((action) => ({ value: action, label: humanAction(action) })),
               ]}
             />
             <span className="admin-select admin-select-date">
@@ -272,7 +272,10 @@ function AuditRow({ row }: { row: AuditEntry }) {
       </time>
       <span className="admin-log-main">
         <span className="admin-log-line">
-          <span className="admin-action">{row.action}</span>
+          {/* The sentence is the copy; the code is the hover and the filter. */}
+          <span className="admin-action" title={row.action}>
+            {humanAction(row.action)}
+          </span>
           <span className="admin-log-by">
             {" by "}
             {/* A machine-derived row (a lot the timer closed, a sweep the
@@ -300,7 +303,7 @@ function AuditRow({ row }: { row: AuditEntry }) {
                 row: the summary names its fields, the panel shows it whole. */}
             <summary title={meta}>
               <span className="admin-sr-only">Evidence: </span>
-              <code>{evidenceKeys(row.meta)}</code>
+              Details <span className="admin-log-keys">{evidenceKeys(row.meta)}</span>
             </summary>
             <pre className="admin-evidence">{JSON.stringify(row.meta, null, 2)}</pre>
           </details>
@@ -330,7 +333,7 @@ function AuditRow({ row }: { row: AuditEntry }) {
 function evidenceKeys(meta: unknown): string {
   if (meta !== null && typeof meta === "object" && !Array.isArray(meta)) {
     const keys = Object.keys(meta);
-    return keys.length === 0 ? "{}" : `{${keys.join(", ")}}`;
+    return keys.length === 0 ? "none" : keys.join(" · ");
   }
   return JSON.stringify(meta);
 }

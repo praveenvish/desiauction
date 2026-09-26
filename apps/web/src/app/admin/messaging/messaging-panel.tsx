@@ -11,7 +11,8 @@ import {
 import { formatCount, maskContact } from "../../../server/admin/format";
 import type { MessagingOverview } from "../../../server/admin/views";
 import { NavButton } from "../../players/nav-button";
-import { RelativeTime, TableCount } from "../admin-ui";
+import { messageKeyLabel, RelativeTime, TableCount } from "../admin-ui";
+import { CopyId } from "../copy-id";
 
 /**
  * Can this deployment actually text anyone, and who must it never text?
@@ -66,7 +67,9 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                 <tr key={row.key} data-testid={`admin-template-${row.key}`}>
                   <td data-label="Message" data-cell="title">
                     <span className="admin-cell-main">
-                      <span className="admin-name admin-mono-key">{row.key}</span>
+                      <span className="admin-name" title={row.key}>
+                        {messageKeyLabel(row.key)}
+                      </span>
                       {/* The registered sentence, verbatim — folded behind the
                           key. The gateway matches it character for character,
                           so it is kept whole, one click away. */}
@@ -93,9 +96,12 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                     </span>
                   </td>
                   <td data-label="Environment variable" className="is-wide">
-                    <code className="admin-env" title={row.variable}>
-                      {row.variable}
-                    </code>
+                    <span className="admin-env-cell">
+                      <code className="admin-env" title={row.variable}>
+                        {row.variable}
+                      </code>
+                      <CopyId value={row.variable} label={`variable ${row.variable}`} />
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -141,7 +147,9 @@ export function MessagingPanel({ overview }: { overview: MessagingOverview }) {
                 {overview.delivery.map((row) => (
                   <tr key={row.template}>
                     <td data-label="Message" data-cell="title">
-                      <span className="admin-name admin-mono-key">{row.template}</span>
+                      <span className="admin-name" title={row.template}>
+                        {messageKeyLabel(row.template)}
+                      </span>
                       {/* The phone's one line under the key. */}
                       <span className="da-row-meta">
                         Failed {formatCount(row.failed)} · Suppressed {formatCount(row.suppressed)}
