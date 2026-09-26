@@ -834,3 +834,91 @@
 .tg-section-action {
   margin-inline-start: auto;
 }
+
+/* ---- one tournament (/tournaments/[slug]) — round 3C ------------------- */
+.tg-detail {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .tg-detail {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  }
+}
+
+.tg-desk {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+.tg-desk-kicker {
+  margin: 0;
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tg-desk-title {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tg-desk-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tg-desk-list > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Phone: "Add a season" takes the width under the line, not a lone button
+   pinned to the right edge (round 2 "orphaned"). */
+@media (max-width: 599px) {
+  .tg-section-action {
+    flex: 1 1 100%;
+    margin-inline-start: 0;
+  }
+
+  .tg-section-action > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Phone: the tournament's three figures as one compact strip — they took
+   ~320px as three wrapped tiles. Figure over label; the hints are the
+   laptop's detail. */
+@media (max-width: 599px) {
+  .competitions [data-testid="tournament-figures"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .competitions [data-testid="tournament-figures"] > * {
+    min-height: 0;
+    padding: var(--space-3);
+  }
+
+  .competitions [data-testid="tournament-figures"] > * > :first-child {
+    display: none;
+  }
+
+  .competitions [data-testid="tournament-figures"] > * :is([class*="stat-hint"]) {
+    display: none;
+  }
+}

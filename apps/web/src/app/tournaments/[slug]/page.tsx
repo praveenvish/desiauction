@@ -1,4 +1,18 @@
-import { Card, EmptyState } from "@desiauction/ui";
+import {
+  Card,
+  EmptyState,
+  IconCalendar,
+  IconFileCheck,
+  IconGavel,
+  IconMatch,
+  IconTile,
+  IconTrophy,
+  IconUsers,
+  ListRow,
+  StatCard,
+  StatGrid,
+} from "@desiauction/ui";
+import Link from "next/link";
 import { enabledSports } from "../../../server/competition/sports";
 import { notFound } from "next/navigation";
 import { cache, Suspense, type ReactNode } from "react";
@@ -8,9 +22,11 @@ import { PageTitle } from "../../../components/shell/page-title";
 import {
   tournamentHeader,
   tournamentSeasons,
+  type SeasonRow,
 } from "../../../server/competition/tournament-actions";
+import { formatCount } from "../../../lib/plural";
 import { CreateCompetitionForm } from "../../seasons/create-competition-form";
-import { SeasonCard } from "../season-card";
+import { SeasonCard, seasonStatusBadge } from "../season-card";
 import { TournamentsSkeleton } from "../tournament-accordion";
 import "../../seasons/seasons.css";
 import "../tournaments.css";
@@ -179,28 +195,137 @@ async function SeasonsSection({
     );
   }
 
+  const latest = seasons[0];
+  const matches = seasons.reduce((sum, season) => sum + season.counts.matches, 0);
+  const firstYear = seasons
+    .map((season) => season.startsOn?.slice(0, 4))
+    .filter((year): year is string => year !== undefined)
+    .sort()[0];
+
   return (
     <>
-      <section className="seasons-section" aria-labelledby="tg-seasons-title">
-        <div className="tg-section-head">
-          <h2 id="tg-seasons-title" className="tg-section-title">
-            Seasons <span className="tg-section-count">{seasons.length}</span>
-          </h2>
-          {what}
-          {canCreateSeason ? (
-            <span className="tg-section-action">{addSeason}</span>
-          ) : (
-            <span className="tg-cannot" data-testid="tournament-cannot-create">
-              Ask an owner to add a season.
-            </span>
-          )}
-        </div>
-        <div className="competitions-grid da-stagger" data-testid="tournament-seasons">
-          {seasons.map((season) => (
-            <SeasonCard key={season.id} season={season} />
-          ))}
-        </div>
-      </section>
+      {/* THE STAT LINE (round 3C): what this tournament amounts to, before
+          its editions — it opened on one card and a blank page. Figures only,
+          so the tiles sit flat; the doors are the cards and the rail below. */}
+      <StatGrid testId="tournament-figures">
+        <StatCard
+          icon={<IconTrophy />}
+          concept="season"
+          value={formatCount(seasons.length)}
+          label={seasons.length === 1 ? "Season" : "Seasons"}
+          hint={firstYear === undefined ? orgName : `Since ${firstYear} · ${orgName}`}
+        />
+        <StatCard
+          icon={<IconUsers />}
+          concept="teams"
+          value={formatCount(latest?.counts.teams ?? 0)}
+          label={(latest?.counts.teams ?? 0) === 1 ? "Team" : "Teams"}
+          hint={latest === undefined ? "" : `In ${latest.name}`}
+        />
+        <StatCard
+          icon={<IconMatch />}
+          concept="fixtures"
+          value={formatCount(matches)}
+          label={matches === 1 ? "Match" : "Matches"}
+          hint={seasons.length === 1 ? "On the schedule" : "Across every season"}
+        />
+      </StatGrid>
+
+      <div className="tg-detail">
+        <section className="seasons-section" aria-labelledby="tg-seasons-title">
+          <div className="tg-section-head">
+            <h2 id="tg-seasons-title" className="tg-section-title">
+              Seasons <span className="tg-section-count">{seasons.length}</span>
+            </h2>
+            {what}
+            {canCreateSeason ? (
+              <span className="tg-section-action">{addSeason}</span>
+            ) : (
+              <span className="tg-cannot" data-testid="tournament-cannot-create">
+                Ask an owner to add a season.
+              </span>
+            )}
+          </div>
+          <div className="competitions-grid da-stagger" data-testid="tournament-seasons">
+            {seasons.map((season) => (
+              <SeasonCard key={season.id} season={season} />
+            ))}
+          </div>
+        </section>
+        {latest !== undefined ? <LatestSeasonDesk season={latest} doors={canCreateSeason} /> : null}
+      </div>
     </>
+  );
+}
+
+/**
+ * THE SECOND OBJECT (round 3C): the newest edition's desks, one row each with
+ * where it stands — players to review, teams, the auction, the schedule. The
+ * season card opens its overview; these open the page past it. Doors only for
+ * someone who manages the tournament (the same bar as "Add a season"); anyone
+ * else reads the same figures as plain rows.
+ */
+function LatestSeasonDesk({ season, doors }: { season: SeasonRow; doors: boolean }) {
+  const base = `/seasons/${season.slug}`;
+  const badge = seasonStatusBadge(season.status, season.settlement, season.counts.auctionDone);
+  const rows = [
+    {
+      key: "players",
+      icon: <IconFileCheck />,
+      concept: "players" as const,
+      title: "Players",
+      meta:
+        season.counts.pending > 0
+          ? `${formatCount(season.counts.pending)} waiting for review`
+          : "Nobody waiting for review",
+      href: `${base}/registrations`,
+    },
+    {
+      key: "teams",
+      icon: <IconUsers />,
+      concept: "teams" as const,
+      title: "Teams",
+      meta: `${formatCount(season.counts.teams)} ${season.counts.teams === 1 ? "team" : "teams"}`,
+      href: `${base}/teams`,
+    },
+    {
+      key: "auction",
+      icon: <IconGavel />,
+      concept: "auction" as const,
+      title: "Auction",
+      meta: season.counts.auctionDone === true ? "Done — squads and prices" : "Not run yet",
+      href: `${base}/auction`,
+    },
+    {
+      key: "schedule",
+      icon: <IconCalendar />,
+      concept: "fixtures" as const,
+      title: "Schedule",
+      meta:
+        season.counts.matches > 0
+          ? `${formatCount(season.counts.matches)} ${season.counts.matches === 1 ? "match" : "matches"}`
+          : "No matches yet",
+      href: `${base}/fixtures`,
+    },
+  ];
+  return (
+    <aside className="tg-desk" aria-labelledby="tg-desk-title" data-testid="tournament-latest">
+      <p className="tg-desk-kicker">Latest season · {badge.label}</p>
+      <h2 id="tg-desk-title" className="tg-desk-title">
+        {season.name}
+      </h2>
+      <ul className="tg-desk-list">
+        {rows.map((row) => (
+          <li key={row.key}>
+            <ListRow
+              lead={<IconTile icon={row.icon} concept={row.concept} size="sm" />}
+              title={row.title}
+              meta={row.meta}
+              {...(doors ? { href: row.href, linkComponent: Link } : {})}
+            />
+          </li>
+        ))}
+      </ul>
+    </aside>
   );
 }
