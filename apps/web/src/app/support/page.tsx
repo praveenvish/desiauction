@@ -50,7 +50,7 @@ export default function SupportPage() {
               <IconClock size={16} /> Replies within a day during beta
             </p>
           </SideCard>
-          <OperatorIdentityCard />
+          <OperatorIdentityCard compact title="Grievances" />
         </>
       }
     >

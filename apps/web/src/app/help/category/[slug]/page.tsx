@@ -60,11 +60,16 @@ export default async function HelpCategoryPage({ params }: { params: Promise<{ s
         <ContentLayout
           prose={false}
           aside={
-            <SideCard headingId="other-guides" title="Other guides">
-              <ul className="pk-side-list">
-                {HELP_CATEGORIES.filter((other) => other.slug !== slug).map((other) => (
+            <SideCard headingId="other-guides" title="All guides">
+              {/* Every guide, this one marked as where you are — the list
+                  used to skip it and read like a list with a hole. */}
+              <ul className="pk-side-list pk-side-list--nav">
+                {HELP_CATEGORIES.map((other) => (
                   <li key={other.slug}>
-                    <Link href={`/help/category/${other.slug}`}>
+                    <Link
+                      href={`/help/category/${other.slug}`}
+                      aria-current={other.slug === slug ? "page" : undefined}
+                    >
                       {other.title}
                       <span className="help-guide-time">{helpArticlesIn(other.slug).length}</span>
                     </Link>

@@ -146,12 +146,24 @@
 /* The sports strip and the handwritten tag beside it. */
 .login-scene-art {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-6);
+}
+
+/* The strip keeps to its own track, so the tag beside it gets clear space
+   (it used to straddle the strip's right border). */
+.login-scene-art > * {
+  min-width: 0;
+}
+
+.login-scene-art .pk-montage {
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .login-scene-art .pk-script {
+  padding-inline: var(--space-2);
   font-size: clamp(1.25rem, 2.4vw, 1.75rem);
 }
 

@@ -24,11 +24,17 @@ export function OperatorIdentityCard({
   headingId = "operator-identity",
   title = "Who operates DesiAuction",
   grievanceLink = true,
+  compact = false,
 }: {
   headingId?: string;
   title?: string;
   /** Off on /legal/grievances itself, where the link would point at the page. */
   grievanceLink?: boolean;
+  /**
+   * /support: only who to complain to, and a link to the full identity on
+   * /legal — the whole card there repeated /legal word for word.
+   */
+  compact?: boolean;
 }) {
   if (!legalIdentityPublished()) {
     return null;
@@ -50,23 +56,25 @@ export function OperatorIdentityCard({
         </div>
       </div>
       <dl className="pk-operator-facts">
-        <div>
-          <dt>Legal name</dt>
-          <dd>{id.legalName}</dd>
-        </div>
-        {id.registrationNumber !== null ? (
+        {compact ? null : (
+          <div>
+            <dt>Legal name</dt>
+            <dd>{id.legalName}</dd>
+          </div>
+        )}
+        {!compact && id.registrationNumber !== null ? (
           <div>
             <dt>CIN</dt>
             <dd className="pk-operator-mono">{id.registrationNumber}</dd>
           </div>
         ) : null}
-        {id.gstin !== null ? (
+        {!compact && id.gstin !== null ? (
           <div>
             <dt>GSTIN</dt>
             <dd className="pk-operator-mono">{id.gstin}</dd>
           </div>
         ) : null}
-        {id.registeredAddress !== null ? (
+        {!compact && id.registeredAddress !== null ? (
           <div>
             <dt>Registered office</dt>
             <dd>{id.registeredAddress}</dd>
@@ -79,7 +87,7 @@ export function OperatorIdentityCard({
               {id.grievanceOfficerName}
               {id.grievanceOfficerEmail !== null ? (
                 <>
-                  {" · "}
+                  {compact ? <br /> : " · "}
                   <a href={`mailto:${id.grievanceOfficerEmail}`} data-private>
                     {id.grievanceOfficerEmail}
                   </a>
@@ -87,7 +95,7 @@ export function OperatorIdentityCard({
               ) : null}
               {id.grievanceOfficerPhone !== null ? (
                 <>
-                  {" · "}
+                  {compact ? <br /> : " · "}
                   <a href={`tel:${id.grievanceOfficerPhone.replace(/\s+/g, "")}`} data-private>
                     {id.grievanceOfficerPhone}
                   </a>
@@ -107,7 +115,13 @@ export function OperatorIdentityCard({
       </dl>
       <p className="pk-operator-foot">
         Complaints are acknowledged within 24 hours and resolved within 15 days.
-        {grievanceLink ? (
+        {compact ? (
+          <>
+            {" "}
+            <Link href="/legal">Full operator details</Link>
+          </>
+        ) : null}
+        {grievanceLink && !compact ? (
           <>
             {" "}
             <Link href="/legal/grievances">How grievance redressal works</Link>

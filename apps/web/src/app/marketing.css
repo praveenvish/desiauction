@@ -4026,11 +4026,11 @@ body:has(.landing.mk) .mk-hero {
   text-align: center;
 }
 
+/* The arrow rides the text: an inline-flex link pinned it to the far edge of
+   a wrapped line on a phone (wow pass, round 2). */
 .mk-features-more a {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
+  display: inline;
+  line-height: 2;
   color: var(--text-accent);
   font-weight: var(--font-weight-medium);
   text-decoration: none;
@@ -4060,4 +4060,10 @@ body:has(.landing.mk) .mk-hero {
 
 .mk-fcard[data-feature="lead"] {
   order: -1;
+}
+
+.mk-features-more a svg {
+  display: inline-block;
+  margin-left: var(--space-1);
+  vertical-align: -3px;
 }

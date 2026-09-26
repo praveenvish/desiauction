@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ButtonLink, IconGavel, IconPin } from "@desiauction/ui";
+import {
+  ButtonLink,
+  IconDevice,
+  IconGavel,
+  IconLedger,
+  IconPin,
+  IconShieldCheck,
+} from "@desiauction/ui";
 
 import { env } from "../../env";
 import { LEGAL_IDENTITY } from "../../content/company";
@@ -91,9 +98,39 @@ export default function AboutPage() {
       <div className="prose">
         <p className="prose-p">
           Auction night decides a tournament's teams — and too often it runs on a spreadsheet and a
-          shared voice call, with disputes settled by whoever shouted first. We built DesiAuction so
-          organizers, owners, players and spectators can all trust the same screen at the same time.
+          shared voice call, with disputes settled by whoever shouted first.
         </p>
+      </div>
+      {/* Rhythm (wow pass, round 2): the story was three plain paragraphs.
+          The one sentence that is the company's reason to exist is set as a
+          pull-quote, and what that means in the product follows as three
+          short principles — each one true of the code, not a slogan. */}
+      <blockquote className="about-quote">
+        <p>
+          We built DesiAuction so organizers, owners, players and spectators can all trust the same
+          screen at the same time.
+        </p>
+      </blockquote>
+      <ul className="about-principles">
+        <li>
+          <IconShieldCheck size={24} weight="duotone" aria-hidden />
+          <strong>The server decides every bid</strong>
+          <span>
+            The auction engine accepts or refuses each one. No screen can invent a bid or a sale.
+          </span>
+        </li>
+        <li>
+          <IconLedger size={24} weight="duotone" aria-hidden />
+          <strong>One record of the night</strong>
+          <span>Every sale lands on an append-only ledger that settlement reads from.</span>
+        </li>
+        <li>
+          <IconDevice size={24} weight="duotone" aria-hidden />
+          <strong>Made for the phone in your hand</strong>
+          <span>Players register, follow the room and share their card from their own phone.</span>
+        </li>
+      </ul>
+      <div className="prose">
         <p className="prose-p">
           We're in beta. Every tournament gets the full platform, free, while we earn your trust —
           and while we build the track record that a young platform has to earn honestly.

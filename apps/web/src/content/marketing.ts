@@ -599,7 +599,7 @@ export const PRICING = {
         // gateway in the repo (server/settlement/adapters/razorpay.ts) collects
         // TEAM dues into an organizer's own books. The platform cannot charge
         // you because it has nowhere to record a charge.
-        body: "Every tournament is free through the beta, so there is no invoice to raise, no purchase order to route and no budget to release. Run the whole thing first and decide about paying afterwards — and a tournament you start during the beta stays free for good.",
+        body: "Every tournament is free through the beta — no invoice, no purchase order, no budget to release. A tournament you start now stays free for good.",
       },
       {
         title: "Your own books, in your own numbering",
@@ -620,13 +620,13 @@ export const PRICING = {
         // TODO(founder): when a document download and an accountant export are
         // reachable from a screen, this paragraph gets its second half back.
         // Until then a committee buyer must not be told they will get files.
-        body: "This is the money your teams owe you, not money you owe us. Declare your legal name and GSTIN once, and the money workspace issues numbered receipts in your own unbroken series, sealed on an append-only ledger, each one re-derivable from the events behind it. Tax invoices and exports for your accountant are not built yet — raise those the way you do now.",
+        body: "Declare your legal name and GSTIN once; receipts to your teams run in your own unbroken series on an append-only ledger. Tax invoices and accountant exports are not built yet.",
       },
       {
         title: "Nothing you record is held hostage",
         // "all export" was false for rosters-plus-everything. The squad CSV and
         // the fixtures CSV are the two downloads that exist.
-        body: "Squads and fixtures download as CSV, and receipts, the ledger and the auction's own record stay readable whatever happens to a pass. No renewal ever stands between your organization and its own paperwork.",
+        body: "Squads and fixtures download as CSV; receipts, the ledger and the auction record stay readable whatever happens to a pass.",
       },
     ],
     // TODO(founder): the page used to end this section with a dashed "What this

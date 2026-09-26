@@ -30,6 +30,33 @@ const FOUNDATION_ICONS: readonly ReactNode[] = [
   <IconRefresh key="recovers" size={24} weight="duotone" />,
 ];
 
+const SECURITY_FACTS = [
+  {
+    title: "Sign-in codes are short-lived",
+    body: "A code lasts five minutes and allows five tries. A number can be sent at most five codes an hour.",
+  },
+  {
+    title: "Codes are never stored as digits",
+    body: "What we keep is a keyed digest tied to the code's purpose — a copy of the database cannot turn it back into a code.",
+  },
+  {
+    title: "Sessions you can see and end",
+    body: "Only a hash of each session token is stored, a new token is issued at every sign-in, and every signed-in device is listed on your account with a sign-out.",
+  },
+  {
+    title: "Cookies scripts cannot read",
+    body: "Session cookies are HTTP-only and secure-only, so a script on a page cannot lift them.",
+  },
+  {
+    title: "A content policy on every page",
+    body: "Each response carries a Content-Security-Policy with a fresh nonce, so only the scripts we served can run.",
+  },
+  {
+    title: "Your number stays private",
+    body: "Public player and team pages never show a mobile number or email address.",
+  },
+] as const;
+
 /**
  * Real, certified architecture facts — the same guarantees /features states,
  * as a 2×2 of cards rather than a wall of four headings, with the two things a
@@ -101,6 +128,23 @@ export default function SecurityPage() {
             </span>
             <h3>{card.title}</h3>
             <p>{card.body}</p>
+          </li>
+        ))}
+      </ul>
+
+      {/* SECURITY-SPECIFIC FACTS (wow pass, round 2). The cards above repeat
+          the /features trust band; these are the details a security-minded
+          reader checks, each one read off the code (server/auth/otp.ts,
+          code-digest.ts, sessions.ts, actions.ts, middleware.ts). No
+          certification, host or region is claimed that the code cannot show. */}
+      <h2 id="under-the-hood" className="cl-list-title sec-facts-title">
+        Under the hood
+      </h2>
+      <ul className="sec-facts" aria-labelledby="under-the-hood">
+        {SECURITY_FACTS.map((fact) => (
+          <li key={fact.title}>
+            <strong>{fact.title}</strong>
+            <span>{fact.body}</span>
           </li>
         ))}
       </ul>

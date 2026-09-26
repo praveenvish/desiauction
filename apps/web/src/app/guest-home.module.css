@@ -1880,8 +1880,10 @@
   .demoLayout {
     padding-top: 20px;
   }
+  /* Bento → steps: 48 + 44px of empty band either side of one rule read as
+     a gap in the page (wow pass, round 2). */
   .toolkit {
-    padding: 48px 0;
+    padding: 48px 0 28px;
   }
   .screenFeature,
   .registration,
@@ -1905,7 +1907,7 @@
     padding-bottom: 32px;
   }
   .finalCta {
-    padding: 44px 20px 52px;
+    padding: 28px 20px 52px;
   }
   /* The sport row scrolls: an edge fade says there is more to it. */
   .sportsGrid {

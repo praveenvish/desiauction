@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 
 import "./content-layout.css";
 import { TopicCard, TopicGrid } from "./public-kit";
+import { TocNav } from "./toc-nav";
 
 export interface ContentAnchor {
   id: string;
@@ -61,18 +62,7 @@ export function ContentLayout({
 
       {hasSide ? (
         <div className="cl-side">
-          {anchors.length === 0 ? null : (
-            <nav className="cl-aside" aria-label="On this page">
-              <p className="cl-aside-title">On this page</p>
-              <ol className="cl-aside-list">
-                {anchors.map((anchor) => (
-                  <li key={anchor.id}>
-                    <a href={`#${anchor.id}`}>{anchor.label}</a>
-                  </li>
-                ))}
-              </ol>
-            </nav>
-          )}
+          {anchors.length === 0 ? null : <TocNav anchors={anchors} />}
           {aside}
         </div>
       ) : null}

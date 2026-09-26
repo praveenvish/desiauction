@@ -206,17 +206,9 @@ export default function PricingPage() {
                     ))}
                   </tr>
                 ))}
-                {/* Read off `tiers`, never re-typed: the table cannot quote a
-                    price the cards above have stopped quoting. */}
-                <tr className="mk-compare-price">
-                  <th scope="row">Price</th>
-                  {PRICING.tiers.map((tier) => (
-                    <td key={tier.name} data-tier={tier.name}>
-                      {tier.price}
-                      <span className="mk-compare-cadence">{tier.cadence}</span>
-                    </td>
-                  ))}
-                </tr>
+                {/* No Price row (wow pass, round 2): the cards directly above
+                    already quote each tier's price, and the row read "Free"
+                    a fourth and fifth time. */}
               </tbody>
             </table>
           </div>

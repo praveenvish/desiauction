@@ -75,10 +75,15 @@ export default function RulesGuidelinesPage() {
             <span className="feature-card-tile" aria-hidden>
               {rule.icon}
             </span>
-            <span className="feature-card-num" aria-hidden>
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <h3>{rule.title}</h3>
+            {/* One marker, not two (wow pass, round 2): the icon tile leads and
+                the rule's number rides its title, instead of a mono "01"
+                competing with the tile from the opposite corner. */}
+            <h3>
+              <span className="feature-card-num" aria-hidden>
+                {String(index + 1)}.
+              </span>{" "}
+              {rule.title}
+            </h3>
             <p>{rule.body}</p>
           </li>
         ))}

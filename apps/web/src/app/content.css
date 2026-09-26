@@ -610,8 +610,8 @@ a.content-card:focus-visible {
 }
 
 .support-detail {
-  font-family: var(--font-mono);
   font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* --- Release notes ------------------------------------------------------------------- */
@@ -788,9 +788,12 @@ a.content-card:focus-visible {
 
 /* ---- help index: one card per guide (wow pass) ---- */
 
+/* Cards take their own height (wow pass, round 2): a two-article guide
+   stretched to its five-article neighbour left ~110px of blank card. */
 .help-index {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: start;
   gap: var(--space-5);
 }
 
@@ -961,6 +964,106 @@ a.content-card:focus-visible {
   font-size: 0.8125rem;
 }
 
+/* ---- /about rhythm: a pull-quote and three principles ---- */
+.cl-prose .about-quote {
+  margin: var(--space-4) 0;
+  padding: var(--space-1) 0 var(--space-1) var(--space-5);
+  border-left: 3px solid var(--accent);
+  color: var(--text-heading);
+}
+
+.about-quote p {
+  margin: 0;
+  max-width: 30ch;
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+}
+
+.cl-prose .about-principles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 719px) {
+  .cl-prose .about-principles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.about-principles li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.about-principles svg {
+  color: var(--accent-ink);
+}
+
+.about-principles strong {
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.about-principles span {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+/* ---- /security "Under the hood": a ruled two-column fact list ---- */
+.cl-list-title.sec-facts-title {
+  margin-top: var(--space-6);
+}
+
+.sec-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 719px) {
+  .sec-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sec-facts li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sec-facts strong {
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.sec-facts span {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
 /* ---- feature cards: a 2×2 of icon + title + body (/security, /rules) ---- */
 /* Always a clean 2×2 (four cards): auto-fit made 3 + an orphan. */
 .feature-cards {
@@ -1002,12 +1105,8 @@ a.content-card:focus-visible {
 }
 
 .feature-card-num {
-  position: absolute;
-  top: var(--space-5);
-  right: var(--space-5);
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  color: var(--text-muted);
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .feature-card h3 {
