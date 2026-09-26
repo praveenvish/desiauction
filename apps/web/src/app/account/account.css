@@ -396,7 +396,7 @@ a.acct-check-row:hover {
 @media (min-width: 1100px) {
   .acct-body {
     display: grid;
-    grid-template-columns: 200px minmax(0, 780px);
+    grid-template-columns: 200px minmax(0, 1fr);
     gap: var(--space-8);
     align-items: start;
   }

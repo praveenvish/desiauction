@@ -1,5 +1,15 @@
 import { competitions } from "@desiauction/db";
-import { EmptyState, IconBell, IconCog, SectionCard } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconArrowRight,
+  IconBell,
+  IconCheckCircle,
+  IconCog,
+  IconGavel,
+  IconShieldCheck,
+  IconUsers,
+  SectionCard,
+} from "@desiauction/ui";
 import Link from "next/link";
 import { inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
@@ -80,66 +90,112 @@ export default async function InboxPage() {
   );
   return (
     <main className="inbox">
-      <SectionCard
-        icon={<IconBell />}
-        title="All notifications"
-        description={
-          events.length === 0
-            ? "Registration decisions, auction results and account alerts land here."
-            : `${String(events.length)} ${events.length === 1 ? "notice" : "notices"} · newest first`
-        }
-        action={
-          <Link
-            href="/account#notifications"
-            className="inbox-settings"
-            aria-label="Notification settings"
-          >
-            <IconCog size={16} aria-hidden />
-            <span className="inbox-settings-text">Notification settings</span>
+      <div className="inbox-main">
+        <SectionCard
+          icon={<IconBell />}
+          title="All notifications"
+          description={
+            events.length === 0
+              ? "Registration decisions, auction results and account alerts land here."
+              : `${String(events.length)} ${events.length === 1 ? "notice" : "notices"} · newest first`
+          }
+          action={
+            <Link
+              href="/account#notifications"
+              className="inbox-settings"
+              aria-label="Notification settings"
+            >
+              <IconCog size={16} aria-hidden />
+              <span className="inbox-settings-text">Notification settings</span>
+            </Link>
+          }
+          flush={events.length > 0}
+        >
+          {events.length === 0 ? (
+            <EmptyState
+              headingLevel={3}
+              title="Nothing yet"
+              description="New notices appear here the moment they happen."
+            />
+          ) : (
+            <InboxList
+              personId={session.personId}
+              events={events.map((event) => {
+                const competitionId = competitionIdOf(event.meta);
+                const competition = competitionId === null ? undefined : named.get(competitionId);
+                const detail = detailOf(event.meta);
+                return {
+                  action: event.action,
+                  at: event.at.toISOString(),
+                  ...(detail === null ? {} : { detail }),
+                  ...(competition !== undefined
+                    ? {
+                        subject: {
+                          name: competition.name,
+                          ...(competition.publicPage ? { href: `/c/${competition.slug}` } : {}),
+                        },
+                      }
+                    : {}),
+                };
+              })}
+            />
+          )}
+        </SectionCard>
+      </div>
+      {/*
+       * WHAT LANDS HERE (wow pass, round 2). The list stopped at 960px and left
+       * the right third of a laptop blank; the rail now says what kinds of
+       * notice arrive, and where the ones that do not (sign-ins) went.
+       */}
+      <aside className="inbox-rail" aria-labelledby="inbox-rail-title">
+        <h2 id="inbox-rail-title" className="inbox-rail-title">
+          What lands here
+        </h2>
+        <ul className="inbox-kinds">
+          <li>
+            <IconCheckCircle size={20} aria-hidden />
+            <span>
+              <strong>Registration decisions</strong>
+              The moment the organizer decides on your entry.
+            </span>
+          </li>
+          <li>
+            <IconGavel size={20} aria-hidden />
+            <span>
+              <strong>Auction results</strong>
+              Which team bought you, and for how much.
+            </span>
+          </li>
+          <li>
+            <IconUsers size={20} aria-hidden />
+            <span>
+              <strong>Your team</strong>
+              Named captain, squad set, picked in a lineup.
+            </span>
+          </li>
+          <li>
+            <IconShieldCheck size={20} aria-hidden />
+            <span>
+              <strong>Account alerts</strong>
+              Changes to your name, number, email or devices.
+            </span>
+          </li>
+        </ul>
+        {/* Where the sign-ins went: routine sign-ins and code requests are kept
+            off this list (server/auth/inbox-filter.ts) and live in the
+            account's security log — said here, so they do not seem lost. */}
+        <p className="inbox-foot">
+          Sign-ins and sign-in codes are in{" "}
+          <Link href="/account#activity" data-testid="inbox-signins-link">
+            Account → Security activity
           </Link>
-        }
-        flush={events.length > 0}
-      >
-        {events.length === 0 ? (
-          <EmptyState
-            headingLevel={3}
-            title="Nothing yet"
-            description="New notices appear here the moment they happen."
-          />
-        ) : (
-          <InboxList
-            personId={session.personId}
-            events={events.map((event) => {
-              const competitionId = competitionIdOf(event.meta);
-              const competition = competitionId === null ? undefined : named.get(competitionId);
-              const detail = detailOf(event.meta);
-              return {
-                action: event.action,
-                at: event.at.toISOString(),
-                ...(detail === null ? {} : { detail }),
-                ...(competition !== undefined
-                  ? {
-                      subject: {
-                        name: competition.name,
-                        ...(competition.publicPage ? { href: `/c/${competition.slug}` } : {}),
-                      },
-                    }
-                  : {}),
-              };
-            })}
-          />
-        )}
-      </SectionCard>
-      {/* Where the sign-ins went: routine sign-ins and code requests are kept
-          off this list (server/auth/inbox-filter.ts) and live in the account's
-          security log — said here, so they do not seem lost. */}
-      <p className="inbox-foot">
-        Sign-ins and sign-in codes are in{" "}
-        <Link href="/account#activity" data-testid="inbox-signins-link">
-          Account → Security activity
+          .
+        </p>
+        <Link href="/account#notifications" className="inbox-rail-link">
+          Choose what reaches you
+          <IconArrowRight size={16} aria-hidden />
         </Link>
-        .
-      </p>
+      </aside>
     </main>
   );
 }

@@ -32,15 +32,13 @@ import {
 import { formatDate, formatDateTime } from "../../lib/format-date";
 import { isKnownEvent, labelForEvent } from "../../lib/inbox-events";
 
-/** How many more sessions and events each "Show more" adds. */
-const PAGE = 10;
 /**
- * What renders first: this device and the three most recent others, and the
- * last five security events. Ten of each ran the account page to ~700px of
- * devices before anything else.
+ * What renders first: this device and the two most recent others, and the
+ * last three security events; "Show all" opens the rest in one press. Ten of
+ * each ran the account page to ~700px of devices before anything else.
  */
-const FIRST_SESSIONS = 4;
-const FIRST_EVENTS = 5;
+const FIRST_SESSIONS = 3;
+const FIRST_EVENTS = 3;
 
 type Pending =
   | { kind: "revoke-session"; session: SessionView }
@@ -343,10 +341,10 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                 variant="secondary"
                 data-testid="show-more-sessions"
                 onClick={() => {
-                  setSessionsShown((shown) => shown + PAGE);
+                  setSessionsShown(security.sessions.length);
                 }}
               >
-                Show more ({String(security.sessions.length - sessionsShown)} left)
+                Show all {String(security.sessions.length)} devices
               </Button>
             </div>
           ) : null}
@@ -388,10 +386,10 @@ export function SecurityPanels({ security }: { security: AccountSecurity }) {
                 variant="secondary"
                 data-testid="show-more-events"
                 onClick={() => {
-                  setEventsShown((shown) => shown + PAGE);
+                  setEventsShown(security.events.length);
                 }}
               >
-                Show more ({String(security.events.length - eventsShown)} left)
+                Show all {String(security.events.length)} events
               </Button>
             ) : null}
             {/* Truncation is ADMITTED rather than performed silently. */}
