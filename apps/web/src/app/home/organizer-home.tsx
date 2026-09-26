@@ -560,6 +560,46 @@ export async function OrganizerHome({
     settlement: <IconRupee size={14} />,
     fixtures: <IconCalendar size={14} />,
   };
+  /*
+   * ONE DOOR PER DESTINATION (round 3C). The page used to open Fixtures three
+   * times (the road's current step, the attention row, the schedule card's
+   * empty CTA) and Teams and Auction twice each. Doors are claimed in reading
+   * order of importance — the attention card's tasks first, then the road,
+   * then the figure tiles, then the side cards — and a later surface that
+   * would repeat a claimed destination renders without its link.
+   */
+  const claimed = new Set<string>();
+  const pathOf = (href: string): string => href.split("?")[0] ?? href;
+  const claim = (href: string | undefined): string | undefined => {
+    if (href === undefined || claimed.has(pathOf(href))) return undefined;
+    claimed.add(pathOf(href));
+    return href;
+  };
+  if (nextStep !== null) {
+    claimed.add(pathOf(nextStep.cta.href));
+    if (nextStep.secondary !== undefined) claimed.add(pathOf(nextStep.secondary.href));
+  }
+  for (const row of restAttention) claimed.add(pathOf(row.href));
+  const currentStep = journey?.find((step) => step.state === "current");
+  const roadDoor = currentStep === undefined ? undefined : claim(journeyHref[currentStep.key]);
+  const tileDoor = {
+    teams: claim(`${focusBase}/teams`),
+    players: claim(`${focusBase}/registrations`),
+    // Only a reader without money sight gets the Fixtures tile (see below).
+    fixtures:
+      focusOverview?.purseCommitted === undefined ? claim(`${focusBase}/fixtures`) : undefined,
+    auction: claim(`${focusBase}/auction`),
+  };
+  const resultsDoor =
+    lastDone === undefined ? undefined : claim(`/seasons/${lastDone.competitionSlug}/auction`);
+  const scheduleDoor =
+    schedule.length > 0
+      ? undefined
+      : claim(
+          seasonToOpen === undefined
+            ? "/tournaments?view=seasons"
+            : `/seasons/${seasonToOpen.slug}/fixtures`,
+        );
   const lotsPct =
     focusOverview === null || focusOverview.lotsTotal === 0
       ? 0
@@ -737,7 +777,6 @@ export async function OrganizerHome({
                     label={`${focusOverview.competition.name} progress`}
                     linkComponent={Link}
                     steps={journey.map((step): JourneyStep => {
-                      const href = journeyHref[step.key];
                       // Zero is left unsaid: a "0" beside a completed step reads as a fault.
                       const many = view.competitions.length > 1 && (stageCount[step.key] ?? 0) > 0;
                       const item: JourneyStep = {
@@ -766,9 +805,9 @@ export async function OrganizerHome({
                       // ONE LINK PER DESTINATION (round 3B): the road is a
                       // read-out; only the step you are on is a door. Done
                       // steps' pages are the figure tiles right under it.
-                      return href === undefined || step.state !== "current"
+                      return roadDoor === undefined || step.state !== "current"
                         ? item
-                        : { ...item, href };
+                        : { ...item, href: roadDoor };
                     })}
                   />
                 ),
@@ -785,8 +824,7 @@ export async function OrganizerHome({
             rolling
             value={formatCount(focusOverview.teamCount)}
             label="Teams"
-            href={`${focusBase}/teams`}
-            linkComponent={Link}
+            {...(tileDoor.teams !== undefined ? { href: tileDoor.teams, linkComponent: Link } : {})}
           />
           <StatCard
             icon={<IconUser />}
@@ -799,8 +837,9 @@ export async function OrganizerHome({
                 ? `${formatCount(focusOverview.pendingPlayers)} to review`
                 : "In the auction pool"
             }
-            href={`${focusBase}/registrations`}
-            linkComponent={Link}
+            {...(tileDoor.players !== undefined
+              ? { href: tileDoor.players, linkComponent: Link }
+              : {})}
           />
           {/* Money-gated in the read: absent for a reader without money sight,
               who gets the season's fixtures in its place. */}
@@ -826,8 +865,9 @@ export async function OrganizerHome({
               rolling
               value={formatCount(focusOverview.fixtureCount)}
               label="Fixtures"
-              href={`${focusBase}/fixtures`}
-              linkComponent={Link}
+              {...(tileDoor.fixtures !== undefined
+                ? { href: tileDoor.fixtures, linkComponent: Link }
+                : {})}
             />
           )}
           <StatCard
@@ -838,8 +878,9 @@ export async function OrganizerHome({
             label="Lots sold"
             hint={focusOverview.lotsTotal === 0 ? "No lots yet" : `${String(lotsPct)}%`}
             progress={lotsPct}
-            href={`${focusBase}/auction`}
-            linkComponent={Link}
+            {...(tileDoor.auction !== undefined
+              ? { href: tileDoor.auction, linkComponent: Link }
+              : {})}
           />
         </StatGrid>
       ) : null}
@@ -1084,8 +1125,12 @@ export async function OrganizerHome({
                 <PanelEmpty
                   icon={<IconGavel />}
                   title={`${lastDone.competitionName}'s auction is done`}
-                  text={`${String(lastDone.lotsSold)} of ${String(lastDone.lotsTotal)} sold. Every squad and every price is on the results page.`}
-                  ctaHref={`/seasons/${lastDone.competitionSlug}/auction`}
+                  text={
+                    resultsDoor === undefined
+                      ? `${String(lastDone.lotsSold)} of ${String(lastDone.lotsTotal)} sold. Every squad and every price is behind Lots sold.`
+                      : `${String(lastDone.lotsSold)} of ${String(lastDone.lotsTotal)} sold. Every squad and every price is on the results page.`
+                  }
+                  ctaHref={resultsDoor}
                   ctaLabel="See results"
                 />
               ) : otherAuctions.length === 0 ? (
@@ -1152,12 +1197,12 @@ export async function OrganizerHome({
                 <PanelEmpty
                   icon={<IconCalendar />}
                   title="No fixtures scheduled."
-                  text="Create a match schedule to keep your community engaged."
-                  ctaHref={
-                    seasonToOpen === undefined
-                      ? "/tournaments?view=seasons"
-                      : `/seasons/${seasonToOpen.slug}/fixtures`
+                  text={
+                    scheduleDoor === undefined
+                      ? "Matches land here once they are on the schedule."
+                      : "Create a match schedule to keep your community engaged."
                   }
+                  ctaHref={scheduleDoor}
                   ctaLabel="Set up the schedule"
                 />
               ) : (
@@ -1244,7 +1289,8 @@ function PanelEmpty({
   icon: ReactNode;
   title: string;
   text: string;
-  ctaHref: string;
+  /** Absent when another surface on the page already opens this destination. */
+  ctaHref: string | undefined;
   ctaLabel: string;
 }) {
   return (
@@ -1253,11 +1299,15 @@ function PanelEmpty({
       icon={icon}
       title={title.replace(/\.$/, "")}
       description={text}
-      action={
-        <ButtonLink href={ctaHref} variant="secondary" size="sm">
-          {ctaLabel}
-        </ButtonLink>
-      }
+      {...(ctaHref !== undefined
+        ? {
+            action: (
+              <ButtonLink href={ctaHref} variant="secondary" size="sm">
+                {ctaLabel}
+              </ButtonLink>
+            ),
+          }
+        : {})}
     />
   );
 }
