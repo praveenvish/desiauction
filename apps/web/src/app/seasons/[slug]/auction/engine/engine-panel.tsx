@@ -152,7 +152,7 @@ export function EnginePanel({ slug, record }: { slug: string; record?: EngineRec
         <span
           className="engine-health-tile"
           data-tone={
-            restful ? "ok" : unreachable || (diagnostics !== null && !healthy) ? "danger" : "ok"
+            restful ? "rest" : unreachable || (diagnostics !== null && !healthy) ? "danger" : "ok"
           }
           aria-hidden
         >

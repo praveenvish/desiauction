@@ -2137,6 +2137,13 @@
   color: var(--success-strong);
 }
 
+/* At rest (the auction is over) the shield is the console's gold tile, as on
+   every sibling page — green is kept for "running and healthy". */
+.engine-health-tile[data-tone="rest"] {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
 .engine-health-tile[data-tone="danger"] {
   background: var(--danger-subtle);
   color: var(--danger-strong);
@@ -3976,9 +3983,33 @@
 
 .ledger-lot-code,
 .ledger-paddle {
-  font-family: var(--font-mono);
   font-size: var(--text-xs-size);
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
+}
+
+/* The outcome pill and, for a re-run, the words that say so. */
+.ledger-outcome {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 2px var(--space-2);
+}
+
+.ledger-pass {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* A first pass that was not the lot's last word: it steps back, in ink that
+   still reads (never opacity — axe samples it). */
+.ledger-grid tbody tr[data-superseded] .ledger-lot-name,
+.ledger-grid tbody tr[data-superseded] .ledger-result {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-regular);
 }
 
 .ledger-paddle {

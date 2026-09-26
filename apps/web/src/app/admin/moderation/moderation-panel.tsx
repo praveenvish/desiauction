@@ -60,7 +60,6 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
             <EmptyState
               size="compact"
               icon={<IconEyeOff />}
-              concept="done"
               title="Nothing is taken down"
               description="Seasons DesiAuction takes off the public web are listed here, with who and why."
             />

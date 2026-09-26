@@ -67,7 +67,6 @@ export function ReviewDeskPanel({ desk }: { desk: ReviewDesk }) {
             <EmptyState
               size="compact"
               icon={<IconStar />}
-              concept="done"
               title="Nothing waiting"
               description={`New reviews land here as people send them · ${String(desk.published.length)} published · ${String(desk.hidden.length)} hidden`}
             />
