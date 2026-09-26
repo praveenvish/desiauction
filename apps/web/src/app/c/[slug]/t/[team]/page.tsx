@@ -1,4 +1,4 @@
-import { cache, type CSSProperties } from "react";
+import { cache, type CSSProperties, type ReactNode } from "react";
 import { formatAmount, paise, roleLabelIn, sportPackFor, type MoneyUnit } from "@desiauction/core";
 import { ButtonLink, IconArrowLeft, PlayerImage, RosterMark } from "@desiauction/ui";
 import type { Metadata } from "next";
@@ -199,15 +199,19 @@ export default async function PublicTeamPage({
                     </span>
                     <span className="team-page-who">
                       <strong>
-                        <span className="team-page-name">{member.name}</span>
-                        {/* The role on the sheet, as a badge after the name —
-                            not in the price slot, where gold italics read as
-                            a price. */}
-                        {member.marks.includes("captain") ? (
-                          <RosterMark kind="captain" className="team-page-badge" />
-                        ) : member.marks.includes("icon") ? (
-                          <RosterMark kind="icon" className="team-page-badge" />
-                        ) : null}
+                        <NameWithBadge
+                          name={member.name}
+                          badge={
+                            /* The role on the sheet, as a badge after the name
+                               — not in the price slot, where gold italics
+                               read as a price. */
+                            member.marks.includes("captain") ? (
+                              <RosterMark kind="captain" className="team-page-badge" />
+                            ) : member.marks.includes("icon") ? (
+                              <RosterMark kind="icon" className="team-page-badge" />
+                            ) : null
+                          }
+                        />
                       </strong>
                       <span>{roleLabelIn(pack, member.role)}</span>
                     </span>
@@ -247,4 +251,27 @@ export default async function PublicTeamPage({
 /** A player's price in the season's own unit — "₹12,500" or "1,250 pts". */
 function formatPrice(pricePaise: number, unit: MoneyUnit): string {
   return formatAmount(paise(pricePaise), unit);
+}
+
+/**
+ * A name with its badge, where the badge never takes a line of its own
+ * (round-5 review): the name's last word and the badge are glued together, so
+ * a long name wraps before its last word and the badge rides that word.
+ */
+function NameWithBadge({ name, badge }: { name: string; badge: ReactNode }) {
+  if (badge === null) {
+    return <>{name}</>;
+  }
+  const cut = name.trimEnd().lastIndexOf(" ");
+  const head = cut === -1 ? "" : name.slice(0, cut + 1);
+  const last = cut === -1 ? name : name.slice(cut + 1);
+  return (
+    <>
+      {head}
+      <span className="team-page-nowrap">
+        {last}
+        {badge}
+      </span>
+    </>
+  );
 }
