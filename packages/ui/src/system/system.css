@@ -324,6 +324,10 @@ table.da-rows .da-row-meta {
     white-space: nowrap;
   }
 
+  table.da-rows tr:not(:has(> [data-cell="status"])) [data-cell="figure"] {
+    grid-row: 1 / span 2;
+  }
+
   table.da-rows tr:not(:has(> [data-cell="figure"])) [data-cell="status"] {
     grid-row: 1 / span 2;
   }

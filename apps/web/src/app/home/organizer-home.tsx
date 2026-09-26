@@ -763,7 +763,12 @@ export async function OrganizerHome({
                         hint: step.hint,
                         icon: journeyIcon[step.key],
                       };
-                      return href === undefined ? item : { ...item, href };
+                      // ONE LINK PER DESTINATION (round 3B): the road is a
+                      // read-out; only the step you are on is a door. Done
+                      // steps' pages are the figure tiles right under it.
+                      return href === undefined || step.state !== "current"
+                        ? item
+                        : { ...item, href };
                     })}
                   />
                 ),
@@ -812,8 +817,7 @@ export async function OrganizerHome({
               {...(focusOverview.pursePct != null
                 ? { hint: `${String(focusOverview.pursePct)}% of every purse` }
                 : {})}
-              href={`${focusBase}/auction`}
-              linkComponent={Link}
+              // No door: "Lots sold" beside it opens the same auction page.
             />
           ) : (
             <StatCard
@@ -872,9 +876,6 @@ export async function OrganizerHome({
                       <th className="home-num">Teams</th>
                       <th className="home-num">Players</th>
                       <th>Status</th>
-                      <th className="home-end">
-                        <VisuallyHidden>Actions</VisuallyHidden>
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -902,16 +903,6 @@ export async function OrganizerHome({
                           <td className="home-num home-mono">{row.registrations}</td>
                           <td>
                             <Pill tone={badge.tone}>{badge.label}</Pill>
-                          </td>
-                          <td className="home-end">
-                            <Link
-                              href={`/seasons/${row.slug}`}
-                              className="home-view"
-                              aria-label={`View ${row.name}`}
-                            >
-                              View
-                              <IconArrowRight size={14} />
-                            </Link>
                           </td>
                         </tr>
                       );

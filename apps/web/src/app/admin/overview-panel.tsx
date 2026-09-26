@@ -84,9 +84,8 @@ export function OverviewPanel({
           label="Seasons"
           hint="Across every club"
           // The one tile without a door. Seasons are listed per club, and the
-          // organizations directory is where an administrator reaches them.
-          href="/admin/orgs"
-          linkComponent={Link}
+          // Organizations tile beside it is the door there (one link per
+          // destination — it used to be a second link to the same page).
         />
         <StatCard
           icon={<IconUser />}
@@ -108,8 +107,7 @@ export function OverviewPanel({
               ? `${formatCount(live.running.length)} live now`
               : "None live now"
           }
-          href="/admin/live"
-          linkComponent={Link}
+          // No door here: "Open the live board" on the Live now card is it.
         />
       </StatGrid>
 
@@ -242,12 +240,6 @@ export function OverviewPanel({
             concept="money"
             title="Settlements"
             description={`${countNoun(totals.cases, "settlement case")} · ${countNoun(totals.financeOrgs, "finance org")}`}
-            action={
-              <Link href="/admin/health" className="adm-link">
-                Finance health
-                <IconArrowRight size={16} aria-hidden />
-              </Link>
-            }
           >
             <StatusList
               lines={overview.casesByStatus}

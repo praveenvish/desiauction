@@ -135,8 +135,10 @@ export function ModerationPanel({ desk }: { desk: ModerationDesk }) {
                   label="Public seasons"
                   total={desk.publishedTotal}
                   shown={desk.published.length}
-                  noun="· search to reach the rest"
-                />
+                  noun="public seasons"
+                >
+                  Search to reach the rest.
+                </Pager>
               </div>
             ) : null}
           </>

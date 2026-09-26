@@ -1128,6 +1128,11 @@ p.admin-warning {
     display: none;
   }
 
+  /* The meta line sits under the name, not under the monogram. */
+  .admin-table.da-rows [data-cell="title"]:has(.admin-person) .da-row-meta {
+    padding-inline-start: calc(28px + var(--space-3));
+  }
+
   .admin-table.da-rows [data-cell="title"] .admin-cell-main:not(.admin-person) {
     display: block;
     overflow: hidden;

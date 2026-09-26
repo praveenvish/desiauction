@@ -1222,6 +1222,7 @@ export function RegistrationDashboardPanel({
                 page={page.page}
                 pageCount={totalPages}
                 pageSize={page.pageSize}
+                noun="players"
                 onPage={(entry) => {
                   pushQuery({ page: String(entry) });
                 }}

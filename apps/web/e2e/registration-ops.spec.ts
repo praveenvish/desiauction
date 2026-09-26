@@ -159,18 +159,18 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   // And the ones still owing are one click away — the desk's own question,
   // which is a different axis from triage status.
   await feesTile.click();
-  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 5$/);
+  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 5 players$/);
   // The fee select lives in the toolbar's Filters menu (a <details>): open it.
   // `exact`: "Fee" alone, not the fees fact on the lede.
   await page.getByTestId("filters-menu").locator("summary").click();
   await page.getByLabel("Fee", { exact: true }).selectOption("pending");
-  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 3$/);
+  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 3 players$/);
   await page.getByLabel("Fee", { exact: true }).selectOption("");
   // WAIT FOR THE ROWS TO COME BACK. Clearing the filter pushes a new query and
   // re-renders; without this the select-all below runs against whatever is
   // still on screen and checks three rows instead of eight. It passed when this
   // step was written and is a race either way.
-  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 8$/);
+  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 8 players$/);
 
   // Select all on the page and bulk-approve.
   await page.getByLabel("Select all on page").check();
@@ -221,7 +221,7 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
 
   // Filter to approved (the status tab) and confirm only approved rows show.
   await page.getByTestId("stat-approved").click();
-  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 8$/);
+  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 8 players$/);
 
   // Search narrows deterministically.
   // The SHELL gained a global search trigger whose aria-label is also "Search",
@@ -229,7 +229,7 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   // page's own filter box.
   await page.getByRole("textbox", { name: "Search" }).fill("Player 3");
   await page.getByTestId("search-submit").click();
-  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 1$/);
+  await expect(page.getByTestId("page-indicator")).toHaveText(/ of 1 player$/);
 
   /*
    * WHAT TO ORDER. Every size has been in the database since the desk columns

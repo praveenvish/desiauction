@@ -35,7 +35,7 @@ export interface PagerProps {
   firstHref?: string | null;
   nextHref?: string | null;
   linkComponent?: ElementType;
-  /** A noun for the summary: "Showing 1–25 of 43 players". */
+  /** A plural noun for the summary: "Showing 1–25 of 43 players" ("of 1 player"). */
   noun?: string;
   /** Anything else for the row (keyboard hints), drawn between the two ends. */
   children?: ReactNode;
@@ -80,7 +80,9 @@ export function Pager({
   nextTestId,
 }: PagerProps) {
   const numbered = page !== undefined && pageCount !== undefined;
-  const of = `${GROUPED.format(total)}${noun !== undefined ? ` ${noun}` : ""}`;
+  // A plural noun; one of them reads singular ("of 1 player").
+  const word = noun === undefined ? "" : ` ${total === 1 ? noun.replace(/s$/, "") : noun}`;
+  const of = `${GROUPED.format(total)}${word}`;
   let summary: string;
   if (numbered && (pageSize !== undefined || shown !== undefined)) {
     // Without a page size, a full page's row count IS the size; the last page
@@ -114,8 +116,10 @@ export function Pager({
     };
     const disabled = to === null && (href === null || href === undefined);
     if (disabled) {
+      // A disabled link: named, announced as unavailable (a bare span may not
+      // carry an aria-label — axe aria-prohibited-attr).
       return (
-        <span {...common} aria-disabled="true" data-disabled="">
+        <span {...common} role="link" aria-disabled="true" data-disabled="">
           {content}
         </span>
       );
@@ -135,7 +139,11 @@ export function Pager({
     }
     const resolved = href ?? (to !== null && hrefFor !== undefined ? hrefFor(to) : undefined);
     if (resolved === undefined) {
-      return <span {...common}>{content}</span>;
+      return (
+        <span {...common} role="link" aria-disabled="true">
+          {content}
+        </span>
+      );
     }
     return (
       <Link href={resolved} {...common}>

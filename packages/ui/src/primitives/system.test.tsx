@@ -28,7 +28,9 @@ describe("Pager", () => {
     expect(screen.getByTestId("summary")).toHaveTextContent("Showing 26–43 of 43");
     expect(screen.getByRole("link", { name: "Page 1" })).toHaveAttribute("href", "/players?page=1");
     expect(screen.getByRole("link", { name: "Page 2" })).toHaveAttribute("aria-current", "page");
-    expect(screen.queryByRole("link", { name: "Next page" })).toBeNull();
+    const next = screen.getByRole("link", { name: "Next page" });
+    expect(next).toHaveAttribute("aria-disabled", "true");
+    expect(next).not.toHaveAttribute("href");
   });
 
   it("infers the window from the rows shown when the size is unknown", () => {

@@ -3,37 +3,25 @@ import {
   IconArrowRight,
   IconCalendar,
   IconChevronDown,
-  IconGavel,
   IconPin,
-  IconUser,
-  IconUsers,
   PopoverMenu,
 } from "@desiauction/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { HeroFigures, HeroStatus, SeasonCrest } from "../../components/season-hero/season-hero";
+import { HeroStatus, SeasonCrest } from "../../components/season-hero/season-hero";
 import type { SeasonOverviewView } from "../../server/competition/actions";
 import { coverOf } from "../tournaments/featured-season";
 import { dateRange, seasonStatusBadge } from "../tournaments/season-card";
-import { formatCount } from "../../lib/plural";
 
 /**
  * The club hero at the top of an organizer's /home (founder mockup 2): the
- * season this person is working on, its crest and its three figures, and a
+ * season this person is working on, its crest and its road, and a
  * switcher when they run more than one season.
  *
  * No quote. The mockup carries a club motto; no such field exists, and a line
  * the organizer never wrote is not something this page may put in their mouth.
  */
-
-const AUCTION_WORD: Record<string, string> = {
-  scheduled: "Scheduled",
-  live: "Live",
-  paused: "Paused",
-  completed: "Done",
-  reconciled: "Done",
-};
 
 export interface SwitchableSeason {
   slug: string;
@@ -83,9 +71,15 @@ export function ClubHero({
           </HeroStatus>
         }
         title={
-          <Link href={`/seasons/${season.slug}`} className="home-hero-link">
-            {season.name}
-          </Link>
+          // One link per destination: with one season, "Open season" is the
+          // door; the title links only when that button is the season switch.
+          switchable.length > 1 ? (
+            <Link href={`/seasons/${season.slug}`} className="home-hero-link">
+              {season.name}
+            </Link>
+          ) : (
+            season.name
+          )
         }
         meta={[
           ...(overview.orgName !== ""
@@ -111,33 +105,8 @@ export function ClubHero({
                 </>,
               ]
             : []),
-          <HeroFigures
-            key="figures"
-            label={`${season.name} at a glance`}
-            figures={[
-              {
-                key: "teams",
-                icon: <IconUsers />,
-                value: formatCount(overview.teamCount),
-                label: "Teams",
-              },
-              {
-                key: "players",
-                icon: <IconUser />,
-                value: formatCount(overview.approvedPlayers),
-                label: "Players",
-              },
-              {
-                key: "auction",
-                icon: <IconGavel />,
-                value:
-                  overview.auctionStatus === null
-                    ? "Not set"
-                    : (AUCTION_WORD[overview.auctionStatus] ?? "Set up"),
-                label: "Auction night",
-              },
-            ]}
-          />,
+          // No hero figures here: the KPI tiles right under the hero carry
+          // Teams and Players (they said "3 Teams, 43 Players" twice).
         ]}
         actions={
           switchable.length > 1 ? (
