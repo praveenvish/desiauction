@@ -1,7 +1,6 @@
 import { competitions } from "@desiauction/db";
 import {
   EmptyState,
-  IconArrowRight,
   IconBell,
   IconCheckCircle,
   IconCog,
@@ -191,10 +190,8 @@ export default async function InboxPage() {
           </Link>
           .
         </p>
-        <Link href="/account#notifications" className="inbox-rail-link">
-          Choose what reaches you
-          <IconArrowRight size={16} aria-hidden />
-        </Link>
+        {/* One link per destination (round 3B): notification settings is the
+            gear in the page head, not a second link here. */}
       </aside>
     </main>
   );

@@ -231,7 +231,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table admin-tape">
+            <table className="admin-table admin-tape da-rows">
               <thead>
                 <tr>
                   <th scope="col">Time</th>
@@ -254,7 +254,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                     <td data-label="Lot" className="admin-count">
                       {bid.lotNumber}
                     </td>
-                    <td data-label="Team">
+                    <td data-label="Team" data-cell="title">
                       <span className="admin-cell-main is-inline">
                         <span className="admin-name">{bid.teamName}</span>
                         <span className="admin-meta">
@@ -262,8 +262,11 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                           {bid.status === "outbid" ? " · outbid" : ""}
                         </span>
                       </span>
+                      <span className="da-row-meta">
+                        Lot {bid.lotNumber} · {istTime(bid.placedAtMs)}
+                      </span>
                     </td>
-                    <td data-label="Bid" className="admin-num admin-count">
+                    <td data-label="Bid" className="admin-num admin-count" data-cell="figure">
                       {money.exact(bid.amount)}
                     </td>
                   </tr>
@@ -358,7 +361,7 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
           </div>
         ) : (
           <div className="admin-table-wrap">
-            <table className="admin-table admin-lots">
+            <table className="admin-table admin-lots da-rows">
               <thead>
                 <tr>
                   <th scope="col">Player</th>
@@ -378,18 +381,27 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
               <tbody>
                 {overview.lots.map((lot) => (
                   <tr key={lot.lotId}>
-                    <td data-label="Player">
+                    <td data-label="Player" data-cell="title">
                       <span className="admin-cell-main">
                         <span className="admin-name">{lot.playerName ?? "Unnamed"}</span>
                         {lot.role !== null ? (
                           <span className="admin-meta">{labelOf(lot.role)}</span>
                         ) : null}
                       </span>
+                      <span className="da-row-meta">
+                        {[
+                          `Lot ${String(lot.lotNumber)}`,
+                          lot.role !== null ? labelOf(lot.role) : null,
+                          lot.paddleNumber,
+                        ]
+                          .filter((part) => part !== null)
+                          .join(" · ")}
+                      </span>
                     </td>
                     <td data-label="Lot" className="admin-count">
                       {lot.lotNumber}
                     </td>
-                    <td data-label="Status">
+                    <td data-label="Status" data-cell="status">
                       <Pill tone={LOT_STATUS_TONE[lot.status] ?? "neutral"}>
                         {LOT_STATUS_LABEL[lot.status] ?? lot.status}
                       </Pill>
@@ -399,7 +411,11 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                         {money.compact(lot.basePrice)}
                       </td>
                     )}
-                    <td data-label="Final" className="admin-num admin-count is-side">
+                    <td
+                      data-label="Final"
+                      className="admin-num admin-count is-side"
+                      data-cell="figure"
+                    >
                       {lot.soldPrice === null ? "—" : money.compact(lot.soldPrice)}
                     </td>
                     <td data-label="Paddle">{lot.paddleNumber ?? "—"}</td>

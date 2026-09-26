@@ -146,7 +146,7 @@
   border-color: var(--accent-line);
 }
 
-/* The squad's faces, one strip, the whole strip a link to the squad. */
+/* The squad's faces, one strip — a glance; "My squad" is the door. */
 .ow-squad {
   display: flex;
   flex-wrap: wrap;
@@ -156,17 +156,7 @@
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--surface-sunken);
-  color: var(--text-accent);
-  text-decoration: none;
-}
-
-.ow-squad:hover .ow-squad-more {
-  text-decoration: underline;
-}
-
-.ow-squad:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  color: var(--text-secondary);
 }
 
 .ow-faces {

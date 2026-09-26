@@ -9,7 +9,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { formatCount, maskPersonContact } from "../../../server/admin/format";
+import { countNoun, formatCount, maskPersonContact } from "../../../server/admin/format";
 import type { UserDirectory } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
 import { RelativeTime, TableCount, monogram } from "../admin-ui";
@@ -100,7 +100,7 @@ export function UsersPanel({
         ) : (
           <>
             <div className="admin-table-wrap">
-              <table className="admin-table is-linked" data-testid="admin-user-table">
+              <table className="admin-table is-linked da-rows" data-testid="admin-user-table">
                 <thead>
                   <tr>
                     <th scope="col">User</th>
@@ -116,7 +116,7 @@ export function UsersPanel({
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td data-label="User">
+                      <td data-label="User" data-cell="title">
                         <span className="admin-cell-main admin-person">
                           <span className="admin-monogram" aria-hidden>
                             {monogram(row.name)}
@@ -134,6 +134,20 @@ export function UsersPanel({
                           <span className="registration-phone admin-meta" data-private>
                             {maskPersonContact(row)}
                           </span>
+                        </span>
+                        {/* The phone row's one line of meta (the counts' columns step
+                            aside there); zeros say nothing, so they are left out. */}
+                        <span className="da-row-meta">
+                          <span data-private>{maskPersonContact(row)}</span>
+                          {[
+                            row.orgs > 0 ? countNoun(row.orgs, "organization") : null,
+                            row.activeGrants > 0
+                              ? countNoun(row.activeGrants, "active grant")
+                              : null,
+                          ]
+                            .filter((part) => part !== null)
+                            .map((part) => ` · ${part}`)
+                            .join("")}
                         </span>
                       </td>
                       <td
@@ -154,7 +168,7 @@ export function UsersPanel({
                           same "4m ago" for most people. One column: the last
                           thing they did, and when they joined only when they
                           have done nothing since. */}
-                      <td data-label="Last activity" className="is-side">
+                      <td data-label="Last activity" className="is-side" data-cell="figure">
                         {row.lastActivityAt === null ? (
                           <span className="admin-meta">
                             Joined <RelativeTime at={row.createdAt} />

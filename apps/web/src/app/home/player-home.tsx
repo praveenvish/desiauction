@@ -133,13 +133,14 @@ function SoldMoment({
             <IconArrowRight size={16} />
           </ButtonLink>
         ) : null}
-        <ButtonLink
-          href={`${base}/register`}
-          size="lg"
-          variant={registration.posterReady ? "secondary" : "primary"}
-        >
-          Your season
-        </ButtonLink>
+        {/* ONE LINK PER DESTINATION (round 3B): with a card to share, the
+            season's own page is the row under "My seasons", not a second
+            button here. */}
+        {registration.posterReady ? null : (
+          <ButtonLink href={`${base}/register`} size="lg">
+            Your season
+          </ButtonLink>
+        )}
       </div>
       {completeness !== null ? (
         <p className="pm-moment-foot">
@@ -454,7 +455,11 @@ export async function PlayerHome({
                     nested in it, and offered only where a verdict exists. */}
                   {/* An unsold player gets no share card (the share-card rule);
                       the route still draws the verdict, home doesn't offer it. */}
-                  {registration.posterReady && registration.auction?.kind !== "unsold" ? (
+                  {/* …and the season in the sold moment above already offers its
+                      card, so its row does not offer it twice. */}
+                  {registration.posterReady &&
+                  registration.auction?.kind !== "unsold" &&
+                  registration.registrationId !== moment?.registrationId ? (
                     <Link
                       href={`/seasons/${registration.competitionSlug}/posters`}
                       className="home-own-poster"

@@ -247,7 +247,7 @@ table.da-rows .da-row-meta {
   display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 719px) {
   table.da-rows,
   table.da-rows tbody {
     display: block;
@@ -301,8 +301,8 @@ table.da-rows .da-row-meta {
   }
 
   table.da-rows [data-cell="title"] > * {
-    display: block;
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

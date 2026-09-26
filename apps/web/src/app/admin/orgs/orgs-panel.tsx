@@ -10,7 +10,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { formatCount } from "../../../server/admin/format";
+import { countNoun, formatCount } from "../../../server/admin/format";
 import type { OrgDirectory, OrgFilter } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
 import { RelativeTime, TableCount } from "../admin-ui";
@@ -107,7 +107,7 @@ export function OrgsPanel({
         ) : (
           <>
             <div className="admin-table-wrap">
-              <table className="admin-table is-linked" data-testid="admin-org-table">
+              <table className="admin-table is-linked da-rows" data-testid="admin-org-table">
                 <thead>
                   <tr>
                     <th scope="col">Organization</th>
@@ -132,7 +132,7 @@ export function OrgsPanel({
                           hidden; `data-label` names every figure in its place,
                           so Seasons, Members and Cases never read as three
                           unlabelled numbers. */}
-                      <td data-label="Organization">
+                      <td data-label="Organization" data-cell="title">
                         <span className="admin-cell-main is-inline">
                           <Link href={`/admin/orgs/${row.slug}`} className="admin-name">
                             {row.name}
@@ -143,6 +143,16 @@ export function OrgsPanel({
                               Matched: {row.matchedSeason}
                             </span>
                           ) : null}
+                        </span>
+                        <span className="da-row-meta">
+                          {[
+                            row.competitions > 0 ? countNoun(row.competitions, "season") : null,
+                            row.members > 0 ? countNoun(row.members, "member") : null,
+                            row.openCases > 0 ? `${formatCount(row.openCases)} open` : null,
+                            row.financeDeclared ? "finance declared" : null,
+                          ]
+                            .filter((part) => part !== null)
+                            .join(" · ") || "No seasons yet"}
                         </span>
                       </td>
                       <td
@@ -203,7 +213,7 @@ export function OrgsPanel({
                           </span>
                         )}
                       </td>
-                      <td data-label="Last activity" className="is-side">
+                      <td data-label="Last activity" className="is-side" data-cell="figure">
                         {row.lastActivityAt === null ? (
                           <span className="admin-meta">Never</span>
                         ) : (

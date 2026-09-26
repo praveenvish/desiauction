@@ -1061,7 +1061,7 @@ p.admin-warning {
     padding-inline: var(--space-4);
   }
 
-  .admin-table thead {
+  .admin-table:not(.da-rows) thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1069,15 +1069,15 @@ p.admin-warning {
     clip: rect(0 0 0 0);
   }
 
-  .admin-table,
-  .admin-table tbody {
+  .admin-table:not(.da-rows),
+  .admin-table:not(.da-rows) tbody {
     display: block;
   }
 
   /* A compact list row, not a labelled card: line 1 is the primary cell,
      line 2 the rest as an inline "label value · label value" run. An org used
      to be 218px tall here; it is ~64px. */
-  .admin-table tbody tr {
+  .admin-table:not(.da-rows) tbody tr {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -1086,9 +1086,9 @@ p.admin-warning {
     border-top: 1px solid var(--border-subtle);
   }
 
-  .admin-table td,
-  .admin-table td:first-child,
-  .admin-table td:last-child {
+  .admin-table:not(.da-rows) td,
+  .admin-table:not(.da-rows) td:first-child,
+  .admin-table:not(.da-rows) td:last-child {
     display: inline-flex;
     align-items: baseline;
     gap: 4px;
@@ -1100,54 +1100,71 @@ p.admin-warning {
     color: var(--text-secondary);
   }
 
-  .admin-table td:first-child,
-  .admin-table td.is-wide {
+  .admin-table:not(.da-rows) td:first-child,
+  .admin-table:not(.da-rows) td.is-wide {
     font-size: var(--text-sm-size);
     color: var(--text-primary);
   }
 
-  .admin-table td.is-wide {
+  .admin-table:not(.da-rows) td.is-wide {
     flex: 1 1 100%;
   }
 
-  .admin-table .admin-num {
+  .admin-table:not(.da-rows) .admin-num {
     text-align: start;
   }
 
-  .admin-table td[data-label]:not(:first-child)::before {
+  .admin-table:not(.da-rows) td[data-label]:not(:first-child)::before {
     content: attr(data-label);
     color: var(--text-muted);
     font-size: var(--text-xs-size);
   }
 
-  .admin-table td[data-empty] {
+  /* A da-rows table (the product's one phone row) says its detail once, in
+     the row's meta line — the cell's own sub-line steps aside. */
+  .admin-table.da-rows [data-cell="title"] .admin-cell-main > .admin-meta,
+  .admin-table.da-rows [data-cell="title"] .admin-slug,
+  .admin-table.da-rows [data-cell="title"] .admin-person > .registration-phone {
+    display: none;
+  }
+
+  .admin-table.da-rows [data-cell="title"] .admin-cell-main:not(.admin-person) {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .admin-table:not(.da-rows) td[data-empty],
+  .admin-table:not(.da-rows) td[data-zero] {
+    /* A zero says nothing on a phone row ("Organizations —"): it steps aside. */
     display: none;
   }
 
   /* The row's key time/figure rides line 1, right-aligned beside the name;
      a zero-height flex break then sends every other cell to line 2. */
-  .admin-table tbody tr::after {
+  .admin-table:not(.da-rows) tbody tr::after {
     content: "";
     order: 2;
     flex-basis: 100%;
     height: 0;
   }
 
-  .admin-table td:first-child {
+  .admin-table:not(.da-rows) td:first-child {
     flex: 1 1 0;
     order: 0;
   }
 
-  .admin-table td {
+  .admin-table:not(.da-rows) td {
     order: 3;
   }
 
-  .admin-table td.is-side {
+  .admin-table:not(.da-rows) td.is-side {
     order: 1;
     margin-inline-start: auto;
   }
 
-  .admin-table td.is-side::before {
+  .admin-table:not(.da-rows) td.is-side::before {
     display: none;
   }
 

@@ -178,7 +178,9 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
         ) : null}
 
         {shown.length > 0 ? (
-          <Link className="ow-squad" href={squadHref} aria-label={`${team.teamName} squad`}>
+          // ONE LINK PER DESTINATION (round 3B): the squad's door is the "My
+          // squad" button below; the faces are a glance, not a second link.
+          <div className="ow-squad">
             <ul className="ow-faces">
               {shown.map((lot) => (
                 <li key={lot.lotId} title={lot.playerName ?? ""}>
@@ -195,12 +197,10 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
             </ul>
             <span className="ow-squad-more">
               {bought.length > shown.length
-                ? `+${String(bought.length - shown.length)} more · `
-                : ""}
-              See the squad
-              <IconArrowRight size={16} />
+                ? `+${String(bought.length - shown.length)} more`
+                : `${String(bought.length)} bought`}
             </span>
-          </Link>
+          </div>
         ) : null}
 
         <nav className="ow-links" aria-label={`${team.teamName} shortcuts`}>
@@ -241,7 +241,6 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
       {plan !== null && bought.length > 0 ? (
         <OwnerDuo
           teamId={team.teamId}
-          squadHref={squadHref}
           bought={bought}
           roles={plan.roles}
           preSignedRoles={plan.preSignedRoles}
@@ -263,7 +262,6 @@ type Bought = NonNullable<Awaited<ReturnType<typeof planView>>>["lots"];
  */
 function OwnerDuo({
   teamId,
-  squadHref,
   bought,
   roles,
   preSignedRoles,
@@ -272,7 +270,6 @@ function OwnerDuo({
   money,
 }: {
   teamId: string;
-  squadHref: string;
   bought: Bought;
   roles: { key: string; label: string }[];
   preSignedRoles: string[];
@@ -312,10 +309,6 @@ function OwnerDuo({
             <IconTrophy size={20} />
             Top buys
           </h2>
-          <Link className="hd-link" href={squadHref}>
-            Whole squad
-            <IconArrowRight size={16} />
-          </Link>
         </div>
         <ol className="hd-rows">
           {top.map((lot, index) => (
