@@ -165,6 +165,15 @@ export default async function MySportsPage({
    * column instead of a short card beside a near-empty rail.
    */
   const asideEmpty = !ownerOnly && shownUpcoming.length === 0 && bySport.length <= 1;
+  const privacy = (
+    <p className="me-privacy">
+      <IconShieldCheck size={16} aria-hidden />
+      <span>
+        <strong>Who sees this page?</strong> Only you. Clubs see what you enter for their season;
+        your share card shows only what you choose.
+      </span>
+    </p>
+  );
 
   return (
     <main className="me">
@@ -317,7 +326,14 @@ export default async function MySportsPage({
       {/* An owner who does not play has one object — their team — and /teams
           holds the squad: the rail here was its fourth copy (review r3). One
           column at a reading measure, not a short card beside a tall rail. */}
-      <div className="me-layout" data-single={asideEmpty ? "" : undefined}>
+      {/* An owner who does not play: two even columns — the team and its
+          notes on the left, the night on the right — so neither column ends
+          ~120px above the other (round-5 review). */}
+      <div
+        className="me-layout"
+        data-single={asideEmpty ? "" : undefined}
+        data-owner={ownerOnly ? "" : undefined}
+      >
         <div className="me-main">
           {owns.length > 0 ? <OwnedTeams teams={owns} /> : null}
           {seasons.length === 0 && owns.length > 0 ? (
@@ -440,6 +456,7 @@ export default async function MySportsPage({
               )}
             </SectionCard>
           )}
+          {ownerOnly ? privacy : null}
         </div>
 
         <aside
@@ -509,13 +526,7 @@ export default async function MySportsPage({
               night their team was built: what it cost and where it went. */}
           {ownerOnly && owns[0] !== undefined ? <OwnerNight team={owns[0]} /> : null}
 
-          <p className="me-privacy">
-            <IconShieldCheck size={16} aria-hidden />
-            <span>
-              <strong>Who sees this page?</strong> Only you. Clubs see what you enter for their
-              season; your share card shows only what you choose.
-            </span>
-          </p>
+          {ownerOnly ? null : privacy}
         </aside>
       </div>
     </main>
