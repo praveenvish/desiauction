@@ -1394,10 +1394,12 @@ export function FixturesPanel({
         icon={<IconCalendar />}
         title="Schedule"
         description={
+          // Empty and unfiltered, the page head already says so (round 2 counted
+          // three "nothing yet" lines on one screen); the card doesn't repeat it.
           page.total === 0
             ? filtered
               ? "No match fits these filters."
-              : "Nothing on the schedule yet."
+              : undefined
             : `${String(page.total)} match${page.total === 1 ? "" : "es"}${filtered ? " match these filters" : ""} · grouped by round`
         }
         flush
@@ -1615,9 +1617,7 @@ export function FixturesPanel({
                       : canManage
                         ? isLobby
                           ? "No lobbies yet — add the first one with “Add lobby”."
-                          : needsGround
-                            ? "Matches land here once a ground is added and the schedule is generated."
-                            : "Generated and hand-added matches land here."
+                          : "Generated and hand-added matches land here, grouped by round."
                         : "No fixtures yet. The organizer hasn't scheduled any matches."}
                   </td>
                 </tr>

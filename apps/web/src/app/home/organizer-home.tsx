@@ -1167,7 +1167,7 @@ export async function OrganizerHome({
                       ? "/tournaments?view=seasons"
                       : `/seasons/${seasonToOpen.slug}/fixtures`
                   }
-                  ctaLabel="Generate a schedule"
+                  ctaLabel="Set up the schedule"
                 />
               ) : (
                 <ul className="home-list">

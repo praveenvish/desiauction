@@ -49,7 +49,7 @@ export default async function MoneyPage() {
             className="my-money-empty-body"
             headingLevel={2}
             title="No receipts yet"
-            description="When you own a team and a club records your payment, its receipt lands here. Running a season? Its fees and settlement live on that season's Money tab."
+            description="When you own a team and a club records your payment, its receipt lands here. Running a club? A rupee season's fees and settlement are on your club's money desk; a points season has nothing to settle."
             action={
               <ButtonLink href="/tournaments" variant="secondary" size="sm">
                 Go to your tournaments

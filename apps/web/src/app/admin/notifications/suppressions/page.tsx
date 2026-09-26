@@ -55,8 +55,8 @@ export default async function AdminSuppressionsPage() {
             <NotifySubnav current="suppressions" />
           </AdminPageHead>
           <p className="admin-lede admin-lede-under">
-            Contacts we must not send to. Sign-in codes still go; every lift and addition is audited
-            and revertible.
+            Contacts we must not send to. Sign-in codes still go; every lift and addition is
+            audited, and can be reverted while nothing has changed since.
           </p>
 
           {/* Look up, then suppress: two one-row forms, full width. Side by
@@ -89,7 +89,7 @@ export default async function AdminSuppressionsPage() {
             icon={<IconClock />}
             tone="neutral"
             title="Recent changes"
-            description="Last twenty lifts and additions · a revert is itself recorded"
+            description="Last twenty lifts and additions · Revert shows while a change still stands"
             flush
             data-testid="suppression-recent"
           >
