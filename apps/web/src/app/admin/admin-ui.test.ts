@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   capabilityLabel,
+  foldSignInRequests,
   foldRuns,
   humanAction,
   messageKeyLabel,
@@ -73,5 +74,23 @@ describe("capabilityLabel", () => {
   it("names scopes the way the product does", () => {
     expect(scopeTypeLabel("org")).toBe("Club");
     expect(scopeTypeLabel("platform")).toBe("Platform");
+  });
+});
+
+describe("foldSignInRequests", () => {
+  it("folds a code request into the sign-in it led to, and keeps an unused one", () => {
+    const rows = [
+      { action: "poster.made" },
+      { action: "auth.login.otp" },
+      { action: "auth.otp.requested" },
+      { action: "auth.otp.requested" },
+      { action: "poster.made" },
+    ];
+    expect(foldSignInRequests(rows).map((row) => row.action)).toEqual([
+      "poster.made",
+      "auth.login.otp",
+      "auth.otp.requested",
+      "poster.made",
+    ]);
   });
 });

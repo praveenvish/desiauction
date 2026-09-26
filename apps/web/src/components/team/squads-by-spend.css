@@ -126,3 +126,23 @@
 .ax-spend .ax-muted {
   color: var(--text-muted);
 }
+
+.ax-spend-foot {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .ax-spend-link {
+    display: none;
+  }
+
+  .ax-spend-foot {
+    display: block;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+    font-size: var(--text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-accent);
+    text-decoration: none;
+  }
+}

@@ -2004,6 +2004,17 @@ a.admin-quiet-link:hover {
   justify-self: end;
 }
 
+/* Words a phone row needs because its column heads are hidden. */
+.admin-room-phone {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .admin-room-phone {
+    display: inline;
+  }
+}
+
 @media (max-width: 1023px) {
   .admin-room-head {
     display: none;
@@ -2026,6 +2037,16 @@ a.admin-quiet-link:hover {
   }
 
   .admin-room:not([data-trouble]) .admin-room-facts > div:last-child {
+    display: none;
+  }
+
+  /* One statement of trouble per row: the Room line carries the words. */
+  .admin-room-pill[data-trouble] {
+    display: none;
+  }
+
+  /* A zero spend says nothing on a two-line phone row. */
+  .admin-room-facts > div:nth-child(2):has([data-zero]) {
     display: none;
   }
 
@@ -2607,6 +2628,18 @@ a.admin-quiet-link:hover {
     text-overflow: ellipsis;
   }
 
+  /* The two doors sit side by side — stacked, they doubled every row (~100pt
+     a season, 50 seasons). */
+  .admin-mod-rows .admin-mod-main {
+    flex: 1 1 auto;
+  }
+
+  .admin-mod-rows .pass-row-actions {
+    flex: none;
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+  }
+
   .admin-mod-rows .admin-quiet-label {
     position: absolute;
     width: 1px;
@@ -2950,6 +2983,11 @@ a.admin-quiet-link:hover {
   list-style: none;
 }
 
+/* The phone list's "Show all" fold goes with it. */
+.admin-lot-list + .admin-more {
+  display: none;
+}
+
 .admin-lot-list > li + li {
   border-top: 1px solid var(--border-subtle);
 }
@@ -2973,6 +3011,10 @@ a.admin-quiet-link:hover {
 
 @media (max-width: 719px) {
   .admin-lot-list {
+    display: block;
+  }
+
+  .admin-lot-list + .admin-more {
     display: block;
   }
 

@@ -21,8 +21,10 @@ import {
   absoluteIst,
   capabilityLabel,
   foldRuns,
+  foldSignInRequests,
   humanAction,
   monogram,
+  RecentFold,
   scopeTypeLabel,
 } from "../../admin-ui";
 import { CopyId } from "../../copy-id";
@@ -255,8 +257,12 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
               />
             </div>
           ) : (
-            <ul className="admin-rows admin-rows-dense">
-              {foldRuns(activity, (a, b) => a.action === b.action).map(({ row, count }) => (
+            <RecentFold
+              items={foldRuns(foldSignInRequests(activity), (a, b) => a.action === b.action)}
+              className="admin-rows admin-rows-dense"
+              keep={8}
+            >
+              {({ row, count }) => (
                 <li key={row.id}>
                   <span className="admin-activity-line">
                     <span className="admin-activity-what" title={row.action}>
@@ -266,8 +272,8 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
                   </span>
                   <RelativeTime at={row.at} />
                 </li>
-              ))}
-            </ul>
+              )}
+            </RecentFold>
           )}
         </SectionCard>
       </div>

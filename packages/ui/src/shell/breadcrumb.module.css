@@ -73,3 +73,17 @@
 .separator {
   color: var(--text-muted);
 }
+
+/* A header trail on a phone keeps only its nearest ancestor (round 5A): two
+   segments each truncated ("Thane Sports Cl… / TPL 20…") named neither. The
+   season is the one a reader navigates back to; the club is a tap further. */
+@media (max-width: 719px) {
+  .as-trail .item:not(:last-child) {
+    display: none;
+  }
+
+  .as-trail .link,
+  .as-trail .current {
+    max-width: 22ch;
+  }
+}

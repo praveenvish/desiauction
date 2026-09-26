@@ -322,8 +322,7 @@ export function messageKeyLabel(key: string): string {
         .toLowerCase(),
     )
     .join(" ");
-  const sentence =
-    named ?? (words === "" ? base : words.charAt(0).toUpperCase() + words.slice(1));
+  const sentence = named ?? (words === "" ? base : words.charAt(0).toUpperCase() + words.slice(1));
   return version !== undefined && version !== "" ? `${sentence} · v${version}` : sentence;
 }
 
@@ -373,6 +372,19 @@ export function foldRuns<T>(
   return out;
 }
 
+/**
+ * A sign-in is two audit rows — "Asked for a sign-in code", then "Signed in
+ * with a code" — and on a person's activity list they were half the rows. The
+ * request folds into the sign-in right after it (rows arrive newest first);
+ * a request that led to no sign-in stays, since that is worth seeing.
+ */
+export function foldSignInRequests<T extends { action: string }>(rows: readonly T[]): T[] {
+  return rows.filter(
+    (row, index) =>
+      !(row.action === "auth.otp.requested" && rows[index - 1]?.action === "auth.login.otp"),
+  );
+}
+
 /** How many rows of a change log show before "Show all". */
 export const RECENT_SHOWN = 5;
 
@@ -402,7 +414,7 @@ export function RecentFold<T>({
         </details>
       ) : null}
     </>
-  )
+  );
 }
 
 const CAPABILITY_WORDS: Readonly<Record<string, string>> = {

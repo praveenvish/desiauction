@@ -308,9 +308,12 @@ function RoomRow({
         {badge.dotState === "quiet" ? (
           <span className="admin-sr-only">{badge.label}</span>
         ) : (
-          <Pill tone={badge.tone} dot>
-            {badge.label}
-          </Pill>
+          // With trouble, a phone says it once — on the Room line below.
+          <span className="admin-room-pill" data-trouble={trouble !== null || undefined}>
+            <Pill tone={badge.tone} dot>
+              {badge.label}
+            </Pill>
+          </span>
         )}
       </span>
 
@@ -332,6 +335,10 @@ function RoomRow({
               title={`${String(row.lots.sold)} sold · ${String(row.lots.unsold)} unsold · ${String(row.lots.remaining)} left`}
             >
               {row.lots.sold}/{row.lots.total}
+              <span className="admin-room-phone" aria-hidden>
+                {" "}
+                sold
+              </span>
               <span className="admin-sr-only">
                 {" "}
                 sold · {row.lots.unsold} unsold · {row.lots.remaining} left
@@ -354,6 +361,12 @@ function RoomRow({
           <dd>
             <span data-zero={row.bids.lastFiveMinutes === 0 || undefined}>
               {row.bids.lastFiveMinutes}
+            </span>
+            {/* On a phone the column heads are gone, so the cell names itself:
+                "0 · 0 total" read as two bare numbers. */}
+            <span className="admin-room-phone" aria-hidden>
+              {" "}
+              in 5 min
             </span>
             <span className="admin-meta"> · {row.bids.total} total</span>
           </dd>

@@ -3687,3 +3687,22 @@ p + .date-row {
   border-top: 0;
   padding-top: 0;
 }
+
+/* The next-step banner on a phone (round 5A): the primary step leads, full
+   width; the side doors share one row under it instead of wrapping 2 + 1. */
+@media (max-width: 719px) {
+  [data-testid="next-step"] [data-testid="advance-status"] {
+    order: -1;
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  [data-testid="next-step"] [data-testid="next-squad-sheets"],
+  [data-testid="next-step"] [data-testid="next-posters"],
+  [data-testid="next-step"] [data-testid="open-readiness"] {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    white-space: nowrap;
+  }
+}

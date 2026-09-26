@@ -1296,6 +1296,7 @@ function PanelEmpty({
   return (
     <EmptyState
       size="compact"
+      className="da-empty-row"
       icon={icon}
       title={title.replace(/\.$/, "")}
       description={text}

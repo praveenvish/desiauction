@@ -125,6 +125,11 @@ export function SquadsBySpend({
           </li>
         ))}
       </ul>
+      {/* A phone's header has no room for the door beside a two-line
+          description; it closes the list instead of taking a row of its own. */}
+      <Link href={`/seasons/${night.slug}/teams`} className="ax-spend-foot">
+        See the squads
+      </Link>
     </SectionCard>
   );
 }

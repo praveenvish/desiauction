@@ -752,11 +752,18 @@
   .ntc-kind {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: var(--space-1);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-4);
   }
 
+  /* The name and its pencil share the first line (round 5A); the one-line
+     description, truncated on a phone anyway, is the name's hover. */
   .ntc-kind-name {
-    grid-column: 1 / -1;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .ntc-kind-desc {
+    display: none;
   }
 
   .ntc-kind .ntc-cells {
@@ -781,11 +788,12 @@
   }
 
   .ntc-optout {
-    grid-column: 1;
+    grid-column: 1 / -1;
   }
 
   .ntc-edit {
     grid-column: 2;
+    grid-row: 1;
   }
 
   .ntc-kind .ntc-template-link {

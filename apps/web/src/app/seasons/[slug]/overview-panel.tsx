@@ -565,7 +565,9 @@ export function OverviewPanel({
       const copy = NEXT_COPY[status];
       nextNotice = (
         <Notice
-          tone="info"
+          /* Gold, the product's "your move" colour: this was the last
+             info-blue surface in the console (round 4 review). */
+          tone="warning"
           icon={<IconInfo size={20} />}
           title={
             status === "registration_open" && view.pendingPlayers > 0
@@ -594,7 +596,9 @@ export function OverviewPanel({
     } else if (status === "registration_closed" && !locked) {
       nextNotice = (
         <Notice
-          tone="info"
+          /* Gold, the product's "your move" colour: this was the last
+             info-blue surface in the console (round 4 review). */
+          tone="warning"
           icon={<IconInfo size={20} />}
           title={onward.title}
           action={

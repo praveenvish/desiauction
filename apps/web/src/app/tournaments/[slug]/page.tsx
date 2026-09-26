@@ -259,15 +259,19 @@ async function SeasonsSection({
               <SeasonCard key={season.id} season={season} />
             ))}
           </div>
-          {night !== null ? (
+        </section>
+        {latest !== undefined ? <LatestSeasonDesk season={latest} doors={canCreateSeason} /> : null}
+        {/* After the desk in the source, so a phone reads season → its desks
+            → the night; a laptop puts it back under the season cards. */}
+        {night !== null ? (
+          <div className="tg-night">
             <SquadsBySpend
               night={night}
               testId="tournament-spend"
               description={`${night.seasonName}'s auction · what each team spent, and its top buy`}
             />
-          ) : null}
-        </section>
-        {latest !== undefined ? <LatestSeasonDesk season={latest} doors={canCreateSeason} /> : null}
+          </div>
+        ) : null}
       </div>
     </>
   );

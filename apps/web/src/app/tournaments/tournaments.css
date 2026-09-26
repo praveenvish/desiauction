@@ -846,6 +846,21 @@
   .tg-detail {
     grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   }
+
+  /* The night sits under the season cards; the desk runs down beside both. */
+  .tg-detail > .tg-desk {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .tg-detail > .tg-night {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
+
+.tg-night {
+  min-width: 0;
 }
 
 .tg-desk {

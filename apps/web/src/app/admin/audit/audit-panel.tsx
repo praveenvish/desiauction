@@ -116,6 +116,12 @@ export function AuditPanel({ page }: { page: AuditPage }) {
                     {runs(day.rows, filters.action !== ADMIN_ACCESS_ACTION).map((run) =>
                       run.length === 1 ? (
                         <AuditRow key={run[0]?.id} row={run[0] as AuditEntry} />
+                      ) : isSignInPair(run) ? (
+                        <AuditRow
+                          key={run[0]?.id}
+                          row={run[0] as AuditEntry}
+                          askedAt={(run[1] as AuditEntry).at}
+                        />
                       ) : (
                         <AccessRun key={run[0]?.id} rows={run} />
                       ),
@@ -201,6 +207,22 @@ function runs(rows: readonly AuditEntry[], fold: boolean): AuditEntry[][] {
   for (const row of rows) {
     const last = out[out.length - 1];
     const head = last?.[0];
+    /* A sign-in is two rows — the code asked for, then used — and they were
+       half of every page. The request folds into the sign-in it led to (same
+       person, within ten minutes); filtered to either action, nothing folds. */
+    if (
+      last !== undefined &&
+      head !== undefined &&
+      last.length === 1 &&
+      head.action === SIGN_IN_ACTION &&
+      row.action === CODE_ASKED_ACTION &&
+      head.actor === row.actor &&
+      head.at.getTime() - row.at.getTime() <= PAIR_WINDOW_MS &&
+      head.at.getTime() >= row.at.getTime()
+    ) {
+      last.push(row);
+      continue;
+    }
     if (
       last !== undefined &&
       head !== undefined &&
@@ -214,6 +236,16 @@ function runs(rows: readonly AuditEntry[], fold: boolean): AuditEntry[][] {
     }
   }
   return out;
+}
+
+const SIGN_IN_ACTION = "auth.login.otp";
+const CODE_ASKED_ACTION = "auth.otp.requested";
+const PAIR_WINDOW_MS = 10 * 60_000;
+
+function isSignInPair(run: readonly AuditEntry[]): boolean {
+  return (
+    run.length === 2 && run[0]?.action === SIGN_IN_ACTION && run[1]?.action === CODE_ASKED_ACTION
+  );
 }
 
 function surfaceOf(row: AuditEntry): string | null {
@@ -259,7 +291,14 @@ function AccessRun({ rows }: { rows: readonly AuditEntry[] }) {
   );
 }
 
-function AuditRow({ row }: { row: AuditEntry }) {
+function AuditRow({
+  row,
+  askedAt,
+}: {
+  row: AuditEntry;
+  /** A sign-in that folds in the code request before it (see `runs`). */
+  askedAt?: Date;
+}) {
   const meta = row.meta !== null && row.meta !== undefined ? JSON.stringify(row.meta) : null;
   return (
     <li className="admin-log-row">
@@ -296,6 +335,12 @@ function AuditRow({ row }: { row: AuditEntry }) {
               </>
             ) : null}
           </span>
+          {askedAt !== undefined ? (
+            <span className="admin-log-keys" title={absoluteIst(askedAt)}>
+              {" · code asked for at "}
+              {CLOCK.format(askedAt)}
+            </span>
+          ) : null}
         </span>
         {meta !== null ? (
           <details className="admin-log-meta">

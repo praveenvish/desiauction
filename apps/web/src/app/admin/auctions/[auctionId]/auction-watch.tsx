@@ -26,9 +26,14 @@ import { roleLabeller } from "../../../../lib/role-label";
 import { adminAuctionWatch, type AuctionWatch } from "../../../../server/admin/live-watch";
 import { eventLabel } from "../../../seasons/[slug]/auction/auction-bits";
 import { AuctionOverviewPanel } from "../../../seasons/[slug]/auction/auction-overview-panel";
-import { ReadOnlyNotice } from "../../admin-ui";
+import { ReadOnlyNotice, RecentFold } from "../../admin-ui";
 import { LiveFreshness } from "../../live-freshness";
 import { ageLabel, istClock, istTime, istWhen, usePolled } from "../../use-polled";
+
+/** A finished night's bid tape shows its last few; the rest fold. */
+const TAPE_SHOWN = 5;
+/** A phone's lot list shows ten before "Show all" (the laptop table is whole). */
+const LOTS_SHOWN = 10;
 
 const REFRESH_MS = 5_000;
 
@@ -124,6 +129,37 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
   const sameBase =
     overview.lots.length > 1 && overview.lots.every((lot) => lot.basePrice === firstBase);
 
+  const tapeShown = stillRunning ? pulse.tape : pulse.tape.slice(0, TAPE_SHOWN);
+  const tapeRest = stillRunning ? [] : pulse.tape.slice(TAPE_SHOWN);
+  const tapeRow = (bid: (typeof pulse.tape)[number], index: number) => (
+    <tr
+      key={`${String(bid.placedAtMs)}-${String(index)}`}
+      data-outbid={bid.status === "outbid" || undefined}
+    >
+      <td data-label="Time" className="admin-count">
+        {istTime(bid.placedAtMs)}
+      </td>
+      <td data-label="Lot" className="admin-count">
+        {bid.lotNumber}
+      </td>
+      <td data-label="Team" data-cell="title">
+        <span className="admin-cell-main is-inline">
+          <span className="admin-name">{bid.teamName}</span>
+          <span className="admin-meta">
+            {bid.paddleNumber}
+            {bid.status === "outbid" ? " · outbid" : ""}
+          </span>
+        </span>
+        <span className="da-row-meta">
+          Lot {bid.lotNumber} · {istTime(bid.placedAtMs)}
+        </span>
+      </td>
+      <td data-label="Bid" className="admin-num admin-count" data-cell="figure">
+        {money.exact(bid.amount)}
+      </td>
+    </tr>
+  );
+
   return (
     <>
       <SectionCard
@@ -141,7 +177,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
         action={
           <span className="admin-pills">
             <Pill tone={STATUS_TONE[header.status] ?? "neutral"} dot testId="auction-watch-status">
-              {header.status}
+              {/* Title case, as every other "Completed" in the product. */}
+              {header.status.charAt(0).toUpperCase() + header.status.slice(1)}
             </Pill>
             {/* "You are watching, not conducting" — said by the pill, with the
                 full sentence one tap away, instead of a paragraph per visit. */}
@@ -252,37 +289,19 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                {pulse.tape.map((bid, index) => (
-                  <tr
-                    key={`${String(bid.placedAtMs)}-${String(index)}`}
-                    data-outbid={bid.status === "outbid" || undefined}
-                  >
-                    <td data-label="Time" className="admin-count">
-                      {istTime(bid.placedAtMs)}
-                    </td>
-                    <td data-label="Lot" className="admin-count">
-                      {bid.lotNumber}
-                    </td>
-                    <td data-label="Team" data-cell="title">
-                      <span className="admin-cell-main is-inline">
-                        <span className="admin-name">{bid.teamName}</span>
-                        <span className="admin-meta">
-                          {bid.paddleNumber}
-                          {bid.status === "outbid" ? " · outbid" : ""}
-                        </span>
-                      </span>
-                      <span className="da-row-meta">
-                        Lot {bid.lotNumber} · {istTime(bid.placedAtMs)}
-                      </span>
-                    </td>
-                    <td data-label="Bid" className="admin-num admin-count" data-cell="figure">
-                      {money.exact(bid.amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              <tbody>{tapeShown.map(tapeRow)}</tbody>
             </table>
+            {tapeRest.length > 0 ? (
+              // A finished night's tape is a record, not a feed: the last few
+              // bids, the rest one press away (15 near-identical rows ran the
+              // phone page to 18k px).
+              <details className="admin-more">
+                <summary>Show all {String(pulse.tape.length)} bids</summary>
+                <table className="admin-table admin-tape da-rows">
+                  <tbody>{tapeRest.map((bid, index) => tapeRow(bid, index + TAPE_SHOWN))}</tbody>
+                </table>
+              </details>
+            ) : null}
           </div>
         )}
       </SectionCard>
@@ -374,8 +393,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             {/* A phone reads one ListRow per lot — name over "lot · role ·
               paddle", price over a dot and a word — instead of the table's
               three-tier card (~107pt a lot, 22,000px for 37 lots). */}
-            <ul className="admin-lot-list" data-testid="auction-watch-lot-rows">
-              {overview.lots.map((lot) => (
+            <RecentFold items={overview.lots} className="admin-lot-list" keep={LOTS_SHOWN}>
+              {(lot) => (
                 <li key={lot.lotId}>
                   <ListRow
                     title={lot.playerName ?? "Unnamed"}
@@ -395,8 +414,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                     }
                   />
                 </li>
-              ))}
-            </ul>
+              )}
+            </RecentFold>
             <div className="admin-table-wrap admin-lots-wrap">
               <table className="admin-table admin-lots da-rows">
                 <thead>
@@ -478,8 +497,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
             <EmptyState size="compact" icon={<IconClock />} title="Nothing has happened yet" />
           </div>
         ) : (
-          <ul className="admin-rows">
-            {overview.events.map((event) => (
+          <RecentFold items={overview.events} className="admin-rows">
+            {(event) => (
               <li key={event.seq}>
                 <span>
                   {/* The engine's own names ("AuctionClosed") read as code on
@@ -492,8 +511,8 @@ export function AuctionWatchView({ initial }: { initial: AuctionWatch }) {
                 </span>
                 <span className="admin-when">{istTime(event.atMs)}</span>
               </li>
-            ))}
-          </ul>
+            )}
+          </RecentFold>
         )}
       </SectionCard>
     </>

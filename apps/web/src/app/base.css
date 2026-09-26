@@ -198,3 +198,34 @@ button:hover .icon-trail {
 [data-theme="floodlight"] {
   color-scheme: dark;
 }
+
+/*
+ * AN EMPTY PANEL IS ONE ROW ON A PHONE (round 5A).
+ *
+ * A centred tile → title → line → button stack spent ~260px per card on a
+ * 390px screen, three times down /home. On a phone the tile sits beside the
+ * words and the card reads as one line of news. Opt-in per call site.
+ */
+@media (max-width: 719px) {
+  .da-empty-row[data-size] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    column-gap: var(--space-3);
+    row-gap: var(--space-1);
+    padding: var(--space-3) 0;
+    text-align: left;
+  }
+
+  .da-empty-row[data-size] > :first-child {
+    grid-row: 1 / span 3;
+    align-self: start;
+    margin: 0;
+  }
+
+  .da-empty-row[data-size] > :not(:first-child) {
+    grid-column: 2;
+    margin-top: 0;
+  }
+}
