@@ -532,8 +532,11 @@ export function LivePanel({
                        finished room for is where their own team landed. */
                     <>
                       <p className="competitions-hint">
-                        {myOutcome.teamName} · {soldCount} sold · {unsoldCount} unsold across the
-                        night. Every squad below is final.
+                        {/* The team names the figures below; the night's
+                            count is its own sentence (round-5 review: "Mumbai
+                            Mavericks · 30 sold" read as Mumbai's 30). */}
+                        Your team: {myOutcome.teamName}. The night: {soldCount} sold · {unsoldCount}{" "}
+                        unsold. Every squad below is final.
                       </p>
                       <dl className="live-over-figures" data-testid="live-over-mine">
                         <div>
