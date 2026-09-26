@@ -1,6 +1,6 @@
 import type { TeamSummary } from "../../../../server/competition/competitions";
 import { fixtureDashboard } from "../../../../server/competition/fixture-actions";
-import { scheduleStep, type ScheduleStep } from "./schedule-step";
+import { pairingTeams, scheduleStep, type ScheduleStep } from "./schedule-step";
 
 /**
  * The empty schedule's next step, read from the fixtures list's own loader
@@ -28,6 +28,6 @@ export async function emptySchedule(
       grounds: dashboard?.grounds?.length ?? 1,
       canManage: dashboard?.viewer.canManage ?? false,
     }),
-    teams: dashboard?.teams ?? [],
+    teams: pairingTeams(dashboard?.fixtureShape, dashboard?.teams ?? []),
   };
 }

@@ -40,3 +40,15 @@ export function scheduleStep(input: {
     why: "Create the fixtures from the list.",
   };
 }
+
+/**
+ * The teams a round-robin preview may pair. A lobby sport (battle royale) has
+ * no pairings — every squad plays every lobby — so it gets none, and the
+ * preview, which needs two, draws nothing rather than an invented schedule.
+ */
+export function pairingTeams<T>(
+  shape: "duel" | "lobby" | undefined,
+  teams: readonly T[],
+): readonly T[] {
+  return shape === "lobby" ? [] : teams;
+}

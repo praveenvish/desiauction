@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scheduleStep } from "./schedule-step";
+import { pairingTeams, scheduleStep } from "./schedule-step";
 
 const base = { slug: "s", orgSlug: "o", teams: 4, grounds: 1, canManage: true };
 
@@ -21,5 +21,18 @@ describe("the empty schedule's next step", () => {
     expect(scheduleStep({ ...base, grounds: 0, canManage: false }).href).toBe(
       "/seasons/s/fixtures",
     );
+  });
+});
+
+describe("pairingTeams", () => {
+  const teams = ["Mumbai Mavericks", "Pune Panthers", "Thane Tuskers"];
+
+  it("pairs every team of a duel sport", () => {
+    expect(pairingTeams("duel", teams)).toEqual(teams);
+    expect(pairingTeams(undefined, teams)).toEqual(teams);
+  });
+
+  it("offers no pairings for a lobby sport, where every squad plays every lobby", () => {
+    expect(pairingTeams("lobby", teams)).toEqual([]);
   });
 });
