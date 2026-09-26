@@ -13,8 +13,11 @@ import {
   IconAlert,
   IconChevronLeft,
   IconChevronRight,
+  IconPause,
   IconPlay,
   IconShieldCheck,
+  IconSkipBack,
+  IconSkipForward,
   PlayerImage,
 } from "@desiauction/ui";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -25,7 +28,6 @@ import { lotSeed } from "../../../../../lib/player-seed";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { useMoney } from "../../../../../components/money-unit";
 import { eventLabel } from "../auction-bits";
-import { GlyphPause, GlyphSkipBack, GlyphSkipForward } from "./transport-glyphs";
 
 // THE REPLAY VIEWER (M-IP4-3). The founder scrubs through the immutable event
 // log; every frame is core's pure fold of events[0..n] — the EXACT reducer the
@@ -199,7 +201,7 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
               disabled={step === 0}
               aria-label="Back to the start"
             >
-              <GlyphSkipBack size={16} />
+              <IconSkipBack size={16} weight="fill" />
             </button>
             <button
               type="button"
@@ -224,7 +226,11 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
               aria-label={playing ? "Pause" : "Play"}
               aria-pressed={playing}
             >
-              {playing ? <GlyphPause size={20} /> : <IconPlay size={20} weight="fill" />}
+              {playing ? (
+                <IconPause size={20} weight="fill" />
+              ) : (
+                <IconPlay size={20} weight="fill" />
+              )}
             </button>
             <button
               type="button"
@@ -246,7 +252,7 @@ export function ReplayPanel({ data }: { data: ReplayViewerData }) {
               disabled={step >= total}
               aria-label="Jump to the end"
             >
-              <GlyphSkipForward size={16} />
+              <IconSkipForward size={16} weight="fill" />
             </button>
           </div>
           <div className="replay-now">

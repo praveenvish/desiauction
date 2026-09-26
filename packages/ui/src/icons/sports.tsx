@@ -23,14 +23,14 @@
  * viewBox, decorative by default; a caller that needs it announced passes a
  * `title`.
  */
-import { BasketballIcon } from "@phosphor-icons/react/dist/ssr/Basketball";
-import { CricketIcon } from "@phosphor-icons/react/dist/ssr/Cricket";
-import { CrosshairIcon } from "@phosphor-icons/react/dist/ssr/Crosshair";
-import { GameControllerIcon } from "@phosphor-icons/react/dist/ssr/GameController";
-import { HockeyIcon } from "@phosphor-icons/react/dist/ssr/Hockey";
-import { PingPongIcon } from "@phosphor-icons/react/dist/ssr/PingPong";
-import { SoccerBallIcon } from "@phosphor-icons/react/dist/ssr/SoccerBall";
-import { VolleyballIcon } from "@phosphor-icons/react/dist/ssr/Volleyball";
+import { SportGlyphBasketball } from "./glyphs/SportGlyphBasketball";
+import { SportGlyphCricket } from "./glyphs/SportGlyphCricket";
+import { SportGlyphCrosshair } from "./glyphs/SportGlyphCrosshair";
+import { SportGlyphGameController } from "./glyphs/SportGlyphGameController";
+import { SportGlyphHockey } from "./glyphs/SportGlyphHockey";
+import { SportGlyphPingPong } from "./glyphs/SportGlyphPingPong";
+import { SportGlyphSoccerBall } from "./glyphs/SportGlyphSoccerBall";
+import { SportGlyphVolleyball } from "./glyphs/SportGlyphVolleyball";
 import type { ReactNode, SVGProps } from "react";
 
 export interface SportIconProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
@@ -39,7 +39,7 @@ export interface SportIconProps extends Omit<SVGProps<SVGSVGElement>, "children"
   title?: string;
 }
 
-type PhosphorGlyph = typeof CricketIcon;
+type PhosphorGlyph = typeof SportGlyphCricket;
 
 /** A Phosphor glyph behind the sport-icon contract (size, optional title). */
 function phosphor(
@@ -84,7 +84,7 @@ function Svg({ size = 24, title, children, ...rest }: SportIconProps & { childre
 
 /** Cricket: Phosphor's bat and ball. */
 export function IconSportCricket(props: SportIconProps) {
-  return phosphor(CricketIcon, props);
+  return phosphor(SportGlyphCricket, props);
 }
 
 /** Box cricket: the ball, inside the cage's netting. */
@@ -101,17 +101,17 @@ export function IconSportBoxCricket(props: SportIconProps) {
 
 /** Football: Phosphor's panelled ball. */
 export function IconSportFootball(props: SportIconProps) {
-  return phosphor(SoccerBallIcon, props);
+  return phosphor(SportGlyphSoccerBall, props);
 }
 
 /** Basketball: Phosphor's ball. */
 export function IconSportBasketball(props: SportIconProps) {
-  return phosphor(BasketballIcon, props);
+  return phosphor(SportGlyphBasketball, props);
 }
 
 /** Hockey: Phosphor's stick and ball. */
 export function IconSportHockey(props: SportIconProps) {
-  return phosphor(HockeyIcon, props);
+  return phosphor(SportGlyphHockey, props);
 }
 
 /** Kabaddi: a raider reaching across the mid-line. */
@@ -129,7 +129,7 @@ export function IconSportKabaddi(props: SportIconProps) {
 
 /** Volleyball: Phosphor's ball. */
 export function IconSportVolleyball(props: SportIconProps) {
-  return phosphor(VolleyballIcon, props);
+  return phosphor(SportGlyphVolleyball, props);
 }
 
 /** Badminton: a shuttlecock, cork down, feathers up. */
@@ -145,7 +145,7 @@ export function IconSportBadminton(props: SportIconProps) {
 
 /** Table tennis: Phosphor's bat and ball. */
 export function IconSportTableTennis(props: SportIconProps) {
-  return phosphor(PingPongIcon, props);
+  return phosphor(SportGlyphPingPong, props);
 }
 
 /** Pickleball: the solid paddle with its drilled ball. */
@@ -162,12 +162,12 @@ export function IconSportPickleball(props: SportIconProps) {
 
 /** Esports: Phosphor's controller. */
 export function IconSportEsports(props: SportIconProps) {
-  return phosphor(GameControllerIcon, props);
+  return phosphor(SportGlyphGameController, props);
 }
 
 /** Battle royale: Phosphor's crosshair — the drop zone. */
 export function IconSportBattleRoyale(props: SportIconProps) {
-  return phosphor(CrosshairIcon, props);
+  return phosphor(SportGlyphCrosshair, props);
 }
 
 /** Every sport we can draw, keyed by the pack key in `@desiauction/core`. */
