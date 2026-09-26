@@ -274,6 +274,11 @@ a.wordmark:hover .wordmark-glyph {
     -webkit-line-clamp: 2;
     line-clamp: 2;
     white-space: normal;
+    /* Two lines of 18px at 1.25 plus the trail ran past the 64px bar and sat
+       on its hairline ("Thane Premier / League", round 2). A step smaller and
+       tighter, two lines and the trail fit inside it. */
+    font-size: var(--text-md-size);
+    line-height: 1.15;
   }
 
   /* In the page head the action gets its own full-width row. */

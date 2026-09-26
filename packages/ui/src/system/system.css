@@ -205,6 +205,36 @@ a.da-row:hover .da-row-title {
   line-height: var(--text-sm-line);
 }
 
+/* Title and meta read as one block: the grid stretches its two rows to the
+   row's height, and centring each line in its own half left a ~20px gap
+   between a name and its meta line (round 3C). */
+.da-row > .da-row-title {
+  align-self: end;
+}
+
+.da-row > .da-row-meta {
+  align-self: start;
+}
+
+.da-row:not(:has(> .da-row-meta)) > .da-row-title {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.da-row > .da-row-figure {
+  align-self: end;
+}
+
+.da-row > .da-row-status {
+  align-self: start;
+}
+
+.da-row:not(:has(> .da-row-status)) > .da-row-figure,
+.da-row:not(:has(> .da-row-figure)) > .da-row-status {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
 .da-row-meta {
   grid-area: meta;
   color: var(--text-secondary);

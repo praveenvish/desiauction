@@ -225,6 +225,14 @@
   border-radius: var(--radius-md);
 }
 
+/* A figure that is not a door sits flat: no lift shadow and no chevron, so a
+   row of tiles says at a glance which ones open something (round 3C — tiles
+   that gave their link to another surface kept looking pressable). */
+div.stat {
+  box-shadow: none;
+  background: transparent;
+}
+
 /* Clickable tiles take the shared card recipe (`.da-lift`, motion.css). */
 a.stat,
 button.stat {
