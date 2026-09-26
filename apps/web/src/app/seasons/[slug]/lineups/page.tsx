@@ -89,7 +89,7 @@ export default async function LineupsPage({
               </p>
               <div className="st-empty-actions">
                 <ButtonLink href={`/seasons/${slug}/fixtures`} size="sm">
-                  Go to schedule
+                  Build the schedule
                 </ButtonLink>
               </div>
             </div>

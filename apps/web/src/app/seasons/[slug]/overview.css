@@ -507,6 +507,12 @@ a.ov-hero-club:focus-visible {
     gap: var(--space-3);
   }
 
+  /* The logo keeps its text beside it on a phone (round 2: stacked, the
+     logo card alone ran ~250pt). Only the wide cover needs the full row. */
+  .ov-image[data-shape="square"] {
+    flex-direction: row;
+  }
+
   .ov-cover-frame {
     width: 100%;
   }
