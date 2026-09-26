@@ -5,6 +5,7 @@ import {
   IconBell,
   IconBroadcast,
   IconClock,
+  IconFile,
   IconLock,
   IconPencil,
   Pill,
@@ -33,44 +34,66 @@ import { ChannelControl, ControlToggle, RevertButton, SwitchToggle } from "./not
  * channel cell wraps on its own.
  */
 
-const CATEGORY: Record<GridRow["category"], { label: string; tone: KitTone }> = {
-  login: { label: "Sign-in", tone: "neutral" },
+/**
+ * The category is said once per group by the card title; a row names its
+ * category only where it changes how the row behaves — a security alert asks
+ * for a reason to stop, a staff notice goes to us, not to a customer.
+ */
+const CATEGORY: Record<GridRow["category"], { label: string; tone: KitTone } | null> = {
+  login: null,
   security: { label: "Security", tone: "red" },
-  transactional: { label: "Transactional", tone: "blue" },
-  operational: { label: "Our team", tone: "purple" },
+  transactional: null,
+  operational: { label: "Our team", tone: "neutral" },
   promotional: { label: "Promotional", tone: "amber" },
 };
 
-function StateChip({ row, cell }: { row: GridRow; cell: GridCell }) {
+/**
+ * What a cell's state is, in words. Every cell carries it (assistive tech and
+ * the specs read it); the EYE is shown it only when it is news. A switch that
+ * is on already says "on", and a column whose whole channel is not set up says
+ * so once, in its head — so neither repeats forty times down the grid.
+ */
+function StateChip({ row, cell, shared }: { row: GridRow; cell: GridCell; shared: boolean }) {
   const testId = `notify-state-${row.key}-${cell.channel}`;
   switch (cell.state) {
     case "locked":
       return (
-        <Pill tone="neutral" icon={<IconLock size={14} />} testId={testId}>
+        <span className="ntc-state" data-tone="neutral" data-testid={testId}>
+          <IconLock size={16} />
           Locked
-        </Pill>
+        </span>
       );
     case "channel_off":
       return (
-        <Pill tone="amber" dot testId={testId}>
+        <span className="ntc-state" data-tone="amber" data-testid={testId}>
+          <span className="ntc-dot" aria-hidden />
           Channel off
-        </Pill>
+        </span>
       );
     case "admin_off":
       return (
-        <Pill tone="red" dot testId={testId}>
+        <span className="ntc-state" data-tone="red" data-testid={testId}>
+          <span className="ntc-dot" aria-hidden />
           Off by admin
-        </Pill>
+        </span>
       );
     case "on":
-      return cell.notConfigured === null ? (
-        <Pill tone="green" dot testId={testId}>
-          On
-        </Pill>
-      ) : (
-        <Pill tone="amber" dot testId={testId}>
+      if (cell.notConfigured === null) {
+        return (
+          <span className="admin-sr-only" data-testid={testId}>
+            On
+          </span>
+        );
+      }
+      return shared ? (
+        <span className="admin-sr-only" data-testid={testId}>
           Not configured
-        </Pill>
+        </span>
+      ) : (
+        <span className="ntc-state" data-tone="amber" data-testid={testId}>
+          <span className="ntc-dot" aria-hidden />
+          Not configured
+        </span>
       );
   }
 }
@@ -84,14 +107,17 @@ function Counts({ counts, channel, days }: { counts: CellCounts; channel: string
   if (channel === "whatsapp") {
     parts.push(`${String(counts.delivered)} delivered`, `${String(counts.read)} read`);
   }
-  // The cell draws the one figure that matters at a glance (sent, and failed
-  // when there were any); the whole line is announced and on hover.
+  // The one figure that matters at a glance (sent, and failed when there were
+  // any); nothing sent is a quiet dash, not a "0 sent" in every cell. The whole
+  // line is announced and on hover.
   return (
     <span className="ntc-counts" title={`Last ${String(days)} days: ${parts.join(" · ")}`}>
       <span aria-hidden>
-        <span data-zero={counts.sent === 0 || undefined}>
-          {counts.sent.toLocaleString("en-IN")} sent
-        </span>
+        {counts.sent === 0 && counts.failed === 0 ? (
+          <span data-zero>—</span>
+        ) : (
+          <span>{counts.sent.toLocaleString("en-IN")}</span>
+        )}
         {counts.failed > 0 ? (
           <span className="ntc-counts-bad"> · {counts.failed.toLocaleString("en-IN")} failed</span>
         ) : null}
@@ -118,8 +144,13 @@ function Cell({
   shared: boolean;
 }) {
   return (
-    <li className="ntc-cell" data-state={cell.state} style={{ gridColumn: column, gridRow: 1 }}>
-      <div className="ntc-cell-head">
+    <li
+      className="ntc-cell"
+      data-state={cell.state}
+      data-idle={(cell.state === "on" && cell.notConfigured !== null && shared) || undefined}
+      style={{ gridColumn: column }}
+    >
+      <span className="ntc-cell-line">
         {row.locked ? (
           <span className="ntc-locked-label">{cell.channelLabel}</span>
         ) : (
@@ -132,25 +163,27 @@ function Cell({
             needsReason={row.needsReason}
           />
         )}
-        <StateChip row={row} cell={cell} />
-      </div>
+        {cell.state === "locked" ? <StateChip row={row} cell={cell} shared={shared} /> : null}
+        <Counts counts={cell.counts} channel={cell.channel} days={days} />
+        {cell.template === null ? null : <TemplateLine row={row} cell={cell} />}
+      </span>
+      {cell.state === "locked" ? null : <StateChip row={row} cell={cell} shared={shared} />}
       {cell.notConfigured === null ? null : (
         // Said once in the column head when the whole column shares it; the
         // cell keeps the sentence for assistive tech and on hover.
         <span
-          className="admin-meta ntc-note ntc-why"
-          data-shared={shared || undefined}
+          className="admin-sr-only"
           title={cell.notConfigured}
           data-testid={`notify-why-${row.key}-${cell.channel}`}
         >
           {cell.notConfigured}
         </span>
       )}
-      {cell.template === null ? null : <TemplateLine row={row} cell={cell} />}
       {cell.state === "admin_off" && cell.reason !== null ? (
-        <span className="admin-meta ntc-note">Reason: {cell.reason}</span>
+        <span className="ntc-reason" title={cell.reason}>
+          “{cell.reason}”
+        </span>
       ) : null}
-      <Counts counts={cell.counts} channel={cell.channel} days={days} />
     </li>
   );
 }
@@ -158,10 +191,10 @@ function Cell({
 const SOURCE_LABEL = { admin: "mapped here", env: "server setting", unset: "" } as const;
 
 /**
- * Which approved template a WhatsApp or SMS cell goes out under, and where
- * that came from — with the way to the templates page, where it is changed.
- * A plain link (not NavButton): it sits inside a dense cell, and the whole
- * line is the target (44px via .ntc-template-link).
+ * Which approved template a WhatsApp or SMS cell goes out under, and the way
+ * to the templates page, where it is changed. With no template it is a quiet
+ * document glyph (the column already says the channel is not set up); with one
+ * it is the template's name.
  */
 function TemplateLine({ row, cell }: { row: GridRow; cell: GridCell }) {
   const template = cell.template;
@@ -173,11 +206,13 @@ function TemplateLine({ row, cell }: { row: GridRow; cell: GridCell }) {
       : template.approval === "not_approved"
         ? " · not approved"
         : "";
+  const none = template.handle === null;
   return (
     <Link
-      className="admin-meta ntc-template-link"
+      className="ntc-template-link"
+      data-none={none || undefined}
       title={
-        template.handle === null
+        none
           ? `${word}: none mapped`
           : `${word}: ${template.handle} (${SOURCE_LABEL[template.source]})${approval}`
       }
@@ -185,8 +220,15 @@ function TemplateLine({ row, cell }: { row: GridRow; cell: GridCell }) {
       data-testid={`notify-template-${row.key}-${cell.channel}`}
       data-source={template.source}
     >
-      {template.handle === null ? `${word}: none` : template.handle}
-      {template.handle !== null && template.source === "admin" ? (
+      {none ? (
+        <>
+          <IconFile size={16} />
+          <span className="admin-sr-only">{word}: none</span>
+        </>
+      ) : (
+        <span className="ntc-template-name">{template.handle}</span>
+      )}
+      {!none && template.source === "admin" ? (
         <span className="admin-sr-only"> (mapped here)</span>
       ) : null}
       <span className="admin-sr-only"> — manage templates for {row.label}</span>
@@ -195,9 +237,11 @@ function TemplateLine({ row, cell }: { row: GridRow; cell: GridCell }) {
 }
 
 /**
- * An email kind's wording, per language — what goes out now, and whether a
- * draft waits — with the way into the editor (Phase 2). Only where the wording
- * is editable: our own staff notices have no line.
+ * An email kind's wording — what goes out in each language now, and whether a
+ * draft waits — as ONE pencil at the row's end. The state is the pencil's
+ * tooltip and its announced name; the eye gets a gold mark only when the
+ * wording is no longer the default (published or drafted), which is the only
+ * time it is news.
  */
 function WordingLine({
   kind,
@@ -208,9 +252,22 @@ function WordingLine({
   label: string;
   wording: WordingSummary;
 }) {
+  const summary = wording.languages
+    .map(
+      (entry) =>
+        `${entry.label} — ${
+          entry.status.state === "published"
+            ? `Published v${String(entry.status.version)}`
+            : "Default"
+        }${entry.draft === null ? "" : ` (draft v${String(entry.draft)})`}`,
+    )
+    .join(" · ");
+  const changed = wording.languages.some(
+    (entry) => entry.status.state === "published" || entry.draft !== null,
+  );
   return (
     <div className="ntc-wording" data-testid={`notify-wording-${kind}`}>
-      <span className="admin-meta">
+      <span className="admin-sr-only">
         Wording:{" "}
         {wording.languages.map((entry, index) => (
           <span key={entry.language}>
@@ -223,12 +280,15 @@ function WordingLine({
           </span>
         ))}
       </span>
-      {/* NavButton, not buttonClassName(): this is a server component, and the
-          kit's class helper lives in a "use client" module. */}
-      <Link href={wording.href} className="ntc-wording-link">
+      <Link
+        href={wording.href}
+        className="ntc-wording-link"
+        title={`Wording: ${summary}`}
+        data-changed={changed || undefined}
+      >
         <IconPencil size={16} />
         <span className="admin-sr-only">Edit email wording — {label}</span>
-        <span aria-hidden>Edit</span>
+        {changed ? <span className="ntc-wording-mark" aria-hidden /> : null}
       </Link>
     </div>
   );
@@ -250,11 +310,13 @@ function KindRow({
   return (
     <li className="ntc-kind" data-testid={`notify-kind-${row.key}`}>
       <div className="ntc-kind-name">
-        <span className="admin-name">{row.label}</span>
+        <span className="ntc-kind-title">
+          <span className="admin-name">{row.label}</span>
+          {category === null ? null : <Pill tone={category.tone}>{category.label}</Pill>}
+        </span>
         <span className="admin-meta ntc-kind-desc" title={row.description}>
           {row.description}
         </span>
-        <Pill tone={category.tone}>{category.label}</Pill>
       </div>
       <ul className="ntc-cells" aria-label={`${row.label}, by channel`}>
         {row.cells.map((cell) => (
@@ -270,10 +332,12 @@ function KindRow({
           />
         ))}
       </ul>
-      <div className="ntc-kind-foot">
+      <div className="ntc-optout">
         {row.locked ? (
-          <span className="admin-meta">
-            <IconLock size={16} /> Never stopped — not by a person, a club, or an admin.
+          <span className="ntc-optout-note">
+            <IconLock size={16} />
+            Never stopped
+            <span className="admin-sr-only"> — not by a person, a club, or an admin.</span>
           </span>
         ) : row.person.allowed || row.org.allowed ? (
           <div className="ntc-controls">
@@ -295,12 +359,17 @@ function KindRow({
             ) : null}
           </div>
         ) : (
-          <span className="admin-meta">
-            {row.category === "security"
-              ? "People and clubs can never turn this off."
-              : "Only an admin can turn this off."}
+          <span className="ntc-optout-note">
+            Admin only
+            <span className="admin-sr-only">
+              {row.category === "security"
+                ? " — people and clubs can never turn this off."
+                : " — only an admin can turn this off."}
+            </span>
           </span>
         )}
+      </div>
+      <div className="ntc-edit">
         {editable ? <WordingLine kind={row.key} label={row.label} wording={wording} /> : null}
       </div>
     </li>
@@ -319,9 +388,11 @@ function groupColumns(
   return order
     .filter((entry) => rows.some((row) => row.cells.some((cell) => cell.channel === entry.channel)))
     .map((entry) => {
-      const cells = rows.flatMap((row) =>
-        row.cells.filter((cell) => cell.channel === entry.channel),
-      );
+      // A sign-in code is never stopped and carries no "not set up" sentence,
+      // so it does not get a say in whether the column shares one.
+      const cells = rows
+        .filter((row) => !row.locked)
+        .flatMap((row) => row.cells.filter((cell) => cell.channel === entry.channel));
       const first = cells[0]?.notConfigured ?? null;
       const shared = first !== null && cells.every((cell) => cell.notConfigured === first);
       return { channel: entry.channel, label: entry.label, note: shared ? first : null };
@@ -333,7 +404,7 @@ export function NotificationsPanel({ center }: { center: NotificationCenter }) {
     <>
       <SectionCard
         icon={<IconBroadcast />}
-        tone="blue"
+        tone="neutral"
         title="Channels"
         description="Kill switches for a provider incident. Login codes are never stopped."
         flush
@@ -350,13 +421,14 @@ export function NotificationsPanel({ center }: { center: NotificationCenter }) {
               <span className="admin-cell-main">
                 <span className="ntc-kind-head">
                   <span className="admin-name">{channel.label}</span>
-                  <Pill
-                    tone={channel.enabled ? "green" : "red"}
-                    dot
-                    testId={`notify-channel-state-${channel.channel}`}
+                  <span
+                    className="ntc-state"
+                    data-tone={channel.enabled ? "green" : "red"}
+                    data-testid={`notify-channel-state-${channel.channel}`}
                   >
+                    <span className="ntc-dot" aria-hidden />
                     {channel.enabled ? "On" : "Off everywhere"}
-                  </Pill>
+                  </span>
                 </span>
                 {channel.enabled ? null : (
                   <span className="admin-meta">
@@ -413,6 +485,8 @@ export function NotificationsPanel({ center }: { center: NotificationCenter }) {
                     </span>
                   ))}
                 </span>
+                <span>Opt-out</span>
+                <span />
               </div>
               <ul className="ntc-kinds">
                 {group.rows.map((row) => (

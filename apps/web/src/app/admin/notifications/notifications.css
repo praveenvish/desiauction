@@ -281,13 +281,15 @@
   border-radius: var(--radius-sm);
 }
 
-/* ══ wow pass: the switchboard ══════════════════════════════════════════
-   A column per channel, a row per message. The kind's name spans two rows:
-   its channel cells, then a footer line (opt-outs · wording). */
+/* ══ wow pass (round 2): the switchboard ═══════════════════════════════
+   One line per message. A column per channel holds a switch and one quiet
+   figure; a state is drawn only when it is news (off, channel off, locked, a
+   single cell not set up). A whole column that is not set up says so once in
+   its head. Opt-outs and the wording pencil close the row. */
 
 .ntc-channels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   margin: 0;
   padding: 0;
   list-style: none;
@@ -296,12 +298,13 @@
 
 .ntc-channel {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   min-width: 0;
-  padding: var(--space-3) var(--space-5);
+  box-sizing: border-box;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
   border-inline-end: 1px solid var(--border-subtle);
 }
 
@@ -311,10 +314,58 @@
 
 .ntc-channel .ntc-kind-head {
   align-items: center;
+  justify-content: flex-start;
+}
+
+.ntc-channel .admin-name {
+  font-size: var(--text-sm-size);
+}
+
+.ntc-channel button {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* A state, in words: a dot in the state's colour, the word in ink. */
+.ntc-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.ntc-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+}
+
+.ntc-state[data-tone="green"] .ntc-dot {
+  background: var(--success-strong);
+}
+
+.ntc-state[data-tone="amber"] .ntc-dot {
+  background: var(--warning-strong);
+}
+
+.ntc-state[data-tone="red"] .ntc-dot {
+  background: var(--danger-strong);
+}
+
+.ntc-state[data-tone="red"] {
+  color: var(--text-primary);
 }
 
 .ntc-matrix {
-  --ntc-name: minmax(15rem, 1.35fr);
+  --ntc-col: 9.5rem;
+  --ntc-optout: 11rem;
+  --ntc-edit: 2.75rem;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -326,10 +377,14 @@
 
 .ntc-kind {
   display: grid;
-  grid-template-columns: var(--ntc-name) minmax(0, 3fr);
+  grid-template-columns:
+    minmax(0, 1fr) calc(var(--ntc-cols, 4) * var(--ntc-col)) var(--ntc-optout)
+    var(--ntc-edit);
+  align-items: center;
   column-gap: var(--space-4);
-  row-gap: var(--space-1);
-  padding: var(--space-3) var(--space-5);
+  box-sizing: border-box;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
   transition: background-color var(--duration-fast) var(--ease-out);
 }
@@ -343,11 +398,16 @@
 }
 
 .ntc-kind-name {
-  grid-row: span 2;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ntc-kind-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -356,22 +416,259 @@
 }
 
 .ntc-kind-desc {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-xs-size);
 }
 
 .ntc-kind .ntc-cells {
   display: grid;
   grid-template-columns: repeat(var(--ntc-cols, 4), minmax(0, 1fr));
-  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  gap: 0;
+}
+
+.ntc-kind .ntc-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  grid-row: 1;
+  min-width: 0;
+  padding: 0 var(--space-2) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.ntc-cell-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The switch: still a checkbox to every assistive technology, drawn as a
+   32×18 track. Same paint as /account's, one size down for a dense grid. */
+.ntc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.ntc-toggle:hover {
+  background: none;
+}
+
+.ntc-toggle input {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  box-shadow: inset 0 0 0 1px var(--border-interactive);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.ntc-toggle input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.ntc-toggle input:checked {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.ntc-toggle input:checked::before {
+  transform: translateX(14px);
+}
+
+.ntc-toggle input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ntc-toggle input:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+/* A channel that cannot send yet: the switch keeps its setting, but reads as
+   standing by rather than live. */
+.ntc-cell[data-idle] .ntc-toggle input:checked {
+  opacity: 0.45;
+}
+
+.ntc-cell[data-state="admin_off"] .ntc-toggle input,
+.ntc-cell[data-state="channel_off"] .ntc-toggle input {
+  box-shadow: inset 0 0 0 1px var(--border-interactive);
+}
+
+.ntc-locked-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.ntc-counts {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ntc-counts [data-zero] {
+  color: var(--text-muted);
+}
+
+.ntc-counts-bad {
+  color: var(--danger-strong);
+  font-weight: var(--font-weight-medium);
+}
+
+.ntc-reason {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+/* The template door: a quiet glyph when none is mapped, the name when one is. */
+.ntc-template-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.ntc-template-link[data-none] {
+  color: var(--text-muted);
+}
+
+.ntc-template-link:hover {
+  color: var(--text-accent);
+  background: var(--surface-sunken);
+}
+
+.ntc-template-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ntc-template-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ntc-optout {
+  min-width: 0;
+}
+
+.ntc-optout .ntc-controls {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.ntc-optout .ntc-toggle {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+.ntc-optout-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.ntc-edit {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ntc-wording {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ntc-wording-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.ntc-wording-link:hover {
+  background: var(--surface-raised);
+  color: var(--text-accent);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+
+.ntc-wording-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ntc-wording-mark {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--accent-line);
 }
 
 .ntc-matrix-head {
+  min-height: 0;
+  box-sizing: border-box;
+  height: 32px;
   padding-block: 0;
-  height: 34px;
-  align-items: center;
   background: var(--surface-raised);
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-muted);
@@ -381,14 +678,10 @@
   text-transform: uppercase;
 }
 
-.ntc-matrix-head > span:first-child {
-  grid-row: auto;
-}
-
 .ntc-col-head {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px;
   min-width: 0;
   white-space: nowrap;
 }
@@ -396,150 +689,16 @@
 .ntc-col-note {
   padding: 1px 6px;
   border-radius: var(--radius-full);
-  background: var(--warning-subtle);
-  color: var(--warning-strong);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
   font-size: 10px;
   letter-spacing: 0.02em;
   text-transform: none;
 }
 
-/* A cell: switch + state on one line, then one quiet figure. */
-.ntc-kind .ntc-cell {
-  gap: 2px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-}
-
-.ntc-kind .ntc-cell-head {
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-}
-
-.ntc-kind .ntc-toggle {
-  min-height: 32px;
-  padding: 0;
-}
-
-.ntc-kind .ntc-toggle:hover {
-  background: none;
-}
-
-.ntc-kind .ntc-toggle input {
-  margin-top: 0;
-}
-
-.ntc-kind .ntc-locked-label {
-  min-height: 32px;
-}
-
-.ntc-counts {
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-  font-variant-numeric: tabular-nums;
-}
-
-.ntc-counts-bad {
-  color: var(--danger-strong);
-}
-
-.ntc-kind .ntc-why[data-shared] {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-
-.ntc-kind .ntc-cell {
-  position: relative;
-}
-
-.ntc-kind .ntc-why {
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: var(--text-xs-size);
-}
-
-.ntc-kind .ntc-template-link {
-  display: block;
-  min-height: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs-size);
-}
-
-.ntc-kind-foot {
-  grid-column: 2;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-4);
-  min-width: 0;
-  padding-top: var(--space-1);
-  border-top: 1px dashed var(--border-subtle);
-}
-
-.ntc-kind-foot .admin-meta svg {
-  vertical-align: -3px;
-}
-
-.ntc-kind-foot .ntc-controls {
-  gap: 0 var(--space-3);
-}
-
-.ntc-kind-foot .ntc-toggle {
-  min-height: 32px;
-  padding: 0 var(--space-1);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-regular);
-}
-
-.ntc-kind-foot .ntc-toggle input {
-  width: 16px;
-  height: 16px;
-  margin-top: 0;
-}
-
-.ntc-wording {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
-}
-
-.ntc-wording-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 28px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
-}
-
-.ntc-wording-link:hover {
-  border-color: var(--border-interactive);
-  color: var(--text-accent);
-}
-
-.ntc-wording-link:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
 .ntc-recent > li {
-  padding-block: 8px;
+  min-height: 48px;
+  padding-block: 6px;
 }
 
 .ntc-recent-line {
@@ -568,59 +727,84 @@
   }
 
   .ntc-kind .ntc-cell .ntc-locked-label {
-    display: none;
-  }
-
-  .ntc-kind .ntc-cell .ntc-toggle {
-    position: relative;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 }
 
+@media (min-width: 900px) and (max-width: 1279px) {
+  .ntc-matrix {
+    --ntc-col: 7rem;
+    --ntc-optout: 8rem;
+  }
+}
+
+/* A phone: one row per message — its name, then its channels as a wrap of
+   small labelled switches, then who may opt out and the pencil. */
 @media (max-width: 899px) {
   .ntc-matrix-head {
     display: none;
   }
 
   .ntc-kind {
-    grid-template-columns: minmax(0, 1fr);
-    padding-inline: var(--space-4);
-    row-gap: var(--space-2);
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
   }
 
   .ntc-kind-name {
-    grid-row: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: var(--space-2);
-  }
-
-  .ntc-kind-desc {
-    flex-basis: 100%;
-    -webkit-line-clamp: 1;
+    grid-column: 1 / -1;
   }
 
   .ntc-kind .ntc-cells {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-4);
   }
 
   .ntc-kind .ntc-cell {
-    grid-column: auto !important;
-    grid-row: auto !important;
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    background: var(--surface);
+    padding: 0;
   }
 
-  .ntc-kind-foot {
+  .ntc-kind .ntc-cell .notify-switch-label,
+  .ntc-kind .ntc-locked-label {
+    font-size: var(--text-xs-size);
+    color: var(--text-secondary);
+  }
+
+  .ntc-kind .ntc-counts {
+    display: none;
+  }
+
+  .ntc-optout {
     grid-column: 1;
   }
 
+  .ntc-edit {
+    grid-column: 2;
+  }
+
+  .ntc-kind .ntc-template-link {
+    display: none;
+  }
+
+  .ntc-channels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .ntc-channel {
+    min-height: 48px;
+    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
     border-inline-end: 0;
     border-bottom: 1px solid var(--border-subtle);
-    padding-inline: var(--space-4);
+  }
+
+  .ntc-channel:last-child {
+    border-bottom: 0;
   }
 }
 
