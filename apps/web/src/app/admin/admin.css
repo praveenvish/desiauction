@@ -2865,3 +2865,9 @@ a.admin-quiet-link:hover {
     font-weight: var(--font-weight-semibold);
   }
 }
+
+.admin-room-trouble > [role="note"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

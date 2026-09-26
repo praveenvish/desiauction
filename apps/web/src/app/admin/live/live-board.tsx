@@ -389,9 +389,13 @@ function RoomRow({
           {/* Trouble is said in the Room column, in words, where the eye
               already looks — not as a second full-width strip per row. */}
           {trouble !== null ? (
-            <dd className="admin-room-trouble" role="note" data-testid="live-room-trouble">
-              <IconAlert size={16} />
-              {trouble}
+            // The note role sits on a span inside the <dd>: a <dd> may not
+            // carry one (axe aria-allowed-role, and it breaks the <dl>).
+            <dd className="admin-room-trouble">
+              <span role="note" data-testid="live-room-trouble">
+                <IconAlert size={16} />
+                {trouble}
+              </span>
             </dd>
           ) : (
             <dd className="admin-meta">{engineLine(engine)}</dd>
