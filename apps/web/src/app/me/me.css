@@ -94,11 +94,11 @@
    owner's even two-column layout on a laptop): the 2×2 block was what left
    the right column taller than the left. */
 .me-layout[data-owner] .me-side {
-  container-type: inline-size;
+  container: me-side / inline-size;
 }
 
-@container (min-width: 540px) {
-  .me-night-facts {
+@container me-side (min-width: 540px) {
+  .me-side .me-night-facts {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
