@@ -58,14 +58,15 @@ const IST_DAY = new Intl.DateTimeFormat("en-CA", {
 });
 
 /**
- * "2026-03-14T18:30" → "14 Mar" this year, "14 Mar 2025" in any other. Null
- * where the organizer has set no date.
+ * The season's start date, said AS the season's start. Null where the
+ * organizer has set no date.
  *
- * The year used to be dropped always, so a night still waiting in the queue
- * read "1 Aug" beside "Not set up yet" in late September — which August, and
- * is it coming or gone? A date in the past on a night that has not happened is
- * said plainly, with the one useful next step: it is the organizer's date, so
- * ask them. A finished night keeps its plain date; the past is where it belongs.
+ * `startsOn` is when the season begins, not when its auction night is — the
+ * product holds no separate night date. This line used to call it the night
+ * and say "Date passed · 1 Aug 2026 — check with the organizer" while /auctions
+ * printed the same season as "1 Aug – 31 Oct 2026", running (round 2). Both now
+ * say the season's dates: "Season starts 3 Oct", "Season began 1 Aug", and a
+ * finished night keeps its plain date. The year shows outside this one.
  */
 export function nightDate(startsOn: string | null, over: boolean, now = new Date()): string | null {
   if (startsOn === null) return null;
@@ -78,15 +79,8 @@ export function nightDate(startsOn: string | null, over: boolean, now = new Date
     month: "short",
     ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }),
   });
-  if (!over && day < today) {
-    const full = parsed.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-    return `Date passed · ${full} — check with the organizer`;
-  }
-  return label;
+  if (over) return label;
+  return day < today ? `Season began ${label}` : `Season starts ${label}`;
 }
 
 function Row({ season }: { season: ConductedSeason }) {

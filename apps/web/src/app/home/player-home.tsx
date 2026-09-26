@@ -454,7 +454,9 @@ export async function PlayerHome({
                   </Link>
                   {/* The player's own card — a sibling of the row link, never
                     nested in it, and offered only where a verdict exists. */}
-                  {registration.posterReady ? (
+                  {/* An unsold player gets no share card (the share-card rule);
+                      the route still draws the verdict, home doesn't offer it. */}
+                  {registration.posterReady && registration.auction?.kind !== "unsold" ? (
                     <Link
                       href={`/seasons/${registration.competitionSlug}/posters`}
                       className="home-own-poster"
