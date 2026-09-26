@@ -622,10 +622,13 @@
   }
 }
 
-/* The round-robin these teams make, behind the "add a ground" gate (round 5A). */
+/* The round-robin these teams make, behind the "add a ground" gate (round 5A).
+   Tracks wide enough for two three-word names side by side (two columns on a
+   laptop card), and a name that still does not fit wraps rather than
+   truncating to "Mumbai Maveri…". */
 .fx-pairings {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr));
   margin: 0;
   padding: 0;
   list-style: none;
@@ -654,12 +657,12 @@
 }
 
 .fx-pair-name {
-  overflow: hidden;
+  min-width: 0;
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
+  line-height: var(--text-sm-line);
   color: var(--text-heading);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .fx-pair-vs {
