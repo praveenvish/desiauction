@@ -14,6 +14,7 @@ import { notFound } from "next/navigation";
 
 import { ledgerView } from "../../../../../server/auction/conduct-actions";
 import { parseLedgerFilter } from "../../../../../lib/ledger-filter";
+import { passNote } from "../../../../../lib/ledger-passes";
 import { formatTime } from "../../../../../lib/format-date";
 import { moneyFormat } from "../../../../../lib/money";
 import { seasonUnit } from "../../../../../server/competition/season-unit";
@@ -43,6 +44,14 @@ function resultTone(result: string): "sold" | "undo" | "rejected" | "unsold" | "
     return "unsold";
   }
   return "neutral";
+}
+
+/** "37 lots + 11 re-runs = 48 results": what the Results count is made of. */
+function resultsCount(results: number, outcomes: { lots: number; reRuns: number }): string {
+  const parts = `${String(outcomes.lots)} lots + ${String(outcomes.reRuns)} re-run${outcomes.reRuns === 1 ? "" : "s"}`;
+  return outcomes.lots + outcomes.reRuns === results
+    ? `${parts} = ${String(results)} results`
+    : `${String(results)} results · ${parts}`;
 }
 
 export default async function LedgerPage({
@@ -83,11 +92,13 @@ export default async function LedgerPage({
           <ToolbarCount>
             <span
               data-testid="ledger-meta"
-              title={`${view.auctionName} — regenerated from the event log in ${view.generationMs.toFixed(1)} ms`}
+              title={`${view.auctionName} — ${String(view.outcomes.lots)} lots, finally ${String(view.outcomes.sold)} sold and ${String(view.outcomes.unsold)} unsold · regenerated from the event log in ${view.generationMs.toFixed(1)} ms`}
             >
-              {view.filter === "all"
-                ? `${String(view.totalRows)} rows`
-                : `${String(view.filteredRows)} of ${String(view.totalRows)} rows`}{" "}
+              {view.filter === "results" && view.outcomes.reRuns > 0
+                ? resultsCount(view.filteredRows, view.outcomes)
+                : view.filter === "all"
+                  ? `${String(view.totalRows)} rows`
+                  : `${String(view.filteredRows)} of ${String(view.totalRows)} rows`}{" "}
               · as recorded
             </span>
           </ToolbarCount>
@@ -152,7 +163,11 @@ export default async function LedgerPage({
                 /* On a phone the row is a two-line list item (lot + result
                    over time · team · bid) — never a stack of labelled cells:
                    seven labels per row made a finished ledger ~125pt a row. */
-                <tr key={row.seq} data-testid={`ledger-row-${String(row.seq)}`}>
+                <tr
+                  key={row.seq}
+                  data-testid={`ledger-row-${String(row.seq)}`}
+                  data-superseded={view.passes[row.seq]?.superseded === true || undefined}
+                >
                   <td className="ledger-c-seq">{row.seq}</td>
                   <td className="ledger-c-time">{formatTime(row.atMs)}</td>
                   <td className="ledger-col-minor">{row.actorName}</td>
@@ -194,8 +209,21 @@ export default async function LedgerPage({
                     )}
                   </td>
                   <td className="ledger-c-result">
-                    <span className="ledger-result" data-tone={resultTone(row.result)}>
-                      {row.result}
+                    <span className="ledger-outcome">
+                      <span className="ledger-result" data-tone={resultTone(row.result)}>
+                        {row.result}
+                      </span>
+                      {/* A requeued lot's first UNSOLD is not its last word:
+                          said beside the pill, so three bought players no
+                          longer read as unsold. */}
+                      {(() => {
+                        const note = passNote(row.result, view.passes[row.seq]);
+                        return note === null ? null : (
+                          <span className="ledger-pass" data-testid="ledger-pass">
+                            {note}
+                          </span>
+                        );
+                      })()}
                     </span>
                   </td>
                   <td className="ledger-col-minor">{row.reason ?? "—"}</td>
