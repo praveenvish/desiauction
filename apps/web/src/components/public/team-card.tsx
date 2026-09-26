@@ -11,7 +11,7 @@
  * a way to see the rest. It shows names and playing roles. Purses and phone
  * numbers are not in the read model it is given.
  */
-import { IconStar } from "@desiauction/ui";
+import { RosterMark, type RosterMarkKind } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -21,8 +21,13 @@ export interface TeamCardPlayer {
   name: string;
   /** The registration number, e.g. "R4QD52B" — public, and how a player is found. */
   number: string;
-  /** Pre-signed before the auction (icon or captain). */
+  /**
+   * Pre-signed before the auction. Kept for callers that only know THAT a
+   * player was pre-signed; `mark` says how, and wins when both are given.
+   */
   preSigned?: boolean;
+  /** How the squad holds them — the same badge every squad row uses. */
+  mark?: Exclude<RosterMarkKind, "you"> | null;
   /**
    * The playing role in the season's words ("Batter"). Shown in the row's
    * trailing slot in place of the registration number when given.
@@ -91,22 +96,17 @@ export function TeamCard({
               <span className="team-card-avatar" aria-hidden>
                 {player.photo ?? teamCardInitials(player.name)}
               </span>
-              <span className="team-card-player-name">{player.name}</span>
-              {/* A star, not the word "Pre-signed": the word cost about 70px
-                  on a row that already carries a name and a number, and every
-                  name in a squad of pre-signed players was truncated to make
-                  room for a label repeated down the whole card. The meaning is
-                  kept for anyone not reading visually. */}
-              {/* The slot is always there, star or not: an optional column
-                  pushed the role label left on the starred rows only. */}
-              {player.preSigned === true ? (
-                <span className="team-card-tag" title="Pre-signed">
-                  <IconStar size={16} weight="fill" aria-hidden />
-                  <span className="team-card-sr">Pre-signed</span>
-                </span>
-              ) : (
-                <span className="team-card-tag-slot" aria-hidden />
-              )}
+              {/* The badge rides the name, as on every other squad row. A
+                  star in its own mid-row column forced two-word names onto
+                  two lines on a phone and said less ("pre-signed" — as
+                  what?). */}
+              <span className="team-card-player-name">
+                {player.name}
+                {(player.mark ?? (player.preSigned === true ? "retained" : null)) ===
+                null ? null : (
+                  <RosterMark kind={player.mark ?? "retained"} className="team-card-mark" />
+                )}
+              </span>
               {player.role !== undefined ? (
                 player.role === "" ? null : (
                   <span className="team-card-number team-card-role">{player.role}</span>

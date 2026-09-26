@@ -103,9 +103,9 @@
    line — so a squad of pre-signed players drew a ragged two-line list. */
 .team-card-player {
   display: grid;
-  /* Fixed star slot and a fixed role column: every row's role starts at the
-     same x, starred or not. */
-  grid-template-columns: 28px minmax(0, 1fr) 20px minmax(0, 7rem);
+  /* A fixed role column: every row's role starts at the same x, badged or
+     not. The badge rides the name cell. */
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 7rem);
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2);
@@ -146,24 +146,8 @@
   color: var(--text-primary);
 }
 
-.team-card-tag {
-  display: grid;
-  place-items: center;
-  inline-size: 20px;
-  block-size: 20px;
-  border-radius: var(--radius-full);
-  background: var(--accent-subtle);
-  color: var(--text-accent);
-}
-
-.team-card-sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+.team-card-mark {
+  margin-left: var(--space-2);
 }
 
 .team-card-number {

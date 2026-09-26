@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import { roleLabeller } from "../../../../lib/role-label";
-import { Card, IconPlus, PlayerImage } from "@desiauction/ui";
+import { Card, IconPlus, PlayerImage, RosterMark } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
 import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
@@ -160,12 +160,10 @@ export function squadSizesOf(
 function MemberBadges({ member }: { member: SquadMember }) {
   return (
     <>
-      {member.icon ? <span className="squad-tag squad-tag--icon">Icon</span> : null}
-      {member.retained ? <span className="squad-tag squad-tag--retained">Retained</span> : null}
-      {member.captain ? <span className="squad-tag squad-tag--captain">Captain</span> : null}
-      {member.viceCaptain && !member.captain ? (
-        <span className="squad-tag squad-tag--captain">Vice-captain</span>
-      ) : null}
+      {member.icon ? <RosterMark kind="icon" /> : null}
+      {member.retained ? <RosterMark kind="retained" /> : null}
+      {member.captain ? <RosterMark kind="captain" /> : null}
+      {member.viceCaptain && !member.captain ? <RosterMark kind="vice-captain" /> : null}
     </>
   );
 }
@@ -289,7 +287,7 @@ export function SquadBoard({
                       <span className="squad-role">{labelOf(member.role)}</span>
                       <span className="squad-price">
                         {member.price === null ? (
-                          <span className="squad-presigned">pre-signed</span>
+                          <span className="squad-presigned">Pre-signed</span>
                         ) : (
                           money.ledger(member.price)
                         )}

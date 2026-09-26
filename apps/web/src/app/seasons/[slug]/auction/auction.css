@@ -1705,31 +1705,6 @@
   color: var(--text-muted);
 }
 
-.squad-tag {
-  flex: none;
-  padding: 1px 7px;
-  border-radius: var(--radius-full);
-  font-size: 10px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.squad-tag--icon {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  color: var(--text-accent);
-}
-
-.squad-tag--retained {
-  background: color-mix(in srgb, var(--info-base) 18%, transparent);
-  color: var(--info-base);
-}
-
-.squad-tag--captain {
-  background: color-mix(in srgb, var(--success-base) 18%, transparent);
-  color: var(--success-base);
-}
-
 /* --- the pool: sold, unsold, still to come -------------------------------- */
 .pool-stats {
   display: flex;

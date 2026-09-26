@@ -8,6 +8,7 @@ import {
   IconUser,
   Pill,
   PlayerImage,
+  RosterMark,
   SectionCard,
   TeamChip,
   type KitTone,
@@ -258,7 +259,7 @@ function SoldDuo({
                   <span className="hd-who">
                     <span className="hd-name">
                       {buy.name}
-                      {self ? <span className="hd-you">You</span> : null}
+                      {self ? <RosterMark kind="you" className="hd-you" /> : null}
                     </span>
                     <span className="hd-meta">{buy.teamName ?? "Sold"}</span>
                   </span>

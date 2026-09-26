@@ -160,16 +160,7 @@
 }
 
 .hd-you {
-  display: inline-block;
   margin-left: var(--space-2);
-  padding: 0 var(--space-2);
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-full);
-  font-size: var(--text-xs-size);
-  line-height: 18px;
-  font-weight: var(--font-weight-semibold);
-  color: var(--accent-ink);
-  vertical-align: 1px;
 }
 
 .hd-figure[data-muted="true"] {

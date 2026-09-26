@@ -1,5 +1,5 @@
-import { roleLabelIn, sportPackFor, type PosterMark } from "@desiauction/core";
-import { IconArrowRight, IconUsers, PlayerImage } from "@desiauction/ui";
+import { roleLabelIn, sportPackFor } from "@desiauction/core";
+import { IconArrowRight, IconUsers, PlayerImage, RosterMark } from "@desiauction/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -7,13 +7,6 @@ import { moneyFormat } from "../../lib/money";
 import type { PublicTeam } from "../../server/competition/public";
 import "../../app/home/home-duo.css";
 import "./squad-list.css";
-
-/** The words a squad mark is read as — the same ones /teams and the room use. */
-const MARK_LABEL: Record<PosterMark, string> = {
-  captain: "Captain",
-  icon: "Icon",
-  retained: "Retained",
-};
 
 /**
  * ONE SQUAD LIST (round 4). The same squad was drawn by two copies of one
@@ -87,11 +80,9 @@ export function SquadList({
                 <span className="sq-line">
                   <span className="hd-name">{member.name}</span>
                   {member.marks.map((mark) => (
-                    <span key={mark} className="sq-mark" data-mark={mark}>
-                      {MARK_LABEL[mark]}
-                    </span>
+                    <RosterMark key={mark} kind={mark} />
                   ))}
-                  {isSelf ? <span className="hd-you">You</span> : null}
+                  {isSelf ? <RosterMark kind="you" /> : null}
                 </span>
                 <span className="hd-meta">{roleLabelIn(pack, member.role) || "Player"}</span>
               </span>

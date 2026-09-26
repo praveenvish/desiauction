@@ -1382,16 +1382,7 @@
 }
 
 .team-page-badge {
-  display: inline-block;
   margin-left: var(--space-2);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--accent-subtle);
-  color: var(--text-accent);
-  font-size: var(--text-xs-size);
-  line-height: 20px;
-  font-weight: var(--font-weight-semibold);
-  vertical-align: 2px;
 }
 
 /* Phone: one grouped list with hairlines, not twelve bordered cards. */

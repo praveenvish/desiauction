@@ -117,6 +117,8 @@ export type { FillPaint, FillTextToken } from "./identity/fill-contrast";
 export { placeholderIdentity, initialsFor } from "./identity/placeholder";
 export type { PlaceholderIdentity, PlaceholderPattern } from "./identity/placeholder";
 export { PlayerImage } from "./identity/player-image";
+export { RosterMark } from "./identity/roster-mark";
+export type { RosterMarkKind, RosterMarkProps } from "./identity/roster-mark";
 export type { PlayerImageProps, PlayerImageSize } from "./identity/player-image";
 export { ImageUploader, IMAGE_UPLOAD_ACCEPT, imageFileProblem } from "./identity/image-uploader";
 export type { ImageUploaderProps, UploadOutcome } from "./identity/image-uploader";

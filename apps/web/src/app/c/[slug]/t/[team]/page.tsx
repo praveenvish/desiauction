@@ -1,6 +1,6 @@
 import { cache, type CSSProperties } from "react";
 import { formatAmount, paise, roleLabelIn, sportPackFor, type MoneyUnit } from "@desiauction/core";
-import { ButtonLink, IconArrowLeft, PlayerImage } from "@desiauction/ui";
+import { ButtonLink, IconArrowLeft, PlayerImage, RosterMark } from "@desiauction/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -186,6 +186,7 @@ export default async function PublicTeamPage({
                         name={member.name}
                         seed={member.registrationId}
                         size="md"
+                        shape="round"
                         src={member.photoUrl}
                         decorative
                       />
@@ -197,9 +198,9 @@ export default async function PublicTeamPage({
                             not in the price slot, where gold italics read as
                             a price. */}
                         {member.marks.includes("captain") ? (
-                          <span className="team-page-badge">Captain</span>
+                          <RosterMark kind="captain" className="team-page-badge" />
                         ) : member.marks.includes("icon") ? (
-                          <span className="team-page-badge">Icon</span>
+                          <RosterMark kind="icon" className="team-page-badge" />
                         ) : null}
                       </strong>
                       <span>{roleLabelIn(pack, member.role)}</span>

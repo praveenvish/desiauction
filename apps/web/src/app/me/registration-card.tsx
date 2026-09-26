@@ -1,4 +1,4 @@
-import { Pill, TeamChip, type KitTone } from "@desiauction/ui";
+import { Pill, RosterMark, TeamChip, type KitTone } from "@desiauction/ui";
 import type { MoneyUnit } from "@desiauction/core";
 import Link from "next/link";
 
@@ -81,9 +81,9 @@ export function RegistrationCard({
           <span className="me-reg-noteam">No team yet</span>
         )}
         {season.isCaptain && season.auction?.kind !== "captain" ? (
-          <Pill tone="purple">Captain</Pill>
+          <RosterMark kind="captain" />
         ) : season.isViceCaptain ? (
-          <Pill tone="purple">Vice-captain</Pill>
+          <RosterMark kind="vice-captain" />
         ) : null}
       </span>
     </Link>

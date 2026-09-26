@@ -1,4 +1,12 @@
-import { EmptyState, IconArrowRight, IconGavel, IconUsers, PlayerImage } from "@desiauction/ui";
+import {
+  EmptyState,
+  IconArrowRight,
+  IconGavel,
+  IconUsers,
+  PlayerImage,
+  RosterMark,
+  type RosterMarkKind,
+} from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
@@ -40,11 +48,12 @@ export async function OwnSquad({
   // Pre-signed first (captain, icon, retained): they are the squad's first
   // names and they count in "Players n/max" above, so they are cards too.
   const preSigned = plan.preSignedPlayers;
-  const marksOf = (player: (typeof preSigned)[number]): string =>
-    [player.isIcon ? "Icon" : null, player.isCaptain ? "Captain" : null]
-      .concat(player.isRetained ? ["Retained"] : [])
-      .filter((word): word is string => word !== null)
-      .join(" · ");
+  const marksOf = (player: (typeof preSigned)[number]): RosterMarkKind[] =>
+    [
+      player.isCaptain ? ("captain" as const) : null,
+      player.isIcon ? ("icon" as const) : null,
+      player.isRetained ? ("retained" as const) : null,
+    ].filter((kind) => kind !== null);
   return (
     <section
       className="tm-own"
@@ -104,10 +113,14 @@ export async function OwnSquad({
                 decorative
               />
               <span className="tm-own-who">
-                <span className="tm-own-player-name">{player.playerName ?? "Player"}</span>
+                <span className="tm-own-line">
+                  <span className="tm-own-player-name">{player.playerName ?? "Player"}</span>
+                  {marksOf(player).map((kind) => (
+                    <RosterMark key={kind} kind={kind} />
+                  ))}
+                </span>
                 <span className="tm-own-role">
-                  <span className="tm-own-mark">{marksOf(player)}</span>
-                  {player.role !== null ? ` · ${labelOf(player.role)}` : ""}
+                  {player.role !== null ? labelOf(player.role) : "Player"}
                 </span>
               </span>
               <span className="tm-own-price tm-own-price--signed">Pre-signed</span>

@@ -121,6 +121,7 @@ export function SquadsView({
               // internal handle, and a squad sheet is read by what people play.
               role: roleLabel(player.role),
               preSigned: player.status === "retained",
+              mark: player.preSignedAs,
               photo: (
                 <PlayerImage
                   name={player.name}
