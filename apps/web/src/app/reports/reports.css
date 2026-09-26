@@ -226,14 +226,21 @@
 }
 
 @media (max-width: 719px) {
+  /* Name over the bar, figures under it. Sharing row one with "89,500 pts ·
+     90% · 10,500 left · 12 players" cut every team to "Mum…/Pune…". */
   .rp-bar-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-1) var(--space-3);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
   }
 
-  .rp-bar-track {
-    grid-column: 1 / -1;
-    grid-row: 2;
+  .rp-bar-label {
+    white-space: normal;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .rp-bar-value {
+    text-align: start;
+    white-space: normal;
   }
 
   .rp-picker {

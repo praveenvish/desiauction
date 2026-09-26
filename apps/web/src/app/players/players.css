@@ -384,10 +384,14 @@
     display: none;
   }
 
+  /* Two lines, not an ellipsis: "Thane T…" hid the team, so a sold player
+     looked like an unsold one. */
   .px-sub {
+    display: -webkit-box;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .px-sub-phone {

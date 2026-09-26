@@ -83,6 +83,8 @@ export function AppointmentsPanel({ slug, view }: { slug: string; view: Appointm
              list" — so the teams stay above the fold (the table was ~450px). */
           <details className="tm-announce-review">
             <summary className="tm-announce-summary">
+              {/* 32px discs: at 24px the 8px overlap covered half of each
+                  monogram ("RI VI NI…" clipped to slivers). */}
               <span className="tm-face-stack" aria-hidden>
                 {view.rows.slice(0, 6).map((row) => (
                   <PlayerImage
@@ -90,7 +92,7 @@ export function AppointmentsPanel({ slug, view }: { slug: string; view: Appointm
                     name={row.name}
                     seed={row.registrationId}
                     src={row.photoUrl}
-                    size="xs"
+                    size="sm"
                     shape="round"
                     decorative
                   />

@@ -234,7 +234,11 @@ export default async function PlayersPage({
                                 and team the hidden cells hold on a laptop. */}
                             <span className="px-sub-phone">
                               {row.role !== null ? ` · ${row.role}` : ""}
-                              {row.teamName !== null ? ` · ${row.teamName}` : ""}
+                              {row.teamName !== null
+                                ? ` · ${row.teamName}`
+                                : row.auctionDone && row.status === "approved"
+                                  ? " · Unsold"
+                                  : ""}
                             </span>
                           </span>
                         </span>

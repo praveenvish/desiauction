@@ -17,6 +17,7 @@ import { useState, useTransition } from "react";
 import { formatPhone } from "../../../lib/format-phone";
 import { declineErasureAction, eraseAccountAction } from "../../../server/admin/erasure-actions";
 import type { DeskRow, ErasureDesk } from "../../../server/privacy/desk";
+import { ERASURE_PROMISE_DAYS, erasureDaysLeft, istDate } from "./erasure-sla";
 
 /**
  * Deciding erasure requests, with what the erasure will do in front of you.
@@ -35,7 +36,7 @@ export function ErasureDeskPanel({ desk, nowMs }: { desk: ErasureDesk; nowMs: nu
           icon={<IconTrash />}
           tone="red"
           title="Open requests"
-          description={`${String(desk.open.length)} waiting, oldest first · a reply is promised within ${String(PROMISE_DAYS)} days`}
+          description={`${String(desk.open.length)} waiting, oldest first · a reply is promised within ${String(ERASURE_PROMISE_DAYS)} days`}
           flush
           data-testid="erasure-open"
         >
@@ -67,10 +68,8 @@ export function ErasureDeskPanel({ desk, nowMs }: { desk: ErasureDesk; nowMs: nu
             {desk.decided.map((row) => (
               <li key={row.id}>
                 <span className="admin-meta">
-                  asked {row.requestedAt.toISOString().slice(0, 10)}
-                  {row.decidedAt === null
-                    ? ""
-                    : ` · decided ${row.decidedAt.toISOString().slice(0, 10)}`}
+                  asked {istDate(row.requestedAt.getTime())}
+                  {row.decidedAt === null ? "" : ` · decided ${istDate(row.decidedAt.getTime())}`}
                   {row.decisionNote === null ? "" : ` · ${row.decisionNote}`}
                 </span>
                 <Pill
@@ -99,11 +98,8 @@ export function ErasureDeskPanel({ desk, nowMs }: { desk: ErasureDesk; nowMs: nu
 }
 
 /** The account page's promise, drawn: how long this request has left. */
-const PROMISE_DAYS = 7;
-
 function SlaPill({ requestedAt, nowMs }: { requestedAt: Date; nowMs: number }) {
-  const waited = Math.floor((nowMs - requestedAt.getTime()) / 86_400_000);
-  const left = PROMISE_DAYS - waited;
+  const left = erasureDaysLeft(requestedAt.getTime(), nowMs);
   if (left < 0) {
     return (
       <Pill tone="red" dot testId="erasure-sla">
@@ -163,7 +159,7 @@ function ErasureRow({ row, nowMs }: { row: DeskRow; nowMs: number }) {
         <SlaPill requestedAt={row.requestedAt} nowMs={nowMs} />
       </div>
       <p className="pass-row-sub">
-        asked {row.requestedAt.toISOString().slice(0, 10)}
+        asked {istDate(row.requestedAt.getTime())}
         {row.phone !== null ? (
           <>
             {" · "}

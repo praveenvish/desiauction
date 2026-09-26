@@ -1,5 +1,14 @@
 /* /money — the personal receipts page. Tokens only; both themes. */
 
+/* One axis: the tile is centred, so the title, the sentence and the button
+   are too (they sat left under a centred icon and read as a bug). */
+section.my-money-empty .my-money-empty-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
 .my-money-empty {
   display: flex;
   flex-direction: column;

@@ -46,6 +46,7 @@ export default async function MoneyPage() {
         <section className="my-money-empty" data-testid="my-money-empty">
           <IconTile icon={<IconReceipt weight="duotone" />} tone="gold" />
           <EmptyState
+            className="my-money-empty-body"
             headingLevel={2}
             title="No receipts yet"
             description="When you own a team and a club records your payment, its receipt lands here. Running a season? Its fees and settlement live on that season's Money tab."

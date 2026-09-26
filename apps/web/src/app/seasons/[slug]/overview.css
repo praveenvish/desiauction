@@ -137,7 +137,7 @@ a.ov-hero-club:focus-visible {
 /* Cards side by side share a height, as in the mockup: a short card beside a
    tall one otherwise leaves a ragged hole in the row. */
 .ov-grid > * {
-  align-items: start;
+  align-items: stretch;
 }
 
 /* ---- Card links, empty states --------------------------------------------- */

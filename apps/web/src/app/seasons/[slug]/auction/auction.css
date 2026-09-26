@@ -1559,6 +1559,40 @@
   color: var(--money-value);
 }
 
+/* PHONE: the role drops under the name, so the name gets the width it lost
+   to "All-rounder" — "Rohan Kulk…" and "Kun…" clipped on a 390px screen.
+   Face and price span both lines; the row stays one player. */
+@media (max-width: 719px) {
+  .squad-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "face who price"
+      "face role price";
+    row-gap: 0;
+  }
+
+  .squad-row > :first-child {
+    grid-area: face;
+  }
+
+  .squad-who {
+    grid-area: who;
+    flex-wrap: wrap;
+  }
+
+  .squad-name {
+    white-space: normal;
+  }
+
+  .squad-role {
+    grid-area: role;
+  }
+
+  .squad-price {
+    grid-area: price;
+  }
+}
+
 /* The open-spots line is not a player: no grid tracks to honour. */
 .squad-row--open {
   display: flex;

@@ -163,6 +163,15 @@
   color: var(--text-secondary);
 }
 
+/* PHONE: a card whose head carries a sentence gives it the row; the pill or
+   link beside it wraps under instead of squeezing the sentence to five lines
+   (Season pass, Standings). A bare title keeps its inline "View all". */
+@media (max-width: 719px) {
+  .card-titles:has(> .card-desc) {
+    flex-basis: 14rem;
+  }
+}
+
 .card-action {
   flex: none;
   display: flex;
@@ -270,6 +279,18 @@ a.stat:hover .stat-chevron {
   color: var(--text-secondary);
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* A half-width phone tile cut its key fact mid-number ("43 approved · 0 t…",
+   "58% of every pur…"): there the hint wraps, up to two lines. */
+@media (max-width: 719px) {
+  .stat-hint {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+  }
 }
 
 .stat-bar {
