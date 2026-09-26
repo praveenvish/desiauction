@@ -919,3 +919,192 @@
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   }
 }
+
+/* ---- The owner's own squad, inline (wow pass, round 2) ---- */
+
+.tm-grid .tm-card[data-own="true"] {
+  border-color: var(--accent-line);
+  box-shadow:
+    inset 0 3px 0 var(--team),
+    var(--shadow-2);
+}
+
+.tm-card-yours {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.tm-own {
+  --team: var(--accent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  overflow: hidden;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      50% 120% at 100% 0%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.tm-own::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--team);
+}
+
+.tm-own-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-6);
+}
+
+.tm-own-id {
+  min-width: 0;
+}
+
+.tm-own-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.tm-own-name {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-2xl-size);
+  line-height: 1.2;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-own-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+
+.tm-own-facts dt {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+
+.tm-own-facts dd {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.tm-own-facts dd span {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.tm-own-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-own-player {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.tm-own-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tm-own-player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-own-role {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  color: var(--text-secondary);
+}
+
+.tm-own-price {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.tm-own-empty {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.tm-own-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.tm-own-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.tm-own-link:hover {
+  text-decoration: underline;
+}

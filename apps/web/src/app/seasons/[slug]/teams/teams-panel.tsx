@@ -77,10 +77,13 @@ export function TeamsPanel({
   slug,
   selected,
   beforeGrid,
+  ownTeamId,
 }: {
   view: TeamsWorkspaceView;
   slug: string;
   selected: TeamCard | null;
+  /** The viewer's own team (an owner): its card leads and says so. */
+  ownTeamId?: string;
   /**
    * Work that is waiting on the organizer (announcements, squad sheets),
    * drawn above the team cards rather than below them — the page's job right
@@ -91,7 +94,7 @@ export function TeamsPanel({
   if (selected !== null) {
     return <RosterDetail slug={slug} team={selected} view={view} />;
   }
-  return <TeamGrid view={view} slug={slug} beforeGrid={beforeGrid} />;
+  return <TeamGrid view={view} slug={slug} beforeGrid={beforeGrid} ownTeamId={ownTeamId} />;
 }
 
 /* --- The franchise grid ---------------------------------------------------- */
@@ -100,10 +103,12 @@ function TeamGrid({
   view,
   slug,
   beforeGrid,
+  ownTeamId,
 }: {
   view: TeamsWorkspaceView;
   slug: string;
   beforeGrid?: ReactNode;
+  ownTeamId?: string | undefined;
 }) {
   const money = useMoney();
   const [query, setQuery] = useState("");
@@ -111,13 +116,18 @@ function TeamGrid({
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (needle === "") return view.teams;
-    return view.teams.filter(
+    // The owner's own team leads; everyone else keeps the season's order.
+    const ordered =
+      ownTeamId === undefined
+        ? view.teams
+        : [...view.teams].sort((a, b) => Number(b.id === ownTeamId) - Number(a.id === ownTeamId));
+    if (needle === "") return ordered;
+    return ordered.filter(
       (team) =>
         team.name.toLowerCase().includes(needle) ||
         (team.shortName ?? "").toLowerCase().includes(needle),
     );
-  }, [query, view.teams]);
+  }, [query, view.teams, ownTeamId]);
 
   return (
     <>
@@ -217,7 +227,7 @@ function TeamGrid({
         <ul className="tm-grid" data-testid="teams-list">
           {shown.map((team) => (
             <li key={team.id}>
-              <TeamGridCard team={team} slug={slug} />
+              <TeamGridCard team={team} slug={slug} own={team.id === ownTeamId} />
             </li>
           ))}
           {shown.length === 0 ? <li className="tm-grid-empty">No teams match “{query}”.</li> : null}
@@ -260,7 +270,7 @@ function teamPaint(color: string | null): CSSProperties | undefined {
   return color !== null ? ({ "--team": color } as CSSProperties) : undefined;
 }
 
-function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
+function TeamGridCard({ team, slug, own }: { team: TeamCard; slug: string; own: boolean }) {
   const money = useMoney();
   const remaining =
     team.purseTotal !== undefined && team.spent !== undefined
@@ -270,7 +280,11 @@ function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
   const full =
     team.squadMax !== undefined && team.squadMax !== null && team.squadFilled >= team.squadMax;
   return (
-    <article className="team-card tm-card" style={teamPaint(team.color)}>
+    <article
+      className="team-card tm-card"
+      style={teamPaint(team.color)}
+      data-own={own ? "true" : undefined}
+    >
       <div className="tm-card-top">
         <Crest team={team} size="md" />
         <div className="tm-card-id">
@@ -281,6 +295,7 @@ function TeamGridCard({ team, slug }: { team: TeamCard; slug: string }) {
             ) : null}
           </span>
           <span className="tm-card-owner" title={owner}>
+            {own ? <span className="tm-card-yours">Your team · </span> : null}
             {owner}
           </span>
         </div>
