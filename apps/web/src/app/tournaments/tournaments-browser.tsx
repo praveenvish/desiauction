@@ -1,6 +1,17 @@
 "use client";
 
-import { IconGrid, IconList, IconSearch, VisuallyHidden } from "@desiauction/ui";
+import {
+  IconGrid,
+  IconList,
+  Pill,
+  SegmentedTabs,
+  Toolbar,
+  ToolbarCount,
+  ToolbarSearch,
+  ToolbarSelect,
+  ToolbarSpacer,
+  ToolbarToggle,
+} from "@desiauction/ui";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { PageAction } from "../../components/shell/page-action";
@@ -45,12 +56,13 @@ export interface BrowsableGroup extends AccordionGroup {
   createdAt: number;
 }
 
+/* The status tabs, in the order a season lives them. */
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
+  { value: "draft", label: "Draft" },
+  { value: "setup", label: "In setup" },
   { value: "registration_open", label: "Registration open" },
   { value: "registration_closed", label: "Registration closed" },
-  { value: "setup", label: "In setup" },
-  { value: "draft", label: "Draft" },
 ];
 
 const SORT_OPTIONS: { value: Sort; label: string }[] = [
@@ -89,16 +101,15 @@ function byEdition(a: SeasonRow, b: SeasonRow, oldestFirst: boolean): number {
 export function TournamentsBrowser({
   groups,
   initialMode,
-  summary,
+  pendingReview = 0,
   featured,
   actionGrouped,
   actionSeasons,
 }: {
   groups: BrowsableGroup[];
   initialMode: ViewMode;
-  /** The summary cards, built on the server. One set for both views: every
-      figure on it is about seasons, which both views list. */
-  summary: ReactNode;
+  /** Registrations waiting on THIS person, across every season they review. */
+  pendingReview?: number;
   /** The featured season (banner + journey), built on the server. */
   featured?: ReactNode;
   /** The header's one primary action per view — absent for someone who holds
@@ -192,158 +203,152 @@ export function TournamentsBrowser({
   const totalSeasons = groups.reduce((sum, group) => sum + group.seasons.length, 0);
   const shownSeasons = seasons.length;
 
+  // Every figure on the status tabs counts the WHOLE index, whichever tab is
+  // open — the tab is the filter, its number is how many it would show.
+  const statusCount = (value: StatusFilter): number =>
+    value === "all"
+      ? totalSeasons
+      : groups.reduce(
+          (sum, group) => sum + group.seasons.filter((season) => season.status === value).length,
+          0,
+        );
+
+  const countLine = flat
+    ? filtering
+      ? `${String(shownSeasons)} of ${String(totalSeasons)} seasons`
+      : `${String(totalSeasons)} ${totalSeasons === 1 ? "season" : "seasons"}`
+    : filtering
+      ? `${String(visible.length)} of ${String(groups.length)} · ${String(shownSeasons)} of ${String(totalSeasons)} seasons`
+      : `${String(groups.length)} ${groups.length === 1 ? "tournament" : "tournaments"} · ${String(totalSeasons)} ${totalSeasons === 1 ? "season" : "seasons"}`;
+
   return (
     <>
       {(flat ? actionSeasons : actionGrouped) !== undefined ? (
         <PageAction>{flat ? actionSeasons : actionGrouped}</PageAction>
       ) : null}
 
-      {/* The view switch and the filters share one row (founder mockup): the
-          switch on the left, search / status / sort on the right. */}
-      <div className="tg-topbar">
-        {/* Two indexes over one dataset used to be two URLs with two vocabularies.
-          They are one destination now, and this is the switch between them. */}
-        <div className="tg-modes" role="group" aria-label="Index view" data-testid="tg-modes">
-          <button
-            type="button"
-            className="tg-mode-btn"
-            aria-pressed={!flat}
-            onClick={() => {
-              chooseMode("grouped");
-            }}
-            data-testid="tg-mode-grouped"
-          >
-            By tournament
-          </button>
-          <button
-            type="button"
-            className="tg-mode-btn"
-            aria-pressed={flat}
-            onClick={() => {
-              chooseMode("seasons");
-            }}
-            data-testid="tg-mode-seasons"
-          >
-            All seasons
-          </button>
-        </div>
-
-        <div className="tg-toolbar">
-          <div className="tg-search">
-            <span className="tg-search-icon" aria-hidden>
-              <IconSearch size={16} />
-            </span>
-            <input
-              type="search"
-              className="tg-search-input"
-              placeholder="Search tournaments or seasons…"
-              aria-label="Search tournaments and seasons"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-              }}
-              data-testid="tg-search"
-            />
-          </div>
-
-          <label className="tg-pill">
-            <span className="tg-pill-label">Status:</span>
-            <select
-              className="tg-pill-select"
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value as StatusFilter);
-              }}
-              data-testid="tg-status"
-            >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="tg-pill">
-            <span className="tg-pill-label">Sort:</span>
-            <select
-              className="tg-pill-select"
-              // "Most seasons" cannot be *selected* in the flat view, but it can
-              // be *carried in* from the grouped one; the control shows what the
-              // list is actually doing rather than a value with no option.
-              value={flat && sort === "seasons" ? "newest" : sort}
-              onChange={(event) => {
-                setSort(event.target.value as Sort);
-              }}
-              data-testid="tg-sort"
-            >
-              {(flat ? SEASON_SORT_OPTIONS : SORT_OPTIONS).map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/* Two states of one setting, so `aria-pressed` on a pair beats a pair
-            of unrelated buttons — a screen reader announces which is current.
-            Grouped view only: "All seasons" IS the card grid, so a List/Grid
-            pair beside the view switch would be a control with one state. */}
-          {flat ? null : (
-            <div className="tg-view" role="group" aria-label="Season layout">
-              <button
-                type="button"
-                className="tg-view-btn"
-                aria-pressed={layout === "list"}
-                onClick={() => {
-                  setLayout("list");
-                }}
-                data-testid="tg-view-list"
-              >
-                <IconList size={16} />
-                <VisuallyHidden>List</VisuallyHidden>
-              </button>
-              <button
-                type="button"
-                className="tg-view-btn"
-                aria-pressed={layout === "grid"}
-                onClick={() => {
-                  setLayout("grid");
-                }}
-                data-testid="tg-view-grid"
-              >
-                <IconGrid size={16} />
-                <VisuallyHidden>Grid</VisuallyHidden>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {summary}
-
       {featured}
 
-      {/* Two jobs in one line. It announces the result of a filter that runs
-          entirely in the browser (nothing else would tell a screen reader the
-          list had changed), and it says out loud that the summary cards above
-          are NOT filtered — the band once kept reading "7 Seasons" with one
-          season left on screen, and nothing on the page admitted it. */}
-      <p className="tg-results" role="status" aria-live="polite" data-testid="tg-results">
-        {flat
-          ? filtering
-            ? `Showing ${String(shownSeasons)} of ${String(totalSeasons)} seasons. The summary above counts everything.`
-            : `${String(totalSeasons)} ${totalSeasons === 1 ? "season" : "seasons"}`
-          : filtering
-            ? `Showing ${String(visible.length)} of ${String(groups.length)} ${groups.length === 1 ? "group" : "groups"} · ${String(shownSeasons)} of ${String(totalSeasons)} seasons. The summary above counts everything.`
-            : `${String(groups.length)} ${groups.length === 1 ? "tournament" : "tournaments"} · ${String(totalSeasons)} ${totalSeasons === 1 ? "season" : "seasons"}`}
-      </p>
+      {/* THE SHARED LIST HEAD (round 2): status tabs with counts, then ONE
+          toolbar row — view · search · count · sort · layout — the same kit
+          and geometry as Players and Registrations. The four KPI tiles that
+          sat here were these same numbers, mostly zeros, and not filters. */}
+      <div className="tg-listhead">
+        <div className="tg-tabs-row">
+          <SegmentedTabs
+            label="Season status"
+            testId="tg-summary"
+            items={STATUS_OPTIONS.map((option) => ({
+              key: option.value,
+              label: option.label,
+              count: statusCount(option.value).toLocaleString("en-IN"),
+              active: status === option.value,
+              onSelect: () => {
+                setStatus(option.value);
+              },
+              testId: `tg-status-${option.value}`,
+            }))}
+          />
+          {pendingReview > 0 ? (
+            <Pill tone="amber" dot testId="tg-pending">
+              {pendingReview.toLocaleString("en-IN")}{" "}
+              {pendingReview === 1 ? "registration" : "registrations"} to review
+            </Pill>
+          ) : null}
+        </div>
+
+        <Toolbar className="tg-bar" testId="tg-toolbar">
+          <ToolbarToggle
+            label="Index view"
+            testId="tg-modes"
+            items={[
+              {
+                key: "grouped",
+                label: "By tournament",
+                active: !flat,
+                onSelect: () => {
+                  chooseMode("grouped");
+                },
+                testId: "tg-mode-grouped",
+              },
+              {
+                key: "seasons",
+                label: "All seasons",
+                active: flat,
+                onSelect: () => {
+                  chooseMode("seasons");
+                },
+                testId: "tg-mode-seasons",
+              },
+            ]}
+          />
+          <ToolbarSearch
+            id="tg-search"
+            label="Search tournaments and seasons"
+            placeholder="Search tournaments or seasons…"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+            }}
+            testId="tg-search"
+          />
+          <ToolbarSpacer />
+          {/* Announces a filter that runs entirely in the browser — nothing
+              else would tell a screen reader the list had changed. */}
+          <ToolbarCount>
+            <span role="status" aria-live="polite" data-testid="tg-results">
+              {countLine}
+            </span>
+          </ToolbarCount>
+          <ToolbarSelect
+            id="tg-sort"
+            label="Sort"
+            testId="tg-sort"
+            // "Most seasons" cannot be *selected* in the flat view, but it can
+            // be *carried in* from the grouped one; the control shows what the
+            // list is actually doing rather than a value with no option.
+            value={flat && sort === "seasons" ? "newest" : sort}
+            onChange={(event) => {
+              setSort(event.target.value as Sort);
+            }}
+            options={flat ? SEASON_SORT_OPTIONS : SORT_OPTIONS}
+          />
+          {/* Grouped view only: "All seasons" IS the card grid. */}
+          {flat ? null : (
+            <ToolbarToggle
+              label="Season layout"
+              items={[
+                {
+                  key: "list",
+                  label: "List",
+                  icon: <IconList size={16} />,
+                  active: layout === "list",
+                  onSelect: () => {
+                    setLayout("list");
+                  },
+                  testId: "tg-view-list",
+                },
+                {
+                  key: "grid",
+                  label: "Grid",
+                  icon: <IconGrid size={16} />,
+                  active: layout === "grid",
+                  onSelect: () => {
+                    setLayout("grid");
+                  },
+                  testId: "tg-view-grid",
+                },
+              ]}
+            />
+          )}
+        </Toolbar>
+      </div>
 
       {flat ? (
         seasons.length === 0 ? (
           <p className="tg-noresults" data-testid="tg-noresults">
             {filtering
-              ? "Nothing matches that search. Try a different name, or set Status back to “All”."
+              ? "Nothing matches. Try a different name, or pick the “All” tab."
               : "No seasons yet. Every edition you run will appear here."}
           </p>
         ) : (
@@ -355,7 +360,7 @@ export function TournamentsBrowser({
         )
       ) : visible.length === 0 ? (
         <p className="tg-noresults" data-testid="tg-noresults">
-          Nothing matches that search. Try a different name, or set Status back to “All”.
+          Nothing matches. Try a different name, or pick the “All” tab.
         </p>
       ) : (
         <div className="tg-list">

@@ -1,15 +1,4 @@
-import {
-  ButtonLink,
-  Card,
-  IconAlert,
-  IconCalendar,
-  IconPlay,
-  IconTile,
-  IconTrophy,
-  IconUsers,
-  type KitConcept,
-} from "@desiauction/ui";
-import type { ReactNode } from "react";
+import { ButtonLink, Card, IconTrophy } from "@desiauction/ui";
 import { enabledSports } from "../../server/competition/sports";
 import { redirect } from "next/navigation";
 
@@ -25,11 +14,6 @@ import "../seasons/seasons.css";
 import "./tournaments.css";
 
 export const metadata = { title: "Tournaments · DesiAuction" };
-
-/** `Stat` never formats a number itself (C-7) — the caller owns the locale. */
-function count(value: number): string {
-  return value.toLocaleString("en-IN");
-}
 
 /**
  * The tournaments index — rail slot 2, built to Tournaments & Orgs.dc.html.
@@ -159,86 +143,8 @@ export default async function TournamentsPage({
     </FormDialog>
   );
 
-  /*
-   * ONE summary, whichever view is showing (founder mockup, 2026-09-19). The
-   * index used to swap between a tournament band and a season band; both led
-   * with counts of the same rows in different units. The four figures that
-   * matter are all about seasons — how many, how many taking entries, how many
-   * in flight, and the one to-do — and the tournament count rides the first
-   * card's hint rather than taking a card of its own.
-   */
-  const tournamentsHint =
-    view.totals.tournaments === 0
-      ? "All one-off seasons"
-      : `Across ${count(view.totals.tournaments)} tournament${view.totals.tournaments === 1 ? "" : "s"}`;
+  // Only what THIS person may decide (`registration.review`).
   const pending = view.canReviewAnywhere ? view.totals.pending : 0;
-  // One ruled strip, not four boxed tiles of mostly zeros (~110px → ~56px).
-  const summaryFacts: {
-    key: string;
-    icon: ReactNode;
-    concept: KitConcept;
-    value: string;
-    label: string;
-    hint: string;
-    quiet?: boolean;
-  }[] = [
-    {
-      key: "seasons",
-      icon: <IconCalendar />,
-      concept: "season",
-      value: count(view.totals.seasons),
-      label: "Total seasons",
-      hint: tournamentsHint,
-    },
-    {
-      key: "open",
-      icon: <IconUsers />,
-      concept: "players",
-      value: count(view.totals.open),
-      label: "Accepting entries",
-      hint: view.totals.open === 0 ? "Nobody taking entries" : "Players can register",
-      quiet: view.totals.open === 0,
-    },
-    {
-      key: "flight",
-      icon: <IconPlay />,
-      concept: "auction",
-      value: count(view.totals.inFlight),
-      label: "In flight",
-      hint: "In setup or open",
-      quiet: view.totals.inFlight === 0,
-    },
-    // The only figure here that is a to-do rather than a fact, and it counts
-    // only what THIS person may decide (`registration.review`).
-    {
-      key: "pending",
-      icon: <IconAlert />,
-      concept: pending > 0 ? "alert" : "neutral",
-      value: count(pending),
-      label: "Registrations to review",
-      hint: !view.canReviewAnywhere
-        ? "Owners and staff review these"
-        : pending === 0
-          ? "Nothing waiting"
-          : "Awaiting approval",
-      quiet: pending === 0,
-    },
-  ];
-  const summary = (
-    <ul className="tg-facts da-stagger" data-testid="tg-summary">
-      {summaryFacts.map((fact) => (
-        <li key={fact.key} className="tg-fact" data-quiet={fact.quiet === true || undefined}>
-          <IconTile icon={fact.icon} concept={fact.concept} size="sm" />
-          <span className="tg-fact-text">
-            <span className="tg-fact-line">
-              <strong className="tg-fact-value">{fact.value}</strong> {fact.label}
-            </span>
-            <span className="tg-fact-hint">{fact.hint}</span>
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
 
   const featuredNode =
     featured === null ? null : (
@@ -304,35 +210,13 @@ export default async function TournamentsPage({
             </div>
           </Card>
         ) : (
-          <>
-            <TournamentsBrowser
-              groups={groups}
-              initialMode={mode}
-              summary={summary}
-              featured={featuredNode}
-              {...(canCreate ? { actionGrouped: newTournament, actionSeasons: newSeason } : {})}
-            />
-
-            {/* The way to the next edition, as a quiet dashed row at the end
-                of the list (help is in the rail, not a footnote here). */}
-            {canCreate ? (
-              <section className="tg-cta" aria-labelledby="tg-cta-title">
-                <IconTile icon={<IconTrophy />} concept="season" size="sm" />
-                <div className="tg-cta-text">
-                  <h2 id="tg-cta-title">Running another edition?</h2>
-                  <p>Start a new season — invite players and keep the excitement going.</p>
-                </div>
-                <FormDialog
-                  title="New season"
-                  triggerLabel="+ New season"
-                  variant="secondary"
-                  triggerTestId="cta-new-season"
-                >
-                  <CreateCompetitionForm sports={sportOptions} orgs={createIn} />
-                </FormDialog>
-              </section>
-            ) : null}
-          </>
+          <TournamentsBrowser
+            groups={groups}
+            initialMode={mode}
+            pendingReview={pending}
+            featured={featuredNode}
+            {...(canCreate ? { actionGrouped: newTournament, actionSeasons: newSeason } : {})}
+          />
         )}
       </div>
     </main>

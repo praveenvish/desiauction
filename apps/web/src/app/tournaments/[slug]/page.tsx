@@ -1,4 +1,4 @@
-import { Card, EmptyState, PageIntro } from "@desiauction/ui";
+import { Card, EmptyState } from "@desiauction/ui";
 import { enabledSports } from "../../../server/competition/sports";
 import { notFound } from "next/navigation";
 import { cache, Suspense, type ReactNode } from "react";
@@ -49,10 +49,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 const WHAT_A_TOURNAMENT_IS =
   "A tournament holds the editions that actually run. Add the first one to take registrations, pick teams and run auction night.";
 
-function whatThisIs(tournamentName: string, seasons: number): string {
+function whatThisIs(tournamentName: string, orgName: string, seasons: number): string {
   return seasons === 0
     ? WHAT_A_TOURNAMENT_IS
-    : `Every edition of ${tournamentName}. Add a season when the next one is ready.`;
+    : `Every edition of ${tournamentName}, run by ${orgName}.`;
 }
 
 /**
@@ -92,30 +92,28 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
       <div className="competitions-stack">
         {/* The way back is the identity bar's trail ("Tournaments"); the
             separate "← All tournaments" row repeated it. */}
+        {/* The club is named in the seasons line below (round 2: it floated
+            alone at the top left as a subtitle to nothing). */}
         <PageTitle title={tournament.name} />
-        <PageIntro
-          subtitle={tournament.orgName}
-          {...(viewer.canCreateSeason
-            ? {
-                actions: (
-                  <FormDialog
-                    title={`New season in ${tournament.name}`}
-                    triggerLabel="Add a season"
-                    size="touch"
-                    triggerTestId="add-season"
-                  >
-                    {addSeasonForm}
-                  </FormDialog>
-                ),
-              }
-            : {})}
-        />
         <Suspense fallback={<TournamentsSkeleton rows={3} />}>
           <SeasonsSection
             tournamentId={tournament.id}
             tournamentName={tournament.name}
+            orgName={tournament.orgName}
             canCreateSeason={viewer.canCreateSeason}
             addSeasonForm={addSeasonForm}
+            addSeason={
+              viewer.canCreateSeason ? (
+                <FormDialog
+                  title={`New season in ${tournament.name}`}
+                  triggerLabel="Add a season"
+                  size="touch"
+                  triggerTestId="add-season"
+                >
+                  {addSeasonForm}
+                </FormDialog>
+              ) : undefined
+            }
           />
         </Suspense>
       </div>
@@ -126,20 +124,25 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
 async function SeasonsSection({
   tournamentId,
   tournamentName,
+  orgName,
   canCreateSeason,
   addSeasonForm,
+  addSeason,
 }: {
   tournamentId: string;
   tournamentName: string;
+  orgName: string;
   canCreateSeason: boolean;
   addSeasonForm: ReactNode;
+  /** The page's one create door, at the end of the section head. */
+  addSeason?: ReactNode;
 }) {
   const seasons = await tournamentSeasons(tournamentId);
   /* The best sentence in the journey used to vanish the moment it worked: it
      lived only in the empty state, so once a season existed the whole of the
      page's explanation of itself was "Demo Cricket Club · 5 seasons". It is
      drawn here, beside the seasons, so it can say the right thing about them. */
-  const what = <p className="tg-what">{whatThisIs(tournamentName, seasons.length)}</p>;
+  const what = <p className="tg-what">{whatThisIs(tournamentName, orgName, seasons.length)}</p>;
 
   if (seasons.length === 0) {
     return (
@@ -184,7 +187,9 @@ async function SeasonsSection({
             Seasons <span className="tg-section-count">{seasons.length}</span>
           </h2>
           {what}
-          {canCreateSeason ? null : (
+          {canCreateSeason ? (
+            <span className="tg-section-action">{addSeason}</span>
+          ) : (
             <span className="tg-cannot" data-testid="tournament-cannot-create">
               Ask an owner to add a season.
             </span>

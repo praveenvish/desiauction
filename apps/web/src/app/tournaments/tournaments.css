@@ -1,226 +1,60 @@
 /* The tournaments accordion (Tournaments & Orgs.dc.html). */
 
-/* --- view switch ---------------------------------------------------------- */
-/* Two views of ONE dataset — the merge of what used to be /tournaments and
-   /seasons. It sits above the summary band because the band follows it, and it
-   carries words rather than glyphs: "grouped by tournament" and "every edition,
-   flat" are not ideas an icon pair can carry. */
-.tg-modes {
-  display: inline-flex;
-  align-self: flex-start;
-  max-width: 100%;
-  padding: 2px;
-  gap: 2px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-
-.tg-mode-btn {
-  min-height: 40px;
-  padding: 0 var(--space-4);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-sm-size);
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.tg-mode-btn:hover {
-  color: var(--text-primary);
-}
-
-.tg-mode-btn[aria-pressed="true"] {
-  background: var(--surface-raised);
-  color: var(--text-accent);
-  box-shadow: var(--shadow-1);
-}
-
-.tg-mode-btn:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
-/* Below ~380px the pair is the widest thing on the page; the labels are the
-   last thing that may shrink, so the padding goes first. */
-@media (max-width: 400px) {
-  .tg-mode-btn {
-    padding: 0 var(--space-2);
-  }
-}
-
-/* --- toolbar -------------------------------------------------------------- */
-/* The filters sit on the page, not in a box of their own (founder mockup):
-   each control is its own white field, in one row with the view switch. */
-.tg-topbar {
+/* --- the list head: status tabs, then ONE toolbar row (round 2) ---------- */
+.tg-listhead {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3) var(--space-5);
-}
-
-.tg-toolbar {
-  flex: 1 1 36rem;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: var(--space-3);
-  flex-wrap: wrap;
-  min-width: 0;
 }
 
-.tg-search {
-  flex: 1 1 14rem;
-  max-width: 24rem;
-  min-width: 200px;
+.tg-tabs-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-}
-
-.tg-search:focus-within {
-  border-color: var(--focus-ring);
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -1px;
-}
-
-.tg-search-icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-}
-
-.tg-search-input {
-  flex: 1;
+  gap: var(--space-2) var(--space-3);
   min-width: 0;
-  min-height: 44px;
-  border: none;
-  background: none;
-  padding: var(--space-2) 0;
-  font-family: var(--font-text);
-  font-size: var(--text-sm-size);
-  color: var(--text-primary);
 }
 
-/* The wrapper already draws the focus ring for the whole control; a second
-   ring on the bare input would sit inside the first. */
-.tg-search-input:focus {
-  outline: none;
-}
+/* Phone: the search takes its own row, the view pair and sort share the
+   next — two full-width rows at most, never a ragged third. */
+@media (max-width: 719px) {
+  .tg-bar > :nth-child(2) {
+    order: -1;
+    flex-basis: 100%;
+    max-width: none;
+  }
 
-.tg-search-input::placeholder {
-  color: var(--text-muted);
-}
+  /* A phone is one column either way, so List / Grid has nothing to switch;
+     and "Sort" is said by the chevron. View + sort then share one row. */
+  .tg-bar [aria-label="Season layout"] {
+    display: none;
+  }
 
-/* `min-width` is the floor this never had. It was `flex: 1; min-width: 0` under
-   620px with nothing to stop it, so at 390 the Status pill rendered 25px wide
-   and Sort's own content overflowed its box and printed "Newx". A pill that
-   cannot fit its label is not a smaller control, it is a broken one — the
-   toolbar wraps instead. */
-.tg-pill {
-  flex: none;
-  min-width: 9rem;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 0 var(--space-2) 0 var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
+  .tg-bar label[for="tg-sort"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
 
-.tg-pill:focus-within {
-  border-color: var(--focus-ring);
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -1px;
-}
+  .tg-bar :has(> #tg-sort) {
+    margin-inline-start: auto;
+  }
 
-.tg-pill-label {
-  flex: none;
-  color: var(--text-muted);
-}
+  /* The count stays a live region, just not a visible chip on a phone. */
+  .tg-bar [role="status"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 
-/* A native <select> keeps the platform's own dropdown — on a phone that is the
-   OS picker, which no custom listbox matches for reach or reliability. */
-.tg-pill-select {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  border: none;
-  background: none;
-  padding: var(--space-2) var(--space-1) var(--space-2) 0;
-  font-family: var(--font-text);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.tg-pill-select:focus {
-  outline: none;
-}
-
-.tg-view {
-  flex: none;
-  display: inline-flex;
-  padding: 2px;
-  gap: 2px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-
-/* 40x40 inside a 2px-padded group: the pair reads 44 tall alongside the 44px
-   search box and pills it sits with, without either button becoming a slab. */
-.tg-view-btn {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.tg-view-btn:hover {
-  color: var(--text-primary);
-}
-
-.tg-view-btn[aria-pressed="true"] {
-  background: var(--surface-raised);
-  color: var(--text-accent);
-  box-shadow: var(--shadow-1);
-}
-
-.tg-view-btn:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
-/* Says what the filter did (nothing else would tell a screen reader that a
-   browser-side filter had changed the list) AND that the summary band above is
-   not filtered with it. */
-.tg-results {
-  margin: 0;
-  font-size: var(--text-sm-size);
-  color: var(--text-muted);
+  .tg-bar > :has(> [role="status"]) {
+    display: contents;
+  }
 }
 
 .tg-noresults {
@@ -674,31 +508,6 @@
   }
 }
 
-/* On a phone the toolbar stops being a row: the search box takes the full
-   width and the controls sit under it rather than each collapsing to nothing. */
-@media (max-width: 620px) {
-  .tg-topbar,
-  .tg-toolbar {
-    justify-content: flex-start;
-  }
-
-  .tg-search {
-    flex-basis: 100%;
-    max-width: none;
-  }
-
-  /* Grow to share the row, but never below a width that fits the label. Two
-     pills at 9rem plus the gap exceed 390, so they wrap onto separate lines —
-     which is the correct outcome, and the one the old rule prevented by
-     letting them collapse to 25px instead. */
-  /* Status, Sort and the layout pair share one row (the pair used to take
-     a 60px row of its own). */
-  .tg-pill {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-}
-
 /* The accordion header never got a mobile treatment — only the toolbar did.
    Below 620 the title takes a line of its own and the actions sit underneath,
    so `+ Season` and the kebab stop competing with the name for a 358px box. */
@@ -984,125 +793,6 @@
   }
 }
 
-/* --- the summary: one ruled strip of four facts ---------------------------- */
-.tg-facts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-}
-
-.tg-fact {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3) var(--space-4);
-}
-
-.tg-fact + .tg-fact {
-  border-inline-start: 1px solid var(--border-subtle);
-}
-
-.tg-fact-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.tg-fact-line {
-  overflow: hidden;
-  font-size: var(--text-sm-size);
-  color: var(--text-primary);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.tg-fact-value {
-  margin-inline-end: 2px;
-  font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-heading);
-}
-
-.tg-fact[data-quiet] .tg-fact-value {
-  color: var(--text-secondary);
-}
-
-.tg-fact-hint {
-  overflow: hidden;
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-@media (max-width: 1023px) {
-  .tg-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .tg-fact:nth-child(3) {
-    border-inline-start: 0;
-  }
-
-  .tg-fact:nth-child(n + 3) {
-    border-top: 1px solid var(--border-subtle);
-  }
-}
-
-@media (max-width: 719px) {
-  .tg-fact {
-    gap: var(--space-2);
-    padding: 10px var(--space-3);
-  }
-
-  .tg-fact-hint {
-    display: none;
-  }
-
-  .tg-fact-line {
-    white-space: normal;
-    font-size: var(--text-xs-size);
-  }
-}
-
-/* --- "Running another edition?" — a quiet dashed row ------------------------ */
-.tg-cta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3) var(--space-4);
-  box-sizing: border-box;
-  padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-xl);
-  background: transparent;
-}
-
-.tg-cta-text {
-  flex: 1 1 16rem;
-  min-width: 0;
-}
-
-.competitions .tg-cta h2 {
-  margin: 0;
-  font-size: var(--text-sm-size);
-  line-height: 1.3;
-}
-
-.tg-cta p {
-  margin: 2px 0 0;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
 /* --- one tournament: a compact section head over its season cards ---------- */
 .tg-section-head {
   display: flex;
@@ -1135,4 +825,12 @@
 
 .tg-section-head .tg-what {
   font-size: var(--text-sm-size);
+}
+
+.tg-section-head {
+  align-items: center;
+}
+
+.tg-section-action {
+  margin-inline-start: auto;
 }
