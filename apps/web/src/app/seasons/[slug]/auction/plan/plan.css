@@ -314,19 +314,28 @@
 
 .plan-bought {
   display: grid;
-  margin: 0;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
   padding: 0;
   list-style: none;
 }
 
 .plan-bought-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
-  min-height: 44px;
+  min-height: 52px;
+  padding: var(--space-2) 0;
   border-top: 1px solid var(--border-subtle);
   font-size: var(--text-sm-size);
+}
+
+.plan-bought-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .plan-bought-name {

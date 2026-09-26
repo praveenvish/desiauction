@@ -1,7 +1,7 @@
 "use client";
 
 import { TARGET_PRIORITY_LABELS, type PlanReport, type ReportOutcome } from "@desiauction/core";
-import { Badge, Card, EmptyState, type BadgeTone } from "@desiauction/ui";
+import { Badge, Card, EmptyState, PlayerImage, type BadgeTone } from "@desiauction/ui";
 
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
 import { useMoney } from "../../../../../components/money-unit";
@@ -45,9 +45,20 @@ function BoughtList({
         .map((row) => {
           const lot = lotsByRegistration.get(row.registrationId);
           return (
+            // A face, and the role under the name: the role sat ~700px from
+            // the name across a full-width row (review r2, r3).
             <li key={row.registrationId} className="plan-bought-row">
-              <span className="plan-bought-name">{lot?.playerName ?? "A player"}</span>
-              <span className="plan-bought-role">{labelOf(lot?.role ?? null)}</span>
+              <PlayerImage
+                name={lot?.playerName ?? "A player"}
+                seed={row.registrationId}
+                size="sm"
+                shape="round"
+                decorative
+              />
+              <span className="plan-bought-who">
+                <span className="plan-bought-name">{lot?.playerName ?? "A player"}</span>
+                <span className="plan-bought-role">{labelOf(lot?.role ?? null)}</span>
+              </span>
               <span className="plan-bought-price">{money.ledger(row.paid)}</span>
             </li>
           );
@@ -80,7 +91,7 @@ export function NoPlanReport({
         description={
           bought.length === 0
             ? "And the night passed without a signing for this team."
-            : `Bought ${String(bought.length)} ${bought.length === 1 ? "player" : "players"} for ${money.ledger(report.outsidePlanTotal)}.`
+            : `Bought ${String(bought.length)} ${bought.length === 1 ? "player" : "players"} on the night for ${money.ledger(report.outsidePlanTotal)}.`
         }
       />
       {bought.length > 0 ? (

@@ -25,7 +25,7 @@ import {
   IconPin,
   IconRefresh,
   IconShieldCheck,
-  IconStar,
+  IconStarOutline,
   IconTile,
   IconTrophy,
   IconUser,
@@ -325,7 +325,9 @@ function missingForRegistration(competition: SeasonOverviewView["competition"]):
 const ROLE_MARK: Record<string, { icon: ReactNode; tone: KitTone }> = {
   batter: { icon: <IconBat />, tone: "gold" },
   bowler: { icon: <IconBall />, tone: "gold" },
-  all_rounder: { icon: <IconStar />, tone: "gold" },
+  // The outline star: the solid one was the only filled mark among four
+  // outline glyphs (review r2, r3).
+  all_rounder: { icon: <IconStarOutline />, tone: "gold" },
   wicket_keeper: { icon: <IconShieldCheck />, tone: "gold" },
 };
 const OTHER_ROLE_MARK = { icon: <IconUser />, tone: "gold" as KitTone };
@@ -343,9 +345,12 @@ export function OverviewPanel({
   view,
   slug,
   pass,
+  mineTeamIds = [],
 }: {
   view: SeasonOverviewView;
   slug: string;
+  /** Teams the viewer owns in this season — marked "Your team" in the list. */
+  mineTeamIds?: readonly string[];
   /** The season pass card, laid into the page's last row. */
   pass?: ReactNode;
 }) {
@@ -909,7 +914,12 @@ export function OverviewPanel({
                           logoUrl={team.logoUrl}
                         />
                       </span>
-                      <span className="ov-team-name">{team.name}</span>
+                      <span className="ov-team-name">
+                        {team.name}
+                        {mineTeamIds.includes(team.teamId) ? (
+                          <span className="ov-team-yours">Your team</span>
+                        ) : null}
+                      </span>
                       <span className="ov-team-figs">
                         {team.squadMax !== undefined && team.squadMax !== null ? (
                           <span>

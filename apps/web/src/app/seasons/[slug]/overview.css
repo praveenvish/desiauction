@@ -564,3 +564,11 @@ a.ov-hero-club:focus-visible {
 .ov-public-strip > a:hover {
   text-decoration: underline;
 }
+
+/* The viewer's own team in the overview list — the words /teams uses. */
+.ov-team-yours {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}

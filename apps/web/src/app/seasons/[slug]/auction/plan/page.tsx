@@ -43,10 +43,10 @@ export default async function PlanPage({
         </AnnouncerProvider>
         <nav className="live-exits" aria-label="Other auction views">
           <ButtonLink href={`/seasons/${slug}/auction/live`} data-testid="plan-open-live">
-            Owner room
+            Back to the owner room
           </ButtonLink>
           <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
-            Auction
+            Auction overview
           </ButtonLink>
         </nav>
       </div>
