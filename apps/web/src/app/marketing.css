@@ -3718,6 +3718,15 @@ body:has(.landing.mk) .mk-hero {
   margin-bottom: var(--space-4);
 }
 
+/* Stacked on a phone, each card still arrives on the scroll reveal
+   (mk-drift, a --space-6 pre-roll) — the last card rode 24px over a 16px gap
+   and sat on the tier table (round-5 review). The gap outgrows the drift. */
+@media (max-width: 899px) {
+  .mk-pricing-page .mk-tiers {
+    margin-bottom: var(--space-10);
+  }
+}
+
 /* Three cards read across (round-5 review): only Free quotes a figure, so its
    price slot is taller and its bullets started ~20px lower than Pro's and
    Association's. On a laptop each card is a subgrid of the row's five slots —

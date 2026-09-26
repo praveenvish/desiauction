@@ -78,3 +78,20 @@
   padding-inline-start: var(--space-3);
   border-inline-start: 1px solid var(--border-subtle);
 }
+
+/*
+   A phone packs the strip tighter, so a five-tab row (a team owner's season:
+   Overview · My team · My plan · Auction room · Table) shows the edge of the
+   next tab under the end fade instead of breaking cleanly at a tab boundary,
+   where the fade had nothing to fade and "Table" read as missing (round-5
+   review). Height and the 44px-tall target are unchanged.
+*/
+@media (max-width: 479px) {
+  .list {
+    gap: 0;
+  }
+
+  .tab {
+    padding-inline: var(--space-2);
+  }
+}
