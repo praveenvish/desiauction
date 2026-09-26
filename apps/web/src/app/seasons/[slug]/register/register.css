@@ -1198,12 +1198,6 @@
   color: var(--accent-ink);
 }
 
-.reg-sold-note {
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
-}
-
 .reg-status-body {
   margin: 0;
   color: var(--text-secondary);
@@ -1274,11 +1268,18 @@
   margin: 0;
 }
 
-/* Two equal buttons on one row, even on a phone. */
+/* Two equal buttons on one row; on a phone each takes the row, so
+   "Find an open tournament" never wraps inside its button. */
 .reg-closed-actions > * {
   flex: 1 1 0;
   min-width: 0;
   justify-content: center;
+}
+
+@media (max-width: 480px) {
+  .reg-closed-actions > * {
+    flex-basis: 100%;
+  }
 }
 
 .reg-closed {
@@ -1294,43 +1295,55 @@
 }
 
 /* In the narrow register card the podium reads as a ranked list. */
-.reg-closed .top-buys {
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
-}
+/* Laptop: one line per sale in the narrow card. A phone takes the shared
+   compact ranked list (top-buys.css) — fixed rank slot, price in the text
+   face — which this block used to override with a 20px price that squeezed
+   the names to "Arjun Desh…". */
+@media (min-width: 640px) {
+  .reg-closed .top-buys {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
 
-.reg-closed .top-buy-link {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    "rank name price"
-    "rank team price";
-  align-items: center;
-  padding: var(--space-3) var(--space-4);
-}
+  .reg-closed .top-buy-link {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "rank name price"
+      "rank team price";
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+  }
 
-.reg-closed .top-buy-rank {
-  align-self: center;
-}
+  .reg-closed .top-buy-rank {
+    align-self: center;
+  }
 
-/* One line per sale in a narrow card: the price steps down a size so the
-   name keeps its width and wraps by word, never letter by letter; the team
-   line ends in "…". */
-.reg-closed .top-buy-price {
-  font-family: var(--font-text);
-  font-size: var(--text-xl-size);
-  font-weight: var(--font-weight-bold, 700);
-}
+  /* One line per sale in a narrow card: the price steps down a size so the
+     name keeps its width and wraps by word, never letter by letter; the team
+     line ends in "…". */
+  .reg-closed .top-buy-price {
+    font-family: var(--font-text);
+    font-size: var(--text-xl-size);
+    font-weight: var(--font-weight-bold, 700);
+  }
 
-.reg-closed .top-buy-name {
-  min-width: 0;
-  overflow-wrap: normal;
-}
+  .reg-closed .top-buy-name {
+    min-width: 0;
+    overflow-wrap: normal;
+  }
 
-.reg-closed .top-buy-team {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  .reg-closed .top-buy-team {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .reg-closed .top-buy-rank {
+    justify-content: center;
+    width: 40px;
+    box-sizing: border-box;
+  }
 }
 
 .reg-status-foot {

@@ -470,6 +470,33 @@
   display: none;
 }
 
+/* Laptop band: the tournament's own monogram in the tile, the sport as a
+   corner badge — the same bat on every card read as "no content yet". */
+@media (min-width: 640px) {
+  .tc:not([data-cover]) .tc-glyph {
+    width: 52px;
+    height: 52px;
+  }
+
+  .tc:not([data-cover]) .tc-initials {
+    display: block;
+    font-size: var(--text-lg-size);
+    line-height: 1;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: -0.01em;
+    color: var(--accent-ink);
+  }
+
+  .tc:not([data-cover]) .tc-glyph svg {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 14px;
+    height: 14px;
+    opacity: 0.8;
+  }
+}
+
 .tc-line-dot {
   flex: none;
   width: 7px;

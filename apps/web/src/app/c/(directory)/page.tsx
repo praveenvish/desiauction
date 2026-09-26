@@ -338,6 +338,7 @@ export default async function DirectoryPage({
               {directory.entries.map((entry) => (
                 <TournamentCard
                   key={entry.slug}
+                  hideStatus={filter !== "all"}
                   tournament={{
                     name: entry.name,
                     slug: entry.slug,

@@ -277,11 +277,9 @@ export function RegistrationStatus({
       {soldPrice !== null ? (
         <div className="reg-sold" data-testid="my-sold-price">
           <span className="reg-sold-label">Your price</span>
+          {/* The figure alone: the team is already in the title and on the
+              squad button — a caption said it a third time (review r3). */}
           <strong className="reg-sold-figure">{soldPrice}</strong>
-          {/* The price is the figure above; the caption says who paid it. */}
-          <span className="reg-sold-note">
-            Bought by {result?.teamName} at the {competitionName} auction.
-          </span>
         </div>
       ) : null}
 
@@ -358,9 +356,11 @@ export function RegistrationStatus({
         </div>
       ) : null}
 
-      {signed || passed ? (
-        /* After the verdict the two actions above are the page's job; the
-           rest is a quiet row of links, not three more buttons. */
+      {signed ? null : passed ? (
+        /* After the verdict the actions above are the page's job; the rest is
+           a quiet row of links, not three more buttons. A sold player gets
+           two actions and nothing else: the season page, home and a season
+           share were three more doors beside "See your squad" (review r3). */
         <div className="reg-status-links">
           {listed ? (
             <Link href={`/c/${slug}`} data-testid="view-season">
@@ -395,7 +395,7 @@ export function RegistrationStatus({
         </div>
       ) : signed ? (
         <p className="reg-status-foot register-hint" data-testid="drop-out-contact">
-          Need to drop out? Contact {result.orgName}.
+          Something wrong? Contact {result.orgName}.
         </p>
       ) : null}
     </Card>

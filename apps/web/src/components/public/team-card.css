@@ -103,7 +103,9 @@
    line — so a squad of pre-signed players drew a ragged two-line list. */
 .team-card-player {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  /* Fixed star slot and a fixed role column: every row's role starts at the
+     same x, starred or not. */
+  grid-template-columns: 28px minmax(0, 1fr) 20px minmax(0, 7rem);
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2);
@@ -175,6 +177,12 @@
 .team-card-role {
   font-family: inherit;
   font-size: var(--text-sm-size);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-card-number {
+  text-align: end;
 }
 
 .team-card-more,

@@ -97,12 +97,16 @@ export function TeamCard({
                   name in a squad of pre-signed players was truncated to make
                   room for a label repeated down the whole card. The meaning is
                   kept for anyone not reading visually. */}
+              {/* The slot is always there, star or not: an optional column
+                  pushed the role label left on the starred rows only. */}
               {player.preSigned === true ? (
                 <span className="team-card-tag" title="Pre-signed">
-                  <IconStar width={13} height={13} aria-hidden />
+                  <IconStar size={16} weight="fill" aria-hidden />
                   <span className="team-card-sr">Pre-signed</span>
                 </span>
-              ) : null}
+              ) : (
+                <span className="team-card-tag-slot" aria-hidden />
+              )}
               {player.role !== undefined ? (
                 player.role === "" ? null : (
                   <span className="team-card-number team-card-role">{player.role}</span>

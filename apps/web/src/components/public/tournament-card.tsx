@@ -82,10 +82,16 @@ export function TournamentCard({
   shareRef,
   /** The featured card on the landing page is wider and louder. */
   feature = false,
+  /**
+   * The list is already filtered to one state ("Registration open"), so the
+   * same pill on every card is noise; the phone row's dot stays.
+   */
+  hideStatus = false,
 }: {
   tournament: TournamentCardData;
   shareRef?: string;
   feature?: boolean;
+  hideStatus?: boolean;
 }) {
   const {
     name,
@@ -178,9 +184,11 @@ export function TournamentCard({
             <SportIcon sport={sport} size={28} />
           </span>
         )}
-        <span className="tc-status" data-tone={tone} data-testid="tournament-card-status">
-          {status}
-        </span>
+        {hideStatus ? null : (
+          <span className="tc-status" data-tone={tone} data-testid="tournament-card-status">
+            {status}
+          </span>
+        )}
       </div>
 
       <div className="tc-body">

@@ -1078,9 +1078,12 @@
 }
 
 /* What WhatsApp will send, shown before it is sent. */
+/* Set as the message it is — a quoted bubble with a gold rule — rather than
+   a grey box that read as static page text. */
 .share-sheet-preview {
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent-line);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text-primary);
@@ -1117,6 +1120,13 @@
   color: var(--text-secondary);
 }
 
+/* An empty status line takes no room (it stays in the DOM as the live
+   region): it left ~40px of dead space under the actions. */
+.share-sheet-note:empty {
+  min-height: 0;
+  margin-top: calc(var(--space-3) * -1);
+}
+
 /* Laptop: the message on the left, the actions stacked beside it — a share
    affordance must not outweigh the page it shares (wow pass). */
 @media (min-width: 900px) {
@@ -1128,16 +1138,32 @@
     align-items: start;
   }
 
-  .share-sheet-head,
-  .share-sheet-preview,
-  .share-sheet-note {
+  /* Explicit rows: head beside WhatsApp, the message beside the other
+     actions, the status line under both. Auto-placed, the message sat in a
+     row stretched by the button column and left ~40px dead under it. */
+  .share-sheet-head {
     grid-column: 1;
+    grid-row: 1;
   }
 
-  .share-sheet-primary,
+  .share-sheet-primary {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .share-sheet-preview {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: stretch;
+  }
+
   .share-sheet-wide,
   .share-sheet-actions {
     grid-column: 2;
+  }
+
+  .share-sheet-note {
+    grid-column: 1 / -1;
   }
 
   .share-sheet-primary,
@@ -1233,13 +1259,12 @@
   aspect-ratio: 1;
   margin-inline: auto;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 24%, rgb(255 255 255 / 0.4), transparent 42%),
-    radial-gradient(circle, var(--team) 58%, color-mix(in srgb, var(--team) 55%, #000) 100%);
+  /* A flat disc in the team's colour: the glossy 3D sphere was the one
+     skeuomorphic object in a flat kit (review r2, r3). */
+  background: var(--team);
   box-shadow:
-    inset 0 2px 0 rgb(255 255 255 / 0.35),
-    inset 0 -14px 28px rgb(0 0 0 / 0.3),
-    0 30px 70px color-mix(in srgb, var(--team) 40%, transparent);
+    0 0 0 6px color-mix(in srgb, var(--team) 22%, transparent),
+    var(--shadow-2);
   overflow: hidden;
 }
 
@@ -1263,7 +1288,6 @@
   font-weight: var(--font-weight-bold, 700);
   letter-spacing: 0.02em;
   color: #fff;
-  text-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
 }
 
 .team-page-empty {

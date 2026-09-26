@@ -108,7 +108,9 @@ export default async function PublicTeamPage({
       : [{ value: facts.remainingLabel, label: "Purse left" }]),
     ...(facts.topBuy === null
       ? []
-      : [{ value: facts.topBuy.priceLabel, label: `Top buy · ${facts.topBuy.name}`, aside: true }]),
+      : // A figure like the three before it, so no divider of its own: the
+        // strip drew one rule before the last tile only (review r2, r3).
+        [{ value: facts.topBuy.priceLabel, label: `Top buy · ${facts.topBuy.name}` }]),
   ];
   const messages = {
     en: teamShareMessage(

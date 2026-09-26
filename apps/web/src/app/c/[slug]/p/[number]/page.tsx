@@ -241,7 +241,9 @@ export default async function PlayerProfilePage({
                 </div>
               ),
             }
-          : { watermark: player.sport })}
+          : // No 360px ghost glyph behind the name: decoration without a job,
+            // it competed with the price for the eye (review r2, r3).
+            {})}
         status={
           <Badge tone={signed ? "neutral" : "success"} data-testid="player-status">
             {status}
