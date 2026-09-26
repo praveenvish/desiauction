@@ -914,6 +914,12 @@
     padding: var(--space-3);
   }
 
+  /* The kit spans an odd last tile across the row on a phone; three
+     figures share one row here. */
+  .competitions [data-testid="tournament-figures"] > :last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+
   .competitions [data-testid="tournament-figures"] > * > :first-child {
     display: none;
   }
