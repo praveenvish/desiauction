@@ -33,6 +33,7 @@ import { LotStatusPill, PaddleChip, eventLabel } from "./auction-bits";
 import { BroadcastLinks } from "./broadcast-links";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 import { useMoney } from "../../../../components/money-unit";
+import { formatCount } from "../../../../lib/plural";
 
 /*
  * THE OVERVIEW TAB AS A DASHBOARD (founder mockup 4).
@@ -565,7 +566,7 @@ export function OverviewDashboard({
       icon={<IconClock />}
       tone="neutral"
       title="Event log & replay"
-      description={`${view.eventCount.toLocaleString("en-IN")} events, in the order they happened`}
+      description={`${formatCount(view.eventCount)} events, in the order they happened`}
       action={<TabLink tab="log">View all events</TabLink>}
       flush
     >

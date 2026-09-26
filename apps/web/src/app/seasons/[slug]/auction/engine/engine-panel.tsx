@@ -22,6 +22,7 @@ import { engineDiagnosticsAction } from "../../../../../server/auction/conduct-a
 import { submitAuctionCommand } from "../../../../../server/auction/live-actions";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { usePolled } from "../../../../admin/use-polled";
+import { formatCount } from "../../../../../lib/plural";
 
 // RECOVERY DASHBOARD + ENGINE DIAGNOSTICS (M-IP4-3). Everything read-only,
 // polled from the engine's diagnostics feed through the conduct-gated proxy.
@@ -253,11 +254,11 @@ export function EnginePanel({ slug, record }: { slug: string; record?: EngineRec
           </div>
           <div>
             <dt>Events on the record</dt>
-            <dd>{(diagnostics?.eventCount ?? record.events).toLocaleString("en-IN")}</dd>
+            <dd>{formatCount(diagnostics?.eventCount ?? record.events)}</dd>
           </div>
           <div>
             <dt>Lots</dt>
-            <dd>{record.lots.toLocaleString("en-IN")}</dd>
+            <dd>{formatCount(record.lots)}</dd>
           </div>
           <div>
             <dt>Engine</dt>

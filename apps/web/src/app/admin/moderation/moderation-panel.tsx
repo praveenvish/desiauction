@@ -32,6 +32,7 @@ import type {
   PublicSeasonRow,
 } from "../../../server/admin/moderation-views";
 import { AdminFilterForm } from "../admin-filter-form";
+import { formatDate } from "../../../lib/format-date";
 
 const REASON_MIN = 10;
 const REASON_MAX = 500;
@@ -181,7 +182,7 @@ function PublicRow({ row }: { row: PublicSeasonRow }) {
           <span aria-hidden> · </span>
           <span className="admin-sport">{row.sport}</span>
           <span aria-hidden> · </span>
-          created {row.createdAt.toISOString().slice(0, 10)}
+          created {formatDate(row.createdAt)}
         </span>
       </span>
       <div className="pass-row-actions">
@@ -284,7 +285,7 @@ function HeldRow({ row }: { row: HeldSeasonRow }) {
         <Link href={`/admin/orgs/${row.orgSlug}`} className="admin-inline-link">
           {row.orgName}
         </Link>{" "}
-        · {row.heldAt.toISOString().slice(0, 10)}
+        · {formatDate(row.heldAt)}
         {row.heldByName === null ? "" : ` · by ${row.heldByName}`}
       </p>
       <blockquote className="pass-row-note">{row.reason}</blockquote>

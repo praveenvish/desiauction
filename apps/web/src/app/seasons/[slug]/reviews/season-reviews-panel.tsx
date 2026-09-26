@@ -9,6 +9,7 @@ import {
   replyToReviewAction,
   type SeasonReviewsView,
 } from "../../../../server/reviews/season-actions";
+import { formatShortDate } from "../../../../lib/format-date";
 
 /**
  * The club's two controls (FR-1 Phase 4): ask for reviews, and answer one.
@@ -19,11 +20,7 @@ import {
  */
 
 function day(date: Date): string {
-  return date.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatShortDate(date);
 }
 
 export function AskReviewsCard({

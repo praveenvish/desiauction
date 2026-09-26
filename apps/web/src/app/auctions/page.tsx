@@ -25,6 +25,7 @@ import { dateRange } from "../tournaments/season-card";
 import { NavButton } from "../players/nav-button";
 import "../players/players.css";
 import "./auctions.css";
+import { formatCount } from "../../lib/plural";
 
 export const metadata = { title: "Auctions · DesiAuction" };
 
@@ -38,7 +39,7 @@ const STATUS: Record<AuctionNightStatus, { label: string; tone: KitTone }> = {
 };
 
 function count(value: number): string {
-  return value.toLocaleString("en-IN");
+  return formatCount(value);
 }
 
 function nights(value: number): string {

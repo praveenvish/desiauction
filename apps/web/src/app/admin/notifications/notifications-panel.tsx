@@ -22,6 +22,7 @@ import type {
 import type { WordingSummary } from "../../../server/admin/template-views";
 import { RelativeTime } from "../admin-ui";
 import { ChannelControl, ControlToggle, RevertButton, SwitchToggle } from "./notification-controls";
+import { formatCount } from "../../../lib/plural";
 
 /**
  * The control center, rendered on the server. Three parts, top to bottom, in
@@ -116,10 +117,10 @@ function Counts({ counts, channel, days }: { counts: CellCounts; channel: string
         {counts.sent === 0 && counts.failed === 0 ? (
           <span data-zero>—</span>
         ) : (
-          <span>{counts.sent.toLocaleString("en-IN")}</span>
+          <span>{formatCount(counts.sent)}</span>
         )}
         {counts.failed > 0 ? (
-          <span className="ntc-counts-bad"> · {counts.failed.toLocaleString("en-IN")} failed</span>
+          <span className="ntc-counts-bad"> · {formatCount(counts.failed)} failed</span>
         ) : null}
       </span>
       <span className="admin-sr-only">

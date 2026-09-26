@@ -3,6 +3,7 @@ import { StarGlyphs } from "@desiauction/ui";
 import type { PublishedReview, SeasonReviews } from "../../server/reviews/season";
 import { ReportReview } from "./report-review";
 import styles from "./season-reviews.module.css";
+import { formatMonthYear } from "../../lib/format-date";
 
 /**
  * A SEASON'S PUBLISHED REVIEWS (FR-1 Phase 4) — shared by the public season page
@@ -29,11 +30,7 @@ function Stars({ rating, decorative = false }: { rating: number; decorative?: bo
 }
 
 function when(date: Date): string {
-  return date.toLocaleDateString("en-IN", {
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatMonthYear(date);
 }
 
 export function SeasonReviewSummary({ shown }: { shown: SeasonReviews }) {

@@ -1,4 +1,5 @@
 import type { DayRow } from "../../../../server/admin/delivery-analytics-views";
+import { formatCount } from "../../../../lib/plural";
 
 /**
  * The daily trend, drawn on the server as plain SVG — no chart library, no
@@ -49,9 +50,9 @@ export function TrendChart({ days, windowDays }: { days: readonly DayRow[]; wind
           <span>
             {max <= 1 && total.sent + total.failed + total.suppressed === 0
               ? "0"
-              : max.toLocaleString("en-IN")}
+              : formatCount(max)}
           </span>
-          <span>{Math.round(max / 2).toLocaleString("en-IN")}</span>
+          <span>{formatCount(Math.round(max / 2))}</span>
           <span>0</span>
         </span>
         <svg

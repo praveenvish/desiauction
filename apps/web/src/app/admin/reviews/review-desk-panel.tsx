@@ -25,6 +25,7 @@ import {
 } from "../../../server/admin/review-actions";
 import type { DeskAsk, DeskReview, ReviewDesk } from "../../../server/admin/review-views";
 import type { AskOutcome } from "../../../server/reviews/desk";
+import { formatDate } from "../../../lib/format-date";
 
 /**
  * ASK, THEN MODERATE (FR-1 Phase 2).
@@ -47,7 +48,7 @@ const DELIVERY_WORDS: Record<Extract<AskOutcome, { ok: true }>["delivery"], stri
 };
 
 function day(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return formatDate(date);
 }
 
 export function ReviewDeskPanel({ desk }: { desk: ReviewDesk }) {

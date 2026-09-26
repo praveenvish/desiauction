@@ -17,7 +17,8 @@ import { useState, useTransition } from "react";
 import { formatPhone } from "../../../lib/format-phone";
 import { declineErasureAction, eraseAccountAction } from "../../../server/admin/erasure-actions";
 import type { DeskRow, ErasureDesk } from "../../../server/privacy/desk";
-import { ERASURE_PROMISE_DAYS, erasureDaysLeft, istDate } from "./erasure-sla";
+import { ERASURE_PROMISE_DAYS, erasureDaysLeft } from "./erasure-sla";
+import { formatDate } from "../../../lib/format-date";
 
 /**
  * Deciding erasure requests, with what the erasure will do in front of you.
@@ -68,8 +69,8 @@ export function ErasureDeskPanel({ desk, nowMs }: { desk: ErasureDesk; nowMs: nu
             {desk.decided.map((row) => (
               <li key={row.id}>
                 <span className="admin-meta">
-                  asked {istDate(row.requestedAt.getTime())}
-                  {row.decidedAt === null ? "" : ` · decided ${istDate(row.decidedAt.getTime())}`}
+                  asked {formatDate(row.requestedAt)}
+                  {row.decidedAt === null ? "" : ` · decided ${formatDate(row.decidedAt)}`}
                   {row.decisionNote === null ? "" : ` · ${row.decisionNote}`}
                 </span>
                 <Pill
@@ -157,7 +158,7 @@ function ErasureRow({ row, nowMs }: { row: DeskRow; nowMs: number }) {
           )}
         </span>
         <span className="pass-row-sub">
-          asked {istDate(row.requestedAt.getTime())}
+          asked {formatDate(row.requestedAt)}
           {" · "}
           {row.clubs === 0 ? "no clubs" : `${String(row.clubs)} club${row.clubs === 1 ? "" : "s"}`}
           {row.phone !== null ? (

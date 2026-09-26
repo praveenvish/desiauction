@@ -18,6 +18,7 @@ import { FEE_LABEL, STATUS_LABEL } from "../seasons/[slug]/_players/labels";
 import { NavButton } from "./nav-button";
 import { PlayersFilters } from "./players-filters";
 import "./players.css";
+import { formatCount } from "../../lib/plural";
 
 export const metadata = { title: "Players · DesiAuction" };
 
@@ -47,7 +48,7 @@ const ROUTE_LABEL: Record<NonNullable<PlayerIndexRow["squadRoute"]>, string> = {
 };
 
 function count(value: number): string {
-  return value.toLocaleString("en-IN");
+  return formatCount(value);
 }
 
 /** The page's own query string, with `patch` applied — for the stat cards and pager. */

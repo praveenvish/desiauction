@@ -16,6 +16,7 @@ import { HeroFigures, HeroStatus, SeasonCrest } from "../../components/season-he
 import type { SeasonOverviewView } from "../../server/competition/actions";
 import { coverOf } from "../tournaments/featured-season";
 import { dateRange, seasonStatusBadge } from "../tournaments/season-card";
+import { formatCount } from "../../lib/plural";
 
 /**
  * The club hero at the top of an organizer's /home (founder mockup 2): the
@@ -110,13 +111,13 @@ export function ClubHero({
               {
                 key: "teams",
                 icon: <IconUsers />,
-                value: overview.teamCount.toLocaleString("en-IN"),
+                value: formatCount(overview.teamCount),
                 label: "Teams",
               },
               {
                 key: "players",
                 icon: <IconUser />,
-                value: overview.approvedPlayers.toLocaleString("en-IN"),
+                value: formatCount(overview.approvedPlayers),
                 label: "Players",
               },
               {

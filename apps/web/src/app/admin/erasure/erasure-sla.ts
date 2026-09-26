@@ -1,12 +1,7 @@
+import { istCalendarDate } from "../../../lib/format-date";
+
 /** The account page's promise: an erasure request is answered within 7 days. */
 export const ERASURE_PROMISE_DAYS = 7;
-
-const IST_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Kolkata",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
 
 /**
  * The India calendar date, as YYYY-MM-DD. The desk printed the UTC date, so a
@@ -14,12 +9,12 @@ const IST_DAY = new Intl.DateTimeFormat("en-CA", {
  * correct "Due today" on the 26th — and looked a day overdue.
  */
 export function istDate(ms: number): string {
-  return IST_DAY.format(ms);
+  return istCalendarDate(ms);
 }
 
 /** Days since the epoch of the India calendar day `ms` falls on. */
 function istDayNumber(ms: number): number {
-  const [year, month, day] = IST_DAY.format(ms).split("-").map(Number);
+  const [year, month, day] = istCalendarDate(ms).split("-").map(Number);
   return Math.round(Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1) / 86_400_000);
 }
 

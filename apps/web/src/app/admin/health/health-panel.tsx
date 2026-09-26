@@ -3,6 +3,7 @@ import { EmptyState, IconClock, IconCog, IconLedger, Pill, SectionCard } from "@
 import { formatCount, waitedFor } from "../../../server/admin/format";
 import type { OrgHealthRow, PlatformHealth } from "../../../server/admin/views";
 import { RelativeTime } from "../admin-ui";
+import { formatDate } from "../../../lib/format-date";
 
 /**
  * PX-9 §5 — platform health.
@@ -250,11 +251,11 @@ function OrgHealth({ org, hidden }: { org: OrgHealthRow; hidden: readonly string
                 {certification.verdict === "PASS" ? (
                   <span className="admin-state" data-tone="green">
                     <span className="admin-state-dot" aria-hidden />
-                    Pass · {certification.at.toISOString().slice(0, 10)}
+                    Pass · {formatDate(certification.at)}
                   </span>
                 ) : (
                   <Pill tone="red" dot>
-                    {certification.verdict} · {certification.at.toISOString().slice(0, 10)}
+                    {certification.verdict} · {formatDate(certification.at)}
                   </Pill>
                 )}
                 {/* The digest is evidence, so it is all there — the first eight

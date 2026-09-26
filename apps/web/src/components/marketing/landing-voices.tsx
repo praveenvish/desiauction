@@ -3,6 +3,7 @@ import { unstable_rethrow } from "next/navigation";
 
 import { landingVoices, type LandingVoice } from "../../server/reviews/voices";
 import styles from "./landing-voices.module.css";
+import { formatMonthYear } from "../../lib/format-date";
 
 /**
  * "In their own words" (FR-1 Phase 5). Not "from organizers" or "from people
@@ -35,11 +36,7 @@ async function voices(): Promise<readonly LandingVoice[]> {
 }
 
 function month(date: Date): string {
-  return date.toLocaleDateString("en-IN", {
-    month: "long",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatMonthYear(date);
 }
 
 export async function LandingVoices() {

@@ -28,6 +28,7 @@ import type { CompetitionSummary } from "../../server/competition/competitions";
 import type { SeasonRow } from "../../server/competition/tournament-actions";
 import { dateRange, seasonStatusBadge } from "./season-card";
 import { seasonJourney } from "./season-journey";
+import { formatCount } from "../../lib/plural";
 
 /**
  * The season a reader most likely came here for, drawn as the founder's
@@ -96,7 +97,7 @@ export function FeaturedSeason({
     {
       key: "teams",
       icon: <IconUsers />,
-      value: (overview?.teamCount ?? season.counts.teams).toLocaleString("en-IN"),
+      value: formatCount(overview?.teamCount ?? season.counts.teams),
       label: "Teams",
     },
     ...(overview !== null
@@ -104,7 +105,7 @@ export function FeaturedSeason({
           {
             key: "players",
             icon: <IconUser />,
-            value: overview.approvedPlayers.toLocaleString("en-IN"),
+            value: formatCount(overview.approvedPlayers),
             label: "Players",
           },
         ]

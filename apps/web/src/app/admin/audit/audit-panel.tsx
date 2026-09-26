@@ -15,6 +15,7 @@ import { actorLabel, formatCount, isSystemActor } from "../../../server/admin/fo
 import type { AuditEntry, AuditFilters, AuditPage } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
 import { absoluteIst } from "../admin-ui";
+import { formatDayDate } from "../../../lib/format-date";
 
 /**
  * PX-9 §4 — the audit viewer.
@@ -160,13 +161,7 @@ function auditHref(filters: AuditFilters, after: string | null): string {
   return qs === "" ? "/admin/audit" : `/admin/audit?${qs}`;
 }
 
-const DAY = new Intl.DateTimeFormat("en-IN", {
-  timeZone: "Asia/Kolkata",
-  weekday: "short",
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
+const DAY = { format: (at: Date | number): string => formatDayDate(at, true) };
 
 const CLOCK = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",

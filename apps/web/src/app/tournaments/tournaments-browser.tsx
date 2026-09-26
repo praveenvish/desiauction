@@ -19,6 +19,7 @@ import { SeasonCard } from "./season-card";
 import { TournamentAccordion, type AccordionGroup } from "./tournament-accordion";
 
 import type { SeasonRow } from "../../server/competition/tournament-actions";
+import { formatCount } from "../../lib/plural";
 
 /**
  * Search, filter, sort and layout state for the tournaments index.
@@ -241,7 +242,7 @@ export function TournamentsBrowser({
             items={STATUS_OPTIONS.map((option) => ({
               key: option.value,
               label: option.label,
-              count: statusCount(option.value).toLocaleString("en-IN"),
+              count: formatCount(statusCount(option.value)),
               active: status === option.value,
               onSelect: () => {
                 setStatus(option.value);
@@ -251,8 +252,8 @@ export function TournamentsBrowser({
           />
           {pendingReview > 0 ? (
             <Pill tone="amber" dot testId="tg-pending">
-              {pendingReview.toLocaleString("en-IN")}{" "}
-              {pendingReview === 1 ? "registration" : "registrations"} to review
+              {formatCount(pendingReview)} {pendingReview === 1 ? "registration" : "registrations"}{" "}
+              to review
             </Pill>
           ) : null}
         </div>

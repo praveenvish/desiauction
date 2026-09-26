@@ -10,6 +10,7 @@ import {
   revokeMoneyAuthorityAction,
   type MoneyAuthorityView,
 } from "../../../server/settlement/actions";
+import { formatDate } from "../../../lib/format-date";
 
 /**
  * PX-7 — Money authority.
@@ -44,15 +45,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 /** "24 Jul 2026" — the provenance line under a holder's name. */
 export function grantedLine(grantedByName: string | null, grantedAt: string | null): string | null {
-  const when =
-    grantedAt === null
-      ? null
-      : new Date(grantedAt).toLocaleDateString("en-IN", {
-          timeZone: "Asia/Kolkata", // PRR P2/F25: pin the zone or SSR/CSR disagree
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        });
+  const when = grantedAt === null ? null : formatDate(grantedAt);
   if (grantedByName === null && when === null) return null;
   if (grantedByName === null) return `Granted ${when ?? ""}`;
   return when === null ? `Granted by ${grantedByName}` : `Granted by ${grantedByName} · ${when}`;

@@ -32,11 +32,12 @@ import { SeasonPicker } from "./season-picker";
 import { NavButton } from "../players/nav-button";
 import "../players/players.css";
 import "./reports.css";
+import { formatCount } from "../../lib/plural";
 
 export const metadata = { title: "Reports · DesiAuction" };
 
 function count(value: number): string {
-  return value.toLocaleString("en-IN");
+  return formatCount(value);
 }
 
 function pctOf(part: number, whole: number): number {

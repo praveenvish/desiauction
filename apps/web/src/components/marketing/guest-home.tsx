@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconArrowRight, IconCheck, IconGavel, IconRefresh, IconTrophy } from "./icons";
 import { track } from "../../lib/telemetry";
 import styles from "../../app/guest-home.module.css";
+import { exactINR } from "../../lib/inr";
 
 /** Content remains visible before hydration and when motion is disabled. */
 export function HomeMotion({ children }: { children: ReactNode }) {
@@ -134,7 +135,8 @@ export function HomeMotion({ children }: { children: ReactNode }) {
 }
 
 type SportOption = { key: string; label: string; role: string };
-const money = (value: number) => `₹${value.toLocaleString("en-IN")}`;
+/** The mock purse in rupees, through the product's one rupee formatter. */
+const money = (value: number) => exactINR(value * 100);
 
 /**
  * THE DEMO NEEDS A RIVAL.

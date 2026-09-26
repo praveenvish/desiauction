@@ -57,6 +57,8 @@ import { HomeShortcuts } from "./home-shortcuts";
 import type { NextStep } from "./next-step";
 import { NextStepBanner } from "./next-step-banner";
 import "./home.css";
+import { dateTile } from "../../lib/format-date";
+import { formatCount } from "../../lib/plural";
 
 /**
  * A season's facts on one line — "1 Aug – 31 Oct 2026 · Mumbai · ₹2L
@@ -220,9 +222,6 @@ async function attentionFor(
  * console exists for, renders as "Good afternoon" under UTC. Pinning the zone
  * keeps the greeting and the fixture dates true wherever the server runs.
  */
-const IST = "Asia/Kolkata";
-const IST_DAY = new Intl.DateTimeFormat("en-IN", { timeZone: IST, day: "2-digit" });
-const IST_MONTH = new Intl.DateTimeFormat("en-IN", { timeZone: IST, month: "short" });
 
 /** Build a polyline `points` string for a 7-value series. */
 function points(series: number[], max: number): string {
@@ -779,7 +778,7 @@ export async function OrganizerHome({
             icon={<IconUsers />}
             concept="teams"
             rolling
-            value={focusOverview.teamCount.toLocaleString("en-IN")}
+            value={formatCount(focusOverview.teamCount)}
             label="Teams"
             href={`${focusBase}/teams`}
             linkComponent={Link}
@@ -788,11 +787,11 @@ export async function OrganizerHome({
             icon={<IconUser />}
             concept="players"
             rolling
-            value={focusOverview.approvedPlayers.toLocaleString("en-IN")}
+            value={formatCount(focusOverview.approvedPlayers)}
             label="Players"
             hint={
               focusOverview.pendingPlayers > 0
-                ? `${focusOverview.pendingPlayers.toLocaleString("en-IN")} to review`
+                ? `${formatCount(focusOverview.pendingPlayers)} to review`
                 : "In the auction pool"
             }
             href={`${focusBase}/registrations`}
@@ -821,7 +820,7 @@ export async function OrganizerHome({
               icon={<IconCalendar />}
               concept="fixtures"
               rolling
-              value={focusOverview.fixtureCount.toLocaleString("en-IN")}
+              value={formatCount(focusOverview.fixtureCount)}
               label="Fixtures"
               href={`${focusBase}/fixtures`}
               linkComponent={Link}
@@ -1181,9 +1180,9 @@ export async function OrganizerHome({
                           className="home-row-link"
                         >
                           <span className="home-date">
-                            <b>{when !== null ? IST_DAY.format(when) : "--"}</b>
+                            <b>{when !== null ? dateTile(when).day.padStart(2, "0") : "--"}</b>
                             <span>
-                              {when !== null ? IST_MONTH.format(when).toUpperCase() : "TBD"}
+                              {when !== null ? dateTile(when).month.toUpperCase() : "TBD"}
                             </span>
                           </span>
                           <span className="home-row-text">

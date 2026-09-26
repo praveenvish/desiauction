@@ -1,6 +1,12 @@
 import { EmptyState, IconEye, type BadgeTone, type KitTone } from "@desiauction/ui";
 import type { ReactNode } from "react";
 
+import { formatDate, relativeAge } from "../../lib/format-date";
+import { formatCount } from "../../lib/plural";
+
+/** Ages come from the product's one date grammar (lib/format-date). */
+export { relativeAge };
+
 /**
  * PX-9 shared admin rendering. Presentation only — no reads, no rules. The
  * tone map is a LOOK-UP over statuses the domains already publish; it invents
@@ -193,62 +199,20 @@ export function RelativeTime({ at, absolute = false }: { at: Date; absolute?: bo
  * works in one timezone; the stored value is UTC, and printing it unlabelled
  * was a five-and-a-half-hour lie by omission.
  */
-const IST = new Intl.DateTimeFormat("en-IN", {
+const IST_CLOCK = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Kolkata",
-  year: "numeric",
-  month: "short",
-  day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
 });
 
+/** "2 Aug 2026, 15:23 IST" — the date in the product's one form, a 24h clock. */
 export function absoluteIst(at: Date): string {
-  return `${IST.format(at)} IST`;
+  return `${formatDate(at)}, ${IST_CLOCK.format(at)} IST`;
 }
 
 function distance(at: Date): string {
   return relativeAge(at.getTime(), Date.now());
-}
-
-/**
- * "3d ago" / "in 7mo". Past ages are FLOORED, like the calendar a reader counts
- * on: a request asked 7 days and 14 hours ago is "7d ago". Rounding printed
- * "8d ago" on /admin beside the erasure desk's own date, which is 7 days back —
- * the same request, two ages, in front of the founder.
- */
-export function relativeAge(atMs: number, nowMs: number): string {
-  const seconds = Math.round((nowMs - atMs) / 1000);
-  // Future instants used to fall into the `< 60` branch below and print
-  // "just now" — the Health page's "Next due 01 Apr 2027 · just now" beside a
-  // NOT RUNNING runner read as "should be firing right now". Say "in 7mo".
-  if (seconds < -30) {
-    const ahead = -seconds;
-    if (ahead < 3600) {
-      return `in ${String(Math.max(1, Math.round(ahead / 60)))}m`;
-    }
-    if (ahead < 86400) {
-      return `in ${String(Math.round(ahead / 3600))}h`;
-    }
-    const days = Math.round(ahead / 86400);
-    return days < 60 ? `in ${String(days)}d` : `in ${String(Math.round(days / 30))}mo`;
-  }
-  if (seconds < 60) {
-    return "just now";
-  }
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `${String(minutes)}m ago`;
-  }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${String(hours)}h ago`;
-  }
-  const days = Math.floor(hours / 24);
-  if (days < 30) {
-    return `${String(days)}d ago`;
-  }
-  return new Date(atMs).toISOString().slice(0, 10);
 }
 
 /**
@@ -289,7 +253,7 @@ export function humanAction(action: string): string {
  * figure is grouped the Indian way ("1,06,700" is what an operator here reads).
  */
 export function KpiValue({ n }: { n: number }) {
-  return n === 0 ? <span className="admin-zero">0</span> : <>{n.toLocaleString("en-IN")}</>;
+  return n === 0 ? <span className="admin-zero">0</span> : <>{formatCount(n)}</>;
 }
 
 /**
@@ -306,7 +270,7 @@ export function TableCount({ n }: { n: number }) {
       </span>
     );
   }
-  return <>{n.toLocaleString("en-IN")}</>;
+  return <>{formatCount(n)}</>;
 }
 
 /**

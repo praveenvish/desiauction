@@ -10,6 +10,7 @@ import Link from "next/link";
 
 import type { ConductedSeason } from "../../server/roles/roles";
 import { monogram, type Tone } from "./home-parts";
+import { formatDate, formatShortDate, istCalendarDate } from "../../lib/format-date";
 
 /**
  * THE AUCTIONEER'S HOME — and before RN-1 there was no such surface at all.
@@ -49,14 +50,6 @@ function readiness(season: ConductedSeason): { label: string; tone: Tone; dot?: 
   return { label: "Ready", tone: "blue" };
 }
 
-/** Today in India as "YYYY-MM-DD" — the seasons' dates are IST wall-clock. */
-const IST_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Kolkata",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
 /**
  * The season's start date, said AS the season's start. Null where the
  * organizer has set no date.
@@ -71,14 +64,9 @@ const IST_DAY = new Intl.DateTimeFormat("en-CA", {
 export function nightDate(startsOn: string | null, over: boolean, now = new Date()): string | null {
   if (startsOn === null) return null;
   const day = startsOn.slice(0, 10);
-  const parsed = new Date(`${day}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const today = IST_DAY.format(now);
-  const label = parsed.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }),
-  });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const today = istCalendarDate(now);
+  const label = day.slice(0, 4) === today.slice(0, 4) ? formatShortDate(day) : formatDate(day);
   if (over) return label;
   return day < today ? `Season began ${label}` : `Season starts ${label}`;
 }

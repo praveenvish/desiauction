@@ -36,6 +36,8 @@ import { ownPhotoUrl, playerProfileFor, profileCompletenessFor } from "../../ser
 import { rolesOf, type OwnedTeam } from "../../server/roles/roles";
 import { RegistrationCard } from "./registration-card";
 import "./me.css";
+import { formatDate, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
+import { formatCount } from "../../lib/plural";
 
 export const metadata = { title: "My sports · DesiAuction" };
 
@@ -72,21 +74,19 @@ const PLAYED_LABEL: Record<CareerMatch["played"], string> = {
 
 function matchDate(kickoffAt: string | null): string {
   if (kickoffAt === null) return "—";
-  const d = new Date(`${kickoffAt.slice(0, 10)}T00:00:00`);
-  return Number.isNaN(d.getTime())
-    ? kickoffAt.slice(0, 10)
-    : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const day = kickoffAt.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? formatDate(day) : day;
 }
 
-/** "Sat 27 Sept · 4:30 pm" from the fixture's local wall-clock text. */
+/** "Sat, 27 Sep · 4:30 pm" from the fixture's local wall-clock text. */
 function kickoffLabel(kickoffAt: string | null): string {
   if (kickoffAt === null) return "Time to be announced";
-  const d = new Date(kickoffAt.length > 10 ? kickoffAt : `${kickoffAt}T00:00`);
-  if (Number.isNaN(d.getTime())) return kickoffAt;
-  const day = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  const day = kickoffAt.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return kickoffAt;
+  const wall = kickoffAt.replace(" ", "T").slice(0, 16);
   return kickoffAt.length > 10
-    ? `${day} · ${d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })}`
-    : day;
+    ? `${formatDayDate(day)} · ${formatWallTime(wall)}`
+    : formatDayDate(day);
 }
 
 function seasonYear(startsOn: string | null): string {
@@ -106,7 +106,7 @@ export default async function MySportsPage({
     redirect("/onboarding");
   }
   // Today in IST — fixture kickoffs are local wall-clock text.
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const today = istCalendarDate();
   const [query, career, matches, upcomingMatches, profile, completeness, photoUrl, roles] =
     await Promise.all([
       searchParams,
@@ -214,7 +214,7 @@ export default async function MySportsPage({
           <StatCard
             icon={<IconTrophy />}
             tone="gold"
-            value={career.totals.seasons.toLocaleString("en-IN")}
+            value={formatCount(career.totals.seasons)}
             label={career.totals.seasons === 1 ? "Season" : "Seasons"}
             hint={
               sports.length > 0
@@ -225,21 +225,21 @@ export default async function MySportsPage({
           <StatCard
             icon={<IconMatch />}
             tone="gold"
-            value={matchesPlayed.toLocaleString("en-IN")}
+            value={formatCount(matchesPlayed)}
             label="Matches played"
             hint={matchesPlayed > 0 ? `${String(wins)} won` : "From recorded lineups"}
           />
           <StatCard
             icon={<IconUsers />}
             tone="gold"
-            value={career.totals.teams.toLocaleString("en-IN")}
+            value={formatCount(career.totals.teams)}
             label={career.totals.teams === 1 ? "Team" : "Teams"}
             hint="Across every club"
           />
           <StatCard
             icon={<IconGavel />}
             tone="gold"
-            value={auctioned.toLocaleString("en-IN")}
+            value={formatCount(auctioned)}
             label={auctioned === 1 ? "Auction" : "Auctions"}
             hint={
               career.totals.highestPrice === null

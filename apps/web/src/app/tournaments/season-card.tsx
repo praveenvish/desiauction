@@ -2,6 +2,7 @@ import { Badge, Card, IconCalendar, IconPin, VisuallyHidden } from "@desiauction
 import Link from "next/link";
 
 import type { CompetitionSummary } from "../../server/competition/competitions";
+import { formatDateRange } from "../../lib/format-date";
 
 // The season card, extracted so the tournaments index and the seasons index
 // render an edition identically. It was inline in /seasons; a second copy would
@@ -91,23 +92,7 @@ export function seasonStatusBadge(
 
 /** "1 Aug – 15 Aug 2026", or a single dated end, or nothing. Days arrive as ISO. */
 export function dateRange(startsOn: string | null, endsOn: string | null): string | null {
-  const day = (iso: string, withYear: boolean): string =>
-    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      ...(withYear ? { year: "numeric" } : {}),
-      timeZone: "UTC",
-    });
-  if (startsOn === null && endsOn === null) {
-    return null;
-  }
-  if (startsOn === null) {
-    return day(endsOn ?? "", true);
-  }
-  if (endsOn === null) {
-    return day(startsOn, true);
-  }
-  return `${day(startsOn, false)} – ${day(endsOn, true)}`;
+  return startsOn === null && endsOn === null ? null : formatDateRange(startsOn, endsOn);
 }
 
 export function SeasonCard({

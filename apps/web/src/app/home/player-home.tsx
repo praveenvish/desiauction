@@ -32,6 +32,7 @@ import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/pr
 import { verdictOf } from "../me/registration-card";
 import "./home-duo.css";
 import "./player-home.css";
+import { dateTile, istCalendarDate } from "../../lib/format-date";
 
 /**
  * THE PLAYER'S HOME.
@@ -159,12 +160,9 @@ function SoldMoment({
 /** "2026-10-04 09:30" (local wall-clock text) → { day: "4", month: "Oct" }. */
 function dateBlock(kickoffAt: string | null): { day: string; month: string } | null {
   if (kickoffAt === null) return null;
-  const date = new Date(`${kickoffAt.slice(0, 10)}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return null;
-  return {
-    day: String(date.getUTCDate()),
-    month: date.toLocaleDateString("en-IN", { month: "short", timeZone: "UTC" }),
-  };
+  const day = kickoffAt.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  return dateTile(day);
 }
 
 /**
@@ -373,7 +371,7 @@ export async function PlayerHome({
       .reverse()
       .find((entry) => entry.auction?.kind === "sold" && entry.teamName !== null) ?? null;
   // Today in IST — fixture kickoffs are local wall-clock text (as /me reads it).
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const today = istCalendarDate();
   const [team, upcoming, topBuys] =
     moment === null || moment.teamName === null
       ? [null, [], []]
