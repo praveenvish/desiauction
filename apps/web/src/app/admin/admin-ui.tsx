@@ -208,7 +208,17 @@ export function absoluteIst(at: Date): string {
 }
 
 function distance(at: Date): string {
-  const seconds = Math.round((Date.now() - at.getTime()) / 1000);
+  return relativeAge(at.getTime(), Date.now());
+}
+
+/**
+ * "3d ago" / "in 7mo". Past ages are FLOORED, like the calendar a reader counts
+ * on: a request asked 7 days and 14 hours ago is "7d ago". Rounding printed
+ * "8d ago" on /admin beside the erasure desk's own date, which is 7 days back —
+ * the same request, two ages, in front of the founder.
+ */
+export function relativeAge(atMs: number, nowMs: number): string {
+  const seconds = Math.round((nowMs - atMs) / 1000);
   // Future instants used to fall into the `< 60` branch below and print
   // "just now" — the Health page's "Next due 01 Apr 2027 · just now" beside a
   // NOT RUNNING runner read as "should be firing right now". Say "in 7mo".
@@ -226,19 +236,19 @@ function distance(at: Date): string {
   if (seconds < 60) {
     return "just now";
   }
-  const minutes = Math.round(seconds / 60);
+  const minutes = Math.floor(seconds / 60);
   if (minutes < 60) {
     return `${String(minutes)}m ago`;
   }
-  const hours = Math.round(minutes / 60);
+  const hours = Math.floor(minutes / 60);
   if (hours < 24) {
     return `${String(hours)}h ago`;
   }
-  const days = Math.round(hours / 24);
+  const days = Math.floor(hours / 24);
   if (days < 30) {
     return `${String(days)}d ago`;
   }
-  return at.toISOString().slice(0, 10);
+  return new Date(atMs).toISOString().slice(0, 10);
 }
 
 /**
