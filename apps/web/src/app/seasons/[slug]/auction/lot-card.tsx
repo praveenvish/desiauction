@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { useMoney } from "../../../../components/money-unit";
 import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
 import type { AuctionClock } from "./use-auction-socket";
+import "./lot-card.css";
 
 // THE PLAYER CARD — the one picture of the lot every role shares (live-room
 // stage 1). The player fills it: their photo when they consented to one, and
@@ -46,7 +47,7 @@ export interface LotCardClock {
  * this component and nothing above it, and it shows exactly what the socket
  * says — which already freezes the moment the feed goes stale.
  */
-function CardClock({ remainingMs, totalMs, clock, frozen, extensions }: LotCardClock) {
+function CardClock({ remainingMs, totalMs, clock, frozen }: LotCardClock) {
   const smooth = useSyncExternalStore(
     clock?.subscribe ?? noopSubscribe,
     clock?.getSnapshot ?? nullSnapshot,
@@ -58,30 +59,11 @@ function CardClock({ remainingMs, totalMs, clock, frozen, extensions }: LotCardC
   // A lot whose window is unknown draws a full bar rather than dividing by zero.
   const fraction = totalMs <= 0 || ms === null ? 1 : Math.max(0, Math.min(1, ms / totalMs));
 
-  // THE BID BOUGHT TIME. The flag rises when the extension count does — on the
-  // same lot only, since the card is keyed per lot by its parent.
-  const seen = useRef(extensions);
-  const [flag, setFlag] = useState<number | null>(null);
-  useEffect(() => {
-    if (extensions > seen.current) {
-      setFlag(extensions);
-      const timer = setTimeout(() => {
-        setFlag(null);
-      }, EXTENSION_FLAG_MS);
-      seen.current = extensions;
-      return () => {
-        clearTimeout(timer);
-      };
-    }
-    seen.current = extensions;
-    return undefined;
-  }, [extensions]);
-
   if (frozen) {
     return (
       <>
         <p className="lot-card-clock lot-card-clock--paused" data-testid="lot-paused">
-          <IconPause size={20} weight="fill" />
+          <IconPause size={16} weight="fill" />
           <span>Paused</span>
         </p>
         <span className="lot-card-drain" data-tier="paused" aria-hidden>
@@ -104,17 +86,36 @@ function CardClock({ remainingMs, totalMs, clock, frozen, extensions }: LotCardC
         </span>
         <span className="lot-card-unit">sec</span>
       </p>
-      {flag !== null ? (
-        // Decorative: "Time extended" is announced by the room's announcer.
-        <span key={flag} className="lot-card-flag" data-testid="lot-extended" aria-hidden>
-          Time extended
-        </span>
-      ) : null}
       <span className="lot-card-drain" data-tier={critical ? "critical" : "calm"} aria-hidden>
         <span style={{ transform: `scaleX(${fraction.toFixed(4)})` }} />
       </span>
     </>
   );
+}
+
+/**
+ * THE BID BOUGHT TIME. The flag rises when the extension count does — on the
+ * same lot only, since the card is keyed per lot by its parent — and stands
+ * for a moment.
+ */
+function useExtensionFlag(extensions: number): number | null {
+  const seen = useRef(extensions);
+  const [flag, setFlag] = useState<number | null>(null);
+  useEffect(() => {
+    if (extensions > seen.current) {
+      setFlag(extensions);
+      const timer = setTimeout(() => {
+        setFlag(null);
+      }, EXTENSION_FLAG_MS);
+      seen.current = extensions;
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+    seen.current = extensions;
+    return undefined;
+  }, [extensions]);
+  return flag;
 }
 
 export function LotCard({
@@ -151,13 +152,28 @@ export function LotCard({
   nameTestId?: string;
   className?: string;
 }) {
+  const flag = useExtensionFlag(clock?.extensions ?? 0);
+  const role = roleLabel !== null && roleLabel.trim() !== "" ? roleLabel : null;
   return (
     <div className={["lot-card", className].filter(Boolean).join(" ")} data-testid="lot-card">
       {/* Decorative: the name is printed over the card in display type. */}
       <PlayerPortrait name={name} seed={seed} src={photoUrl} decorative />
       <span className="lot-card-scrim" aria-hidden />
-      {roleLabel !== null && roleLabel.trim() !== "" ? (
-        <span className="lot-card-role">{roleLabel}</span>
+      {/* THE TAG ROW — the card's one slot for words at its head: the role,
+          and beside it the passing "Time extended" flag. It keeps to the
+          height of the role badge, clear of the portrait's initials below and
+          of the clock badge to its right, at every phone width (stage 3: the
+          flag used to float between the two and sat on the initials). */}
+      {role !== null || flag !== null ? (
+        <div className="lot-card-tags">
+          {role !== null ? <span className="lot-card-role">{role}</span> : null}
+          {flag !== null && clock !== undefined && !clock.frozen ? (
+            // Decorative: "Time extended" is announced by the room's announcer.
+            <span key={flag} className="lot-card-flag" data-testid="lot-extended" aria-hidden>
+              Time extended
+            </span>
+          ) : null}
+        </div>
       ) : null}
       {clock !== undefined ? <CardClock {...clock} /> : null}
       <div className="lot-card-id">
