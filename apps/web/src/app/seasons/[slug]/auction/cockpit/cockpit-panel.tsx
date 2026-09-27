@@ -12,7 +12,6 @@ import {
   Field,
   IconClock,
   IconList,
-  PlayerImage,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,9 +24,9 @@ import {
 } from "../../../../../components/auction/needs-resolution";
 import { HashTabs } from "../../../../../components/hash-tabs/hash-tabs";
 import { formatDateTime } from "../../../../../lib/format-date";
-import { lotSeed } from "../../../../../lib/player-seed";
 import { personContact } from "../../../../../lib/person-label";
 import { ConductorDesk, type DeskControls } from "./conductor-desk";
+import { BaseDetail, LotQueueList } from "./lot-queue";
 import type { GavelHandle } from "./gavel-button";
 import type { CockpitView } from "../../../../../server/auction/conduct-actions";
 // Straight from its own module: a "use server" file may export only async
@@ -46,7 +45,7 @@ import { BroadcastLinks } from "../broadcast-links";
 import { CeremonyStage } from "../ceremony-stage";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
-import { AuctionProgress, useLiveFeed } from "../live-experience";
+import { useLiveFeed } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
@@ -622,39 +621,38 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       <div className="cockpit-grid cockpit-lower">
         <div className="cockpit-col">
           {finished && queue.length === 0 && needsResolution.length === 0 ? null : (
-            <Card data-testid="queue-card">
+            <section data-testid="queue-card" className="room-card" aria-label="Lot queue">
               {/* A finished night has no queue: the card keeps only its list of
-                who went unsold. */}
+                  who went unsold. */}
               {finished && queue.length === 0 ? null : (
-                <div className="competition-head">
+                <div className="room-card-head">
                   <h2>Lot queue</h2>
-                  <span className="competitions-hint">skip &amp; bring-forward</span>
+                  <span className="room-muted">
+                    {queue.length === 0 ? "empty" : `${String(queue.length)} to go`}
+                  </span>
                 </div>
               )}
               {finished && queue.length === 0 ? null : queue.length === 0 ? (
-                <p className="competitions-hint" data-testid="queue-empty">
+                <p className="room-muted" data-testid="queue-empty">
                   No queued lots.
                 </p>
               ) : (
-                <ol className="cockpit-queue">
-                  {queue.map((entry) => (
-                    <li key={entry.lotId} data-testid={`queue-${entry.lotNumber}`}>
-                      <Badge tone="info">{entry.lotNumber}</Badge>
-                      <PlayerImage
-                        name={entry.playerName ?? "Unnamed"}
-                        seed={lotSeed(entry.lotId, view.lotMedia)}
-                        src={view.lotMedia[entry.lotId]?.photoUrl}
-                        size="sm"
-                        shape="round"
-                        decorative
-                      />
-                      <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
-                      <span className="competitions-hint">
-                        base {money.ledger(entry.basePrice)}
-                      </span>
-                      <span className="queue-actions">
+                <LotQueueList
+                  label="Queued lots"
+                  roles={view.roles}
+                  lotMedia={view.lotMedia}
+                  rows={queue.map((entry) => ({
+                    id: entry.lotId,
+                    lotNumber: entry.lotNumber,
+                    playerName: entry.playerName,
+                    role: entry.role,
+                    detail: <BaseDetail basePrice={entry.basePrice} />,
+                    testId: `queue-${entry.lotNumber}`,
+                    actions: (
+                      <>
                         <Button
                           size="sm"
+                          variant="secondary"
                           onClick={() =>
                             void send(
                               `open-${entry.lotId}`,
@@ -666,6 +664,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                           loading={pending === `open-${entry.lotId}`}
                           disabled={lot !== null || !live || stale}
                           data-testid={`open-${entry.lotNumber}`}
+                          aria-label={`Open ${entry.lotNumber}, ${entry.playerName ?? "unnamed"}`}
                         >
                           Open
                         </Button>
@@ -683,13 +682,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                           loading={pending === `withdraw-${entry.lotId}`}
                           disabled={stale}
                           data-testid={`withdraw-${entry.lotNumber}`}
+                          aria-label={`Withdraw ${entry.lotNumber}, ${entry.playerName ?? "unnamed"}`}
                         >
                           Withdraw
                         </Button>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
+                      </>
+                    ),
+                  }))}
+                />
               )}
               {needsResolution.length > 0 ? (
                 <>
@@ -746,35 +746,36 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                       </Button>
                     </div>
                   ) : null}
-                  <ol className="cockpit-queue">
-                    {needsResolution.map((entry) => (
-                      <li key={entry.id} data-testid={`resolve-${entry.lotNumber}`}>
-                        <Badge tone={finished ? "neutral" : "warning"}>{entry.lotNumber}</Badge>
-                        <PlayerImage
-                          name={entry.playerName ?? "Unnamed"}
-                          seed={lotSeed(entry.id, view.lotMedia)}
-                          src={view.lotMedia[entry.id]?.photoUrl}
-                          size="sm"
-                          shape="round"
-                          decorative
-                        />
-                        <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
-                        <span className="competitions-hint">{entry.status}</span>
-                        {finished ? null : (
-                          <span className="queue-actions">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() =>
-                                void send(
-                                  `requeue-${entry.id}`,
-                                  "RequeueLot",
-                                  { lotId: entry.id },
-                                  `${entry.lotNumber} requeued`,
-                                )
-                              }
-                              loading={pending === `requeue-${entry.id}`}
-                              /* `finished` for the same reason "Invite owner"
+                  <LotQueueList
+                    label={finished ? "Lots not sold" : "Lots that need resolving"}
+                    tone="attention"
+                    roles={view.roles}
+                    lotMedia={view.lotMedia}
+                    rows={needsResolution.map((entry) => ({
+                      id: entry.id,
+                      lotNumber: entry.lotNumber,
+                      playerName: entry.playerName,
+                      role: "",
+                      detail: entry.status,
+                      testId: `resolve-${entry.lotNumber}`,
+                      ...(finished
+                        ? {}
+                        : {
+                            actions: (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() =>
+                                    void send(
+                                      `requeue-${entry.id}`,
+                                      "RequeueLot",
+                                      { lotId: entry.id },
+                                      `${entry.lotNumber} requeued`,
+                                    )
+                                  }
+                                  loading={pending === `requeue-${entry.id}`}
+                                  /* `finished` for the same reason "Invite owner"
                                  carries it: the control was offered on a
                                  completed auction, directly under a banner
                                  saying nothing here can be opened or undone, and
@@ -783,48 +784,44 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                  the refusal never reached the screen, so the
                                  conductor's only evidence was a button that did
                                  not respond. */
-                              disabled={stale || finished}
-                              data-testid={`requeue-${entry.lotNumber}`}
-                            >
-                              Requeue
-                            </Button>
-                            {entry.status === "frozen" ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  void send(
-                                    `withdraw-${entry.id}`,
-                                    "WithdrawLot",
-                                    { lotId: entry.id },
-                                    `${entry.lotNumber} withdrawn`,
-                                  )
-                                }
-                                loading={pending === `withdraw-${entry.id}`}
-                                disabled={stale || finished}
-                                data-testid={`withdraw-frozen-${entry.lotNumber}`}
-                              >
-                                Withdraw
-                              </Button>
-                            ) : null}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
+                                  disabled={stale || finished}
+                                  data-testid={`requeue-${entry.lotNumber}`}
+                                >
+                                  Requeue
+                                </Button>
+                                {entry.status === "frozen" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      void send(
+                                        `withdraw-${entry.id}`,
+                                        "WithdrawLot",
+                                        { lotId: entry.id },
+                                        `${entry.lotNumber} withdrawn`,
+                                      )
+                                    }
+                                    loading={pending === `withdraw-${entry.id}`}
+                                    disabled={stale || finished}
+                                    data-testid={`withdraw-frozen-${entry.lotNumber}`}
+                                  >
+                                    Withdraw
+                                  </Button>
+                                ) : null}
+                              </>
+                            ),
+                          }),
+                    }))}
+                  />
                 </>
               ) : null}
-            </Card>
+            </section>
           )}
         </div>
 
         <div className="cockpit-col">
-          {/* Same reason as the live room: the component renders its own
-              connecting state, and guarding it here reintroduces the re-flow. */}
-          {/* A finished night read from the record has no progress to report:
-              the bar printed "— / — lots · — in queue" over the result. */}
-          {overOffline ? null : <AuctionProgress snapshot={snapshot} />}
-
+          {/* No progress bar here: the room's header says "n of N done" and
+              the queue card says how many are to go (stage 3). */}
           {/* One panel at a time on the right: purses while the room is live,
               owners while it is being set up, and the two broadcast screens
               (DA-20 — their only door) a tab away instead of above both. */}
@@ -843,12 +840,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     {/* Without the engine a purse is a column of dashes; the
                         squads below already say what each team spent. */}
                     {overOffline ? null : (
-                      <PurseBoard
-                        snapshot={snapshot}
-                        teams={view.teams}
-                        rules={view.rules}
-                        squadSizes={squadSizesOf(view.teams, view.preSigned, feed.resolved)}
-                      />
+                      /* No "can bid up to" line: the desk's paddle rail says it
+                         beside every team already. The board keeps what the
+                         desk does not — the purse left and what is spent. */
+                      <PurseBoard snapshot={snapshot} teams={view.teams} />
                     )}
                     <PoolSummary
                       snapshot={snapshot}
@@ -1096,6 +1091,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         resolved={feed.resolved}
         snapshot={snapshot}
         squadMax={view.rules.squadMax}
+        collapsible
       />
 
       {/* UNDO's confirmation — it names what is about to be reversed. */}

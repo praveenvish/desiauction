@@ -1,0 +1,506 @@
+/* ==========================================================================
+   THE ROOM KIT (live-room stage 3). One card, one row, one tag for everything
+   around the player card — the queue, the purses, the pool, the squads, the
+   owner's team, up next — in the desk's language: the UI face with tabular
+   figures (never the typewriter face for money), calm tokens, hairline rows.
+   Loaded by live-experience.tsx, which every live surface imports.
+   ========================================================================== */
+
+.room-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+@media (min-width: 900px) {
+  .room-card {
+    padding: var(--space-5);
+  }
+}
+
+.room-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.room-card h2,
+.room-card-head h2 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  color: var(--text-heading);
+}
+
+.room-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.room-muted {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A calm tag: a word about the row, not a shout. */
+.room-tag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.room-tag[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--success-base) 45%, transparent);
+  color: var(--success-base);
+}
+
+.room-tag[data-tone="warning"] {
+  border-color: color-mix(in srgb, var(--warning-base) 45%, transparent);
+  color: var(--warning-base);
+}
+
+.room-tag[data-tone="accent"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text-accent);
+}
+
+/* A player's portrait at list size: the same seeded card as the stage. */
+.room-thumb {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  width: 40px;
+  height: 50px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.room-row-words {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.room-row-words .room-muted {
+  font-size: var(--text-xs-size);
+}
+
+.room-row-name {
+  overflow: hidden;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-link {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-accent);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.room-link:focus-visible,
+.room-more:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* "Show all N": the list's tail, folded. */
+.room-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  color: var(--text-heading);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.room-more:hover {
+  border-color: var(--border-interactive);
+}
+
+/* ---- Progress: a line of words over a thin bar ----------------------------- */
+
+.live-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.live-progress-words {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-progress-words b {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.live-progress-bar {
+  flex: 1 1 100%;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.live-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-progress-bar span {
+    transition: none;
+  }
+}
+
+/* ---- Your team -------------------------------------------------------------- */
+
+.my-team-head {
+  justify-content: flex-start;
+}
+
+.my-team-head h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-team-paddle {
+  flex: none;
+  font-size: var(--text-xs-size);
+}
+
+.my-team-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.my-team-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+/* A plan tile takes the full row under the three figures. */
+.my-team-stat[data-testid="my-plan-headroom"] {
+  grid-column: 1 / -1;
+}
+
+.my-team-label {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.my-team-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.25;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.my-team-context {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  line-height: 1.45;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.my-squad-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.my-squad-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.my-squad-list li:first-child {
+  border-top: 0;
+}
+
+.my-squad-list .registration-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-medium);
+}
+
+.my-squad-price {
+  flex: none;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- Up next ----------------------------------------------------------------- */
+
+.up-next-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.up-next-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.up-next-list li:first-child {
+  border-top: 0;
+}
+
+/* ---- The lot queue (cockpit) ------------------------------------------------ */
+
+/* One row = one line at every width: portrait, who, and the two acts. Each row
+   is exactly one height, so the folded list shows exactly QUEUE_FOLD rows. */
+.lot-queue {
+  --queue-row: 64px;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lot-queue[data-folded="true"] {
+  overflow: hidden;
+  max-height: calc(var(--queue-row) * 5);
+}
+
+.lot-queue li {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  height: var(--queue-row);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.lot-queue li:first-child {
+  border-top: 0;
+}
+
+.lot-queue .queue-actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.lot-queue[data-tone="attention"] .room-thumb {
+  border-color: color-mix(in srgb, var(--warning-base) 45%, transparent);
+}
+
+/* ---- The spectator's stage ---------------------------------------------------- */
+
+.spectate-room {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.spectate-room-stage,
+.spectate-room-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.spectate-lot .lot-card {
+  height: clamp(240px, 40svh, 360px);
+}
+
+@media (min-width: 900px) {
+  .spectate-room[data-lot="true"] {
+    display: grid;
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-5);
+  }
+
+  .spectate-lot .lot-card {
+    height: auto;
+    aspect-ratio: 4 / 5;
+  }
+
+  .spectate-room .owner-price-amount {
+    font-size: 44px;
+  }
+
+  .spectate-room-main {
+    gap: var(--space-4);
+  }
+}
+
+.spectate-bids,
+.spectate-sales {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spectate-bids li,
+.spectate-sales li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.spectate-bids li:first-child,
+.spectate-sales li:first-child {
+  border-top: 0;
+}
+
+.spectate-bid-team {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spectate-bid-amount,
+.spectate-sale-price {
+  flex: none;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.spectate-bids li:not([data-leading="true"]) .spectate-bid-team,
+.spectate-bids li:not([data-leading="true"]) .spectate-bid-amount {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+.spectate-bids .purse-chip,
+.spectate-bids .purse-crest {
+  width: 26px;
+  height: 26px;
+}
+
+.spectate-sale-team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.spectate-sale-team .purse-chip,
+.spectate-sale-team .purse-crest {
+  width: 18px;
+  height: 18px;
+  font-size: 8px;
+  border-radius: 5px;
+}
+
+.spectate-squads-link {
+  box-sizing: border-box;
+  min-height: 52px;
+  text-decoration: none;
+}

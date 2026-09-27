@@ -1,12 +1,11 @@
 "use client";
 
-import type { AuctionSnapshot, PlanState } from "@desiauction/core";
+import { maxAffordableBid, type AuctionSnapshot, type PlanState } from "@desiauction/core";
 import {
   Badge,
   ButtonLink,
   Card,
   IconBroadcast,
-  IconCheck,
   IconCrown,
   IconFile,
   IconLedger,
@@ -16,6 +15,7 @@ import {
   IconWallet,
   Pill,
   PlayerImage,
+  PlayerPortrait,
   SectionCard,
   StatCard,
   StatGrid,
@@ -28,9 +28,12 @@ import { useMoney } from "../../../../components/money-unit";
 import type { MoneyFormat } from "../../../../lib/money";
 import { lotSeed } from "../../../../lib/player-seed";
 import type { AuctionRules, LotMedia, ResolvedLot } from "../../../../server/auction/live-summary";
+import { roleLabeller } from "../../../../lib/role-label";
 import { fitBadge } from "./plan/plan-model";
+import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
 import "./dashboard.css";
 import "./live/live.css";
+import "./room.css";
 
 // PX-6 live-experience kit: presentation over the broadcast AuctionSnapshot
 // and the resolved-lot history. NOTHING here decides — money math comes from
@@ -387,24 +390,31 @@ export function AuctionProgress({ snapshot }: { snapshot: AuctionSnapshot | null
       data-testid="auction-progress"
       data-connecting={snapshot === null}
     >
+      <p className="live-progress-words">
+        {snapshot === null ? (
+          "— of — settled"
+        ) : (
+          <>
+            <b>{snapshot.lotsResolved}</b> of {snapshot.lotsTotal} settled
+            <span className="live-progress-rest"> · {snapshot.queue.length} to go</span>
+          </>
+        )}
+      </p>
+      {/* Calm tags, not badges: the card already carries the clock and the
+          extension flag, so these are the footnote, not the headline. */}
+      {snapshot?.currentLot?.status === "closing_soon" ? (
+        <span className="room-tag" data-tone="warning" data-testid="closing-soon">
+          Closing soon
+        </span>
+      ) : null}
+      {extensions > 0 ? (
+        <span className="room-tag" data-testid="anti-snipe">
+          Extended ×{extensions}
+        </span>
+      ) : null}
       <div className="live-progress-bar" role="presentation">
         <span style={{ width: `${String(pct)}%` }} />
       </div>
-      <span className="competitions-hint">
-        {snapshot === null
-          ? "— / — lots · — in queue"
-          : `${String(snapshot.lotsResolved)}/${String(snapshot.lotsTotal)} lots · ${String(snapshot.queue.length)} in queue`}
-      </span>
-      {snapshot?.currentLot?.status === "closing_soon" ? (
-        <Badge tone="warning" data-testid="closing-soon">
-          Closing soon
-        </Badge>
-      ) : null}
-      {extensions > 0 ? (
-        <Badge tone="info" data-testid="anti-snipe">
-          Anti-snipe ×{extensions}
-        </Badge>
-      ) : null}
     </div>
   );
 }
@@ -426,6 +436,8 @@ export function MyTeamCard({
   squadSize,
   plan = null,
   lotMedia = {},
+  team,
+  onShowSquad,
 }: {
   snapshot: AuctionSnapshot | null;
   myTeamId: string;
@@ -449,6 +461,10 @@ export function MyTeamCard({
   plan?: PlanState | null;
   /** Faces for the squad list, keyed by lot id. */
   lotMedia?: MediaByLot;
+  /** The franchise's crest and colours, for the card's head. */
+  team?: TeamIdentity | undefined;
+  /** Opens the room's squad tab — where the whole squad is listed. */
+  onShowSquad?: () => void;
 }) {
   const money = useMoney();
   const paddle = snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddleNumber) ?? null;
@@ -459,98 +475,128 @@ export function MyTeamCard({
   const leading =
     snapshot?.currentLot?.currentBid !== null &&
     snapshot?.currentLot?.currentBid.paddleNumber === myPaddleNumber;
-  const complete = squadSize >= rules.squadMax;
+  // What the purse can actually buy: the engine's own reserve arithmetic (the
+  // same call the raise button makes), so the two never disagree.
+  const upTo =
+    paddle === null || paddle.purseRemaining === null
+      ? null
+      : Number(
+          maxAffordableBid({
+            purseRemaining: paddle.purseRemaining,
+            squadSize,
+            squadMin: rules.squadMin,
+            minPossiblePrice: rules.minPossiblePrice,
+          }),
+        );
+  // ONE LINE OF CONTEXT, in words an owner uses — not "10 short of minimum".
+  const toMinimum = rules.squadMin - squadSize;
+  const open = rules.squadMax - squadSize;
+  const context =
+    open <= 0
+      ? "Your squad is complete."
+      : toMinimum > 0
+        ? `${String(toMinimum)} more ${toMinimum === 1 ? "player" : "players"} to reach the minimum of ${String(rules.squadMin)}.`
+        : `Minimum reached — ${String(open)} ${open === 1 ? "spot" : "spots"} still open.`;
+  const latest = [...squad].reverse().slice(0, 3);
   return (
-    <Card data-testid="my-team-card" className="live-card my-team">
-      <div className="competition-head">
-        <h2>{myTeamName}</h2>
+    <section
+      data-testid="my-team-card"
+      className="room-card my-team"
+      aria-labelledby="my-team-title"
+    >
+      <div className="room-card-head my-team-head">
+        <PurseTeamCrest team={team} fallback={myTeamName} />
+        <h2 id="my-team-title">{myTeamName}</h2>
         {leading ? (
-          <Badge tone="success" data-testid="my-team-leading">
+          <span className="room-tag" data-tone="success" data-testid="my-team-leading">
             Leading this lot
-          </Badge>
+          </span>
         ) : (
-          <a className="live-card-link" href="#live-squads">
-            View squad
-          </a>
+          <span className="room-muted my-team-paddle">{myPaddleNumber}</span>
         )}
       </div>
       {paddle !== null ? (
-        <div className="my-team-stats">
-          {/* This is the viewer's OWN paddle, so the engine always sends its
-              money; the fallback exists because the type is honest about
-              redaction, not because a bidder is ever denied their own purse. */}
-          <div className="my-team-stat" data-testid="my-purse">
-            <span className="my-team-value">
-              {paddle.purseRemaining === null ? "—" : money.ledger(paddle.purseRemaining)}
-            </span>
-            <span className="my-team-label">Purse remaining</span>
-          </div>
-          <div className="my-team-stat" data-testid="my-spent">
-            <span className="my-team-value">
-              {paddle.committed === null ? "—" : money.ledger(paddle.committed)}
-            </span>
-            <span className="my-team-label">Committed</span>
-          </div>
-          <div className="my-team-stat" data-testid="my-slots">
-            <span className="my-team-value">
-              {squadSize}/{rules.squadMax}
-            </span>
-            <span className="my-team-label">Squad (min {rules.squadMin})</span>
-          </div>
-          {plan !== null && fit !== null ? (
-            <div className="my-team-stat" data-testid="my-plan-headroom" data-fit={plan.budget.fit}>
-              <span className="my-team-value">
-                {plan.budget.headroom < 0
-                  ? `−${money.ledger(-plan.budget.headroom)}`
-                  : money.ledger(plan.budget.headroom)}
-              </span>
-              <span className="my-team-label">Plan headroom</span>
-              <Badge tone={fit.tone} className="plan-tile-badge">
-                {plan.budget.fit === "fits"
-                  ? "Fits"
-                  : plan.budget.fit === "at_risk"
-                    ? "At risk"
-                    : "Over purse"}
-              </Badge>
+        <>
+          <dl className="my-team-stats">
+            {/* This is the viewer's OWN paddle, so the engine always sends its
+                money; the fallback exists because the type is honest about
+                redaction, not because a bidder is ever denied their own purse. */}
+            <div className="my-team-stat" data-testid="my-purse">
+              <dt className="my-team-label">Purse left</dt>
+              <dd className="my-team-value">
+                {paddle.purseRemaining === null ? "—" : money.ledger(paddle.purseRemaining)}
+              </dd>
             </div>
-          ) : (
-            <div className="my-team-stat my-team-stat--pill">
-              <Pill
-                tone={complete ? "green" : squadSize >= rules.squadMin ? "blue" : "amber"}
-                icon={complete ? <IconCheck /> : undefined}
+            <div className="my-team-stat" data-testid="my-ceiling">
+              <dt className="my-team-label">Can bid up to</dt>
+              <dd className="my-team-value">{upTo === null ? "—" : money.ledger(upTo)}</dd>
+            </div>
+            <div className="my-team-stat" data-testid="my-slots">
+              <dt className="my-team-label">Squad</dt>
+              <dd className="my-team-value">
+                {squadSize}/{rules.squadMax}
+              </dd>
+            </div>
+            {plan !== null && fit !== null ? (
+              <div
+                className="my-team-stat"
+                data-testid="my-plan-headroom"
+                data-fit={plan.budget.fit}
               >
-                {complete
-                  ? "Squad complete"
-                  : squadSize >= rules.squadMin
-                    ? `${String(rules.squadMax - squadSize)} spots open`
-                    : `${String(rules.squadMin - squadSize)} short of minimum`}
-              </Pill>
-            </div>
-          )}
-        </div>
+                <dt className="my-team-label">Plan headroom</dt>
+                <dd className="my-team-value">
+                  {plan.budget.headroom < 0
+                    ? `−${money.ledger(-plan.budget.headroom)}`
+                    : money.ledger(plan.budget.headroom)}
+                  <Badge tone={fit.tone} className="plan-tile-badge">
+                    {plan.budget.fit === "fits"
+                      ? "Fits"
+                      : plan.budget.fit === "at_risk"
+                        ? "At risk"
+                        : "Over purse"}
+                  </Badge>
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+          <p className="my-team-context">
+            <span data-testid="my-spent">
+              Spent {paddle.committed === null ? "—" : money.ledger(paddle.committed)}
+            </span>
+            <span aria-hidden> · </span>
+            <span>{context}</span>
+          </p>
+        </>
       ) : null}
       {squad.length > 0 ? (
-        <ul className="conflict-list my-squad-list" data-testid="my-squad">
-          {squad.map((lot) => (
-            <li key={lot.lotId}>
-              <Badge tone="success">{lot.lotNumber}</Badge>
-              <LotFace
-                lotId={lot.lotId}
-                name={lot.playerName ?? "Unnamed"}
-                lotMedia={lotMedia}
-                size="sm"
-              />
-              <span className="registration-name">{lot.playerName ?? "Unnamed"}</span>
-              <span className="registration-phone">
-                {lot.soldPrice !== null ? money.ledger(lot.soldPrice) : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="room-label">Latest signings</p>
+          <ul className="my-squad-list" data-testid="my-squad">
+            {latest.map((lot) => (
+              <li key={lot.lotId}>
+                <LotFace
+                  lotId={lot.lotId}
+                  name={lot.playerName ?? "Unnamed"}
+                  lotMedia={lotMedia}
+                  size="sm"
+                />
+                <span className="registration-name">{lot.playerName ?? "Unnamed"}</span>
+                <span className="my-squad-price">
+                  {lot.soldPrice !== null ? money.ledger(lot.soldPrice) : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       ) : (
-        <p className="competitions-hint">No players signed yet — your wins land here.</p>
+        <p className="room-muted">No players won yet — your wins land here.</p>
       )}
-    </Card>
+      {onShowSquad !== undefined ? (
+        <button type="button" className="room-link" onClick={onShowSquad}>
+          See your whole squad
+        </button>
+      ) : null}
+    </section>
   );
 }
 
@@ -787,47 +833,54 @@ export function UpNext({
   snapshot,
   limit = 5,
   lotMedia = {},
+  roles = [],
 }: {
   snapshot: AuctionSnapshot | null;
   limit?: number;
   /** Faces for the queue, keyed by lot id. */
   lotMedia?: MediaByLot;
+  /** The season's roles, so a footballer is not named in cricket. */
+  roles?: readonly { key: string; label: string }[];
 }) {
   const money = useMoney();
+  const labelOf = roleLabeller(roles);
   const queue = snapshot?.queue ?? [];
   if (queue.length === 0) {
     return null;
   }
   return (
-    <Card data-testid="up-next">
-      <div className="competition-head">
-        <h2>Up next</h2>
-        <span className="competitions-hint">{queue.length} still to come</span>
+    <section data-testid="up-next" className="room-card" aria-labelledby="up-next-title">
+      <div className="room-card-head">
+        <h2 id="up-next-title">Up next</h2>
+        <span className="room-muted">{queue.length} to go</span>
       </div>
       <ol className="up-next-list">
-        {queue.slice(0, limit).map((entry, index) => (
+        {queue.slice(0, limit).map((entry) => (
           <li key={entry.lotId}>
-            <span className="up-next-pos" aria-hidden>
-              {index + 1}
+            <span className="room-thumb">
+              <PlayerPortrait
+                name={entry.playerName ?? entry.lotNumber}
+                seed={lotSeed(entry.lotId, lotMedia)}
+                src={lotMedia[entry.lotId]?.photoUrl ?? null}
+                decorative
+              />
             </span>
-            <LotFace
-              lotId={entry.lotId}
-              name={entry.playerName ?? entry.lotNumber}
-              lotMedia={lotMedia}
-              size="sm"
-            />
-            <span className="up-next-name">{entry.playerName ?? entry.lotNumber}</span>
-            <span className="up-next-role">{entry.role.replace(/_/g, " ")}</span>
-            <span className="up-next-base">base {money.ledger(entry.basePrice)}</span>
+            <span className="room-row-words">
+              <span className="room-row-name">{entry.playerName ?? entry.lotNumber}</span>
+              <span className="room-muted">
+                {entry.role === "" ? "" : `${labelOf(entry.role)} · `}base{" "}
+                {money.ledger(entry.basePrice)}
+              </span>
+            </span>
           </li>
         ))}
       </ol>
       {queue.length > limit ? (
-        <p className="competitions-hint">
+        <p className="room-muted">
           and {queue.length - limit} more after {queue[limit - 1]?.playerName ?? "these"}
         </p>
       ) : null}
-    </Card>
+    </section>
   );
 }
 

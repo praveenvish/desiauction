@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import { roleLabeller } from "../../../../lib/role-label";
-import { Card, IconPlus, PlayerImage, RosterMark } from "@desiauction/ui";
+import { IconChevronDown, IconPlus, PlayerImage, RosterMark } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 
 import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
@@ -185,6 +185,7 @@ export function SquadBoard({
    */
   showPurse = true,
   note = null,
+  collapsible = false,
 }: {
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
@@ -197,6 +198,13 @@ export function SquadBoard({
   squadMax: number;
   showPurse?: boolean;
   note?: string | null;
+  /**
+   * Each team folds to one line (a native disclosure) — the conductor's page,
+   * where the desk already says every squad's size and a phone used to scroll
+   * past thirty-six rows of them (stage 3). The text stays in the document,
+   * so a search in the page still finds a player.
+   */
+  collapsible?: boolean;
 }) {
   const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
@@ -205,8 +213,8 @@ export function SquadBoard({
     (snapshot?.paddles ?? []).map((paddle) => [paddle.teamId, paddle.purseRemaining]),
   );
   return (
-    <Card data-testid="squad-board" className="live-card">
-      <div className="competition-head">
+    <section data-testid="squad-board" className="room-card squad-board" aria-label="Squads">
+      <div className="room-card-head">
         <h2>Squads</h2>
         {/* The shorthand was a note to ourselves: "pre-signed" is a schema word
             and "never bid" reads as an instruction. The room needs the fact. */}
@@ -222,93 +230,100 @@ export function SquadBoard({
       <div className="squad-grid">
         {squads.map(({ team, members }) => {
           const remaining = purseByTeam.get(team.id);
-          return (
-            <section key={team.id} className="squad-team" data-testid={`squad-${team.id}`}>
-              <div className="squad-team-head">
-                <PurseTeamCrest team={team} fallback={team.name} />
-                <span className="squad-team-name">{team.name}</span>
-                <span className="squad-team-count">
-                  {members.length}/{squadMax}
-                </span>
-              </div>
-              {/* The LINE is unconditional once purses are shown at all; only
-                  the figure waits. Rendered conditionally, it appeared per team
-                  when the socket answered — four teams, ~75px, and every squad
-                  below moved. `showPurse` still decides whether this viewer is
-                  entitled to see purses; that is a permission and stays a
-                  branch. Not knowing a number yet is not a permission. */}
+          const purseLine = showPurse ? (
+            <span
+              className="squad-team-purse"
+              data-spent={remaining !== undefined && remaining !== null ? undefined : ""}
+            >
               {/* SEALED IS NOT A DASH. When the engine withholds a purse from
-                  this viewer (every guest on /spectate), the line showed a lone
-                  "—" under every squad. What the team SPENT is the sum of the
-                  prices printed on the rows below it, so that is what the line
-                  says; only a line still waiting for the socket stays a dash. */}
-              {showPurse ? (
-                <p
-                  className="squad-team-purse"
-                  data-spent={remaining !== undefined && remaining !== null ? undefined : ""}
-                >
-                  {/* Before (or without) the socket, what a squad SPENT is still
-                      known — it is the prices on the rows below — so the line
-                      says it rather than a lone dash. */}
-                  {remaining !== undefined && remaining !== null
-                    ? `${money.ledger(remaining)} left`
-                    : `${money.ledger(
-                        members.reduce((sum, member) => sum + (member.price ?? 0), 0),
-                      )} spent`}
-                </p>
-              ) : null}
-              {members.length === 0 ? (
-                <p className="competitions-hint">No players signed yet.</p>
-              ) : (
-                <ul className="squad-list">
-                  {members.map((member) => (
-                    <li key={member.key} className="squad-row">
-                      <PlayerImage
-                        name={member.name}
-                        seed={member.seed}
-                        src={member.photoUrl}
-                        size="sm"
-                        shape="round"
-                        teamColor={team.primaryColor ?? undefined}
-                        ring
-                        decorative
-                      />
-                      {/* ONE LINE, always. The row used to flex-wrap, so a
+                    this viewer (every guest on /spectate), what the team SPENT
+                    is the sum of the prices on the rows below, so that is what
+                    the line says. Unconditional once purses are shown at all,
+                    so the line never appears late and moves the squads. */}
+              {remaining !== undefined && remaining !== null
+                ? `${money.ledger(remaining)} left`
+                : `${money.ledger(
+                    members.reduce((sum, member) => sum + (member.price ?? 0), 0),
+                  )} spent`}
+            </span>
+          ) : null;
+          const head = (
+            <>
+              <PurseTeamCrest team={team} fallback={team.name} />
+              <span className="squad-team-words">
+                <span className="squad-team-name">{team.name}</span>
+                {purseLine}
+              </span>
+              <span className="squad-team-count">
+                {members.length}/{squadMax}
+              </span>
+            </>
+          );
+          const list =
+            members.length === 0 ? (
+              <p className="competitions-hint">No players signed yet.</p>
+            ) : (
+              <ul className="squad-list">
+                {members.map((member) => (
+                  <li key={member.key} className="squad-row">
+                    <PlayerImage
+                      name={member.name}
+                      seed={member.seed}
+                      src={member.photoUrl}
+                      size="sm"
+                      shape="round"
+                      teamColor={team.primaryColor ?? undefined}
+                      ring
+                      decorative
+                    />
+                    {/* ONE LINE, always. The row used to flex-wrap, so a
                           badge or a long name pushed the price onto a second
                           line and a phone row grew to ~110px. Name + badges
                           share a cell that truncates; role and price keep
                           their own tracks and never wrap. */}
-                      <span className="squad-who">
-                        <span className="squad-name" title={member.name}>
-                          {member.name}
-                        </span>
-                        <MemberBadges member={member} />
+                    <span className="squad-who">
+                      <span className="squad-name" title={member.name}>
+                        {member.name}
                       </span>
-                      <span className="squad-role">{labelOf(member.role)}</span>
-                      <span className="squad-price">
-                        {member.price === null ? (
-                          <span className="squad-presigned">Pre-signed</span>
-                        ) : (
-                          money.ledger(member.price)
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                  {members.length < squadMax ? (
-                    <li className="squad-row squad-row--open">
-                      <IconPlus size={14} />
-                      {squadMax - members.length === 1
-                        ? "1 spot open"
-                        : `${String(squadMax - members.length)} spots open`}
-                    </li>
-                  ) : null}
-                </ul>
-              )}
+                      <MemberBadges member={member} />
+                    </span>
+                    <span className="squad-role">{labelOf(member.role)}</span>
+                    <span className="squad-price">
+                      {member.price === null ? (
+                        <span className="squad-presigned">Pre-signed</span>
+                      ) : (
+                        money.ledger(member.price)
+                      )}
+                    </span>
+                  </li>
+                ))}
+                {members.length < squadMax ? (
+                  <li className="squad-row squad-row--open">
+                    <IconPlus size={14} />
+                    {squadMax - members.length === 1
+                      ? "1 spot open"
+                      : `${String(squadMax - members.length)} spots open`}
+                  </li>
+                ) : null}
+              </ul>
+            );
+          return collapsible ? (
+            <details key={team.id} className="squad-team" data-testid={`squad-${team.id}`}>
+              <summary className="squad-team-head">
+                {head}
+                <IconChevronDown size={16} className="squad-team-caret" aria-hidden />
+              </summary>
+              {list}
+            </details>
+          ) : (
+            <section key={team.id} className="squad-team" data-testid={`squad-${team.id}`}>
+              <div className="squad-team-head">{head}</div>
+              {list}
             </section>
           );
         })}
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -340,7 +355,7 @@ export function PoolSummary({
     null,
   );
   return (
-    <Card data-testid="pool-summary">
+    <section data-testid="pool-summary" className="room-card" aria-label="Player pool">
       <h2>Player pool</h2>
       <dl className="pool-stats">
         <div>
@@ -356,7 +371,7 @@ export function PoolSummary({
           </dd>
         </div>
         <div>
-          <dt>Remaining</dt>
+          <dt>To go</dt>
           <dd data-testid="pool-remaining">{remaining}</dd>
         </div>
         {withdrawn > 0 ? (
@@ -383,6 +398,6 @@ export function PoolSummary({
           </span>
         ) : null}
       </div>
-    </Card>
+    </section>
   );
 }
