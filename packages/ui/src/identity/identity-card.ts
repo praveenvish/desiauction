@@ -26,19 +26,34 @@ export interface IdentityCard extends PlaceholderIdentity {
   transform: string;
   /** Glyph size in view units — one initial is set larger than two. */
   fontSize: number;
-  /** Vertical centre of the initials, in view units (upper-middle, clear of the name). */
+  /**
+   * Vertical centre of the initials, in view units: a little below the middle,
+   * clear of the corner the card's clock badge occupies and of the name at the
+   * foot.
+   */
   glyphY: number;
 }
 
-/** Glyph size for a count of initials: a lone letter gets the room two would share. */
+/**
+ * Glyph size for a count of initials: a lone letter gets the room two would share.
+ *
+ * Sized for the card's WIDEST crop, not its 4:5 drawing. On a phone the card is
+ * wider than it is tall, the drawing is sliced top and bottom, and initials set
+ * at 172 reached the top-right corner — straight under the 64px seconds badge
+ * ("YC" read as "Y" and a clock). At 150, centred at 236, two letters stay
+ * clear of that corner at 360, 390 and 430 wide.
+ */
 function glyphSize(initials: string | null): number {
   if (initials === null) {
     return 0;
   }
   const clusters = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(initials)]
     .length;
-  return clusters > 1 ? 172 : 212;
+  return clusters > 1 ? 150 : 184;
 }
+
+/** Below the drawing's middle (250 would be dead centre): see `glyphSize`. */
+const GLYPH_Y = 236;
 
 function patternTransform(identity: PlaceholderIdentity): string {
   const { angle, pattern } = identity;
@@ -62,6 +77,6 @@ export function identityCardOf(seed: string, name: string): IdentityCard {
     ...identity,
     transform: patternTransform(identity),
     fontSize: glyphSize(identity.initials),
-    glyphY: 212,
+    glyphY: GLYPH_Y,
   };
 }
