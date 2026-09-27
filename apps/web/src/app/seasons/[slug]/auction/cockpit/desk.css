@@ -302,6 +302,9 @@
 /* ---- The gavel desk ------------------------------------------------------------ */
 
 .desk-bar {
+  /* Positioned so the gavel's "hold again" cue sits against it, out of flow
+     (on a phone the bar is fixed, which positions it too). */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

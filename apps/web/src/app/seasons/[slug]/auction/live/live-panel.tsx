@@ -32,6 +32,7 @@ import {
   useLiveFeed,
 } from "../live-experience";
 import { PageStatus } from "../../../../../components/shell/page-status";
+import { gavelResetKey } from "../../../../../components/auction/desk-action";
 import { AuctionAnnouncer } from "../auction-announcer";
 import { GavelButton } from "../cockpit/gavel-button";
 import { OwnerStage, OwnerWon } from "../owner-stage";
@@ -936,6 +937,7 @@ export function LivePanel({
                   disabled={lot === null || pending === "close-lot"}
                   testId="conduct-close-lot"
                   describedBy="live-gavel-hint"
+                  resetKey={gavelResetKey(lot)}
                 />
               </div>
               <p className="competitions-hint" id="live-gavel-hint">

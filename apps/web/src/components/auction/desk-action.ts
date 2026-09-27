@@ -178,3 +178,24 @@ export function deskActionWords(
       return { label: "", shortLabel: "", why: "" };
   }
 }
+
+/**
+ * WHAT A GAVEL HOLD IS FOR: the lot, who leads it and at what price. The gavel
+ * passes this to its hold gate as the `resetKey`, so a new bid landing mid-hold
+ * (a new leader, a new amount, pass → sell) aborts the hold and the conductor
+ * holds again for what the label now says. Stage 4, a founder decision: before,
+ * a hold begun as "sell to Pune" completed as a sale to whoever led when it
+ * filled. With no lot the key is empty (the gavel is disabled then).
+ */
+export function gavelResetKey(
+  lot: {
+    readonly lotId: string;
+    readonly currentBid: { readonly paddleNumber: string; readonly amount: number } | null;
+  } | null,
+): string {
+  if (lot === null) {
+    return "";
+  }
+  const bid = lot.currentBid;
+  return `${lot.lotId}:${bid?.paddleNumber ?? "none"}:${bid === null ? "none" : String(bid.amount)}`;
+}

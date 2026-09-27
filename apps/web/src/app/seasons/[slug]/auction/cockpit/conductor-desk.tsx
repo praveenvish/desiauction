@@ -14,6 +14,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref }
 import { COCKPIT_SHORTCUTS } from "../../../../../components/auction/cockpit-keys";
 import {
   deskActionWords,
+  gavelResetKey,
   isGavelAction,
   type DeskAction,
 } from "../../../../../components/auction/desk-action";
@@ -256,6 +257,7 @@ export function ConductorDesk({
             stale={stale}
             pending={pending}
             gavelRef={gavelRef}
+            resetKey={gavelResetKey(lot)}
             controls={controls}
           />
           <div className="desk-row">
@@ -674,6 +676,7 @@ function PrimaryAction({
   stale,
   pending,
   gavelRef,
+  resetKey,
   controls,
 }: {
   action: DeskAction;
@@ -682,6 +685,8 @@ function PrimaryAction({
   stale: boolean;
   pending: string | null;
   gavelRef: Ref<GavelHandle>;
+  /** `gavelResetKey(lot)`: a new bid mid-hold aborts the hold. */
+  resetKey: string;
   controls: DeskControls;
 }) {
   if (action.kind === "finished") {
@@ -704,6 +709,7 @@ function PrimaryAction({
         holdingLabel="Keep holding…"
         icon={<IconGavel size={24} weight="fill" />}
         disabled={stale || pending === "close-lot"}
+        resetKey={resetKey}
         onConfirm={controls.gavel}
       />
     );

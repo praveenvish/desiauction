@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { deskActionOf, deskActionWords, isGavelAction, type DeskInput } from "./desk-action";
+import {
+  deskActionOf,
+  deskActionWords,
+  gavelResetKey,
+  isGavelAction,
+  type DeskInput,
+} from "./desk-action";
 
 const queue = [
   { lotId: "lot-2", lotNumber: "L002", playerName: "Rohan Kulkarni" },
@@ -127,5 +133,27 @@ describe("deskActionWords — the button names the act", () => {
       expect(words.label.length).toBeGreaterThan(0);
       expect(words.why.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("gavelResetKey — what a gavel hold is for", () => {
+  const bid = (paddleNumber: string, amount: number) => ({ paddleNumber, amount });
+
+  it("names the lot, the leader's paddle and the amount", () => {
+    expect(gavelResetKey({ lotId: "L1", currentBid: bid("P2", 1500) })).toBe("L1:P2:1500");
+    expect(gavelResetKey({ lotId: "L1", currentBid: null })).toBe("L1:none:none");
+    expect(gavelResetKey(null)).toBe("");
+  });
+
+  it("changes on every change a hold must restart for", () => {
+    const base = gavelResetKey({ lotId: "L1", currentBid: bid("P1", 1000) });
+    // pass → sell
+    expect(gavelResetKey({ lotId: "L1", currentBid: null })).not.toBe(base);
+    // a new leader at the same price, the same leader at a new price, a new lot
+    expect(gavelResetKey({ lotId: "L1", currentBid: bid("P2", 1000) })).not.toBe(base);
+    expect(gavelResetKey({ lotId: "L1", currentBid: bid("P1", 1100) })).not.toBe(base);
+    expect(gavelResetKey({ lotId: "L2", currentBid: bid("P1", 1000) })).not.toBe(base);
+    // …and not on a re-render that changes nothing
+    expect(gavelResetKey({ lotId: "L1", currentBid: bid("P1", 1000) })).toBe(base);
   });
 });

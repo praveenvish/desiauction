@@ -440,6 +440,8 @@ button.paddle-chip:focus-visible {
 }
 
 .conduct-row {
+  /* The gavel's "hold again" cue is placed against this row. */
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);

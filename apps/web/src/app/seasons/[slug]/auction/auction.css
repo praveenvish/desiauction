@@ -3320,6 +3320,30 @@ details.squad-team[open] .squad-team-caret {
   user-select: none;
 }
 
+/* "New bid — hold again": a new bid aborted the hold. The region sits OUT OF
+   FLOW against the caller's positioned container (the desk bar, the /live
+   conduct row), above the gavel's top edge — it can never push, shrink or
+   move the button under a held pointer. No animation: it is a sentence. */
+.gavel-restart {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.gavel-restart-cue {
+  display: block;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--warning-base);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
 .cockpit-gavel:disabled {
   opacity: 0.55;
   cursor: not-allowed;
