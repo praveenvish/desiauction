@@ -69,6 +69,16 @@ export interface SeasonCounts {
   matches: number;
   /** Registrations awaiting an organizer decision — the only actionable one. */
   pending: number;
+  /*
+   * The three below are read by the tournaments index only; the org page folds
+   * its own editions without them, so they are optional and read as zero.
+   */
+  /** Players approved into the pool — the season's size once registration runs. */
+  approved?: number;
+  /** Matches being played right now — the most urgent thing a season can hold. */
+  live?: number;
+  /** Matches played to the end. */
+  played?: number;
   /**
    * The season's auction has been run (completed or reconciled). The
    * competition status stops at `registration_closed`, so without this a
@@ -78,7 +88,14 @@ export interface SeasonCounts {
   auctionDone?: boolean;
 }
 
-const NO_COUNTS: SeasonCounts = { teams: 0, matches: 0, pending: 0 };
+const NO_COUNTS: SeasonCounts = {
+  teams: 0,
+  matches: 0,
+  pending: 0,
+  approved: 0,
+  live: 0,
+  played: 0,
+};
 
 /**
  * One settlement-case read for the whole page, on the same system pool the
@@ -262,18 +279,27 @@ async function countsFor(
       .where(inArray(teams.competitionId, competitionIds))
       .groupBy(teams.competitionId),
     fixtureRows: await db
-      .select({ competitionId: fixtures.competitionId, count: tally })
+      .select({
+        competitionId: fixtures.competitionId,
+        count: tally,
+        live: sql<number>`(count(*) filter (where ${fixtures.status} = 'in_progress'))::int`,
+        played: sql<number>`(count(*) filter (where ${fixtures.status} = 'completed'))::int`,
+      })
       .from(fixtures)
       .where(inArray(fixtures.competitionId, competitionIds))
       .groupBy(fixtures.competitionId),
     pendingRows: await db
-      .select({ competitionId: registrations.competitionId, count: tally })
+      .select({
+        competitionId: registrations.competitionId,
+        // "Submitted" is the only status that is waiting on a human.
+        count: sql<number>`(count(*) filter (where ${registrations.status} = 'submitted'))::int`,
+        approved: sql<number>`(count(*) filter (where ${registrations.status} = 'approved'))::int`,
+      })
       .from(registrations)
       .where(
         and(
           inArray(registrations.competitionId, competitionIds),
-          // "Submitted" is the only status that is waiting on a human.
-          eq(registrations.status, "submitted"),
+          inArray(registrations.status, ["submitted", "approved"]),
         ),
       )
       .groupBy(registrations.competitionId),
@@ -303,10 +329,15 @@ async function countsFor(
     read(row.competitionId).teams = row.count;
   }
   for (const row of fixtureRows) {
-    read(row.competitionId).matches = row.count;
+    const entry = read(row.competitionId);
+    entry.matches = row.count;
+    entry.live = row.live;
+    entry.played = row.played;
   }
   for (const row of pendingRows) {
-    read(row.competitionId).pending = row.count;
+    const entry = read(row.competitionId);
+    entry.pending = row.count;
+    entry.approved = row.approved;
   }
   for (const row of slices.flatMap((slice) => slice.doneRows)) {
     read(row.competitionId).auctionDone = true;

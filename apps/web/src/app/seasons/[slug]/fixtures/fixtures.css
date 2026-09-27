@@ -328,7 +328,7 @@
   background: var(--surface-sunken);
   color: var(--text-secondary);
   font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -484,7 +484,7 @@ a.mx-day:hover {
 
 .mx-day-name {
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
 
@@ -586,7 +586,7 @@ a.mx-week-step:hover {
 .mx-daygroup-head h2 {
   margin: 0;
   font-size: var(--text-md-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
 
@@ -719,7 +719,7 @@ a.mx-week-step:hover {
 
 .mx-side[data-won="true"] .mx-side-name,
 .mx-side[data-won="true"] .mx-side-score {
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
 
@@ -733,7 +733,7 @@ a.mx-week-step:hover {
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
   font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
 }
 
@@ -812,7 +812,7 @@ a.mx-week-step:hover {
   color: var(--text-heading);
   font-size: var(--text-lg-size);
   line-height: var(--text-lg-line);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
 }
 
 .mx-panel-title:focus-visible {
@@ -974,7 +974,7 @@ a.mx-week-step:hover {
   gap: var(--space-2);
   padding: 0;
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
 

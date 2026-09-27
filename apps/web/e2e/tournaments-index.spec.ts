@@ -2,8 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { latestOtp } from "./otp";
 
-// The tournaments index: first run, the summary band, and the toolbar
-// (search / status / sort / layout) that filters the accordion.
+// The tournaments index: first run, "Needs you now", the tournament cards and
+// the toolbar (views / stage / search / sort).
 //
 // The toolbar runs entirely in the browser — no `searchParams`, no server
 // round-trip — so nothing about it is covered by a server test. Everything
@@ -61,7 +61,7 @@ function dialog(page: Page) {
  */
 const COLD = { timeout: 30_000 } as const;
 
-test("the tournaments index: first run, summary band, and the toolbar", async ({ page }) => {
+test("the tournaments index: first run, needs-you, cards, and the toolbar", async ({ page }) => {
   await otpLogin(page, PHONE);
 
   // A person with no org cannot create a tournament, so the org comes first.
@@ -108,15 +108,18 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   await expect(page.getByTestId("competition-name")).toHaveText(`Alpha One ${STAMP}`, COLD);
 
   await page.goto("/tournaments");
-  const summary = page.getByTestId("tg-summary");
-  await expect(summary).toBeVisible();
-  // Two tournaments, one season — the status tabs count what the page can
-  // actually see, and the toolbar's count names both units.
-  await expect(summary).toContainText("All");
-  await expect(page.getByTestId("tg-status-all")).toContainText("1");
+  // Two tournaments, one season. The season is in setup, so it is also what
+  // "Needs you now" leads with — its one next step is finishing setup.
   await expect(page.getByTestId("tg-results")).toHaveText("2 tournaments · 1 season");
-  // The one season is featured above the list, and links into its workspace.
   await expect(page.getByTestId("tg-featured")).toContainText(`Alpha One ${STAMP}`);
+  await expect(page.getByTestId("tg-featured").getByTestId("tx-next-step")).toHaveText(
+    "Finish setup",
+  );
+  // Stage chips count something or are not drawn: with every season at one
+  // stage there is nothing to filter between, so there are no chips at all.
+  await expect(page.getByTestId("tg-summary")).toHaveCount(0);
+  // The page's one primary action is the same in both views.
+  await expect(page.getByTestId("new-tournament")).toBeVisible();
 
   const alphaGroup = page.getByTestId(`tg-${alpha}`);
   const zuluGroup = page.getByTestId(`tg-${zulu}`);
@@ -125,16 +128,17 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
 
   // A tournament with no seasons says so, and shows no season figures.
   await expect(zuluGroup).toContainText("no seasons yet");
-  // The one with a season states the count once, in agreement with itself.
+  // The one with a season states the count once, and shows the edition itself —
+  // cards open on their editions; nothing is hidden behind a toggle.
   await expect(alphaGroup).toContainText("1 season");
+  await expect(alphaGroup.getByTestId("tg-season")).toBeVisible();
 
   // --- search -------------------------------------------------------------
   await page.getByTestId("tg-search").fill("Zulu");
   await expect(zuluGroup).toBeVisible();
   await expect(alphaGroup).toHaveCount(0);
 
-  // A season name matches too, and the hit is REVEALED: a match inside a
-  // collapsed group is a match the organizer cannot see.
+  // A season name matches too, and the hit is shown inside its tournament.
   await page.getByTestId("tg-search").fill("Alpha One");
   await expect(alphaGroup).toBeVisible();
   await expect(zuluGroup).toHaveCount(0);
@@ -147,50 +151,9 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   await page.getByTestId("tg-search").fill("");
   await expect(alphaGroup).toBeVisible();
   await expect(zuluGroup).toBeVisible();
-  // Nothing stays forced open once the filter clears. A group filtered out is
-  // unmounted, so coming back it takes the default again — and only the first
-  // group defaults to open, which under "Newest" is Zulu, not Alpha.
-  await expect(alphaGroup.getByTestId("tg-season")).toBeHidden();
 
-  // --- status filter (the status tabs) -------------------------------------
-  // The new season is a draft, so "Registration open" must empty the list —
-  // including the seasonless tournament, which cannot satisfy the filter.
-  await page.getByTestId("tg-status-registration_open").click();
-  await expect(page.getByTestId("tg-noresults")).toBeVisible();
-
-  await page.getByTestId("tg-status-draft").click();
-  await expect(alphaGroup).toBeVisible();
-  await expect(zuluGroup).toHaveCount(0);
-  // Filtered down, the sub-line and the header figure must still agree.
-  await expect(alphaGroup).toContainText("1 season");
-
-  // --- the accordion opens and closes on its own --------------------------
-  // A fresh load, so the open/closed state is the documented default rather
-  // than whatever the filtering above left behind: a group that was briefly
-  // the only match was briefly the first group, and kept that open state.
-  await page.goto("/tournaments");
-  const toggle = page.getByTestId(`tg-toggle-${alpha}`);
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  await expect(alphaGroup.getByTestId("tg-season")).toBeVisible();
-
-  // --- layout -------------------------------------------------------------
-  await expect(page.getByTestId("tg-view-list")).toHaveAttribute("aria-pressed", "true");
-  await page.getByTestId("tg-view-grid").click();
-  await expect(page.getByTestId("tg-view-grid")).toHaveAttribute("aria-pressed", "true");
-  // The grid renders season CARDS, so the row treatment is gone entirely and
-  // the same season reappears inside the card grid.
-  await expect(alphaGroup.getByTestId("tg-season")).toHaveCount(0);
-  const grid = alphaGroup.locator(".tg-grid");
-  await expect(grid).toBeVisible();
-  await expect(grid).toContainText(`Alpha One ${STAMP}`);
-
-  await page.getByTestId("tg-view-list").click();
-  await expect(alphaGroup.getByTestId("tg-season")).toBeVisible();
-
-  await toggle.click();
-  await expect(alphaGroup.getByTestId("tg-season")).toBeHidden();
+  // The card's edition row opens the season workspace.
+  await expect(alphaGroup.getByTestId("tg-season")).toHaveAttribute("href", /^\/seasons\/[^/?#]+$/);
 
   // --- the two views ------------------------------------------------------
   // /seasons used to be a second index over these same rows. It is a view now,
@@ -198,12 +161,11 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   await page.getByTestId("tg-mode-seasons").click();
   await expect(page).toHaveURL(/\?view=seasons$/);
   await expect(page.getByTestId("tg-mode-seasons")).toHaveAttribute("aria-pressed", "true");
-  // One summary for both views: every figure on it is about seasons.
-  await expect(page.getByTestId("tg-summary")).toBeVisible();
-  // Flat: the accordion is gone, the seasons are cards, and the layout pair
-  // goes with it (this view IS the grid, so it has only one state to offer).
+  // Flat: the tournament cards are gone and every season is one row, with
+  // "New season" beside the list — the view is about editions.
   await expect(page.getByTestId(`tg-${alpha}`)).toHaveCount(0);
-  await expect(page.getByTestId("tg-view-grid")).toHaveCount(0);
+  await expect(page.getByTestId("new-season")).toBeVisible();
+  await expect(page.getByTestId("new-tournament")).toBeVisible();
   await expect(page.getByTestId("competitions-list")).toContainText(`Alpha One ${STAMP}`);
 
   // The flat view inherits the toolbar the old /seasons index never had.
@@ -221,15 +183,8 @@ test("the tournaments index: first run, summary band, and the toolbar", async ({
   await expect(page.getByTestId("tg-mode-seasons")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("competitions-list")).toContainText(`Alpha One ${STAMP}`);
 
-  // The season WORKSPACE did not move.
-  //
-  // Seasons live inside their tournament's group, and a group starts CLOSED —
-  // so the row is in the DOM (which is why the containsText above passes) while
-  // being unreachable to role queries, exactly as it is unreachable to a person
-  // until they open it. Open it the way they would.
-  // The SEASONS view renders season CARDS, not the accordion's grouped rows —
-  // `tg-season` belongs to the grouped view and does not exist here at all.
-  // Click the card's own link, scoped to the list so the toolbar cannot match.
+  // The season WORKSPACE did not move: the row's name opens it. Scoped to the
+  // list so the toolbar cannot match.
   await page
     .getByTestId("competitions-list")
     .locator("a", { hasText: `Alpha One ${STAMP}` })

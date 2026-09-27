@@ -43,7 +43,7 @@
   color: var(--text-heading);
   font-size: var(--text-lg-size);
   line-height: var(--text-lg-line);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
 }
 
 .tpl-kind-desc {

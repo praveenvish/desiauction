@@ -39,7 +39,7 @@
   margin: 0;
   color: var(--text-heading);
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
 }
 
 .ptpl-lede {

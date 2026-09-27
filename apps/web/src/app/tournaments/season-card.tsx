@@ -90,6 +90,14 @@ export function seasonStatusBadge(
   return { label: statusLabel(status), tone: statusTone(status) };
 }
 
+/**
+ * The season's cover photo, or null for the floodlight. `competitions.cover_url`
+ * is not on the summary yet; when it lands, it flows through here unchanged.
+ */
+export function coverOf(season: CompetitionSummary & { coverUrl?: string | null }): string | null {
+  return season.coverUrl ?? null;
+}
+
 /** "1 Aug – 15 Aug 2026", or a single dated end, or nothing. Days arrive as ISO. */
 export function dateRange(startsOn: string | null, endsOn: string | null): string | null {
   return startsOn === null && endsOn === null ? null : formatDateRange(startsOn, endsOn);
