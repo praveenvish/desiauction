@@ -583,14 +583,14 @@ a.mx-week-step:hover {
   padding: var(--space-3) var(--space-4);
 }
 
-.mx-daygroup-head h3 {
+.mx-daygroup-head h2 {
   margin: 0;
   font-size: var(--text-md-size);
   font-weight: var(--font-weight-bold);
   color: var(--text-heading);
 }
 
-.mx-daygroup[data-today="true"] .mx-daygroup-head h3 {
+.mx-daygroup[data-today="true"] .mx-daygroup-head h2 {
   color: var(--accent-ink);
 }
 
@@ -1146,10 +1146,6 @@ a.mx-week-step:hover {
     grid-template-columns: repeat(7, 4.5rem);
   }
 
-  .mx-toolbar .st-search {
-    flex: 1 1 100%;
-  }
-
   .mx-daygroup-head {
     padding: var(--space-3);
   }
@@ -1203,7 +1199,61 @@ a.mx-week-step:hover {
     width: 8px;
   }
 
-  .mx-pipeline-go {
+  /* One row of tools: the tabs, then Plan and Add beside them. */
+  .st-head.fx-head {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .st-head.fx-head > .st-actions {
+    width: auto;
+    flex-wrap: nowrap;
+  }
+
+  .st-head.fx-head > .st-actions > * {
+    flex: none;
+  }
+
+  .mx-wide-only {
+    display: none;
+  }
+
+  /* Everything published: the steps have nothing to say on a phone. */
+  .mx-pipeline[data-settled="true"] .mx-steps {
+    display: none;
+  }
+
+  .mx-pipeline {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .st-toolbar.mx-toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .mx-toolbar .st-search {
+    gap: var(--space-1);
+    padding-inline-start: var(--space-2);
+  }
+
+  .mx-toolbar .st-select {
+    padding-inline: var(--space-2) var(--space-6);
+  }
+
+  .mx-pipeline[data-settled="true"] .mx-pipeline-say {
+    display: none;
+  }
+
+  .mx-toolbar .st-search,
+  .mx-toolbar .st-select {
     width: 100%;
+    min-width: 0;
+  }
+
+  .mx-pipeline-go {
+    width: auto;
   }
 }

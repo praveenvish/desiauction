@@ -268,7 +268,7 @@ export function SchedulePanel({
             }}
           >
             <IconPlus size={16} aria-hidden />
-            Add {noun}
+            Add<span className="mx-wide-only"> {noun}</span>
           </Button>
         </div>
       ) : null}
@@ -344,7 +344,12 @@ export function SchedulePanel({
   const played = stats.inProgress + stats.completed;
   const pipeline =
     canManage && !empty ? (
-      <section className="mx-pipeline" aria-label="Publishing" data-testid="generate-panel">
+      <section
+        className="mx-pipeline"
+        aria-label="Publishing"
+        data-testid="generate-panel"
+        data-settled={stats.draft + stats.scheduled === 0 ? "true" : undefined}
+      >
         <ol className="mx-steps">
           <li data-on={stats.draft > 0 ? "true" : undefined}>
             <span className="mx-step-count" data-testid="stat-draft">
@@ -514,7 +519,7 @@ export function SchedulePanel({
         <input
           name="q"
           type="search"
-          placeholder={`${lobbySeason ? "Lobby" : "Match"} number`}
+          placeholder={`${lobbySeason ? "Lobby" : "Match"} no.`}
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -695,7 +700,12 @@ export function SchedulePanel({
       ) : null}
       {days.map((day) => {
         const rel = relativeDay(day.date, today);
-        const full = wallDay(day.date, view.mode === "search").label;
+        // The year only when it is not this one — a finished season from last
+        // year reads "Sat, 14 Feb 2026", not a February still to come.
+        const full = wallDay(
+          day.date,
+          view.mode === "search" || day.date.slice(0, 4) !== today.slice(0, 4),
+        ).label;
         const liveCount = day.rows.filter((row) => row.status === "in_progress").length;
         return (
           <section
@@ -707,7 +717,7 @@ export function SchedulePanel({
             aria-labelledby={`day-head-${day.date}`}
           >
             <header className="mx-daygroup-head">
-              <h3 id={`day-head-${day.date}`}>{rel !== null ? `${rel} · ${full}` : full}</h3>
+              <h2 id={`day-head-${day.date}`}>{rel !== null ? `${rel} · ${full}` : full}</h2>
               <span>
                 {day.rows.length} {day.rows.length === 1 ? noun : nouns}
                 {liveCount > 0 ? ` · ${String(liveCount)} playing now` : ""}
@@ -724,7 +734,7 @@ export function SchedulePanel({
           data-testid="day-undated"
         >
           <header className="mx-daygroup-head">
-            <h3 id="day-head-undated">Not dated yet</h3>
+            <h2 id="day-head-undated">Not dated yet</h2>
             <span>
               {view.undated.length} {view.undated.length === 1 ? noun : nouns}
             </span>
@@ -780,6 +790,7 @@ export function SchedulePanel({
           grounds={grounds}
           isLobby={lobbySeason}
           drafts={stats.draft}
+          canGenerate={!lobbySeason && !empty && grounds.length > 0}
           seasonStartsOn={view.competition.startsOn}
           seasonEndsOn={view.competition.endsOn}
         />

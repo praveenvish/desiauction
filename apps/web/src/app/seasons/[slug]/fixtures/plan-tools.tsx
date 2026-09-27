@@ -509,9 +509,16 @@ export function PlanDialogs({
   grounds,
   isLobby,
   drafts,
+  canGenerate,
   seasonStartsOn,
   seasonEndsOn,
 }: {
+  /**
+   * While the schedule is empty the generator sits inline on the page; a
+   * second copy in a closed dialog would put every one of its labels on the
+   * page twice (a closed <dialog> keeps its contents in the DOM).
+   */
+  canGenerate: boolean;
   open: PlanDialog;
   onClose: () => void;
   slug: string;
@@ -610,7 +617,7 @@ export function PlanDialogs({
 
   return (
     <>
-      {isLobby ? null : (
+      {isLobby || !canGenerate ? null : (
         <Dialog
           open={open === "generate"}
           onClose={onClose}
