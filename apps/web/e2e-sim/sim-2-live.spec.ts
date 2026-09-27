@@ -186,13 +186,23 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
     propagation.push(Date.now() - t);
   }
 
+  // Stage 4: a bid landing mid-hold aborts the hold ("New bid — hold again").
+  // The conductor then holds again, for the leader the label now names.
+  let gavelRestarts = 0;
   async function gavel(): Promise<void> {
     const g = org.getByTestId("cockpit-gavel");
-    await expect(g).toBeEnabled();
-    await g.hover();
-    await org.mouse.down();
-    await org.waitForTimeout(900);
-    await org.mouse.up();
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await expect(g).toBeEnabled();
+      await g.hover();
+      await org.mouse.down();
+      await org.waitForTimeout(900);
+      await org.mouse.up();
+      if (!(await org.getByTestId("cockpit-gavel-restart").isVisible())) break;
+      gavelRestarts += 1;
+      log(`   gavel: a new bid landed mid-hold — holding again (restart ${gavelRestarts})`);
+      await expect(g).toHaveAttribute("data-holding", "false");
+      if (!(await g.isVisible())) break;
+    }
     await expect(g).toBeHidden({ timeout: 20_000 });
   }
 
@@ -673,6 +683,7 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
     seenByRivalMs: { p50: ppct(50), p90: ppct(90), max: psorted.at(-1) },
     issues,
     budgetChecks,
+    gavelRestarts,
   };
   writeFileSync(path.join(OUT, "live-summary.json"), JSON.stringify(summary, null, 2));
   log(
