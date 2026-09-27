@@ -160,6 +160,8 @@ export interface ChannelSwitchView {
 export interface RecentChange {
   readonly id: string;
   readonly at: Date;
+  /** The kind this change touched, or the channel for a whole-channel switch. */
+  readonly subject: string;
   readonly actorName: string | null;
   readonly summary: string;
   readonly reason: string | null;
@@ -404,6 +406,7 @@ export async function notificationControlCenter(
       {
         id: row.id,
         at: row.at,
+        subject: row.subject,
         actorName: row.actorName,
         summary: summarize(row.subject, meta),
         reason: meta.reason,

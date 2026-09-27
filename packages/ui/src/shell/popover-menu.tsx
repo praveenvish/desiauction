@@ -22,6 +22,7 @@ export interface PopoverMenuItem {
   /** Action item — rendered as a button (e.g. wraps a server action call). */
   onSelect?: () => void;
   danger?: boolean;
+  testId?: string;
 }
 
 export interface PopoverMenuProps {
@@ -154,6 +155,7 @@ export function PopoverMenu({
                   <MenuLink
                     role="menuitem"
                     href={item.href}
+                    data-testid={item.testId}
                     className={[styles["item"], item.danger === true ? styles["danger"] : ""]
                       .filter(Boolean)
                       .join(" ")}
@@ -167,6 +169,7 @@ export function PopoverMenu({
                   <button
                     role="menuitem"
                     type="button"
+                    data-testid={item.testId}
                     className={[styles["item"], item.danger === true ? styles["danger"] : ""]
                       .filter(Boolean)
                       .join(" ")}
