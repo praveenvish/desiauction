@@ -1,203 +1,19 @@
-/* FIXTURES — the schedule tab (fixtures-panel.tsx), plus the calendar and
-   match day. Page-local; the shared card language is in ../_tabs/tabs.css.
-   Tokens only. */
+/* THE MATCHES SCREEN — the Schedule tab (schedule-panel.tsx, match-panel.tsx,
+   plan-tools.tsx, result-form.tsx). Page-local; the shared card language is in
+   ../_tabs/tabs.css. Tokens only. */
 
 .fx-status {
   display: inline-flex;
   text-transform: capitalize;
 }
 
-/* ---- Next match ---- */
-
-.fx-next {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.fx-faceoff {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-}
-
-.fx-faceoff[data-lobby="true"] {
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
-}
-
-.fx-side {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  text-align: center;
-}
-
-.fx-side-name {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  font-size: var(--text-md-size);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.3;
-  color: var(--text-heading);
-}
-
-.fx-vs-big {
-  font-family: var(--font-text);
-  font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.fx-lobby-count {
-  font-size: var(--text-md-size);
-  color: var(--text-secondary);
-}
-
-.fx-lobby-count strong {
-  font-size: var(--text-2xl-size);
-  color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
-}
-
-.fx-next-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-5);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-.fx-next-facts li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.fx-next-facts svg {
-  flex: none;
-  color: var(--text-muted);
-}
-
-.fx-final {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  text-align: center;
-}
-
-.fx-final strong {
-  font-size: var(--text-xl-size);
-  color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.fx-final span {
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-}
-
-/* ---- Results worklist ---- */
-
-.fx-result-row {
-  display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, auto) auto;
-  align-items: center;
-  gap: var(--space-2) var(--space-4);
-  font-size: var(--text-sm-size);
-}
-
-.fx-result-score {
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-  text-align: end;
-}
-
-.fx-result-score strong {
-  color: var(--text-heading);
-}
-
-.fx-results > li[data-scored="false"] .st-mono {
-  color: var(--warning-strong);
-}
-
-.fx-result-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  align-items: end;
-  gap: var(--space-3) var(--space-4);
-  margin-top: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-}
+/* ---- Lobby placings ---- */
 
 .fx-squad-row {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: var(--space-3);
-}
-
-.fx-result-form > button {
-  justify-self: start;
-}
-
-/* ---- Schedule tools ---- */
-
-.fx-tools {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.fx-pipeline {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-  margin: 0;
-}
-
-.fx-pipeline > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-
-.fx-pipeline dt {
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-}
-
-.fx-pipeline dd {
-  margin: 0;
-  font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
-}
-
-.fx-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 /* ---- Generate form ---- */
@@ -407,329 +223,6 @@
   color: var(--text-secondary);
 }
 
-/* ---- The schedule table ---- */
-
-.fx-num {
-  white-space: nowrap;
-}
-
-.fx-teams {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.fx-vs {
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.fx-when {
-  min-width: 9.5rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.fx-place .st-sub {
-  white-space: nowrap;
-}
-
-.fx-place,
-.fx-score {
-  display: inline-flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.fx-score strong {
-  color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
-}
-
-.fx-table tr[data-status="cancelled"] > td {
-  color: var(--text-muted);
-}
-
-.st-table tbody td.fx-none {
-  padding-block: var(--space-8);
-  text-align: center;
-  color: var(--text-secondary);
-}
-
-.fx-move-row > td {
-  background: var(--surface-sunken);
-}
-
-.fx-move {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-}
-
-.fx-move > * {
-  flex: 1 1 200px;
-  min-width: 0;
-}
-
-.fx-move > button {
-  flex: 0 0 auto;
-}
-
-.fx-timeline > li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-}
-
-/* ---- Calendar and match day ---- */
-
-.cal-left {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3) var(--space-5);
-  min-width: 0;
-}
-
-.cal-views {
-  display: inline-flex;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-}
-
-.cal-view {
-  display: inline-flex;
-  align-items: center;
-  min-height: 36px;
-  padding: 0 var(--space-4);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  text-decoration: none;
-  text-transform: capitalize;
-}
-
-.cal-view:hover {
-  color: var(--text-heading);
-}
-
-.cal-view[aria-current="page"] {
-  border-color: var(--accent-line);
-  background: var(--accent-subtle);
-  color: var(--text-heading);
-}
-
-.cal-view:focus-visible,
-.cal-step:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.cal-pager {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.cal-pager strong {
-  min-width: 0;
-  font-size: var(--text-sm-size);
-  color: var(--text-heading);
-  text-align: center;
-}
-
-.cal-step {
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  color: var(--text-heading);
-}
-
-.cal-step:hover {
-  border-color: var(--border-strong);
-}
-
-.cal-lines {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.cal-line {
-  display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-1) var(--space-4);
-  padding: var(--space-3) var(--space-5);
-  border-top: 1px solid var(--border-subtle);
-  font-size: var(--text-sm-size);
-}
-
-.cal-line-time {
-  display: flex;
-  flex-direction: column;
-  font-variant-numeric: tabular-nums;
-}
-
-.cal-line-time strong {
-  color: var(--text-heading);
-}
-
-.cal-line-main {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.cal-line-where {
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-}
-
-.md-side {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-.cal-none {
-  margin: 0;
-  padding: var(--space-4) var(--space-5) var(--space-5);
-  border-top: 1px solid var(--border-subtle);
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-/* ---- Phone ---- */
-
-@media (max-width: 719px) {
-  .fx-result-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .fx-result-row .fx-teams {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .fx-result-score {
-    grid-column: 1 / -1;
-    text-align: start;
-  }
-
-  .fx-faceoff {
-    gap: var(--space-2);
-    padding: var(--space-3);
-  }
-
-  .fx-side-name {
-    font-size: var(--text-sm-size);
-  }
-
-  .fx-table tbody tr:not([data-group]) > td.fx-num {
-    grid-column: 1 / -1;
-  }
-
-  .fx-move > * {
-    flex-basis: 100%;
-  }
-
-  .cal-left {
-    width: 100%;
-  }
-
-  .cal-views,
-  .cal-pager {
-    width: 100%;
-  }
-
-  .cal-views > * {
-    flex: 1;
-    justify-content: center;
-  }
-
-  .cal-pager {
-    justify-content: space-between;
-  }
-
-  .cal-line {
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding-inline: var(--space-4);
-  }
-
-  .cal-line-time {
-    grid-column: 1 / -1;
-    flex-direction: row;
-    gap: var(--space-2);
-  }
-
-  .md-side {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-2);
-  }
-
-  .cal-none {
-    padding-inline: var(--space-4);
-  }
-}
-
-/* ---- One control rung (wow pass) -------------------------------------------
-   The Schedule views, the calendar range and the date stepper share the
-   segmented control's 40px height and sunken track, so the row reads as one
-   instrument instead of three button sizes. */
-.cal-head .cal-left {
-  gap: var(--space-2) var(--space-3);
-}
-
-.cal-head .cal-pager {
-  box-sizing: border-box;
-  height: 40px;
-  padding: 3px;
-  gap: var(--space-1);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-
-.cal-head .cal-pager strong {
-  padding: 0 var(--space-2);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.cal-head .cal-step {
-  width: 32px;
-  height: 32px;
-  border-color: transparent;
-  border-radius: 9px;
-  background: transparent;
-}
-
-.cal-head .cal-step:hover {
-  background: var(--surface-raised);
-}
-
 /* The schedule list's head: views, what is here, the one action. */
 .st-head.fx-head {
   justify-content: flex-start;
@@ -746,103 +239,1021 @@
   }
 }
 
-/* ---- An empty week still reads as a calendar (round 2) ---- */
+/* ==== The Matches screen ================================================== */
 
-.cal-today {
+.mx {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mx-live-word {
+  color: var(--danger-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* "Plan" wears the secondary button's clothes: it is a menu of tools, not the
+   page's one primary action. */
+.mx-plan-trigger {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: var(--space-2);
+  min-height: 36px;
   padding: 0 var(--space-3);
-  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-accent);
-  text-decoration: none;
 }
 
-.cal-today:hover {
+.mx-plan-trigger:hover {
+  background: var(--surface-sunken);
+}
+
+/* ---- Publishing strip: Draft → Scheduled → Published, and the one step ---- */
+
+.mx-pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
 }
 
-.cal-today:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
-.cal-week {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+.mx-steps {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.cal-week-day {
+.mx-steps > li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.mx-steps > li + li::before {
+  content: "";
+  width: 16px;
+  height: 1px;
+  background: var(--border-strong);
+}
+
+.mx-steps > li[data-on="true"],
+.mx-steps > li[data-done="true"] {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mx-step-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.mx-steps > li[data-on="true"] .mx-step-count {
+  background: var(--warning-subtle);
+  color: var(--warning-strong);
+}
+
+.mx-steps > li[data-done="true"] .mx-step-count {
+  background: var(--success-subtle, var(--surface-sunken));
+  color: var(--success-strong);
+}
+
+.mx-pipeline-say {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mx-pipeline-go {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* ---- Attention: matches owed a score, clashes ---- */
+
+.mx-owed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.mx-owed-link {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.mx-conflicts {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.mx-conflicts > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  cursor: pointer;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--danger-strong);
+}
+
+.mx-conflicts > ul {
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+/* ---- The list and its panel ---- */
+
+.mx-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.mx-layout[data-open="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem);
+}
+
+.mx-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* The days, then one row of filters under them. */
+.mx-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+
+.st-toolbar.mx-toolbar {
+  margin: 0;
+  padding: 0;
+}
+
+.mx-toolbar .st-search {
+  flex: 0 1 18rem;
+}
+
+/* ---- The week strip ---- */
+
+.mx-week {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.mx-days {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.mx-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 100%;
+  min-height: 56px;
+  padding: var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  text-decoration: none;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+a.mx-day:hover {
+  border-color: var(--border-strong);
+}
+
+.mx-day[data-empty="true"] {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.mx-day[data-today="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+.mx-day-name {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-heading);
+}
+
+.mx-day[data-empty="true"] .mx-day-name {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.mx-day[data-today="true"] .mx-day-name {
+  color: var(--accent-ink);
+}
+
+.mx-day-date,
+.mx-day-count {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mx-day-count[data-live="true"] {
+  color: var(--danger-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mx-week-step {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+
+a.mx-week-step:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.mx-week-step[data-off="true"] {
+  color: var(--border-strong);
+}
+
+.mx-this-week {
+  align-self: center;
+  flex: none;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  white-space: nowrap;
+}
+
+/* ---- Days and their matches ---- */
+
+.mx-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mx-none,
+.mx-search-say {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mx-search-say {
+  padding: 0;
+  border: 0;
+}
+
+.mx-daygroup {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+  scroll-margin-top: calc(var(--shell-topbar-h, 56px) + var(--space-4));
+}
+
+.mx-daygroup[data-today="true"] {
+  border-color: var(--accent-line);
+}
+
+.mx-daygroup-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.mx-daygroup-head h2 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-heading);
+}
+
+.mx-daygroup[data-today="true"] .mx-daygroup-head h2 {
+  color: var(--accent-ink);
+}
+
+.mx-daygroup-head > span {
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.mx-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One match: when and where | the two sides (and the score) | state | step. */
+.mx-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5rem 9.5rem;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline-end: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mx-row:hover {
+  background: var(--surface-sunken);
+}
+
+.mx-row[data-selected="true"] {
+  background: var(--accent-subtle);
+  box-shadow: inset 3px 0 0 var(--accent-line);
+}
+
+.mx-row[data-status="cancelled"] .mx-sides {
+  opacity: 0.7;
+}
+
+.mx-row-link {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-3) 0 var(--space-3) var(--space-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.mx-row-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+}
+
+.mx-when {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  height: 96px;
-  box-sizing: border-box;
-  padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: repeating-linear-gradient(135deg, transparent 0 7px, var(--surface-sunken) 7px 8px);
 }
 
-.cal-week-name {
+.mx-time {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mx-ground {
+  overflow: hidden;
   font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mx-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Capped, so a score sits beside its team's name rather than a screen away. */
+.mx-sides {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 26rem;
+}
+
+.mx-side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.mx-side .st-crest {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+}
+
+.mx-side-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mx-side-score {
+  flex: none;
+  font-size: var(--text-md-size);
   font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.cal-week-num {
-  font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
+.mx-side[data-won="true"] .mx-side-name,
+.mx-side[data-won="true"] .mx-side-score {
+  font-weight: var(--font-weight-bold);
   color: var(--text-heading);
 }
 
-.cal-week-day[data-focus="true"] {
-  border-style: solid;
-  border-color: var(--border-strong);
+.mx-lobby-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-secondary);
+}
+
+.mx-sub {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.mx-sub[data-tone="result"] {
+  font-weight: var(--font-weight-semibold);
+  color: var(--success-strong);
+}
+
+.mx-state {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.mx-act {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mx-act > * {
+  white-space: nowrap;
+}
+
+/* A reader without fixture.manage has no step column. */
+.mx-row:not(:has(.mx-act)) {
+  grid-template-columns: minmax(0, 1fr) 7.5rem;
+}
+
+/* ---- The match panel (a sheet on a phone) ---- */
+
+.mx-panel {
+  position: sticky;
+  top: calc(var(--shell-topbar-h, 56px) + var(--space-4));
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-height: calc(100dvh - var(--shell-topbar-h, 56px) - var(--space-8));
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   background: var(--surface-raised);
+  box-shadow: var(--shadow-2);
+  color: var(--text-primary);
 }
 
-.cal-week-day[data-today="true"] {
-  border-style: solid;
-  border-color: var(--accent-line);
-  box-shadow: inset 0 3px 0 var(--accent);
+.mx-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.cal-week-day[data-today="true"] .cal-week-num {
-  color: var(--accent-ink, var(--text-accent));
+.mx-panel-titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
-.cal-week-empty {
-  padding-block: var(--space-5) var(--space-2);
+.mx-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
 }
 
+.mx-panel-title {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-bold);
+}
+
+.mx-panel-title:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.mx-panel-close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-block: calc(-1 * var(--space-2));
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+}
+
+.mx-panel-close:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.mx-panel-close:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mx-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: var(--space-3) var(--space-5) 0;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mx-facts > li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.mx-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.mx-step {
+  align-items: stretch;
+}
+
+.mx-step p {
+  margin: 0;
+}
+
+.mx-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mx-final {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.mx-final strong {
+  font-size: var(--text-2xl-size);
+  color: var(--text-heading);
+}
+
+.mx-lineups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mx-lineups > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mx-lineup-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+}
+
+.mx-lineup-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-heading);
+}
+
+.mx-lineup-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--warning-strong);
+  white-space: nowrap;
+}
+
+.mx-lineup-state[data-set="true"] {
+  color: var(--success-strong);
+}
+
+.mx-lineup-editor {
+  padding-bottom: var(--space-3);
+}
+
+.mx-lineup-editor .lu-side {
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+/* ---- The score form ---- */
+
+.mx-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mx-score-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  min-width: 0;
+}
+
+/* Floated, so the legend sits inside the box rather than on its border. */
+.mx-score-team {
+  float: left;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-heading);
+}
+
+.mx-score-fields {
+  clear: both;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+  gap: var(--space-2);
+}
+
+.mx-score-fields input {
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.mx-more > summary {
+  cursor: pointer;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mx-more[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+.mx-result-go {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.mx-move {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mx-inline-go {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.mx-danger p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+}
+
+.mx-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mx-history > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mx-panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ---- Narrower ---- */
+
+@media (max-width: 1279px) {
+  .mx-layout[data-open="true"] .mx-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mx-layout[data-open="true"] .mx-state {
+    display: none;
+  }
+}
+
+@media (max-width: 1099px) {
+  .mx-layout[data-open="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mx-layout[data-open="true"] .mx-state {
+    display: flex;
+  }
+
+  /* Before hydration the panel is the server's <aside>: drawn where the sheet
+     will be, so the upgrade to a modal <dialog> does not move anything. */
+  .mx-panel {
+    position: fixed;
+    inset: auto 0 0;
+    top: auto;
+    z-index: 40;
+    max-height: calc(100dvh - var(--space-12));
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: var(--shadow-4);
+  }
+
+  .mx-sheet {
+    width: 100%;
+    max-width: 40rem;
+    margin: auto auto 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* The modal lands focus on the title (it is the first thing to read); that
+     is not a keyboard move, so it draws no ring. */
+  .mx-sheet .mx-panel-title:focus-visible {
+    outline: none;
+  }
+
+  .mx-sheet::backdrop {
+    background: var(--scrim, rgb(7 10 15 / 0.6));
+  }
+
+  .mx-sheet-grip {
+    align-self: center;
+    flex: none;
+    width: 40px;
+    height: 5px;
+    margin: var(--space-2) 0 0;
+    border-radius: var(--radius-full);
+    background: var(--border-strong);
+  }
+
+  .mx-panel-head {
+    padding-top: var(--space-3);
+  }
+
+  .mx-result-go {
+    position: sticky;
+    bottom: 0;
+    padding: var(--space-3) 0;
+    background: var(--surface-raised);
+  }
+}
+
+/* A phone: the week strip scrolls sideways, and a match is a card — time and
+   state on top, the two sides, then its one step at full width. */
 @media (max-width: 719px) {
-  .cal-week {
-    gap: 4px;
+  .mx-controls {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .cal-week-day {
-    height: 56px;
+  .mx-week {
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-4);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .mx-week-step {
+    display: none;
+  }
+
+  .mx-days {
+    grid-template-columns: repeat(7, 4.5rem);
+  }
+
+  .mx-daygroup-head {
+    padding: var(--space-3);
+  }
+
+  /* The state rides in the card's top corner; the step, if any, gets its own
+     line under the sides. */
+  .mx-row,
+  .mx-layout[data-open="true"] .mx-row,
+  .mx-row:not(:has(.mx-act)) {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "link"
+      "act";
+    gap: 0;
+    padding: 0 var(--space-3);
+  }
+
+  .mx-row-link {
+    grid-area: link;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    padding: var(--space-3) 0;
+  }
+
+  .mx-when {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--space-2);
+    padding-inline-end: 7.5rem;
+  }
+
+  .mx-state,
+  .mx-layout[data-open="true"] .mx-state {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+  }
+
+  .mx-act {
+    grid-area: act;
+    padding-bottom: var(--space-3);
+  }
+
+  .mx-act:empty {
+    display: none;
+  }
+
+  .mx-steps > li + li::before {
+    width: 8px;
+  }
+
+  /* One row of tools: the tabs, then Plan and Add beside them. */
+  .st-head.fx-head {
+    flex-wrap: wrap;
     align-items: center;
-    padding: 6px 2px;
+    gap: var(--space-2);
   }
 
-  .cal-week-name {
-    font-size: 10px;
-    letter-spacing: 0;
+  .st-head.fx-head > .st-actions {
+    width: auto;
+    flex-wrap: nowrap;
   }
 
-  .cal-week-num {
-    font-size: var(--text-md-size);
+  .st-head.fx-head > .st-actions > * {
+    flex: none;
+  }
+
+  .mx-wide-only {
+    display: none;
+  }
+
+  /* Everything published: the steps have nothing to say on a phone. */
+  .mx-pipeline[data-settled="true"] .mx-steps {
+    display: none;
+  }
+
+  .mx-pipeline {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .st-toolbar.mx-toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .mx-toolbar .st-search {
+    gap: var(--space-1);
+    padding-inline-start: var(--space-2);
+  }
+
+  .mx-toolbar .st-select {
+    padding-inline: var(--space-2) var(--space-6);
+  }
+
+  .mx-pipeline[data-settled="true"] .mx-pipeline-say {
+    display: none;
+  }
+
+  .mx-toolbar .st-search,
+  .mx-toolbar .st-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mx-pipeline-go {
+    width: auto;
   }
 }

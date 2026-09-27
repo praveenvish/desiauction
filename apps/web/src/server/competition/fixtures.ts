@@ -256,6 +256,8 @@ export interface FixtureQuery {
   search?: string; // fixture number
   from?: string; // YYYY-MM-DD
   to?: string;
+  /** Only fixtures with no kickoff yet (hand-added or imported without a date). */
+  undated?: boolean;
   sort?: FixtureSort;
   page: number;
   pageSize: number;
@@ -307,6 +309,9 @@ export async function queryFixtures(
   if (query.to !== undefined && query.to !== "") {
     filters.push(lte(fixtures.kickoffAt, `${query.to}T23:59`));
   }
+  if (query.undated === true) {
+    filters.push(sql`${fixtures.kickoffAt} is null`);
+  }
   const where = and(...filters);
   const pageSize = Math.min(Math.max(query.pageSize, 1), 100);
   const page = Math.max(query.page, 1);
@@ -323,6 +328,76 @@ export async function queryFixtures(
     .limit(pageSize)
     .offset((page - 1) * pageSize);
   return { rows: rows.map(toSnapshot), total, page, pageSize };
+}
+
+/**
+ * ONE ROW PER MATCH DAY: how many matches it has and whether one is being
+ * played. The Matches screen's week strip, and the choice of which week to open
+ * on, are both read from this — a count per date, never the fixtures.
+ */
+export interface FixtureDayCount {
+  readonly date: string; // YYYY-MM-DD
+  readonly count: number;
+  readonly live: number;
+}
+
+export async function fixtureDayCounts(
+  db: Db,
+  competitionId: string,
+  query: { visible?: readonly FixtureStatus[]; teamId?: string; groundId?: string },
+): Promise<FixtureDayCount[]> {
+  const day = sql<string>`substr(${fixtures.kickoffAt}, 1, 10)`;
+  const rows = await db
+    .select({
+      date: day,
+      count: sql<number>`count(*)::int`,
+      live: sql<number>`(count(*) filter (where ${fixtures.status} = 'in_progress'))::int`,
+    })
+    .from(fixtures)
+    .where(
+      and(
+        eq(fixtures.competitionId, competitionId),
+        sql`${fixtures.kickoffAt} is not null`,
+        // A cancelled match is still news on its own day, but it does not make
+        // a day worth opening on.
+        sql`${fixtures.status} <> 'cancelled'`,
+        ...(query.visible === undefined ? [] : [inArray(fixtures.status, [...query.visible])]),
+        ...(query.teamId !== undefined && query.teamId !== ""
+          ? [
+              sql`(${fixtures.homeTeamId} = ${query.teamId} or ${fixtures.awayTeamId} = ${query.teamId})`,
+            ]
+          : []),
+        ...(query.groundId !== undefined && query.groundId !== ""
+          ? [eq(fixtures.groundId, query.groundId)]
+          : []),
+      ),
+    )
+    .groupBy(day)
+    .orderBy(day);
+  return rows;
+}
+
+/** One fixture, only if it belongs to this competition — the id comes from an address. */
+export async function fixtureOfCompetition(
+  db: Db,
+  competitionId: string,
+  fixtureId: string,
+  visible?: readonly FixtureStatus[],
+): Promise<FixtureSnapshot | null> {
+  // Ids are ULIDs (and UUIDs in older rows): letters, digits and dashes only.
+  if (!/^[0-9A-Za-z-]{10,40}$/.test(fixtureId)) {
+    return null;
+  }
+  const [row] = await snapshotQuery(db)
+    .where(
+      and(
+        eq(fixtures.id, fixtureId),
+        eq(fixtures.competitionId, competitionId),
+        ...(visible === undefined ? [] : [inArray(fixtures.status, [...visible])]),
+      ),
+    )
+    .limit(1);
+  return row === undefined ? null : toSnapshot(row);
 }
 
 export async function fixtureSnapshot(db: Db, fixtureId: string): Promise<FixtureSnapshot | null> {

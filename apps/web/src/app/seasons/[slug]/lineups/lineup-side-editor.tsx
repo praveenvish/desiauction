@@ -23,12 +23,15 @@ export function LineupSideEditor({
   fixtureId,
   side,
   announce,
+  onSaved,
 }: {
   slug: string;
   fixtureId: string;
   side: LineupSide;
   /** Absent for a match that has no announce state (none selected). */
   announce: LineupAnnounceState | undefined;
+  /** After a save or an announce lands — the match list reads the counts. */
+  onSaved?: () => void;
 }) {
   const [picked, setPicked] = useState<ReadonlySet<string>>(
     () => new Set(side.players.filter((player) => player.played).map((p) => p.registrationId)),
@@ -62,6 +65,7 @@ export function LineupSideEditor({
           ? { tone: "ok", text: `Saved — ${String(result.played)} played` }
           : { tone: "error", text: result.error },
       );
+      if (result.ok) onSaved?.();
     });
   }
 

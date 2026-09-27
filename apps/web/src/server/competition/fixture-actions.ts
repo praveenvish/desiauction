@@ -2,8 +2,10 @@
 
 import { outsideWindowMessage } from "../../lib/fixture-window";
 import {
+  addDays,
   parseFixtureCsv,
   parseScoreField,
+  roleLabelIn,
   sportPackFor,
   type FixtureStatus,
   type ResultOutcome,
@@ -58,29 +60,29 @@ import {
 } from "./fixture-aggregate";
 import { commitFixtureImport, importDryRun } from "./fixture-import";
 import {
-  calendarRange,
   competitionTimeline,
+  fixtureDayCounts,
+  fixtureOfCompetition,
   fixtureStats,
   fixtureTimeline,
-  matchDay,
   nextFixture,
   nowWallClock,
   organizerSchedule,
   queryFixtures,
-  upcomingFixtures,
-  weekView,
   PUBLIC_FIXTURE_STATUSES,
-  type CalendarDay,
   type FixturePage,
   type FixtureSnapshot,
   type FixtureSort,
   type FixtureStats,
   type FixtureTimelineEntry,
-  type MatchDayGround,
   type NextFixture,
   type OrganizerFixture,
 } from "./fixtures";
 import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
+import { DAYS_SHOWN, focusStart, weekStrip, type WeekStrip } from "./schedule-week";
+import { formOf, nextOf, type FormLetter, type TeamNext } from "./standings-form";
+import { lineupFixtures, lineupSides, type LineupSide } from "./lineups";
+import { lineupAnnounceStates, type LineupAnnounceState } from "./lineup-announce";
 import {
   activeGroundsOf,
   createGround,
@@ -675,90 +677,220 @@ export async function fixtureTimelineAction(
   );
 }
 
-// --- Calendar / timeline / match-day views -------------------------------------------
+// --- The Matches screen ----------------------------------------------------------------
 
-export interface CalendarView {
-  competition: CompetitionSummary;
-  view: "day" | "week" | "timeline";
-  date: string;
-  days: CalendarDay[];
-  timeline: FixtureSnapshot[];
-  upcoming: FixtureSnapshot[];
+export interface ScheduleViewParams {
+  /** The first of the seven days to show (YYYY-MM-DD); by default, two days back. */
+  date?: string;
+  team?: string;
+  ground?: string;
+  /** A fixture number: searches the whole season rather than one week. */
+  q?: string;
+  /** The fixture open in the side panel (its id). */
+  match?: string;
 }
 
-const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+type ResultShape = {
+  outcome: ResultOutcome;
+  score: { home?: Record<string, number>; away?: Record<string, number> } | null;
+};
 
-export async function calendarView(
-  slug: string,
-  params: { view?: string; date?: string },
-): Promise<CalendarView | null> {
-  const session = await requireSession();
-  const competition = await resolveMemberCompetition(session.personId, slug);
-  if (competition === null) {
-    return null;
-  }
-  const view = params.view === "week" ? "week" : params.view === "timeline" ? "timeline" : "day";
-  const date =
-    params.date !== undefined && DATE_SHAPE.test(params.date)
-      ? params.date
-      : nowWallClock().slice(0, 10);
-  return inCompetitionOrg(session.personId, competition, async (db) => {
-    // Same gate as the dashboard: the calendar is the same schedule, laid out
-    // differently, so a grantless member sees the same published subset here.
-    const canManage = await canCompetition(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "fixture.manage",
-    );
-    const visible = canManage ? undefined : PUBLIC_FIXTURE_STATUSES;
-    const [days, timeline, upcoming] = await Promise.all([
-      view === "week"
-        ? weekView(db, competition.id, date, visible)
-        : view === "day"
-          ? calendarRange(db, competition.id, date, date, visible)
-          : Promise.resolve([]),
-      view === "timeline" ? competitionTimeline(db, competition.id, visible) : Promise.resolve([]),
-      upcomingFixtures(db, competition.id, nowWallClock(), visible),
-    ]);
-    return { competition, view, date, days, timeline, upcoming };
-  });
-}
-
-export interface MatchDayView {
+/**
+ * ONE SCREEN FOR THE SCHEDULE (2026-09-27). List, Calendar, Match day and
+ * Lineups were four faces of the same matches; this is the one read behind the
+ * screen that replaced them: one week of matches grouped by day, the day strip
+ * above it, and the one match open in the side panel with its lineups and
+ * score.
+ *
+ * Same gate as the dashboard, resolved before any read: without
+ * `fixture.manage` only the public statuses are read, and the grounds,
+ * conflicts, lineups and the unscored worklist are absent keys, not hidden
+ * ones.
+ */
+export interface ScheduleView {
+  scoreFields: FixtureDashboard["scoreFields"];
+  fixtureShape: FixtureDashboard["fixtureShape"];
+  terms: FixtureDashboard["terms"];
   competition: CompetitionSummary;
-  date: string;
-  groundGroups: MatchDayGround[];
+  orgSlug: string;
+  stats: FixtureStats;
+  next: NextFixture | null;
+  teams: TeamSummary[];
+  grounds?: GroundOption[];
+  conflicts?: LabelledConflict[];
+  today: string;
+  week: WeekStrip;
+  /** "week" shows the week's days; "search" is a season-wide fixture-number search. */
+  mode: "week" | "search";
+  /** The week's matches (or the search's), kickoff order. */
+  rows: FixtureSnapshot[];
+  /** Matches with no date yet — they belong to no day. */
+  undated: FixtureSnapshot[];
+  /** More matched than one screen holds (search mode only). */
+  truncated: boolean;
+  results: Record<string, ResultShape>;
+  /** Manage only: played matches with no score — anywhere in the season. */
+  outstanding?: FixtureSnapshot[];
+  /** Manage only: players saved per side, per two-sided match; null = not saved. */
+  lineups?: Record<string, { home: number | null; away: number | null }>;
+  selected: {
+    fixture: FixtureSnapshot;
+    /** Manage only, two-sided matches only. */
+    sides?: LineupSide[];
+    announce?: Record<string, LineupAnnounceState>;
+  } | null;
   viewer: { canManage: boolean };
 }
 
-export async function matchDayView(
+const ROWS_SHOWN = 100;
+
+export async function scheduleView(
   slug: string,
-  params: { date?: string },
-): Promise<MatchDayView | null> {
+  params: ScheduleViewParams,
+): Promise<ScheduleView | null> {
   const session = await requireSession();
   const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
-  const date =
-    params.date !== undefined && DATE_SHAPE.test(params.date)
-      ? params.date
-      : nowWallClock().slice(0, 10);
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  const now = nowWallClock();
+  const today = now.slice(0, 10);
+  const team = params.team ?? "";
+  const ground = params.ground ?? "";
+  const search = (params.q ?? "").trim();
   return inCompetitionOrg(session.personId, competition, async (db) => {
-    const canManage = await canCompetition(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "fixture.manage",
-    );
-    const groundGroups = await matchDay(
-      db,
-      competition.id,
-      date,
-      canManage ? undefined : PUBLIC_FIXTURE_STATUSES,
-    );
-    return { competition, date, groundGroups, viewer: { canManage } };
+    const canManage = await canCompetition(db, session.personId, scope, "fixture.manage");
+    const visible = canManage ? undefined : PUBLIC_FIXTURE_STATUSES;
+    const narrow = {
+      ...(visible !== undefined ? { visible } : {}),
+      ...(team !== "" ? { teamId: team } : {}),
+      ...(ground !== "" && canManage ? { groundId: ground } : {}),
+    };
+    const days = await fixtureDayCounts(db, competition.id, narrow);
+    const start = focusStart({ requested: params.date, today, days });
+    const mode = search !== "" ? "search" : "week";
+    const [
+      orgSlug,
+      stats,
+      page,
+      undatedPage,
+      teamList,
+      groundList,
+      conflicts,
+      resultMap,
+      next,
+      completedPage,
+      lineupList,
+      picked,
+    ] = await Promise.all([
+      orgSlugOf(db, competition.orgId),
+      fixtureStats(db, competition.id, visible),
+      queryFixtures(db, competition.id, {
+        ...narrow,
+        ...(mode === "search" ? { search } : { from: start, to: addDays(start, DAYS_SHOWN - 1) }),
+        sort: "kickoff",
+        page: 1,
+        pageSize: ROWS_SHOWN,
+      }),
+      mode === "search"
+        ? Promise.resolve(null)
+        : queryFixtures(db, competition.id, {
+            ...narrow,
+            undated: true,
+            sort: "number",
+            page: 1,
+            pageSize: ROWS_SHOWN,
+          }),
+      teamsOf(db, competition.id),
+      canManage ? activeGroundsOf(db, competition.orgId) : Promise.resolve(undefined),
+      canManage ? competitionConflicts(db, competition) : Promise.resolve(undefined),
+      resultsOf(db, competition.id),
+      nextFixture(db, competition.id, now, visible),
+      canManage
+        ? queryFixtures(db, competition.id, {
+            status: "completed",
+            sort: "kickoff",
+            page: 1,
+            pageSize: ROWS_SHOWN,
+          })
+        : Promise.resolve(null),
+      canManage ? lineupFixtures(db, competition.id) : Promise.resolve(null),
+      params.match !== undefined && params.match !== ""
+        ? fixtureOfCompetition(db, competition.id, params.match, visible)
+        : Promise.resolve(null),
+    ]);
+    const pack = sportPackFor(competition.sport);
+    /*
+     * A played match with no score. A duel's score is a `fixture_results` row;
+     * a lobby writes none — it is scored when every squad in it is placed.
+     */
+    const outstanding =
+      completedPage === null
+        ? undefined
+        : completedPage.rows.filter((row) =>
+            row.homeTeamId === null
+              ? row.squadCount === 0 || row.placedCount < row.squadCount
+              : !resultMap.has(row.id),
+          );
+    let selected: ScheduleView["selected"] = null;
+    if (picked !== null) {
+      const lineupFixture = lineupList?.find((entry) => entry.id === picked.id);
+      if (canManage && lineupFixture !== undefined && picked.status !== "cancelled") {
+        const sides = (await lineupSides(db, competition.id, lineupFixture)).map((side) => ({
+          ...side,
+          players: side.players.map((player) => ({
+            ...player,
+            role: player.role === null ? null : roleLabelIn(pack, player.role),
+          })),
+        }));
+        selected = {
+          fixture: picked,
+          sides,
+          announce: await lineupAnnounceStates(lineupFixture, sides),
+        };
+      } else {
+        selected = { fixture: picked };
+      }
+    }
+    return {
+      competition,
+      orgSlug,
+      stats,
+      next,
+      teams: teamList,
+      ...(groundList !== undefined ? { grounds: groundList } : {}),
+      ...(conflicts !== undefined ? { conflicts } : {}),
+      terms: pack.terms,
+      fixtureShape: pack.fixtureShape ?? "duel",
+      scoreFields: pack.result.scoreFields.map((field) => ({
+        key: field.key,
+        label: field.entry?.label ?? field.label,
+        ...(field.entry?.help !== undefined ? { help: field.entry.help } : {}),
+      })),
+      today,
+      week: weekStrip(start, days),
+      mode,
+      rows: page.rows,
+      undated: undatedPage?.rows ?? [],
+      truncated: page.total > page.rows.length,
+      results: Object.fromEntries(
+        [...resultMap.entries()].map(([fixtureId, row]) => [
+          fixtureId,
+          { outcome: row.outcome, score: row.score },
+        ]),
+      ),
+      ...(outstanding !== undefined ? { outstanding } : {}),
+      ...(lineupList !== null
+        ? {
+            lineups: Object.fromEntries(
+              lineupList.map((entry) => [entry.id, entry.recorded] as const),
+            ),
+          }
+        : {}),
+      selected,
+      viewer: { canManage },
+    };
   });
 }
 
@@ -882,6 +1014,10 @@ export interface StandingsPageView {
   readonly standings: StandingsView;
   /** Colour and crest per team, for the table's team tiles. */
   readonly teams: readonly TeamSummary[];
+  /** Last five results per team, oldest first (two-sided seasons only). */
+  readonly form: Record<string, FormLetter[]>;
+  /** Each team's match being played now, else its next one to come. */
+  readonly next: Record<string, TeamNext>;
   readonly viewer: { canManage: boolean };
 }
 
@@ -905,9 +1041,22 @@ export async function standingsView(slug: string): Promise<StandingsPageView | n
       ),
       standingsOf(db, competition.id),
     ]);
-    // The teams' colours and crests, for the table's team tiles.
-    const teams = await teamsOf(db, competition.id);
-    return { competition, standings, teams, viewer: { canManage } };
+    // The teams' colours and crests, for the table's team tiles; the season's
+    // matches for form and next — only what this viewer may see of them.
+    const [teams, timeline, resultMap] = await Promise.all([
+      teamsOf(db, competition.id),
+      competitionTimeline(db, competition.id, canManage ? undefined : PUBLIC_FIXTURE_STATUSES),
+      resultsOf(db, competition.id),
+    ]);
+    const outcomes = new Map([...resultMap.entries()].map(([id, row]) => [id, row.outcome]));
+    return {
+      competition,
+      standings,
+      teams,
+      form: Object.fromEntries(formOf(timeline, outcomes)),
+      next: Object.fromEntries(nextOf(timeline, nowWallClock())),
+      viewer: { canManage },
+    };
   });
 }
 
