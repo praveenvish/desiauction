@@ -1129,12 +1129,28 @@ button.paddle-chip:focus-visible {
     right: 0;
     bottom: 0;
     z-index: 25;
-    padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+    padding: var(--space-3) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+    /* SOLID from its top edge. The bar used to fade in over its own padding,
+       so whatever the room had scrolled under it ("Bid feed", a squad row)
+       showed through right behind the budget line. The fade now sits OUTSIDE
+       the bar (::before), where content is meant to dissolve into it. */
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface);
+  }
+
+  .owner-bidbar::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: var(--space-4);
     background: linear-gradient(
       180deg,
       color-mix(in srgb, var(--surface) 0%, transparent),
-      var(--surface) var(--space-3)
+      var(--surface)
     );
+    pointer-events: none;
   }
 
   .owner-bidbar .paddle-stats {

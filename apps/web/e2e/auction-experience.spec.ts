@@ -374,9 +374,11 @@ test("the full night: lobby → owners → bidding with notifications → public
   const signedPlayer =
     (await ownerA.page.locator(".lot-hero-name").first().textContent())?.trim() ?? "";
   expect(signedPlayer.length).toBeGreaterThan(0);
-  // Winner hears it; the squad and the money move on the owner workspace.
+  // Winner is told, on the stage itself (the YOU WON moment — it replaced the
+  // "You signed …" toast that landed on top of it); the squad and the money
+  // move on the owner workspace.
   await Promise.all([
-    expect(ownerA.page.getByText(new RegExp(`You signed ${signedPlayer}`))).toBeVisible({
+    expect(ownerA.page.getByTestId("owner-won-title")).toContainText(`You won ${signedPlayer}`, {
       timeout: 45_000,
     }),
     holdCloseLot(organizer),

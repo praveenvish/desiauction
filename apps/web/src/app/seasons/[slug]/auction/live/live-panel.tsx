@@ -19,7 +19,7 @@ import {
   useToast,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import {
   submitAuctionCommand,
@@ -324,35 +324,14 @@ export function LivePanel({
     await send("bid", "PlaceBid", { lotId, paddleId: myPaddle.paddleId, amountRaw: amount });
   };
 
-  // PX-6 bidder notification: won (last outcome SOLD to my paddle). Pure
-  // observation of server truth.
+  // NO TOASTS FOR WHERE THE OWNER STANDS (live-room stage 1).
   //
-  // THE OUTBID TOAST IS GONE (live-room stage 1). It landed at the foot of a
-  // phone — on the raise button and the jump chips, the exact controls an
-  // outbid owner reaches for next. The owner's state line now says it in place
-  // ("Pune Panthers bid 1,500 pts — bid 2,000 to take the lead back"), and the
-  // status ribbon's live region already announces every new leading bid.
-  const wonSeqRef = useRef<number>(0);
-  useEffect(() => {
-    if (snapshot === null || myPaddle === null) {
-      return;
-    }
-    const mine = myPaddle.paddleNumber;
-    const outcome = snapshot.lastOutcome;
-    if (
-      outcome !== null &&
-      outcome.atSeq > wonSeqRef.current &&
-      outcome.kind.toLowerCase() === "sold" &&
-      outcome.paddleNumber === mine
-    ) {
-      wonSeqRef.current = outcome.atSeq;
-      toast({
-        title: `You signed ${outcome.playerName ?? outcome.lotNumber}${outcome.amount !== null ? ` for ${money.ledger(outcome.amount)}` : ""}!`,
-        tone: "success",
-        group: "bid-status",
-      });
-    }
-  }, [snapshot, myPaddle, toast, money]);
+  // The outbid toast landed at the foot of a phone — on the raise button and
+  // the jump chips, the exact controls an outbid owner reaches for next; the
+  // state line says it in place instead. The "You signed X for N!" toast went
+  // the same way: it arrived on top of the owner's own YOU WON moment
+  // (`OwnerWon`, below), which already says who, for how much, and what is left
+  // in the purse. The room's announcer says each of them for the ear.
 
   const lot = snapshot?.currentLot ?? null;
 
