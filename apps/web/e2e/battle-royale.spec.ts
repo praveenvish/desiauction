@@ -127,9 +127,9 @@ test("a battle royale season: one lobby, four squads, and a table built from pla
   await expect(page.getByTestId("stat-total")).toContainText("1", { timeout: 20_000 });
   await expect(page.getByTestId(/^lobby-.*F001$/)).toContainText("4 squads");
 
-  // Draft → scheduled → published → in progress → completed, the same gates
-  // every other fixture passes through.
-  for (const step of ["schedule", "publish", "start", "complete"]) {
+  // Draft → scheduled → published → in progress, the same gates every other
+  // fixture passes through. Starting a match opens it, placings form and all.
+  for (const step of ["schedule", "publish", "start"]) {
     await page.getByTestId(new RegExp(`^${step}-.*F001$`)).click();
     await expect(page.getByTestId(new RegExp(`^${step}-.*F001$`))).toHaveCount(0, {
       timeout: 20_000,
@@ -137,16 +137,17 @@ test("a battle royale season: one lobby, four squads, and a table built from pla
   }
 
   /*
-   * THE PLACEMENT FORM. One block per squad in the lobby — not per team in the
-   * season, which would invite a scorer to place a squad that never dropped.
+   * THE PLACEMENT FORM, in the lobby's own panel. One block per squad in the
+   * lobby — not per team in the season, which would invite a scorer to place a
+   * squad that never dropped. Saving it finishes the match in the same click.
    */
-  await page.getByTestId(/^record-.*F001$/).click();
+  await expect(page.getByTestId("match-panel")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("lobby-form")).toBeVisible();
   for (const squad of SQUADS) {
     await page.getByLabel(`${squad.name} placement`, { exact: true }).fill(squad.placement);
     await page.getByLabel(`${squad.name} kills`, { exact: true }).fill(squad.kills);
   }
-  await page.getByTestId("lobby-submit").click();
+  await page.getByTestId("lobby-finish").click();
   await expect(page.getByText("Lobby recorded")).toBeVisible({ timeout: 20_000 });
 
   // A lobby writes no `fixture_results` row, so "scored" can only mean every

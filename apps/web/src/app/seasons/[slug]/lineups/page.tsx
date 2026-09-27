@@ -13,6 +13,6 @@ export default async function LineupsPage({
 }) {
   const [{ slug }, { fixture }] = await Promise.all([params, searchParams]);
   redirect(
-    `/seasons/${slug}/fixtures${fixture !== undefined && /^[0-9a-f-]{36}$/i.test(fixture) ? `?match=${fixture}` : ""}`,
+    `/seasons/${slug}/fixtures${fixture !== undefined && /^[0-9A-Za-z-]{10,40}$/.test(fixture) ? `?match=${fixture}` : ""}`,
   );
 }

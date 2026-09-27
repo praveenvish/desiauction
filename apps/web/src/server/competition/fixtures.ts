@@ -384,7 +384,8 @@ export async function fixtureOfCompetition(
   fixtureId: string,
   visible?: readonly FixtureStatus[],
 ): Promise<FixtureSnapshot | null> {
-  if (!/^[0-9a-f-]{36}$/i.test(fixtureId)) {
+  // Ids are ULIDs (and UUIDs in older rows): letters, digits and dashes only.
+  if (!/^[0-9A-Za-z-]{10,40}$/.test(fixtureId)) {
     return null;
   }
   const [row] = await snapshotQuery(db)

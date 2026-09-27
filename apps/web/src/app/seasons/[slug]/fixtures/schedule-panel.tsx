@@ -1,5 +1,6 @@
 "use client";
 
+import { addDays } from "@desiauction/core";
 import {
   Button,
   ButtonLink,
@@ -58,7 +59,7 @@ import {
  * THE MATCHES SCREEN (2026-09-27) — the Schedule tab's one screen, where List,
  * Calendar, Match day and Lineups used to be four.
  *
- * It reads the way an organizer's day does: a strip of this week's days on
+ * It reads the way an organizer's day does: a strip of seven days around today on
  * top, the matches below grouped by day with today among them, and on every
  * row the ONE thing that match is waiting for — Start, Enter score, Set
  * lineups — or its result. Tapping a match opens it (a side panel; a sheet on a
@@ -438,7 +439,7 @@ export function SchedulePanel({
           testId="next-match"
         >
           {next.state === "live"
-            ? "It is not in the week you are looking at."
+            ? "It is not among the days you are looking at."
             : "Start it, move it or cancel it."}
         </Notice>
       ) : null}
@@ -564,7 +565,7 @@ export function SchedulePanel({
   const week = view.week;
   const thisWeek = week.days.some((day) => day.date === today);
   const strip = (
-    <nav className="mx-week" aria-label="Days of the week">
+    <nav className="mx-week" aria-label="Days">
       {week.earlier !== null ? (
         <Link
           href={href({ date: week.earlier, match: "" })}
@@ -638,12 +639,12 @@ export function SchedulePanel({
       )}
       {!thisWeek ? (
         <Link
-          href={href({ date: today, match: "" })}
+          href={href({ date: addDays(today, -2), match: "" })}
           scroll={false}
           className="mx-this-week"
           data-testid="week-today"
         >
-          This week
+          Today
         </Link>
       ) : null}
     </nav>
@@ -674,14 +675,14 @@ export function SchedulePanel({
             ? `No ${noun} is numbered like “${filters.q}”.`
             : `${String(view.rows.length)}${view.truncated ? "+" : ""} ${view.rows.length === 1 ? noun : nouns} numbered like “${filters.q}”.`}{" "}
           <Link href={href({ q: "" })} scroll={false}>
-            Back to the week
+            Back to the days
           </Link>
         </p>
       ) : days.length === 0 && view.undated.length === 0 ? (
         <p className="mx-none">
           {filters.team !== "" || filters.ground !== ""
-            ? `No ${noun} fits these filters this week.`
-            : `No ${nouns} this week.`}
+            ? `No ${noun} fits these filters on these days.`
+            : `No ${nouns} on these days.`}
           {week.later !== null ? (
             <>
               {" "}

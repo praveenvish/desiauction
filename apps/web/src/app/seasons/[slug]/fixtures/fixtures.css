@@ -412,23 +412,27 @@
   min-width: 0;
 }
 
+/* The days, then one row of filters under them. */
 .mx-controls {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3) var(--space-4);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
 }
 
-.mx-toolbar {
-  flex: 1 1 22rem;
+.st-toolbar.mx-toolbar {
   margin: 0;
+  padding: 0;
+}
+
+.mx-toolbar .st-search {
+  flex: 0 1 18rem;
 }
 
 /* ---- The week strip ---- */
 
 .mx-week {
   display: flex;
-  flex: 10 1 34rem;
   align-items: stretch;
   gap: var(--space-1);
   min-width: 0;
@@ -671,11 +675,13 @@ a.mx-week-step:hover {
   white-space: nowrap;
 }
 
+/* Capped, so a score sits beside its team's name rather than a screen away. */
 .mx-sides {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
+  max-width: 26rem;
 }
 
 .mx-side {
@@ -959,7 +965,10 @@ a.mx-week-step:hover {
   min-width: 0;
 }
 
+/* Floated, so the legend sits inside the box rather than on its border. */
 .mx-score-team {
+  float: left;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -970,6 +979,7 @@ a.mx-week-step:hover {
 }
 
 .mx-score-fields {
+  clear: both;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
   gap: var(--space-2);
@@ -1081,6 +1091,12 @@ a.mx-week-step:hover {
     border: 0;
   }
 
+  /* The modal lands focus on the title (it is the first thing to read); that
+     is not a keyboard move, so it draws no ring. */
+  .mx-sheet .mx-panel-title:focus-visible {
+    outline: none;
+  }
+
   .mx-sheet::backdrop {
     background: var(--scrim, rgb(7 10 15 / 0.6));
   }
@@ -1116,7 +1132,6 @@ a.mx-week-step:hover {
   }
 
   .mx-week {
-    flex-basis: auto;
     margin-inline: calc(-1 * var(--space-4));
     padding-inline: var(--space-4);
     overflow-x: auto;
@@ -1131,36 +1146,33 @@ a.mx-week-step:hover {
     grid-template-columns: repeat(7, 4.5rem);
   }
 
-  .mx-toolbar {
-    flex-basis: auto;
+  .mx-toolbar .st-search {
+    flex: 1 1 100%;
   }
 
   .mx-daygroup-head {
     padding: var(--space-3);
   }
 
+  /* The state rides in the card's top corner; the step, if any, gets its own
+     line under the sides. */
   .mx-row,
-  .mx-layout[data-open="true"] .mx-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "link link"
-      "state act";
-    gap: 0 var(--space-3);
-    padding: 0 var(--space-3) var(--space-3);
-  }
-
+  .mx-layout[data-open="true"] .mx-row,
   .mx-row:not(:has(.mx-act)) {
+    position: relative;
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "link"
-      "state";
+      "act";
+    gap: 0;
+    padding: 0 var(--space-3);
   }
 
   .mx-row-link {
     grid-area: link;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
-    padding: var(--space-3) 0 var(--space-2);
+    padding: var(--space-3) 0;
   }
 
   .mx-when {
@@ -1168,14 +1180,23 @@ a.mx-week-step:hover {
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0 var(--space-2);
+    padding-inline-end: 7.5rem;
   }
 
-  .mx-state {
-    grid-area: state;
+  .mx-state,
+  .mx-layout[data-open="true"] .mx-state {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
   }
 
   .mx-act {
     grid-area: act;
+    padding-bottom: var(--space-3);
+  }
+
+  .mx-act:empty {
+    display: none;
   }
 
   .mx-steps > li + li::before {

@@ -79,7 +79,7 @@ import {
   type OrganizerFixture,
 } from "./fixtures";
 import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
-import { focusWeek, weekStrip, type WeekStrip } from "./schedule-week";
+import { DAYS_SHOWN, focusStart, weekStrip, type WeekStrip } from "./schedule-week";
 import { formOf, nextOf, type FormLetter, type TeamNext } from "./standings-form";
 import { lineupFixtures, lineupSides, type LineupSide } from "./lineups";
 import { lineupAnnounceStates, type LineupAnnounceState } from "./lineup-announce";
@@ -680,7 +680,7 @@ export async function fixtureTimelineAction(
 // --- The Matches screen ----------------------------------------------------------------
 
 export interface ScheduleViewParams {
-  /** Any day of the week to show (YYYY-MM-DD); the week is Monday to Sunday. */
+  /** The first of the seven days to show (YYYY-MM-DD); by default, two days back. */
   date?: string;
   team?: string;
   ground?: string;
@@ -768,7 +768,7 @@ export async function scheduleView(
       ...(ground !== "" && canManage ? { groundId: ground } : {}),
     };
     const days = await fixtureDayCounts(db, competition.id, narrow);
-    const start = focusWeek({ requested: params.date, today, days });
+    const start = focusStart({ requested: params.date, today, days });
     const mode = search !== "" ? "search" : "week";
     const [
       orgSlug,
@@ -788,7 +788,7 @@ export async function scheduleView(
       fixtureStats(db, competition.id, visible),
       queryFixtures(db, competition.id, {
         ...narrow,
-        ...(mode === "search" ? { search } : { from: start, to: addDays(start, 6) }),
+        ...(mode === "search" ? { search } : { from: start, to: addDays(start, DAYS_SHOWN - 1) }),
         sort: "kickoff",
         page: 1,
         pageSize: ROWS_SHOWN,

@@ -1,15 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { focusWeek, isWallDate, mondayOf, weekStrip } from "./schedule-week";
-
-describe("mondayOf", () => {
-  it("returns the Monday on or before a date, Sunday belonging to the week before", () => {
-    expect(mondayOf("2026-09-28")).toBe("2026-09-28"); // Monday
-    expect(mondayOf("2026-09-27")).toBe("2026-09-21"); // Sunday
-    expect(mondayOf("2026-10-01")).toBe("2026-09-28"); // Thursday
-    expect(mondayOf("2026-08-01")).toBe("2026-07-27"); // Saturday, across a month
-  });
-});
+import { focusStart, isWallDate, weekStrip } from "./schedule-week";
 
 describe("isWallDate", () => {
   it("accepts real calendar dates only", () => {
@@ -20,58 +11,68 @@ describe("isWallDate", () => {
   });
 });
 
-describe("focusWeek", () => {
-  const today = "2026-09-27"; // a Sunday
-  const days = [{ date: "2026-09-20" }, { date: "2026-10-04" }, { date: "2026-10-12" }];
+describe("focusStart", () => {
+  const today = "2026-09-27"; // a Sunday — the case a Monday-to-Sunday week got wrong
 
-  it("honours the week asked for", () => {
-    expect(focusWeek({ requested: "2026-10-13", today, days })).toBe("2026-10-12");
+  it("opens on the day asked for", () => {
+    expect(focusStart({ requested: "2026-10-13", today, days: [] })).toBe("2026-10-13");
   });
 
   it("ignores a malformed request", () => {
-    expect(focusWeek({ requested: "soon", today, days: [{ date: "2026-09-24" }] })).toBe(
-      "2026-09-21",
+    expect(focusStart({ requested: "soon", today, days: [{ date: "2026-09-28" }] })).toBe(
+      "2026-09-25",
     );
   });
 
-  it("opens on this week when it has a match", () => {
-    expect(focusWeek({ requested: undefined, today, days: [{ date: "2026-09-22" }] })).toBe(
-      "2026-09-21",
+  it("opens two days back when the days around today have a match — tomorrow included", () => {
+    expect(focusStart({ requested: undefined, today, days: [{ date: "2026-09-28" }] })).toBe(
+      "2026-09-25",
+    );
+    expect(focusStart({ requested: undefined, today, days: [{ date: "2026-09-25" }] })).toBe(
+      "2026-09-25",
     );
   });
 
-  it("else on the week of the next match", () => {
-    expect(focusWeek({ requested: undefined, today, days })).toBe("2026-09-28");
-  });
-
-  it("else on the week of the last match, for a finished season", () => {
+  it("else on the next match to come", () => {
     expect(
-      focusWeek({
+      focusStart({
+        requested: undefined,
+        today,
+        days: [{ date: "2026-09-20" }, { date: "2026-10-04" }],
+      }),
+    ).toBe("2026-10-04");
+  });
+
+  it("else closing on the last match, for a finished season", () => {
+    expect(
+      focusStart({
         requested: undefined,
         today,
         days: [{ date: "2026-08-01" }, { date: "2026-08-03" }],
       }),
-    ).toBe("2026-08-03");
+    ).toBe("2026-07-28");
   });
 
-  it("else on this week", () => {
-    expect(focusWeek({ requested: undefined, today, days: [] })).toBe("2026-09-21");
+  it("else around today", () => {
+    expect(focusStart({ requested: undefined, today, days: [] })).toBe("2026-09-25");
   });
 });
 
 describe("weekStrip", () => {
-  it("draws all seven days and the nearest match day either side", () => {
-    const strip = weekStrip("2026-09-21", [
+  it("draws all seven days and steps to the match days either side", () => {
+    const strip = weekStrip("2026-09-25", [
       { date: "2026-09-10", count: 2, live: 0 },
       { date: "2026-09-27", count: 2, live: 1 },
-      { date: "2026-10-04", count: 1, live: 0 },
+      { date: "2026-10-01", count: 1, live: 0 },
       { date: "2026-10-20", count: 1, live: 0 },
     ]);
     expect(strip.days).toHaveLength(7);
-    expect(strip.days[6]).toEqual({ date: "2026-09-27", count: 2, live: 1 });
-    expect(strip.days[0]).toEqual({ date: "2026-09-21", count: 0, live: 0 });
-    expect(strip.earlier).toBe("2026-09-10");
-    expect(strip.later).toBe("2026-10-04");
+    expect(strip.days[2]).toEqual({ date: "2026-09-27", count: 2, live: 1 });
+    expect(strip.days[0]).toEqual({ date: "2026-09-25", count: 0, live: 0 });
+    // Earlier: the window that CLOSES on 10 Sep.
+    expect(strip.earlier).toBe("2026-09-04");
+    // Later: the window that OPENS on 20 Oct.
+    expect(strip.later).toBe("2026-10-20");
   });
 
   it("has no step past either end", () => {

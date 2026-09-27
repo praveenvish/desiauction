@@ -4,7 +4,7 @@ import { latestOtp } from "./otp";
 
 // M-IP3-3 founder journey: create venue + grounds, generate a deterministic
 // round-robin schedule, publish it, move a fixture INTO a conflict (refused with
-// a warning), resolve by moving to a free slot, browse the calendar, export the
+// a warning), resolve by moving to a free slot, browse the days, export the
 // fixtures CSV. Everything local.
 
 const STAMP = String(Date.now()).slice(-8);
@@ -33,7 +33,7 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   }
 }
 
-test("the scheduling journey: venue, grounds, generate, publish, conflict, resolve, calendar, export", async ({
+test("the scheduling journey: venue, grounds, generate, publish, conflict, resolve, days, export", async ({
   page,
 }) => {
   test.setTimeout(120_000); // dev-mode compiles several new routes first-hit
@@ -108,18 +108,22 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   await expect(page.getByTestId("stat-published")).toContainText("6");
 
   // Move fixture F002 onto F001's slot -> the conflict engine refuses.
+  // The season is past, so the Matches screen opens on its last seven days —
+  // all three match days of this one.
   const rowOne = page.getByTestId(/^fixture-.*F001$/);
-  // Columns are #, Fixture, Kickoff, Ground, Status[, Actions] — nth(2)/(3),
-  // not (3)/(4); the row carries no leading checkbox column.
-  // Kickoffs now render as "Sat, 1 Aug 2026, 6:00 pm" rather than raw ISO, so
-  // the slot for the datetime-local input comes from the round grouping instead.
-  const kickoffOne = (await rowOne.locator("td").nth(2).textContent()) ?? "";
-  expect(kickoffOne).toMatch(/\d{1,2} Aug 2026/);
+  await expect(rowOne).toContainText(/\d{1,2} Aug 2026/);
   const slotOne = "2026-08-01T18:00";
+  const groundOne = ((await rowOne.locator(".mx-ground").textContent()) ?? "")
+    .replace(/^Ground:\s*/, "")
+    .trim();
+  // Moving is done from the match's own panel.
+  await page
+    .getByTestId(/^fixture-.*F002$/)
+    .locator("a.mx-row-link")
+    .click();
+  await expect(page.getByTestId("match-panel")).toBeVisible({ timeout: 20_000 });
   await page.getByTestId(/^move-.*F002$/).click();
   await page.getByLabel("New kickoff").fill(slotOne);
-  // Same ground as F001: pick the ground F001 shows.
-  const groundOne = ((await rowOne.locator("td").nth(3).textContent()) ?? "").trim();
   // The select leads with "Keep the current ground"; pick F001's ground by name.
   await page.getByLabel("New ground").selectOption({
     label: `Azad Maidan · ${groundOne.startsWith("Main") ? "Main Oval" : "Side Strip"}`,
@@ -128,25 +132,29 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   // Conflict warning surfaces; the fixture did NOT move.
   await expect(page.getByText(/booked twice|hosts two fixtures/)).toBeVisible();
 
-  // Resolve: move F002 to a free evening instead — accepted.
+  // Resolve: move F002 to a free evening instead — accepted. It is now the
+  // season's last match, so the screen opens on its days.
   await page.getByLabel("New kickoff").fill("2026-09-10T18:00");
   await page.getByTestId(/^confirm-move-.*F002$/).click();
-  await expect(page.getByTestId(/^fixture-.*F002$/)).toContainText("10 Sep 2026, 6:00 pm");
+  await expect(page.getByTestId(/^fixture-.*F002$/)).toContainText("10 Sep 2026, 6:00 pm", {
+    timeout: 20_000,
+  });
 
-  // Browse the calendar: day view shows opening day, timeline lists everything.
-  await page.getByTestId("open-calendar").click();
-  await expect(page.getByTestId("calendar-date")).toBeVisible({ timeout: 20_000 });
-  await page.goto(page.url().split("?")[0] + "?view=day&date=2026-08-01");
-  await expect(page.getByTestId("day-2026-08-01")).toBeVisible();
-  await page.getByTestId("view-timeline").click();
-  await expect(page.getByTestId("timeline-view")).toBeVisible();
-  await expect(page.getByTestId("timeline-view").getByTestId(/^cal-.*F001$/)).toBeVisible();
+  // The days: step to opening day by address, and find a match by number.
+  const base = `/seasons/${new URL(page.url()).pathname.split("/")[2] ?? ""}/fixtures`;
+  await page.goto(`${base}?date=2026-08-01`);
+  await expect(page.getByTestId("day-2026-08-01")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("day-2026-08-01").getByTestId(/^fixture-.*F001$/)).toBeVisible();
+  // The old calendar address lands on the same days.
+  await page.goto(`${base}/calendar?view=day&date=2026-08-01`);
+  await expect(page.getByTestId("day-2026-08-01")).toBeVisible({ timeout: 20_000 });
 
-  // Export produces the fixtures CSV.
-  await page.goto(`/seasons/${new URL(page.url()).pathname.split("/")[2] ?? ""}/fixtures`);
+  // Export produces the fixtures CSV, from the Plan menu.
+  await page.goto(base);
   await expect(page.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
+  await page.getByRole("button", { name: "Plan the schedule" }).click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByTestId("export-csv").click();
   const download = await downloadPromise;
