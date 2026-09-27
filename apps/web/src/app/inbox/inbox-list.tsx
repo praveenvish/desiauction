@@ -177,8 +177,20 @@ export function InboxList({ personId, events }: { personId: string; events: Inbo
     }
   }
 
+  const fresh = hydrated
+    ? events.filter((event) => seenBefore === null || event.at > seenBefore).length
+    : 0;
+
   return (
     <div className="inbox-list" data-testid="inbox-list" data-hydrated={hydrated}>
+      {/* How many are new, said once — the dots say which. */}
+      <p className="inbox-summary" data-testid="inbox-summary">
+        {fresh > 0
+          ? `${String(fresh)} new since your last visit`
+          : hydrated
+            ? "Nothing new since your last visit"
+            : " "}
+      </p>
       {groups.map((group) => (
         <div key={group.key} className="inbox-day">
           <h3 className="inbox-day-title">{dayLabel(group.key, now)}</h3>
@@ -196,15 +208,18 @@ export function InboxList({ personId, events }: { personId: string; events: Inbo
                 >
                   <IconTile icon={look.icon} tone={look.tone} size="md" />
                   <span className="inbox-label">
-                    <span className="inbox-headline">{label}</span>
+                    {/* The whole row is the door when the notice has one: the
+                        link was a small underline on the subject line, and the
+                        headline a reader actually taps did nothing. */}
+                    {event.subject?.href !== undefined ? (
+                      <Link href={event.subject.href} className="inbox-headline inbox-row-link">
+                        {label}
+                      </Link>
+                    ) : (
+                      <span className="inbox-headline">{label}</span>
+                    )}
                     {event.subject !== undefined ? (
-                      <span className="inbox-subject">
-                        {event.subject.href !== undefined ? (
-                          <Link href={event.subject.href}>{event.subject.name}</Link>
-                        ) : (
-                          event.subject.name
-                        )}
-                      </span>
+                      <span className="inbox-subject">{event.subject.name}</span>
                     ) : null}
                     {event.detail !== undefined ? (
                       <span className="inbox-detail">{event.detail}</span>
@@ -223,6 +238,11 @@ export function InboxList({ personId, events }: { personId: string; events: Inbo
           </ol>
         </div>
       ))}
+      {/* The end of the list says so, instead of stopping at blank space. */}
+      <p className="inbox-end" data-testid="inbox-end">
+        <IconCheckCircle size={18} aria-hidden />
+        You&apos;re up to date.
+      </p>
     </div>
   );
 }
