@@ -79,9 +79,10 @@
 }
 
 /* The shell's primary action steps back when the page leads with a next-step
-   banner: one ink button per screen, and the banner's is the one. */
-[data-surface="console"]:has(.home-next) [data-page-action] button,
-[data-surface="console"]:has(.home-next) [data-page-action] a {
+   banner (or the hero's next-step band): one ink button per screen, and the
+   next step's is the one. */
+[data-surface="console"]:has(.home-next, .home-hero-next) [data-page-action] button,
+[data-surface="console"]:has(.home-next, .home-hero-next) [data-page-action] a {
   background: var(--surface-raised);
   background-image: none;
   color: var(--text-heading);
