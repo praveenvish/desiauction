@@ -1,15 +1,19 @@
+import { sportPackFor } from "@desiauction/core";
 import { ButtonLink, Card, IconTrophy } from "@desiauction/ui";
 import { enabledSports } from "../../server/competition/sports";
 import { redirect } from "next/navigation";
 
 import { FormDialog } from "../../components/form-dialog";
 import { currentSession } from "../../server/auth/actions";
-import { seasonOverviewView } from "../../server/competition/actions";
+import { organizerScheduleView } from "../../server/competition/fixture-actions";
+import { nowWallClock } from "../../server/competition/fixtures";
 import { tournamentsView } from "../../server/competition/tournament-actions";
 import { CreateCompetitionForm } from "../seasons/create-competition-form";
 import { CreateTournamentForm } from "./create-tournament-form";
-import { FeaturedSeason, pickFeatured } from "./featured-season";
-import { TournamentsBrowser, type BrowsableGroup, type ViewMode } from "./tournaments-browser";
+import { NeedsYou } from "./needs-you";
+import { needsYou } from "./season-stage";
+import type { BrowsableGroup } from "./tournament-card";
+import { TournamentsBrowser, type ViewMode } from "./tournaments-browser";
 import "../seasons/seasons.css";
 import "./tournaments.css";
 
@@ -58,28 +62,27 @@ export default async function TournamentsPage({
   // offer an org the server will refuse.
   const createIn = view.creatableOrgs;
 
-  // The season the page leads with, and its overview — the one extra read on
-  // this page, and only when there is a season to feature.
-  const featuredSeason = pickFeatured([
+  const today = nowWallClock().slice(0, 10);
+  const allSeasons = [
     ...view.tournaments.flatMap((tournament) => tournament.seasons),
     ...view.standalone,
-  ]);
-  const featured =
-    featuredSeason === null
-      ? null
-      : {
-          season: featuredSeason,
-          tournamentName:
-            view.tournaments.find((tournament) => tournament.id === featuredSeason.tournamentId)
-              ?.name ?? null,
-        };
-  const featuredOverview =
-    featuredSeason === null ? null : await seasonOverviewView(featuredSeason.slug);
+  ];
+  const tournamentNames = Object.fromEntries(
+    view.tournaments.map((tournament) => [tournament.id, tournament.name]),
+  );
+  // What is waiting on this person, and the next few matches across every
+  // season they run — the band at the top (see needs-you.tsx).
+  const waiting = needsYou(allSeasons, today);
+  const upcoming = isEmpty ? [] : (await organizerScheduleView()).slice(0, 3);
 
   const groups: BrowsableGroup[] = [
     ...view.tournaments.map((tournament) => ({
       key: tournament.slug,
       name: tournament.name,
+      sportLabel:
+        tournament.seasons[0] !== undefined
+          ? sportPackFor(tournament.seasons[0].sport).label
+          : undefined,
       // The accordion appends the season count — see AccordionGroup.meta.
       meta: tournament.orgName,
       seasons: tournament.seasons,
@@ -116,27 +119,16 @@ export default async function TournamentsPage({
       : []),
   ];
 
-  const newTournament = (
-    <FormDialog
-      title="New tournament"
-      triggerLabel="+ New tournament"
-      // `touch`, not `sm`. The page's primary action was a 32px rung while
-      // /home sends people here to perform it — the same regression already
-      // corrected on the earlier console screens.
-      size="touch"
-      triggerTestId="new-tournament"
-    >
-      <CreateTournamentForm orgs={createIn} />
-    </FormDialog>
-  );
-
-  /* The "All seasons" view's primary action is the thing that view is about —
-     one edition, under no particular tournament. Same slot, same rung. */
+  /* The "All seasons" view is about editions, so it carries "New season" as
+     its own secondary button beside the list — the identity bar's one primary
+     action stays "New tournament" in both views. Every inbound /seasons link
+     arrives expecting this door, under this test id. */
   const newSeason = (
     <FormDialog
       title="New season"
       triggerLabel="+ New season"
-      size="touch"
+      variant="secondary"
+      size="sm"
       triggerTestId="new-season"
     >
       <CreateCompetitionForm sports={sportOptions} orgs={createIn} />
@@ -146,14 +138,40 @@ export default async function TournamentsPage({
   // Only what THIS person may decide (`registration.review`).
   const pending = view.canReviewAnywhere ? view.totals.pending : 0;
 
-  const featuredNode =
-    featured === null ? null : (
-      <FeaturedSeason
-        season={featured.season}
-        tournamentName={featured.tournamentName}
-        overview={featuredOverview}
-      />
-    );
+  /* The dashed card that closes the grid: the next tournament, or a one-off
+     season. It fills the row a single tournament leaves empty. */
+  const startCard = canCreate ? (
+    <article className="tx-start" data-testid="tx-start">
+      <span className="tx-start-glyph" aria-hidden>
+        <IconTrophy size={22} />
+      </span>
+      <h3>Run another tournament</h3>
+      <p>
+        A tournament is the league that comes back every year. Each year is a new season with its
+        own registration, auction and fixtures.
+      </p>
+      <div className="tx-start-go">
+        <FormDialog
+          title="New tournament"
+          triggerLabel="+ New tournament"
+          variant="secondary"
+          size="sm"
+          triggerTestId="start-tournament"
+        >
+          <CreateTournamentForm orgs={createIn} />
+        </FormDialog>
+        <FormDialog
+          title="New one-off season"
+          triggerLabel="or a one-off season"
+          triggerAsLink
+          triggerClassName="tx-start-alt"
+          triggerTestId="start-one-off"
+        >
+          <CreateCompetitionForm sports={sportOptions} orgs={createIn} />
+        </FormDialog>
+      </div>
+    </article>
+  ) : null;
 
   return (
     <main className="competitions">
@@ -210,13 +228,23 @@ export default async function TournamentsPage({
             </div>
           </Card>
         ) : (
-          <TournamentsBrowser
-            groups={groups}
-            initialMode={mode}
-            pendingReview={pending}
-            featured={featuredNode}
-            {...(canCreate ? { actionGrouped: newTournament, actionSeasons: newSeason } : {})}
-          />
+          <>
+            <NeedsYou
+              seasons={waiting}
+              tournamentNames={new Map(Object.entries(tournamentNames))}
+              upcoming={upcoming}
+              today={today}
+            />
+            <TournamentsBrowser
+              groups={groups}
+              initialMode={mode}
+              today={today}
+              pendingReview={pending}
+              tournamentNames={tournamentNames}
+              {...(startCard !== null ? { startCard } : {})}
+              {...(canCreate ? { newSeason } : {})}
+            />
+          </>
         )}
       </div>
     </main>

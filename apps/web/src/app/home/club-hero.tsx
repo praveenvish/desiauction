@@ -11,8 +11,7 @@ import type { ReactNode } from "react";
 
 import { HeroStatus, SeasonCrest } from "../../components/season-hero/season-hero";
 import type { SeasonOverviewView } from "../../server/competition/actions";
-import { coverOf } from "../tournaments/featured-season";
-import { dateRange, seasonStatusBadge } from "../tournaments/season-card";
+import { coverOf, dateRange, seasonStatusBadge } from "../tournaments/season-card";
 
 /**
  * The club hero at the top of an organizer's /home (founder mockup 2): the

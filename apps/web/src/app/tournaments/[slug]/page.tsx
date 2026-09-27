@@ -1,17 +1,5 @@
-import {
-  Card,
-  EmptyState,
-  IconCalendar,
-  IconFileCheck,
-  IconGavel,
-  IconMatch,
-  IconTile,
-  IconTrophy,
-  IconUsers,
-  ListRow,
-  StatCard,
-  StatGrid,
-} from "@desiauction/ui";
+import { sportPackFor } from "@desiauction/core";
+import { Card, EmptyState, IconArrowRight, IconPlus, buttonClassName } from "@desiauction/ui";
 import Link from "next/link";
 import { enabledSports } from "../../../server/competition/sports";
 import { notFound } from "next/navigation";
@@ -19,6 +7,9 @@ import { cache, Suspense, type ReactNode } from "react";
 
 import { FormDialog } from "../../../components/form-dialog";
 import { PageTitle } from "../../../components/shell/page-title";
+import { formatWallTime } from "../../../lib/format-date";
+import { standingsView } from "../../../server/competition/fixture-actions";
+import { nowWallClock } from "../../../server/competition/fixtures";
 import {
   tournamentHeader,
   tournamentSeasons,
@@ -26,8 +17,12 @@ import {
 } from "../../../server/competition/tournament-actions";
 import { formatCount } from "../../../lib/plural";
 import { CreateCompetitionForm } from "../../seasons/create-competition-form";
-import { SeasonCard, seasonStatusBadge } from "../season-card";
+import { dateRange } from "../season-card";
+import { SeasonRoad } from "../season-road";
+import { STAGE_LABEL, initialsOf, nextStep, seasonStage } from "../season-stage";
+import { StagePill } from "../tournament-card";
 import { TournamentsSkeleton } from "../tournament-accordion";
+import { wallDay } from "../../seasons/[slug]/fixtures/schedule-model";
 import "../../seasons/seasons.css";
 import "../tournaments.css";
 
@@ -122,7 +117,7 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
               viewer.canCreateSeason ? (
                 <FormDialog
                   title={`New season in ${tournament.name}`}
-                  triggerLabel="Add a season"
+                  triggerLabel="+ New season"
                   size="touch"
                   triggerTestId="add-season"
                 >
@@ -138,9 +133,9 @@ export default async function TournamentPage({ params }: { params: Promise<{ slu
 }
 
 async function SeasonsSection({
-  tournamentId,
   tournamentName,
   orgName,
+  tournamentId,
   canCreateSeason,
   addSeasonForm,
   addSeason,
@@ -150,29 +145,24 @@ async function SeasonsSection({
   orgName: string;
   canCreateSeason: boolean;
   addSeasonForm: ReactNode;
-  /** The page's one create door, at the end of the section head. */
+  /** The page's one create door, in the identity band. */
   addSeason?: ReactNode;
 }) {
   const seasons = await tournamentSeasons(tournamentId);
-  /* The best sentence in the journey used to vanish the moment it worked: it
-     lived only in the empty state, so once a season existed the whole of the
-     page's explanation of itself was "Demo Cricket Club · 5 seasons". It is
-     drawn here, beside the seasons, so it can say the right thing about them. */
-  const what = <p className="tg-what">{whatThisIs(tournamentName, orgName, seasons.length)}</p>;
+  const today = nowWallClock().slice(0, 10);
 
   if (seasons.length === 0) {
     return (
       <>
-        {what}
+        <IdentityBand name={tournamentName} meta={orgName} figures={[]} action={addSeason} />
+        <p className="tg-what">{whatThisIs(tournamentName, orgName, 0)}</p>
         <Card>
           <EmptyState
             headingLevel={2}
             title="No seasons yet"
             description={
               canCreateSeason
-                ? // The line above the list already says what a tournament is;
-                  // repeating it here printed the same sentence twice.
-                  "Start with this year's season — dates, sport and teams come next."
+                ? "Start with this year's season — dates, sport and teams come next."
                 : "This tournament has no editions yet. Ask an owner to add a season."
             }
             {...(canCreateSeason
@@ -195,137 +185,337 @@ async function SeasonsSection({
     );
   }
 
-  const latest = seasons[0];
+  const [latest, ...earlier] = seasons as [SeasonRow, ...SeasonRow[]];
   const matches = seasons.reduce((sum, season) => sum + season.counts.matches, 0);
   const firstYear = seasons
     .map((season) => season.startsOn?.slice(0, 4))
     .filter((year): year is string => year !== undefined)
     .sort()[0];
+  const sport = sportPackFor(latest.sport).label;
+  const meta = [orgName, sport, firstYear !== undefined ? `since ${firstYear}` : null]
+    .filter((part) => part !== null)
+    .join(" · ");
 
   return (
     <>
-      {/* THE STAT LINE (round 3C): what this tournament amounts to, before
-          its editions — it opened on one card and a blank page. Figures only,
-          so the tiles sit flat; the doors are the cards and the rail below. */}
-      <StatGrid testId="tournament-figures">
-        <StatCard
-          icon={<IconTrophy />}
-          concept="season"
-          value={formatCount(seasons.length)}
-          label={seasons.length === 1 ? "Season" : "Seasons"}
-          hint={firstYear === undefined ? orgName : `Since ${firstYear} · ${orgName}`}
-        />
-        <StatCard
-          icon={<IconUsers />}
-          concept="teams"
-          value={formatCount(latest?.counts.teams ?? 0)}
-          label={(latest?.counts.teams ?? 0) === 1 ? "Team" : "Teams"}
-          hint={latest === undefined ? "" : `In ${latest.name}`}
-        />
-        <StatCard
-          icon={<IconMatch />}
-          concept="fixtures"
-          value={formatCount(matches)}
-          label={matches === 1 ? "Match" : "Matches"}
-          hint={seasons.length === 1 ? "On the schedule" : "Across every season"}
-        />
-      </StatGrid>
+      <IdentityBand
+        name={tournamentName}
+        meta={meta}
+        figures={[
+          [formatCount(seasons.length), seasons.length === 1 ? "Season" : "Seasons"],
+          [formatCount(latest.counts.teams), latest.counts.teams === 1 ? "Team" : "Teams"],
+          [formatCount(latest.counts.approved ?? 0), "Players"],
+          [formatCount(matches), matches === 1 ? "Match" : "Matches"],
+        ]}
+        action={addSeason}
+      />
+      {!canCreateSeason ? (
+        <p className="tg-cannot" data-testid="tournament-cannot-create">
+          Ask an owner to add a season.
+        </p>
+      ) : null}
 
-      <div className="tg-detail">
-        <section className="seasons-section" aria-labelledby="tg-seasons-title">
-          <div className="tg-section-head">
-            <h2 id="tg-seasons-title" className="tg-section-title">
-              Seasons <span className="tg-section-count">{seasons.length}</span>
-            </h2>
-            {what}
+      <div className="tx-detail">
+        <section className="tx-editions-col" aria-labelledby="tg-seasons-title">
+          <header className="tx-section-head">
+            <h2 id="tg-seasons-title">Editions</h2>
+            <p>Newest first</p>
+          </header>
+          <div data-testid="tournament-seasons" className="tx-editions-stack">
+            <LatestEdition season={latest} today={today} doors={canCreateSeason} />
+            {earlier.length > 0 ? (
+              <section className="tx-earlier" aria-label="Earlier seasons">
+                {earlier.map((season) => (
+                  <Link
+                    key={season.id}
+                    href={`/seasons/${season.slug}`}
+                    className="tx-edition"
+                    data-testid="tg-season"
+                  >
+                    <span className="tx-edition-id">
+                      <strong>{season.name}</strong>
+                      <span>
+                        {[dateRange(season.startsOn, season.endsOn), season.location]
+                          .filter((part) => part !== null)
+                          .join(" · ") || "Dates to be set"}
+                      </span>
+                    </span>
+                    <SeasonRoad season={season} size="sm" />
+                    <StagePill stage={seasonStage(season, today)} />
+                  </Link>
+                ))}
+              </section>
+            ) : null}
             {canCreateSeason ? (
-              <span className="tg-section-action">{addSeason}</span>
-            ) : (
-              <span className="tg-cannot" data-testid="tournament-cannot-create">
-                Ask an owner to add a season.
-              </span>
-            )}
-          </div>
-          <div className="competitions-grid da-stagger" data-testid="tournament-seasons">
-            {seasons.map((season) => (
-              <SeasonCard key={season.id} season={season} />
-            ))}
+              <article className="tx-next-edition">
+                <span className="tx-start-glyph" aria-hidden>
+                  <IconPlus size={20} />
+                </span>
+                <div>
+                  <h3>The next edition</h3>
+                  <p>
+                    When {tournamentName} comes back, start its new season here. It opens its own
+                    registration, auction and fixtures.
+                  </p>
+                </div>
+              </article>
+            ) : null}
           </div>
         </section>
-        {latest !== undefined ? <LatestSeasonDesk season={latest} doors={canCreateSeason} /> : null}
+        <SoFar season={latest} />
       </div>
     </>
   );
 }
 
+/** Who this tournament is, and what it amounts to — the band the page opens on. */
+function IdentityBand({
+  name,
+  meta,
+  figures,
+  action,
+}: {
+  name: string;
+  meta: string;
+  figures: readonly (readonly [string, string])[];
+  action?: ReactNode;
+}) {
+  return (
+    <section
+      className="tx-band"
+      aria-label={`${name} at a glance`}
+      data-testid="tournament-figures"
+    >
+      <span className="tx-crest" data-size="xl" aria-hidden>
+        {initialsOf(name)}
+      </span>
+      <div className="tx-band-id">
+        {/* The identity bar owns the page's one h1 (its title); this is the
+            band's own line, not a second heading. */}
+        <p className="tx-band-name">{name}</p>
+        <p className="tx-band-meta">{meta}</p>
+      </div>
+      {figures.length > 0 ? (
+        <dl className="tx-band-figures">
+          {figures.map(([value, label]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {action !== undefined ? <div className="tx-band-go">{action}</div> : null}
+    </section>
+  );
+}
+
 /**
- * THE SECOND OBJECT (round 3C): the newest edition's desks, one row each with
- * where it stands — players to review, teams, the auction, the schedule. The
- * season card opens its overview; these open the page past it. Doors only for
- * someone who manages the tournament (the same bar as "Add a season"); anyone
- * else reads the same figures as plain rows.
+ * The newest edition, opened up: its road, where it stands, its next step,
+ * and its four desks one click away — Players, Teams, Auction, Schedule. Doors
+ * only for someone who manages the tournament; anyone else reads the figures.
  */
-function LatestSeasonDesk({ season, doors }: { season: SeasonRow; doors: boolean }) {
+function LatestEdition({
+  season,
+  today,
+  doors,
+}: {
+  season: SeasonRow;
+  today: string;
+  doors: boolean;
+}) {
   const base = `/seasons/${season.slug}`;
-  const badge = seasonStatusBadge(season.status, season.settlement, season.counts.auctionDone);
-  const rows = [
+  const stage = seasonStage(season, today);
+  const step = nextStep(season, today);
+  const live = season.counts.live ?? 0;
+  const desks = [
     {
       key: "players",
-      icon: <IconFileCheck />,
-      concept: "players" as const,
       title: "Players",
       meta:
         season.counts.pending > 0
           ? `${formatCount(season.counts.pending)} waiting for review`
-          : "Nobody waiting for review",
+          : `${formatCount(season.counts.approved ?? 0)} approved`,
       href: `${base}/registrations`,
     },
     {
       key: "teams",
-      icon: <IconUsers />,
-      concept: "teams" as const,
       title: "Teams",
       meta: `${formatCount(season.counts.teams)} ${season.counts.teams === 1 ? "team" : "teams"}`,
       href: `${base}/teams`,
     },
     {
       key: "auction",
-      icon: <IconGavel />,
-      concept: "auction" as const,
       title: "Auction",
       meta: season.counts.auctionDone === true ? "Done — squads and prices" : "Not run yet",
       href: `${base}/auction`,
     },
     {
       key: "schedule",
-      icon: <IconCalendar />,
-      concept: "fixtures" as const,
       title: "Schedule",
       meta:
         season.counts.matches > 0
-          ? `${formatCount(season.counts.matches)} ${season.counts.matches === 1 ? "match" : "matches"}`
+          ? `${formatCount(season.counts.played ?? 0)} of ${formatCount(season.counts.matches)} played`
           : "No matches yet",
       href: `${base}/fixtures`,
     },
   ];
   return (
-    <aside className="tg-desk" aria-labelledby="tg-desk-title" data-testid="tournament-latest">
-      <p className="tg-desk-kicker">Latest season · {badge.label}</p>
-      <h2 id="tg-desk-title" className="tg-desk-title">
-        {season.name}
-      </h2>
-      <ul className="tg-desk-list">
-        {rows.map((row) => (
-          <li key={row.key}>
-            <ListRow
-              lead={<IconTile icon={row.icon} concept={row.concept} size="sm" />}
-              title={row.title}
-              meta={row.meta}
-              {...(doors ? { href: row.href, linkComponent: Link } : {})}
-            />
+    <article className="tx-latest" data-testid="tournament-latest">
+      <header className="tx-latest-head">
+        <div className="tx-latest-id">
+          <span className="tx-latest-title">
+            <Link href={base} className="tx-latest-name">
+              {season.name}
+            </Link>
+            {season.running ? (
+              <span className="tx-pill" data-tone="running">
+                Now running
+              </span>
+            ) : (
+              <StagePill stage={stage} />
+            )}
+          </span>
+          <span className="tx-latest-when">
+            {[dateRange(season.startsOn, season.endsOn), season.location]
+              .filter((part) => part !== null)
+              .join(" · ") || "Dates to be set"}
+          </span>
+        </div>
+        <Link href={base} className={buttonClassName({ variant: "secondary", size: "sm" })}>
+          Open season
+          <IconArrowRight size={16} aria-hidden />
+        </Link>
+      </header>
+      <div className="tx-now-road">
+        <SeasonRoad season={season} />
+        <span className="tx-stage-word">
+          {STAGE_LABEL[stage]}
+          {live > 0 ? ` · ${formatCount(live)} playing now` : ""}
+        </span>
+        {step !== null && doors ? (
+          <Link
+            href={step.href}
+            className={buttonClassName({ variant: step.urgent ? "primary" : "ghost", size: "sm" })}
+          >
+            {step.label}
+          </Link>
+        ) : null}
+      </div>
+      <ul className="tx-desks">
+        {desks.map((desk) => (
+          <li key={desk.key}>
+            {doors ? (
+              <Link href={desk.href} className="tx-desk">
+                <strong>{desk.title}</strong>
+                <span>{desk.meta}</span>
+              </Link>
+            ) : (
+              <span className="tx-desk">
+                <strong>{desk.title}</strong>
+                <span>{desk.meta}</span>
+              </span>
+            )}
           </li>
         ))}
       </ul>
+    </article>
+  );
+}
+
+/**
+ * THE LATEST EDITION SO FAR: the top of its table and the match being played
+ * (or the next one). The page used to end its right column on a list of desk
+ * links that repeated the season card beside it.
+ */
+async function SoFar({ season }: { season: SeasonRow }) {
+  const view = await standingsView(season.slug);
+  if (view === null) {
+    return null;
+  }
+  const { standings } = view;
+  const teams = new Map(view.teams.map((team) => [team.id, team]));
+  const rows = standings.rows.slice(0, 5);
+  // One line per match: the table's `next` is per team, so a match appears
+  // once for each side — keep the first of each.
+  const seen = new Set<string>();
+  const nextMatches = standings.rows
+    .map((row) => ({ team: row.teamName, next: view.next[row.teamId] }))
+    .filter(
+      (entry): entry is { team: string; next: NonNullable<typeof entry.next> } =>
+        entry.next !== undefined,
+    )
+    .filter((entry) => {
+      if (seen.has(entry.next.fixtureId)) return false;
+      seen.add(entry.next.fixtureId);
+      return true;
+    })
+    .sort(
+      (a, b) =>
+        Number(b.next.live) - Number(a.next.live) ||
+        (a.next.kickoffAt ?? "9999").localeCompare(b.next.kickoffAt ?? "9999"),
+    )
+    .slice(0, 3);
+  const played = standings.recorded > 0;
+  return (
+    <aside className="tx-sofar" aria-labelledby="tx-sofar-title" data-testid="tournament-so-far">
+      <header className="tx-section-head">
+        <h2 id="tx-sofar-title">{season.name} so far</h2>
+      </header>
+      <div className="tx-sofar-card">
+        <h3 className="tx-label">Table</h3>
+        {played && rows.length > 0 ? (
+          <ol className="tx-table">
+            {rows.map((row, index) => (
+              <li key={row.teamId} data-lead={index === 0 ? "true" : undefined}>
+                <span className="tx-table-pos">{index + 1}</span>
+                <span className="tx-crest" data-size="sm" aria-hidden>
+                  {teams.get(row.teamId)?.shortName ?? initialsOf(row.teamName)}
+                </span>
+                <span className="tx-table-name">{row.teamName}</span>
+                <span className="tx-table-pts">
+                  {row.points} {row.points === 1 ? "pt" : "pts"}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="tx-sofar-empty">The table fills as results come in.</p>
+        )}
+        <Link href={`/seasons/${season.slug}/standings`} className="tx-more">
+          Full table
+          <IconArrowRight size={14} aria-hidden />
+        </Link>
+        {nextMatches.length > 0 ? (
+          <>
+            <h3 className="tx-label">
+              {nextMatches[0]?.next.live === true ? "Playing now" : "Next up"}
+            </h3>
+            <ul className="tx-sofar-matches">
+              {nextMatches.map((entry) => (
+                <li key={entry.next.fixtureId} data-live={entry.next.live ? "true" : undefined}>
+                  <Link
+                    href={`/seasons/${season.slug}/fixtures?match=${entry.next.fixtureId}`}
+                    className="tx-sofar-match"
+                  >
+                    <span className="tx-sofar-teams">
+                      {entry.team}
+                      {entry.next.opponent !== null ? ` v ${entry.next.opponent}` : ""}
+                    </span>
+                    <span className="tx-sofar-when">
+                      {entry.next.live
+                        ? "Playing now"
+                        : entry.next.kickoffAt !== null
+                          ? `${wallDay(entry.next.kickoffAt.slice(0, 10)).label}, ${formatWallTime(entry.next.kickoffAt)}`
+                          : "Date to be set"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </div>
     </aside>
   );
 }
