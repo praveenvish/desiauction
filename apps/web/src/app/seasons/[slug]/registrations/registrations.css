@@ -427,33 +427,25 @@ section.rd-card[data-flush="true"] {
   font-size: var(--text-sm-size);
 }
 
-.rd-card .pd-col-num {
-  width: 2.5rem;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.rd-card .pd-col-date {
-  white-space: nowrap;
-  color: var(--text-secondary);
-}
-
 .rd-card .pd-status > :first-child {
   text-transform: capitalize;
 }
 
-.rd-card .pd-marks-inline {
-  margin-inline-start: var(--space-1);
-  vertical-align: middle;
-}
-
-/* Captain / icon / retained: a 16px glyph on a tinted disc, named by title
-   and hidden text (the 10px text chips were unreadable). */
+/* Captain / icon / retained: a labelled chip beside the name (2026-09-27).
+   A bare crown or star after the team said nothing to someone who had not
+   been told, and on a phone it went with the clipped team name. */
 .rd-card .pd-mark-chip {
-  width: 22px;
-  min-width: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  min-width: 0;
   height: 22px;
-  padding: 0;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
 }
 
 .rd-card .pd-mark-chip[data-kind="retained"] {
@@ -500,20 +492,6 @@ section.rd-card[data-flush="true"] {
 .rd-card .pd-pager {
   padding: 0 var(--space-4) var(--space-3);
   border-top: 1px solid var(--border-subtle);
-}
-
-/* Shed the columns the sheet repeats, widest screens keep all nine. */
-@media (max-width: 1279px) {
-  .rd-card .pd-col-date {
-    display: none;
-  }
-}
-
-@media (max-width: 1023px) {
-  .rd-card .pd-col-num,
-  .rd-card .pd-col-role {
-    display: none;
-  }
 }
 
 @media (max-width: 1023px) {
@@ -564,11 +542,6 @@ section.rd-card[data-flush="true"] {
   .rd-card .pd-table .pd-row td:first-child,
   .rd-card .pd-table .pd-row td:last-child {
     padding: 0;
-  }
-
-  .rd-card .pd-row td.pd-col-num,
-  .rd-card .pd-row td.pd-col-date {
-    display: none;
   }
 
   .rd-card .pd-row td.pd-col-status {
@@ -624,8 +597,8 @@ section.rd-card[data-flush="true"] {
   }
 
   /* The list row says who and which team; the phone number is in the sheet.
-     The team moves up onto the meta line (.pd-meta-phone), so the Team cell
-     leaves the row unless it has a warning to give. */
+     The team is its own line under the name (.pd-phone-team) — whole, never
+     clipped — so the Team cell leaves the row unless it has a warning. */
   .rd-card .pd-row .pd-player-meta [data-private] {
     display: none;
   }
@@ -634,45 +607,45 @@ section.rd-card[data-flush="true"] {
     display: none;
   }
 
-  .rd-card .pd-row td.pd-col-team .pd-team,
-  .rd-card .pd-row td.pd-col-team .pd-marks-inline {
+  .rd-card .pd-row td.pd-col-team .pd-team {
+    display: none;
+  }
+
+  .rd-card .pd-row .pd-phone-team {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* The pill is its own mark — no "·" before it, which dangled at the start
+     of the line whenever the pill wrapped. */
+  .rd-card .pd-row .pd-player-meta > .pd-phone-team::before {
+    content: none;
+  }
+
+  /* The registration code is in the player's sheet; the row keeps who and
+     for whom. */
+  .rd-card .pd-row .pd-player-meta .pd-mono {
     display: none;
   }
 
   .rd-card .pd-row .pd-player-meta {
-    flex-wrap: nowrap;
-    gap: 0 6px;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .rd-card .pd-row .pd-meta-phone {
-    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    min-width: 0;
+    row-gap: 4px;
+  }
+
+  /* Approved is the normal state: on a phone it is not worth a column. The
+     cell leaves the grid (still read out), and the name gets the width. */
+  .rd-card .pd-row td.pd-col-status:has(.pd-status-quiet) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
     overflow: hidden;
-    color: var(--text-secondary);
+    clip-path: inset(50%);
     white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
-  .rd-card .pd-row .pd-meta-phone:not(:empty)::before {
-    content: "·";
-    color: var(--text-muted);
-  }
-
-  .rd-card .pd-row .pd-meta-team {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .rd-card .pd-row .pd-meta-phone svg {
-    flex: none;
-    color: var(--accent-ink, var(--text-accent));
+  .rd-card .pd-row .pd-player {
+    gap: var(--space-2);
   }
 
   .rd-toolbar .rd-sort {
@@ -698,5 +671,166 @@ section.rd-card[data-flush="true"] {
 
   .rd-card .pd-row {
     padding-inline: var(--space-3);
+  }
+}
+
+/* ======================================================================
+   THE PLAYERS DESK REDESIGN (2026-09-27): the pool strip, rows that say who
+   each player is, a quiet "Approved".
+   ====================================================================== */
+
+.rd-card .pd-player-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+}
+
+.rd-card .pd-player-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+}
+
+.rd-card .pd-player-meta > span + span::before {
+  content: "·";
+  margin-inline-end: var(--space-2);
+  color: var(--text-muted);
+}
+
+.rd-card .pd-meta-role {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.rd-card .pd-phone-team {
+  display: none;
+}
+
+.rd-card .pd-status-quiet {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.pd-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-8);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.pd-pool-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+}
+
+.pd-pool-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.pd-pool-value {
+  font-size: var(--text-2xl-size);
+  line-height: 1.15;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-pool-of {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.pd-pool-hint {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.pd-pool-roles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.pd-pool-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+}
+
+.pd-pool-bar > span,
+.pd-pool-dot {
+  background: var(--accent-line);
+}
+
+.pd-pool-bar > span[data-slot="1"],
+.pd-pool-dot[data-slot="1"] {
+  background: var(--info-base);
+}
+
+.pd-pool-bar > span[data-slot="2"],
+.pd-pool-dot[data-slot="2"] {
+  background: var(--success-base);
+}
+
+.pd-pool-bar > span[data-slot="3"],
+.pd-pool-dot[data-slot="3"] {
+  background: var(--text-secondary);
+}
+
+.pd-pool-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.pd-pool-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pd-pool-legend strong {
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-pool-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+@media (max-width: 719px) {
+  .pd-pool {
+    padding: var(--space-4);
+  }
+
+  .pd-pool-value {
+    font-size: var(--text-xl-size);
   }
 }
