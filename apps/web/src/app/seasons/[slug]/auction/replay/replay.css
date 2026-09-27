@@ -1,0 +1,833 @@
+/* THE REPLAY (replay-panel.tsx) — the auction night, watched again. The room's
+   own look: the player card from lot-card.css, the teams in their colours,
+   a player bar pinned to the foot of the page. Tokens only. */
+
+.rp-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.rp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.rp-head-text {
+  display: flex;
+  flex: 1 1 16rem;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rp-head h1 {
+  margin: 0;
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.rp-head p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.rp-head-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.rp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.rp-body {
+  display: grid;
+  grid-template-columns: 17rem minmax(0, 1fr) 19rem;
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.rp-side-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.rp-side-head strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ---- The lots, as a playlist ---- */
+
+.rp-lots {
+  position: sticky;
+  top: var(--space-4);
+  min-width: 0;
+}
+
+.rp-lot-list {
+  max-height: calc(100dvh - 18rem);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.rp-lot-list li + li .rp-lot {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rp-lot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rp-lot:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+
+.rp-lot:disabled {
+  cursor: default;
+}
+
+/* Still to come: quieter by colour, never by opacity (a faded row fails contrast). */
+.rp-lot[data-state="waiting"] .rp-lot-name {
+  color: var(--text-secondary);
+}
+
+.rp-lot[aria-current="true"] {
+  background: var(--accent-subtle);
+  box-shadow: inset 3px 0 0 var(--accent-line);
+}
+
+/* On the gold tint the muted grey falls under 4.5:1; the number steps up. */
+.rp-lot[aria-current="true"] .rp-lot-no,
+.rp-lot[aria-current="true"] .rp-lot-state {
+  color: var(--text-secondary);
+}
+
+.rp-lot:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.rp-lot-no {
+  flex: none;
+  width: 2.5rem;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-lot-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rp-lot-state {
+  flex: none;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.rp-lot[data-state="bidding"] .rp-lot-state {
+  color: var(--accent-ink);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rp-lot-sold {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-lot-sold .purse-chip {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+
+/* ---- The moment ---- */
+
+.rp-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.rp-moment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.rp-moment-top {
+  display: grid;
+  grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-5);
+}
+
+/* The player card takes its shape from the page it sits on (lot-card.css). */
+.rp-card {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+}
+
+.rp-price {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.rp-moment-state {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.rp-unsold-word {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl-size, 2.25rem);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.rp-unsold-sub {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.rp-war {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.rp-war-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.rp-war-head strong {
+  flex: 1 1 auto;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.rp-war-key {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs-size);
+}
+
+.rp-war-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rp-war-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+}
+
+.rp-war-chart {
+  width: 100%;
+  height: auto;
+  max-height: 180px;
+}
+
+.rp-war-line {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 2;
+}
+
+.rp-war-point {
+  stroke: var(--surface-raised);
+  stroke-width: 2;
+}
+
+.rp-war-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--text-heading);
+}
+
+.rp-war-axis {
+  font-size: 11px;
+  fill: var(--text-muted);
+}
+
+.rp-empty,
+.rp-failed {
+  padding: var(--space-6);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+}
+
+/* ---- The finished night ---- */
+
+.rp-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.rp-summary-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--accent-subtle), transparent 70%),
+    var(--surface-raised);
+  text-align: center;
+}
+
+.rp-summary-kicker {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.rp-summary-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl-size, 2.25rem);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-summary-sub {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.rp-watch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 46px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--text-on-accent, #1a1814);
+  font: inherit;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.rp-top {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.rp-top-head {
+  margin: var(--space-2) 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.rp-top ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-top-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rp-top-row:hover .rp-top-watch {
+  color: var(--text-accent);
+}
+
+.rp-top-rank {
+  width: 1.25rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.rp-top li:first-child .rp-top-rank {
+  color: var(--accent-ink);
+}
+
+.rp-top-who {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rp-top-name {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.rp-top-meta {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.rp-top-amount {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-top-watch {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* ---- The teams ---- */
+
+.rp-teams {
+  position: sticky;
+  top: var(--space-4);
+  min-width: 0;
+}
+
+.rp-team-list {
+  margin: 0;
+  padding: var(--space-1) var(--space-4);
+  list-style: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.rp-team {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+
+.rp-team + .rp-team {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rp-team-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rp-team-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.rp-team-bought {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-team-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.rp-team-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--duration-fast) var(--ease-out);
+}
+
+.rp-team-left {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-ledger {
+  display: block;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.rp-ledger:hover {
+  color: var(--text-primary);
+}
+
+/* ---- The player bar ---- */
+
+.rp-transport {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 calc(-1 * var(--space-6));
+  padding: var(--space-3) var(--space-6) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.rp-chapters {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+
+.rp-chapter {
+  flex: 1 1 0;
+  border-radius: 2px;
+  background: var(--surface-sunken);
+}
+
+.rp-chapter[data-state="sold"] {
+  background: var(--team, var(--accent));
+}
+
+.rp-chapter[data-state="unsold"] {
+  background: var(--border-strong);
+}
+
+.rp-chapter[data-state="now"] {
+  background: var(--accent);
+  transform: scaleY(1.5);
+}
+
+.rp-slider {
+  width: 100%;
+  height: 20px;
+  margin: -4px 0 0;
+  accent-color: var(--accent);
+}
+
+.rp-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.rp-buttons {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.rp-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rp-btn--play {
+  width: 52px;
+  height: 52px;
+  border-color: var(--accent-line);
+  background: var(--accent);
+  color: var(--text-on-accent, #1a1814);
+}
+
+.rp-btn:focus-visible,
+.rp-speed-btn:focus-visible,
+.rp-watch:focus-visible,
+.rp-top-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rp-now {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rp-now-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rp-now-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-status {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+  text-transform: capitalize;
+}
+
+.rp-speed {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.rp-speed-btn {
+  min-width: 40px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.rp-speed-btn[aria-pressed="true"] {
+  background: var(--surface-sunken);
+  color: var(--text-heading);
+}
+
+.rp-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--success-strong);
+}
+
+.rp-verified[data-converged="false"] {
+  color: var(--danger-strong);
+}
+
+/* ---- Narrower ---- */
+
+@media (max-width: 1199px) {
+  .rp-body {
+    grid-template-columns: 15rem minmax(0, 1fr);
+  }
+
+  .rp-teams {
+    position: static;
+    grid-column: 1 / -1;
+  }
+
+  .rp-team-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0 var(--space-4);
+  }
+
+  .rp-team + .rp-team {
+    border-top: 0;
+  }
+}
+
+@media (max-width: 799px) {
+  .rp-page {
+    padding-inline: var(--space-4);
+  }
+
+  .rp-head-actions {
+    display: none;
+  }
+
+  .rp-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* On a phone the moment leads; the playlist and the teams follow it. */
+  .rp-stage {
+    order: -1;
+  }
+
+  .rp-lots {
+    position: static;
+  }
+
+  .rp-lot-list {
+    max-height: 18rem;
+  }
+
+  .rp-moment-top {
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: center;
+  }
+
+  .rp-moment-top .lot-card-name {
+    font-size: var(--text-lg-size);
+  }
+
+  .rp-price .owner-price {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .rp-price .owner-price-amount {
+    font-size: 30px;
+  }
+
+  .rp-transport {
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-4);
+  }
+
+  .rp-controls {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .rp-controls {
+    flex-wrap: nowrap;
+  }
+
+  .rp-btn--edge,
+  .rp-speed,
+  .rp-now-pos {
+    display: none;
+  }
+
+  .rp-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .rp-btn--play {
+    width: 46px;
+    height: 46px;
+  }
+
+  .rp-now-title {
+    font-size: var(--text-sm-size);
+  }
+}
