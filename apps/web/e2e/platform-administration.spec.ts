@@ -142,6 +142,12 @@ test("founder demo: sign in → platform health → find an org → inspect → 
   await expect(page.getByTestId("admin-queues")).toBeVisible();
   // The seed declares a finops profile for the demo org, so its health is here.
   const orgHealth = page.getByTestId("admin-health-demo-club");
+  // A club with nothing wrong sits in the folded "all clear" list; one with a
+  // failure to recover is listed first, open. Either way it is one press away.
+  await expect(orgHealth).toHaveCount(1);
+  if (!(await orgHealth.isVisible())) {
+    await page.getByTestId("admin-health-clear").locator("summary").click();
+  }
   await expect(orgHealth).toBeVisible();
   await expect(orgHealth.getByText("Settlement ingest")).toBeVisible();
   await expect(orgHealth.getByText("Dispatch channels")).toBeVisible();
