@@ -110,7 +110,7 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   // Publishing is confirmed (DA-12): the readiness check passed, so the dialog
   // is the only thing between the organizer and the public internet.
   await page.getByTestId("confirm-publish").click();
-  await expect(page.getByTestId("visibility-row")).toContainText("LIVE");
+  await expect(page.getByTestId("visibility-row")).toContainText("Live");
 
   // A second, never-published draft competition stays structurally absent.
   await page.goto("/seasons");

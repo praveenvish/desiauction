@@ -7,7 +7,6 @@ import {
   IconPencil,
   IconUpload,
   PlayerImage,
-  SectionCard,
   imageFileProblem,
   useToast,
   VisuallyHidden,
@@ -115,12 +114,69 @@ export function SeasonImageCard({
   const title = cover ? "Cover photo" : "Tournament logo";
   const noun = cover ? "cover photo" : "logo";
 
+  // A ROW, not a card (2026-09-27): the logo and the cover were two half-page
+  // cards of explanation. On the overview they are two lines of "How the season
+  // looks" — each says whether it is set and offers the one act.
   return (
-    <SectionCard
-      title={title}
-      className="ov-image-card"
+    <li
+      className="ov-look"
+      data-set={shown !== null ? "" : undefined}
       data-testid={cover ? "season-cover" : "season-branding"}
-      action={
+    >
+      {cover ? (
+        <span
+          className="ov-look-thumb ov-cover-frame"
+          data-empty={shown === null ? "true" : undefined}
+        >
+          {shown !== null ? (
+            <img src={shown} alt="" width={72} height={24} decoding="async" loading="lazy" />
+          ) : (
+            <IconImage size={18} />
+          )}
+        </span>
+      ) : (
+        <span className="ov-look-thumb ov-logo-frame">
+          <PlayerImage
+            name={competitionName}
+            seed={competitionId}
+            size="sm"
+            decorative
+            {...(shown !== null ? { src: shown } : {})}
+          />
+        </span>
+      )}
+      <span className="ov-look-text">
+        <strong>{title}</strong>
+        {error !== null ? (
+          <span id={errorId} role="alert" className="ov-image-error">
+            {error}
+          </span>
+        ) : (
+          <span>
+            {shown !== null
+              ? cover
+                ? "Set — it sits behind the season’s banner."
+                : "Set — shown on the public page and the directory."
+              : cover
+                ? "Not set — the banner keeps its floodlight gradient. About 1600 × 500."
+                : "Not set — players see the season’s initials."}
+          </span>
+        )}
+      </span>
+      <span className="ov-look-actions">
+        {currentUrl !== null ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={busy === "remove"}
+            disabled={busy !== null}
+            data-testid={cover ? "season-cover-remove" : "season-logo-remove"}
+            onClick={() => void remove()}
+          >
+            Remove
+            <VisuallyHidden> {noun}</VisuallyHidden>
+          </Button>
+        ) : null}
         <Button
           variant="secondary"
           size="sm"
@@ -131,63 +187,10 @@ export function SeasonImageCard({
           onClick={() => inputRef.current?.click()}
         >
           {shown !== null ? <IconPencil size={16} /> : <IconUpload size={16} />}
-          {shown !== null ? "Edit" : "Upload"}
+          {shown !== null ? "Change" : "Upload"}
           <VisuallyHidden> {noun}</VisuallyHidden>
         </Button>
-      }
-    >
-      <div className="ov-image" data-shape={cover ? "wide" : "square"}>
-        {cover ? (
-          <span className="ov-cover-frame" data-empty={shown === null ? "true" : undefined}>
-            {shown !== null ? (
-              // Shown as the hero will crop it: object-fit cover, wide. The
-              // intrinsic size is the frame's own 16:5 at its 208px width.
-              <img src={shown} alt="" width={208} height={65} decoding="async" loading="lazy" />
-            ) : (
-              <IconImage size={28} />
-            )}
-          </span>
-        ) : (
-          <span className="ov-logo-frame">
-            <PlayerImage
-              name={competitionName}
-              seed={competitionId}
-              size="xl"
-              decorative
-              {...(shown !== null ? { src: shown } : {})}
-            />
-          </span>
-        )}
-        <div className="ov-image-text">
-          <p>
-            {cover
-              ? "The wide picture behind this season’s banner — your ground, last year’s final. Without one, the banner keeps its floodlight gradient."
-              : "Shown beside this season on the public directory and on its public page. Without one, players see the season’s initials."}
-          </p>
-          {error !== null ? (
-            <p id={errorId} role="alert" className="ov-image-error">
-              {error}
-            </p>
-          ) : (
-            <p className="ov-image-hint">
-              {cover ? "About 1600 × 500 · " : ""}JPEG, PNG or WebP · up to 5 MB
-            </p>
-          )}
-          {currentUrl !== null ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ov-image-remove"
-              loading={busy === "remove"}
-              disabled={busy !== null}
-              data-testid={cover ? "season-cover-remove" : "season-logo-remove"}
-              onClick={() => void remove()}
-            >
-              Remove {noun}
-            </Button>
-          ) : null}
-        </div>
-      </div>
+      </span>
       {/* The visible button proxies the click, so this input is mechanism, not
           a control: out of the tab order and the accessibility tree together. */}
       <input
@@ -205,6 +208,6 @@ export function SeasonImageCard({
           event.target.value = "";
         }}
       />
-    </SectionCard>
+    </li>
   );
 }

@@ -13,14 +13,11 @@ import {
   IconBat,
   IconCalendar,
   IconCheckCircle,
-  IconClock,
   IconCopy,
-  IconExternal,
   IconEye,
   IconEyeOff,
   IconGlobe,
   IconInfo,
-  IconLayers,
   IconLock,
   IconPin,
   IconRefresh,
@@ -30,7 +27,6 @@ import {
   IconTrophy,
   IconUser,
   IconUsers,
-  IconWallet,
   type JourneyStep,
   JourneyStepper,
   type KitTone,
@@ -38,8 +34,6 @@ import {
   Pill,
   SectionCard,
   Select,
-  StatCard,
-  StatGrid,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -341,14 +335,81 @@ function shareLabel(part: number, pct: number): string {
   return part > 0 && pct === 0 ? "<1%" : `${String(pct)}%`;
 }
 
+/** The next step's band inside the hero: what, why, and the buttons. */
+function NextBand({
+  testId,
+  title,
+  body,
+  link,
+  actions,
+}: {
+  testId: string;
+  title: ReactNode;
+  body?: ReactNode;
+  link?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="ov-next" data-testid={testId}>
+      <div className="ov-next-text">
+        <p className="ov-next-title">{title}</p>
+        {body !== undefined && body !== null ? <p className="ov-next-body">{body}</p> : null}
+        {link ?? null}
+      </div>
+      {actions !== undefined && actions !== null ? (
+        <div className="ov-next-actions">{actions}</div>
+      ) : null}
+    </div>
+  );
+}
+
+/** One figure in the strip under the hero. */
+function Figure({
+  value,
+  label,
+  hint,
+  href,
+  tone,
+  testId,
+}: {
+  value: ReactNode;
+  label: string;
+  hint?: string;
+  href?: string | undefined;
+  tone?: "warm";
+  testId: string;
+}) {
+  const body = (
+    <>
+      <span className="ov-figure-value">{value}</span>
+      <span className="ov-figure-label">{label}</span>
+      {hint !== undefined ? <span className="ov-figure-hint">{hint}</span> : null}
+    </>
+  );
+  return (
+    <li className="ov-figure" data-tone={tone} data-testid={testId}>
+      {href !== undefined ? (
+        <Link href={href} className="ov-figure-link">
+          {body}
+        </Link>
+      ) : (
+        <span className="ov-figure-body">{body}</span>
+      )}
+    </li>
+  );
+}
+
 export function OverviewPanel({
   view,
   slug,
   pass,
+  now,
   mineTeamIds = [],
 }: {
   view: SeasonOverviewView;
   slug: string;
+  /** What is happening now (the matches and the table), drawn by the page. */
+  now?: ReactNode;
   /** Teams the viewer owns in this season — marked "Your team" in the list. */
   mineTeamIds?: readonly string[];
   /** The season pass card, laid into the page's last row. */
@@ -405,14 +466,6 @@ export function OverviewPanel({
   const canPublish = view.publishBlockers.length === 0;
   const isPublic = view.competition.visibility === "public";
   const previewable = isPublic || status === "registration_open";
-  // ONE gold action per screen: the next step when there is one; otherwise the
-  // public page's own (the mockup's "View public page"), or "Run it again" on a
-  // finished season.
-  const nextIsPrimary =
-    view.viewer.canManage &&
-    !finished &&
-    (step !== null || (status === "registration_closed" && !locked));
-  const publicIsPrimary = !nextIsPrimary && !finished;
 
   useEffect(() => {
     const pendingFocus = pendingFocusRef.current;
@@ -552,58 +605,69 @@ export function OverviewPanel({
     view.viewer.canManage && (view.auctionStatus === null || view.auctionStatus === "scheduled") ? (
       <Link
         href={`/seasons/${slug}/readiness`}
-        className={buttonClassName({ variant: "secondary" })}
+        className="ov-next-link"
         data-testid="open-readiness"
       >
-        Review readiness
+        Check readiness
+        <IconArrowRight size={14} aria-hidden />
       </Link>
     ) : null;
+  const glass = buttonClassName({ variant: "secondary" }, "ov-hero-btn");
 
   let nextNotice: ReactNode = null;
   if (view.viewer.canManage && !finished) {
     if (step !== null) {
       const copy = NEXT_COPY[status];
+      // While registration is open with people waiting, reviewing them IS the
+      // next step; closing registration is the gate after it, so it steps back.
+      const reviewFirst = status === "registration_open" && view.pendingPlayers > 0;
       nextNotice = (
-        <Notice
-          /* Gold, the product's "your move" colour: this was the last
-             info-blue surface in the console (round 4 review). */
-          tone="warning"
-          icon={<IconInfo size={20} />}
+        <NextBand
+          testId="next-step"
           title={
-            status === "registration_open" && view.pendingPlayers > 0
-              ? `Registration is open — ${String(view.pendingPlayers)} waiting for your review.`
-              : copy?.title
+            reviewFirst
+              ? `${String(view.pendingPlayers)} ${view.pendingPlayers === 1 ? "player is" : "players are"} waiting for your review`
+              : (copy?.title ?? "")
           }
-          action={
+          body={copy?.body}
+          link={readinessLink}
+          actions={
             <>
-              {readinessLink}
               <Button
                 ref={advanceRef}
                 onClick={() => void advance()}
                 loading={busy}
                 data-testid="advance-status"
+                variant={reviewFirst ? "secondary" : "primary"}
+                {...(reviewFirst ? { className: "ov-hero-btn", "data-tone": "glass" } : {})}
               >
                 {step.label}
-                <IconArrowRight size={16} />
+                {reviewFirst ? null : <IconArrowRight size={16} />}
               </Button>
+              {reviewFirst ? (
+                <Link
+                  href={`/seasons/${slug}/registrations`}
+                  className={buttonClassName({ variant: "primary" })}
+                  data-testid="next-review"
+                >
+                  Review {view.pendingPlayers}{" "}
+                  {view.pendingPlayers === 1 ? "registration" : "registrations"}
+                  <IconArrowRight size={16} />
+                </Link>
+              ) : null}
             </>
           }
-          testId="next-step"
-        >
-          {copy?.body}
-        </Notice>
+        />
       );
     } else if (status === "registration_closed" && !locked) {
       nextNotice = (
-        <Notice
-          /* Gold, the product's "your move" colour: this was the last
-             info-blue surface in the console (round 4 review). */
-          tone="warning"
-          icon={<IconInfo size={20} />}
+        <NextBand
+          testId="next-step"
           title={onward.title}
-          action={
+          body={onward.body}
+          link={readinessLink}
+          actions={
             <>
-              {readinessLink}
               {/* "Run it again" belongs to a season that is actually over (the
                   Retrospective); offering it mid-season beside the real next
                   step made starting afresh look like the thing to do. */}
@@ -611,7 +675,8 @@ export function OverviewPanel({
                 <Link
                   key={door.href}
                   href={door.href}
-                  className={buttonClassName({ variant: "secondary" })}
+                  className={glass}
+                  data-tone="glass"
                   data-testid={door.testId}
                 >
                   {door.label}
@@ -627,24 +692,18 @@ export function OverviewPanel({
               </Link>
             </>
           }
-          testId="next-step"
-        >
-          {onward.body}
-        </Notice>
+        />
       );
     } else if (status === "registration_closed" && locked) {
       nextNotice = (
-        <Notice
-          tone="warning"
-          icon={<IconInfo size={20} />}
+        <NextBand
+          testId="settlement-locked"
           title={`The auction is done. Settling it needs money authority for ${
             view.orgName === "" ? "this club" : view.orgName
           } — a separate grant from running the season.`}
-          action={runAgainButton(false)}
-          testId="settlement-locked"
-        >
-          Ask an owner of the club to give you one under Money &amp; roles.
-        </Notice>
+          body="Ask an owner of the club to give you one under Money & roles."
+          actions={runAgainButton(false)}
+        />
       );
     }
   }
@@ -726,14 +785,19 @@ export function OverviewPanel({
                   Season details
                 </Button>
               ) : null}
-              <Link
-                href={secondary.href}
-                className={buttonClassName({ variant: "secondary" }, "ov-hero-btn")}
-                data-tone="glass"
-                data-testid="season-secondary"
-              >
-                {secondary.label}
-              </Link>
+              {/* The band below the road carries the next step; this door is for
+                  whoever gets no band (a team owner, a finished season), so the
+                  page never offers the same move twice. */}
+              {nextNotice === null || finished ? (
+                <Link
+                  href={secondary.href}
+                  className={buttonClassName({ variant: "secondary" }, "ov-hero-btn")}
+                  data-tone="glass"
+                  data-testid="season-secondary"
+                >
+                  {secondary.label}
+                </Link>
+              ) : null}
               {view.auctionLive ? (
                 <Link
                   href={`/seasons/${slug}/auction/live`}
@@ -760,6 +824,10 @@ export function OverviewPanel({
                 </p>
               </VisuallyHidden>
               <JourneyStepper variant="rail" steps={journey} linkComponent={Link} />
+              {/* THE ONE NEXT STEP, inside the hero (2026-09-27). It was a gold
+                  banner under the hero repeating the hero's own button, above a
+                  stat tile saying it a third time. */}
+              {finished ? null : nextNotice}
             </div>
           }
         />
@@ -768,9 +836,7 @@ export function OverviewPanel({
       <div className="ov-journey" data-testid="lifecycle-panel">
         {finished ? (
           <Retrospective view={view} slug={slug} runAgain={runAgainButton(true)} />
-        ) : (
-          nextNotice
-        )}
+        ) : null}
         {blocked && missing.length > 0 ? (
           <Notice
             tone="danger"
@@ -794,46 +860,35 @@ export function OverviewPanel({
         ) : null}
       </div>
 
-      <StatGrid testId="season-figures">
-        <StatCard
-          icon={<IconUser />}
-          concept="players"
-          rolling
+      {/* The figures, one strip (they were four tiles the height of a card).
+          Before an auction there is no purse and no lot, so those two wait. */}
+      <ul className="ov-figures" data-testid="season-figures">
+        <Figure
           value={view.approvedPlayers}
-          label="Approved players"
-          {...(approvedHint !== undefined
-            ? { hint: approvedHint, href: `/seasons/${slug}/registrations` }
-            : {})}
-          linkComponent={Link}
+          label={view.approvedPlayers === 1 ? "approved player" : "approved players"}
+          {...(approvedHint !== undefined ? { hint: approvedHint } : {})}
+          href={view.viewer.canReview ? `/seasons/${slug}/registrations` : undefined}
           testId="overview-approved"
         />
         {view.auctionStatus === null && view.pendingPlayers > 0 ? (
-          <StatCard
-            icon={<IconClock />}
-            concept="alert"
-            rolling
+          <Figure
             value={view.pendingPlayers}
-            label="Awaiting your review"
+            label="waiting for your review"
+            tone="warm"
             href={`/seasons/${slug}/registrations`}
-            linkComponent={Link}
             testId="pending-tile"
           />
         ) : null}
-        <StatCard
-          icon={<IconUsers />}
-          concept="teams"
-          rolling
+        <Figure
           value={view.teamCount}
-          label={view.teamCount === 1 ? "Team" : "Teams"}
+          label={view.teamCount === 1 ? "team" : "teams"}
+          href={`/seasons/${slug}/teams`}
           testId="overview-teams"
         />
         {view.auctionStatus !== null && view.purseCommitted !== undefined ? (
-          <StatCard
-            icon={<IconWallet />}
-            concept="money"
-            rolling
+          <Figure
             value={points ? money.exact(view.purseCommitted) : money.compact(view.purseCommitted)}
-            label="Purse committed"
+            label="purse committed"
             {...(view.pursePct !== undefined && view.pursePct !== null
               ? { hint: `${shareLabel(view.purseCommitted, view.pursePct)} of the total purse` }
               : {})}
@@ -841,22 +896,16 @@ export function OverviewPanel({
           />
         ) : null}
         {view.auctionStatus !== null ? (
-          <StatCard
-            icon={<IconLayers />}
-            concept="auction"
-            value={
-              <>
-                {view.lotsSold}
-                <span className="ov-stat-of">/{view.lotsTotal}</span>
-              </>
-            }
-            label="Lots sold"
+          <Figure
+            value={`${String(view.lotsSold)}/${String(view.lotsTotal)}`}
+            label="lots sold"
             hint={`${String(lotsPct)}% of the pool`}
-            progress={lotsPct}
             testId="overview-lots"
           />
         ) : null}
-      </StatGrid>
+      </ul>
+
+      {now}
 
       <div className="ov-grid">
         <CardGrid>
@@ -1012,11 +1061,31 @@ export function OverviewPanel({
         </CardGrid>
       </div>
 
-      <div className="ov-grid">
-        <CardGrid>
-          {/* The season's own mark. It sits beside the public page because this
-            is the mark that page puts on the internet. */}
-          {view.viewer.canManage ? (
+      {/* A reader who cannot run the season (a team owner, a member) is not
+          told about publishing, copy-links and listing state — that is the
+          organizer's control panel. They get the one useful thing in it: the
+          door to the public page, when there is one. */}
+      {!view.viewer.canManage && isPublic && view.platformHold === null ? (
+        <p className="ov-public-strip" data-testid="visibility-row">
+          <IconGlobe size={20} aria-hidden />
+          <span>
+            <strong>The season&apos;s public page is live.</strong> Anyone with the link can follow
+            the squads and results.
+          </span>
+          <Link href={`/c/${slug}`} data-testid="open-public-page">
+            View public page
+            <IconArrowRight size={16} />
+          </Link>
+        </p>
+      ) : null}
+
+      {/* HOW THE SEASON LOOKS (2026-09-27): the logo, the cover and the public
+          page were three half-page cards of explanation and the pass a fourth —
+          the whole bottom half of the overview was setup chores. Now each is one
+          row that says whether it is done, with the one act beside it. */}
+      {view.viewer.canManage ? (
+        <SectionCard title="How the season looks" className="ov-looks-card" flush>
+          <ul className="ov-looks">
             <SeasonImageCard
               slug={slug}
               competitionId={view.competition.id}
@@ -1024,80 +1093,46 @@ export function OverviewPanel({
               slot="logo"
               currentUrl={view.logoUrl}
             />
-          ) : null}
-
-          {/* A reader who cannot run the season (a team owner, a member) is not
-              told about publishing, copy-links and listing state — that card
-              is the organizer's control panel. They get the one useful thing
-              in it: the door to the public page, when there is one. */}
-          {!view.viewer.canManage && isPublic && view.platformHold === null ? (
-            /* One slim row across the grid, not a half-width card holding a
-               single button under Teams (wow pass, round 2). */
-            <p className="ov-public-strip" data-testid="visibility-row">
-              <IconGlobe size={20} aria-hidden />
-              <span>
-                <strong>The season&apos;s public page is live.</strong> Anyone with the link can
-                follow the squads and results.
-              </span>
-              <Link href={`/c/${slug}`} data-testid="open-public-page">
-                View public page
-                <IconArrowRight size={16} />
-              </Link>
-            </p>
-          ) : null}
-
-          {/* DA-12: publishing has a block of its own, not a ghost button in the
-            footer of a card about something else. */}
-          {view.viewer.canManage ? (
-            <SectionCard
-              title="Public page"
+            <SeasonImageCard
+              slug={slug}
+              competitionId={view.competition.id}
+              competitionName={view.competition.name}
+              slot="cover"
+              currentUrl={view.coverUrl}
+            />
+            <li
+              className="ov-look"
+              data-set={isPublic ? "" : undefined}
               data-testid="visibility-row"
-              action={
-                view.platformHold !== null ? (
-                  <Pill tone="red" testId="platform-hold-badge">
-                    Taken down
-                  </Pill>
-                ) : (
-                  <Pill tone={isPublic ? "green" : "neutral"} dot={isPublic}>
-                    {isPublic ? "LIVE" : "Not listed"}
-                  </Pill>
-                )
-              }
             >
-              <div className="ov-public">
-                {previewable && view.platformHold === null ? (
-                  <div className="ov-url-row">
-                    <span className="ov-url">
+              <span className="ov-look-thumb" aria-hidden>
+                <IconGlobe size={18} />
+              </span>
+              <span className="ov-look-text">
+                <strong>
+                  Public page{" "}
+                  {view.platformHold !== null ? (
+                    <Pill tone="red" testId="platform-hold-badge">
+                      Taken down
+                    </Pill>
+                  ) : (
+                    <Pill tone={isPublic ? "green" : "neutral"} dot={isPublic}>
+                      {isPublic ? "Live" : "Not listed"}
+                    </Pill>
+                  )}
+                </strong>
+                <span>
+                  {view.platformHold !== null ? (
+                    "DesiAuction has taken this season’s public page down. Your season, registrations and auction are untouched — only the public page is gone."
+                  ) : (
+                    <>
                       <span className="ov-url-text">/c/{slug}</span>
-                      {isPublic ? (
-                        <button
-                          type="button"
-                          className="ov-icon-btn"
-                          aria-label="Copy the public page link"
-                          onClick={() => void copyPublicLink()}
-                        >
-                          <IconCopy size={18} />
-                        </button>
-                      ) : null}
-                    </span>
-                    <a
-                      className="ov-icon-btn ov-icon-btn-boxed"
-                      href={`/c/${slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="Open the public page in a new tab"
-                    >
-                      <IconExternal size={18} />
-                    </a>
-                  </div>
-                ) : null}
-                <p className="ov-muted">
-                  {view.platformHold !== null
-                    ? "DesiAuction has taken this season’s public page down. Your season, registrations and auction are untouched — only the public page is gone."
-                    : isPublic
-                      ? "This season is listed publicly — anyone can see it and share it."
-                      : "Publishing puts this season on the public directory, where players and spectators can find it."}
-                </p>
+                      {isPublic
+                        ? " · listed publicly — anyone can see it and share it."
+                        : " · publishing puts it on the directory for players and spectators."}
+                    </>
+                  )}
+                </span>
                 {!canPublish && !isPublic ? (
                   <ul className="season-blockers" data-testid="publish-blockers">
                     {view.publishBlockers.map((blocker) => (
@@ -1119,56 +1154,51 @@ export function OverviewPanel({
                     ))}
                   </ul>
                 ) : null}
-                <div className="ov-public-actions">
-                  {previewable ? (
-                    <Link
-                      className={buttonClassName({
-                        variant: publicIsPrimary && isPublic ? "primary" : "secondary",
-                      })}
-                      href={`/c/${slug}`}
-                      data-testid="open-public-page"
-                    >
-                      {isPublic ? "View public page" : "Preview the public page"}
-                      <IconArrowRight size={16} />
-                    </Link>
-                  ) : null}
-                  <Button
-                    ref={publishRef}
-                    variant={!isPublic && publicIsPrimary ? "primary" : "secondary"}
-                    loading={busy}
-                    disabled={!canPublish && !isPublic}
-                    data-testid="toggle-visibility"
-                    onClick={() => {
-                      if (isPublic) {
-                        void setVisibility("private");
-                      } else {
-                        setPublishOpen(true);
-                      }
-                    }}
+              </span>
+              <span className="ov-look-actions">
+                {isPublic && view.platformHold === null ? (
+                  <button
+                    type="button"
+                    className="ov-icon-btn"
+                    aria-label="Copy the public page link"
+                    onClick={() => void copyPublicLink()}
                   >
-                    {isPublic ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                    {isPublic ? "Unpublish" : "Publish"}
-                  </Button>
-                </div>
-              </div>
-            </SectionCard>
-          ) : null}
-
-          {/* One grid for the season's public face, so a reader who cannot
-              manage the season sees the public page and the pass side by side
-              rather than two half-empty rows. */}
-          {view.viewer.canManage ? (
-            <SeasonImageCard
-              slug={slug}
-              competitionId={view.competition.id}
-              competitionName={view.competition.name}
-              slot="cover"
-              currentUrl={view.coverUrl}
-            />
-          ) : null}
+                    <IconCopy size={18} />
+                  </button>
+                ) : null}
+                {previewable && view.platformHold === null ? (
+                  <Link
+                    className={buttonClassName({ variant: "ghost", size: "sm" })}
+                    href={`/c/${slug}`}
+                    data-testid="open-public-page"
+                  >
+                    {isPublic ? "View" : "Preview"}
+                  </Link>
+                ) : null}
+                <Button
+                  ref={publishRef}
+                  size="sm"
+                  variant={isPublic ? "ghost" : "secondary"}
+                  loading={busy}
+                  disabled={!canPublish && !isPublic}
+                  data-testid="toggle-visibility"
+                  onClick={() => {
+                    if (isPublic) {
+                      void setVisibility("private");
+                    } else {
+                      setPublishOpen(true);
+                    }
+                  }}
+                >
+                  {isPublic ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  {isPublic ? "Unpublish" : "Publish"}
+                </Button>
+              </span>
+            </li>
+          </ul>
           {pass}
-        </CardGrid>
-      </div>
+        </SectionCard>
+      ) : null}
 
       <Dialog
         open={publishOpen}
