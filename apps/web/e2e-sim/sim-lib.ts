@@ -42,15 +42,11 @@ export async function shot(page: Page, name: string): Promise<void> {
 }
 
 export async function otpLogin(page: Page, phone: string, name: string): Promise<void> {
-  await page.goto("/login");
-  // Email-first login may be the default; switch to the phone door if shown.
+  // The phone door by address: email is the default door, and the switch to
+  // mobile is a link whose wording has changed before (a role/name lookup
+  // broke the harness silently when it became a link).
+  await page.goto("/login?method=phone");
   const phoneField = page.getByLabel("Mobile number");
-  if (!(await phoneField.isVisible().catch(() => false))) {
-    await page
-      .getByRole("button", { name: /phone|mobile/i })
-      .first()
-      .click();
-  }
   await phoneField.fill(phone);
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", COLD);
