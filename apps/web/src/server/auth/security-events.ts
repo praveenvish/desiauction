@@ -4,7 +4,7 @@ import { cache } from "react";
 
 import { dbHandle } from "../db";
 import { hiddenInboxActions } from "../messaging/gate";
-import { inboxExclusions } from "./inbox-filter";
+import { LEDGER_ONLY_ACTIONS, inboxExclusions } from "./inbox-filter";
 
 // Security events ride the append-only audit substrate (IP-2_DESIGN D8) with
 // person scope — one ledger, one query surface, no parallel event store.
@@ -123,7 +123,10 @@ export async function listSecurityEvents(
     db
       .select({ action: auditLog.action, at: auditLog.at, meta: auditLog.meta })
       .from(auditLog)
-      .where(eq(auditLog.scopeId, personId))
+      // The upload quota ledger is a counter, not security activity.
+      .where(
+        and(eq(auditLog.scopeId, personId), notInArray(auditLog.action, [...LEDGER_ONLY_ACTIONS])),
+      )
       .orderBy(desc(auditLog.at))
       .limit(limit)
       .offset(offset),
@@ -162,7 +165,9 @@ export async function countSecurityEvents(personId: string): Promise<number> {
     db
       .select({ total: sql<number>`count(*)::int` })
       .from(auditLog)
-      .where(eq(auditLog.scopeId, personId)),
+      .where(
+        and(eq(auditLog.scopeId, personId), notInArray(auditLog.action, [...LEDGER_ONLY_ACTIONS])),
+      ),
   );
   return rows[0]?.total ?? 0;
 }

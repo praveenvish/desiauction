@@ -27,8 +27,23 @@ export const ACCOUNT_ONLY_ACTIONS = [
   "auth.logout",
 ] as const;
 
-/** The actions an inbox read leaves out: the routine ones above, plus whatever
- *  this person switched off for the app. */
+/**
+ * LEDGER ROWS THAT ARE NOT EVENTS AT ALL (2026-09-27).
+ *
+ * The photo-upload rate limiter (`server/media/presign-quota.ts`) counts its
+ * quota by writing one audit row per upload, scoped to the uploader — the same
+ * log and the same scope the inbox reads. With no label, every organizer who
+ * uploaded photos was told `media.upload_requested` in raw monospace, once per
+ * photo (up to 300 an hour on a bulk import), and the bell lit for each. These
+ * are a counter, not news and not security activity: neither page shows them.
+ */
+export const LEDGER_ONLY_ACTIONS = [
+  "media.upload_requested",
+  "media.own_upload_requested",
+] as const;
+
+/** The actions an inbox read leaves out: the routine ones above, the quota
+ *  ledger, plus whatever this person switched off for the app. */
 export function inboxExclusions(hidden: readonly string[]): string[] {
-  return [...new Set<string>([...ACCOUNT_ONLY_ACTIONS, ...hidden])];
+  return [...new Set<string>([...ACCOUNT_ONLY_ACTIONS, ...LEDGER_ONLY_ACTIONS, ...hidden])];
 }
