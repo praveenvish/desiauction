@@ -61,10 +61,18 @@ export function LotQueueList({
         data-folded={folded ? "true" : "false"}
         data-tone={tone}
         onFocus={(event) => {
-          // Keyboard focus on a folded row unfolds the list first.
-          const row = (event.target as HTMLElement).closest("li");
+          // KEYBOARD focus on a folded row unfolds the list first. Only the
+          // keyboard's (`:focus-visible`): a pointer press focuses the button
+          // too, and unfolding between its mousedown and mouseup moved the row
+          // out from under the pointer and swallowed the click (sim-2 caught
+          // it on a sixth "Requeue").
+          const target = event.target as HTMLElement;
+          if (!folded || !target.matches(":focus-visible")) {
+            return;
+          }
+          const row = target.closest("li");
           const index = row === null ? -1 : Number(row.dataset["index"] ?? -1);
-          if (folded && index >= QUEUE_FOLD) {
+          if (index >= QUEUE_FOLD) {
             setExpanded(true);
           }
         }}
