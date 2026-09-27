@@ -653,6 +653,12 @@ export interface RegistrationStats {
    * read back as free.
    */
   feeCollectedPaise: number;
+  /**
+   * The auction pool by playing role, largest first — the same rows
+   * `auctionPool` counts, so the bar and the figure always add up. The role is
+   * the pack's key (null when a player gave none).
+   */
+  poolByRole: { role: string | null; count: number }[];
 }
 
 export async function registrationStats(db: Db, competitionId: string): Promise<RegistrationStats> {
@@ -662,6 +668,7 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
+      role: registrations.role,
       hasTeam: sql<boolean>`${registrations.teamId} is not null`,
       feeStatus: registrations.feeStatus,
       /*
@@ -685,6 +692,7 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
       registrations.isCaptain,
       registrations.isRetained,
       registrations.feeStatus,
+      registrations.role,
       sql`${registrations.teamId} is not null`,
     );
   const stats: RegistrationStats = {
@@ -703,7 +711,9 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     retainedWithoutTeam: 0,
     fees: { pending: 0, paid: 0, waived: 0, refunded: 0 },
     feeCollectedPaise: 0,
+    poolByRole: [],
   };
+  const pool = new Map<string | null, number>();
   for (const row of rows) {
     // Registrations are created in "submitted"; "draft" is a machine-only state
     // that is never persisted here, so it is not a counted bucket.
@@ -741,9 +751,13 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
         }
       } else {
         stats.auctionPool += row.count;
+        pool.set(row.role, (pool.get(row.role) ?? 0) + row.count);
       }
     }
   }
+  stats.poolByRole = [...pool.entries()]
+    .map(([role, count]) => ({ role, count }))
+    .sort((a, b) => b.count - a.count);
   return stats;
 }
 
