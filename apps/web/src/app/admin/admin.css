@@ -851,24 +851,6 @@ p.admin-warning {
   font-size: var(--text-sm-size);
 }
 
-/* The watch's figures are times and ranges — words, sized to fit a phone.
-   (The kit's figure is the first line of the card's text column.) */
-.admin-vitals [data-tone] > span:last-child > span:first-child {
-  font-size: var(--text-md-size);
-  line-height: 1.3;
-  white-space: normal;
-}
-
-.admin-watch-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.admin-watch-body p {
-  margin: 0;
-}
-
 /* A link inside a sentence (a card's description, a desk row's facts). */
 .admin-inline-link {
   color: var(--text-accent);
@@ -2114,27 +2096,6 @@ a.admin-quiet-link:hover {
   color: var(--text-muted);
 }
 
-/* ---- The bid tape: one line a bid; an outbid bid steps back ---- */
-
-.admin-tape tbody tr[data-outbid] td {
-  color: var(--text-muted);
-}
-
-.admin-tape tbody tr[data-outbid] .admin-name {
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
-.admin-tape tbody tr[data-outbid] td.admin-num {
-  text-decoration: line-through;
-  text-decoration-color: var(--border-strong);
-}
-
-/* The watch's figures are times and ranges; keep each on one line. */
-.admin-vitals [data-tone] > span:last-child > span:first-child {
-  white-space: nowrap;
-}
-
 /* ---- A person's profile card (user detail) ---- */
 
 .admin-profile {
@@ -2730,74 +2691,12 @@ a.admin-quiet-link:hover {
   flex: 1 1 18rem;
 }
 
-/* The watch page's progress and burndown, framed like the cards around them. */
-.admin-watch-progress {
-  overflow: hidden;
-  padding: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-}
-
-.admin-watch-progress > *,
-.admin-watch-progress .auc-split > * {
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-/* The one unpadded card in the product (round 3): the two panels inside sat
-   flush to the frame. They take the console's card inset, and the burndown is
-   parted from progress by a hairline rather than by a second frame. */
-/* Specific enough to beat the console surface's card rule, which trims a
-   card's inline padding (that trim is what left this block flush). */
-[data-surface="console"] .dash-stack.admin-stack .admin-watch-progress > [data-testid],
-[data-surface="console"] .dash-stack.admin-stack .admin-watch-progress .auc-split > [data-testid] {
-  padding: var(--space-5) var(--space-6);
-}
-
-.admin-watch-progress .auc-split {
-  border-top: 1px solid var(--border-subtle);
-}
-
-@media (max-width: 640px) {
-  [data-surface="console"] .dash-stack.admin-stack .admin-watch-progress > [data-testid],
-  [data-surface="console"]
-    .dash-stack.admin-stack
-    .admin-watch-progress
-    .auc-split
-    > [data-testid] {
-    padding: var(--space-4);
-  }
-}
-
 .admin-bad {
   color: var(--danger-strong);
 }
 
 .admin-slim.is-info > svg {
   color: var(--text-muted);
-}
-
-/* Lots on a phone: "Name · Role" and the price on line 1, "L001 Sold P02"
-   on line 2 — no label before every value. */
-@media (max-width: 719px) {
-  .admin-lots td::before {
-    display: none;
-  }
-
-  .admin-lots .admin-cell-main {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .admin-lots td.is-side {
-    color: var(--text-primary);
-    font-weight: var(--font-weight-semibold);
-  }
 }
 
 .admin-room-trouble > [role="note"] {
@@ -2845,32 +2744,6 @@ a.admin-quiet-link:hover {
   }
 }
 
-/* Admin auction lots: the table on a laptop, one ListRow per lot on a phone. */
-.admin-lot-list {
-  display: none;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* The phone list's "Show all" fold goes with it. */
-.admin-lot-list + .admin-more {
-  display: none;
-}
-
-.admin-lot-list > li + li {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.admin-lot-list .da-row {
-  padding-inline: var(--space-4);
-}
-
-.admin-lot-list .da-row-figure {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-}
-
 .admin-lot-state {
   display: inline-flex;
   align-items: center;
@@ -2879,26 +2752,394 @@ a.admin-quiet-link:hover {
   color: var(--text-primary);
 }
 
-@media (max-width: 719px) {
-  .admin-lot-list {
-    display: block;
-  }
-
-  .admin-lot-list + .admin-more {
-    display: block;
-  }
-
-  .admin-lots-wrap {
-    display: none;
-  }
-}
-
 /* An environment variable is pasted into a deploy, not read: copy is one tap. */
 .admin-env-cell {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
+}
+
+/* ---- One auction, watched (redesign 2026-09-27) ---------------------------
+   The result first — in the organizer hub's own recipe, so the two read
+   alike — then the teams, then every lot, and the records folded. */
+
+.admin-watch-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: clamp(var(--space-4), 3vw, var(--space-6));
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 20%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.admin-watch-result-title {
+  margin: 0;
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-watch-result-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-watch-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.admin-watch-bar > span {
+  display: block;
+  height: 100%;
+}
+
+.admin-watch-bar > [data-kind="sold"] {
+  background: var(--state-sold);
+}
+
+.admin-watch-bar > [data-kind="block"] {
+  background: var(--accent);
+}
+
+.admin-watch-bar > [data-kind="queued"] {
+  background: var(--border-strong);
+}
+
+.admin-watch-bar > [data-kind="unsold"] {
+  background: var(--state-unsold);
+}
+
+.admin-watch-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-watch-figures > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-watch-figures dt {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-watch-figures dd {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A name over one quiet line; `is-end` right-aligns it for a figure. */
+.admin-watch-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+}
+
+.admin-watch-who > strong {
+  overflow: hidden;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-watch-who > span {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-watch-who.is-end {
+  align-items: flex-end;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-watch-who.is-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+}
+
+.admin-watch-block {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Bid tape rows (the live card, and the closed night's fold). */
+.admin-watch-tape,
+.admin-watch-teams,
+.admin-watch-lots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-watch-tape > li,
+.admin-watch-teams > li,
+.admin-watch-lots > li {
+  display: grid;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-watch-tape > li {
+  grid-template-columns: 5rem minmax(0, 1fr) auto;
+}
+
+.admin-watch-tape > li[data-outbid] strong,
+.admin-watch-tape > li[data-outbid] .admin-watch-fig {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.admin-watch-when {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-watch-fig {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Teams: paddle, name + bought over a spend bar in the team colour, spent
+   and left, the top buy. */
+.admin-watch-teams > li {
+  grid-template-columns: auto minmax(0, 1fr) 9rem 7.5rem;
+}
+
+.admin-watch-paddle {
+  --team: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--team) 14%, transparent);
+  color: var(--text-heading);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.admin-watch-team {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.admin-watch-spend {
+  --team: var(--accent);
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.admin-watch-spend > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--team);
+}
+
+.admin-watch-top {
+  flex-direction: column-reverse;
+}
+
+/* Lots: number, player and role, the team that bought, the price. */
+.admin-watch-lots > li {
+  grid-template-columns: 3.5rem minmax(0, 1fr) minmax(0, 13rem) 7.5rem;
+  padding-block: var(--space-2);
+}
+
+.admin-watch-lot-no {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+}
+
+.admin-watch-lot-team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-watch-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.admin-watch-phone {
+  display: none;
+}
+
+/* The records, folded: one row each that opens. */
+.admin-watch-folds {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.admin-watch-fold + .admin-watch-fold {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-watch-fold > summary {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 0 var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  list-style: none;
+  cursor: pointer;
+}
+
+.admin-watch-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-watch-fold > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.admin-watch-fold > summary strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.admin-watch-fold-hint {
+  overflow: hidden;
+  text-align: end;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-watch-caret {
+  transition: transform var(--duration-fast) ease;
+}
+
+.admin-watch-fold[open] .admin-watch-caret {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 719px) {
+  .admin-watch-result-title {
+    font-size: var(--text-2xl-size);
+    line-height: var(--text-2xl-line);
+  }
+
+  .admin-watch-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-watch-tape > li,
+  .admin-watch-teams > li,
+  .admin-watch-lots > li {
+    padding-inline: var(--space-4);
+  }
+
+  .admin-watch-tape > li {
+    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  }
+
+  /* The top buy leaves the row; the spend and what is left stay. */
+  .admin-watch-teams > li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .admin-watch-top {
+    display: none;
+  }
+
+  /* One lot = name over "L001 · role · team", the price at the end. */
+  .admin-watch-lots > li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-watch-lot-no,
+  .admin-watch-lot-team {
+    display: none;
+  }
+
+  .admin-watch-phone {
+    display: inline;
+  }
+
+  .admin-watch-fold > summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0 var(--space-4);
+  }
+
+  .admin-watch-fold-hint {
+    display: none;
+  }
 }
 
 /* ---- Health: the verdict first (redesign 2026-09-27) ----------------------
