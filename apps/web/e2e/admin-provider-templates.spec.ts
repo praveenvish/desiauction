@@ -66,6 +66,8 @@ test("an admin maps a WhatsApp template, the grid follows, and clearing goes bac
 
   await otpLogin(page, FOUNDER);
   await page.goto("/admin/notifications");
+  // The template link lives in the message's panel, opened from its row.
+  await page.getByTestId(`notify-kind-${KIND}`).click();
   const cellLine = page.getByTestId(`notify-template-${KIND}-whatsapp`);
   await expect(cellLine).not.toHaveAttribute("data-source", "admin");
 
@@ -98,8 +100,8 @@ test("an admin maps a WhatsApp template, the grid follows, and clearing goes bac
   await expect(page.getByTestId(`tpl-wa-name-${KIND}-source`)).toHaveText("Mapped here");
   await expect(page.getByTestId("tpl-recent")).toContainText(name);
 
-  // The grid now names the mapped template.
-  await page.goto("/admin/notifications");
+  // The message's panel now names the mapped template.
+  await page.goto(`/admin/notifications?kind=${KIND}`);
   await expect(cellLine).toHaveAttribute("data-source", "admin");
   await expect(cellLine).toContainText(name);
 
@@ -109,7 +111,7 @@ test("an admin maps a WhatsApp template, the grid follows, and clearing goes bac
   await expect(page.getByTestId(`tpl-wa-name-${KIND}-source`)).not.toHaveText("Mapped here");
   await expect(page.getByTestId(`tpl-clear-whatsapp-${KIND}`)).toHaveCount(0);
 
-  await page.goto("/admin/notifications");
+  await page.goto(`/admin/notifications?kind=${KIND}`);
   await expect(cellLine).not.toHaveAttribute("data-source", "admin");
   await expect(cellLine).not.toContainText(name);
 });

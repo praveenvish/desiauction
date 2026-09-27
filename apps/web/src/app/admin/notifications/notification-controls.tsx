@@ -1,6 +1,15 @@
 "use client";
 
-import { Button, Dialog, Field, IconAlert, Notice, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Dialog,
+  Field,
+  IconKebab,
+  IconShieldCheck,
+  Notice,
+  PopoverMenu,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -69,12 +78,18 @@ function useIntended(server: boolean) {
 
 /**
  * One kind on one channel. A security alert does not switch off on a click:
- * it opens a dialog that says what is lost and will not submit without a
- * written reason. A sign-in code has no toggle at all — the cell is `locked`.
+ * it opens a dialog that says what stops and who stops being warned, and will
+ * not submit without a written reason (10–500 characters). A sign-in code has
+ * no toggle at all — the cell is `locked`.
+ *
+ * A switch in the eyes of assistive tech (role="switch" on the checkbox),
+ * named for the message AND the channel: the panel's row shows the channel,
+ * the name says both.
  */
 export function SwitchToggle({
   kind,
   kindLabel,
+  kindDescription,
   channel,
   channelLabel,
   enabled,
@@ -82,6 +97,8 @@ export function SwitchToggle({
 }: {
   kind: string;
   kindLabel: string;
+  /** What the message does — the security confirm says it before asking why. */
+  kindDescription: string;
   channel: string;
   channelLabel: string;
   enabled: boolean;
@@ -96,10 +113,11 @@ export function SwitchToggle({
   const id = `notify-cell-${kind}-${channel}`;
   return (
     <>
-      <label className="notify-switch ntc-toggle" htmlFor={id}>
+      <label className="ntc-toggle" htmlFor={id}>
         <input
           id={id}
           type="checkbox"
+          role="switch"
           checked={shown}
           disabled={pending}
           data-testid={id}
@@ -114,9 +132,8 @@ export function SwitchToggle({
             run(() => setNotificationSwitch(kind, channel, next), undefined, clear);
           }}
         />
-        <span className="notify-switch-label">
-          {channelLabel}
-          <span className="admin-sr-only"> for {kindLabel}</span>
+        <span className="admin-sr-only">
+          {kindLabel} on {channelLabel}
         </span>
       </label>
       {needsReason ? (
@@ -125,7 +142,7 @@ export function SwitchToggle({
           onClose={() => {
             setOpen(false);
           }}
-          title={`Switch off ${kindLabel} on ${channelLabel}?`}
+          title={`Stop “${kindLabel}” on ${channelLabel}?`}
           footer={
             <>
               <Button
@@ -133,8 +150,9 @@ export function SwitchToggle({
                 onClick={() => {
                   setOpen(false);
                 }}
+                data-testid="notify-reason-keep"
               >
-                Cancel
+                Keep it on
               </Button>
               <Button
                 variant="danger"
@@ -155,32 +173,38 @@ export function SwitchToggle({
             </>
           }
         >
-          <Notice tone="danger" icon={<IconAlert size={20} />} testId="notify-security-warning">
-            This is a security alert. While it is off, a person whose mobile number or sign-in email
-            is changed — by them or by someone who got into their account — is not warned on{" "}
-            {channelLabel}. Clubs and people can never switch it off; only you can, and your reason
-            is kept on the audit log against your name.
-          </Notice>
-          <Field
-            label="Reason"
-            name={`notify-reason-${kind}-${channel}`}
-            value={reason}
-            required
-            maxLength={REASON_MAX}
-            autoComplete="off"
-            data-testid="notify-reason-input"
-            help={`Why it must stop, and until when. At least ${String(SECURITY_REASON_MIN)} characters.`}
-            onChange={(event) => {
-              setReason(event.target.value);
-            }}
-          />
+          <div className="ntc-confirm">
+            <Notice
+              tone="danger"
+              icon={<IconShieldCheck size={20} />}
+              title="This is a security message"
+              testId="notify-security-warning"
+            >
+              {kindDescription} While it is off, nobody is warned on {channelLabel}. People and
+              clubs can never stop it — only an admin can.
+            </Notice>
+            <Field
+              label="Reason — why must it stop?"
+              name={`notify-reason-${kind}-${channel}`}
+              value={reason}
+              required
+              maxLength={REASON_MAX}
+              autoComplete="off"
+              placeholder="e.g. duplicates from the provider — back on after their fix"
+              data-testid="notify-reason-input"
+              help={`At least ${String(SECURITY_REASON_MIN)} characters. Kept on the audit log against your name; the whole admin team sees it.`}
+              onChange={(event) => {
+                setReason(event.target.value);
+              }}
+            />
+          </div>
         </Dialog>
       ) : null}
     </>
   );
 }
 
-/** "People can turn this off" / "Clubs can turn this off" — only where the catalogue allows. */
+/** "People can turn it off" / "Clubs can turn it off" — only where the catalogue allows. */
 export function ControlToggle({
   kind,
   kindLabel,
@@ -195,12 +219,20 @@ export function ControlToggle({
   const { pending, run } = useRun();
   const { shown, intend, clear } = useIntended(effective);
   const id = `notify-${side}-${kind}`;
-  const label = side === "person" ? "People can turn this off" : "Clubs can turn this off";
+  const text =
+    side === "person"
+      ? "A person can turn it off for themselves"
+      : "A club can turn it off for its players";
   return (
-    <label className="notify-switch ntc-toggle" htmlFor={id}>
+    <label className="ntc-toggle ntc-toggle-row" htmlFor={id}>
+      <span className="ntc-toggle-text">
+        {text}
+        <span className="admin-sr-only"> — {kindLabel}</span>
+      </span>
       <input
         id={id}
         type="checkbox"
+        role="switch"
         checked={shown}
         disabled={pending}
         data-testid={id}
@@ -220,66 +252,72 @@ export function ControlToggle({
           );
         }}
       />
-      <span className="notify-switch-text">
-        <span className="notify-switch-label">
-          {/* The column head says "Opt-out"; the row says who. */}
-          <span aria-hidden>{side === "person" ? "People" : "Clubs"}</span>
-          <span className="admin-sr-only">
-            {label} — {kindLabel}
-          </span>
-        </span>
-      </span>
     </label>
   );
 }
 
 /**
- * A whole channel. Switching one off asks first, with an optional reason the
- * rest of the team reads on the strip; switching it back on does not.
+ * A whole channel's kill switch — an incident tool, so it lives in the card's
+ * ⋯ menu rather than on the strip as a button. Switching off asks first, with
+ * an optional reason the team reads on the card; switching back on is one
+ * visible click, because that is the way out of an incident.
  */
 export function ChannelControl({
   channel,
   label,
   enabled,
+  links,
 }: {
   channel: string;
   label: string;
   enabled: boolean;
+  /** Where the channel's details live — analytics, templates. */
+  links: readonly { label: string; href: string }[];
 }) {
   const { pending, run } = useRun();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  if (!enabled) {
-    return (
-      <Button
-        variant="secondary"
-        size="sm"
-        loading={pending}
-        onClick={() => {
-          run(() => setChannelSwitch(channel, true));
-        }}
-        data-testid={`notify-channel-on-${channel}`}
-      >
-        Switch {label} back on
-      </Button>
-    );
-  }
   return (
-    <>
-      {/* Quiet until it is needed: a kill switch is an incident tool, and four
-          full buttons in a row read as the page's main action. */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          setReason("");
-          setOpen(true);
-        }}
-        aria-label={`Switch ${label} off…`}
-        data-testid={`notify-channel-off-${channel}`}
-      >
-        Switch off…
-      </Button>
+    <div className="ntc-channel-actions">
+      {enabled ? null : (
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={pending}
+          onClick={() => {
+            run(() => setChannelSwitch(channel, true));
+          }}
+          data-testid={`notify-channel-on-${channel}`}
+        >
+          Switch back on
+        </Button>
+      )}
+      <PopoverMenu
+        label={`${label} options`}
+        trigger={<IconKebab size={20} />}
+        triggerClassName="ntc-kebab"
+        items={[
+          ...links.map((link) => ({
+            key: link.href,
+            label: link.label,
+            href: link.href,
+          })),
+          ...(enabled
+            ? [
+                {
+                  key: "off",
+                  label: `Switch ${label} off everywhere…`,
+                  danger: true,
+                  testId: `notify-channel-off-${channel}`,
+                  onSelect: () => {
+                    setReason("");
+                    setOpen(true);
+                  },
+                },
+              ]
+            : []),
+        ]}
+      />
       <Dialog
         open={open}
         onClose={() => {
@@ -294,7 +332,7 @@ export function ChannelControl({
                 setOpen(false);
               }}
             >
-              Cancel
+              Keep it on
             </Button>
             <Button
               variant="danger"
@@ -315,23 +353,25 @@ export function ChannelControl({
           </>
         }
       >
-        <p>
-          Every message on {label} stops, for every club and every person, until it is switched back
-          on. Texts that can go by SMS instead still do. Login codes are never stopped.
-        </p>
-        <Field
-          label="Reason (optional)"
-          name={`notify-channel-reason-${channel}`}
-          value={reason}
-          maxLength={REASON_MAX}
-          autoComplete="off"
-          help="Shown on the strip and kept on the audit log — for example, a provider incident."
-          onChange={(event) => {
-            setReason(event.target.value);
-          }}
-        />
+        <div className="ntc-confirm">
+          <p>
+            Every message on {label} stops, for every club and every person, until it is switched
+            back on. Texts that can go by SMS instead still do. Sign-in codes are never stopped.
+          </p>
+          <Field
+            label="Reason (optional)"
+            name={`notify-channel-reason-${channel}`}
+            value={reason}
+            maxLength={REASON_MAX}
+            autoComplete="off"
+            help="Shown on the channel card and kept on the audit log — for example, a provider incident."
+            onChange={(event) => {
+              setReason(event.target.value);
+            }}
+          />
+        </div>
       </Dialog>
-    </>
+    </div>
   );
 }
 
