@@ -1,16 +1,6 @@
-import {
-  EmptyState,
-  IconClock,
-  IconInfo,
-  IconLock,
-  IconMessageCircle,
-  IconPhone,
-  IconRefresh,
-  Pill,
-  SectionCard,
-  ToastProvider,
-} from "@desiauction/ui";
+import { EmptyState, IconInfo, IconLock, Notice, Pill, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { platformAdminPageGate } from "../../../../server/admin/authz";
 import {
@@ -23,13 +13,22 @@ import {
 } from "../../../../server/admin/provider-template-views";
 import { RecentFold, RelativeTime } from "../../admin-ui";
 import {
-  ClearTemplate,
   MapTemplate,
   RefreshFromMeta,
   RevertTemplate,
-  SubmitTemplate,
+  TemplateRowMenu,
   UseApprovedName,
 } from "./template-controls";
+import {
+  clearLabel,
+  mappedCount,
+  setupLines,
+  setupTitle,
+  smsStatus,
+  whatsappStatus,
+  type SetupLine,
+  type TemplateStatus,
+} from "./templates-model";
 import { AdminPageHead } from "../../admin-ui";
 import { NotifySubnav } from "../notify-subnav";
 import "../../../seasons/seasons.css";
@@ -42,12 +41,18 @@ export const metadata = {
 };
 
 /**
- * WHATSAPP AND SMS TEMPLATES (Notification Control Center, Phase 3).
+ * WHATSAPP AND SMS TEMPLATES (Notification Control Center, Phase 3; redesign
+ * stage 2, 2026-09-27).
  *
  * Which approved template each message goes out under, what Meta last said
  * about it, and a way to submit the catalogue's own wording for approval. The
  * wording itself is not editable here — Meta sends only what it approved.
  * Behind `platform.admin` and nothing new; a not-found for everyone else.
+ *
+ * Laid out like Messages: one calm banner for what is not set up on this
+ * server, a list per channel with each message's state in a word and its
+ * doors at the row's end (Map, and a ⋯ for the rarer ones), recent changes
+ * in the side column.
  *
  * Rendered whole, no Suspense (the Phase 1 lesson): every section here is
  * changed by its own actions, and a streamed boundary kept showing the view
@@ -69,15 +74,20 @@ export default async function ProviderTemplatesPage() {
             <NotifySubnav current="templates" />
           </AdminPageHead>
           <p className="admin-lede admin-lede-under">
-            Which Meta-approved template each message uses. A mapping here wins over the server
-            setting; every change is audited.
+            Which approved template each WhatsApp and SMS message goes out under. A mapping here
+            wins over the server setting; every change is audited.
           </p>
 
-          <SyncCard view={view} />
-          <OtpCard view={view} />
-          <WhatsAppCard view={view} />
-          <SmsCard view={view} />
-          <RecentCard view={view} />
+          <SetupBanner view={view} />
+          <div className="msg-layout ptpl-layout">
+            <div className="msg-list">
+              <WhatsAppList view={view} />
+              <SmsList view={view} />
+            </div>
+            <div className="msg-side">
+              <RecentCard view={view} />
+            </div>
+          </div>
         </div>
       </main>
     </ToastProvider>
@@ -96,53 +106,63 @@ const SOURCE: Record<MappedView["source"], { label: string }> = {
   unset: { label: "Not set" },
 };
 
-function SyncCard({ view }: { view: ProviderTemplatesView }) {
+/* ── What is not set up, said once ─────────────────────────────────────── */
+
+const SETUP_LINE: Record<SetupLine["key"], ReactNode> = {
+  whatsapp: (
+    <>
+      WhatsApp is not set up on this server (no phone number ID or token): nothing goes on WhatsApp
+      yet, whatever is mapped here.
+    </>
+  ),
+  sms: <>SMS is dormant — DLT is not configured (no MSG91 key). IDs mapped here wait for it.</>,
+  sync: (
+    <>
+      Status sync is off: set <code>WHATSAPP_BUSINESS_ACCOUNT_ID</code> to read Meta&rsquo;s
+      approvals and submit templates from here. Mapping names works without it.
+    </>
+  ),
+};
+
+/**
+ * One banner for everything the server lacks. The page used to say "not set
+ * up" three times in three shades before the first row; each fact is still
+ * here, as one line of one notice.
+ */
+function SetupBanner({ view }: { view: ProviderTemplatesView }) {
+  const lines = setupLines(view);
+  const title = setupTitle(view);
+  if (lines.length === 0 || title === null) return null;
   return (
-    <SectionCard
-      icon={<IconRefresh />}
-      tone="neutral"
-      title="Meta status"
-      description="What Meta last said about each template. Read on demand, and every six hours by the scheduled job."
-      action={view.syncEnabled ? <RefreshFromMeta /> : undefined}
-      data-testid="tpl-sync"
-    >
-      {view.syncEnabled ? (
-        <p className="admin-meta" data-testid="tpl-sync-state">
-          {view.sync.lastSuccessAt === null ? (
-            "Not read from Meta yet."
-          ) : (
-            <>
-              Last read <RelativeTime at={view.sync.lastSuccessAt} /> ·{" "}
-              {String(view.sync.templateCount)} template
-              {view.sync.templateCount === 1 ? "" : "s"} on the account
-            </>
-          )}
-          {view.sync.lastError === null ? null : (
-            <span className="ptpl-sync-error"> · Last try failed: {view.sync.lastError}</span>
-          )}
-        </p>
-      ) : (
-        // One quiet line, not a banner: the page had three stacked notices
-        // saying "not set up" in three shades before the first row.
-        <p className="ptpl-note" data-testid="tpl-sync-disabled">
-          <IconInfo size={16} />
-          <span>
-            Status sync is off: set <code>WHATSAPP_BUSINESS_ACCOUNT_ID</code> (WhatsApp Manager →
-            Account tools) with the WhatsApp access token to read Meta&rsquo;s approvals and to
-            submit templates from here. Mapping names works without it.
-          </span>
-        </p>
-      )}
-    </SectionCard>
+    <Notice tone="info" icon={<IconInfo size={20} />} title={title} testId="tpl-setup">
+      <ul className="ptpl-setup">
+        {lines.map((line) => (
+          <li key={line.key} data-testid={line.testId}>
+            {SETUP_LINE[line.key]}
+          </li>
+        ))}
+      </ul>
+    </Notice>
+  );
+}
+
+/* ── A row ─────────────────────────────────────────────────────────────── */
+
+function StatusWord({ status, testId }: { status: TemplateStatus; testId: string }) {
+  return (
+    <span className="ptpl-status">
+      <Pill tone={status.tone} dot testId={testId}>
+        {status.word}
+      </Pill>
+    </span>
   );
 }
 
 function Statuses({ statuses, testId }: { statuses: readonly StatusView[]; testId: string }) {
   if (statuses.length === 0) {
     return (
-      <span className="admin-zero ptpl-nostatus" data-testid={testId} title="No status from Meta">
-        <span aria-hidden>—</span>
-        <span className="admin-sr-only">No status from Meta</span>
+      <span className="admin-sr-only" data-testid={testId}>
+        No status from Meta
       </span>
     );
   }
@@ -150,13 +170,14 @@ function Statuses({ statuses, testId }: { statuses: readonly StatusView[]; testI
     <ul className="ptpl-statuses" data-testid={testId}>
       {statuses.map((s) => (
         <li key={s.language}>
-          <Pill tone={s.tone} dot>
+          <span className="ntc-state" data-tone={s.tone}>
+            <span className="ntc-dot" aria-hidden />
             {s.language}: {s.label}
-          </Pill>
-          {s.quality === null ? null : <span className="admin-meta"> Quality {s.quality}</span>}
-          {s.submitted ? <span className="admin-meta"> · as submitted</span> : null}
+          </span>
+          {s.quality === null ? null : <span> · Quality {s.quality}</span>}
+          {s.submitted ? <span> · as submitted</span> : null}
           {s.rejectedReason === null ? null : (
-            <span className="admin-meta ptpl-rejected"> Reason: {s.rejectedReason}</span>
+            <span className="ptpl-rejected"> · Reason: {s.rejectedReason}</span>
           )}
         </li>
       ))}
@@ -164,50 +185,26 @@ function Statuses({ statuses, testId }: { statuses: readonly StatusView[]; testI
   );
 }
 
-function OtpCard({ view }: { view: ProviderTemplatesView }) {
-  return (
-    <SectionCard
-      icon={<IconLock />}
-      tone="neutral"
-      title="Sign-in code"
-      description="Meta's authentication template. Set on the server only — whether anybody can sign in is never changed from a screen."
-      data-testid="tpl-otp"
-    >
-      <div className="ptpl-row-head">
-        <span className="admin-cell-main">
-          <span className="admin-name">{view.otp.name ?? "Not set"}</span>
-          <span className="admin-meta">
-            WHATSAPP_TEMPLATE_NAME
-            {view.otp.language === null ? "" : ` · language ${view.otp.language}`}
-          </span>
-        </span>
-        <Pill tone="neutral" icon={<IconLock size={14} />}>
-          Read-only
-        </Pill>
-      </div>
-      <Statuses statuses={view.otp.statuses} testId="tpl-otp-status" />
-    </SectionCard>
-  );
-}
-
+/** The template a row uses, where it comes from, and the server setting under it. */
 function Mapped({ mapped, testId }: { mapped: MappedView; testId: string }) {
   const source = SOURCE[mapped.source];
   return (
-    <span className="admin-cell-main">
-      <span className="ptpl-row-head">
-        {/* "None" beside "Not set" said one thing twice: with no template the
-            state alone is drawn, and the name is announced as none. */}
+    <span className="ptpl-mapped">
+      <span className="ptpl-mapped-line">
+        {/* With no template the state alone is drawn, and the name is
+            announced as none. */}
         {mapped.handle === null ? (
           <span className="admin-sr-only" data-testid={testId}>
             None
           </span>
         ) : (
-          <span className="admin-name ptpl-handle" data-testid={testId}>
+          <span className="ptpl-handle" data-testid={testId}>
             {mapped.handle}
           </span>
         )}
+        {/* "Not set" is the row's state word already; said once. */}
         <span
-          className="admin-state"
+          className={mapped.source === "unset" ? "admin-sr-only" : "admin-state ptpl-source"}
           data-tone={SOURCE_DOT[mapped.source]}
           data-testid={`${testId}-source`}
         >
@@ -216,7 +213,7 @@ function Mapped({ mapped, testId }: { mapped: MappedView; testId: string }) {
         </span>
       </span>
       {mapped.source === "admin" ? (
-        <span className="admin-meta">
+        <span className="ptpl-meta">
           {mapped.languages === null ? null : `Approved in ${mapped.languages.join(", ")} · `}
           {mapped.updatedByName ?? "An operator"}
           {mapped.updatedAt === null ? null : (
@@ -229,11 +226,11 @@ function Mapped({ mapped, testId }: { mapped: MappedView; testId: string }) {
         </span>
       ) : null}
       <span
-        className="admin-meta ptpl-env"
+        className="ptpl-meta ptpl-env"
         title={`Server setting ${mapped.envVar}: ${mapped.envValue ?? "unset"}`}
       >
         <span className="admin-sr-only">Server setting </span>
-        <code className="admin-env">{mapped.envVar}</code>
+        <code>{mapped.envVar}</code>
         {mapped.envValue === null ? (
           <span className="admin-sr-only">: unset</span>
         ) : (
@@ -248,24 +245,19 @@ function WhatsAppKindRow({ row, view }: { row: WhatsAppRow; view: ProviderTempla
   const approval = row.approval;
   return (
     <li id={`tpl-${row.kind}`} data-testid={`tpl-wa-${row.kind}`} className="ptpl-row">
-      <div className="ptpl-row-head">
-        <span className="admin-cell-main">
-          <span className="admin-name">{row.label}</span>
-          <span className="admin-meta">{row.description}</span>
-        </span>
-      </div>
-      <Mapped mapped={row.mapped} testId={`tpl-wa-name-${row.kind}`} />
-      <Statuses statuses={row.statuses} testId={`tpl-wa-status-${row.kind}`} />
-      {approval?.verdict === "not_approved" ? (
-        <p className="admin-meta ptpl-warn" data-testid={`tpl-wa-warn-${row.kind}`}>
-          Not sending on WhatsApp: {approval.why}.
-        </p>
-      ) : approval?.verdict === "approved" && approval.missing.length > 0 ? (
-        <p className="admin-meta" data-testid={`tpl-wa-warn-${row.kind}`}>
-          Not approved yet in {approval.missing.join(", ")} — those readers get English.
-        </p>
-      ) : null}
-      <div className="ptpl-actions">
+      <span className="ptpl-kind">
+        <span className="ptpl-kind-name">{row.label}</span>
+        <span className="ptpl-kind-desc">{row.description}</span>
+      </span>
+      <StatusWord status={whatsappStatus(row)} testId={`tpl-wa-state-${row.kind}`} />
+      <span className="ptpl-what">
+        <Mapped mapped={row.mapped} testId={`tpl-wa-name-${row.kind}`} />
+        <Statuses statuses={row.statuses} testId={`tpl-wa-status-${row.kind}`} />
+      </span>
+      <span className="ptpl-actions">
+        {row.approvedCandidates.map((name) => (
+          <UseApprovedName key={name} kind={row.kind} kindLabel={row.label} name={name} />
+        ))}
         <MapTemplate
           kind={row.kind}
           kindLabel={row.label}
@@ -275,67 +267,149 @@ function WhatsAppKindRow({ row, view }: { row: WhatsAppRow; view: ProviderTempla
           approvedNames={view.approvedNames}
           syncKnown={view.sync.lastSuccessAt !== null}
         />
-        {row.mapped.source === "admin" ? (
-          <ClearTemplate
-            kind={row.kind}
-            kindLabel={row.label}
-            channel="whatsapp"
-            fallback={row.mapped.envValue}
-          />
-        ) : null}
-        {row.approvedCandidates.map((name) => (
-          <UseApprovedName key={name} kind={row.kind} kindLabel={row.label} name={name} />
-        ))}
-        {view.syncEnabled && row.submitRefusal === null ? (
-          <SubmitTemplate
-            kind={row.kind}
-            kindLabel={row.label}
-            suggestedName={row.suggestedName}
-            preview={row.preview}
-          />
-        ) : null}
-      </div>
-      {row.submitRefusal === null ? null : <p className="admin-meta">{row.submitRefusal}</p>}
+        <TemplateRowMenu
+          kind={row.kind}
+          kindLabel={row.label}
+          channel="whatsapp"
+          clear={row.mapped.source === "admin" ? clearLabel(row.mapped) : null}
+          submit={
+            view.syncEnabled && row.submitRefusal === null
+              ? { suggestedName: row.suggestedName, preview: row.preview }
+              : null
+          }
+        />
+      </span>
+      {approval?.verdict === "not_approved" ? (
+        <p className="ptpl-note-line ptpl-warn" data-testid={`tpl-wa-warn-${row.kind}`}>
+          Not sending on WhatsApp: {approval.why}.
+        </p>
+      ) : approval?.verdict === "approved" && approval.missing.length > 0 ? (
+        <p className="ptpl-note-line" data-testid={`tpl-wa-warn-${row.kind}`}>
+          Not approved yet in {approval.missing.join(", ")} — those readers get English.
+        </p>
+      ) : null}
+      {row.submitRefusal === null ? null : <p className="ptpl-note-line">{row.submitRefusal}</p>}
     </li>
   );
 }
 
-function WhatsAppCard({ view }: { view: ProviderTemplatesView }) {
+/** Meta's authentication template: shown, never changed from a screen. */
+function OtpRow({ view }: { view: ProviderTemplatesView }) {
   return (
-    <SectionCard
-      icon={<IconMessageCircle />}
-      tone="neutral"
-      title="WhatsApp templates"
-      description="One template name holds both languages. A reader gets their own language where it is approved, else English."
-      flush
-      data-testid="tpl-whatsapp"
-    >
-      {view.whatsappConfigured ? null : (
-        <div className="ptpl-card-note">
-          <p className="ptpl-note" data-testid="tpl-wa-unconfigured">
-            <IconInfo size={16} />
-            <span>
-              WhatsApp is not set up on this server (no phone number ID or token), so nothing goes
-              on WhatsApp whatever is mapped here.
-            </span>
-          </p>
-        </div>
-      )}
-      <ul className="admin-rows ptpl-grid">
+    <li className="ptpl-row" data-testid="tpl-otp">
+      <span className="ptpl-kind">
+        <span className="ptpl-kind-name">Sign-in code</span>
+        <span className="ptpl-kind-desc">
+          Meta&rsquo;s authentication template. Set on the server only — whether anybody can sign in
+          is never changed from a screen.
+        </span>
+      </span>
+      <StatusWord
+        status={
+          view.otp.name === null
+            ? { word: "Not set", tone: "neutral" }
+            : {
+                word: "Set on server",
+                tone: "blue",
+              }
+        }
+        testId="tpl-otp-state"
+      />
+      <span className="ptpl-what">
+        <span className="ptpl-mapped">
+          {view.otp.name === null ? null : <span className="ptpl-handle">{view.otp.name}</span>}
+          <span className="ptpl-meta ptpl-env">
+            <code>WHATSAPP_TEMPLATE_NAME</code>
+            {view.otp.language === null ? "" : ` · language ${view.otp.language}`}
+          </span>
+        </span>
+        <Statuses statuses={view.otp.statuses} testId="tpl-otp-status" />
+      </span>
+      <span className="ptpl-actions">
+        <Pill tone="neutral" icon={<IconLock size={14} />}>
+          Read-only
+        </Pill>
+      </span>
+    </li>
+  );
+}
+
+function ListHead({
+  id,
+  title,
+  count,
+  children,
+}: {
+  id: string;
+  title: string;
+  count: string;
+  children?: ReactNode;
+}) {
+  return (
+    <header className="msg-group-head ptpl-head">
+      <span className="ptpl-head-text">
+        <h2 id={id}>{title}</h2>
+        <span>{count}</span>
+      </span>
+      {children}
+    </header>
+  );
+}
+
+function SyncState({ view }: { view: ProviderTemplatesView }) {
+  if (!view.syncEnabled) return null;
+  return (
+    <span className="ptpl-sync" data-testid="tpl-sync">
+      <span className="ptpl-sync-text" data-testid="tpl-sync-state">
+        {view.sync.lastSuccessAt === null ? (
+          "Not read from Meta yet"
+        ) : (
+          <>
+            Meta read <RelativeTime at={view.sync.lastSuccessAt} /> ·{" "}
+            {String(view.sync.templateCount)} template
+            {view.sync.templateCount === 1 ? "" : "s"}
+          </>
+        )}
+        {view.sync.lastError === null ? null : (
+          <span className="ptpl-sync-error"> · Last try failed: {view.sync.lastError}</span>
+        )}
+      </span>
+      <RefreshFromMeta />
+    </span>
+  );
+}
+
+function WhatsAppList({ view }: { view: ProviderTemplatesView }) {
+  return (
+    <section className="msg-card" aria-labelledby="tpl-whatsapp-title" data-testid="tpl-whatsapp">
+      <ListHead id="tpl-whatsapp-title" title="WhatsApp" count={mappedCount(view.whatsapp)}>
+        <SyncState view={view} />
+      </ListHead>
+      <p className="ptpl-lede">
+        One template name holds both languages. A reader gets their own language where it is
+        approved, else English.
+      </p>
+      <ul className="ptpl-rows">
+        <OtpRow view={view} />
         {view.whatsapp.map((row) => (
           <WhatsAppKindRow key={row.kind} row={row} view={view} />
         ))}
       </ul>
-    </SectionCard>
+    </section>
   );
 }
 
 function SmsKindRow({ row }: { row: SmsRow }) {
   return (
     <li id={`tpl-sms-${row.kind}`} data-testid={`tpl-sms-${row.kind}`} className="ptpl-row">
-      <span className="admin-name">{row.label}</span>
-      <Mapped mapped={row.mapped} testId={`tpl-sms-id-${row.kind}`} />
-      <div className="ptpl-actions">
+      <span className="ptpl-kind">
+        <span className="ptpl-kind-name">{row.label}</span>
+      </span>
+      <StatusWord status={smsStatus(row)} testId={`tpl-sms-state-${row.kind}`} />
+      <span className="ptpl-what">
+        <Mapped mapped={row.mapped} testId={`tpl-sms-id-${row.kind}`} />
+      </span>
+      <span className="ptpl-actions">
         <MapTemplate
           kind={row.kind}
           kindLabel={row.label}
@@ -345,75 +419,60 @@ function SmsKindRow({ row }: { row: SmsRow }) {
           approvedNames={[]}
           syncKnown={false}
         />
-        {row.mapped.source === "admin" ? (
-          <ClearTemplate
-            kind={row.kind}
-            kindLabel={row.label}
-            channel="sms"
-            fallback={row.mapped.envValue}
-          />
-        ) : null}
-      </div>
+        <TemplateRowMenu
+          kind={row.kind}
+          kindLabel={row.label}
+          channel="sms"
+          clear={row.mapped.source === "admin" ? clearLabel(row.mapped) : null}
+          submit={null}
+        />
+      </span>
     </li>
   );
 }
 
-function SmsCard({ view }: { view: ProviderTemplatesView }) {
+function SmsList({ view }: { view: ProviderTemplatesView }) {
   return (
-    <SectionCard
-      icon={<IconPhone />}
-      tone="neutral"
-      title="SMS templates"
-      description="The DLT template ID each SMS goes out against."
-      flush
-      data-testid="tpl-sms"
-    >
-      {view.smsGateway ? null : (
-        <div className="ptpl-card-note">
-          <p className="ptpl-note" data-testid="tpl-sms-dormant">
-            <IconInfo size={16} />
-            <span>
-              SMS is dormant — DLT is not configured (no MSG91 key). IDs mapped here take effect
-              once it is.
-            </span>
-          </p>
-        </div>
-      )}
-      <ul className="admin-rows ptpl-grid">
+    <section className="msg-card" aria-labelledby="tpl-sms-title" data-testid="tpl-sms">
+      <ListHead id="tpl-sms-title" title="SMS" count={mappedCount(view.sms)} />
+      <p className="ptpl-lede">The DLT template ID each SMS goes out against.</p>
+      <ul className="ptpl-rows">
         {view.sms.map((row) => (
           <SmsKindRow key={row.kind} row={row} />
         ))}
       </ul>
-    </SectionCard>
+    </section>
   );
 }
 
+/* ── Recent changes ────────────────────────────────────────────────────── */
+
 function RecentCard({ view }: { view: ProviderTemplatesView }) {
   return (
-    <SectionCard
-      icon={<IconClock />}
-      tone="neutral"
-      title="Recent changes"
-      description="Mappings and submissions, newest first. Revert re-applies what a mapping replaced, and is itself recorded."
-      flush
+    <section
+      className="msg-card msg-recent"
+      aria-labelledby="tpl-recent-title"
       data-testid="tpl-recent"
     >
+      <header className="msg-recent-head">
+        <h2 id="tpl-recent-title">Recent changes</h2>
+        <span>Mappings and submissions, newest first · a revert is recorded too</span>
+      </header>
       {view.recent.length === 0 ? (
-        <div className="admin-card-empty">
-          <EmptyState
-            size="compact"
-            headingLevel={3}
-            title="Nothing changed yet"
-            description="Every template still uses the server setting. Mappings and submissions appear here with who made them."
-          />
-        </div>
+        <EmptyState
+          size="compact"
+          headingLevel={3}
+          title="Nothing changed yet"
+          description="Every template still uses the server setting. Mappings and submissions appear here with who made them."
+        />
       ) : (
-        <RecentFold items={view.recent} className="admin-rows">
+        <RecentFold items={view.recent} className="msg-recent-list">
           {(change) => (
             <li key={change.id} data-testid={`tpl-change-${change.id}`}>
-              <span className="admin-cell-main">
-                <span className="admin-name">{change.summary}</span>
-                <span className="admin-meta">
+              <span className="msg-recent-dot" aria-hidden />
+              <span className="msg-recent-text">
+                <span className="msg-change-line">{change.summary}</span>
+                <span className="msg-change-meta">
                   {change.actorName ?? "An operator"} · <RelativeTime at={change.at} />
                   {change.revertOf === null ? null : " · a revert"}
                 </span>
@@ -425,6 +484,6 @@ function RecentCard({ view }: { view: ProviderTemplatesView }) {
           )}
         </RecentFold>
       )}
-    </SectionCard>
+    </section>
   );
 }

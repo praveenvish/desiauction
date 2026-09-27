@@ -82,8 +82,9 @@ test("an admin maps a WhatsApp template, the grid follows, and clearing goes bac
   await expect(page.getByTestId("tpl-refresh")).toHaveCount(0);
   // The sign-in template is shown, read-only.
   await expect(page.getByTestId("tpl-otp")).toContainText("Read-only");
-  // SMS is dormant in the harness, and says so.
+  // SMS is dormant in the harness, and says so — in the one set-up banner.
   await expect(page.getByTestId("tpl-sms")).toBeVisible();
+  await expect(page.getByTestId("tpl-sms-dormant")).toBeVisible();
 
   // Meta's name rule is checked as it is typed.
   const prefix = `tpl-map-whatsapp-${KIND}`;
@@ -105,11 +106,17 @@ test("an admin maps a WhatsApp template, the grid follows, and clearing goes bac
   await expect(cellLine).toHaveAttribute("data-source", "admin");
   await expect(cellLine).toContainText(name);
 
-  // Clear: back to the server setting.
+  // Clear, from the row's ⋯: back to the server setting.
   await page.goto(PAGE);
+  const more = page.getByTestId(`tpl-wa-${KIND}`).getByRole("button", { name: /^More for / });
+  await more.click();
   await page.getByTestId(`tpl-clear-whatsapp-${KIND}`).click();
   await expect(page.getByTestId(`tpl-wa-name-${KIND}-source`)).not.toHaveText("Mapped here");
+  // Nothing mapped here any more, so the ⋯ offers no Clear.
+  await more.click();
+  await expect(page.getByRole("menu")).toBeVisible();
   await expect(page.getByTestId(`tpl-clear-whatsapp-${KIND}`)).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   await page.goto(`/admin/notifications?kind=${KIND}`);
   await expect(cellLine).not.toHaveAttribute("data-source", "admin");
