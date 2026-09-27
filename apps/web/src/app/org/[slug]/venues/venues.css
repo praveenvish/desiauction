@@ -79,3 +79,210 @@
 .vn-seasons .da-row-figure {
   color: var(--text-muted);
 }
+
+/* ---- The club's Venues tab (2026-09-27): venue cards, ground rows ---- */
+
+.vn-layout {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .vn-layout {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  }
+}
+
+.vn-main,
+.vn-panel,
+.vn-seasons-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.vn-lede {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.vn-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.vn-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vn-head h2,
+.vn-seasons-aside h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.vn-head p,
+.vn-seasons-aside > p {
+  margin: 2px 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.vn-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.vn-card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+.vn-pin {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.vn-card-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vn-card-id h3 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.vn-card-id span,
+.vn-none {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.vn-none {
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.vn-grounds {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vn-ground {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.vn-ground-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vn-ground-text strong {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.vn-ground-text span {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.vn-kebab {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+.vn-card-foot {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.vn-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.vn-dialog-form input,
+.vn-dialog-form select {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.vn-season {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.vn-season:hover {
+  background: var(--surface-sunken);
+}
+
+.vn-season-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vn-season-text strong {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.vn-season-text span {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.vn-seasons-aside .vn-seasons {
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}

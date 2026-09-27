@@ -722,12 +722,14 @@
   align-items: flex-end;
 }
 
-/* Column widths are shared by the header and every row so they line up. */
+/* One grid shared by the header and every row, so the columns cannot drift:
+   person · roles · joined · the row's ⋯. */
 .od-member-cols,
 .od-member-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.7fr) 96px 44px;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .od-member-cols {
@@ -740,7 +742,6 @@
 }
 
 .od-member-person {
-  flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -748,31 +749,29 @@
 }
 
 .od-member-roles {
-  /* Shrinkable, not fixed: the pills read "Speaks for the money" now, not
-     "FINOPS", and a hard 260px column had nowhere to put the difference. */
-  flex: 0 1 260px;
   min-width: 0;
   display: flex;
   gap: var(--space-1);
   flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 .od-member-joined {
-  flex: none;
-  width: 90px;
   font-size: var(--text-sm-size);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .od-member-action {
-  flex: none;
-  min-width: 120px;
   display: flex;
   justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+}
+
+.od-member-kebab {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--text-secondary);
 }
 
 .od-member-list {
@@ -935,25 +934,27 @@
   }
 
   .od-member-row {
-    flex-wrap: wrap;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    grid-template-areas:
+      "person action"
+      "roles roles"
+      "joined joined";
     row-gap: var(--space-2);
   }
 
   .od-member-person {
-    flex: 1 1 100%;
+    grid-area: person;
   }
 
   /* Under the name, aligned to the text rather than to the avatar. */
   .od-member-roles {
-    flex: 1 1 auto;
-    width: auto;
-    justify-content: flex-start;
+    grid-area: roles;
     padding-left: calc(36px + var(--space-3));
   }
 
   .od-member-joined {
-    flex: none;
-    width: auto;
+    grid-area: joined;
+    padding-left: calc(36px + var(--space-3));
   }
 
   .od-member-joined-label {
@@ -961,8 +962,7 @@
   }
 
   .od-member-action {
-    width: auto;
-    margin-left: auto;
+    grid-area: action;
   }
 }
 
@@ -970,4 +970,292 @@
   font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
+}
+
+/* ======================================================================
+   THE CLUB REDESIGN (2026-09-27): header figures, the overview's season
+   that needs you, the money keys as cards. Tokens only; both themes.
+   ====================================================================== */
+
+.od-hero-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.od-hero-figures strong {
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Overview ---- */
+
+.od-overview-grid {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .od-overview-grid {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  }
+}
+
+.od-overview-main,
+.od-seasons,
+.od-activity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.od-overview-main {
+  gap: var(--space-6);
+}
+
+.od-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.od-section-head h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.od-season-list,
+.od-activity .od-activity-list {
+  margin: 0;
+  padding: var(--space-1) var(--space-4);
+  list-style: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.od-season-list {
+  padding: 0;
+  overflow: hidden;
+}
+
+.od-season-list > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.od-season-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.od-season-row:hover {
+  background: var(--surface-sunken);
+}
+
+.od-season-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.od-season-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.od-season-text strong {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.od-season-text span {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.od-season-go {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+/* ---- Money & roles: the two keys ---- */
+
+.od-keys-head h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.od-keys-head p {
+  margin: var(--space-1) 0 0;
+  max-width: 70ch;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.od-key {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.od-key-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.od-key-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.od-key-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.od-key-text h2 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.od-key-text p {
+  margin: 2px 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.od-key-empty {
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.od-key-empty h3 {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.od-key-empty p {
+  margin: 2px 0 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.od-key-holders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-key-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.od-key-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.od-key-id strong {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.od-key-id span {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.od-key-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (max-width: 560px) {
+  .od-key-head {
+    flex-wrap: wrap;
+  }
+
+  .od-key-row {
+    flex-wrap: wrap;
+  }
+
+  .od-key-id {
+    flex-basis: calc(100% - 32px - 44px - var(--space-3) * 2);
+  }
+}
+
+/* On a phone the hero's action drops under the figures, full width — beside
+   them it squeezed the club's figures into a one-word column. */
+@media (max-width: 719px) {
+  .od-hero-id {
+    flex: 1 1 calc(100% - 44px - var(--space-3));
+    min-width: 0;
+  }
+
+  .od-hero-actions {
+    flex: 1 1 100%;
+  }
+
+  .od-hero-actions > * {
+    flex: 1 1 auto;
+  }
+
+  .od-hero-actions button {
+    width: 100%;
+  }
+
+  .od-hero-figures {
+    gap: 2px var(--space-3);
+  }
 }

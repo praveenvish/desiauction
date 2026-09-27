@@ -91,7 +91,13 @@ test("the house journey: create, invite, accept, assign, isolate", async ({ brow
   // text match that the invite dialog's <option>Staff</option> also satisfies.
   await expect(members.locator('[data-role="staff"]')).toHaveCount(1);
   // Revoking a role is a confirmed act now, not a single click.
-  await page.getByRole("button", { name: "Remove staff" }).click();
+  // Row actions live in each row's ⋯ menu now.
+  await members
+    .getByRole("row")
+    .filter({ has: page.locator('[data-role="staff"]') })
+    .getByRole("button", { name: /^Actions for / })
+    .click();
+  await page.getByRole("menuitem", { name: /Remove staff/ }).click();
   const confirm = page.getByRole("dialog");
   await expect(confirm.getByTestId("member-change-consequence")).toContainText("loses the ability");
   await confirm.getByTestId("confirm-member-change").click();
