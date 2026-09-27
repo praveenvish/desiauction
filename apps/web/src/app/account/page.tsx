@@ -384,7 +384,6 @@ export default async function AccountPage({
                   <li key={section.key}>
                     <Link
                       href={`/account?section=${section.key}`}
-                      scroll={false}
                       className="acct-section-link"
                       aria-current={section.key === open ? "page" : undefined}
                       data-testid={`account-section-${section.key}`}

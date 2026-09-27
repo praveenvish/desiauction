@@ -1158,6 +1158,16 @@ a.acct-check-row:hover {
   }
 
   .acct-next {
+    flex-wrap: nowrap;
     max-width: none;
+    padding: var(--space-3);
+  }
+
+  .acct-next-text {
+    flex: 1 1 0;
+  }
+
+  .acct[data-picked] {
+    gap: var(--space-2);
   }
 }
