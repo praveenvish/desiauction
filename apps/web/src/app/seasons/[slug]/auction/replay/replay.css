@@ -203,8 +203,10 @@
   gap: var(--space-5);
 }
 
+/* The player card takes its shape from the page it sits on (lot-card.css). */
 .rp-card {
   width: 100%;
+  aspect-ratio: 4 / 5;
 }
 
 .rp-price {
@@ -769,9 +771,13 @@
   }
 
   .rp-moment-top {
-    grid-template-columns: 9rem minmax(0, 1fr);
+    grid-template-columns: 9.5rem minmax(0, 1fr);
     gap: var(--space-3);
     align-items: center;
+  }
+
+  .rp-moment-top .lot-card-name {
+    font-size: var(--text-lg-size);
   }
 
   .rp-transport {
