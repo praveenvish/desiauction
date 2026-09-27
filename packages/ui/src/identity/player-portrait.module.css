@@ -1,0 +1,52 @@
+/* The portrait fills a box its caller sizes (the auction card). Both states —
+   photo and identity — occupy the whole box, so nothing moves between them. */
+.frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  background: var(--identity-field);
+}
+
+.poster {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Faces sit in the upper third of a portrait; the name overlays the foot. */
+  object-position: 50% 22%;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.photo[data-loaded="false"] {
+  opacity: 0;
+}
+
+/* The display stack, as the small mark sets its initials: Clash Display for
+   Latin names, its Devanagari face for Devanagari ones. */
+.glyph {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.03em;
+}
+
+.glyph-shadow {
+  fill: var(--identity-field-deep);
+  fill-opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo {
+    transition: none;
+  }
+}
