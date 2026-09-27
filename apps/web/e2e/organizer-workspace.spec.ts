@@ -105,7 +105,9 @@ test("founder demo: org → competition → approve → team roster → venue �
   await page.getByRole("button", { name: "Add a ground" }).click();
   await page.getByLabel("Ground name").fill("Main Oval");
   await page.getByTestId("add-ground").click();
-  await expect(page.getByRole("cell", { name: "Main Oval" })).toBeVisible();
+  await expect(
+    page.getByTestId("venues-panel").getByText("Main Oval", { exact: true }),
+  ).toBeVisible();
 
   // Competition with dates (lifecycle guard) → open registration.
   await page.goto("/seasons");

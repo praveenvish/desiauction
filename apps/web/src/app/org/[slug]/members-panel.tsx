@@ -8,6 +8,9 @@ import {
   Dialog,
   EmptyState,
   Field,
+  IconKebab,
+  PopoverMenu,
+  type PopoverMenuItem,
   Select,
   useToast,
   VisuallyHidden,
@@ -465,6 +468,50 @@ function MemberRowView({
   const isStaff = member.capabilitySets.includes("org:staff");
   const isSelf = member.personId === view.viewer.personId;
   const pills = member.capabilitySets.length === 0 ? ["viewer"] : member.capabilitySets;
+  const items: PopoverMenuItem[] = [];
+  if (view.viewer.canIssueGrants && !isSelf) {
+    if (isStaff) {
+      items.push({
+        key: "remove-staff",
+        label: "Remove staff…",
+        testId: `remove-staff-${member.personId}`,
+        onSelect: () => {
+          onIntent({
+            title: `Remove ${name} from staff?`,
+            body: `${name} loses the ability to run seasons, add teams, review registrations and manage fixtures for this organization. They stay a member and keep read access. You can make them staff again at any time.`,
+            confirmLabel: "Remove staff",
+            run: () => revokeGrantAction(slug, member.personId, "org:staff"),
+          });
+        },
+      });
+    } else if (!isOwner) {
+      /* "Make staff" on a row that already reads Owner offered a DEMOTION
+         dressed as a promotion — staff is a strictly smaller set than owner,
+         and issuing it changed nothing at all. */
+      items.push({
+        key: "make-staff",
+        label: "Make staff",
+        testId: `make-staff-${member.personId}`,
+        onSelect: onGrant,
+      });
+    }
+  }
+  if (view.viewer.canRemove && !isSelf) {
+    items.push({
+      key: "remove",
+      label: "Remove from club…",
+      danger: true,
+      testId: `remove-member-${member.personId}`,
+      onSelect: () => {
+        onIntent({
+          title: `Remove ${name} from ${view.org.name}?`,
+          body: `${name} loses every role they hold here, disappears from this member list, and this organization disappears from theirs — including any tournament, team or money surface it reaches. Their account and their own organizations are untouched. They can only come back through a fresh invite link.`,
+          confirmLabel: "Remove from organization",
+          run: () => removeMemberAction(slug, member.personId),
+        });
+      },
+    });
+  }
 
   return (
     <div className="od-member-row" role="row" data-testid={`member-${member.personId}`}>
@@ -510,48 +557,17 @@ function MemberRowView({
         {joinedLabel(member.joinedAt)}
       </span>
       <span className="od-member-action" role="cell">
-        {view.viewer.canIssueGrants && !isSelf ? (
-          isStaff ? (
-            <Button
-              size="touch"
-              variant="ghost"
-              onClick={() => {
-                onIntent({
-                  title: `Remove ${name} from staff?`,
-                  body: `${name} loses the ability to run seasons, add teams, review registrations and manage fixtures for this organization. They stay a member and keep read access. You can make them staff again at any time.`,
-                  confirmLabel: "Remove staff",
-                  run: () => revokeGrantAction(slug, member.personId, "org:staff"),
-                });
-              }}
-              data-testid={`remove-staff-${member.personId}`}
-            >
-              Remove staff
-            </Button>
-          ) : /* "Make staff" on a row that already reads Owner offered a
-                 DEMOTION dressed as a promotion — staff is a strictly smaller
-                 set than owner, and issuing it changed nothing at all. */
-          isOwner ? null : (
-            <Button size="touch" variant="secondary" onClick={onGrant}>
-              Make staff
-            </Button>
-          )
-        ) : null}
-        {view.viewer.canRemove && !isSelf ? (
-          <Button
-            size="touch"
-            variant="ghost"
-            onClick={() => {
-              onIntent({
-                title: `Remove ${name} from ${view.org.name}?`,
-                body: `${name} loses every role they hold here, disappears from this member list, and this organization disappears from theirs — including any tournament, team or money surface it reaches. Their account and their own organizations are untouched. They can only come back through a fresh invite link.`,
-                confirmLabel: "Remove from organization",
-                run: () => removeMemberAction(slug, member.personId),
-              });
-            }}
-            data-testid={`remove-member-${member.personId}`}
-          >
-            Remove
-          </Button>
+        {/* One ⋯ per row. The row used to end in "Remove staff" as a link,
+            "Make staff" as a button and "Remove" as a link, so every row was a
+            different width and the columns drifted. Each act still opens the
+            same confirm dialog; only where it is offered changed. */}
+        {items.length > 0 ? (
+          <PopoverMenu
+            label={`Actions for ${name}`}
+            trigger={<IconKebab size={18} />}
+            triggerClassName="od-member-kebab"
+            items={items}
+          />
         ) : null}
       </span>
     </div>

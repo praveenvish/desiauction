@@ -45,8 +45,8 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
   await page.getByLabel("Club name").filter({ visible: true }).fill(`Fixture Org ${STAMP}`);
   await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
-  await page.getByRole("tab", { name: "Tournaments" }).click();
-  await page.getByTestId("open-venues").click();
+  // Venues is a tab on the club page now.
+  await page.getByRole("tab", { name: "Venues" }).click();
   await expect(page.getByTestId("venues-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -58,7 +58,7 @@ test("the scheduling journey: venue, grounds, generate, publish, conflict, resol
     await page.getByRole("button", { name: "Add a ground" }).click();
     await page.getByLabel("Ground name").fill(ground);
     await page.getByTestId("add-ground").click();
-    await expect(page.getByRole("cell", { name: ground })).toBeVisible();
+    await expect(page.getByTestId("venues-panel").getByText(ground, { exact: true })).toBeVisible();
   }
 
   // Competition with dates and four teams.
@@ -169,8 +169,8 @@ test("fixtures dashboard and venues page: axe zero violations", async ({ page })
   await page.getByLabel("Club name").filter({ visible: true }).fill(`Axe Fix Org ${STAMP}`);
   await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
-  await page.getByRole("tab", { name: "Tournaments" }).click();
-  await page.getByTestId("open-venues").click();
+  // Venues is a tab on the club page now.
+  await page.getByRole("tab", { name: "Venues" }).click();
   await expect(page.getByTestId("venues-heading")).toBeVisible({ timeout: 20_000 });
   const venuesScan = await new AxeBuilder({ page }).analyze();
   expect(venuesScan.violations, JSON.stringify(venuesScan.violations, null, 2)).toEqual([]);

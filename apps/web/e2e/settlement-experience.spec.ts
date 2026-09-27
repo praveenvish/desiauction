@@ -197,6 +197,7 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await expect(page.getByTestId("money-authority")).toContainText("Nobody can settle yet");
   await axeClean(page, "org · money authority");
 
+  await page.getByTestId("open-grant-authority").click();
   await page.getByTestId("authority-person").selectOption({ label: "Settlement Founder" });
   await page.getByTestId("authority-role").selectOption("settlement:controller");
   await page.getByTestId("grant-authority").click();

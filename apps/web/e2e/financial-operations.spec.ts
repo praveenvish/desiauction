@@ -107,7 +107,9 @@ test("founder demo: settle an auction → open Financial Operations → observe,
     // The row's own "Revoke" only opens a confirmation dialog — a money
     // authority is not removed on one click. The dialog's own Revoke,
     // testid `confirm-revoke-finance`, is the action.
-    await adminRow.getByRole("button", { name: "Revoke" }).click();
+    // Revoke lives in the holder's ⋯ menu now.
+    await adminRow.getByRole("button", { name: /^Actions for / }).click();
+    await page.getByRole("menuitem", { name: /Revoke/ }).click();
     await page.getByTestId("confirm-revoke-finance").click();
     await expect(adminRow).toHaveCount(0, { timeout: 20_000 });
     // The money door's HREF is decided on the server from the viewer's finance
@@ -128,6 +130,7 @@ test("founder demo: settle an auction → open Financial Operations → observe,
   await axeClean(page, "org · finance authority");
 
   // Cross it, from the product: grant finance authority to a named person.
+  await page.getByTestId("open-grant-finance").click();
   await page.getByTestId("finance-person").selectOption({ label: "Demo Admin" });
   await page.getByTestId("finance-role").selectOption("finops:controller");
   await page.getByTestId("grant-finance").click();
