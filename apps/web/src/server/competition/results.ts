@@ -464,6 +464,13 @@ export interface StandingsView {
   /** How many fixtures have a result, of how many that were played. */
   readonly recorded: number;
   readonly playable: number;
+  /**
+   * Matches being played right now with nothing recorded yet. They used to be
+   * counted in `playable`, so a table read "3 of 4 results in" while the fourth
+   * match was still in its first innings — an outstanding result that was not
+   * outstanding.
+   */
+  readonly live: number;
 }
 
 /**
@@ -498,6 +505,7 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
     db
       .select({
         id: fixtures.id,
+        status: fixtures.status,
         homeTeamId: fixtures.homeTeamId,
         awayTeamId: fixtures.awayTeamId,
       })
@@ -512,6 +520,8 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
 
   const sides = new Map(playedFixtures.map((row) => [row.id, row]));
   const inputs: AnyResultInput[] = [];
+  /** The fixtures that put something into the table. */
+  const counted = new Set<string>();
 
   /*
    * THE LOBBIES, folded from their participants.
@@ -546,8 +556,9 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
       });
       byFixture.set(row.fixtureId, list);
     }
-    for (const placements of byFixture.values()) {
+    for (const [fixtureId, placements] of byFixture) {
       inputs.push({ placements });
+      counted.add(fixtureId);
     }
   }
 
@@ -572,6 +583,7 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
        */
       continue;
     }
+    counted.add(fixture.id);
     inputs.push({
       homeTeamId: fixture.homeTeamId,
       awayTeamId: fixture.awayTeamId,
@@ -588,5 +600,15 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
     standingsRulesOf(pack),
   ).map((row) => ({ ...row, teamName: names.get(row.teamId) ?? row.teamId }));
 
-  return { rows, sport: pack, recorded: inputs.length, playable: playedFixtures.length };
+  // A match in progress is owed a result only once it has one or has finished.
+  const live = playedFixtures.filter(
+    (row) => row.status === "in_progress" && !counted.has(row.id),
+  ).length;
+  return {
+    rows,
+    sport: pack,
+    recorded: inputs.length,
+    playable: playedFixtures.length - live,
+    live,
+  };
 }

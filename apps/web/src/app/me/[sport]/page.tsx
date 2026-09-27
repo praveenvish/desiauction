@@ -271,7 +271,7 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
               ? {}
               : {
                   action: (
-                    <Link href="/account#sports" className="me-link">
+                    <Link href="/account?section=player#sports" className="me-link">
                       Edit <IconArrowRight size={14} aria-hidden />
                     </Link>
                   ),
@@ -285,7 +285,7 @@ export default async function MySportPage({ params }: { params: Promise<{ sport:
                 <p>
                   Nothing set yet. Your role and styles fill in every registration form for you.
                 </p>
-                <Link href="/account#sports" className="me-link">
+                <Link href="/account?section=player#sports" className="me-link">
                   Add how you play <IconArrowRight size={14} aria-hidden />
                 </Link>
               </div>

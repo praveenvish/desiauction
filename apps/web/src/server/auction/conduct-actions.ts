@@ -456,6 +456,10 @@ export interface ReplayViewerData {
   engineSerialized: string | null;
   /** Faces keyed by lot id, beside the fold and never inside it (see `SpectatorView.lotMedia`). */
   lotMedia: Record<string, LotMedia>;
+  /** Franchise identity — name, short name, colour, crest — for the teams in colour. */
+  teams: SpectatorView["teams"];
+  /** The season's role words, so the card says "Batter", not `batter`. */
+  roles: { key: string; label: string }[];
 }
 
 /** The replay viewer's feed — pure inputs for a client-side visual fold. */
@@ -464,12 +468,17 @@ export async function replayViewerData(slug: string): Promise<ReplayViewerData |
   if (gate === null || !gate.canConduct) {
     return null;
   }
-  const [events, refs, engineSerialized, lotMedia] = await inGateOrg(gate, (db) =>
+  const [events, refs, engineSerialized, lotMedia, teamRows] = await inGateOrg(gate, (db) =>
     Promise.all([
       loadEvents(db, gate.auction.id),
       snapshotRefs(db, gate.auction),
       fetchEngineSnapshot(gate.auction.id),
       lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
+      db
+        .select(TEAM_IDENTITY)
+        .from(teams)
+        .where(eq(teams.competitionId, gate.competition.id))
+        .orderBy(asc(teams.name)),
     ]),
   );
   return {
@@ -479,6 +488,8 @@ export async function replayViewerData(slug: string): Promise<ReplayViewerData |
     refs,
     engineSerialized,
     lotMedia,
+    teams: signCrests(teamRows),
+    roles: roleOptions(gate.competition.sport),
   };
 }
 

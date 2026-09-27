@@ -55,7 +55,16 @@ test("posters, lineups, case review, board and overlay pass axe", async ({ page 
   await otpLogin(page, FOUNDER);
 
   await scan(page, `${SEASON}/posters`, "posters");
-  await scan(page, `${SEASON}/lineups`, "lineups");
+  // Lineups live in each match's panel now: scan the Matches screen with a
+  // played match open (its lineups and its score).
+  await scan(page, `${SEASON}/fixtures`, "matches");
+  const played = page
+    .locator('[data-testid^="fixture-"][data-status="completed"] a.mx-row-link')
+    .first();
+  await expect(played).toBeVisible({ timeout: 30_000 });
+  await played.click();
+  await expect(page.getByTestId("match-panel")).toBeVisible({ timeout: 30_000 });
+  await axeClean(page, "matches · match panel");
 
   // The case id is the seed's, not a constant: follow the money page's own
   // link to its review, the way an organizer reaches it.

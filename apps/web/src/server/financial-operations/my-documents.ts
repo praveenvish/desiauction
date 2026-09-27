@@ -1,8 +1,16 @@
-import { competitions, finopsDocuments, finopsSeries, paddles, teams } from "@desiauction/db";
+import {
+  competitions,
+  finopsDocuments,
+  finopsSeries,
+  organizations,
+  paddles,
+  teams,
+} from "@desiauction/db";
 import { formattedNumber } from "@desiauction/financial-operations";
 import { desc, eq, inArray } from "drizzle-orm";
 
 import { systemDb } from "../db";
+import { storage } from "../media";
 
 /**
  * The documents issued to YOU — the receipts a person who paid can actually see.
@@ -32,8 +40,14 @@ export interface MyDocument {
   readonly formatted: string;
   readonly kind: string;
   readonly amount: number;
+  /** The team the document was issued to — /money groups by it. */
+  readonly teamId: string;
   readonly teamName: string;
+  /** The team's own mark, so a receipt reads as that franchise's. */
+  readonly teamColor: string | null;
+  readonly teamLogoUrl: string | null;
   readonly competitionName: string | null;
+  readonly orgName: string | null;
   readonly issuedAt: string;
 }
 
@@ -53,7 +67,11 @@ export async function myDocuments(personId: string): Promise<MyDocument[]> {
       number: finopsDocuments.number,
       kind: finopsDocuments.kind,
       amount: finopsDocuments.amount,
+      partyId: finopsDocuments.partyId,
       partyLabel: finopsDocuments.partyLabel,
+      teamColor: teams.primaryColor,
+      teamLogoKey: teams.logoUrl,
+      orgName: organizations.name,
       createdAt: finopsDocuments.createdAt,
       prefix: finopsSeries.prefix,
       fy: finopsSeries.fy,
@@ -63,6 +81,7 @@ export async function myDocuments(personId: string): Promise<MyDocument[]> {
     .innerJoin(finopsSeries, eq(finopsSeries.id, finopsDocuments.seriesId))
     .leftJoin(teams, eq(teams.id, finopsDocuments.partyId))
     .leftJoin(competitions, eq(competitions.id, teams.competitionId))
+    .leftJoin(organizations, eq(organizations.id, competitions.orgId))
     .where(inArray(finopsDocuments.partyId, teamIds))
     .orderBy(desc(finopsDocuments.createdAt));
 
@@ -73,8 +92,13 @@ export async function myDocuments(personId: string): Promise<MyDocument[]> {
     formatted: formattedNumber(row.prefix, row.fy, row.number),
     kind: row.kind,
     amount: row.amount,
+    teamId: row.partyId,
     teamName: row.partyLabel,
+    teamColor: row.teamColor,
+    // Published branding (it renders on /c/<slug>), signed at the view boundary.
+    teamLogoUrl: row.teamLogoKey === null ? null : storage.readUrl(row.teamLogoKey),
     competitionName: row.competitionName,
+    orgName: row.orgName,
     issuedAt: row.createdAt.toISOString(),
   }));
 }

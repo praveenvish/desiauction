@@ -257,10 +257,10 @@ test("founder demo: complete an auction → settle it → close, prove and repla
   await expect(page.getByTestId("settle-case")).toBeDisabled();
 
   // Kings' Waive is DISABLED — they owe nothing now. Only Chargers can be waived.
-  const kingsRow = page.getByRole("row", { name: /Kings/ });
-  await expect(kingsRow.getByRole("button", { name: "Waive" })).toBeDisabled();
-  await page
-    .getByRole("row", { name: /Chargers/ })
+  const teamCard = (name: RegExp) =>
+    page.getByTestId("obligations-table").getByRole("listitem").filter({ hasText: name });
+  await expect(teamCard(/Kings/).getByRole("button", { name: "Waive" })).toBeDisabled();
+  await teamCard(/Chargers/)
     .getByRole("button", { name: "Waive" })
     .click();
   // A waiver without a reason cannot be submitted: it is recorded against a name.

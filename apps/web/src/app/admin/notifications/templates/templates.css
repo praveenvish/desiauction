@@ -1,64 +1,202 @@
 /*
- * /admin/notifications/templates — WhatsApp and SMS template mapping (Phase 3).
- * Tokens only; `ptpl-` so nothing here collides with the email editor's
- * `tpl-` classes once both pages have loaded in one session. The page head and
- * back link repeat the editor's rules on purpose: the two pages share a shape.
+ * /admin/notifications/templates — WhatsApp and SMS template mapping (Phase 3;
+ * redesign stage 2, 2026-09-27). Tokens only; `ptpl-` so nothing here collides
+ * with the email editor's `tpl-` classes once both pages have loaded in one
+ * session. The frame — cards, group heads, the side column, recent changes —
+ * is the Messages page's own (notifications.css); this file is the row.
  */
 
-.tpl-page-head {
+/* The one set-up banner: a short list of what the server lacks. */
+.ptpl-setup {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.tpl-back {
-  gap: var(--space-2);
-  margin-inline-start: calc(-1 * var(--space-3));
-}
-
-.ptpl-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  scroll-margin-top: var(--space-6);
-}
-
-.ptpl-row:target {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
-}
-
-.ptpl-row-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-3);
-  min-width: 0;
-}
-
-.ptpl-handle {
-  font-family: var(--font-mono, ui-monospace, monospace);
-  overflow-wrap: anywhere;
-}
-
-.ptpl-statuses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.ptpl-statuses > li {
+.ptpl-setup code,
+.ptpl-env code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
+
+/* A list's head: its channel, how many are mapped, and Meta's sync. */
+.ptpl-head {
+  flex-wrap: wrap;
+}
+
+.ptpl-head-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ptpl-head h2 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ptpl-lede {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.ptpl-sync {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
+}
+
+.ptpl-sync-text {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.ptpl-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ptpl-rows > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ── A row: the message · its state in a word · what is mapped · the doors ─ */
+
+.ptpl-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5rem minmax(0, 1.4fr) auto;
+  grid-template-areas: "kind status what actions";
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  scroll-margin-top: calc(var(--shell-topbar-h) + 64px);
+}
+
+.ptpl-row:target {
+  background: var(--accent-subtle);
+  box-shadow: inset 3px 0 0 var(--accent-line);
+}
+
+.ptpl-kind {
+  grid-area: kind;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
+}
+
+.ptpl-kind-name {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ptpl-kind-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.ptpl-status {
+  grid-area: status;
+  min-width: 0;
+}
+
+.ptpl-what {
+  grid-area: what;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ptpl-mapped {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ptpl-mapped-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-2);
+  min-width: 0;
+}
+
+.ptpl-handle {
+  color: var(--text-heading);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.ptpl-source {
+  font-size: var(--text-xs-size);
+}
+
+.ptpl-meta {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  overflow-wrap: anywhere;
+}
+
+.ptpl-env {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ptpl-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  margin: 0;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  list-style: none;
+}
+
+.ptpl-statuses .ntc-state {
+  font-weight: var(--font-weight-medium);
+}
+
+.ptpl-actions {
+  grid-area: actions;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+/* A warning or a refusal runs the full width under its row. */
+.ptpl-note-line {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
 }
 
 .ptpl-rejected,
@@ -67,15 +205,57 @@
   color: var(--danger-strong);
 }
 
-.ptpl-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+/* A laptop narrower than the two columns: the status joins the message. */
+@media (max-width: 1279px) and (min-width: 1100px) {
+  .ptpl-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      "kind what actions"
+      "status what actions";
+  }
+
+  .ptpl-status {
+    justify-self: start;
+  }
 }
 
-.ptpl-card-note {
-  padding: var(--space-3) var(--space-4) 0;
+/* A phone: the message and its doors, then its state and what is mapped.
+   The server variable is laptop detail. */
+@media (max-width: 719px) {
+  .ptpl-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "kind actions"
+      "status actions"
+      "what what";
+    padding-left: var(--space-3);
+  }
+
+  .ptpl-status {
+    justify-self: start;
+  }
+
+  .ptpl-kind-desc,
+  .ptpl-env {
+    display: none;
+  }
+
+  /* Nothing mapped: the state word says it; no empty line under it. */
+  .ptpl-row:not(:has(.ptpl-handle)) .ptpl-what {
+    display: none;
+  }
+
+  .ptpl-row {
+    min-height: 0;
+    row-gap: 4px;
+  }
+
+  .ptpl-lede {
+    padding-inline: var(--space-3);
+  }
 }
+
+/* ── The dialogs ───────────────────────────────────────────────────────── */
 
 .ptpl-langs {
   display: flex;
@@ -150,108 +330,4 @@
   font-size: var(--text-xs-size);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-/* ── wow pass: a template per row, in columns ─────────────────────────────
-   kind · what is mapped · Meta's verdict · the doors. A warning or a refusal
-   runs the full width under its row. */
-
-.ptpl-grid > li.ptpl-row {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1.1fr) minmax(0, 1.4fr) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-1) var(--space-4);
-  padding-block: 10px;
-}
-
-.ptpl-grid > li.ptpl-row > .ptpl-actions {
-  grid-column: -2;
-  grid-row: 1;
-  justify-content: flex-end;
-}
-
-.ptpl-grid > li.ptpl-row > p {
-  grid-column: 1 / -1;
-  margin: 0;
-}
-
-.ptpl-grid .ptpl-row-head .admin-meta {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.ptpl-env {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.ptpl-grid .ptpl-statuses {
-  font-size: var(--text-xs-size);
-}
-
-@media (max-width: 899px) {
-  .ptpl-grid > li.ptpl-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .ptpl-grid > li.ptpl-row > :not(.ptpl-actions) {
-    grid-column: 1 / -1;
-  }
-
-  .ptpl-grid > li.ptpl-row > .ptpl-row-head,
-  .ptpl-grid > li.ptpl-row > .admin-name:first-child {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .ptpl-grid > li.ptpl-row > .ptpl-actions {
-    grid-column: 2;
-    grid-row: 1;
-  }
-}
-
-/* ── wow pass, round 2 ── a "not set up" fact is one quiet line, not a banner;
-   env names are code; the recent list is one row per change. */
-.ptpl-note {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-xs-size);
-  line-height: 1.5;
-}
-
-.ptpl-note > svg {
-  flex: none;
-  margin-top: 1px;
-  color: var(--text-muted);
-}
-
-.ptpl-note code {
-  font-family: var(--font-mono);
-}
-
-.ptpl-card-note {
-  padding: var(--space-2) var(--space-5);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-sunken);
-}
-
-.ptpl-env .admin-env {
-  font-size: 11px;
-}
-
-/* A phone keeps the row to its name, its state and its one door: the server
-   variable and an empty Meta status are laptop detail. */
-@media (max-width: 719px) {
-  .ptpl-env,
-  .ptpl-nostatus {
-    display: none;
-  }
 }

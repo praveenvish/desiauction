@@ -199,20 +199,24 @@ function ResultRow({
   const [open, setOpen] = useState(false);
   const active = row.liftedAt === null;
   return (
-    <li data-testid={`suppression-row-${row.id}`} data-active={active ? "true" : "false"}>
-      <span className="admin-cell-main">
-        <span className="ntc-kind-head">
-          <span className="admin-name">
+    <li
+      className="spr-row"
+      data-testid={`suppression-row-${row.id}`}
+      data-active={active ? "true" : "false"}
+    >
+      <span className="spr-row-main">
+        <span className="spr-row-title">
+          <span className="spr-row-name">
             {channelName(row.channel)} · {scopeName(row.scope)}
           </span>
           <span className="spr-pills">
-            <Pill tone={REASON_TONE[row.reason] ?? "neutral"}>{row.reason}</Pill>
             <Pill tone={active ? "red" : "green"} dot testId={`suppression-state-${row.id}`}>
               {active ? "In force" : "Lifted"}
             </Pill>
+            <Pill tone={REASON_TONE[row.reason] ?? "neutral"}>{row.reason}</Pill>
           </span>
         </span>
-        <span className="admin-meta">
+        <span className="spr-row-meta">
           {SOURCE[row.source]} · since {absoluteIst(row.createdAt)}
           {row.liftedAt === null ? null : ` · lifted ${absoluteIst(row.liftedAt)}`}
         </span>
@@ -221,7 +225,7 @@ function ResultRow({
         <>
           <Button
             variant="secondary"
-            size="touch"
+            size="sm"
             onClick={() => {
               setOpen(true);
             }}
@@ -280,27 +284,35 @@ export function SuppressionSearchPanel() {
             setQuery(event.target.value);
           }}
         />
-        <Button type="submit" size="touch" loading={searching} data-testid="suppression-search-go">
+        <Button type="submit" loading={searching} data-testid="suppression-search-go">
           Look up
         </Button>
       </form>
-      <div aria-live="polite" data-testid="suppression-results">
-        {result === null ? null : !result.ok ? (
+      <div aria-live="polite" className="spr-results" data-testid="suppression-results">
+        {result === null ? (
+          <p className="spr-hint">
+            Whether anything stops messages to that contact, on which channel, and why — with a way
+            to lift it.
+          </p>
+        ) : !result.ok ? (
           <Notice tone="warning" testId="suppression-search-error">
             {result.error}
           </Notice>
         ) : result.rows.length === 0 ? (
           <EmptyState
+            size="compact"
             headingLevel={3}
             title="Not suppressed"
             description={`Nothing stops ${channelName(result.channel).toLowerCase()} to ${result.contact}.`}
           />
         ) : (
           <>
-            <p className="admin-meta">
+            <p className="spr-results-head">
               {channelName(result.channel)} to <span data-private>{result.contact}</span>
+              {" · "}
+              {String(result.rows.length)} {result.rows.length === 1 ? "record" : "records"}
             </p>
-            <ul className="admin-rows is-stacked">
+            <ul className="spr-rows">
               {result.rows.map((row) => (
                 <ResultRow
                   key={row.id}
@@ -350,7 +362,7 @@ export function AddSuppressionForm({ scopes }: { scopes: readonly string[] }) {
         required
         maxLength={320}
         autoComplete="off"
-        help="Email stops email; a number stops SMS and WhatsApp."
+        help="Email stops email; a number stops texts."
         data-testid="suppression-add-contact"
         onChange={(event) => {
           setContact(event.target.value);
@@ -378,20 +390,14 @@ export function AddSuppressionForm({ scopes }: { scopes: readonly string[] }) {
         required
         maxLength={REASON_MAX}
         autoComplete="off"
-        help={`Why, and who asked — ${String(REASON_MIN)}+ characters, kept on the audit log.`}
+        help={`Why, and who asked — ${String(REASON_MIN)}+ characters, audited.`}
         data-testid="suppression-add-reason"
         onChange={(event) => {
           setReason(event.target.value);
         }}
       />
       <div className="spr-add-go">
-        <Button
-          type="submit"
-          size="touch"
-          loading={pending}
-          disabled={!valid}
-          data-testid="suppression-add-go"
-        >
+        <Button type="submit" loading={pending} disabled={!valid} data-testid="suppression-add-go">
           Suppress
         </Button>
       </div>

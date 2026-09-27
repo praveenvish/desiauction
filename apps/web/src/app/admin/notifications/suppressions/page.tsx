@@ -1,11 +1,4 @@
-import {
-  EmptyState,
-  IconClock,
-  IconLock,
-  IconPlus,
-  SectionCard,
-  ToastProvider,
-} from "@desiauction/ui";
+import { EmptyState, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { platformAdminPageGate } from "../../../../server/admin/authz";
@@ -59,71 +52,84 @@ export default async function AdminSuppressionsPage() {
             audited, and can be reverted while nothing has changed since.
           </p>
 
-          {/* Look up, then suppress: two one-row forms, full width. Side by
-              side they were two cards of unequal height (420 vs 640px). */}
-          <div className="spr-stack">
-            <SectionCard
-              icon={<IconLock />}
-              tone="neutral"
-              title="Look up a contact"
-              description="Is it suppressed, and why? Only the contact you type is shown."
-              flush
-              data-testid="suppression-lookup"
-            >
-              <SuppressionSearchPanel />
-            </SectionCard>
+          {/* Lookup first: the question this page answers is "is this contact
+              suppressed, and why?". Adding one by hand and the recent changes
+              sit in the side column, as on Messages. */}
+          <div className="msg-layout spr-layout">
+            <div className="msg-list">
+              <section
+                className="msg-card"
+                aria-labelledby="spr-lookup-title"
+                data-testid="suppression-lookup"
+              >
+                <header className="msg-group-head">
+                  <h2 id="spr-lookup-title" className="spr-title">
+                    Look up a contact
+                  </h2>
+                  <span>Only the contact you type is shown</span>
+                </header>
+                <SuppressionSearchPanel />
+              </section>
+            </div>
 
-            <SectionCard
-              icon={<IconPlus />}
-              tone="neutral"
-              title="Suppress a contact"
-              description="A request that did not come by STOP. It stops that channel until lifted."
-              flush
-              data-testid="suppression-add-card"
-            >
-              <AddSuppressionForm scopes={SUPPRESSION_SCOPES} />
-            </SectionCard>
-          </div>
+            <div className="msg-side">
+              <section
+                className="msg-card"
+                aria-labelledby="spr-add-title"
+                data-testid="suppression-add-card"
+              >
+                <header className="msg-recent-head spr-add-head">
+                  <h2 id="spr-add-title">Suppress a contact</h2>
+                  <span>
+                    A request that did not come by STOP. It stops that channel until lifted.
+                  </span>
+                </header>
+                <AddSuppressionForm scopes={SUPPRESSION_SCOPES} />
+              </section>
 
-          <SectionCard
-            icon={<IconClock />}
-            tone="neutral"
-            title="Recent changes"
-            description="Lifts and additions, newest first · Revert shows while a change still stands"
-            flush
-            data-testid="suppression-recent"
-          >
-            {desk.recent.length === 0 ? (
-              <div className="admin-card-empty">
-                <EmptyState
-                  size="compact"
-                  headingLevel={3}
-                  title="Nothing changed by hand yet"
-                  description="Lifts and manual suppressions appear here with who made them and why."
-                />
-              </div>
-            ) : (
-              <RecentFold items={desk.recent} className="admin-rows ntc-recent">
-                {(change) => (
-                  <li key={change.id} data-testid={`suppression-change-${change.id}`}>
-                    <span className="admin-cell-main">
-                      <span className="ntc-recent-line" data-private>
-                        {change.summary}
-                      </span>
-                      <span className="admin-meta">
-                        {change.actorName ?? "An operator"} · <RelativeTime at={change.at} />
-                        {change.revertOf === null ? null : " · a revert"}
-                        {change.reason === null ? null : ` · “${change.reason}”`}
-                      </span>
-                    </span>
-                    {change.revertable ? (
-                      <SuppressionRevertButton auditId={change.id} summary={change.summary} />
-                    ) : null}
-                  </li>
+              <section
+                className="msg-card msg-recent"
+                aria-labelledby="spr-recent-title"
+                data-testid="suppression-recent"
+              >
+                <header className="msg-recent-head">
+                  <h2 id="spr-recent-title">Recent changes</h2>
+                  <span>
+                    Lifts and additions, newest first · Revert shows while a change still stands
+                  </span>
+                </header>
+                {desk.recent.length === 0 ? (
+                  <EmptyState
+                    size="compact"
+                    headingLevel={3}
+                    title="Nothing changed by hand yet"
+                    description="Lifts and manual suppressions appear here with who made them and why."
+                  />
+                ) : (
+                  <RecentFold items={desk.recent} className="msg-recent-list">
+                    {(change) => (
+                      <li key={change.id} data-testid={`suppression-change-${change.id}`}>
+                        <span className="msg-recent-dot" aria-hidden />
+                        <span className="msg-recent-text">
+                          <span className="msg-change-line" data-private>
+                            {change.summary}
+                          </span>
+                          <span className="msg-change-meta">
+                            {change.actorName ?? "An operator"} · <RelativeTime at={change.at} />
+                            {change.revertOf === null ? null : " · a revert"}
+                            {change.reason === null ? null : ` · “${change.reason}”`}
+                          </span>
+                        </span>
+                        {change.revertable ? (
+                          <SuppressionRevertButton auditId={change.id} summary={change.summary} />
+                        ) : null}
+                      </li>
+                    )}
+                  </RecentFold>
                 )}
-              </RecentFold>
-            )}
-          </SectionCard>
+              </section>
+            </div>
+          </div>
         </div>
       </main>
     </ToastProvider>

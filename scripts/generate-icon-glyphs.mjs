@@ -116,6 +116,8 @@ const ICONS = {
   IconPause: "Pause",
   IconSkipBack: "SkipBack",
   IconSkipForward: "SkipForward",
+  IconSms: "ChatText",
+  IconWhatsApp: "WhatsappLogo",
 };
 
 /** Glyphs that are always drawn in one weight, whatever the caller asks. */

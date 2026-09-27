@@ -99,3 +99,5 @@ export { IconInbox } from "./glyphs/IconInbox";
 export { IconPause } from "./glyphs/IconPause";
 export { IconSkipBack } from "./glyphs/IconSkipBack";
 export { IconSkipForward } from "./glyphs/IconSkipForward";
+export { IconSms } from "./glyphs/IconSms";
+export { IconWhatsApp } from "./glyphs/IconWhatsApp";

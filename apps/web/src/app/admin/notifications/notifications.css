@@ -1,9 +1,19 @@
 /*
- * The Notification Control Center (/admin/notifications). Tokens only; the
- * switches reuse the product's `notify-switch` (base.css, 44px), so a toggle
- * here reads like the one on /account.
+ * The notifications admin (/admin/notifications and its sections). Tokens
+ * only. The Messages control centre (2026-09-27) comes first: the channel
+ * strip, the attention banner, the message list, the one-message panel (a
+ * bottom sheet under 1100px) and recent changes. The suppression desk and
+ * delivery analytics follow.
  */
 
+.admin-lede.admin-lede-under {
+  flex: none;
+  margin-top: calc(-1 * var(--space-2));
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* A title with a pill beside it (the suppression desk's rows). */
 .ntc-kind-head {
   display: flex;
   flex-wrap: wrap;
@@ -13,446 +23,22 @@
   min-width: 0;
 }
 
-/* One cell per channel. They wrap rather than scroll: at 360px each cell takes
-   the full row, on a desktop up to four sit side by side. */
-.ntc-cells {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.ntc-recent > li {
+  min-height: 48px;
+  padding-block: 6px;
 }
 
-.ntc-cell {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.ntc-cell[data-state="admin_off"] {
-  border-color: var(--danger-strong);
-}
-
-.ntc-cell[data-state="channel_off"] {
-  border-color: var(--warning-strong);
-}
-
-.ntc-cell-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-2);
-}
-
-/* The toggle keeps its 44px target but sits inline, not as a full-width row. */
-.ntc-toggle {
-  align-items: center;
-  padding-inline: 0;
+.ntc-recent-line {
+  color: var(--text-heading);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
 }
 
-.ntc-toggle input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
+/* ── The switch ──────────────────────────────────────────────────────────
+   Still a checkbox to every assistive technology (role="switch" where it is
+   one), drawn as a track. 32×18 by default (the suppression desk's confirm);
+   the message panel draws it a size up. */
 
-/* A locked cell has no control: the label sits where the toggle would, at the
-   same height, so the row does not jump. */
-.ntc-locked-label {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-}
-
-.ntc-note {
-  color: var(--text-secondary);
-}
-
-.ntc-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 var(--space-4);
-}
-
-/* ── Phase 4: the header links, the suppression desk, delivery analytics ── */
-
-.ntc-page-head {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.ntc-back {
-  gap: var(--space-2);
-  margin-inline-start: calc(-1 * var(--space-3));
-}
-
-/* The Phase 1 page's doors to its two sub-pages. They wrap at 360px. */
-.ntc-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.ntc-links a {
-  gap: var(--space-2);
-}
-
-.spr-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
-/* The search field and its button share a row on a desktop and stack on a
-   phone; the button lines up with the input, not the help text. */
-.spr-search {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--space-2) var(--space-3);
-}
-
-.spr-search > :first-child {
-  flex: 1 1 16rem;
-  min-width: 0;
-}
-
-.spr-search > button {
-  margin-top: calc(var(--text-sm-size) * 1.5 + var(--space-1));
-}
-
-.spr-pills {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-/* Analytics: the window switch, the per-channel figures and the trend. */
-.dla-windows {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.dla-figures {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
-.dla-channel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.dla-channel h3 {
-  margin: 0;
-}
-
-.dla-channel dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-1) var(--space-3);
-  margin: 0;
-}
-
-.dla-channel dt {
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-}
-
-.dla-channel dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-  text-align: end;
-}
-
-.dla-trend {
-  padding: var(--space-3) var(--space-4) var(--space-2);
-}
-
-.dla-trend svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 10rem;
-}
-
-.dla-bar-sent {
-  fill: var(--success-strong);
-}
-
-.dla-bar-failed {
-  fill: var(--danger-strong);
-}
-
-.dla-bar-suppressed {
-  fill: var(--warning-strong);
-}
-
-.dla-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-.dla-swatch {
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-inline-end: var(--space-1);
-  border-radius: 2px;
-  vertical-align: -0.1em;
-}
-
-/* The legend's swatches are spans, which take a background, not a fill. */
-.dla-swatch.dla-bar-sent {
-  background: var(--success-strong);
-}
-
-.dla-swatch.dla-bar-failed {
-  background: var(--danger-strong);
-}
-
-.dla-swatch.dla-bar-suppressed {
-  background: var(--warning-strong);
-}
-
-.dla-trend details {
-  margin-top: var(--space-2);
-}
-
-.dla-trend summary {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.dla-code {
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: var(--text-sm-size);
-  overflow-wrap: anywhere;
-}
-
-/* "Template: da_auction_sold (mapped here) · approved" — the way to
-   /admin/notifications/templates from a WhatsApp or SMS cell. A 44px target
-   in a dense cell, so the whole line is the link. */
-.ntc-template-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  overflow-wrap: anywhere;
-  color: var(--text-accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.ntc-template-link:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-/* ══ wow pass (round 2): the switchboard ═══════════════════════════════
-   One line per message. A column per channel holds a switch and one quiet
-   figure; a state is drawn only when it is news (off, channel off, locked, a
-   single cell not set up). A whole column that is not set up says so once in
-   its head. Opt-outs and the wording pencil close the row. */
-
-.ntc-channels {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.ntc-channel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-width: 0;
-  box-sizing: border-box;
-  min-height: 56px;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
-  border-inline-end: 1px solid var(--border-subtle);
-}
-
-.ntc-channel:last-child {
-  border-inline-end: 0;
-}
-
-.ntc-channel .ntc-kind-head {
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.ntc-channel .admin-name {
-  font-size: var(--text-sm-size);
-}
-
-.ntc-channel button {
-  flex: none;
-  white-space: nowrap;
-}
-
-/* A state, in words: a dot in the state's colour, the word in ink. */
-.ntc-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
-}
-
-.ntc-dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-full);
-  background: var(--text-muted);
-}
-
-.ntc-state[data-tone="green"] .ntc-dot {
-  background: var(--success-strong);
-}
-
-.ntc-state[data-tone="amber"] .ntc-dot {
-  background: var(--warning-strong);
-}
-
-.ntc-state[data-tone="red"] .ntc-dot {
-  background: var(--danger-strong);
-}
-
-.ntc-state[data-tone="red"] {
-  color: var(--text-primary);
-}
-
-.ntc-matrix {
-  --ntc-col: 9.5rem;
-  --ntc-optout: 11rem;
-  --ntc-edit: 2.75rem;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.ntc-kinds {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ntc-kind {
-  display: grid;
-  grid-template-columns:
-    minmax(0, 1fr) calc(var(--ntc-cols, 4) * var(--ntc-col)) var(--ntc-optout)
-    var(--ntc-edit);
-  align-items: center;
-  column-gap: var(--space-4);
-  box-sizing: border-box;
-  min-height: 56px;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
-  border-bottom: 1px solid var(--border-subtle);
-  transition: background-color var(--duration-fast) var(--ease-out);
-}
-
-.ntc-kinds > .ntc-kind:last-child {
-  border-bottom: 0;
-}
-
-.ntc-kinds > .ntc-kind:hover {
-  background: var(--surface-sunken);
-}
-
-.ntc-kind-name {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.ntc-kind-title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.ntc-kind-name .admin-name {
-  font-size: var(--text-sm-size);
-}
-
-.ntc-kind-desc {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: var(--text-xs-size);
-}
-
-.ntc-kind .ntc-cells {
-  display: grid;
-  grid-template-columns: repeat(var(--ntc-cols, 4), minmax(0, 1fr));
-  align-items: center;
-  gap: 0;
-}
-
-.ntc-kind .ntc-cell {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  grid-row: 1;
-  min-width: 0;
-  padding: 0 var(--space-2) 0 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-}
-
-.ntc-cell-line {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* The switch: still a checkbox to every assistive technology, drawn as a
-   32×18 track. Same paint as /account's, one size down for a dense grid. */
 .ntc-toggle {
   display: inline-flex;
   align-items: center;
@@ -461,6 +47,7 @@
   padding: 0;
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-medium);
+  cursor: pointer;
 }
 
 .ntc-toggle:hover {
@@ -496,11 +83,13 @@
 
 .ntc-toggle input:checked {
   background: var(--accent);
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 
 .ntc-toggle input:checked::before {
   transform: translateX(14px);
+  /* A light thumb on the gold track in both themes. */
+  background: var(--text-on-dark);
 }
 
 .ntc-toggle input:focus-visible {
@@ -513,358 +102,1173 @@
   opacity: 0.7;
 }
 
-/* A channel that cannot send yet: the switch keeps its setting, but reads as
-   standing by rather than live. */
-.ntc-cell[data-idle] .ntc-toggle input:checked {
-  opacity: 0.45;
-}
-
-.ntc-cell[data-state="admin_off"] .ntc-toggle input,
-.ntc-cell[data-state="channel_off"] .ntc-toggle input {
-  box-shadow: inset 0 0 0 1px var(--border-interactive);
-}
-
-.ntc-locked-label {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-}
-
-.ntc-counts {
-  color: var(--text-secondary);
-  font-size: var(--text-xs-size);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.ntc-counts [data-zero] {
-  color: var(--text-muted);
-}
-
-.ntc-counts-bad {
-  color: var(--danger-strong);
-  font-weight: var(--font-weight-medium);
-}
-
-.ntc-reason {
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: var(--text-secondary);
-  font-size: var(--text-xs-size);
-}
-
-/* The template door: a quiet glyph when none is mapped, the name when one is. */
-.ntc-template-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  min-height: 24px;
-  max-width: 100%;
-  border-radius: var(--radius-sm);
-  color: var(--text-accent);
-  text-decoration: none;
-}
-
-.ntc-template-link[data-none] {
-  color: var(--text-muted);
-}
-
-.ntc-template-link:hover {
-  color: var(--text-accent);
-  background: var(--surface-sunken);
-}
-
-.ntc-template-name {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs-size);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.ntc-template-link:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.ntc-optout {
-  min-width: 0;
-}
-
-.ntc-optout .ntc-controls {
-  display: flex;
-  gap: var(--space-3);
-}
-
-.ntc-optout .ntc-toggle {
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-regular);
-  color: var(--text-secondary);
-}
-
-.ntc-optout-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-}
-
-.ntc-edit {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.ntc-wording {
-  display: inline-flex;
-  align-items: center;
-}
-
-.ntc-wording-link {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition:
-    background-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-
-.ntc-wording-link:hover {
-  background: var(--surface-raised);
-  color: var(--text-accent);
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
-}
-
-.ntc-wording-link:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.ntc-wording-mark {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--accent-line);
-}
-
-.ntc-matrix-head {
-  min-height: 0;
-  box-sizing: border-box;
-  height: 32px;
-  padding-block: 0;
-  background: var(--surface-raised);
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.ntc-col-head {
+/* A state in words: a dot in the state's colour, the word in ink. */
+.ntc-state {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
-.ntc-col-note {
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-  font-size: 10px;
-  letter-spacing: 0.02em;
-  text-transform: none;
-}
-
-.ntc-recent > li {
-  min-height: 48px;
-  padding-block: 6px;
-}
-
-.ntc-recent-line {
-  color: var(--text-heading);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-}
-
-.admin-lede.admin-lede-under {
+.ntc-dot {
   flex: none;
-  margin-top: calc(-1 * var(--space-2));
-  font-size: var(--text-xs-size);
-  color: var(--text-muted);
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
 }
 
-/* On a wide screen the column head names the channel, so the switch's
-   visible label steps back (it is still its accessible name). */
-@media (min-width: 900px) {
-  .ntc-kind .ntc-cell .notify-switch-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .ntc-kind .ntc-cell .ntc-locked-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
+.ntc-state[data-tone="green"] .ntc-dot {
+  background: var(--success-strong);
 }
 
-@media (min-width: 900px) and (max-width: 1279px) {
-  .ntc-matrix {
-    --ntc-col: 7rem;
-    --ntc-optout: 8rem;
-  }
+.ntc-state[data-tone="amber"] .ntc-dot {
+  background: var(--warning-strong);
 }
 
-/* A phone: one row per message — its name, then its channels as a wrap of
-   small labelled switches, then who may opt out and the pencil. */
-@media (max-width: 899px) {
-  .ntc-matrix-head {
-    display: none;
-  }
-
-  .ntc-kind {
-    grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: var(--space-1);
-    padding: var(--space-2) var(--space-4);
-  }
-
-  /* The name and its pencil share the first line (round 5A); the one-line
-     description, truncated on a phone anyway, is the name's hover. */
-  .ntc-kind-name {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .ntc-kind-desc {
-    display: none;
-  }
-
-  .ntc-kind .ntc-cells {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 var(--space-4);
-  }
-
-  .ntc-kind .ntc-cell {
-    padding: 0;
-  }
-
-  .ntc-kind .ntc-cell .notify-switch-label,
-  .ntc-kind .ntc-locked-label {
-    font-size: var(--text-xs-size);
-    color: var(--text-secondary);
-  }
-
-  .ntc-kind .ntc-counts {
-    display: none;
-  }
-
-  .ntc-optout {
-    grid-column: 1 / -1;
-  }
-
-  .ntc-edit {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .ntc-kind .ntc-template-link {
-    display: none;
-  }
-
-  .ntc-channels {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .ntc-channel {
-    min-height: 48px;
-    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
-    border-inline-end: 0;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .ntc-channel:last-child {
-    border-bottom: 0;
-  }
+.ntc-state[data-tone="red"] .ntc-dot {
+  background: var(--danger-strong);
 }
 
-/* ── wow pass: delivery analytics ── three equal channel tiles, a quieter
-   "numbers by day" door, a chart with a floor. */
-
-.dla-figures {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  padding: 0 var(--space-5) var(--space-5);
+.ntc-state[data-tone="blue"] .ntc-dot {
+  background: var(--info-strong);
 }
 
-.dla-channel {
+.ntc-bad {
+  color: var(--danger-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── The channel strip ─────────────────────────────────────────────────── */
+
+.ntc-channels {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ntc-channel {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-4);
+  min-width: 0;
+  padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
   box-shadow: var(--shadow-1);
 }
 
-.dla-channel h3 {
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
-  letter-spacing: 0.02em;
+.ntc-channel[data-state="off"] {
+  border-color: var(--danger-strong);
 }
 
-.dla-channel dl {
-  font-size: var(--text-sm-size);
+.ntc-channel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
-.dla-channel dd {
-  font-weight: var(--font-weight-semibold);
+.ntc-channel-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   color: var(--text-heading);
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.dla-trend svg {
+.ntc-channel-line {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.ntc-channel-foot {
+  display: flex;
+  margin-top: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 36px;
+}
+
+.ntc-channel-sub {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.ntc-channel-short {
+  display: none;
+}
+
+.ntc-channel-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ntc-kebab {
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+/* ── The message list ──────────────────────────────────────────────────── */
+
+.msg-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.msg-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.msg-toolbar {
+  flex-wrap: wrap;
+}
+
+.msg-card {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.msg-empty {
+  padding: var(--space-5);
+}
+
+.msg-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken);
+}
+
+.msg-group-head h2,
+.msg-group-head h3 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.msg-group-head span {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.msg-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.msg-rows > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.msg-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.msg-row:hover {
+  background: var(--surface-sunken);
+}
+
+.msg-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.msg-row[aria-current="true"] {
+  background: var(--accent-subtle);
+  box-shadow: inset 3px 0 0 var(--accent-line);
+}
+
+.msg-row[aria-current="true"] .msg-row-optout,
+.msg-row[aria-current="true"] .msg-row-chevron {
+  color: var(--text-secondary);
+}
+
+.msg-row-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.msg-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.msg-row-name {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.msg-row-desc {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.msg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.msg-chips > span {
+  font-variant-numeric: tabular-nums;
+}
+
+.msg-row-note {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  overflow-wrap: anywhere;
+}
+
+.msg-row-optout {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 10.5rem;
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  text-align: end;
+}
+
+.msg-row-chevron {
+  flex: none;
+  color: var(--text-muted);
+}
+
+/* ── The side column: the open message, then recent changes ────────────── */
+
+.msg-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.msg-hint {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.msg-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-2);
+  color: var(--text-primary);
+}
+
+.msg-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.dla-trend summary {
-  min-height: 36px;
-  color: var(--text-accent);
+.msg-panel-titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.msg-eyebrow,
+.msg-label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.msg-panel-title {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+}
+
+.msg-panel-title:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.msg-panel-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.msg-panel-close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-block: calc(-1 * var(--space-2));
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+}
+
+.msg-panel-close:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.msg-panel-close:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.msg-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-2);
+}
+
+.msg-panel-section:last-child {
+  padding-bottom: var(--space-5);
+}
+
+.msg-chs,
+.msg-optouts,
+.msg-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.msg-ch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.msg-ch {
+  align-items: flex-start;
+}
+
+.msg-ch-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.msg-ch-name {
+  color: var(--text-heading);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
 }
 
-/* ── wow pass round 2: a chart with a scale ── */
+.msg-ch-line {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.msg-ch-why {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.msg-ch-reason {
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.msg-ch-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.msg-ch-lock {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--info-subtle);
+  color: var(--info-strong);
+}
+
+.msg-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.msg-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.msg-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.msg-mono {
+  font-family: var(--font-mono);
+}
+
+.msg-wording {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+}
+
+.msg-wording-state {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+/* The panel's switches: a size up from the default, 40×24 on a 44px row. */
+.msg-ch .ntc-toggle,
+.msg-optouts .ntc-toggle {
+  min-height: 44px;
+}
+
+.msg-ch .ntc-toggle input,
+.msg-optouts .ntc-toggle input {
+  width: 40px;
+  height: 24px;
+}
+
+.msg-ch .ntc-toggle input::before,
+.msg-optouts .ntc-toggle input::before {
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+}
+
+.msg-ch .ntc-toggle input:checked::before,
+.msg-optouts .ntc-toggle input:checked::before {
+  transform: translateX(16px);
+}
+
+/* The switch and what it means, side by side under the channel's state. The
+   switch is always drawn plainly on or off — it is the admin's intent; the
+   words say whether that intent can send yet. */
+.msg-ch-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.msg-ch-switch .ntc-toggle {
+  flex: none;
+}
+
+.msg-ch-switch-note {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.msg-ch-switch-note[data-state="admin_off"] {
+  color: var(--danger-strong);
+}
+
+.msg-optouts > li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ntc-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.ntc-toggle-text {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-regular);
+}
+
+.msg-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.msg-history > li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.msg-change-line {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.msg-change-meta {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+  overflow-wrap: anywhere;
+}
+
+.ntc-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ntc-confirm p {
+  margin: 0;
+}
+
+/* ── Recent changes ────────────────────────────────────────────────────── */
+
+.msg-recent {
+  padding: var(--space-3) var(--space-4);
+}
+
+.msg-recent-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--space-2);
+}
+
+.msg-recent-head h2 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.msg-recent-head span {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.msg-recent-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.msg-recent-list > li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.msg-recent-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: var(--radius-full);
+  background: var(--accent-line);
+}
+
+.msg-recent-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.msg-recent .admin-more > summary {
+  min-height: 36px;
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* On a laptop the side column stays in view while the list scrolls: a
+   message opened from the bottom of the list opens where the eye is. It sits
+   under the shell's sticky identity bar and section tabs. */
+@media (min-width: 1100px) {
+  .msg-side {
+    --msg-side-top: calc(var(--shell-topbar-h) + 44px + var(--space-4));
+    position: sticky;
+    top: var(--msg-side-top);
+    max-height: calc(100dvh - var(--msg-side-top) - var(--space-4));
+    overflow-y: auto;
+    /* Room for the panel's shadow inside the scroller's clip. */
+    margin: calc(-1 * var(--space-2));
+    padding: var(--space-2);
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+
+/* ── Under 1100px: one column, the open message as a bottom sheet ───────── */
+
+@media (max-width: 1279px) {
+  .ntc-channels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1099px) {
+  .msg-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .msg-hint {
+    display: none;
+  }
+
+  /* Before hydration the panel is the server's <aside>: drawn where the sheet
+     will be, so the upgrade to a modal <dialog> does not move anything. */
+  .msg-panel {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    max-height: calc(100dvh - var(--space-12));
+    overflow-y: auto;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: var(--shadow-4);
+  }
+
+  .msg-sheet {
+    width: 100%;
+    max-width: 40rem;
+    margin: auto auto 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .msg-sheet::backdrop {
+    background: var(--scrim, rgb(7 10 15 / 0.6));
+  }
+
+  .msg-sheet-grip {
+    align-self: center;
+    flex: none;
+    width: 40px;
+    height: 5px;
+    margin: var(--space-2) 0 0;
+    border-radius: var(--radius-full);
+    background: var(--border-strong);
+  }
+
+  .msg-panel-head {
+    padding-top: var(--space-3);
+  }
+}
+
+/* Under 900px the four cards would fill the first screen: the strip becomes
+   one card of one-line rows — name · state · its number · ⋯ — so the banner
+   and the first messages are in view without a scroll. The full sentence is
+   one tap away in the ⋯ (and on a laptop). */
+@media (max-width: 899px) {
+  .ntc-channels {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-1);
+  }
+
+  .ntc-channel {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-1) 0 var(--space-3);
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .ntc-channel + .ntc-channel {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .ntc-channel[data-state="off"] {
+    box-shadow: inset 3px 0 0 var(--danger-strong);
+  }
+
+  .ntc-channel-head,
+  .ntc-channel-foot {
+    display: contents;
+  }
+
+  .ntc-channel-name {
+    flex: 1 1 auto;
+    font-size: var(--text-sm-size);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .ntc-channel-line,
+  .ntc-channel-sub {
+    display: none;
+  }
+
+  .ntc-channel-short {
+    display: inline;
+    order: 1;
+    color: var(--text-secondary);
+    font-size: var(--text-xs-size);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .ntc-channel[data-state="off"] .ntc-channel-short {
+    display: none;
+  }
+
+  .ntc-channel-actions {
+    order: 2;
+  }
+}
+
+@media (max-width: 719px) {
+  /* The first screen belongs to the channels, the banner and the first
+     messages; the page's one-line explanation is laptop furniture. */
+  .msg-lede {
+    display: none;
+  }
+
+  .admin-stack:has(> .ntc-strip) {
+    gap: var(--space-3);
+  }
+
+  .admin-stack:has(> .ntc-strip) .msg-list {
+    gap: var(--space-2);
+  }
+
+  .ntc-channel {
+    min-height: 40px;
+  }
+
+  .admin-stack:has(> .ntc-strip) .msg-group-head {
+    padding-block: var(--space-2);
+  }
+
+  .msg-row {
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-2) var(--space-3) var(--space-3);
+  }
+
+  .msg-row-desc,
+  .msg-row-optout {
+    display: none;
+  }
+
+  .msg-panel-section {
+    padding-inline: var(--space-4);
+  }
+
+  .msg-panel-head {
+    padding-left: var(--space-4);
+  }
+}
+
+/* ── The suppression desk and delivery analytics ───────────────────────── */
+
+.spr-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+/* The search field and its button share a row on a desktop and stack on a
+   phone; the button lines up with the input, not the help text. */
+.spr-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2) var(--space-3);
+}
+
+.spr-search > :first-child {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.spr-search > button {
+  margin-top: calc(var(--text-sm-size) * 1.5 + var(--space-1));
+}
+
+.spr-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* ── The suppression desk (stage 2): lookup first, rows like Messages ──── */
+
+.spr-title {
+  margin: 0;
+}
+
+.spr-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.spr-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.spr-results-head {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  overflow-wrap: anywhere;
+}
+
+.spr-rows {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  list-style: none;
+}
+
+.spr-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+}
+
+.spr-row + .spr-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.spr-row[data-active="false"] .spr-row-name {
+  color: var(--text-secondary);
+}
+
+.spr-row-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.spr-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.spr-row-name {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.spr-row-meta {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+/* The desk's side column holds a form: it scrolls with the page rather than
+   sticking (a sticky column clipped the Suppress button inside its own
+   scroller). */
+@media (min-width: 1100px) {
+  .spr-layout .msg-side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* Adding one by hand: a compact stacked form in the side column. */
+.spr-add-head {
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.spr-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.spr-add-go {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Delivery analytics (stage 2): figures, channels, trend, reasons ─────── */
+
+.dla-figs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.dla-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+.dla-fig + .dla-fig {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.dla-fig dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dla-fig dd {
+  margin: 0;
+}
+
+.dla-fig-value {
+  color: var(--text-heading);
+  font-size: var(--text-2xl-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.dla-fig[data-alarm] .dla-fig-value {
+  color: var(--danger-strong);
+}
+
+.dla-fig-hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.dla-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dla-channel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.dla-channel + .dla-channel {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.dla-channel-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dla-channel dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm-size);
+}
+
+.dla-channel dt {
+  color: var(--text-secondary);
+}
+
+.dla-channel dd {
+  margin: 0;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.dla-channel dd[data-zero] {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.dla-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.dla-empty {
+  padding: var(--space-4);
+}
+
+.dla-reasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dla-reasons > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.dla-reasons > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.dla-reason-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dla-reason-name {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.dla-reason-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.dla-reason-count {
+  flex: none;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The trend: a chart with a floor and a scale, drawn on the server. */
+.dla-trend {
+  padding: var(--space-3) var(--space-4) var(--space-2);
+}
+
 .dla-plot {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-2);
   align-items: stretch;
+}
+
+.dla-trend svg {
+  display: block;
+  width: 100%;
+  height: 10rem;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .dla-axis-y {
@@ -895,44 +1299,107 @@
   vector-effect: non-scaling-stroke;
 }
 
-.dla-trend svg {
-  height: 10rem;
-  max-height: none;
+.dla-bar-sent {
+  fill: var(--success-strong);
 }
 
-.dla-code {
-  font-family: inherit;
+.dla-bar-failed {
+  fill: var(--danger-strong);
 }
 
-/* ── wow pass round 2: the suppression desk's forms, one row each ── */
-.spr-stack {
+.dla-bar-suppressed {
+  fill: var(--warning-strong);
+}
+
+.dla-legend {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
 }
 
-.spr-add {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
-  align-items: start;
-  gap: var(--space-3);
+.dla-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-inline-end: var(--space-1);
+  border-radius: 2px;
+  vertical-align: -0.1em;
 }
 
-.spr-add-go {
-  margin-top: calc(var(--text-sm-size) * 1.5 + var(--space-1));
+/* The legend's swatches are spans, which take a background, not a fill. */
+.dla-swatch.dla-bar-sent {
+  background: var(--success-strong);
+}
+
+.dla-swatch.dla-bar-failed {
+  background: var(--danger-strong);
+}
+
+.dla-swatch.dla-bar-suppressed {
+  background: var(--warning-strong);
+}
+
+.dla-trend details {
+  margin-top: var(--space-1);
+}
+
+.dla-trend summary {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+@media (max-width: 1099px) {
+  .dla-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 899px) {
-  .spr-add {
+  .dla-figs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dla-fig:nth-child(3) {
+    border-left: 0;
+  }
+
+  .dla-fig:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .dla-figures {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .spr-add-go {
-    margin-top: 0;
+  .dla-channel + .dla-channel {
+    border-top: 1px solid var(--border-subtle);
+    border-left: 0;
+  }
+
+  .dla-channel dl {
+    grid-template-columns: repeat(2, auto 1fr);
   }
 }
 
-.dla-channel dd[data-zero] {
-  color: var(--text-muted);
-  font-weight: var(--font-weight-regular);
+@media (max-width: 719px) {
+  .dla-fig,
+  .dla-channel,
+  .dla-trend,
+  .dla-reasons > li {
+    padding-inline: var(--space-3);
+  }
+
+  .dla-fig-value {
+    font-size: var(--text-lg-size);
+  }
 }
