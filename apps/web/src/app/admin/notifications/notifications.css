@@ -211,6 +211,10 @@
   font-size: var(--text-xs-size);
 }
 
+.ntc-channel-short {
+  display: none;
+}
+
 .ntc-channel-actions {
   display: inline-flex;
   flex: none;
@@ -267,6 +271,7 @@
   background: var(--surface-sunken);
 }
 
+.msg-group-head h2,
 .msg-group-head h3 {
   margin: 0;
   color: var(--text-heading);
@@ -502,8 +507,8 @@
   border-top: 1px solid var(--border-subtle);
 }
 
-.msg-ch > [aria-hidden] {
-  align-self: flex-start;
+.msg-ch {
+  align-items: flex-start;
 }
 
 .msg-ch-text {
@@ -543,7 +548,6 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  margin-top: 2px;
 }
 
 .msg-ch-lock {
@@ -552,6 +556,9 @@
   align-items: center;
   justify-content: center;
   width: 40px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--info-subtle);
   color: var(--info-strong);
 }
 
@@ -619,10 +626,28 @@
   transform: translateX(16px);
 }
 
-/* A channel that cannot send yet: the switch keeps its setting, but reads as
-   standing by rather than live. */
-.msg-ch:has(.ntc-state[data-tone="amber"]) .ntc-toggle input:checked {
-  opacity: 0.5;
+/* The switch and what it means, side by side under the channel's state. The
+   switch is always drawn plainly on or off — it is the admin's intent; the
+   words say whether that intent can send yet. */
+.msg-ch-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.msg-ch-switch .ntc-toggle {
+  flex: none;
+}
+
+.msg-ch-switch-note {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.msg-ch-switch-note[data-state="admin_off"] {
+  color: var(--danger-strong);
 }
 
 .msg-optouts > li {
@@ -817,33 +842,82 @@
   }
 }
 
-@media (max-width: 719px) {
+/* Under 900px the four cards would fill the first screen: the strip becomes
+   one card of one-line rows — name · state · its number · ⋯ — so the banner
+   and the first messages are in view without a scroll. The full sentence is
+   one tap away in the ⋯ (and on a laptop). */
+@media (max-width: 899px) {
   .ntc-channels {
-    gap: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-1);
   }
 
   .ntc-channel {
-    padding: var(--space-3) var(--space-2) var(--space-1) var(--space-3);
-  }
-
-  .ntc-channel-line {
-    font-size: var(--text-xs-size);
-  }
-
-  /* 170px cards: the name keeps its words and the state wraps under it. */
-  .ntc-channel-head {
+    flex-direction: row;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-1) var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-1) 0 var(--space-3);
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 
-  .ntc-channel-head > [aria-hidden] {
-    display: none;
+  .ntc-channel + .ntc-channel {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .ntc-channel[data-state="off"] {
+    box-shadow: inset 3px 0 0 var(--danger-strong);
+  }
+
+  .ntc-channel-head,
+  .ntc-channel-foot {
+    display: contents;
   }
 
   .ntc-channel-name {
-    flex-basis: 100%;
-    overflow: visible;
-    white-space: normal;
+    flex: 1 1 auto;
+    font-size: var(--text-sm-size);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .ntc-channel-line,
+  .ntc-channel-sub {
+    display: none;
+  }
+
+  .ntc-channel-short {
+    display: inline;
+    order: 1;
+    color: var(--text-secondary);
+    font-size: var(--text-xs-size);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .ntc-channel[data-state="off"] .ntc-channel-short {
+    display: none;
+  }
+
+  .ntc-channel-actions {
+    order: 2;
+  }
+}
+
+@media (max-width: 719px) {
+  /* The first screen belongs to the channels, the banner and the first
+     messages; the page's one-line explanation is laptop furniture. */
+  .msg-lede {
+    display: none;
   }
 
   .msg-row {
@@ -885,7 +959,7 @@
 }
 
 .spr-search > :first-child {
-  flex: 1 1 16rem;
+  flex: 1 1 12rem;
   min-width: 0;
 }
 
@@ -899,175 +973,286 @@
   gap: var(--space-1);
 }
 
-/* Analytics: the window switch, the per-channel figures and the trend. */
-.dla-windows {
+/* ── The suppression desk (stage 2): lookup first, rows like Messages ──── */
+
+.spr-title {
+  margin: 0;
+}
+
+.spr-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.spr-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+}
+
+.spr-results-head {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  overflow-wrap: anywhere;
+}
+
+.spr-rows {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  list-style: none;
+}
+
+.spr-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+}
+
+.spr-row + .spr-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.spr-row[data-active="false"] .spr-row-name {
+  color: var(--text-secondary);
+}
+
+.spr-row-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.spr-row-title {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.spr-row-name {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.spr-row-meta {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+/* The desk's side column holds a form: it scrolls with the page rather than
+   sticking (a sticky column clipped the Suppress button inside its own
+   scroller). */
+@media (min-width: 1100px) {
+  .spr-layout .msg-side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* Adding one by hand: a compact stacked form in the side column. */
+.spr-add-head {
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+.spr-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.spr-add-go {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Delivery analytics (stage 2): figures, channels, trend, reasons ─────── */
+
+.dla-figs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.dla-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+.dla-fig + .dla-fig {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.dla-fig dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dla-fig dd {
+  margin: 0;
+}
+
+.dla-fig-value {
+  color: var(--text-heading);
+  font-size: var(--text-2xl-size);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.dla-fig[data-alarm] .dla-fig-value {
+  color: var(--danger-strong);
+}
+
+.dla-fig-hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
 }
 
 .dla-figures {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .dla-channel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   min-width: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
-.dla-channel h3 {
+.dla-channel + .dla-channel {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.dla-channel-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-bold);
 }
 
 .dla-channel dl {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: var(--space-1) var(--space-3);
+  gap: 4px var(--space-3);
   margin: 0;
+  font-size: var(--text-sm-size);
 }
 
 .dla-channel dt {
   color: var(--text-secondary);
-  font-size: var(--text-sm-size);
 }
 
 .dla-channel dd {
   margin: 0;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   text-align: end;
 }
 
+.dla-channel dd[data-zero] {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.dla-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.dla-empty {
+  padding: var(--space-4);
+}
+
+.dla-reasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dla-reasons > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.dla-reasons > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.dla-reason-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dla-reason-name {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.dla-reason-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs-size);
+}
+
+.dla-reason-count {
+  flex: none;
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The trend: a chart with a floor and a scale, drawn on the server. */
 .dla-trend {
   padding: var(--space-3) var(--space-4) var(--space-2);
 }
 
-.dla-trend svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 10rem;
-}
-
-.dla-bar-sent {
-  fill: var(--success-strong);
-}
-
-.dla-bar-failed {
-  fill: var(--danger-strong);
-}
-
-.dla-bar-suppressed {
-  fill: var(--warning-strong);
-}
-
-.dla-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-.dla-swatch {
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-inline-end: var(--space-1);
-  border-radius: 2px;
-  vertical-align: -0.1em;
-}
-
-/* The legend's swatches are spans, which take a background, not a fill. */
-.dla-swatch.dla-bar-sent {
-  background: var(--success-strong);
-}
-
-.dla-swatch.dla-bar-failed {
-  background: var(--danger-strong);
-}
-
-.dla-swatch.dla-bar-suppressed {
-  background: var(--warning-strong);
-}
-
-.dla-trend details {
-  margin-top: var(--space-2);
-}
-
-.dla-trend summary {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.dla-code {
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: var(--text-sm-size);
-  overflow-wrap: anywhere;
-}
-
-/* ── wow pass: delivery analytics ── three equal channel tiles, a quieter
-   "numbers by day" door, a chart with a floor. */
-
-.dla-figures {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  padding: 0 var(--space-5) var(--space-5);
-}
-
-.dla-channel {
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-}
-
-.dla-channel h3 {
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
-  letter-spacing: 0.02em;
-}
-
-.dla-channel dl {
-  font-size: var(--text-sm-size);
-}
-
-.dla-channel dd {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.dla-trend svg {
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.dla-trend summary {
-  min-height: 36px;
-  color: var(--text-accent);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-}
-
-/* ── wow pass round 2: a chart with a scale ── */
 .dla-plot {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-2);
   align-items: stretch;
+}
+
+.dla-trend svg {
+  display: block;
+  width: 100%;
+  height: 10rem;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .dla-axis-y {
@@ -1098,44 +1283,107 @@
   vector-effect: non-scaling-stroke;
 }
 
-.dla-trend svg {
-  height: 10rem;
-  max-height: none;
+.dla-bar-sent {
+  fill: var(--success-strong);
 }
 
-.dla-code {
-  font-family: inherit;
+.dla-bar-failed {
+  fill: var(--danger-strong);
 }
 
-/* ── wow pass round 2: the suppression desk's forms, one row each ── */
-.spr-stack {
+.dla-bar-suppressed {
+  fill: var(--warning-strong);
+}
+
+.dla-legend {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
 }
 
-.spr-add {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
-  align-items: start;
-  gap: var(--space-3);
+.dla-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-inline-end: var(--space-1);
+  border-radius: 2px;
+  vertical-align: -0.1em;
 }
 
-.spr-add-go {
-  margin-top: calc(var(--text-sm-size) * 1.5 + var(--space-1));
+/* The legend's swatches are spans, which take a background, not a fill. */
+.dla-swatch.dla-bar-sent {
+  background: var(--success-strong);
+}
+
+.dla-swatch.dla-bar-failed {
+  background: var(--danger-strong);
+}
+
+.dla-swatch.dla-bar-suppressed {
+  background: var(--warning-strong);
+}
+
+.dla-trend details {
+  margin-top: var(--space-1);
+}
+
+.dla-trend summary {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+@media (max-width: 1099px) {
+  .dla-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 899px) {
-  .spr-add {
+  .dla-figs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dla-fig:nth-child(3) {
+    border-left: 0;
+  }
+
+  .dla-fig:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .dla-figures {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .spr-add-go {
-    margin-top: 0;
+  .dla-channel + .dla-channel {
+    border-top: 1px solid var(--border-subtle);
+    border-left: 0;
+  }
+
+  .dla-channel dl {
+    grid-template-columns: repeat(2, auto 1fr);
   }
 }
 
-.dla-channel dd[data-zero] {
-  color: var(--text-muted);
-  font-weight: var(--font-weight-regular);
+@media (max-width: 719px) {
+  .dla-fig,
+  .dla-channel,
+  .dla-trend,
+  .dla-reasons > li {
+    padding-inline: var(--space-3);
+  }
+
+  .dla-fig-value {
+    font-size: var(--text-lg-size);
+  }
 }

@@ -4,12 +4,12 @@ import {
   EmptyState,
   IconAlert,
   IconBell,
-  IconDevice,
   IconLock,
   IconMail,
-  IconMessageCircle,
   IconPencil,
+  IconSms,
   IconTile,
+  IconWhatsApp,
   Notice,
   Pill,
   type KitTone,
@@ -31,9 +31,12 @@ import {
   attentionOf,
   changesFor,
   channelHealth,
+  channelShort,
+  countsLine,
   findRow,
   messageGroups,
   plainCause,
+  switchNote,
   type ChannelHealth,
 } from "./messages-model";
 import { formatCount } from "../../../lib/plural";
@@ -55,8 +58,8 @@ const PAGE = "/admin/notifications";
 
 const CHANNEL_ICON: Readonly<Record<string, ReactNode>> = {
   email: <IconMail />,
-  whatsapp: <IconMessageCircle />,
-  sms: <IconDevice />,
+  whatsapp: <IconWhatsApp />,
+  sms: <IconSms />,
   in_app: <IconBell />,
 };
 
@@ -125,6 +128,9 @@ function ChannelStrip({ health }: { health: readonly ChannelHealth[] }) {
               <p className="ntc-channel-line">{channel.line}</p>
               <div className="ntc-channel-foot">
                 <span className="ntc-channel-sub">{channelSub(channel)}</span>
+                {/* A phone draws the strip as one line per channel: this is
+                    its number, in place of the line and the sub above. */}
+                <span className="ntc-channel-short">{channelShort(channel)}</span>
                 <ChannelControl
                   channel={channel.channel}
                   label={channel.label}
@@ -193,19 +199,6 @@ function stateWord(cell: GridCell): { word: string; tone: string } {
         ? { word: "On", tone: "green" }
         : { word: "Not configured", tone: "amber" };
   }
-}
-
-function countsLine(cell: GridCell, days: number): string {
-  const c = cell.counts;
-  if (c.sent + c.failed + c.suppressed === 0) return `nothing sent in ${String(days)} days`;
-  const parts: string[] = [];
-  if (c.sent > 0) parts.push(`${formatCount(c.sent)} sent`);
-  if (c.failed > 0) parts.push(`${formatCount(c.failed)} failed`);
-  if (c.suppressed > 0) parts.push(`${formatCount(c.suppressed)} suppressed`);
-  if (cell.channel === "whatsapp" && c.delivered > 0) {
-    parts.push(`${formatCount(c.delivered)} delivered`, `${formatCount(c.read)} read`);
-  }
-  return `${parts.join(" · ")} in ${String(days)} days`;
 }
 
 const SOURCE_LABEL = { admin: "mapped here", env: "server setting", unset: "" } as const;
@@ -286,6 +279,7 @@ function ChannelRow({
   wording: WordingSummary | null;
 }) {
   const state = stateWord(cell);
+  const noteId = `notify-note-${row.key}-${cell.channel}`;
   return (
     <li className="msg-ch" data-state={cell.state}>
       <IconTile icon={CHANNEL_ICON[cell.channel]} tone="neutral" size="sm" />
@@ -310,6 +304,30 @@ function ChannelRow({
         {cell.state === "admin_off" && cell.reason !== null ? (
           <span className="msg-ch-reason">“{cell.reason}”</span>
         ) : null}
+        {/* The admin's switch, drawn plainly on or off, and beside it what
+            that means — "on" on a channel that cannot send yet says so in
+            words rather than by looking half-on. */}
+        <span className="msg-ch-switch">
+          {row.locked ? (
+            <span className="msg-ch-lock">
+              <IconLock size={16} />
+            </span>
+          ) : (
+            <SwitchToggle
+              kind={row.key}
+              kindLabel={row.label}
+              kindDescription={row.description}
+              channel={cell.channel}
+              channelLabel={cell.channelLabel}
+              enabled={cell.kindEnabled}
+              needsReason={row.needsReason}
+              describedBy={noteId}
+            />
+          )}
+          <span id={noteId} className="msg-ch-switch-note" data-state={cell.state}>
+            {switchNote(cell)}
+          </span>
+        </span>
         {cell.template === null && wording === null ? null : (
           <span className="msg-ch-links">
             <TemplateLink row={row} cell={cell} />
@@ -317,24 +335,6 @@ function ChannelRow({
           </span>
         )}
       </div>
-      {row.locked ? (
-        <span className="msg-ch-lock" title="Sign-in codes are never stopped">
-          <IconLock size={16} />
-          <span className="admin-sr-only">
-            {row.label} on {cell.channelLabel}: never stopped
-          </span>
-        </span>
-      ) : (
-        <SwitchToggle
-          kind={row.key}
-          kindLabel={row.label}
-          kindDescription={row.description}
-          channel={cell.channel}
-          channelLabel={cell.channelLabel}
-          enabled={cell.kindEnabled}
-          needsReason={row.needsReason}
-        />
-      )}
     </li>
   );
 }

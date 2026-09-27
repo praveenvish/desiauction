@@ -133,6 +133,18 @@ export function channelHealth(
   });
 }
 
+/**
+ * The channel's health in one short phrase, for the one-line rows a phone
+ * draws in place of the cards: "4,472 sent", "24 waiting", "3 failed".
+ */
+export function channelShort(health: ChannelHealth): string {
+  if (health.state === "off") return "Switched off";
+  if (health.state === "not_set_up") return `${formatCount(health.blocked)} waiting`;
+  if (health.failed > 0) return `${formatCount(health.failed)} failed`;
+  if (health.sent > 0) return `${formatCount(health.sent)} sent`;
+  return "Nothing sent";
+}
+
 /* ── Needs attention ───────────────────────────────────────────────────── */
 
 export interface Attention {
@@ -371,4 +383,61 @@ export function findRow(
     if (row !== undefined) return { group, row };
   }
   return null;
+}
+
+/* ── One channel of an open message ────────────────────────────────────── */
+
+/** Why a cell that is switched on cannot send, as the end of a sentence. */
+function waitsFor(cell: GridCell): string {
+  return cell.templateIssue ? "it has an approved template" : `${cell.channelLabel} is set up`;
+}
+
+/**
+ * The window's counts for one message on one channel, in words. On a channel
+ * that cannot send, what the outbox settled as suppressed is said as what it
+ * is — messages that could not go — with the reason beside it, never as a bare
+ * "suppressed" that reads like somebody chose it.
+ */
+export function countsLine(cell: GridCell, days: number): string {
+  const c = cell.counts;
+  const window = `in ${String(days)} days`;
+  if (c.sent + c.failed + c.suppressed === 0) return `nothing sent ${window}`;
+  const parts: string[] = [];
+  if (c.sent > 0) parts.push(`${formatCount(c.sent)} sent`);
+  if (c.failed > 0) parts.push(`${formatCount(c.failed)} failed`);
+  const blocked = cell.notConfigured !== null && cell.state !== "locked";
+  if (c.suppressed > 0) {
+    parts.push(`${formatCount(c.suppressed)} ${blocked ? "couldn't send" : "suppressed"}`);
+  }
+  if (cell.channel === "whatsapp" && c.delivered > 0) {
+    parts.push(`${formatCount(c.delivered)} delivered`, `${formatCount(c.read)} read`);
+  }
+  const line = `${parts.join(" · ")} ${window}`;
+  if (!blocked || c.suppressed === 0) return line;
+  return cell.templateIssue
+    ? `${line} — no approved template yet`
+    : `${line} — ${cell.channelLabel} isn't set up`;
+}
+
+/**
+ * What the admin's switch means, said beside it. The switch is the admin's
+ * intent and is drawn plainly on or off; whether anything goes out as a result
+ * is this sentence's job, so an "on" that cannot send yet never has to look
+ * half-on to say so.
+ */
+export function switchNote(cell: GridCell): string {
+  switch (cell.state) {
+    case "locked":
+      return "Always sent — can't be switched off";
+    case "admin_off":
+      return "Switched off by an admin";
+    case "channel_off":
+      return cell.kindEnabled
+        ? `Switch is on — ${cell.channelLabel} is off everywhere`
+        : `Switch is off — and ${cell.channelLabel} is off everywhere`;
+    case "on":
+      return cell.notConfigured === null
+        ? "Switch is on — sending"
+        : `Switch is on — sends once ${waitsFor(cell)}`;
+  }
 }

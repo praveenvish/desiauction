@@ -94,9 +94,12 @@ export function SwitchToggle({
   channelLabel,
   enabled,
   needsReason,
+  describedBy,
 }: {
   kind: string;
   kindLabel: string;
+  /** The id of the words beside the switch that say what it means. */
+  describedBy?: string;
   /** What the message does — the security confirm says it before asking why. */
   kindDescription: string;
   channel: string;
@@ -120,6 +123,7 @@ export function SwitchToggle({
           role="switch"
           checked={shown}
           disabled={pending}
+          aria-describedby={describedBy}
           data-testid={id}
           onChange={(event) => {
             const next = event.target.checked;

@@ -12,6 +12,8 @@ import {
   attentionOf,
   changesFor,
   channelHealth,
+  channelShort,
+  countsLine,
   chipOf,
   chipsOf,
   filterCounts,
@@ -21,6 +23,8 @@ import {
   messageGroups,
   optOutSummary,
   plainCause,
+  switchNote,
+  type ChannelHealth,
 } from "./messages-model";
 
 const ZERO: CellCounts = { sent: 0, failed: 0, suppressed: 0, delivered: 0, read: 0 };
@@ -299,5 +303,77 @@ describe("one message", () => {
     expect(listWords([])).toBe("");
     expect(listWords(["Email"])).toBe("Email");
     expect(listWords(["Email", "WhatsApp", "SMS"])).toBe("Email, WhatsApp and SMS");
+  });
+});
+
+describe("the channel health, in one line", () => {
+  it("says the one number a phone row has room for", () => {
+    const health = channelHealth(channels(), GROUPS, 30);
+    const of = (channel: string) => health.find((c) => c.channel === channel);
+    expect(channelShort(of("sms") as ChannelHealth)).toBe("3 failed");
+    expect(channelShort(of("email") as ChannelHealth)).toBe("2 waiting");
+    expect(channelShort(of("in_app") as ChannelHealth)).toBe("Nothing sent");
+    const off = channelHealth(channels({ sms: null }), GROUPS, 30).find((c) => c.channel === "sms");
+    expect(channelShort(off as ChannelHealth)).toBe("Switched off");
+    const clean: GridGroup[] = [
+      {
+        key: "g",
+        label: "G",
+        rows: [row("a", "A", [cell("sms", { counts: { ...ZERO, sent: 4472 } })])],
+      },
+    ];
+    const live = channelHealth(channels(), clean, 30).find((c) => c.channel === "sms");
+    expect(channelShort(live as ChannelHealth)).toBe("4,472 sent");
+  });
+});
+
+describe("one channel of an open message", () => {
+  it("says what was sent, failed and suppressed on a live channel", () => {
+    expect(countsLine(cell("sms", { counts: { ...ZERO, sent: 4026, failed: 3 } }), 30)).toBe(
+      "4,026 sent · 3 failed in 30 days",
+    );
+    expect(countsLine(cell("sms", { counts: { ...ZERO, suppressed: 7 } }), 30)).toBe(
+      "7 suppressed in 30 days",
+    );
+    expect(countsLine(cell("in_app"), 7)).toBe("nothing sent in 7 days");
+  });
+
+  it("says what could not go on a channel that is not set up, and why, from the same count", () => {
+    const email = cell("email", {
+      notConfigured: EMAIL_UNSET,
+      counts: { ...ZERO, suppressed: 4026 },
+    });
+    expect(countsLine(email, 30)).toBe("4,026 couldn't send in 30 days — Email isn't set up");
+    const wa = cell("whatsapp", {
+      notConfigured: "No approved template mapped",
+      templateIssue: true,
+      counts: { ...ZERO, suppressed: 12 },
+    });
+    expect(countsLine(wa, 30)).toBe("12 couldn't send in 30 days — no approved template yet");
+    expect(countsLine(cell("email", { notConfigured: EMAIL_UNSET }), 30)).toBe(
+      "nothing sent in 30 days",
+    );
+  });
+
+  it("puts the admin's switch into words, apart from whether anything can send", () => {
+    expect(switchNote(cell("sms"))).toBe("Switch is on — sending");
+    expect(switchNote(cell("email", { notConfigured: EMAIL_UNSET }))).toBe(
+      "Switch is on — sends once Email is set up",
+    );
+    expect(
+      switchNote(cell("whatsapp", { notConfigured: "No template", templateIssue: true })),
+    ).toBe("Switch is on — sends once it has an approved template");
+    expect(switchNote(cell("sms", { state: "admin_off", kindEnabled: false }))).toBe(
+      "Switched off by an admin",
+    );
+    expect(switchNote(cell("sms", { state: "channel_off" }))).toBe(
+      "Switch is on — SMS is off everywhere",
+    );
+    expect(switchNote(cell("sms", { state: "channel_off", kindEnabled: false }))).toBe(
+      "Switch is off — and SMS is off everywhere",
+    );
+    expect(switchNote(cell("email", { state: "locked" }))).toBe(
+      "Always sent — can't be switched off",
+    );
   });
 });

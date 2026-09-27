@@ -37,7 +37,7 @@ export default async function AdminNotificationsPage({
           <AdminPageHead>
             <NotifySubnav current="messages" />
           </AdminPageHead>
-          <p className="admin-lede admin-lede-under">
+          <p className="admin-lede admin-lede-under msg-lede">
             Every message DesiAuction sends, and where it goes. Sign-in codes are never stopped;
             every change is audited and can be reverted.
           </p>
