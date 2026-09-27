@@ -154,8 +154,13 @@ export function LotCard({
 }) {
   const flag = useExtensionFlag(clock?.extensions ?? 0);
   const role = roleLabel !== null && roleLabel.trim() !== "" ? roleLabel : null;
+  const extended = flag !== null && clock !== undefined && !clock.frozen;
   return (
-    <div className={["lot-card", className].filter(Boolean).join(" ")} data-testid="lot-card">
+    <div
+      className={["lot-card", className].filter(Boolean).join(" ")}
+      data-testid="lot-card"
+      data-extended={extended ? "true" : undefined}
+    >
       {/* Decorative: the name is printed over the card in display type. */}
       <PlayerPortrait name={name} seed={seed} src={photoUrl} decorative />
       <span className="lot-card-scrim" aria-hidden />
@@ -167,7 +172,7 @@ export function LotCard({
       {role !== null || flag !== null ? (
         <div className="lot-card-tags">
           {role !== null ? <span className="lot-card-role">{role}</span> : null}
-          {flag !== null && clock !== undefined && !clock.frozen ? (
+          {extended ? (
             // Decorative: "Time extended" is announced by the room's announcer.
             <span key={flag} className="lot-card-flag" data-testid="lot-extended" aria-hidden>
               Time extended

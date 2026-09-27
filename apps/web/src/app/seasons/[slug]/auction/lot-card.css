@@ -229,6 +229,14 @@
   color: var(--warning-base);
 }
 
+/* While the "Time extended" flag stands, the kicker does not also say
+   "· +N extensions": on a phone the two together wrapped the eyebrow to two
+   lines. The count comes back when the flag goes (and stays in the facts line
+   and on the board). */
+.lot-card[data-extended="true"] .lot-card-ext {
+  display: none;
+}
+
 /* `.lot-hero-name` rides along as the suites' handle; the card sets the type. */
 .lot-card .lot-card-name {
   margin: 0;
