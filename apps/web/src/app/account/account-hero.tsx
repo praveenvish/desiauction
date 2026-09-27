@@ -52,6 +52,11 @@ const ITEM_LABELS: Record<
   },
 };
 
+/** "runs 1 club" leads a line with no sports before it. */
+function capitalised(line: string): string {
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
 /** What an account that does not play is asked to finish. */
 const ACCOUNT_ITEMS: readonly ProfileItem[] = ["name", "email", "passkey"];
 
@@ -160,9 +165,11 @@ export function AccountHero({
             ) : null}
             {sports.length > 0 || standing !== null ? (
               <span className="acct-strip-standing">
-                {[sports.join(", "), standing]
-                  .filter((part) => part !== null && part !== "")
-                  .join(" · ")}
+                {capitalised(
+                  [sports.join(", "), standing]
+                    .filter((part) => part !== null && part !== "")
+                    .join(" · "),
+                )}
               </span>
             ) : null}
           </p>
