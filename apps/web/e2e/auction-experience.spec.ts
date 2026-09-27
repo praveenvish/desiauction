@@ -338,13 +338,13 @@ test("the full night: lobby → owners → bidding with notifications → public
 
   await ownerA.page.getByTestId("bid-next").click();
   await expect(ownerA.page.getByTestId("my-team-leading")).toBeVisible({ timeout: 20_000 });
-  // Owner A was leading and is no longer: the outbid notification fires.
-  // (Observe BEFORE acting — toasts are transient and the broadcast can land
-  // while the acting click's server round-trip is still awaiting.)
-  await Promise.all([
-    expect(ownerA.page.getByText(/Outbid — Team Bravo/)).toBeVisible({ timeout: 45_000 }),
-    ownerB.page.getByTestId("bid-next").click(),
-  ]);
+  // Owner A was leading and is no longer: A's state line says who took it.
+  // (It used to be a toast, which landed on A's own bid controls on a phone;
+  // the line is persistent, so it is read after the act, not raced with it.)
+  await ownerB.page.getByTestId("bid-next").click();
+  const stateA = ownerA.page.getByTestId("owner-state");
+  await expect(stateA).toHaveAttribute("data-state", "outbid", { timeout: 45_000 });
+  await expect(stateA).toContainText("Team Bravo bid");
   // WR-1: B took the lot to ₹15,000; A's next rung is ₹20,000 against a ₹12,000 max.
   await expect(ownerA.page.getByTestId("plan-line")).toHaveAttribute("data-verdict", "over_max", {
     timeout: 20_000,

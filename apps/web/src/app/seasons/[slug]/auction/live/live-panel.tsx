@@ -39,8 +39,7 @@ import {
 import { PageStatus } from "../../../../../components/shell/page-status";
 import { AuctionAnnouncer } from "../auction-announcer";
 import { GavelButton } from "../cockpit/gavel-button";
-import { LotHero } from "../lot-hero";
-import { PaddleControl } from "../paddle-control";
+import { OwnerStage, OwnerWon } from "../owner-stage";
 import { evaluateLivePlan, planNameOf } from "../plan-live";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
@@ -325,26 +324,20 @@ export function LivePanel({
     await send("bid", "PlaceBid", { lotId, paddleId: myPaddle.paddleId, amountRaw: amount });
   };
 
-  // PX-6 bidder notifications: outbid (I was leading, now someone else) and
-  // won (last outcome SOLD to my paddle). Pure observation of server truth.
-  const prevLeaderRef = useRef<string | null>(null);
+  // PX-6 bidder notification: won (last outcome SOLD to my paddle). Pure
+  // observation of server truth.
+  //
+  // THE OUTBID TOAST IS GONE (live-room stage 1). It landed at the foot of a
+  // phone — on the raise button and the jump chips, the exact controls an
+  // outbid owner reaches for next. The owner's state line now says it in place
+  // ("Pune Panthers bid 1,500 pts — bid 2,000 to take the lead back"), and the
+  // status ribbon's live region already announces every new leading bid.
   const wonSeqRef = useRef<number>(0);
   useEffect(() => {
     if (snapshot === null || myPaddle === null) {
       return;
     }
     const mine = myPaddle.paddleNumber;
-    const leader = snapshot.currentLot?.currentBid?.paddleNumber ?? null;
-    if (prevLeaderRef.current === mine && leader !== null && leader !== mine) {
-      const amount = snapshot.currentLot?.currentBid?.amount;
-      toast({
-        title: `Outbid — ${snapshot.currentLot?.currentBid?.teamName ?? "another team"}${amount !== undefined ? ` at ${money.ledger(amount)}` : ""}`,
-        tone: "info",
-        // One slot for "where do I stand on this lot": the newest price only.
-        group: "bid-status",
-      });
-    }
-    prevLeaderRef.current = leader;
     const outcome = snapshot.lastOutcome;
     if (
       outcome !== null &&
@@ -380,12 +373,10 @@ export function LivePanel({
     ? view.teams
     : view.teams.filter((team) => view.myTeamIds.includes(team.id));
   const myTeam = view.teams.find((team) => team.id === myPaddle?.teamId);
-  // The ring measures against the window the lot is actually running: an
+  // The clock measures against the window the lot is actually running: an
   // extended lot restarts on the anti-snipe clock, not the opening one.
   const lotDurationMs =
     ((lot?.extensions ?? 0) > 0 ? view.rules.extensionSeconds : view.rules.initialSeconds) * 1000;
-  const leadColor =
-    view.teams.find((team) => team.name === lot?.currentBid?.teamName)?.primaryColor ?? null;
   // Squad sizes counted the way the ENGINE counts them — auction buys PLUS
   // pre-signed players (aggregate.ts:835) — so every ceiling drawn from them is
   // the amount the engine will actually accept.
@@ -447,6 +438,30 @@ export function LivePanel({
             .reduce((sum, row) => sum + (row.soldPrice ?? 0), 0),
         };
 
+  /**
+   * The lot just went to THIS owner's team: the ceremony is on its SOLD beat
+   * and the outcome names one of the team's paddles. Decided by team, as the
+   * engine decides leading, so a second paddle's win is still "yours".
+   */
+  const lastOutcome = snapshot?.lastOutcome ?? null;
+  const myTeamPaddles = new Set(
+    myPaddle === null
+      ? []
+      : (snapshot?.paddles ?? [])
+          .filter((entry) => entry.teamId === myPaddle.teamId)
+          .map((entry) => entry.paddleNumber)
+          .concat(myPaddle.paddleNumber),
+  );
+  const wonOutcome =
+    lot === null &&
+    ceremony.phase === "sold" &&
+    lastOutcome !== null &&
+    lastOutcome.kind === "sold" &&
+    lastOutcome.paddleNumber !== null &&
+    myTeamPaddles.has(lastOutcome.paddleNumber)
+      ? lastOutcome
+      : null;
+
   return (
     <div
       className="competitions-stack"
@@ -467,6 +482,15 @@ export function LivePanel({
           offline={offline}
           lotMedia={view.lotMedia}
           settledStatus={overOffline ? status : undefined}
+          room
+          viewer={
+            myPaddle === null
+              ? undefined
+              : {
+                  teamName: myTeam?.shortName ?? myPaddle.teamName,
+                  paddleNumber: myPaddle.paddleNumber,
+                }
+          }
         />
       </PageStatus>
 
@@ -579,34 +603,43 @@ export function LivePanel({
                   ) : null}
                 </Card>
               ) : lot !== null ? (
-                <>
-                  <LotHero
-                    roles={view.roles}
-                    lot={lot}
-                    remainingMs={remainingMs}
-                    lotDurationMs={lotDurationMs}
-                    leadColor={leadColor}
-                    frozen={notTakingBids}
-                    clock={clock}
-                    media={view.lotMedia[lot.lotId]}
-                  />
-                  {myPaddle !== null ? (
-                    <PaddleControl
-                      lot={lot}
-                      rules={view.rules}
-                      snapshot={snapshot}
-                      myPaddleNumber={myPaddle.paddleNumber}
-                      myTeam={myTeam}
-                      squadSigned={mySquadSigned}
-                      plan={planState}
-                      planNames={planNames}
-                      disabled={readOnly || bidBusy}
-                      onBid={(amount) => {
-                        void bid(amount);
-                      }}
-                    />
-                  ) : null}
-                </>
+                <OwnerStage
+                  roles={view.roles}
+                  lot={lot}
+                  media={view.lotMedia[lot.lotId]}
+                  snapshot={snapshot}
+                  rules={view.rules}
+                  teams={view.teams}
+                  myPaddleNumber={myPaddle?.paddleNumber ?? null}
+                  squadSigned={mySquadSigned}
+                  remainingMs={remainingMs}
+                  lotDurationMs={lotDurationMs}
+                  clock={clock}
+                  frozen={notTakingBids}
+                  readOnly={readOnly}
+                  busy={bidBusy}
+                  onBid={(amount) => {
+                    void bid(amount);
+                  }}
+                  plan={planState}
+                  planNames={planNames}
+                />
+              ) : wonOutcome !== null && myPaddle !== null ? (
+                /* The owner's own SOLD: the same ceremony moment, told to them. */
+                <OwnerWon
+                  roles={view.roles}
+                  outcome={wonOutcome}
+                  ceremonyKey={ceremony.key}
+                  media={view.lotMedia[wonOutcome.lotId]}
+                  lotMedia={view.lotMedia}
+                  resolved={feed.resolved}
+                  rules={view.rules}
+                  purseRemaining={
+                    snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddle.paddleNumber)
+                      ?.purseRemaining ?? null
+                  }
+                  squadSize={squadSizes[myPaddle.teamId] ?? 0}
+                />
               ) : (
                 /* Between lots the owner sees exactly what the room sees. */
                 <CeremonyStage

@@ -157,11 +157,20 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
     await expect.poll(async () => leadingAmount(who.page), { timeout: 10_000 }).toBe(amount);
   };
 
-  /** One bid by `o`. `jump` = amount of a jump chip, otherwise "raise to". */
+  /**
+   * One bid by `o`. `jump` = amount of a bigger-bid chip, otherwise the next bid.
+   * A bigger bid is two steps: the chip only CHOOSES the amount, and the big
+   * button — which then names it — commits it.
+   */
   async function bid(o: Owner, expectAmount: number, jump?: number): Promise<void> {
-    const btn: Locator = jump
-      ? o.page.getByTestId(`bid-jump-${String(jump * 100)}`)
-      : o.page.getByTestId("bid-next");
+    const btn: Locator = o.page.getByTestId("bid-next");
+    if (jump) {
+      const chip = o.page.getByTestId(`bid-jump-${String(jump * 100)}`);
+      await expect(chip).toBeEnabled({ timeout: 10_000 });
+      await chip.click();
+      await expect(chip).toHaveAttribute("aria-pressed", "true");
+      await expect(btn).toHaveAttribute("data-amount", String(jump * 100));
+    }
     await expect(btn).toBeEnabled({ timeout: 10_000 });
     if (!jump) {
       const shown = points(await btn.textContent());
@@ -564,10 +573,13 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
         })
         .toBe(buyer.purse);
       if (name === STAR) {
+        // The outbid toast is gone (it covered the bid controls on a phone);
+        // each owner's state line says where they stand instead — once.
         for (const o of owners) {
+          const lines = o.page.getByTestId("owner-state");
           const outbids = await o.page.getByText(/^Outbid —/).count();
-          log(`   ${o.team} sees ${outbids} "Outbid" toast(s) after the star war`);
-          if (outbids > 1) note(`${o.team}: ${outbids} Outbid toasts stacked`);
+          log(`   ${o.team} after the star war: ${await lines.count()} state line(s)`);
+          if (outbids > 0) note(`${o.team}: ${outbids} Outbid toast(s) still shown`);
         }
         await shot(board, "25-board-after-star");
         await shot(winner.page, "26-owner-after-star");

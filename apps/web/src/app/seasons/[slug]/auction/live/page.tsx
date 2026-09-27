@@ -16,8 +16,11 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
     notFound();
   }
   return (
-    <ToastProvider>
-      {/* THE FOLD IS THE BUDGET. Measured at 390×844 with a lot on the block,
+    // `live-room` scopes the room's own toast placement (live.css): on a phone
+    // the paddle is pinned to the foot, and notices rise above it.
+    <div className="live-room">
+      <ToastProvider>
+        {/* THE FOLD IS THE BUDGET. Measured at 390×844 with a lot on the block,
           463 of 844 pixels went by before the player's name appeared and the
           raise button — the primary action of the entire product — rendered 31px
           BELOW the fold on the device the product was designed for.
@@ -28,49 +31,57 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
           converges to the same server snapshot", which is a note to the
           engineers who built the socket occupying the most valuable pixels the
           product owns. The links now sit at the FOOT of the page: leaving is not
-          what a bidder came here to do. */}
-      <main className="registrations-dash live-page">
-        <div className="dash-stack">
-          <h1 className="auction-sr-only">{view.competition.name} — live auction</h1>
-          <LivePanel
-            slug={slug}
-            view={view}
-            exits={
-              // Keyed: an element handed across to a client component is
-              // checked as a list child when it renders there.
-              <nav key="exits" className="live-exits" aria-label="Other auction views">
-                {view.viewer.canConduct ? (
-                  <ButtonLink href={`/seasons/${slug}/auction/cockpit`} data-testid="open-cockpit">
-                    Cockpit
-                  </ButtonLink>
-                ) : null}
-                {/* WR-1: the owner's plan — a door only for someone who holds a
+          what a bidder came here to do.
+
+          Live-room stage 1: on a phone the bid button now lives in a bar pinned
+          to the foot of the screen (live.css `.owner-bidbar`), so it is above
+          the fold by construction, at every height. */}
+        <main className="registrations-dash live-page">
+          <div className="dash-stack">
+            <h1 className="auction-sr-only">{view.competition.name} — live auction</h1>
+            <LivePanel
+              slug={slug}
+              view={view}
+              exits={
+                // Keyed: an element handed across to a client component is
+                // checked as a list child when it renders there.
+                <nav key="exits" className="live-exits" aria-label="Other auction views">
+                  {view.viewer.canConduct ? (
+                    <ButtonLink
+                      href={`/seasons/${slug}/auction/cockpit`}
+                      data-testid="open-cockpit"
+                    >
+                      Cockpit
+                    </ButtonLink>
+                  ) : null}
+                  {/* WR-1: the owner's plan — a door only for someone who holds a
                     team here while planning is on; /auction/plan 404s for
                     everyone else. */}
-                {view.planAvailable ? (
-                  <ButtonLink
-                    href={`/seasons/${slug}/auction/plan`}
-                    variant="secondary"
-                    data-testid="open-plan"
-                  >
-                    My plan
+                  {view.planAvailable ? (
+                    <ButtonLink
+                      href={`/seasons/${slug}/auction/plan`}
+                      variant="secondary"
+                      data-testid="open-plan"
+                    >
+                      My plan
+                    </ButtonLink>
+                  ) : null}
+                  <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
+                    Spectate
                   </ButtonLink>
-                ) : null}
-                <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
-                  Spectate
-                </ButtonLink>
-                {/* The setup page is the organizer's desk. An owner reached a
+                  {/* The setup page is the organizer's desk. An owner reached a
                     page that is not theirs from the foot of their own room. */}
-                {view.viewer.canConduct ? (
-                  <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
-                    Auction setup
-                  </ButtonLink>
-                ) : null}
-              </nav>
-            }
-          />
-        </div>
-      </main>
-    </ToastProvider>
+                  {view.viewer.canConduct ? (
+                    <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
+                      Auction setup
+                    </ButtonLink>
+                  ) : null}
+                </nav>
+              }
+            />
+          </div>
+        </main>
+      </ToastProvider>
+    </div>
   );
 }
