@@ -227,11 +227,22 @@ body:has(.obs-overlay) {
 .obs-lt-face {
   position: relative;
   flex: none;
+  overflow: hidden;
+  isolation: isolate;
+  width: clamp(60px, 4.2vw, 88px);
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md, 12px);
+  background: var(--identity-field);
   /* `figure` carries 1em/40px of user-agent margin; the 18px here is the
      panel's own left gutter, and `.obs-lt-main` keeps its 26px, which becomes
      the gap. When there is no subject the figure is absent and the words sit
      exactly where they always did. */
-  margin: 0 0 0 18px;
+  margin: 12px 0 12px 18px;
+}
+.obs-lt-face [data-testid="player-portrait"] {
+  position: absolute;
+  inset: 0;
 }
 /* The registration number, over the corner of the frame rather than under it:
    an overlay's height is the video it covers, so a badge in flow would cost
@@ -330,7 +341,6 @@ body:has(.obs-overlay) {
 }
 .obs-lt-timer {
   margin-top: 6px;
-  font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -347,7 +357,6 @@ body:has(.obs-overlay) {
 }
 .obs-lt-timer--stopped {
   color: var(--warning-strong);
-  font-family: var(--font-sans, system-ui, sans-serif);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

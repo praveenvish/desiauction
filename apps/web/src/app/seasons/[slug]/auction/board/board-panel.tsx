@@ -3,7 +3,7 @@
 import { lotSeed } from "../../../../../lib/player-seed";
 import { roleLabeller } from "../../../../../lib/role-label";
 import { type AuctionStatus } from "@desiauction/core";
-import { PlayerImage, paintOnFill } from "@desiauction/ui";
+import { PlayerImage, PlayerPortrait, paintOnFill } from "@desiauction/ui";
 import { useMemo } from "react";
 
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
@@ -454,73 +454,96 @@ export function BoardPanel({
               primitive falls back to the branded mark — because a consent-gated
               null is the ORDINARY case here (DPDP §5) and it must not resize a
               projected frame halfway through a bid. */}
-          <figure className="board-block-face" data-testid="board-block-face">
-            <PlayerImage
+          <figure
+            className="board-block-face"
+            data-testid="board-block-face"
+            data-leading={lot.currentBid === null ? undefined : "true"}
+            style={
+              lot.currentBid === null
+                ? undefined
+                : { borderColor: colorOf(lot.currentBid.teamName) ?? undefined }
+            }
+          >
+            {/* THE PLAYER CARD at hall size (live-room stage 3): the photo when
+                the player consented to one, and otherwise their seeded
+                identity — the same gold-foil initials every phone in the room
+                is showing — never a silhouette. The frame is the SAME box
+                either way, so a consent-gated null cannot resize a projected
+                frame halfway through a bid. The leading franchise's colour
+                rims it while it leads. */}
+            <PlayerPortrait
               name={lot.playerName ?? "Unnamed"}
               /* The registration behind the lot — the one seed rule
-                 (lib/player-seed) — so the same person wears the same monogram
+                 (lib/player-seed) — so the same person wears the same card
                  here, on every roster and on /c. */
               seed={lotSeed(lot.lotId, lotMedia)}
-              size="hero"
               src={facePhoto}
-              /* The leading franchise's colour rings the face while it leads,
-                 so the wall says WHO is winning him before anyone reads it. */
-              teamColor={colorOf(lot.currentBid?.teamName)}
-              ring
+              decorative
             />
             {/* The REGISTRATION number, not `lot.lotNumber` — that one is the
-                queue position and it stays in the kicker above. This is the
-                number called out in the room and printed on the player's own
-                public page, so it is the badge the hall can act on. */}
+                queue position and it stays in the kicker. This is the number
+                called out in the room and printed on the player's own page. */}
             {faceNumber !== null ? (
               <figcaption className="board-block-number" data-testid="board-block-number">
                 #{faceNumber}
               </figcaption>
             ) : null}
           </figure>
-          <div className="board-block-who">
-            <p className="board-block-kicker">
-              On the block · {lot.lotNumber}
-              {lot.extensions > 0 ? ` · extended ×${String(lot.extensions)}` : ""}
-            </p>
-            <h2 className="board-block-name" data-testid="board-block-name">
-              {lot.playerName ?? "Unnamed"}
-            </h2>
-            {/* `role.replace(/_/g, " ")` printed "all rounder" and "wicket
-                keeper" to a room of two hundred people. The shared formatter
-                is the one place those labels are decided. */}
-            <p className="board-block-meta">
-              {labelOf(lot.role)} · base {money.ledger(lot.basePrice)}
-            </p>
-          </div>
-          <div className="board-block-money">
-            <span className="board-block-label">
-              {lot.currentBid !== null ? "Current bid" : "Opening at"}
-            </span>
-            <span className="board-block-amount" data-testid="board-block-amount">
-              {money.ledger(lot.currentBid?.amount ?? lot.nextMinimumBid)}
-            </span>
-            <span className="board-block-leader" data-testid="board-block-leader">
-              {lot.currentBid !== null ? lot.currentBid.teamName : "No bids yet"}
-            </span>
-          </div>
-          <div className="board-block-clock">
-            {showTimer ? (
-              <>
-                <span
-                  className="board-block-seconds"
-                  data-hot={seconds <= 15}
-                  data-testid="board-block-timer"
-                >
-                  {seconds}
+          <div className="board-block-body">
+            <div className="board-block-who">
+              <p className="board-block-kicker">
+                On the block · {lot.lotNumber}
+                {lot.extensions > 0 ? ` · extended ×${String(lot.extensions)}` : ""}
+              </p>
+              <h2 className="board-block-name" data-testid="board-block-name">
+                {lot.playerName ?? "Unnamed"}
+              </h2>
+              {/* The shared formatter decides role labels ("All-rounder"). */}
+              <p className="board-block-meta">
+                {labelOf(lot.role)} · base {money.ledger(lot.basePrice)}
+              </p>
+            </div>
+            <div className="board-block-row">
+              <div className="board-block-money">
+                <span className="board-block-label">
+                  {lot.currentBid !== null ? "Current bid" : "Opening at"}
                 </span>
-                <span className="board-block-label">seconds</span>
-              </>
-            ) : (
-              <span className="board-block-stopped" data-testid="board-block-stopped">
-                {status === "paused" ? "Clock stopped" : stale ? "Clock stopped" : "—"}
-              </span>
-            )}
+                <span className="board-block-amount" data-testid="board-block-amount">
+                  {money.ledger(lot.currentBid?.amount ?? lot.nextMinimumBid)}
+                </span>
+                <span className="board-block-leader" data-testid="board-block-leader">
+                  {lot.currentBid !== null ? (
+                    <>
+                      <BoardCrest
+                        team={teamIdentities.find((team) => team.name === lot.currentBid?.teamName)}
+                        fallback={lot.currentBid.teamName}
+                      />
+                      {lot.currentBid.teamName}
+                    </>
+                  ) : (
+                    "No bids yet"
+                  )}
+                </span>
+              </div>
+              <div className="board-block-clock">
+                {showTimer ? (
+                  <>
+                    <span
+                      className="board-block-seconds"
+                      data-hot={seconds <= 15}
+                      data-testid="board-block-timer"
+                    >
+                      {seconds}
+                    </span>
+                    <span className="board-block-label">seconds</span>
+                  </>
+                ) : (
+                  <span className="board-block-stopped" data-testid="board-block-stopped">
+                    {status === "paused" ? "Clock stopped" : stale ? "Clock stopped" : "—"}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </section>
       ) : null}
