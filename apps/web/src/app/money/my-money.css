@@ -1,7 +1,47 @@
-/* /money — the personal receipts page. Tokens only; both themes. */
+/* /money — what your teams paid, and your clubs' books. Tokens only; both themes. */
 
-/* The empty page: the product's one EmptyState on a card, full width like
-   every other signed-in empty page (it was capped at 560px and floated left). */
+.my-money {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .my-money--books {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+.mm-column,
+.mm-teams,
+.mm-books {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.mm-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.mm-section-head h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mm-section-head span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* The empty page: the product's one EmptyState on a card. */
 .my-money-empty {
   box-sizing: border-box;
   padding: var(--space-4);
@@ -11,51 +51,320 @@
   box-shadow: var(--shadow-1);
 }
 
-/* An organizer's /money: the empty receipts card beside the clubs' books, so
-   the page is two useful objects instead of one card over a blank canvas. */
-.my-money--books {
-  display: grid;
-  gap: var(--space-5);
-  /* Side by side the two cards share one height (312 vs 252 read as a gap). */
-  align-items: stretch;
-}
+/* ---- What your teams paid ---- */
 
-@media (min-width: 1024px) {
-  .my-money--books {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-  }
-}
-
-.my-money-books {
-  box-sizing: border-box;
-  min-width: 0;
-  padding: var(--space-5);
+.mm-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-8);
+  padding: var(--space-5) var(--space-6);
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-1);
 }
 
-.my-money-books-title {
+.mm-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.mm-eyebrow {
   margin: 0;
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.mm-total {
+  margin: 0;
+  font-size: var(--text-3xl-size);
+  line-height: 1.1;
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
 }
 
-.my-money-books-lede {
-  margin: var(--space-1) 0 var(--space-3);
-  color: var(--text-secondary);
+.mm-say {
+  margin: 0;
   font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--success-strong);
 }
 
-.my-money-books-list {
+.mm-say[data-tone="open"] {
+  color: var(--warning-strong);
+}
+
+.mm-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+
+.mm-figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mm-figures dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.mm-figures dd {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- By team ---- */
+
+.mm-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--space-4);
+  align-items: start;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.my-money-books-list > li + li {
+.mm-team,
+.mm-club {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.mm-team-top,
+.mm-club-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mm-mark,
+.mm-club-mark {
+  flex: none;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.mm-club-mark {
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
+}
+
+.mm-team-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mm-team-name h3 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.mm-team-name span {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.mm-team-paid {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-team-paid strong {
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mm-bar {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.mm-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success-base);
+}
+
+.mm-bar[data-tone="gold"] > span {
+  background: var(--accent);
+}
+
+.mm-docs,
+.mm-seasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mm-doc {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
   border-top: 1px solid var(--border-subtle);
+}
+
+.mm-doc-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--info-subtle);
+  color: var(--info-strong);
+}
+
+.mm-doc-icon[data-kind="receipt"] {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.mm-doc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mm-doc-kind {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mm-doc-meta,
+.mm-season-meta {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.mm-doc-no {
+  font-family: var(--font-mono);
+}
+
+.mm-doc-amount {
+  flex: none;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-foot {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+/* ---- Your clubs' books ---- */
+
+.mm-desks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.mm-season {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+  color: inherit;
+  text-decoration: none;
+}
+
+a.mm-season:hover .mm-season-name > span:first-child {
+  text-decoration: underline;
+}
+
+a.mm-season:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.mm-season-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mm-season-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mm-chev {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 719px) {
+  .mm-summary {
+    padding: var(--space-4);
+  }
+
+  .mm-total {
+    font-size: var(--text-2xl-size);
+  }
+
+  .mm-team,
+  .mm-club {
+    padding: var(--space-4);
+  }
 }

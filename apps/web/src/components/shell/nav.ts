@@ -668,10 +668,9 @@ const SURFACE_SUBTITLES: [string, string][] = [
     "Your recurring competitions, and every edition that runs under them — grouped, or all at once.",
   ],
   ["/orgs", "The clubs and academies you run tournaments under."],
-  // What the page ships, not more: /money renders receipts (it computes no
-  // balance and no due), and /inbox already carries approvals, auction results
-  // and receipts — the old line undersold a launch product as unfinished.
-  ["/money", "Receipts issued to your teams, across every season."],
+  // What the page ships, not more: /money sums sealed receipts (it claims no
+  // due — the club's case owns that) and, for organizers, each club's books.
+  ["/money", "What your teams paid, and your clubs' books."],
   ["/inbox", "Approvals, auction results, receipts and account activity."],
   ["/account", "Your sign-in, profile and security."],
   ["/players", "Every player across the seasons you run — search, filter, open their sheet."],
