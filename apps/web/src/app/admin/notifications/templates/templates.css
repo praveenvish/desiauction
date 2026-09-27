@@ -246,6 +246,7 @@
   }
 
   .ptpl-row {
+    min-height: 0;
     row-gap: 4px;
   }
 

@@ -920,6 +920,22 @@
     display: none;
   }
 
+  .admin-stack:has(> .ntc-strip) {
+    gap: var(--space-3);
+  }
+
+  .admin-stack:has(> .ntc-strip) .msg-list {
+    gap: var(--space-2);
+  }
+
+  .ntc-channel {
+    min-height: 40px;
+  }
+
+  .admin-stack:has(> .ntc-strip) .msg-group-head {
+    padding-block: var(--space-2);
+  }
+
   .msg-row {
     gap: var(--space-2);
     padding: var(--space-3) var(--space-2) var(--space-3) var(--space-3);
