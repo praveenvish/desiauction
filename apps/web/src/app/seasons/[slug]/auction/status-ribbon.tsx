@@ -94,6 +94,8 @@ export function StatusRibbon({
    * socket state, whether or not the socket ever answered.
    */
   settledStatus,
+  room = false,
+  viewer,
 }: {
   snapshot: AuctionSnapshot | null;
   connection: ConnectionState;
@@ -104,6 +106,15 @@ export function StatusRibbon({
   offline?: boolean;
   lotMedia?: Readonly<Record<string, LotMedia>>;
   settledStatus?: AuctionSnapshot["auctionStatus"] | undefined;
+  /**
+   * The owner's room (live-room stage 1). The strip gains where the night is
+   * ("Lot 4 of 37") and whose paddle this is, and on a phone it folds to ONE
+   * line — the lot, the bid and the clock are on the player card right under
+   * it, so the strip keeps them for the ear (its live region) and not the eye.
+   */
+  room?: boolean;
+  /** The paddle this room bids with, named in the strip. */
+  viewer?: { teamName: string; paddleNumber: string } | undefined;
 }) {
   const money = useMoney();
   const lot = snapshot?.currentLot ?? null;
@@ -114,6 +125,14 @@ export function StatusRibbon({
   const over =
     status === "completed" || status === "reconciled" || status === "abandoned" ? status : null;
   const finished = over !== null;
+  // Which lot of the night: the one on the block is the next after those
+  // resolved; between lots the strip counts what is done.
+  const progress =
+    !room || snapshot === null || snapshot.lotsTotal === 0
+      ? null
+      : lot !== null
+        ? `Lot ${String(Math.min(snapshot.lotsResolved + 1, snapshot.lotsTotal))} of ${String(snapshot.lotsTotal)}`
+        : `${String(snapshot.lotsResolved)} of ${String(snapshot.lotsTotal)} done`;
   return (
     // `role="status"` makes the whole strip a polite live region, which is what
     // a spectator needs — the lot, the leading bid and the transport state are
@@ -126,7 +145,7 @@ export function StatusRibbon({
     // whole strip as one utterance, and the separators below give it the pauses
     // a screen reader needs to make words out of it.
     <div
-      className={`status-ribbon${variant === "shell" ? " status-ribbon--shell" : ""}`}
+      className={`status-ribbon${variant === "shell" ? " status-ribbon--shell" : ""}${room ? " status-ribbon--room" : ""}`}
       data-testid="status-ribbon"
       role="status"
       aria-atomic="true"
@@ -157,6 +176,12 @@ export function StatusRibbon({
           </>
         )}
       </span>
+      {progress !== null ? (
+        <span className="ribbon-cell ribbon-progress" data-testid="ribbon-progress">
+          <RibbonGap />
+          {progress}
+        </span>
+      ) : null}
       {lot !== null ? (
         <span className="ribbon-cell" data-testid="ribbon-lot">
           <RibbonGap />
@@ -210,11 +235,21 @@ export function StatusRibbon({
             socket still answers (late joiners fold the history from it); the
             chrome just stops advertising it. */}
         {finished ? null : (
-          <Badge tone={live ? "neutral" : "warning"} data-testid="ribbon-network">
+          <Badge
+            tone={live ? "neutral" : "warning"}
+            data-testid="ribbon-network"
+            data-feed={live ? "live" : "down"}
+          >
             {live ? <span className="ribbon-network-dot" aria-hidden /> : null}
             {connectionLabel(connection, offline)}
           </Badge>
         )}
+        {viewer !== undefined ? (
+          <span className="ribbon-viewer" data-testid="ribbon-viewer">
+            {viewer.teamName} · {viewer.paddleNumber}
+            <RibbonGap />
+          </span>
+        ) : null}
         {/* Sound is a room feature and this strip is the room's one piece of
             chrome, so the switch lives here on every live surface. Off by
             default; the click that turns it on is what unlocks the browser. */}
