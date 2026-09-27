@@ -10,17 +10,7 @@ import {
   type TemplateFields,
   type TemplateIssue,
 } from "@desiauction/messaging/email-templates";
-import {
-  Button,
-  Field,
-  IconLock,
-  IconPencil,
-  IconSend,
-  Notice,
-  Pill,
-  SectionCard,
-  useToast,
-} from "@desiauction/ui";
+import { Button, Field, IconLock, IconSend, Notice, Pill, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -915,416 +905,417 @@ function Editor({
   const layout = spec.format === "layout";
 
   return (
-    <SectionCard
-      icon={<IconPencil />}
-      tone="gold"
-      title="Wording"
-      description="Each language is edited, published and undone on its own."
-      data-testid="template-editor"
-    >
-      {/* The tab list is a container, not a stop: focus belongs to its tabs,
+    <section className="msg-card" aria-labelledby="tpl-editor-title" data-testid="template-editor">
+      <header className="msg-group-head">
+        <h2 id="tpl-editor-title">Wording</h2>
+        <span>Each language is edited, published and undone on its own</span>
+      </header>
+      <div className="tpl-editor-body">
+        {/* The tab list is a container, not a stop: focus belongs to its tabs,
           one of which is in the tab order (see packages/ui tabs.tsx). */}
-      <div className="tpl-tabs" role="tablist" aria-label="Language">
-        {view.languages.map((entry, index) => {
-          const selected = entry.language === language.language;
-          return (
-            <button
-              key={entry.language}
-              id={tabId(entry.language)}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={selected ? panelId : undefined}
-              tabIndex={selected ? 0 : -1}
-              className="tpl-tab"
-              data-testid={`template-lang-${entry.language}`}
-              onClick={() => {
-                chooseLanguage(entry.language);
-              }}
-              onKeyDown={(event) => {
-                onTabKey(event, index);
-              }}
-            >
-              <span className="tpl-tab-name" lang={entry.language}>
-                {entry.label}
-              </span>
-              <span className="tpl-tab-status" data-testid={`template-status-${entry.language}`}>
-                {statusText(entry)}
-              </span>
-              {dirtyOf(entry) ? <span className="tpl-tab-dirty">Unsaved edits</span> : null}
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        id={panelId}
-        role="tabpanel"
-        aria-labelledby={tabId(language.language)}
-        className="tpl-panel"
-      >
-        <div className="tpl-source">
-          <p data-testid="template-source">
-            {start.source}
-            {dirty ? " — with unsaved edits." : "."}
-          </p>
-          {dirty ? (
-            <Button variant="ghost" size="touch" onClick={discard} data-testid="template-discard">
-              Discard edits
-            </Button>
-          ) : null}
+        <div className="tpl-tabs" role="tablist" aria-label="Language">
+          {view.languages.map((entry, index) => {
+            const selected = entry.language === language.language;
+            return (
+              <button
+                key={entry.language}
+                id={tabId(entry.language)}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls={selected ? panelId : undefined}
+                tabIndex={selected ? 0 : -1}
+                className="tpl-tab"
+                data-testid={`template-lang-${entry.language}`}
+                onClick={() => {
+                  chooseLanguage(entry.language);
+                }}
+                onKeyDown={(event) => {
+                  onTabKey(event, index);
+                }}
+              >
+                <span className="tpl-tab-name" lang={entry.language}>
+                  {entry.label}
+                </span>
+                <span className="tpl-tab-status" data-testid={`template-status-${entry.language}`}>
+                  {statusText(entry)}
+                </span>
+                {dirtyOf(entry) ? <span className="tpl-tab-dirty">Unsaved edits</span> : null}
+              </button>
+            );
+          })}
         </div>
 
-        {spec.variants.length > 1 ? (
-          <div className="tpl-variants">
-            <Segmented
-              label={`This email has ${String(spec.variants.length)} variants, each edited separately`}
-              options={spec.variants.map((entry) => ({ id: entry.id, label: entry.label }))}
-              value={variant}
-              onChange={chooseVariant}
-              testIdPrefix="template-variant-"
-            />
-          </div>
-        ) : null}
-
-        <div className="tpl-workspace">
-          <section className="tpl-values" aria-labelledby={id("values")}>
-            <h3 className="tpl-subhead" id={id("values")}>
-              Values you can use
-            </h3>
-            <p className="tpl-hint">
-              Click into a field, then a value: it goes in where the cursor was. Each is filled in
-              per person when the email is sent.
+        <div
+          id={panelId}
+          role="tabpanel"
+          aria-labelledby={tabId(language.language)}
+          className="tpl-panel"
+        >
+          <div className="tpl-source">
+            <p data-testid="template-source">
+              {start.source}
+              {dirty ? " — with unsaved edits." : "."}
             </p>
-            <ul className="tpl-chips">
-              {spec.variables.map((variable) => {
-                const descId = id("var", variable.name);
-                const tags = [
-                  variable.required === true ? "must appear" : null,
-                  variable.type === "flag" ? "shows its paragraph only when true" : null,
-                  variable.type === "list" ? "a list — a paragraph on its own" : null,
-                  variable.whenEmpty === "drop" ? "its paragraph is left out when empty" : null,
-                  variable.computed === true ? "written by DesiAuction" : null,
-                ].filter((tag): tag is string => tag !== null);
-                return (
-                  <li key={variable.name} className="tpl-chip-row">
-                    <button
-                      type="button"
-                      className="tpl-chip"
-                      data-kind={variable.type ?? "text"}
-                      aria-describedby={descId}
-                      data-testid={`template-var-${variable.name}`}
-                      onClick={() => {
-                        insert(variable.name);
-                      }}
-                    >
-                      {`{{${variable.name}}}`}
-                    </button>
-                    <span id={descId} className="tpl-hint">
-                      {variable.description}
-                      {tags.length > 0 ? ` (${tags.join("; ")})` : null}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="tpl-hint" role="status">
-              {insertHint}
-            </p>
-          </section>
-
-          <div className="tpl-fields">
-            {fields === undefined ? (
-              <Notice tone="danger">This variant has no wording to edit.</Notice>
-            ) : (
-              <>
-                {single("subject", "Subject", "The line in the inbox.")}
-                {layout
-                  ? single(
-                      "preheader",
-                      "Preview line",
-                      "Shown after the subject in most inboxes, never in the email itself.",
-                    )
-                  : null}
-                {layout ? single("heading", "Heading", "The large line at the top.") : null}
-                {list(
-                  "paragraphs",
-                  layout ? "Opening paragraphs" : "Paragraphs",
-                  layout
-                    ? "Before the code, button or details."
-                    : "The whole body of this plain-text email.",
-                )}
-                {layout
-                  ? list(
-                      "after",
-                      "Closing paragraphs",
-                      "After the code, button or details. May be empty.",
-                    )
-                  : null}
-                {layout ? actionFields() : null}
-                {layout
-                  ? single(
-                      "footnote",
-                      "Footnote",
-                      "Why this person received the email. One paragraph.",
-                      true,
-                    )
-                  : null}
-                {fixedFields.length > 0 ? (
-                  <p className="tpl-quiet">
-                    Fixed by DesiAuction for this email:{" "}
-                    {fixedFields.map((field) => FIELD_NAMES[field]).join(", ")}.
-                  </p>
-                ) : null}
-                {!layout ? (
-                  <p className="tpl-quiet">
-                    A plain-text email: it has no heading, preview line or buttons.
-                  </p>
-                ) : null}
-              </>
-            )}
-          </div>
-
-          <section className="tpl-preview" aria-labelledby={id("preview")}>
-            <h3 className="tpl-subhead" id={id("preview")}>
-              Preview
-            </h3>
-            <p className="tpl-hint">
-              Drawn by the same code that sends it, with sample values.
-              {previewState === "busy" ? " Updating…" : null}
-            </p>
-            {layout ? (
-              <div className="tpl-preview-tools">
-                <Segmented
-                  label="Width"
-                  options={[
-                    { id: "desktop", label: "Desktop" },
-                    { id: "mobile", label: "Mobile" },
-                  ]}
-                  value={width}
-                  onChange={setWidth}
-                  testIdPrefix="template-preview-"
-                />
-                <Segmented
-                  label="Colours"
-                  options={[
-                    { id: "light", label: "Light" },
-                    { id: "dark", label: "Dark" },
-                  ]}
-                  value={theme}
-                  onChange={setTheme}
-                  testIdPrefix="template-preview-"
-                />
-              </div>
+            {dirty ? (
+              <Button variant="ghost" size="touch" onClick={discard} data-testid="template-discard">
+                Discard edits
+              </Button>
             ) : null}
-            {layout && theme === "dark" ? (
+          </div>
+
+          {spec.variants.length > 1 ? (
+            <div className="tpl-variants">
+              <Segmented
+                label={`This email has ${String(spec.variants.length)} variants, each edited separately`}
+                options={spec.variants.map((entry) => ({ id: entry.id, label: entry.label }))}
+                value={variant}
+                onChange={chooseVariant}
+                testIdPrefix="template-variant-"
+              />
+            </div>
+          ) : null}
+
+          <div className="tpl-workspace">
+            <section className="tpl-values" aria-labelledby={id("values")}>
+              <h3 className="tpl-subhead" id={id("values")}>
+                Values you can use
+              </h3>
               <p className="tpl-hint">
-                An approximation: many mail apps invert a light email&rsquo;s colours in dark mode,
-                as here. Some leave it light, and a few do something in between.
+                Click into a field, then a value: it goes in where the cursor was. Each is filled in
+                per person when the email is sent.
               </p>
-            ) : null}
-            {previewState === "failed" ? (
-              <p className="tpl-hint" data-testid="template-preview-stale">
-                The preview could not be drawn just now — this is the last one that was.
+              <ul className="tpl-chips">
+                {spec.variables.map((variable) => {
+                  const descId = id("var", variable.name);
+                  const tags = [
+                    variable.required === true ? "must appear" : null,
+                    variable.type === "flag" ? "shows its paragraph only when true" : null,
+                    variable.type === "list" ? "a list — a paragraph on its own" : null,
+                    variable.whenEmpty === "drop" ? "its paragraph is left out when empty" : null,
+                    variable.computed === true ? "written by DesiAuction" : null,
+                  ].filter((tag): tag is string => tag !== null);
+                  return (
+                    <li key={variable.name} className="tpl-chip-row">
+                      <button
+                        type="button"
+                        className="tpl-chip"
+                        data-kind={variable.type ?? "text"}
+                        aria-describedby={descId}
+                        data-testid={`template-var-${variable.name}`}
+                        onClick={() => {
+                          insert(variable.name);
+                        }}
+                      >
+                        {`{{${variable.name}}}`}
+                      </button>
+                      <span id={descId} className="tpl-hint">
+                        {variable.description}
+                        {tags.length > 0 ? ` (${tags.join("; ")})` : null}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="tpl-hint" role="status">
+                {insertHint}
               </p>
-            ) : null}
-            {preview === null ? (
-              <p className="tpl-quiet">Drawing the preview…</p>
-            ) : (
-              <>
-                <p className="tpl-preview-subject" data-testid="template-preview-subject">
-                  <span className="tpl-label">Subject:</span> {preview.subject}
+            </section>
+
+            <div className="tpl-fields">
+              {fields === undefined ? (
+                <Notice tone="danger">This variant has no wording to edit.</Notice>
+              ) : (
+                <>
+                  {single("subject", "Subject", "The line in the inbox.")}
+                  {layout
+                    ? single(
+                        "preheader",
+                        "Preview line",
+                        "Shown after the subject in most inboxes, never in the email itself.",
+                      )
+                    : null}
+                  {layout ? single("heading", "Heading", "The large line at the top.") : null}
+                  {list(
+                    "paragraphs",
+                    layout ? "Opening paragraphs" : "Paragraphs",
+                    layout
+                      ? "Before the code, button or details."
+                      : "The whole body of this plain-text email.",
+                  )}
+                  {layout
+                    ? list(
+                        "after",
+                        "Closing paragraphs",
+                        "After the code, button or details. May be empty.",
+                      )
+                    : null}
+                  {layout ? actionFields() : null}
+                  {layout
+                    ? single(
+                        "footnote",
+                        "Footnote",
+                        "Why this person received the email. One paragraph.",
+                        true,
+                      )
+                    : null}
+                  {fixedFields.length > 0 ? (
+                    <p className="tpl-quiet">
+                      Fixed by DesiAuction for this email:{" "}
+                      {fixedFields.map((field) => FIELD_NAMES[field]).join(", ")}.
+                    </p>
+                  ) : null}
+                  {!layout ? (
+                    <p className="tpl-quiet">
+                      A plain-text email: it has no heading, preview line or buttons.
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
+
+            <section className="tpl-preview" aria-labelledby={id("preview")}>
+              <h3 className="tpl-subhead" id={id("preview")}>
+                Preview
+              </h3>
+              <p className="tpl-hint">
+                Drawn by the same code that sends it, with sample values.
+                {previewState === "busy" ? " Updating…" : null}
+              </p>
+              {layout ? (
+                <div className="tpl-preview-tools">
+                  <Segmented
+                    label="Width"
+                    options={[
+                      { id: "desktop", label: "Desktop" },
+                      { id: "mobile", label: "Mobile" },
+                    ]}
+                    value={width}
+                    onChange={setWidth}
+                    testIdPrefix="template-preview-"
+                  />
+                  <Segmented
+                    label="Colours"
+                    options={[
+                      { id: "light", label: "Light" },
+                      { id: "dark", label: "Dark" },
+                    ]}
+                    value={theme}
+                    onChange={setTheme}
+                    testIdPrefix="template-preview-"
+                  />
+                </div>
+              ) : null}
+              {layout && theme === "dark" ? (
+                <p className="tpl-hint">
+                  An approximation: many mail apps invert a light email&rsquo;s colours in dark
+                  mode, as here. Some leave it light, and a few do something in between.
                 </p>
-                {preview.html !== null ? (
-                  <div className="tpl-frame-wrap" data-width={width} data-theme-preview={theme}>
-                    <iframe
-                      className="tpl-frame"
-                      title={`Preview of the email, ${width === "desktop" ? "desktop" : "mobile"} width, ${theme} colours`}
-                      srcDoc={preview.html}
-                      sandbox=""
-                      data-testid="template-preview-frame"
-                    />
-                  </div>
-                ) : (
-                  <pre
-                    className="tpl-plain"
-                    lang={language.language}
-                    data-testid="template-preview-text"
-                  >
-                    {preview.text}
-                  </pre>
-                )}
-              </>
-            )}
+              ) : null}
+              {previewState === "failed" ? (
+                <p className="tpl-hint" data-testid="template-preview-stale">
+                  The preview could not be drawn just now — this is the last one that was.
+                </p>
+              ) : null}
+              {preview === null ? (
+                <p className="tpl-quiet">Drawing the preview…</p>
+              ) : (
+                <>
+                  <p className="tpl-preview-subject" data-testid="template-preview-subject">
+                    <span className="tpl-label">Subject:</span> {preview.subject}
+                  </p>
+                  {preview.html !== null ? (
+                    <div className="tpl-frame-wrap" data-width={width} data-theme-preview={theme}>
+                      <iframe
+                        className="tpl-frame"
+                        title={`Preview of the email, ${width === "desktop" ? "desktop" : "mobile"} width, ${theme} colours`}
+                        srcDoc={preview.html}
+                        sandbox=""
+                        data-testid="template-preview-frame"
+                      />
+                    </div>
+                  ) : (
+                    <pre
+                      className="tpl-plain"
+                      lang={language.language}
+                      data-testid="template-preview-text"
+                    >
+                      {preview.text}
+                    </pre>
+                  )}
+                </>
+              )}
+            </section>
+          </div>
+
+          <div className="tpl-issues">
+            <p role="alert" className="tpl-issue-count" data-testid="template-issue-count">
+              {blocked
+                ? `${String(issues.length)} ${issues.length === 1 ? "thing" : "things"} to fix before this can be saved, published or sent as a test.`
+                : ""}
+            </p>
+            {blocked ? (
+              <ul className="tpl-issue-list">
+                {issues.map((issue) => {
+                  const where = whereOf(issue);
+                  return (
+                    <li key={issueKey(issue)}>
+                      {where === "" ? null : <strong>{where}: </strong>}
+                      {issue.message}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
+
+          <div className="tpl-actions">
+            <Button
+              variant="secondary"
+              size="touch"
+              loading={pending && acting === "draft"}
+              disabled={blocked || pending}
+              onClick={saveDraft}
+              data-testid="template-save-draft"
+            >
+              Save draft
+            </Button>
+            <Button
+              variant="primary"
+              size="touch"
+              id={id("publish")}
+              disabled={blocked || pending}
+              aria-expanded={confirm === "publish"}
+              onClick={() => {
+                setConfirm(confirm === "publish" ? null : "publish");
+              }}
+              data-testid="template-publish"
+            >
+              Publish…
+            </Button>
+            {language.published !== null ? (
+              <Button
+                variant="ghost"
+                size="touch"
+                id={id("reset")}
+                disabled={pending}
+                aria-expanded={confirm === "reset"}
+                onClick={() => {
+                  setConfirm(confirm === "reset" ? null : "reset");
+                }}
+                data-testid="template-reset"
+              >
+                Reset to default…
+              </Button>
+            ) : null}
+          </div>
+
+          {confirm === "publish" ? (
+            <div className="tpl-confirm" role="group" aria-labelledby={id("publish", "q")}>
+              <p id={id("publish", "q")}>
+                Publish this wording in {language.label}? It goes out to everyone who receives
+                &ldquo;
+                {view.label}&rdquo;, from the next email sent — there is no review step. The version
+                it replaces stays in the history.
+              </p>
+              <Field
+                label="Note (optional)"
+                name="template-publish-note"
+                value={note}
+                maxLength={500}
+                autoComplete="off"
+                autoFocus
+                help="Kept with the version and on the audit log — what changed, and why."
+                data-testid="template-publish-note"
+                onChange={(event) => {
+                  setNote(event.target.value);
+                }}
+              />
+              <div className="tpl-actions">
+                <Button
+                  variant="primary"
+                  size="touch"
+                  loading={pending}
+                  disabled={blocked}
+                  onClick={publish}
+                  data-testid="template-publish-confirm"
+                >
+                  Publish now
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="touch"
+                  onClick={() => {
+                    setConfirm(null);
+                    focusLater(id("publish"));
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {confirm === "reset" && language.published !== null ? (
+            <div className="tpl-confirm" role="group" aria-labelledby={id("reset", "q")}>
+              <p id={id("reset", "q")}>
+                Go back to DesiAuction&rsquo;s default wording in {language.label}? It goes out from
+                the next email sent. v{language.published.version} stays in the history and can be
+                restored.{dirty ? " Your unsaved edits here are dropped." : ""}
+              </p>
+              <div className="tpl-actions">
+                <Button
+                  variant="danger"
+                  size="touch"
+                  loading={pending}
+                  autoFocus
+                  onClick={reset}
+                  data-testid="template-reset-confirm"
+                >
+                  Reset to default
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="touch"
+                  onClick={() => {
+                    setConfirm(null);
+                    focusLater(id("reset"));
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="tpl-test">
+            <Button
+              variant="secondary"
+              size="touch"
+              loading={pending && acting === "test"}
+              disabled={testBlocked !== null || blocked || pending}
+              aria-describedby={id("test", "hint")}
+              onClick={sendTest}
+              data-testid="template-send-test"
+            >
+              <IconSend size={18} />
+              Send test to me
+            </Button>
+            <span id={id("test", "hint")} className="tpl-hint" data-testid="template-test-hint">
+              {testBlocked ??
+                `This variant, with sample values, to ${view.operatorEmail ?? ""} only · ${String(view.testSendsLeft)} left this hour.`}
+            </span>
+          </div>
+
+          <section className="tpl-history-wrap" aria-labelledby={id("history")}>
+            <h3 className="tpl-subhead" id={id("history")}>
+              Versions in <span lang={language.language}>{language.label}</span>
+            </h3>
+            {history[language.language] ?? null}
           </section>
         </div>
-
-        <div className="tpl-issues">
-          <p role="alert" className="tpl-issue-count" data-testid="template-issue-count">
-            {blocked
-              ? `${String(issues.length)} ${issues.length === 1 ? "thing" : "things"} to fix before this can be saved, published or sent as a test.`
-              : ""}
-          </p>
-          {blocked ? (
-            <ul className="tpl-issue-list">
-              {issues.map((issue) => {
-                const where = whereOf(issue);
-                return (
-                  <li key={issueKey(issue)}>
-                    {where === "" ? null : <strong>{where}: </strong>}
-                    {issue.message}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-        </div>
-
-        <div className="tpl-actions">
-          <Button
-            variant="secondary"
-            size="touch"
-            loading={pending && acting === "draft"}
-            disabled={blocked || pending}
-            onClick={saveDraft}
-            data-testid="template-save-draft"
-          >
-            Save draft
-          </Button>
-          <Button
-            variant="primary"
-            size="touch"
-            id={id("publish")}
-            disabled={blocked || pending}
-            aria-expanded={confirm === "publish"}
-            onClick={() => {
-              setConfirm(confirm === "publish" ? null : "publish");
-            }}
-            data-testid="template-publish"
-          >
-            Publish…
-          </Button>
-          {language.published !== null ? (
-            <Button
-              variant="ghost"
-              size="touch"
-              id={id("reset")}
-              disabled={pending}
-              aria-expanded={confirm === "reset"}
-              onClick={() => {
-                setConfirm(confirm === "reset" ? null : "reset");
-              }}
-              data-testid="template-reset"
-            >
-              Reset to default…
-            </Button>
-          ) : null}
-        </div>
-
-        {confirm === "publish" ? (
-          <div className="tpl-confirm" role="group" aria-labelledby={id("publish", "q")}>
-            <p id={id("publish", "q")}>
-              Publish this wording in {language.label}? It goes out to everyone who receives &ldquo;
-              {view.label}&rdquo;, from the next email sent — there is no review step. The version
-              it replaces stays in the history.
-            </p>
-            <Field
-              label="Note (optional)"
-              name="template-publish-note"
-              value={note}
-              maxLength={500}
-              autoComplete="off"
-              autoFocus
-              help="Kept with the version and on the audit log — what changed, and why."
-              data-testid="template-publish-note"
-              onChange={(event) => {
-                setNote(event.target.value);
-              }}
-            />
-            <div className="tpl-actions">
-              <Button
-                variant="primary"
-                size="touch"
-                loading={pending}
-                disabled={blocked}
-                onClick={publish}
-                data-testid="template-publish-confirm"
-              >
-                Publish now
-              </Button>
-              <Button
-                variant="secondary"
-                size="touch"
-                onClick={() => {
-                  setConfirm(null);
-                  focusLater(id("publish"));
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        {confirm === "reset" && language.published !== null ? (
-          <div className="tpl-confirm" role="group" aria-labelledby={id("reset", "q")}>
-            <p id={id("reset", "q")}>
-              Go back to DesiAuction&rsquo;s default wording in {language.label}? It goes out from
-              the next email sent. v{language.published.version} stays in the history and can be
-              restored.{dirty ? " Your unsaved edits here are dropped." : ""}
-            </p>
-            <div className="tpl-actions">
-              <Button
-                variant="danger"
-                size="touch"
-                loading={pending}
-                autoFocus
-                onClick={reset}
-                data-testid="template-reset-confirm"
-              >
-                Reset to default
-              </Button>
-              <Button
-                variant="secondary"
-                size="touch"
-                onClick={() => {
-                  setConfirm(null);
-                  focusLater(id("reset"));
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="tpl-test">
-          <Button
-            variant="secondary"
-            size="touch"
-            loading={pending && acting === "test"}
-            disabled={testBlocked !== null || blocked || pending}
-            aria-describedby={id("test", "hint")}
-            onClick={sendTest}
-            data-testid="template-send-test"
-          >
-            <IconSend size={18} />
-            Send test to me
-          </Button>
-          <span id={id("test", "hint")} className="tpl-hint" data-testid="template-test-hint">
-            {testBlocked ??
-              `This variant, with sample values, to ${view.operatorEmail ?? ""} only · ${String(view.testSendsLeft)} left this hour.`}
-          </span>
-        </div>
-
-        <section className="tpl-history-wrap" aria-labelledby={id("history")}>
-          <h3 className="tpl-subhead" id={id("history")}>
-            Versions in <span lang={language.language}>{language.label}</span>
-          </h3>
-          {history[language.language] ?? null}
-        </section>
       </div>
-    </SectionCard>
+    </section>
   );
 }
 
