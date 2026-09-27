@@ -1,53 +1,59 @@
 import { PROFILE_ITEMS, type ProfileCompleteness, type ProfileItem } from "@desiauction/core";
-import {
-  IconChevronDown,
-  IconCheckCircle,
-  IconChevronRight,
-  IconCircle,
-  IconMail,
-  IconPhone,
-  IconSpark,
-  IconStar,
-  Pill,
-  PlayerImage,
-  StatCard,
-} from "@desiauction/ui";
+import { IconCheckCircle, IconChevronDown, IconCircle, Pill, PlayerImage } from "@desiauction/ui";
 import Link from "next/link";
-import type { ReactNode } from "react";
 
 import { formatPhone } from "../../lib/format-phone";
+import type { AccountSection } from "./sections";
 
 /**
- * The top of /account: who this account is, and how far its profile has got.
+ * THE IDENTITY STRIP at the top of /account (2026-09-27): who this account is
+ * and the ONE next thing that would make it more complete.
  *
- * Left, the identity card — their own photo (consent-gated and signed on the
- * server; the branded initials mark until a season registration brings one),
- * the name, each way they sign in, the sports they play and the one account
- * action that is not a setting (sign out). Right, the completeness meter as a
- * figure card, and under it the checklist whose unfinished items jump to the
- * card that finishes them.
+ * It replaced a hero card (photo, contacts, sports, three figure tiles, a photo
+ * note, two links) beside a second card that was the completeness meter and an
+ * eight-item checklist — on a phone, a whole screen before the first setting.
+ * The checklist is still here, folded under its count; what leads is the next
+ * item, as a sentence with a door to the section that finishes it.
  *
- * There is no "change photo" here on purpose: a photo arrives WITH the consent
- * a season registration records (photoConsent columns). An upload on this page
- * would store a face without that consent — so the page says where it comes
- * from instead of offering a button that cannot honour it.
+ * There is no "change photo" on purpose: a photo arrives WITH the consent a
+ * season registration records. An upload here would store a face without it.
  */
 
-/**
- * The checklist's words (codes come from core, copy lives with the surface —
- * the publishBlockers pattern). Order mirrors PROFILE_ITEMS. `href` is the card
- * on this page that finishes the item; the photo has none (see above).
- */
-const ITEM_LABELS: Record<ProfileItem, { label: string; hint?: string; href?: string }> = {
-  name: { label: "Name set", href: "#profile" },
-  photo: { label: "Profile photo", hint: "added when you register for a season" },
-  role: { label: "Playing role", hint: "under Sports", href: "#sports" },
-  date_of_birth: { label: "Date of birth", hint: "under Player profile", href: "#player" },
-  style: { label: "Batting or bowling style", hint: "under Sports", href: "#sports" },
-  location: { label: "City", hint: "under Player profile", href: "#player" },
-  email: { label: "Verified email", hint: "for receipts and documents", href: "#profile" },
-  passkey: { label: "Passkey", hint: "the fastest way to sign in", href: "#security" },
+/** The checklist's words, and which section finishes each item. */
+const ITEM_LABELS: Record<
+  ProfileItem,
+  { label: string; next: string; hint?: string; section?: AccountSection }
+> = {
+  name: { label: "Name set", next: "Set your name", section: "profile" },
+  photo: {
+    label: "Profile photo",
+    next: "Add a photo on your next registration",
+    hint: "added when you register for a season",
+  },
+  role: { label: "Playing role", next: "Set your playing role", section: "player" },
+  date_of_birth: { label: "Date of birth", next: "Add your date of birth", section: "player" },
+  style: {
+    label: "Batting or bowling style",
+    next: "Add how you bat or bowl",
+    section: "player",
+  },
+  location: { label: "City", next: "Add your city", section: "player" },
+  email: {
+    label: "Verified email",
+    next: "Add and confirm an email",
+    hint: "for receipts and documents",
+    section: "profile",
+  },
+  passkey: {
+    label: "Passkey",
+    next: "Add a passkey",
+    hint: "the fastest way to sign in",
+    section: "security",
+  },
 };
+
+/** What an account that does not play is asked to finish. */
+const ACCOUNT_ITEMS: readonly ProfileItem[] = ["name", "email", "passkey"];
 
 export interface AccountHeroProps {
   personId: string;
@@ -59,24 +65,14 @@ export interface AccountHeroProps {
   /** Labels of the sports this person plays (has a profile for, or entered). */
   sports: string[];
   completeness: ProfileCompleteness;
-  /** Whether this person has entered any season — decides the photo line. */
-  hasRegistrations: boolean;
-  /** Three small facts under the name — sports, passkeys, devices. */
-  facts: { key: string; icon: ReactNode; value: string; label: string }[];
-  /** The sign-out form, which must be a client component to sweep localStorage. */
-  signOut: ReactNode;
+  /** One short line of who they are here: "1 season · runs 1 club". */
+  standing: string | null;
   /**
    * False for someone who runs a club, owns a team or conducts — and does not
-   * play: their checklist is the account's own items (name, email, passkey),
-   * not "Playing role" and "Batting or bowling style" (review r3).
+   * play: their checklist is the account's own items (name, email, passkey).
    */
   playerItems?: boolean;
-  /** The door to this person's record — "My sports" or "My teams" — or none. */
-  recordLink?: { href: string; label: string } | null;
 }
-
-/** What an account that does not play is asked to finish. */
-const ACCOUNT_ITEMS: readonly ProfileItem[] = ["name", "email", "passkey"];
 
 export function AccountHero({
   personId,
@@ -87,11 +83,8 @@ export function AccountHero({
   photoUrl,
   sports,
   completeness,
-  hasRegistrations,
-  facts,
-  signOut,
+  standing,
   playerItems = true,
-  recordLink = { href: "/me", label: "My sports" },
 }: AccountHeroProps) {
   const hasName = name !== null && name.trim() !== "";
   const missing = new Set(completeness.missing);
@@ -100,187 +93,161 @@ export function AccountHero({
     : PROFILE_ITEMS.filter((item) => ACCOUNT_ITEMS.includes(item));
   const total = items.length;
   const doneCount = items.filter((item) => !missing.has(item)).length;
-  const percent = Math.round((doneCount / Math.max(1, total)) * 100);
+  const left = total - doneCount;
+  // "Profile N of M" — the one way /home, /me and /account say it.
   const progressLabel = playerItems
     ? `Profile ${String(doneCount)} of ${String(total)}`
     : `Account ${String(doneCount)} of ${String(total)}`;
-  const left = total - doneCount;
+  // The next item worth doing: the first missing one this page can finish.
+  const next =
+    items.find((item) => missing.has(item) && ITEM_LABELS[item].section !== undefined) ??
+    items.find((item) => missing.has(item));
+  const nextLabel = next === undefined ? null : ITEM_LABELS[next];
+  const circumference = 2 * Math.PI * 15;
+  const arc = (doneCount / Math.max(1, total)) * circumference;
 
   return (
-    <div className="acct-top">
-      <section className="acct-id" aria-label="Your account">
-        <span className="acct-id-glow" aria-hidden />
-        <div className="acct-id-main">
-          <div className="acct-id-photo">
-            <span className="acct-id-photo-box">
-              <PlayerImage
-                name={hasName ? name : "New member"}
-                seed={personId}
-                src={photoUrl}
-                size="xl"
-                shape="round"
-                fluid
-                decorative
-              />
-            </span>
-          </div>
-          <div className="acct-id-text">
-            <h2 className="acct-id-name" data-testid="account-name">
-              {hasName ? name : "Your profile"}
-            </h2>
-            {/* Each way this account signs in, on its own line. The first is the
-                account's anchor (a number, or — since 0062 — an email), so it
-                carries `account-phone`, grouped the way every other surface
-                prints a number. */}
-            <ul className="acct-id-contacts">
-              {phone !== null ? (
-                <li>
-                  <IconPhone size={16} aria-hidden />
-                  <span data-testid="account-phone" data-private>
-                    {formatPhone(phone)}
-                  </span>
+    <section className="acct-strip" aria-label="Your account">
+      <div className="acct-strip-id">
+        <span className="acct-strip-photo">
+          <PlayerImage
+            name={hasName ? name : "New member"}
+            seed={personId}
+            src={photoUrl}
+            size="lg"
+            shape="round"
+            fluid
+            decorative
+          />
+        </span>
+        <div className="acct-strip-text">
+          <h2 className="acct-strip-name" data-testid="account-name">
+            {hasName ? name : "Your profile"}
+          </h2>
+          {/* Each way this account signs in. The first is the account's anchor
+              (a number, or — since 0062 — an email), so it carries
+              `account-phone`, grouped the way every surface prints a number. */}
+          <p className="acct-strip-line">
+            {phone !== null ? (
+              <span className="acct-strip-contact">
+                <span data-testid="account-phone" data-private>
+                  {formatPhone(phone)}
+                </span>
+                <Pill tone="green" dot>
+                  Verified
+                </Pill>
+              </span>
+            ) : null}
+            {email !== null ? (
+              <span className="acct-strip-contact">
+                <span
+                  className="acct-strip-email"
+                  data-private
+                  {...(phone === null ? { "data-testid": "account-phone" } : {})}
+                >
+                  {email}
+                </span>
+                {emailVerified || phone === null ? (
                   <Pill tone="green" dot>
                     Verified
                   </Pill>
-                </li>
-              ) : null}
-              {email !== null ? (
-                <li>
-                  <IconMail size={16} aria-hidden />
-                  <span
-                    className="acct-id-email"
-                    data-private
-                    {...(phone === null ? { "data-testid": "account-phone" } : {})}
-                  >
-                    {email}
-                  </span>
-                  {emailVerified || phone === null ? (
-                    <Pill tone="green" dot>
-                      Verified
-                    </Pill>
-                  ) : (
-                    <Pill tone="amber" dot>
-                      Not confirmed
-                    </Pill>
-                  )}
-                </li>
-              ) : null}
-            </ul>
-            {sports.length > 0 ? (
-              <ul className="acct-id-sports" aria-label="Sports you play">
-                {sports.map((label) => (
-                  <li key={label}>
-                    <Pill tone="gold" icon={<IconStar />}>
-                      {label}
-                    </Pill>
-                  </li>
-                ))}
-              </ul>
+                ) : (
+                  <Pill tone="amber" dot>
+                    Not confirmed
+                  </Pill>
+                )}
+              </span>
             ) : null}
-          </div>
-        </div>
-        {facts.length === 0 ? null : (
-          <ul className="acct-id-facts" aria-label="Your account at a glance">
-            {facts.map((fact) => (
-              <li key={fact.key}>
-                <span className="acct-id-fact-icon" aria-hidden>
-                  {fact.icon}
-                </span>
-                <span className="acct-id-fact-text">
-                  <span className="acct-id-fact-value">{fact.value}</span>
-                  <span className="acct-id-fact-label">{fact.label}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="acct-id-foot">
-          <p className="acct-id-note">
-            {/* "Arrives with your FIRST registration" was said to people who had
-                already registered — without a photo, because the form's photo
-                is optional. The promise is only true for someone yet to enter. */}
-            {photoUrl !== null
-              ? "Your photo comes from your season registration."
-              : hasRegistrations
-                ? "Add a photo on your next season registration — it shows here and on your card."
-                : "Your photo arrives with your first season registration."}
+            {sports.length > 0 || standing !== null ? (
+              <span className="acct-strip-standing">
+                {[sports.join(", "), standing]
+                  .filter((part) => part !== null && part !== "")
+                  .join(" · ")}
+              </span>
+            ) : null}
           </p>
-          <div className="acct-id-actions">
-            {recordLink === null ? null : (
-              <Link href={recordLink.href} className="acct-link">
-                {recordLink.label} <IconChevronRight size={14} aria-hidden />
-              </Link>
-            )}
-            {signOut}
-          </div>
         </div>
-      </section>
-
-      <div className="acct-strength">
-        {/* PI-1: the real checklist — everything the product actually uses,
-            derived per read by core's profileCompleteness. The label keeps the
-            sentence the rest of the product (and its tests) reads. */}
-        <StatCard
-          icon={<IconSpark />}
-          tone={left === 0 ? "green" : "gold"}
-          // "Profile N of M" — the one way /home, /me and /account say it. It
-          // was "1/8", "Profile 1 of 8", "Profile 1/8" and "13%" on three
-          // screens; the percentage is still the bar, just not a fourth wording.
-          value={left === 0 ? "Complete" : `${String(left)} left`}
-          label={progressLabel}
-          hint={
-            left === 0
-              ? "Everything the product uses is filled in"
-              : playerItems
-                ? "Each one saves a question at your next registration"
-                : "Each one makes signing in and receipts smoother"
-          }
-          progress={percent}
-          testId="profile-completion"
-        />
-        {/* ONE CARD, FOLDED (round 5). The eight-item checklist stood in its
-            own card above every form — on a phone, a screen of circles before
-            the first field. Its count leads; the items open on a tap. A laptop
-            that can style the fold shows them open beside the identity card. */}
-        <details className="acct-check-fold">
-          <summary className="acct-check-summary">
-            <span>{left === 0 ? "See the checklist" : `See the ${String(left)} left`}</span>
-            <IconChevronDown size={16} aria-hidden />
-          </summary>
-          <ul className="acct-checklist" aria-label="Profile checklist">
-            {items.map((item) => {
-              const done = !missing.has(item);
-              const { label, hint, href } = ITEM_LABELS[item];
-              const body = (
-                <>
-                  {done ? (
-                    <IconCheckCircle size={16} className="acct-check-icon" aria-hidden />
-                  ) : (
-                    <IconCircle size={16} className="acct-check-icon" aria-hidden />
-                  )}
-                  <span className="acct-check-text">
-                    <span>{label}</span>
-                    {!done && hint !== undefined ? (
-                      <span className="acct-check-hint">{hint}</span>
-                    ) : null}
-                  </span>
-                </>
-              );
-              return (
-                <li key={item} data-done={done}>
-                  {!done && href !== undefined ? (
-                    <a href={href} className="acct-check-row">
-                      {body}
-                    </a>
-                  ) : (
-                    <span className="acct-check-row">{body}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </details>
       </div>
-    </div>
+
+      <div className="acct-next" data-testid="profile-completion" data-done={left === 0}>
+        <svg className="acct-next-ring" viewBox="0 0 36 36" aria-hidden>
+          <circle cx="18" cy="18" r="15" className="acct-next-track" />
+          <circle
+            cx="18"
+            cy="18"
+            r="15"
+            className="acct-next-arc"
+            strokeDasharray={`${String(arc)} ${String(circumference)}`}
+          />
+        </svg>
+        <div className="acct-next-text">
+          <span className="acct-next-title">
+            {nextLabel === null
+              ? "Everything is filled in"
+              : `Next: ${nextLabel.next.toLowerCase()}`}
+          </span>
+          <span className="acct-next-sub">
+            {progressLabel}
+            {left > 0
+              ? playerItems
+                ? " — each one saves a question at your next registration"
+                : " — each one makes signing in and receipts smoother"
+              : ""}
+          </span>
+        </div>
+        {nextLabel?.section !== undefined ? (
+          <Link
+            href={`/account?section=${nextLabel.section}`}
+            className="acct-next-go"
+            scroll={false}
+          >
+            Do it
+          </Link>
+        ) : null}
+        {left > 0 ? (
+          <details className="acct-next-all">
+            <summary aria-label={`See all ${String(total)} checklist items`}>
+              <IconChevronDown size={16} aria-hidden />
+            </summary>
+            <ul className="acct-checklist" aria-label="Profile checklist">
+              {items.map((item) => {
+                const done = !missing.has(item);
+                const { label, hint, section } = ITEM_LABELS[item];
+                const body = (
+                  <>
+                    {done ? (
+                      <IconCheckCircle size={16} className="acct-check-icon" aria-hidden />
+                    ) : (
+                      <IconCircle size={16} className="acct-check-icon" aria-hidden />
+                    )}
+                    <span className="acct-check-text">
+                      <span>{label}</span>
+                      {!done && hint !== undefined ? (
+                        <span className="acct-check-hint">{hint}</span>
+                      ) : null}
+                    </span>
+                  </>
+                );
+                return (
+                  <li key={item} data-done={done}>
+                    {!done && section !== undefined ? (
+                      <Link
+                        href={`/account?section=${section}`}
+                        className="acct-check-row"
+                        scroll={false}
+                      >
+                        {body}
+                      </Link>
+                    ) : (
+                      <span className="acct-check-row">{body}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        ) : null}
+      </div>
+    </section>
   );
 }

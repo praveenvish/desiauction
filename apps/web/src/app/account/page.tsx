@@ -1,16 +1,12 @@
 import {
   AnnouncerProvider,
-  IconBall,
+  IconArrowLeft,
   IconBell,
+  IconChevronRight,
   IconFile,
-  IconKey,
   IconLock,
   IconShieldCheck,
-  IconTrophy,
-  IconUsers,
-  IconFlag,
   IconUser,
-  ScrollStrip,
   SectionCard,
   ToastProvider,
 } from "@desiauction/ui";
@@ -49,26 +45,39 @@ import { myErasureRequest } from "../../server/privacy/actions";
 import { ProfilePanel } from "./profile-panel";
 import { SecurityPanels } from "./security-panels";
 import { SignOutButton } from "./sign-out-button";
+import { HashSection } from "./hash-section";
+import {
+  ACCOUNT_SECTIONS,
+  contactStatus,
+  notificationsStatus,
+  sectionOf,
+  securityStatus,
+  type AccountSection,
+} from "./sections";
 import "./account.css";
 
 export const metadata = { title: "Account · DesiAuction" };
 
-/** The jump row under the hero — one chip per card, in reading order. */
-const ACCOUNT_SECTIONS: { id: string; label: string; icon: ReactNode }[] = [
-  { id: "profile", label: "Name & contact", icon: <IconUser /> },
-  { id: "player", label: "Player profile", icon: <IconFile /> },
-  { id: "sports", label: "How you play", icon: <IconBall /> },
-  { id: "security", label: "Sign-in & security", icon: <IconLock /> },
-  { id: "notifications", label: "Notifications", icon: <IconBell /> },
-  { id: "data", label: "Privacy & data", icon: <IconShieldCheck /> },
-];
+const SECTION_ICON: Record<AccountSection, ReactNode> = {
+  profile: <IconUser />,
+  player: <IconFile />,
+  security: <IconLock />,
+  notifications: <IconBell />,
+  data: <IconShieldCheck />,
+};
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await currentSession();
   if (session === null) {
     // PX-3 session-expiry UX: come back exactly here after signing in.
     redirect("/login?next=/account");
   }
+  const params = await searchParams;
+  const asked = sectionOf(typeof params["section"] === "string" ? params["section"] : null);
   // Independent reads, together: they were eight awaits in a row, so the page
   // cost the SUM of eight round trips. Completeness needs the passkey count,
   // so it follows.
@@ -111,6 +120,17 @@ export default async function AccountPage() {
   ]);
   const sportForms = SPORTS.map((pack) => {
     const held = sportProfiles.find((profile) => profile.sport === pack.key);
+    /*
+     * A role already given on a registration starts the form. The checklist
+     * counts that role as set (it reads registrations too), so an empty
+     * "Choose…" under a ticked "Playing role" contradicted itself.
+     */
+    const registered = entries.find(
+      (entry) =>
+        entry.sport === pack.key &&
+        entry.role !== null &&
+        pack.roles.values.some((role) => role.key === entry.role),
+    )?.role;
     return {
       played: played.has(pack.key),
       spec: {
@@ -124,7 +144,7 @@ export default async function AccountPage() {
           options: attribute.options.map((option) => ({ key: option.key, label: option.label })),
         })),
       },
-      defaultRole: held?.defaultRole ?? null,
+      defaultRole: held?.defaultRole ?? registered ?? null,
       attributes: held?.attributes ?? {},
     };
   });
@@ -177,12 +197,173 @@ export default async function AccountPage() {
           })),
         };
   const sections = nonPlayer
-    ? ACCOUNT_SECTIONS.filter((section) => section.id !== "player" && section.id !== "sports")
+    ? ACCOUNT_SECTIONS.filter((section) => section.key !== "player")
     : ACCOUNT_SECTIONS;
+  // A laptop always shows one section beside the list; with none asked for,
+  // the first. A phone shows the list alone until one is picked.
+  const open: AccountSection =
+    asked !== null && sections.some((section) => section.key === asked) ? asked : "profile";
+  const missing = new Set(completeness.missing);
+  const playerMissing = ["role", "style", "date_of_birth", "location"].filter((item) =>
+    missing.has(item as never),
+  ).length;
+  const status: Record<AccountSection, { text: string; warn: boolean }> = {
+    profile: {
+      text: contactStatus(session.phone, email.email ?? session.email, email.verified),
+      warn: (email.email ?? session.email) === null || !email.verified,
+    },
+    player: {
+      text: [
+        sportsPlayed.join(", "),
+        playerMissing > 0 ? `${String(playerMissing)} details missing` : "complete",
+      ]
+        .filter((part) => part !== "")
+        .join(" · "),
+      warn: playerMissing > 0,
+    },
+    security: {
+      text: securityStatus(security?.passkeys.length ?? 0, security?.sessions.length ?? 0),
+      warn: (security?.passkeys.length ?? 0) === 0,
+    },
+    notifications: {
+      text:
+        settings === null
+          ? "What we send, and how"
+          : notificationsStatus(settings.topics, settings.whatsapp, settings.language),
+      warn: false,
+    },
+    data: {
+      text:
+        erasure !== null && erasure.status === "requested"
+          ? "Deletion requested"
+          : "Delete your account",
+      warn: erasure !== null && erasure.status === "requested",
+    },
+  };
+  const standing =
+    [
+      entries.length > 0
+        ? `${String(entries.length)} season${entries.length === 1 ? "" : "s"}`
+        : null,
+      roles.organizes.length > 0
+        ? `runs ${String(roles.organizes.length)} club${roles.organizes.length === 1 ? "" : "s"}`
+        : null,
+      roles.owns.length > 0
+        ? `owns ${String(roles.owns.length)} team${roles.owns.length === 1 ? "" : "s"}`
+        : null,
+    ]
+      .filter((part) => part !== null)
+      .join(" · ") || null;
+
+  const pane: Record<AccountSection, ReactNode> = {
+    profile: (
+      <>
+        <ProfilePanel phone={session.phone} name={session.name} email={email} />
+        {nonPlayer ? (
+          <details className="acct-fold" data-testid="account-player-fold">
+            <summary>
+              <span>
+                <strong>Playing too?</strong> Add a player profile — your next season registration
+                starts filled in.
+              </span>
+            </summary>
+            <div className="acct-fold-body">
+              <PersonProfilePanel profile={cricketProfile} />
+              <SportProfiles forms={sportForms} />
+            </div>
+          </details>
+        ) : null}
+      </>
+    ),
+    player: (
+      <>
+        {/* PI-1: the durable identity. Prefills every future registration. */}
+        <PersonProfilePanel profile={cricketProfile} />
+        {/* SP-1 Phase 3: how you play, per sport. */}
+        <SportProfiles forms={sportForms} />
+      </>
+    ),
+    security: security !== null ? <SecurityPanels security={security} /> : null,
+    /*
+     * NOTIFICATIONS — disclosure AND real switches. `maySend` reads the
+     * preferences before every send, so these stop messages rather than
+     * recording an opinion.
+     */
+    notifications: (
+      <SectionCard
+        id="notifications"
+        icon={<IconBell />}
+        tone="gold"
+        title="Notifications"
+        description="Switch any of these off and we stop sending it, by text and by email."
+        className="acct-card"
+        data-testid="notifications-panel"
+      >
+        <div className="acct-always">
+          <span className="acct-always-text">
+            <span className="acct-always-label">Sign-in codes</span>
+            <span className="acct-always-detail">
+              By SMS or email, only when you ask for one. They can&rsquo;t be turned off — they are
+              how you get into your account.
+            </span>
+          </span>
+          <span className="acct-always-tag">Always on</span>
+        </div>
+        {switchSettings === null ? null : <NotificationSwitches settings={switchSettings} />}
+        {settings === null ? null : (
+          <WhatsAppSwitch
+            optedIn={settings.whatsapp}
+            label={WHATSAPP_CONSENT_LABEL}
+            language={settings.language}
+          />
+        )}
+        {settings === null ? null : <MessageLanguageChoice language={settings.language} />}
+        <p className="acct-fineprint">
+          The big moments — a team buys you, you are named captain, you are in a lineup — always
+          land in <Link href="/inbox">your notifications</Link> too. We never sell your number or
+          use it for marketing. Reply <strong>STOP</strong> to any text to stop them all,{" "}
+          <strong>START</strong> to turn them back on.
+        </p>
+      </SectionCard>
+    ),
+    /*
+     * YOUR DATA — the deletion path. A manual, staffed process is defensible at
+     * beta scale; an undiscoverable one is not.
+     */
+    data: (
+      <SectionCard
+        id="data"
+        icon={<IconShieldCheck />}
+        tone="gold"
+        title="Privacy & data"
+        description="Ask us to delete your account. Your own profile is deleted; shared records — an auction you bid in, a receipt issued to you — keep the history but lose your name and number."
+        className="acct-card"
+        data-testid="your-data-panel"
+      >
+        <ErasurePanel request={erasure} />
+        <p className="acct-fineprint">
+          Or email{" "}
+          <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
+            privacy@desiauction.in
+          </a>{" "}
+          from this account, or <Link href="/support">raise it through support</Link>. We reply
+          within seven days either way.{" "}
+          <Link href="/legal/data-retention">Data Retention policy</Link>
+          {" · "}
+          <Link href="/legal/privacy">Privacy Policy</Link>
+        </p>
+      </SectionCard>
+    ),
+  };
+  const openLabel = sections.find((section) => section.key === open)?.label ?? "Account";
+
   return (
     <AnnouncerProvider>
       <ToastProvider>
-        <main className="acct">
+        {/* `data-picked`: a phone shows the list until a section is asked for,
+            then that section alone, with the way back. A laptop shows both. */}
+        <main className="acct" data-picked={asked !== null ? "true" : undefined}>
+          <HashSection current={asked} />
           <AccountHero
             personId={session.personId}
             name={session.name}
@@ -192,176 +373,56 @@ export default async function AccountPage() {
             photoUrl={photoUrl}
             sports={sportsPlayed}
             completeness={completeness}
-            hasRegistrations={entries.length > 0}
-            // Only facts that say something: "0 Sports played · 0 Passkeys"
-            // were empty boasts in the hero.
-            facts={[
-              {
-                key: "sports",
-                icon: <IconBall />,
-                value: String(sportsPlayed.length),
-                label: sportsPlayed.length === 1 ? "Sport played" : "Sports played",
-              },
-              {
-                key: "passkeys",
-                icon: <IconKey />,
-                value: String(security?.passkeys.length ?? 0),
-                label: security?.passkeys.length === 1 ? "Passkey" : "Passkeys",
-              },
-              // Identity, not a worry stat: "25 devices signed in" led the
-              // hero (round 2); the device list lives under Sign-in & security.
-              {
-                key: "seasons",
-                icon: <IconTrophy />,
-                value: String(entries.length),
-                label: entries.length === 1 ? "Season entered" : "Seasons entered",
-              },
-              // Who they are here beyond playing: an organizer's hero was a
-              // name and an empty band (every fact above is zero for them).
-              {
-                key: "clubs",
-                icon: <IconFlag />,
-                value: String(roles.organizes.length),
-                label: roles.organizes.length === 1 ? "Club you run" : "Clubs you run",
-              },
-              {
-                key: "teams",
-                icon: <IconUsers />,
-                value: String(roles.owns.length),
-                label: roles.owns.length === 1 ? "Team you own" : "Teams you own",
-              },
-            ]
-              .filter((fact) => fact.value !== "0")
-              .slice(0, 3)}
-            signOut={<SignOutButton logout={logoutAction} />}
+            standing={standing}
             playerItems={!nonPlayer}
-            recordLink={recordLink}
           />
 
-          {/* Settings read like settings: an index of the cards, then the cards —
-              two columns on a laptop so the page is two screens, not seven. */}
-          {/* A sticky section index beside ONE content column (wow pass). The
-              two-column masonry left ~1,600px of blank left column. */}
-          <div className="acct-body">
-            <nav className="acct-nav" aria-label="Account sections">
-              <ScrollStrip as="ul">
+          <div className="acct-hub">
+            <nav className="acct-sections" aria-label="Account sections">
+              <ul>
                 {sections.map((section) => (
-                  <li key={section.id}>
-                    <a href={`#${section.id}`}>
-                      <span aria-hidden>{section.icon}</span>
-                      {section.label}
-                    </a>
+                  <li key={section.key}>
+                    <Link
+                      href={`/account?section=${section.key}`}
+                      scroll={false}
+                      className="acct-section-link"
+                      aria-current={section.key === open ? "page" : undefined}
+                      data-testid={`account-section-${section.key}`}
+                    >
+                      <span className="acct-section-icon" aria-hidden>
+                        {SECTION_ICON[section.key]}
+                      </span>
+                      <span className="acct-section-text">
+                        <span className="acct-section-label">{section.label}</span>
+                        <span
+                          className="acct-section-status"
+                          data-warn={status[section.key].warn ? "true" : undefined}
+                        >
+                          {status[section.key].text}
+                        </span>
+                      </span>
+                      <IconChevronRight size={16} className="acct-section-go" aria-hidden />
+                    </Link>
                   </li>
                 ))}
-              </ScrollStrip>
-            </nav>
-
-            <div className="acct-columns">
-              <div className="acct-column">
-                <ProfilePanel phone={session.phone} name={session.name} email={email} />
-                {nonPlayer ? (
-                  <details className="acct-fold" data-testid="account-player-fold">
-                    <summary>
-                      <span>
-                        <strong>Playing too?</strong> Add a player profile — your next season
-                        registration starts filled in.
-                      </span>
-                    </summary>
-                    <div className="acct-fold-body">
-                      <PersonProfilePanel profile={cricketProfile} />
-                      <SportProfiles forms={sportForms} />
-                    </div>
-                  </details>
-                ) : (
-                  <>
-                    {/* PI-1: the durable identity. Prefills every future registration. */}
-                    <PersonProfilePanel profile={cricketProfile} />
-                    {/* SP-1 Phase 3: "how you play" has a different answer in each
-                      sport — the ones this person plays, and the rest one at a time. */}
-                    <SportProfiles forms={sportForms} />
-                  </>
+              </ul>
+              <div className="acct-sections-foot">
+                <SignOutButton logout={logoutAction} />
+                {recordLink === null ? null : (
+                  <Link href={recordLink.href} className="acct-link">
+                    {recordLink.label} <IconChevronRight size={14} aria-hidden />
+                  </Link>
                 )}
               </div>
+            </nav>
 
-              <div className="acct-column">
-                {security !== null ? <SecurityPanels security={security} /> : null}
-
-                {/*
-                NOTIFICATIONS — disclosure AND real switches. The column exists
-                (notification_preferences, migration 0023) and `maySend` reads it
-                before every send, so these switches stop messages rather than
-                recording an opinion. The disclosure stays beside them: knowing
-                what we send is not the same as being able to stop it.
-              */}
-                <SectionCard
-                  id="notifications"
-                  icon={<IconBell />}
-                  tone="gold"
-                  title="Notifications"
-                  description="Switch any of these off and we stop sending it, by text and by email."
-                  className="acct-card"
-                  data-testid="notifications-panel"
-                >
-                  <div className="acct-always">
-                    <span className="acct-always-text">
-                      <span className="acct-always-label">Sign-in codes</span>
-                      <span className="acct-always-detail">
-                        By SMS or email, only when you ask for one. They can&rsquo;t be turned off —
-                        they are how you get into your account.
-                      </span>
-                    </span>
-                    <span className="acct-always-tag">Always on</span>
-                  </div>
-                  {switchSettings === null ? null : (
-                    <NotificationSwitches settings={switchSettings} />
-                  )}
-                  {settings === null ? null : (
-                    <WhatsAppSwitch
-                      optedIn={settings.whatsapp}
-                      label={WHATSAPP_CONSENT_LABEL}
-                      language={settings.language}
-                    />
-                  )}
-                  {settings === null ? null : (
-                    <MessageLanguageChoice language={settings.language} />
-                  )}
-                  <p className="acct-fineprint">
-                    The big moments — a team buys you, you are named captain, you are in a lineup —
-                    always land in <Link href="/inbox">your notifications</Link> too. We never sell
-                    your number or use it for marketing. Reply <strong>STOP</strong> to any text to
-                    stop them all, <strong>START</strong> to turn them back on.
-                  </p>
-                </SectionCard>
-
-                {/*
-                YOUR DATA — the deletion path the product did not have. A manual,
-                staffed process is defensible at beta scale. An undiscoverable one
-                is not. This is the discoverable one.
-              */}
-                <SectionCard
-                  id="data"
-                  icon={<IconShieldCheck />}
-                  tone="gold"
-                  title="Privacy & data"
-                  description="Ask us to delete your account. Your own profile is deleted; shared records — an auction you bid in, a receipt issued to you — keep the history but lose your name and number."
-                  className="acct-card"
-                  data-testid="your-data-panel"
-                >
-                  <ErasurePanel request={erasure} />
-                  <p className="acct-fineprint">
-                    Or email{" "}
-                    <a href="mailto:privacy@desiauction.in?subject=Account%20deletion%20request">
-                      privacy@desiauction.in
-                    </a>{" "}
-                    from this account, or <Link href="/support">raise it through support</Link>. We
-                    reply within seven days either way.{" "}
-                    <Link href="/legal/data-retention">Data Retention policy</Link>
-                    {" · "}
-                    <Link href="/legal/privacy">Privacy Policy</Link>
-                  </p>
-                </SectionCard>
-              </div>
-            </div>
+            <section className="acct-pane" aria-label={openLabel} data-section={open}>
+              <Link href="/account" className="acct-back" scroll={false}>
+                <IconArrowLeft size={18} aria-hidden />
+                Account
+              </Link>
+              {pane[open]}
+            </section>
           </div>
         </main>
       </ToastProvider>

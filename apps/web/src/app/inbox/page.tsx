@@ -115,7 +115,7 @@ export default async function InboxPage() {
           }
           action={
             <Link
-              href="/account#notifications"
+              href="/account?section=notifications"
               className="inbox-settings"
               aria-label="Notification settings"
             >
@@ -232,7 +232,7 @@ export default async function InboxPage() {
             account's security log — said here, so they do not seem lost. */}
         <p className="inbox-foot">
           Sign-ins and sign-in codes are in{" "}
-          <Link href="/account#activity" data-testid="inbox-signins-link">
+          <Link href="/account?section=security#activity" data-testid="inbox-signins-link">
             Account → Security activity
           </Link>
           .

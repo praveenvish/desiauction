@@ -35,214 +35,6 @@
 
 /* ---- top: identity card + profile strength -------------------------------- */
 
-.acct-top {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
-}
-
-@media (min-width: 1024px) {
-  .acct-top {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    align-items: stretch;
-  }
-}
-
-.acct-id {
-  box-sizing: border-box;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 0;
-  padding: var(--space-6);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-1);
-}
-
-/* A soft wash of the accent behind the photo — the card's one flourish. */
-.acct-id-glow {
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 96px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-subtle) 90%, transparent),
-    transparent
-  );
-  pointer-events: none;
-}
-
-.acct-id-main {
-  position: relative;
-  /* The card stretches to the checklist beside it on a laptop; the identity
-     takes the spare height (centred) instead of a band of blank above the foot. */
-  flex: 1 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-.acct-id-photo {
-  flex: none;
-  padding: 4px;
-  border-radius: var(--radius-full);
-  background: var(--surface-raised);
-  box-shadow: 0 0 0 2px var(--accent-line);
-}
-
-.acct-id-photo-box {
-  display: block;
-  width: 96px;
-  height: 96px;
-}
-
-.acct-id-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.acct-id-name {
-  margin: 0;
-  font-family: var(--font-text);
-  letter-spacing: -0.01em;
-  font-size: var(--text-2xl-size, 1.5rem);
-  line-height: 1.2;
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-  overflow-wrap: anywhere;
-}
-
-.acct-id-contacts,
-.acct-id-sports {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.acct-id-contacts {
-  flex-direction: column;
-}
-
-.acct-id-contacts li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-}
-
-.acct-id-contacts li > svg {
-  flex: none;
-  color: var(--text-muted);
-}
-
-.acct-id-contacts [data-testid="account-phone"],
-.acct-id-email {
-  color: var(--text-primary);
-  font-weight: var(--font-weight-medium);
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-
-.acct-id-sports {
-  gap: var(--space-2);
-}
-
-.acct-id-facts {
-  position: relative;
-  margin-top: auto;
-  display: grid;
-  /* One to three facts share the full width, on a phone too (they used to
-     fill two of three fixed columns). */
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-  margin-bottom: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.acct-id-facts li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-}
-
-.acct-id-fact-icon {
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  background: var(--accent-subtle);
-  color: var(--text-accent);
-}
-
-.acct-id-fact-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.acct-id-fact-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.acct-id-fact-value {
-  color: var(--text-heading);
-  font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-}
-
-.acct-id-fact-label {
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-}
-
-.acct-id-foot {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-}
-
-.acct-id-note {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-}
-
-.acct-id-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-}
-
 .acct-link {
   display: inline-flex;
   align-items: center;
@@ -256,62 +48,6 @@
 
 .acct-link:hover {
   text-decoration: underline;
-}
-
-/* ONE CARD (round 5): the count, then the checklist folded under it. It was
-   two cards — the figure, and a grid of items with a ragged right column. */
-.acct-strength {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-1);
-}
-
-.acct-strength > [data-testid="profile-completion"] {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.acct-check-fold {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.acct-check-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-height: 44px;
-  padding: 0 var(--space-4);
-  list-style: none;
-  cursor: pointer;
-  color: var(--text-accent);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-}
-
-.acct-check-summary::-webkit-details-marker {
-  display: none;
-}
-
-.acct-check-summary svg {
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-
-.acct-check-fold[open] .acct-check-summary svg {
-  transform: rotate(180deg);
-}
-
-.acct-check-summary:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
 }
 
 .acct-checklist {
@@ -336,14 +72,6 @@
    content, the summary stays and the list opens on a click, as on a phone. */
 @supports selector(::details-content) {
   @media (min-width: 1024px) {
-    .acct-check-fold::details-content {
-      content-visibility: visible;
-    }
-
-    .acct-check-summary {
-      display: none;
-    }
-
     .acct-checklist {
       padding-top: var(--space-2);
     }
@@ -393,115 +121,7 @@ a.acct-check-row:hover {
 
 /* ---- jump row ---------------------------------------------------------------- */
 
-.acct-nav ul {
-  display: flex;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0 0 var(--space-1);
-  list-style: none;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.acct-nav ul::-webkit-scrollbar {
-  display: none;
-}
-
-.acct-nav a {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 40px;
-  padding: 0 var(--space-4);
-  white-space: nowrap;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-full);
-  background: var(--surface-raised);
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-
-.acct-nav a:hover {
-  border-color: var(--border-strong);
-  color: var(--text-heading);
-}
-
-.acct-nav a svg {
-  width: 16px;
-  height: 16px;
-  color: var(--text-accent);
-}
-
 /* ---- the two columns --------------------------------------------------------- */
-
-/* One reading column; the section index rides beside it on a laptop and
-   sticks under the header on a phone. */
-.acct-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-}
-
-.acct-nav {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding-block: var(--space-2);
-  background: var(--surface);
-}
-
-.acct-columns {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-.acct-column {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-@media (min-width: 1100px) {
-  .acct-body {
-    display: grid;
-    grid-template-columns: 200px minmax(0, 1fr);
-    gap: var(--space-8);
-    align-items: start;
-  }
-
-  .acct-nav {
-    top: var(--space-4);
-    padding: 0;
-    background: none;
-  }
-
-  .acct-nav ul {
-    flex-direction: column;
-    gap: 2px;
-    overflow: visible;
-  }
-
-  .acct-nav a {
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 36px;
-    border-color: transparent;
-    background: none;
-    border-radius: var(--radius-md);
-  }
-
-  .acct-nav a:hover {
-    border-color: transparent;
-    background: var(--surface-sunken);
-  }
-}
 
 .acct-fineprint {
   margin: 0;
@@ -1023,24 +643,6 @@ a.acct-check-row:hover {
     gap: var(--space-4);
   }
 
-  .acct-id {
-    padding: var(--space-5) var(--space-4);
-  }
-
-  .acct-id-main {
-    align-items: flex-start;
-    gap: var(--space-4);
-  }
-
-  .acct-id-name {
-    font-size: var(--text-xl-size);
-  }
-
-  .acct-id-photo-box {
-    width: 64px;
-    height: 64px;
-  }
-
   /* On a phone the meter already says how many are done; the list keeps only
      what is left to do. */
   .acct-checklist {
@@ -1050,22 +652,6 @@ a.acct-check-row:hover {
   .acct-checklist li[data-done="true"],
   .acct-checklist:not(:has(li[data-done="false"])) {
     display: none;
-  }
-
-  .acct-id-facts {
-    gap: var(--space-2);
-  }
-
-  .acct-id-facts li {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .acct-columns,
-  .acct-column {
-    gap: var(--space-4);
   }
 
   .security-list li {
@@ -1089,48 +675,6 @@ a.acct-check-row:hover {
 
   .events .security-meta {
     text-align: start;
-  }
-}
-
-/* ROUND 2: a single fact ("16 devices signed in") sat in a 90px tile under
-   an otherwise empty band. One fact is a line, not a tile. */
-.acct-id-facts:has(> li:only-child) {
-  display: flex;
-}
-
-.acct-id-facts > li:only-child {
-  padding: 0;
-  background: none;
-}
-
-.acct-id-facts > li:only-child .acct-id-fact-text {
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.acct-id-facts > li:only-child .acct-id-fact-value {
-  font-size: var(--text-md-size);
-}
-
-.acct-id-facts > li:only-child .acct-id-fact-label {
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-/* Three facts on a 390 phone: icon over figure, so "Seasons entered" keeps
-   one line instead of wrapping beside a 32px tile. */
-@media (max-width: 479px) {
-  .acct-id-facts li {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-  }
-
-  /* Round 5: the figure and its word are the fact; the icon tile above them
-     doubled each tile's height on the longest page a phone has. */
-  .acct-id-facts li .acct-id-fact-icon {
-    display: none;
   }
 }
 
@@ -1226,4 +770,394 @@ a.acct-check-row:hover {
   color: var(--text-heading);
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
+}
+
+/* ==== The settings hub (2026-09-27) =======================================
+   The identity strip, the section list and the one open section. A laptop
+   shows the list beside the section; a phone shows the list, then the
+   section it opens (`.acct[data-picked]`). Tokens only. */
+
+.acct-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.acct-strip-id {
+  display: flex;
+  flex: 1 1 22rem;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.acct-strip-photo {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+.acct-strip-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.acct-strip-name {
+  margin: 0;
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  color: var(--text-heading);
+}
+
+.acct-strip-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.acct-strip-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.acct-strip-email {
+  overflow-wrap: anywhere;
+}
+
+.acct-strip-standing {
+  color: var(--text-muted);
+}
+
+/* The ONE next thing: a ring, a sentence, a door, and the rest folded. */
+.acct-next {
+  position: relative;
+  display: flex;
+  flex: 1 1 24rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 34rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+}
+
+.acct-next[data-done="true"] {
+  border-color: var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.acct-next-ring {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  transform: rotate(-90deg);
+}
+
+.acct-next-track,
+.acct-next-arc {
+  fill: none;
+  stroke-width: 4;
+}
+
+.acct-next-track {
+  stroke: var(--border-subtle);
+}
+
+.acct-next-arc {
+  stroke: var(--accent-line);
+  stroke-linecap: round;
+}
+
+.acct-next-text {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.acct-next-title {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.acct-next-sub {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.acct-next-go {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.acct-next-go:hover {
+  border-color: var(--accent-line);
+}
+
+.acct-next-all > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.acct-next-all > summary::-webkit-details-marker {
+  display: none;
+}
+
+.acct-next-all > summary:hover {
+  background: var(--surface-raised);
+}
+
+.acct-next-all[open] > summary {
+  transform: rotate(180deg);
+}
+
+.acct-next-all[open] .acct-checklist {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: min(22rem, calc(100vw - var(--space-8)));
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-3, var(--shadow-2));
+}
+
+/* ---- The hub: sections beside the open one ---- */
+
+.acct-hub {
+  display: grid;
+  grid-template-columns: 19rem minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.acct-sections {
+  position: sticky;
+  top: calc(var(--shell-topbar-h, 56px) + var(--space-4));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.acct-sections ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.acct-section-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.acct-section-link:hover {
+  background: var(--surface-sunken);
+}
+
+.acct-section-link[aria-current="page"] {
+  background: var(--surface-raised);
+  box-shadow:
+    0 0 0 1px var(--border-subtle),
+    var(--shadow-1),
+    inset 3px 0 0 var(--accent-line);
+}
+
+.acct-section-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.acct-section-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.acct-section-link[aria-current="page"] .acct-section-icon {
+  background: var(--accent-subtle);
+  color: var(--accent-ink);
+}
+
+.acct-section-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.acct-section-label {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.acct-section-status {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.acct-section-status[data-warn="true"] {
+  color: var(--warning-strong);
+}
+
+.acct-section-go {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.acct-sections-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.acct-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* The way back exists for the phone's one-section page only. */
+.acct-back {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .acct-section-go {
+    display: none;
+  }
+}
+
+/* A phone: the list alone, then — once one is asked for — that section alone. */
+@media (max-width: 899px) {
+  .acct-hub {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .acct-sections {
+    position: static;
+  }
+
+  .acct-sections ul {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-1);
+  }
+
+  .acct-sections li + li .acct-section-link {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .acct-section-link {
+    min-height: 56px;
+    border-radius: 0;
+  }
+
+  .acct-section-link[aria-current="page"] {
+    background: none;
+    box-shadow: none;
+  }
+
+  .acct-section-link[aria-current="page"] .acct-section-icon {
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+  }
+
+  .acct-sections-foot {
+    border-top: 0;
+    padding-inline: 0;
+  }
+
+  .acct:not([data-picked]) .acct-pane {
+    display: none;
+  }
+
+  .acct[data-picked] .acct-strip,
+  .acct[data-picked] .acct-sections {
+    display: none;
+  }
+
+  .acct-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    align-self: flex-start;
+    min-height: 44px;
+    font-size: var(--text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-accent);
+    text-decoration: none;
+  }
+
+  .acct-strip {
+    padding: var(--space-4);
+  }
+
+  .acct-next {
+    max-width: none;
+  }
 }
