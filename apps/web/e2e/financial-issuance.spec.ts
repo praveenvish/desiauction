@@ -72,6 +72,8 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
   // Both authority panels live on the org detail page's "Money & roles" tab;
   // other tab panels render in the DOM but display:none until selected.
   await page.getByRole("tab", { name: "Money & roles" }).click();
+  // Each money key opens its grant form in a dialog now.
+  await page.getByTestId("open-grant-authority").click();
   await page.getByTestId("authority-person").selectOption({ label: "Issuance Founder" });
   await page.getByTestId("authority-role").selectOption("settlement:controller");
   await page.getByTestId("grant-authority").click();
@@ -79,6 +81,7 @@ test("founder demo: a fresh org declares finance, settles, and the platform issu
     timeout: 20_000,
   });
 
+  await page.getByTestId("open-grant-finance").click();
   await page.getByTestId("finance-person").selectOption({ label: "Issuance Founder" });
   await page.getByTestId("finance-role").selectOption("finops:controller");
   await page.getByTestId("grant-finance").click();

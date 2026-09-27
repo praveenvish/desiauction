@@ -63,8 +63,8 @@ test("a battle royale season: one lobby, four squads, and a table built from pla
   await page.getByLabel("Club name").filter({ visible: true }).fill(`BR Org ${STAMP}`);
   await page.getByRole("button", { name: "Create club" }).click();
   await expect(page.getByTestId("org-name")).toBeVisible();
-  await page.getByRole("tab", { name: "Tournaments" }).click();
-  await page.getByTestId("open-venues").click();
+  // Venues is a tab on the club page now.
+  await page.getByRole("tab", { name: "Venues" }).click();
   await expect(page.getByTestId("venues-panel")).toHaveAttribute("data-hydrated", "true", {
     timeout: 30_000,
   });
@@ -75,7 +75,9 @@ test("a battle royale season: one lobby, four squads, and a table built from pla
   await page.getByRole("button", { name: "Add a ground" }).click();
   await page.getByLabel("Ground name").fill("Pochinki");
   await page.getByTestId("add-ground").click();
-  await expect(page.getByRole("cell", { name: "Pochinki" })).toBeVisible();
+  await expect(
+    page.getByTestId("venues-panel").getByText("Pochinki", { exact: true }),
+  ).toBeVisible();
 
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();

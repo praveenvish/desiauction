@@ -2,22 +2,14 @@ import {
   AnnouncerProvider,
   ButtonLink,
   Card,
-  CardGrid,
   EmptyState,
   IconArrowRight,
   IconBolt,
-  IconBroadcast,
-  IconCalendar,
   IconCheck,
   IconChevronRight,
-  IconShieldCheck,
   IconTile,
   IconTrophy,
-  IconUsers,
   Pill,
-  SectionCard,
-  StatCard,
-  StatGrid,
   ToastProvider,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -37,6 +29,13 @@ import type { CompetitionSummary } from "../../../server/competition/competition
 import type { SeasonRow } from "../../../server/competition/tournament-actions";
 import { orgCatalogue } from "../../../server/orgs/catalogue";
 import { orgMessagingSettingsView } from "../../../server/messaging/actions";
+import { organizerScheduleView, venuesView } from "../../../server/competition/fixture-actions";
+import { nowWallClock } from "../../../server/competition/fixtures";
+import { tournamentsView } from "../../../server/competition/tournament-actions";
+import { NeedsYou } from "../../tournaments/needs-you";
+import { dateRange } from "../../tournaments/season-card";
+import { STAGE_LABEL, needsYou, seasonStage } from "../../tournaments/season-stage";
+import { VenuesTab } from "./venues/venues-tab";
 import { moneyAuthority } from "../../../server/settlement/actions";
 import { CreateCompetitionForm } from "../../seasons/create-competition-form";
 import { CreateTournamentForm } from "../../tournaments/create-tournament-form";
@@ -127,7 +126,9 @@ function ActivityRow({ row, times = 1 }: { row: OrgActivityRow; times?: number }
       <IconTile icon={style.icon} tone={style.tone} size="sm" />
       <span className="od-activity-text">
         <strong>
-          {activityLabel(row.action)}
+          {times > 1 && row.action.startsWith("grant.")
+            ? "Access changed"
+            : activityLabel(row.action)}
           {times > 1 ? <span className="home-feed-times"> ×{times}</span> : null}
         </strong>
         {who.length > 0 ? <span>{who.join(" · ")}</span> : null}
@@ -202,16 +203,27 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   // wait for it: each re-checks membership itself and returns null for a
   // stranger, so running them alongside the gate reveals nothing and saves two
   // round-trip depths on every visit.
-  const [sportOptions, view, authority, finance, catalogue, overview, messaging] =
-    await Promise.all([
-      enabledSports(),
-      orgView(slug),
-      moneyAuthority(slug),
-      financeAuthority(slug),
-      orgCatalogue(slug),
-      orgOverview(slug),
-      orgMessagingSettingsView(slug),
-    ]);
+  const [
+    sportOptions,
+    view,
+    authority,
+    finance,
+    catalogue,
+    overview,
+    messaging,
+    venues,
+    seasonsView,
+  ] = await Promise.all([
+    enabledSports(),
+    orgView(slug),
+    moneyAuthority(slug),
+    financeAuthority(slug),
+    orgCatalogue(slug),
+    orgOverview(slug),
+    orgMessagingSettingsView(slug),
+    venuesView(slug),
+    tournamentsView(),
+  ]);
   if (view === null) {
     // Non-members and unknown slugs are indistinguishable (M-IP2-3 tenancy).
     notFound();
@@ -230,6 +242,41 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     members: view.memberCount,
     teams: editions.reduce((sum, edition) => sum + edition.teams, 0),
   };
+  /*
+   * THE SEASON THAT NEEDS YOU (2026-09-27). The Overview was four figure tiles
+   * and a "Live & open now" card 400px tall holding one row. It now leads with
+   * the same "Needs you now" cards /tournaments draws — its road, real figures
+   * and the one next step — scoped to this club, read from the same
+   * `tournamentsView` so the two pages cannot disagree about a season.
+   */
+  const today = nowWallClock().slice(0, 10);
+  const clubSeasons = [
+    ...seasonsView.tournaments
+      .filter((tournament) => tournament.orgId === view.org.id)
+      .flatMap((tournament) => tournament.seasons),
+    ...seasonsView.standalone.filter((season) => season.orgId === view.org.id),
+  ];
+  const clubTournamentNames = new Map(
+    seasonsView.tournaments
+      .filter((tournament) => tournament.orgId === view.org.id)
+      .map((tournament) => [tournament.id, tournament.name] as const),
+  );
+  const waiting = needsYou(clubSeasons, today);
+  const waitingIds = new Set(waiting.map((season) => season.id));
+  const otherSeasons = clubSeasons
+    .filter((season) => !waitingIds.has(season.id))
+    .sort((a, b) => (b.startsOn ?? "").localeCompare(a.startsOn ?? ""))
+    .slice(0, 5);
+  const clubSlugs = new Set(clubSeasons.map((season) => season.slug));
+  const upcoming =
+    clubSeasons.length === 0
+      ? []
+      : (await organizerScheduleView())
+          .filter((fixture) => clubSlugs.has(fixture.competitionSlug))
+          .slice(0, 3);
+  const canManageVenues = venues?.viewer.canManage === true;
+  const groundCount = venues?.venues.reduce((sum, venue) => sum + venue.grounds.length, 0) ?? 0;
+
   // The org's Tournaments tab renders the SAME accordion as /tournaments,
   // scoped to this org — one component, so the two surfaces never drift. The
   // catalogue's editions become CompetitionSummary rows (org fixed, tournament
@@ -308,24 +355,6 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
           },
         ]
       : []),
-  ];
-
-  // Live & open now: an auction running, or a season taking entries.
-  const liveOpen: { key: string; slug: string; name: string; tone: "live" | "open" }[] = [
-    ...(overview?.liveAuctions.map((auction) => ({
-      key: `live-${auction.slug}`,
-      slug: auction.slug,
-      name: auction.name,
-      tone: "live" as const,
-    })) ?? []),
-    ...editions
-      .filter((edition) => edition.status === "registration_open")
-      .map((edition) => ({
-        key: `open-${edition.slug}`,
-        slug: edition.slug,
-        name: edition.name,
-        tone: "open" as const,
-      })),
   ];
 
   // The four rungs after "create your club", derived from reads already in
@@ -417,28 +446,6 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
   // the same reason: rungs complete out of order.
   const laddering = canManageOrg && currentRung !== -1 && !(rungs[rungs.length - 1]?.done ?? false);
 
-  const tournamentsCard = (hint?: string) => (
-    <StatCard
-      icon={<IconTrophy />}
-      concept="tournament"
-      rolling
-      value={stats.tournaments}
-      label={plural(stats.tournaments, "Tournament")}
-      {...(hint !== undefined ? { hint } : {})}
-      href="#tournaments"
-    />
-  );
-  const seasonsCard = (
-    <StatCard
-      icon={<IconCalendar />}
-      concept="season"
-      rolling
-      value={stats.seasons}
-      label={plural(stats.seasons, "Season")}
-      href="#tournaments"
-    />
-  );
-
   const overviewTab: ReactNode = (
     <div className="od-overview">
       {overview !== null ? (
@@ -456,125 +463,76 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
           follows the user in here, with the next rung live. */}
       {laddering ? <OrgLadder rungs={rungs} current={currentRung} /> : null}
 
-      {/* Seasons lead when every season is a one-off: "0 Tournaments" as the
-          first tile above a live season read as an empty club — the same
-          confusion /tournaments defuses with its "one-off" hint. */}
-      <StatGrid testId="org-stats">
-        {stats.tournaments === 0 && stats.seasons > 0 ? (
-          <>
-            {seasonsCard}
-            {tournamentsCard("Your seasons are one-offs")}
-          </>
-        ) : (
-          <>
-            {tournamentsCard()}
-            {seasonsCard}
-          </>
-        )}
-        <StatCard
-          icon={<IconUsers />}
-          concept="players"
-          rolling
-          value={stats.members}
-          label={plural(stats.members, "Member")}
-          href="#members"
-        />
-        <StatCard
-          icon={<IconShieldCheck />}
-          concept="teams"
-          rolling
-          value={stats.teams}
-          label={`Active ${plural(stats.teams, "team")}`}
-          hint="Across every season"
-        />
-      </StatGrid>
-
-      <CardGrid>
-        <SectionCard
-          icon={<IconBroadcast />}
-          concept="auction"
-          title="Live & open now"
-          action={
-            <Link
-              href={`/org/${slug}#tournaments`}
-              className="od-more"
-              aria-label="View all tournaments"
-            >
-              View all
-              <IconArrowRight size={14} />
-            </Link>
-          }
-        >
-          {liveOpen.length === 0 ? (
-            editions.length === 0 ? (
-              <EmptyState
-                size="compact"
-                icon={<IconTrophy />}
-                title="Nothing live or taking entries right now"
-              />
-            ) : (
-              /* Nothing live: the club's latest seasons instead of one grey
-                 sentence in a full-height card (round 2). */
-              <>
-                <p className="od-empty">Nothing live or taking entries right now. Latest:</p>
-                <ul className="od-live-list">
-                  {editions.slice(0, 3).map((edition) => (
-                    <li key={edition.id}>
-                      <Link href={`/seasons/${edition.slug}`} className="od-live-row">
-                        <span className="od-live-name">{edition.name}</span>
-                        <span className="od-live-meta">
-                          {edition.teams} {edition.teams === 1 ? "team" : "teams"} ·{" "}
-                          {edition.players} {edition.players === 1 ? "player" : "players"}
+      <div className="od-overview-grid">
+        <div className="od-overview-main">
+          <NeedsYou
+            seasons={waiting}
+            tournamentNames={clubTournamentNames}
+            upcoming={upcoming}
+            today={today}
+          />
+          {otherSeasons.length > 0 ? (
+            <section className="od-seasons" aria-labelledby="od-seasons-title">
+              <div className="od-section-head">
+                <h2 id="od-seasons-title">{waiting.length > 0 ? "Other seasons" : "Seasons"}</h2>
+                <Link href={`/org/${slug}#tournaments`} className="od-more">
+                  All tournaments
+                  <IconArrowRight size={14} aria-hidden />
+                </Link>
+              </div>
+              <ul className="od-season-list" data-testid="org-seasons">
+                {otherSeasons.map((season) => {
+                  const when = dateRange(season.startsOn, season.endsOn);
+                  return (
+                    <li key={season.id}>
+                      <Link href={`/seasons/${season.slug}`} className="od-season-row">
+                        <span className="od-season-text">
+                          <strong>{season.name}</strong>
+                          <span>
+                            {[
+                              when,
+                              `${String(season.counts.teams)} ${season.counts.teams === 1 ? "team" : "teams"}`,
+                            ]
+                              .filter((part): part is string => part !== null)
+                              .join(" · ")}
+                          </span>
                         </span>
-                        <span className="od-live-go" aria-hidden>
-                          <IconChevronRight size={18} />
-                        </span>
+                        <Pill tone="neutral">{STAGE_LABEL[seasonStage(season, today)]}</Pill>
+                        <IconChevronRight size={16} aria-hidden className="od-season-go" />
                       </Link>
                     </li>
-                  ))}
-                </ul>
-              </>
-            )
-          ) : (
-            <ul className="od-live-list">
-              {liveOpen.map((row) => (
-                <li key={row.key}>
-                  <Link href={`/seasons/${row.slug}`} className="od-live-row">
-                    <span className="od-live-name">{row.name}</span>
-                    {row.tone === "live" ? (
-                      <Pill tone="red" dot>
-                        Live
-                      </Pill>
-                    ) : (
-                      <Pill tone="green" dot>
-                        Registration open
-                      </Pill>
-                    )}
-                    <span className="od-live-go" aria-hidden>
-                      <IconChevronRight size={18} />
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : clubSeasons.length === 0 && !laddering ? (
+            <EmptyState size="compact" icon={<IconTrophy />} title="No seasons in this club yet" />
+          ) : null}
+        </div>
 
-        <SectionCard icon={<IconBolt />} concept="activity" title="Recent activity">
+        <section className="od-activity" aria-labelledby="od-activity-title">
+          <div className="od-section-head">
+            <h2 id="od-activity-title">Recent activity</h2>
+          </div>
           {overview === null || overview.activity.length === 0 ? (
             <EmptyState size="compact" icon={<IconBolt />} title="No activity recorded yet" />
           ) : (
             <ul className="od-activity-list">
               {groupActivity(
                 overview.activity,
-                (row) => `${row.action}|${row.subjectName ?? ""}|${row.actorName ?? ""}`,
-              ).map(({ row, times }) => (
-                <ActivityRow key={row.id} row={row} times={times} />
-              ))}
+                // Access granted, revoked, granted again for the same person
+                // read as six lines; they are one fact — their access changed.
+                (row) =>
+                  `${row.action.startsWith("grant.") ? "grant.*" : row.action}|${row.subjectName ?? ""}|${row.actorName ?? ""}`,
+              )
+                .slice(0, 8)
+                .map(({ row, times }) => (
+                  <ActivityRow key={row.id} row={row} times={times} />
+                ))}
             </ul>
           )}
-        </SectionCard>
-      </CardGrid>
+        </section>
+      </div>
     </div>
   );
 
@@ -596,25 +554,29 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
               ))}
             </div>
           )}
-          {/* Grounds belong beside the fixtures that use them, not on the tab
-              about who may touch the money — it was the one link on that tab
-              that had nothing to do with money. Offered only to whoever can
-              manage them, which is who the page now admits. */}
-          {canManageOrg ? (
-            <ButtonLink
-              href={`/org/${slug}/venues`}
-              variant="secondary"
-              size="touch"
-              data-testid="open-venues"
-            >
-              Venues
-              <IconArrowRight size={16} className="icon-trail" />
-            </ButtonLink>
-          ) : null}
         </div>
       ),
     },
     { id: "members", label: "Members", content: <MembersPanel view={view} slug={slug} /> },
+    // Venues is a tab now, offered to whoever may manage them — the same rule
+    // that made /org/[slug]/venues 404 for everyone else.
+    ...(venues !== null && canManageVenues
+      ? [
+          {
+            id: "venues",
+            label: "Venues",
+            content: (
+              <VenuesTab
+                slug={slug}
+                view={venues}
+                seasons={[...editions]
+                  .sort((a, b) => (b.startsOn ?? "").localeCompare(a.startsOn ?? ""))
+                  .slice(0, 5)}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       id: "notifications",
       label: "Notifications",
@@ -671,10 +633,9 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                 ₹
               </span>
               <span className="od-moneydoor-text">
-                <strong>Settlement · Finance · Deliveries · Reconciliation</strong>
+                <strong>Open the money desks</strong>
                 <span>
-                  Cases, receipts &amp; invoices, the delivery log and the reconciliation proof —
-                  the platform&apos;s money operations.
+                  Settlement cases · receipts &amp; invoices · deliveries · reconciliation
                 </span>
               </span>
               <span className="od-moneydoor-go" aria-hidden>
@@ -687,12 +648,14 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
               sentence. The panels each carried a paragraph making the same
               partition argument in different words, directly above the other
               one making it again; nobody read either. */}
-          <p className="od-authority-lead">
-            <strong>Two separate keys.</strong> <em>Settles money</em> opens cases and records what
-            was paid. <em>Speaks for the money</em> issues receipts and closes the books. Neither
-            lets anyone run an auction, and running the club grants neither. Hand each one out on
-            purpose.
-          </p>
+          <div className="od-keys-head">
+            <h2>Two money keys</h2>
+            <p>
+              Separate on purpose: <em>Settles money</em> records what was paid,{" "}
+              <em>Speaks for the money</em> issues receipts and closes the books. Neither lets
+              anyone run an auction, and running the club grants neither.
+            </p>
+          </div>
           <div className="od-authority-grid">
             {authority !== null ? <MoneyAuthorityPanel slug={slug} authority={authority} /> : null}
             {finance !== null ? <FinanceAuthorityPanel slug={slug} authority={finance} /> : null}
@@ -738,6 +701,33 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                   {established === null ? null : <span>Est. {established}</span>}
                   <span className="od-hero-slug">/{view.org.slug}</span>
                 </p>
+                {/* The club's figures in one line — they were four tiles the
+                    height of the tabs, two of them usually zero. */}
+                <ul className="od-hero-figures" data-testid="org-stats">
+                  <li>
+                    <strong>{stats.seasons}</strong> {plural(stats.seasons, "season")}
+                  </li>
+                  {stats.tournaments > 0 ? (
+                    <li>
+                      <strong>{stats.tournaments}</strong> {plural(stats.tournaments, "tournament")}
+                    </li>
+                  ) : null}
+                  <li>
+                    <strong>{stats.teams}</strong> {plural(stats.teams, "team")}
+                  </li>
+                  <li>
+                    <strong>{stats.members}</strong> {plural(stats.members, "member")}
+                  </li>
+                  {canManageVenues ? (
+                    <li>
+                      <strong>{venues.venues.length}</strong>{" "}
+                      {plural(venues.venues.length, "venue")}
+                      {groundCount > 0
+                        ? ` · ${String(groundCount)} ${plural(groundCount, "ground")}`
+                        : ""}
+                    </li>
+                  ) : null}
+                </ul>
               </div>
               <div className="od-hero-actions">
                 {/* At the org level the thing you create is a TOURNAMENT — seasons

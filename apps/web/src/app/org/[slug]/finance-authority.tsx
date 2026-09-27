@@ -1,11 +1,6 @@
 "use client";
 
-import { Badge, Button, Card, Dialog, EmptyState, Select, useToast } from "@desiauction/ui";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-import { personInitials, personLabel } from "../../../lib/person-label";
-import { grantedLine } from "./money-authority";
+import { KeyCard } from "./key-card";
 import {
   issueFinanceAuthorityAction,
   revokeFinanceAuthorityAction,
@@ -45,12 +40,6 @@ const ROLES: { value: string; label: string; description: string }[] = [
   },
 ];
 
-const ROLE_LABEL: Record<string, string> = {
-  "finops:clerk": "Finance clerk",
-  "finops:accountant": "Accountant",
-  "finops:controller": "Finance controller",
-};
-
 export function FinanceAuthorityPanel({
   slug,
   authority,
@@ -58,174 +47,30 @@ export function FinanceAuthorityPanel({
   slug: string;
   authority: FinanceAuthorityView;
 }) {
-  const router = useRouter();
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
-  const [personId, setPersonId] = useState("");
-  const [role, setRole] = useState("finops:accountant");
-  const [revoking, setRevoking] = useState<FinanceAuthorityView["grants"][number] | null>(null);
-
-  const act = async (run: () => Promise<{ ok: boolean; error?: string }>, done: string) => {
-    setBusy(true);
-    const result = await run();
-    setBusy(false);
-    if (result.ok) {
-      toast({ title: done, tone: "success" });
-      router.refresh();
-    } else {
-      toast({ title: result.error ?? "Refused.", tone: "danger" });
-    }
-  };
-
-  const holders = new Map(authority.grants.map((grant) => [grant.personId, grant]));
-
   return (
-    <Card data-testid="finance-authority">
-      <h2>Finance authority</h2>
-
-      {authority.grants.length === 0 ? (
-        <EmptyState
-          headingLevel={3}
-          title="Nobody runs finance yet"
-          description="Until someone holds a finance role, the workspace is invisible and no delivery can be retried or investigated by hand."
-        />
-      ) : (
-        <ul className="od-authority-holders" data-testid="finance-authority-list">
-          {authority.grants.map((grant) => (
-            <li
-              key={grant.grantId}
-              className="od-authority-row"
-              data-testid={`finance-authority-${grant.personId}`}
-            >
-              <span className="od-authority-avatar" aria-hidden>
-                {personInitials(grant)}
-              </span>
-              <span className="od-authority-id">
-                <span className="od-authority-name">{personLabel(grant)}</span>
-                {grantedLine(grant.grantedByName, grant.grantedAt) !== null ? (
-                  <span className="od-authority-provenance">
-                    {grantedLine(grant.grantedByName, grant.grantedAt)}
-                  </span>
-                ) : null}
-              </span>
-              <Badge tone="info">{ROLE_LABEL[grant.capabilitySet] ?? grant.capabilitySet}</Badge>
-              {authority.canIssue ? (
-                <Button
-                  variant="secondary"
-                  size="touch"
-                  disabled={busy}
-                  onClick={() => {
-                    setRevoking(grant);
-                  }}
-                  data-testid={`revoke-finance-${grant.personId}`}
-                >
-                  Revoke
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {authority.canIssue ? (
-        <div className="authority-form">
-          <Select
-            label="Who?"
-            value={personId}
-            onChange={(event) => {
-              setPersonId(event.target.value);
-            }}
-            data-testid="finance-person"
-          >
-            <option value="">Choose a member</option>
-            {authority.members
-              .filter((member) => !holders.has(member.personId))
-              .map((member) => (
-                <option key={member.personId} value={member.personId}>
-                  {personLabel(member)}
-                </option>
-              ))}
-          </Select>
-          <Select
-            label="Finance role"
-            help={ROLES.find((entry) => entry.value === role)?.description}
-            value={role}
-            onChange={(event) => {
-              setRole(event.target.value);
-            }}
-            data-testid="finance-role"
-          >
-            {ROLES.map((entry) => (
-              <option key={entry.value} value={entry.value}>
-                {entry.label}
-              </option>
-            ))}
-          </Select>
-          <Button
-            size="touch"
-            disabled={busy || personId === ""}
-            onClick={() => {
-              void act(
-                () => issueFinanceAuthorityAction(slug, personId, role),
-                "Finance authority granted.",
-              ).then(() => {
-                setPersonId("");
-              });
-            }}
-            data-testid="grant-finance"
-          >
-            Grant
-          </Button>
-        </div>
-      ) : (
-        <p className="authority-hint">Only someone who can hand out roles here can change this.</p>
-      )}
-
-      {/* Same rule as settlement: what is lost is named before it is taken. */}
-      <Dialog
-        open={revoking !== null}
-        onClose={() => {
-          setRevoking(null);
-        }}
-        title={`Revoke ${ROLE_LABEL[revoking?.capabilitySet ?? ""] ?? "finance role"}?`}
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setRevoking(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              loading={busy}
-              onClick={() => {
-                const grant = revoking;
-                if (grant === null) return;
-                void act(
-                  () => revokeFinanceAuthorityAction(slug, grant.grantId),
-                  "Finance authority revoked.",
-                ).then(() => {
-                  setRevoking(null);
-                });
-              }}
-              data-testid="confirm-revoke-finance"
-            >
-              Revoke
-            </Button>
-          </>
-        }
-      >
-        <p data-testid="revoke-finance-consequence">
-          {revoking === null ? "" : personLabel(revoking)} can no longer issue receipts or invoices,
-          send or retry a delivery, or open and close the books for this organization.
-          {authority.grants.length === 1
+    <KeyCard
+      testId="finance-authority"
+      prefix="finance"
+      title="Speaks for the money"
+      purpose="Issues receipts and invoices, and closes the books."
+      emptyTitle="Nobody runs finance yet"
+      emptyBody="Until someone holds a finance role, the workspace is invisible and no delivery can be retried or investigated by hand."
+      roles={ROLES}
+      defaultRole="finops:accountant"
+      grants={authority.grants}
+      members={authority.members}
+      canIssue={authority.canIssue}
+      issue={(personId, role) => issueFinanceAuthorityAction(slug, personId, role)}
+      revoke={(grantId) => revokeFinanceAuthorityAction(slug, grantId)}
+      grantedToast="Finance authority granted."
+      revokedToast="Finance authority revoked."
+      consequence={(holder, last) =>
+        `${holder} can no longer issue receipts or invoices, send or retry a delivery, or open and close the books for this organization.${
+          last
             ? " They are the only person here who can, so the finance workspace becomes invisible to everyone until someone else is granted the role."
-            : ""}
-        </p>
-      </Dialog>
-    </Card>
+            : ""
+        }`
+      }
+    />
   );
 }
