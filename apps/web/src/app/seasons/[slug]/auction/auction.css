@@ -1641,6 +1641,7 @@ details.squad-team[open] .squad-team-caret {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
@@ -1914,8 +1915,9 @@ details.squad-team[open] .squad-team-caret {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
 }
 
 /* One row per TEAM now, so the paddle numbers it holds become an attribute of

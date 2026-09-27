@@ -108,7 +108,10 @@
 }
 
 .room-row-words .room-muted {
+  overflow: hidden;
   font-size: var(--text-xs-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .room-row-name {
@@ -260,7 +263,7 @@
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  font-size: var(--text-md-size);
+  font-size: var(--text-base-size);
   font-weight: var(--font-weight-semibold);
   line-height: 1.25;
   color: var(--text-heading);
@@ -503,4 +506,15 @@
   box-sizing: border-box;
   min-height: 52px;
   text-decoration: none;
+}
+
+/* The paddle and conduct cards under the owner's room take the kit's corners. */
+.live-controls .live-card {
+  border-radius: var(--radius-xl);
+}
+
+.live-controls .live-card h2 {
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
 }

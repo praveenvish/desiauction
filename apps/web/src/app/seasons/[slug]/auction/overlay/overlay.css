@@ -549,7 +549,8 @@ body:has(.obs-overlay) {
 }
 
 .obs-lt-number {
-  font-size: clamp(12px, 0.85vw, 16px);
+  /* The small card is ~80px wide: the number keeps inside it. */
+  font-size: clamp(9px, 0.55vw, 12px);
 }
 
 .obs-lt-bid-label {

@@ -353,6 +353,10 @@ export function SpectatePanel({
           offline={offline}
           lotMedia={lotMedia}
           settledStatus={auctionStatus}
+          /* The room's one-line header (stage 3): the lot, the bid and the
+             clock are on the player card right under it, so the strip keeps
+             them for the ear (its live region) and not twice for the eye. */
+          room
         />
       </PageStatus>
       <SaleAnnouncer snapshot={snapshot} />
