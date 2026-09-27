@@ -658,7 +658,6 @@ export function RegistrationDashboardPanel({
   };
 
   const pendingReview = stats.submitted + stats.waitlisted;
-  const firstOnPage = (page.page - 1) * page.pageSize;
 
   return (
     <div className="pd-desk" data-sheet-open={sheetRow !== null ? "true" : undefined}>
@@ -677,19 +676,6 @@ export function RegistrationDashboardPanel({
                     : `${String(pendingReview)} waiting for a decision`
                 }`}
           </p>
-          {/* DA-35: the figure that decides what auction night contains — the
-              same rule the Auction tab filters on, so the two cannot disagree. */}
-          <span
-            className="rd-fact"
-            data-testid="stat-auction-pool"
-            title={`Auction pool: ${poolHint(stats)}`}
-          >
-            <IconGavel size={16} weight="duotone" aria-hidden />
-            <span>
-              <span className="stat-value">{stats.auctionPool}</span> in auction pool
-            </span>
-            <span className="rd-fact-hint stat-hint">{poolHint(stats)}</span>
-          </span>
           {feesInUse ? (
             <button
               type="button"
@@ -854,6 +840,8 @@ export function RegistrationDashboardPanel({
         </div>
       ) : null}
 
+      {stats.total > 0 ? <PoolStrip stats={stats} roles={desk.roles} /> : null}
+
       <SectionCard flush className="rd-card" title="Players" hideHeader>
         {/* ROW 1 — the status tabs. The
             counts are the old figure tiles; each one is the filter it names
@@ -893,36 +881,50 @@ export function RegistrationDashboardPanel({
                   changeFilter({ status: "approved" });
                 },
               },
-              {
-                key: "waitlisted",
-                label: "Waitlisted",
-                count: <span className="stat-value">{stats.waitlisted}</span>,
-                active: filters.status === "waitlisted",
-                testId: "stat-waitlisted",
-                onSelect: () => {
-                  changeFilter({ status: "waitlisted" });
-                },
-              },
-              {
-                key: "rejected",
-                label: "Declined",
-                count: <span className="stat-value">{stats.rejected}</span>,
-                active: filters.status === "rejected",
-                testId: "stat-rejected",
-                onSelect: () => {
-                  changeFilter({ status: "rejected" });
-                },
-              },
-              {
-                key: "withdrawn",
-                label: "Withdrawn",
-                count: <span className="stat-value">{stats.withdrawn}</span>,
-                active: filters.status === "withdrawn",
-                testId: "stat-withdrawn",
-                onSelect: () => {
-                  changeFilter({ status: "withdrawn" });
-                },
-              },
+              // A state nobody is in is not a filter worth a tab (it read
+              // "Waitlisted 0 · Declined 0 · Withdrawn 0" on every season).
+              ...(stats.waitlisted > 0 || filters.status === "waitlisted"
+                ? [
+                    {
+                      key: "waitlisted",
+                      label: "Waitlisted",
+                      count: <span className="stat-value">{stats.waitlisted}</span>,
+                      active: filters.status === "waitlisted",
+                      testId: "stat-waitlisted",
+                      onSelect: () => {
+                        changeFilter({ status: "waitlisted" });
+                      },
+                    },
+                  ]
+                : []),
+              ...(stats.rejected > 0 || filters.status === "rejected"
+                ? [
+                    {
+                      key: "rejected",
+                      label: "Declined",
+                      count: <span className="stat-value">{stats.rejected}</span>,
+                      active: filters.status === "rejected",
+                      testId: "stat-rejected",
+                      onSelect: () => {
+                        changeFilter({ status: "rejected" });
+                      },
+                    },
+                  ]
+                : []),
+              ...(stats.withdrawn > 0 || filters.status === "withdrawn"
+                ? [
+                    {
+                      key: "withdrawn",
+                      label: "Withdrawn",
+                      count: <span className="stat-value">{stats.withdrawn}</span>,
+                      active: filters.status === "withdrawn",
+                      testId: "stat-withdrawn",
+                      onSelect: () => {
+                        changeFilter({ status: "withdrawn" });
+                      },
+                    },
+                  ]
+                : []),
             ]}
           />
         </div>
@@ -1125,13 +1127,10 @@ export function RegistrationDashboardPanel({
                       <VisuallyHidden>Select</VisuallyHidden>
                     )}
                   </th>
-                  <th className="pd-col-num">#</th>
                   <th>Player</th>
-                  <th className="pd-col-role">Role</th>
                   <th className="pd-col-team">Team</th>
                   <th className="pd-col-status">Status</th>
                   {feesInUse ? <th className="pd-col-fee">Fee</th> : null}
-                  <th className="pd-col-date">Registered on</th>
                   <th className="pd-col-actions">
                     <VisuallyHidden>Actions</VisuallyHidden>
                   </th>
@@ -1142,7 +1141,6 @@ export function RegistrationDashboardPanel({
                   <PlayerRow
                     key={row.id}
                     row={row}
-                    number={firstOnPage + index + 1}
                     cursor={index === cursor}
                     open={row.id === sheetId}
                     checked={selected.has(row.id)}
@@ -1638,6 +1636,61 @@ function NextStep({
   );
 }
 
+/* --- The auction pool, at a glance ----------------------------------------- */
+
+/**
+ * WHO GOES TO THE BLOCK (2026-09-27). It was a chip in the page head —
+ * "37 in auction pool | 43 approved – 3 icons – 3 captains". Now it is a strip
+ * above the list: the pool out of everyone registered, split by role, and why
+ * the rest sit out. `stat-auction-pool` and its `.stat-value` / `.stat-hint`
+ * stay the suites' hooks.
+ */
+function PoolStrip({
+  stats,
+  roles,
+}: {
+  stats: RegistrationStats;
+  roles: readonly { key: string; label: string }[];
+}) {
+  const parts = stats.poolByRole.filter((entry) => entry.count > 0);
+  return (
+    <section className="pd-pool" aria-label="Auction pool" data-testid="stat-auction-pool">
+      <div className="pd-pool-figure">
+        <span className="pd-pool-eyebrow">
+          <IconGavel size={14} weight="duotone" aria-hidden /> Auction pool
+        </span>
+        <span className="pd-pool-value">
+          <span className="stat-value">{stats.auctionPool}</span>
+          <span className="pd-pool-of"> of {stats.total} registered</span>
+        </span>
+        <span className="pd-pool-hint stat-hint">{poolHint(stats)}</span>
+      </div>
+      {parts.length > 0 ? (
+        <div className="pd-pool-roles">
+          <span className="pd-pool-bar" aria-hidden>
+            {parts.map((entry, index) => (
+              <span
+                key={entry.role ?? "none"}
+                data-slot={String(index % 4)}
+                style={{ flexGrow: entry.count }}
+              />
+            ))}
+          </span>
+          <ul className="pd-pool-legend">
+            {parts.map((entry, index) => (
+              <li key={entry.role ?? "none"}>
+                <span className="pd-pool-dot" data-slot={String(index % 4)} aria-hidden />
+                <strong>{entry.count}</strong>{" "}
+                {entry.role === null ? "no role given" : labelOf(roles, entry.role)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 /* --- One row ------------------------------------------------------------- */
 
 const STATUS_PILL: Record<Row["status"], KitTone> = {
@@ -1649,6 +1702,16 @@ const STATUS_PILL: Record<Row["status"], KitTone> = {
   withdrawn: "neutral",
 };
 
+/** Status in words, the same words as the tabs above the list. */
+const STATUS_WORD: Record<Row["status"], string> = {
+  draft: "Draft",
+  submitted: "To review",
+  approved: "Approved",
+  rejected: "Declined",
+  waitlisted: "Waitlisted",
+  withdrawn: "Withdrawn",
+};
+
 const FEE_PILL: Record<Row["feeStatus"], KitTone> = {
   pending: "amber",
   paid: "green",
@@ -1658,7 +1721,6 @@ const FEE_PILL: Record<Row["feeStatus"], KitTone> = {
 
 function PlayerRow({
   row,
-  number,
   cursor,
   open,
   checked,
@@ -1673,8 +1735,6 @@ function PlayerRow({
   onDecline,
 }: {
   row: Row;
-  /** The row's place in the whole filtered list, not just this page. */
-  number: number;
   cursor: boolean;
   open: boolean;
   checked: boolean;
@@ -1719,7 +1779,6 @@ function PlayerRow({
           onChange={onToggle}
         />
       </td>
-      <td className="pd-col-num">{number}</td>
       <td className="pd-col-player">
         <div className="pd-player">
           <PlayerImage
@@ -1730,35 +1789,75 @@ function PlayerRow({
             decorative
           />
           <div className="pd-player-text">
-            <button
-              type="button"
-              className="pd-player-name"
-              onClick={onOpen}
-              data-focus-key={`open-${row.id}`}
-              data-testid={`open-${row.personId}`}
-            >
-              {name}
-            </button>
+            <span className="pd-player-line">
+              <button
+                type="button"
+                className="pd-player-name"
+                onClick={onOpen}
+                data-focus-key={`open-${row.id}`}
+                data-testid={`open-${row.personId}`}
+              >
+                {name}
+              </button>
+              {/* The marks say what they are. They were an unlabelled crown,
+                  star and lock after the team name — and on a phone the team
+                  was clipped and the marks went with it. */}
+              {row.isCaptain ? (
+                <span
+                  className="pd-mark-chip"
+                  data-kind="captain"
+                  data-testid="captain-flag"
+                  title="Captain — skips the auction"
+                >
+                  <IconCrown size={13} weight="fill" aria-hidden />
+                  Captain
+                </span>
+              ) : null}
+              {row.isIcon ? (
+                <span
+                  className="pd-mark-chip"
+                  data-kind="icon"
+                  data-testid="icon-flag"
+                  title="Icon — skips the auction"
+                >
+                  <IconStar size={13} weight="fill" aria-hidden />
+                  Icon
+                </span>
+              ) : null}
+              {row.isRetained ? (
+                <span
+                  className="pd-mark-chip"
+                  data-kind="retained"
+                  data-testid="retained-flag"
+                  title="Retained — skips the auction"
+                >
+                  <IconLock size={13} weight="fill" aria-hidden />
+                  Retained
+                </span>
+              ) : null}
+            </span>
+            {/* Who they are in one line: role, age, the code they registered
+                under and how to reach them — and, while they wait for a
+                decision, how long they have been waiting. */}
             <span className="pd-player-meta">
+              {roleLabel !== "" ? <span className="pd-meta-role">{roleLabel}</span> : null}
+              {row.age !== null ? <span>{row.age} yrs</span> : null}
               <span className="pd-mono">{row.number}</span>
               {/* DA-35: never raw E.164 at a human. */}
               <span data-private>{personContact(row)}</span>
-              {/* PHONE: the team (and its marks) ride this line, so a row is
-                  two lines beside the face (~56px), not three (~115px). The
-                  laptop keeps them in the Team column. */}
-              <span className="pd-meta-phone">
-                {/* Its own box, so a long team name ends in an ellipsis and the
-                    captain/icon marks after it stay on screen (round 2: "Pune
-                    Panthe" hard-clipped and the marks vanished). */}
-                {row.teamName !== null ? (
-                  <span className="pd-meta-team">{row.teamName}</span>
-                ) : auctionDone && row.status === "approved" ? (
-                  <span className="pd-meta-team">Unsold</span>
-                ) : null}
-                {row.isCaptain ? <IconCrown size={16} weight="fill" alt="Captain" /> : null}
-                {row.isIcon ? <IconStar size={16} weight="fill" alt="Icon" /> : null}
-                {row.isRetained ? <IconLock size={16} weight="fill" alt="Retained" /> : null}
-              </span>
+              {row.status === "submitted" || row.status === "waitlisted" ? (
+                <span>
+                  joined <time dateTime={row.createdAt}>{formatDate(row.createdAt)}</time>
+                </span>
+              ) : null}
+              {/* PHONE: the team rides the role's line — whole, never clipped. */}
+              {row.teamName !== null ? (
+                <span className="pd-phone-team">
+                  <TeamChip color={teamColor}>{row.teamName}</TeamChip>
+                </span>
+              ) : auctionDone && row.status === "approved" ? (
+                <span className="pd-phone-team">Unsold</span>
+              ) : null}
             </span>
             {row.duplicateName || categoryFlagged ? (
               <span className="pd-player-flags">
@@ -1778,10 +1877,6 @@ function PlayerRow({
           </div>
         </div>
       </td>
-      <td className="pd-col-role">
-        <span>{roleLabel === "" ? "—" : roleLabel}</span>
-        {row.age !== null ? <span className="pd-sub">{row.age} yrs</span> : null}
-      </td>
       <td className="pd-col-team">
         <span className="pd-team">
           {row.teamName !== null ? (
@@ -1792,52 +1887,23 @@ function PlayerRow({
             </span>
           )}
         </span>
-        <span className="pd-marks-inline">
-          {row.isCaptain ? (
-            <span
-              className="pd-mark-chip"
-              data-kind="captain"
-              data-testid="captain-flag"
-              title="Captain — skips the auction"
-            >
-              <IconCrown size={16} weight="fill" aria-hidden />
-              <VisuallyHidden>Captain</VisuallyHidden>
-            </span>
-          ) : null}
-          {row.isIcon ? (
-            <span
-              className="pd-mark-chip"
-              data-kind="icon"
-              data-testid="icon-flag"
-              title="Icon — skips the auction"
-            >
-              <IconStar size={16} weight="fill" aria-hidden />
-              <VisuallyHidden>Icon</VisuallyHidden>
-            </span>
-          ) : null}
-          {row.isRetained ? (
-            <span
-              className="pd-mark-chip"
-              data-kind="retained"
-              data-testid="retained-flag"
-              title="Retained — skips the auction"
-            >
-              <IconLock size={16} weight="fill" aria-hidden />
-              <VisuallyHidden>Retained</VisuallyHidden>
-            </span>
-          ) : null}
-        </span>
         {(row.isIcon || row.isCaptain || row.isRetained) && row.teamId === null ? (
           <span className="pd-sub pd-sub-danger">No team — in no squad</span>
         ) : null}
       </td>
       <td className="pd-col-status">
-        <span className="pd-status">
-          <RegistrationStatusGlyph status={row.status} />
-          <Pill tone={STATUS_PILL[row.status]} dot>
-            {row.status === "rejected" ? "declined" : row.status}
-          </Pill>
-        </span>
+        {/* Approved is the normal state after triage — said quietly. The states
+            that need a person keep their colour. */}
+        {row.status === "approved" ? (
+          <span className="pd-status-quiet">{STATUS_WORD.approved}</span>
+        ) : (
+          <span className="pd-status">
+            <RegistrationStatusGlyph status={row.status} />
+            <Pill tone={STATUS_PILL[row.status]} dot>
+              {STATUS_WORD[row.status]}
+            </Pill>
+          </span>
+        )}
         {row.status === "rejected" && row.rejectionReason !== null ? (
           <span className="pd-sub" data-testid={`reason-${row.personId}`}>
             {REASON_LABEL[row.rejectionReason] ?? row.rejectionReason}
@@ -1852,9 +1918,6 @@ function PlayerRow({
           </Pill>
         </td>
       ) : null}
-      <td className="pd-col-date">
-        <time dateTime={row.createdAt}>{formatDate(row.createdAt)}</time>
-      </td>
       <td className="pd-col-actions">
         <PopoverMenu
           label={`Actions for ${name}`}

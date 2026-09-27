@@ -131,24 +131,6 @@
 
 /* --- Toolbar & filters -------------------------------------------------- */
 
-.pd-toolbar {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.pd-toolbar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.pd-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .pd-search {
   position: relative;
   flex: 1 1 260px;
@@ -253,11 +235,6 @@
   line-height: var(--text-base-line);
 }
 
-.pd-clear {
-  font-size: var(--text-sm-size);
-  margin-inline-start: var(--space-1);
-}
-
 /* --- Alerts ---------------------------------------------------------- */
 
 .pd-alert {
@@ -328,16 +305,6 @@
   to {
     background-position: 140% 0;
   }
-}
-
-.pd-table-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding-block: var(--space-2);
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
 }
 
 .pd-check {
@@ -507,13 +474,6 @@
   color: var(--text-primary);
 }
 
-.pd-marks-inline {
-  display: inline-flex;
-  gap: 3px;
-  margin-inline-start: var(--space-2);
-  vertical-align: 1px;
-}
-
 .pd-mark-chip {
   display: inline-grid;
   place-items: center;
@@ -539,17 +499,6 @@
 .pd-mark-chip[data-kind="captain"] {
   background: var(--accent-subtle);
   color: var(--text-accent);
-}
-
-.pd-row-actions {
-  display: inline-flex;
-  gap: var(--space-1);
-  margin-inline-end: var(--space-1);
-  opacity: 0.9;
-}
-
-.pd-row-open {
-  vertical-align: middle;
 }
 
 .pd-empty {
@@ -663,9 +612,6 @@ body:has(.pd-sheet) {
 }
 
 /* The team on the meta line is a phone-only echo of the Team column. */
-.pd-meta-phone {
-  display: none;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .pd-sheet,
@@ -1423,18 +1369,6 @@ body:has(.pd-sheet) {
     align-items: stretch;
   }
 
-  .pd-toolbar {
-    justify-content: stretch;
-  }
-
-  .pd-toolbar-actions {
-    width: 100%;
-  }
-
-  .pd-toolbar-actions > * {
-    flex: 1;
-  }
-
   .pd-filter {
     flex: 1 1 calc(50% - var(--space-2));
   }
@@ -1528,10 +1462,6 @@ body:has(.pd-sheet) {
     grid-area: player;
   }
 
-  .pd-row td.pd-col-role {
-    display: none;
-  }
-
   .pd-row td.pd-col-status {
     grid-area: status;
   }
@@ -1549,18 +1479,6 @@ body:has(.pd-sheet) {
 
   .pd-row td.pd-col-actions {
     display: contents;
-  }
-
-  .pd-row .pd-row-actions {
-    grid-area: actions;
-    margin: var(--space-1) 0 0;
-  }
-
-  .pd-row .pd-row-open {
-    grid-area: open;
-    align-self: start;
-    width: 44px;
-    height: 44px;
   }
 
   .pd-row .pd-row-check {
