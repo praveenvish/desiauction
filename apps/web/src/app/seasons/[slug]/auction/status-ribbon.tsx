@@ -113,8 +113,11 @@ export function StatusRibbon({
    * it, so the strip keeps them for the ear (its live region) and not the eye.
    */
   room?: boolean;
-  /** The paddle this room bids with, named in the strip. */
-  viewer?: { teamName: string; paddleNumber: string } | undefined;
+  /**
+   * Who this room is for, named in the strip: the paddle an owner bids with,
+   * or a role ("Conducting") on a surface that holds no paddle.
+   */
+  viewer?: { teamName: string; paddleNumber: string } | { label: string } | undefined;
 }) {
   const money = useMoney();
   const lot = snapshot?.currentLot ?? null;
@@ -246,7 +249,7 @@ export function StatusRibbon({
         )}
         {viewer !== undefined ? (
           <span className="ribbon-viewer" data-testid="ribbon-viewer">
-            {viewer.teamName} · {viewer.paddleNumber}
+            {"label" in viewer ? viewer.label : `${viewer.teamName} · ${viewer.paddleNumber}`}
             <RibbonGap />
           </span>
         ) : null}

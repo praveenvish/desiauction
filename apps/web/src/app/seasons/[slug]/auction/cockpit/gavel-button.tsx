@@ -1,7 +1,7 @@
 "use client";
 
 import { useHoldGate } from "@desiauction/ui";
-import { forwardRef, useImperativeHandle } from "react";
+import { forwardRef, useImperativeHandle, type ReactNode } from "react";
 
 /**
  * v1.1 — the gavel (Tier 1 · gap G2).
@@ -35,6 +35,22 @@ export const GavelButton = forwardRef<
     testId?: string;
     /** Id of the element explaining the hold. Must EXIST on the page. */
     describedBy?: string;
+    /**
+     * What releasing the hold will do (the conductor's desk names it: "Hold to
+     * sell to Pune · 1,500 pts"). It may change between holds — a new bid
+     * renames the leader — so the CALLER must give the button a box that does
+     * not follow its text (the desk's is full-width, one line): the two labels
+     * below keep the width of the longer only for a content-sized button.
+     */
+    label?: ReactNode;
+    /** Shown while the hold is filling. Laid out at all times, like `label`. */
+    holdingLabel?: string;
+    /** Decorative mark before the words. */
+    icon?: ReactNode;
+    /** Extra classes on the button (the desk's primary treatment). */
+    className?: string;
+    /** The key hint drawn inside the button; null draws none. */
+    shortcut?: string | null;
   }
 >(function GavelButton(
   {
@@ -43,6 +59,11 @@ export const GavelButton = forwardRef<
     holdMs = 600,
     testId = "cockpit-gavel",
     describedBy = "cockpit-gavel-hint",
+    label = "Gavel — hold to close",
+    holdingLabel = "Hold…",
+    icon,
+    className,
+    shortcut = "Space",
   },
   ref,
 ) {
@@ -59,7 +80,7 @@ export const GavelButton = forwardRef<
   return (
     <button
       type="button"
-      className="cockpit-gavel"
+      className={["cockpit-gavel", className].filter(Boolean).join(" ")}
       data-testid={testId}
       data-holding={gate.holding ? "true" : "false"}
       disabled={disabled}
@@ -78,11 +99,16 @@ export const GavelButton = forwardRef<
           fired pointerleave 2ms later, and the gate stopped — the gavel on
           /live could not be held with a mouse at all. */}
       <span className="cockpit-gavel-label">
+        {icon === undefined ? null : (
+          <span className="cockpit-gavel-icon" aria-hidden>
+            {icon}
+          </span>
+        )}
         <span className="cockpit-gavel-texts">
-          <span data-shown={gate.holding ? "false" : "true"}>Gavel — hold to close</span>
-          <span data-shown={gate.holding ? "true" : "false"}>Hold…</span>
+          <span data-shown={gate.holding ? "false" : "true"}>{label}</span>
+          <span data-shown={gate.holding ? "true" : "false"}>{holdingLabel}</span>
         </span>
-        <kbd>Space</kbd>
+        {shortcut === null ? null : <kbd>{shortcut}</kbd>}
       </span>
     </button>
   );

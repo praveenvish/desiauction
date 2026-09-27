@@ -1,0 +1,775 @@
+/* ==========================================================================
+   THE CONDUCTOR'S DESK (live-room stage 2). The same player card every role
+   reads, the price with ONE contextual gavel under it, and the room beside it.
+   Phone first: the gavel lives in a bar under the thumb. From 900px the desk
+   is card | price + gavel desk, with the room below; from 1280px the room is
+   the third column (the approved mockup).
+   ========================================================================== */
+
+.desk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.desk-main,
+.desk-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.desk-stage {
+  min-width: 0;
+  scroll-margin-top: var(--space-16);
+}
+
+.desk-stage .lot-card {
+  height: clamp(220px, 34svh, 320px);
+}
+
+/* ---- Cards ----------------------------------------------------------------- */
+
+.desk-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.desk-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.desk-card-head h2 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.desk-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-muted {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-empty-words {
+  margin: 0;
+  font-size: var(--text-base-size);
+  color: var(--text-secondary);
+}
+
+/* The price row is the owner's (lot-card.tsx `LotPrice`); on the desk it sits
+   in a card with the facts under it. */
+.desk-price {
+  gap: var(--space-2);
+}
+
+.desk-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-facts b {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+/* ---- The last result -------------------------------------------------------- */
+
+.desk-result-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-base-size);
+  line-height: 1.4;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-result-line b {
+  font-weight: var(--font-weight-semibold);
+}
+
+.desk-result-line .purse-chip,
+.desk-result-line .purse-crest {
+  width: 24px;
+  height: 24px;
+}
+
+.desk-verdict {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.desk-verdict[data-kind="sold"] {
+  border-color: var(--accent-edge);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text-accent);
+}
+
+.desk-verdict[data-kind="held"] {
+  border-color: color-mix(in srgb, var(--warning-base) 50%, transparent);
+  color: var(--warning-base);
+}
+
+/* ---- Up next (phone card) ---------------------------------------------------- */
+
+.desk-next-who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.desk-next-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.desk-next-name {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+  text-overflow: ellipsis;
+}
+
+.desk-next-last {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.desk-last-inline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.desk-last-inline .desk-result-line {
+  font-size: var(--text-sm-size);
+}
+
+/* A portrait in a small box: the same face as the big card. */
+.desk-thumb {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  width: 44px;
+  height: 54px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.desk-thumb--lg {
+  width: 84px;
+  height: 104px;
+  border-radius: 14px;
+}
+
+.desk-empty-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-height: 180px;
+  padding: var(--space-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-2xl);
+  background: var(--surface-sunken);
+}
+
+/* ---- Paddles and the queue's head -------------------------------------------- */
+
+.desk-room {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--warning-base);
+  white-space: nowrap;
+}
+
+.desk-room[data-full="true"] {
+  color: var(--success-base);
+}
+
+.desk-paddle-list,
+.desk-upnext-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desk-paddle-list li,
+.desk-upnext-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.desk-paddle-list li:first-child,
+.desk-upnext-list li:first-child {
+  border-top: 0;
+}
+
+.desk-paddle-list .purse-chip,
+.desk-paddle-list .purse-crest {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+
+.desk-paddle-words {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.desk-paddle-name {
+  overflow: hidden;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-paddle-words .desk-muted {
+  font-size: var(--text-xs-size);
+}
+
+.desk-leading {
+  flex: none;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  color: var(--text-accent);
+}
+
+.desk-paddle-list li[data-leading="true"] .desk-paddle-name {
+  color: var(--text-accent);
+}
+
+/* ---- The gavel desk ------------------------------------------------------------ */
+
+.desk-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* THE ONE BUTTON. Full-width and one line tall in every state: its box never
+   follows its words, so a label that changes under a held pointer (a new
+   leader mid-hold) cannot move the edge the pointer is inside. */
+.desk-primary,
+.cockpit-gavel.desk-primary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  height: 64px;
+  padding: 0 var(--space-4);
+  overflow: hidden;
+  border: 1px solid var(--accent-edge);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--accent-lift), var(--accent));
+  color: var(--text-on-accent);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 26%, transparent);
+  font: inherit;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform var(--duration-instant) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.desk-primary:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.desk-primary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.desk-primary:disabled {
+  border-color: var(--border-subtle);
+  background: var(--surface-overlay);
+  color: var(--text-secondary);
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.desk-primary[aria-busy="true"] {
+  cursor: progress;
+}
+
+.desk-primary-icon,
+.cockpit-gavel-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.desk-primary-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+/* The gavel is a different kind of press: outlined in gold, filled by the
+   hold. `.cockpit-gavel-fill` is the gate's progress, presentation only. */
+.cockpit-gavel.desk-primary--gavel {
+  border: 1.5px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
+  color: var(--text-accent);
+  box-shadow: none;
+  user-select: none;
+}
+
+.cockpit-gavel.desk-primary--gavel:disabled {
+  border-color: var(--border-subtle);
+  background: var(--surface-overlay);
+  color: var(--text-secondary);
+}
+
+.desk-primary--gavel .cockpit-gavel-fill {
+  opacity: 0.3;
+}
+
+.desk-primary--gavel[data-holding="true"] {
+  border-color: var(--accent-lift);
+}
+
+.desk-primary--gavel .cockpit-gavel-label {
+  gap: var(--space-3);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.desk-primary--gavel .cockpit-gavel-texts {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.desk-primary--gavel .cockpit-gavel-texts > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-primary kbd,
+.desk-kbd {
+  flex: none;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, currentcolor 35%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+}
+
+/* The secondary row: Pause · Freeze · More, equal and thumb-sized. */
+.desk-row {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-2);
+}
+
+.desk-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  color: var(--text-heading);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.desk-chip:hover:not(:disabled) {
+  border-color: var(--border-interactive);
+}
+
+.desk-chip:focus-visible,
+.desk-more-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.desk-chip:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.desk-chip[aria-expanded="true"] {
+  border-color: var(--accent-edge);
+  color: var(--text-accent);
+}
+
+.desk-chip .desk-kbd {
+  color: var(--text-secondary);
+}
+
+/* The hold's explanation (the gavel's aria-describedby) and the shortcuts. */
+.desk-keys {
+  margin: var(--space-1) 0 0;
+  row-gap: var(--space-1);
+}
+
+.desk-why {
+  flex-basis: 100%;
+  color: var(--text-secondary);
+}
+
+/* ---- More ------------------------------------------------------------------------ */
+
+.desk-more {
+  position: relative;
+  min-width: 0;
+}
+
+.desk-more-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(320px, calc(100vw - 2 * var(--space-4)));
+  padding: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-3);
+}
+
+.desk-more-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.desk-more-group + .desk-more-group {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.desk-more-title {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.desk-more-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-heading);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.desk-more-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-heading) 6%, transparent);
+}
+
+.desk-more-item:disabled {
+  cursor: not-allowed;
+}
+
+.desk-more-item:disabled .desk-more-label {
+  color: var(--text-muted);
+}
+
+.desk-more-label {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.desk-more-item[data-grave="true"] .desk-more-label {
+  color: var(--warning-base);
+}
+
+.desk-more-item[data-grave="true"]:disabled .desk-more-label {
+  color: var(--text-muted);
+}
+
+.desk-more-detail {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desk-primary,
+  .desk-chip {
+    transition: none;
+  }
+
+  .desk-primary:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ---- Phone: the gavel under the thumb ------------------------------------------------ */
+
+@media (max-width: 899px) {
+  .desk-long {
+    display: none;
+  }
+
+  /* The price reads straight off the room, as the owner's does: no card
+     chrome eating the width the leader's name needs. */
+  .desk-price {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  /* Between lots the phone reads the small "Up next" card (with the last
+     result under it) — the mockup's ready state — not a second poster. */
+  .desk[data-between="true"] > .desk-stage,
+  .desk[data-between="true"] .desk-result {
+    display: none;
+  }
+
+  .desk-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 25;
+    padding: var(--space-3) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface);
+  }
+
+  /* The fade sits above the bar, where the room dissolves into it; the bar
+     itself is solid from its top edge. */
+  .desk-bar::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: var(--space-4);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 0%, transparent),
+      var(--surface)
+    );
+    pointer-events: none;
+  }
+
+  /* No keyboard under a thumb: the key hints go, the hold's explanation stays
+     for assistive tech (the gavel's describedby must resolve). */
+  .desk-bar .desk-kbd,
+  .desk-primary kbd {
+    display: none;
+  }
+
+  .desk-keys {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* On a phone More opens UP, out of the bar. */
+  .desk-more-panel {
+    top: auto;
+    bottom: calc(100% + var(--space-2));
+  }
+
+  /* Room for the pinned bar at the foot of the page. */
+  .cockpit-page:has(.desk-bar) {
+    padding-bottom: calc(180px + env(safe-area-inset-bottom));
+  }
+
+  /* Toasts rise above the pinned bar instead of landing on it. */
+  .cockpit-room:has(.desk-bar) {
+    --toast-inset-bottom: calc(160px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---- Laptop: card | price + gavel desk (| the room) --------------------------------- */
+
+@media (min-width: 900px) {
+  .desk-short {
+    display: none;
+  }
+
+  .desk {
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    grid-template-areas:
+      "stage main"
+      "stage rail";
+    align-items: start;
+    gap: var(--space-5);
+  }
+
+  .desk-stage {
+    grid-area: stage;
+  }
+
+  .desk-main {
+    grid-area: main;
+    gap: var(--space-4);
+  }
+
+  .desk-rail {
+    grid-area: rail;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--space-4);
+  }
+
+  .desk-stage .lot-card {
+    height: auto;
+    aspect-ratio: 4 / 5;
+  }
+
+  .desk-stage .desk-empty-card {
+    aspect-ratio: 4 / 5;
+  }
+
+  /* The laptop shows the next player as the big card and the result above
+     the gavel, so the phone's combined card stands down. */
+  .desk-next {
+    display: none;
+  }
+
+  .desk-card,
+  .desk-bar {
+    padding: var(--space-5);
+  }
+
+  .desk-bar {
+    gap: var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    background: var(--surface-raised);
+  }
+
+  .desk-primary,
+  .cockpit-gavel.desk-primary {
+    height: 76px;
+    font-size: var(--text-xl-size);
+  }
+
+  .desk-price .owner-price-amount {
+    font-size: 44px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .desk {
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr) minmax(280px, 340px);
+    grid-template-areas: "stage main rail";
+  }
+
+  .desk-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* The cockpit's lower half — the queue and the room's panels — under the desk. */
+.cockpit-lower {
+  margin-top: var(--space-2);
+}
+
+.cockpit-over {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

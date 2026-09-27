@@ -24,6 +24,15 @@ export async function completeAuction(
   trigger: "conduct-complete" | "cockpit-complete",
   reason = "test fixture: minimal squads",
 ): Promise<void> {
+  // The cockpit keeps Complete in the conductor desk's More menu (live-room
+  // stage 2), beside the other acts that change the record.
+  // A click before hydration opens nothing, so wait for the panel to be live.
+  if (trigger === "cockpit-complete") {
+    await expect(page.getByTestId("cockpit-panel")).toHaveAttribute("data-hydrated", "true", {
+      timeout: 30_000,
+    });
+    await page.getByTestId("cockpit-more").click();
+  }
   await page.getByTestId(trigger).click();
   await page.getByRole("dialog").waitFor({ state: "visible", timeout: 20_000 });
   await page.getByTestId("confirm-complete").click();

@@ -418,9 +418,12 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
 
   async function runRound(round: number): Promise<void> {
     for (;;) {
+      // The desk's one button names the next act: "Open next: <name>" while
+      // anyone is queued, "Complete the auction" once the queue is empty.
       const openNext = org.getByTestId("cockpit-open-next");
-      await expect(openNext).toBeVisible({ timeout: 30_000 });
-      if (await openNext.isDisabled()) break;
+      const queueDone = org.getByTestId("desk-complete");
+      await expect(openNext.or(queueDone)).toBeVisible({ timeout: 30_000 });
+      if (!(await openNext.isVisible()) || (await openNext.isDisabled())) break;
       const t0 = Date.now();
       await openNext.click();
       opened += 1;
@@ -587,6 +590,7 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
 
       if (scenario === "undo") {
         // The conductor realises the gavel came down too early, and undoes it.
+        await org.getByTestId("cockpit-more").click();
         await org.getByTestId("cockpit-undo").click();
         await expect(org.getByTestId("undo-summary")).toBeVisible(COLD);
         log(`   undo: ${(await org.getByTestId("undo-summary").textContent())?.trim()}`);
@@ -636,6 +640,7 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
   for (const o of owners) await shot(o.page, `47-owner-end-${o.team.split(" ")[0]}`);
 
   // --- Close the night ----------------------------------------------------------------
+  await org.getByTestId("cockpit-more").click();
   await org.getByTestId("cockpit-complete").click();
   await org.getByRole("dialog").waitFor({ state: "visible", timeout: 20_000 });
   await shot(org, "48-complete-dialog");

@@ -9,7 +9,6 @@ import {
   IconLock,
   IconPause,
   IconTrophy,
-  RollingNumber,
   SoldStamp,
 } from "@desiauction/ui";
 import { useMemo } from "react";
@@ -18,11 +17,11 @@ import { roleLabeller } from "../../../../lib/role-label";
 import { lotSeed } from "../../../../lib/player-seed";
 import type { AuctionRules, LotMedia, ResolvedLot } from "../../../../server/auction/live-summary";
 import { useMoney } from "../../../../components/money-unit";
-import { LotCard } from "./lot-card";
+import { LotCard, LotPrice } from "./lot-card";
 import { ownerStanceOf, stateLineOf, type StateLine } from "./owner-state";
 import { PaddleControl } from "./paddle-control";
 import { PlanLine } from "./plan-line";
-import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
+import type { TeamIdentity } from "./purse-board";
 import type { AuctionClock } from "./use-auction-socket";
 
 // THE OWNER'S STAGE (live-room stage 1): the player card, the price, one
@@ -121,7 +120,6 @@ export function OwnerStage({
   const bid = lot.currentBid;
   const name = lot.playerName ?? "Unnamed";
   const number = media?.number ?? null;
-  const leader = bid === null ? undefined : teams.find((team) => team.name === bid.teamName);
   const stance =
     myPaddleNumber === null
       ? null
@@ -172,31 +170,7 @@ export function OwnerStage({
           }}
         />
       </section>
-      <div className="owner-price">
-        <div className="owner-price-figure">
-          <p className="owner-price-label">{bid === null ? "Opening bid" : "Current bid"}</p>
-          {/* THE DIGITS ROLL, as they did on the hero: the element stays
-                mounted across bids and only the changed digits move. */}
-          <p
-            className={
-              bid === null ? "owner-price-amount owner-price-amount--none" : "owner-price-amount"
-            }
-            data-testid="leading-bid"
-          >
-            <RollingNumber value={money.ledger(bid === null ? lot.basePrice : bid.amount)} />
-          </p>
-        </div>
-        {bid === null ? (
-          <p className="owner-price-leader owner-price-leader--none" data-testid="leading-team">
-            No bids yet
-          </p>
-        ) : (
-          <p key={bid.teamName} className="owner-price-leader" data-testid="leading-team">
-            <PurseTeamCrest team={leader} fallback={bid.paddleNumber} />
-            <span className="owner-price-team">{bid.teamName}</span>
-          </p>
-        )}
-      </div>
+      <LotPrice basePrice={lot.basePrice} bid={bid} teams={teams} />
 
       {stance !== null ? (
         <>

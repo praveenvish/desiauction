@@ -1,8 +1,10 @@
 "use client";
 
-import { IconPause, PlayerPortrait } from "@desiauction/ui";
+import { IconPause, PlayerPortrait, RollingNumber } from "@desiauction/ui";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
+import { useMoney } from "../../../../components/money-unit";
+import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
 import type { AuctionClock } from "./use-auction-socket";
 
 // THE PLAYER CARD — the one picture of the lot every role shares (live-room
@@ -124,6 +126,7 @@ export function LotCard({
   clock,
   stamp,
   onBlock = false,
+  nameTestId,
   className,
 }: {
   name: string;
@@ -144,6 +147,8 @@ export function LotCard({
    * `lot-hero-name` handle the suites read the player off.
    */
   onBlock?: boolean;
+  /** A handle on the name, for a surface whose suites read it (the cockpit's `ceremony-player`). */
+  nameTestId?: string;
   className?: string;
 }) {
   return (
@@ -157,9 +162,62 @@ export function LotCard({
       {clock !== undefined ? <CardClock {...clock} /> : null}
       <div className="lot-card-id">
         <p className="lot-card-kicker">{kicker}</p>
-        <h2 className={onBlock ? "lot-hero-name lot-card-name" : "lot-card-name"}>{name}</h2>
+        <h2
+          className={onBlock ? "lot-hero-name lot-card-name" : "lot-card-name"}
+          data-testid={nameTestId}
+        >
+          {name}
+        </h2>
       </div>
       {stamp !== undefined ? <div className="lot-card-stamp">{stamp}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * THE PRICE UNDER THE CARD — the figure and who holds it, shared by the owner's
+ * stage and the conductor's desk. With no bid it reads the opening bid and
+ * "No bids yet". `leading-bid` / `leading-team` are the suites' long-standing
+ * handles on these two facts.
+ */
+export function LotPrice({
+  basePrice,
+  bid,
+  teams,
+  className,
+}: {
+  basePrice: number;
+  bid: { amount: number; teamName: string; paddleNumber: string } | null;
+  teams: readonly TeamIdentity[];
+  className?: string;
+}) {
+  const money = useMoney();
+  const leader = bid === null ? undefined : teams.find((team) => team.name === bid.teamName);
+  return (
+    <div className={["owner-price", className].filter(Boolean).join(" ")}>
+      <div className="owner-price-figure">
+        <p className="owner-price-label">{bid === null ? "Opening bid" : "Current bid"}</p>
+        {/* THE DIGITS ROLL, as they did on the hero: the element stays mounted
+            across bids and only the changed digits move. */}
+        <p
+          className={
+            bid === null ? "owner-price-amount owner-price-amount--none" : "owner-price-amount"
+          }
+          data-testid="leading-bid"
+        >
+          <RollingNumber value={money.ledger(bid === null ? basePrice : bid.amount)} />
+        </p>
+      </div>
+      {bid === null ? (
+        <p className="owner-price-leader owner-price-leader--none" data-testid="leading-team">
+          No bids yet
+        </p>
+      ) : (
+        <p key={bid.teamName} className="owner-price-leader" data-testid="leading-team">
+          <PurseTeamCrest team={leader} fallback={bid.paddleNumber} />
+          <span className="owner-price-team">{bid.teamName}</span>
+        </p>
+      )}
     </div>
   );
 }
