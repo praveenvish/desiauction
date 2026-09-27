@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  Button,
-  Dialog,
-  Field,
-  IconCrown,
-  Pill,
-  SectionCard,
-  Select,
-  useToast,
-} from "@desiauction/ui";
+import { Button, Dialog, Field, IconCrown, Pill, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -60,68 +51,51 @@ export function SeasonPassCard({ slug, pass }: { slug: string; pass: SeasonPassV
 
   // The body exists only when it has something to say: an uncounted pass is
   // one sentence, and that sentence is the card's description.
-  const hasBody = !uncounted || pass.pending !== null;
-
   return (
     <>
-      <SectionCard
-        title="Season pass"
-        icon={<IconCrown />}
-        tone="gold"
-        className="season-pass-card"
-        data-testid="season-pass"
-        action={
-          <Pill tone="neutral" testId="season-pass-tier">
-            {pass.tierName}
-          </Pill>
-        }
-        {...(uncounted
-          ? {
-              description: (
-                <span data-testid="season-pass-uncounted">
-                  This season has no team or player limit. Tournaments started during beta keep
-                  every tier and every feature, free, for good.
-                </span>
-              ),
-            }
-          : {})}
-      >
-        {hasBody ? (
-          <div className="season-pass-body">
-            {uncounted ? null : (
-              <ul className="season-pass-meters">
-                <Meter label="Teams" usage={pass.teams} testId="pass-meter-teams" />
-                <Meter
-                  label="Players in the pool"
-                  usage={pass.players}
-                  testId="pass-meter-players"
-                />
-              </ul>
-            )}
-
-            {pass.pending !== null ? (
-              <p className="teams-notice" role="status" data-testid="season-pass-pending">
-                You&apos;ve asked for a bigger pass. We&apos;re on it — we&apos;ll come back to you
-                before you need it.
-              </p>
-            ) : null}
-
-            {pass.viewer.canRequest && pass.pending === null && !uncounted ? (
-              <div className="season-pass-actions">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setOpen(true);
-                  }}
-                  data-testid="open-pass-request"
-                >
-                  Ask for more room
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        ) : undefined}
-      </SectionCard>
+      {/* One line under "How the season looks", not a card of its own: which
+          pass, how full it is, and the one thing to do about it. */}
+      <div className="ov-pass" data-testid="season-pass">
+        <span className="ov-pass-icon" aria-hidden>
+          <IconCrown size={18} />
+        </span>
+        <span className="ov-pass-text">
+          <span className="ov-pass-tier">
+            <Pill tone="neutral" testId="season-pass-tier">
+              {pass.tierName}
+            </Pill>{" "}
+            pass
+          </span>
+          {uncounted ? (
+            <span data-testid="season-pass-uncounted">
+              No team or player limit — tournaments started during beta keep every tier, free, for
+              good.
+            </span>
+          ) : (
+            <span>
+              <Usage label="teams" usage={pass.teams} testId="pass-meter-teams" /> ·{" "}
+              <Usage label="players" usage={pass.players} testId="pass-meter-players" />
+            </span>
+          )}
+          {pass.pending !== null ? (
+            <span role="status" data-testid="season-pass-pending">
+              You&apos;ve asked for a bigger pass — we&apos;ll come back to you before you need it.
+            </span>
+          ) : null}
+        </span>
+        {pass.viewer.canRequest && pass.pending === null && !uncounted ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setOpen(true);
+            }}
+            data-testid="open-pass-request"
+          >
+            Ask for more room
+          </Button>
+        ) : null}
+      </div>
 
       <Dialog
         open={open}
@@ -180,7 +154,8 @@ export function SeasonPassCard({ slug, pass }: { slug: string; pass: SeasonPassV
   );
 }
 
-function Meter({
+/** "teams 4 of 4 (full)" — one usage, said in words. */
+function Usage({
   label,
   usage,
   testId,
@@ -190,30 +165,11 @@ function Meter({
   testId: string;
 }) {
   const limit = usage.limit;
-  const pct = limit === null || limit === 0 ? 0 : Math.min(100, (usage.used / limit) * 100);
   return (
-    <li
-      className="season-pass-meter"
-      data-testid={testId}
-      data-full={usage.full ? "true" : undefined}
-    >
-      <span className="season-pass-meter-label">{label}</span>
-      <span className="season-pass-meter-count">
-        {usage.used}
-        {limit === null ? "" : ` / ${String(limit)}`}
-      </span>
-      {limit === null ? null : (
-        <span
-          className="season-pass-bar"
-          role="img"
-          aria-label={`${label}: ${String(usage.used)} of ${String(limit)} used`}
-        >
-          <span className="season-pass-bar-fill" style={{ width: `${String(pct)}%` }} />
-        </span>
-      )}
-      {usage.full ? (
-        <span className="season-pass-meter-note">Full — ask for more room to add another.</span>
-      ) : null}
-    </li>
+    <span className="ov-pass-usage" data-full={usage.full ? "" : undefined} data-testid={testId}>
+      {label} {usage.used}
+      {limit === null ? "" : ` of ${String(limit)}`}
+      {usage.full ? " — full" : ""}
+    </span>
   );
 }
