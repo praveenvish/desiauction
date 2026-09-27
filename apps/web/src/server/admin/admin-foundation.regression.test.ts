@@ -554,6 +554,28 @@ describe("PX-9 · The projections tell the truth", () => {
     expect(none.rows).toHaveLength(0);
     expect(none.total).toBe(0);
   });
+
+  it("the audit explorer's kinds partition the log and never hide it by default", async () => {
+    const all = await auditExplorer(db, { actor: ownerId });
+    const counts = all.kindCounts;
+    // Every row is exactly one kind, so the kinds add up to the whole.
+    expect(counts.changes + counts["sign-ins"] + counts["admin-views"]).toBe(all.total);
+
+    const changes = await auditExplorer(db, { actor: ownerId, kind: "changes" });
+    expect(changes.total).toBe(counts.changes);
+    expect(
+      changes.rows.every(
+        (row) => !row.action.startsWith("auth.") && row.action !== ADMIN_ACCESS_ACTION,
+      ),
+    ).toBe(true);
+
+    const signIns = await auditExplorer(db, { actor: ownerId, kind: "sign-ins" });
+    expect(signIns.rows.every((row) => row.action.startsWith("auth."))).toBe(true);
+
+    // An unknown kind is ignored, never an empty page.
+    const unknown = await auditExplorer(db, { actor: ownerId, kind: "nonsense" });
+    expect(unknown.total).toBe(all.total);
+  });
 });
 
 /**

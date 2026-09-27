@@ -1,6 +1,7 @@
 import {
   EmptyState,
   Pager,
+  SegmentedTabs,
   Toolbar,
   ToolbarChip,
   ToolbarCount,
@@ -12,7 +13,13 @@ import Link from "next/link";
 
 import { ADMIN_ACCESS_ACTION } from "../../../server/admin/capabilities";
 import { actorLabel, formatCount, isSystemActor } from "../../../server/admin/format";
-import type { AuditEntry, AuditFilters, AuditPage } from "../../../server/admin/views";
+import {
+  AUDIT_KINDS,
+  type AuditEntry,
+  type AuditFilters,
+  type AuditKind,
+  type AuditPage,
+} from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
 import { absoluteIst, humanAction } from "../admin-ui";
 import { formatDayDate } from "../../../lib/format-date";
@@ -26,12 +33,39 @@ import { formatDayDate } from "../../../lib/format-date";
  * paraphrased its evidence would be worthless in the moment it matters.
  */
 export function AuditPanel({ page }: { page: AuditPage }) {
-  const { rows, actions, total, filters, nextCursor } = page;
+  const { rows, actions, total, kindCounts, filters, nextCursor } = page;
+  const kind = (AUDIT_KINDS as readonly string[]).includes(filters.kind ?? "")
+    ? (filters.kind as AuditKind)
+    : null;
+  const anyKind = kindCounts.changes + kindCounts["sign-ins"] + kindCounts["admin-views"];
   const nextHref = nextCursor === null ? null : auditHref(filters, nextCursor);
   const days = groupByDay(rows);
   return (
     <>
       <div className="admin-panel">
+        {/* The log's three kinds, as the filter they name. "All" stays the
+            default: a kind is a view of the evidence, never a hiding of it. */}
+        <div className="admin-audit-kinds">
+          <SegmentedTabs
+            label="Kind of event"
+            testId="admin-audit-kinds"
+            items={[
+              { key: "all", label: "All", count: formatCount(anyKind), active: kind === null },
+              ...AUDIT_KINDS.map((key) => ({
+                key,
+                label: KIND_LABEL[key],
+                count: formatCount(kindCounts[key]),
+                active: kind === key,
+              })),
+            ].map((item) => ({
+              ...item,
+              href: auditHref(
+                { ...filters, kind: item.key === "all" ? undefined : item.key },
+                null,
+              ),
+            }))}
+          />
+        </div>
         <AdminFilterForm testId="admin-audit-search">
           <Toolbar>
             <ToolbarSearch
@@ -78,6 +112,7 @@ export function AuditPanel({ page }: { page: AuditPage }) {
                 </ToolbarChip>
               </>
             ) : null}
+            {kind !== null ? <input type="hidden" name="kind" value={kind} /> : null}
             {filters.scopeId !== undefined ? (
               <>
                 <input type="hidden" name="scopeId" value={filters.scopeId} />
@@ -154,7 +189,7 @@ export function AuditPanel({ page }: { page: AuditPage }) {
 /** The current filters, plus a cursor. Every filter survives the page turn. */
 function auditHref(filters: AuditFilters, after: string | null): string {
   const params = new URLSearchParams();
-  for (const key of ["q", "action", "actor", "scopeId", "from", "to"] as const) {
+  for (const key of ["kind", "q", "action", "actor", "scopeId", "from", "to"] as const) {
     const value = filters[key];
     if (value !== undefined && value !== "") {
       params.set(key, value);
@@ -166,6 +201,12 @@ function auditHref(filters: AuditFilters, after: string | null): string {
   const qs = params.toString();
   return qs === "" ? "/admin/audit" : `/admin/audit?${qs}`;
 }
+
+const KIND_LABEL: Readonly<Record<AuditKind, string>> = {
+  changes: "Changes",
+  "sign-ins": "Sign-ins",
+  "admin-views": "Admin views",
+};
 
 const DAY = { format: (at: Date | number): string => formatDayDate(at, true) };
 
@@ -286,7 +327,7 @@ function AccessRun({ rows }: { rows: readonly AuditEntry[] }) {
           ))}
         </ul>
       </details>
-      <span className="admin-log-scope">platform</span>
+      <span className="admin-log-scope" />
     </li>
   );
 }
@@ -354,22 +395,29 @@ function AuditRow({
           </details>
         ) : null}
       </span>
-      <span className="admin-log-scope">
-        {row.scopeType}
-        {row.scopeLabel !== null ? ` · ${row.scopeLabel}` : ""}
-        {/* The platform sentinel is a 26-zero ULID — the noisiest string on
+      {/* "platform" on every other row said nothing, and a sign-in's scope
+          is the person who signed in — the row already names them. The scope
+          shows only when it adds a club or somebody else. */}
+      {row.scopeType === "platform" || (row.scopeType === "person" && row.scopeId === row.actor) ? (
+        <span className="admin-log-scope" />
+      ) : (
+        <span className="admin-log-scope">
+          {row.scopeType}
+          {row.scopeLabel !== null ? ` · ${row.scopeLabel}` : ""}
+          {/* The platform sentinel is a 26-zero ULID — the noisiest string on
             the page, linking to a filter on a synthetic id. The word
             "platform" already says everything the zeros said. */}
-        {/^0+$/.test(row.scopeId) ? null : (
-          <Link
-            href={`/admin/audit?scopeId=${row.scopeId}`}
-            className="admin-log-id"
-            title={`Every event in scope ${row.scopeId}`}
-          >
-            <span className="admin-sr-only">Filter to scope </span>…{row.scopeId.slice(-6)}
-          </Link>
-        )}
-      </span>
+          {/^0+$/.test(row.scopeId) ? null : (
+            <Link
+              href={`/admin/audit?scopeId=${row.scopeId}`}
+              className="admin-log-id"
+              title={`Every event in scope ${row.scopeId}`}
+            >
+              <span className="admin-sr-only">Filter to scope </span>…{row.scopeId.slice(-6)}
+            </Link>
+          )}
+        </span>
+      )}
     </li>
   );
 }

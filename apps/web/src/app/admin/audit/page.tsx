@@ -8,6 +8,7 @@ import type { AuditFilters } from "../../../server/admin/views";
 import { AuditPanel } from "./audit-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
+import "./audit.css";
 import { AdminPageHead } from "../admin-ui";
 
 export const metadata = { title: "Audit · Platform admin · DesiAuction" };
@@ -40,6 +41,7 @@ export default async function AdminAuditPage({
     ...(one("from") !== undefined ? { from: one("from") } : {}),
     ...(one("to") !== undefined ? { to: one("to") } : {}),
     ...(one("after") !== undefined ? { after: one("after") } : {}),
+    ...(one("kind") !== undefined ? { kind: one("kind") } : {}),
   };
   return (
     <main className="registrations-dash">

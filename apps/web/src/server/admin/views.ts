@@ -1269,6 +1269,35 @@ export interface AuditFilters {
   readonly from?: string | undefined;
   readonly to?: string | undefined;
   readonly after?: string | undefined;
+  /** Which of the log's three kinds of row — see `AUDIT_KINDS`. */
+  readonly kind?: string | undefined;
+}
+
+/**
+ * THE LOG'S THREE KINDS OF ROW (2026-09-27). On a real day 83,000 rows were
+ * mostly sign-ins (a code asked for, then used) and administration's own page
+ * views, and the rows that changed something sat between them. The kinds are
+ * VIEWS of one log, never a default that hides anything: "All" stays first
+ * and stays the default, and each kind states its count.
+ */
+export const AUDIT_KINDS = ["changes", "sign-ins", "admin-views"] as const;
+export type AuditKind = (typeof AUDIT_KINDS)[number];
+
+function isAuditKind(value: string | undefined): value is AuditKind {
+  return (AUDIT_KINDS as readonly string[]).includes(value ?? "");
+}
+
+const SIGN_IN_PATTERN = "auth.%";
+
+function kindClause(kind: AuditKind): SQL {
+  switch (kind) {
+    case "sign-ins":
+      return sql`${auditLog.action} like ${SIGN_IN_PATTERN}`;
+    case "admin-views":
+      return eq(auditLog.action, ADMIN_ACCESS_ACTION);
+    case "changes":
+      return sql`${auditLog.action} not like ${SIGN_IN_PATTERN} and ${auditLog.action} <> ${ADMIN_ACCESS_ACTION}`;
+  }
 }
 
 export interface AuditEntry extends ActivityRow {
@@ -1281,6 +1310,8 @@ export interface AuditPage {
   readonly rows: readonly AuditEntry[];
   readonly actions: readonly string[];
   readonly total: number;
+  /** Rows of each kind under every OTHER filter — the kind tabs' counts. */
+  readonly kindCounts: Readonly<Record<AuditKind, number>>;
   readonly filters: AuditFilters;
   readonly truncated: boolean;
   readonly nextCursor: string | null;
@@ -1341,12 +1372,22 @@ export async function auditExplorer(db: Db, filters: AuditFilters = {}): Promise
       clauses.push(lte(auditLog.at, to));
     }
   }
+  // Every filter but the kind: what each kind tab would show.
+  const whereAnyKind = clauses.length === 0 ? undefined : and(...clauses);
+  if (isAuditKind(filters.kind)) {
+    clauses.push(kindClause(filters.kind));
+  }
   const where = clauses.length === 0 ? undefined : and(...clauses);
   const cursor = await auditCursor(db, filters.after);
   const pageWhere =
     cursor === undefined ? where : where === undefined ? cursor : and(where, cursor);
 
-  const [rows, actionRows, total] = await Promise.all([
+  const countOf = (kind: AuditKind) =>
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(auditLog)
+      .where(whereAnyKind === undefined ? kindClause(kind) : and(whereAnyKind, kindClause(kind)));
+  const [rows, actionRows, total, changes, signIns, adminViews] = await Promise.all([
     db
       .select({
         id: auditLog.id,
@@ -1375,6 +1416,9 @@ export async function auditExplorer(db: Db, filters: AuditFilters = {}): Promise
       .select({ n: sql<number>`count(*)::int` })
       .from(auditLog)
       .where(where),
+    countOf("changes"),
+    countOf("sign-ins"),
+    countOf("admin-views"),
   ]);
   const truncated = rows.length > AUDIT_PAGE;
   const page = truncated ? rows.slice(0, AUDIT_PAGE) : rows;
@@ -1401,6 +1445,11 @@ export async function auditExplorer(db: Db, filters: AuditFilters = {}): Promise
     })),
     actions: actionRows.map((row) => row.action),
     total: total[0]?.n ?? 0,
+    kindCounts: {
+      changes: changes[0]?.n ?? 0,
+      "sign-ins": signIns[0]?.n ?? 0,
+      "admin-views": adminViews[0]?.n ?? 0,
+    },
     filters,
     truncated,
     nextCursor: truncated ? (page[page.length - 1]?.id ?? null) : null,

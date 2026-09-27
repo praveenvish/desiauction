@@ -1,0 +1,29 @@
+/* ==========================================================================
+   AUDIT EXPLORER (redesign 2026-09-27). Its own file so a sibling admin
+   redesign appending to admin.css cannot collide with it. Tokens only.
+   ========================================================================== */
+
+/* The log's kinds — All · Changes · Sign-ins · Admin views — above the
+   toolbar, each with its count. */
+.admin-audit-kinds {
+  padding: var(--space-3) var(--space-5) var(--space-2);
+}
+
+/* A row in the platform's own scope says nothing there: the scope column
+   holds a club or a person, or nothing. */
+.admin-log-scope:empty {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .admin-audit-kinds {
+    padding-inline: var(--space-4);
+  }
+
+  /* One or two lines a row: the time, the sentence, and the scope only when
+     it names someone. The "code asked for at …" aside stays on hover and in
+     the laptop row. */
+  .admin-log-line > .admin-log-keys {
+    display: none;
+  }
+}
