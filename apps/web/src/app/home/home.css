@@ -1344,3 +1344,78 @@
 .home-role-change p {
   margin: 0;
 }
+
+/* ---- The one thing waiting on you, inside the club hero (2026-09-27) ---- */
+
+.home-hero-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--hero-crest-line);
+  border-radius: var(--radius-lg);
+  background: var(--hero-crest-bed);
+  color: var(--hero-ink);
+}
+
+.home-hero-next-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.home-hero-next-eyebrow {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hero-ink-soft);
+}
+
+.home-hero-next-title {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--hero-ink);
+}
+
+.home-hero-next-why {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--hero-ink-soft);
+}
+
+.home-hero-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.home-hero-next .home-hero-btn[data-tone="glass"] {
+  background: transparent;
+  border-color: var(--hero-crest-line);
+  color: var(--hero-ink);
+}
+
+.home-hero-next .home-hero-btn[data-tone="glass"]:hover {
+  background: var(--hero-crest-bed);
+  border-color: var(--hero-ink-soft);
+}
+
+@media (max-width: 719px) {
+  .home-hero-next {
+    padding: var(--space-4);
+  }
+
+  .home-hero-next-actions {
+    flex: 1 1 100%;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}
