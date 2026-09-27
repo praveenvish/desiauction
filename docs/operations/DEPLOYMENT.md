@@ -26,7 +26,7 @@ advisory lock, and the runner is a persistent worker.
 | caddy | same host | `caddy:2-alpine` | TLS is automatic |
 | Postgres 17 | same host, built from `ops/deploy/db/Dockerfile` | `packages/db/migrations` + `apps/engine/drizzle` | migrate on release |
 | **PITR** | **pgBackRest → an OFF-BOX S3 repo** (`pgbackrest.env`) | `ops/deploy/` | destroy-and-restore, verified 2026-09-11 (on-box repo) |
-| Object storage | MinIO, same host; `minio-mirror` copies it off-box hourly | `ops/deploy/` | media + finops buckets |
+| Object storage | MinIO-compatible **Silo** (`pgsty/silo`, pinned by digest), same host; `minio-mirror` copies it off-box hourly | `ops/deploy/` | media + finops buckets |
 | Scheduled jobs | `scheduler` (web image) | `ops/deploy/jobs/scheduler.mjs` | `/api/jobs/*` on a clock |
 | Deploy-time DB work | `migrator` (profile `ops`) | `ops/deploy/migrator/` | freeze, migrate, grants, preflight — on the host |
 | Watchdog + alerts | `autoheal`; Grafana-provisioned rules | `ops/deploy/observability/` | webhook to `ALERT_WEBHOOK_URL` |
@@ -43,6 +43,22 @@ what is automated versus founder-held.
 
 The stack is described in `ops/deploy/` — see its README for the env-file split
 and why images are built in CI rather than on the host.
+
+**Object storage runs Silo, not upstream MinIO (2026-09-27).** MinIO withdrew
+every public image — Docker Hub on 2026-09-11, then quay.io, which now returns
+401 to anonymous pulls — so the digests pinned before were unreachable and
+neither `docker compose up` locally nor a fresh production host could start
+object storage. [Silo](https://github.com/pgsty/silo) (`pgsty/silo`, `pgsty/mc`)
+is the community-maintained fork of MinIO (AGPL-3.0, CVE backports, not
+affiliated with MinIO, Inc.). It keeps the S3 API, the `MINIO_*` env vars,
+`server /data`, `mc ready`, `/minio/health/live` and the on-disk format, so the
+`minio` / `storage` services, their volumes, `minio.env` and every `mc` script
+are unchanged. Verified against the real `minio-init` script: buckets created,
+anonymous `GetObject` on media = 200, anonymous list of media = 403, anonymous
+read of finops = 403. Both images are pinned by multi-arch digest; bump them
+deliberately (read the Silo release notes), never by tag.
+Fallback if Silo stalls: `cgr.dev/chainguard/minio` + `cgr.dev/chainguard/minio-client`
+(server image has no `mc`, so the healthcheck would need changing).
 
 `deploy-host.yml` is `workflow_dispatch` only. It refuses a commit that has no
 successful `ci` run, builds every image in CI (never on the production host),
