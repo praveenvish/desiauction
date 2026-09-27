@@ -1,10 +1,10 @@
-import { IconInfo, ToastProvider } from "@desiauction/ui";
-import Link from "next/link";
+import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { recordAdminAccess } from "../../../../server/admin/access-log";
 import { platformDemoGate } from "../../../../server/admin/authz";
 import { publishedAvailability, publishedBlackouts } from "../../../../server/admin/demo-views";
+import { HORIZON_DAYS, bookableDays } from "../../../../server/marketing/demo-slots";
 import { AvailabilityPanel } from "./availability-panel";
 import { AdminPageHead } from "../../admin-ui";
 import "../../../seasons/seasons.css";
@@ -33,34 +33,38 @@ export default async function AdminDemoAvailabilityPage() {
   }
   await recordAdminAccess(operator, "demos", "availability");
 
-  const [windows, blackouts] = await Promise.all([publishedAvailability(), publishedBlackouts()]);
+  // The status band asks the public page's OWN function what it offers, so
+  // the two can never disagree (bookings, blocked days and the two-hour lead
+  // are already taken out there).
+  const [windows, blackouts, days] = await Promise.all([
+    publishedAvailability(),
+    publishedBlackouts(),
+    bookableDays().catch(() => null),
+  ]);
+  const firstDay = days?.[0];
+  const firstSlot = firstDay?.slots[0];
+  const offer =
+    days === null
+      ? null
+      : {
+          slots: days.reduce((sum, day) => sum + day.slots.length, 0),
+          horizonDays: HORIZON_DAYS,
+          next:
+            firstDay !== undefined && firstSlot !== undefined
+              ? `${firstDay.label}, ${firstSlot.label}`
+              : null,
+        };
 
   return (
     <ToastProvider>
       <main className="registrations-dash">
         <div className="dash-stack admin-stack">
           <AdminPageHead>
-            Times published here are offered on{" "}
-            <Link href="/schedule-demo" className="prose-link">
-              the public demo page
-            </Link>
-            , minus bookings, blocked days and the next two hours.
+            The hours somebody will answer a demo call. What is published here is what the public
+            demo page promises.
           </AdminPageHead>
 
-          {windows.length === 0 ? (
-            // A working state, said as one line — not an amber banner above
-            // the only thing on the page an operator came to do.
-            <p className="admin-slim is-info">
-              <IconInfo size={16} />
-              <strong>No times published — and that is a working state.</strong>
-              <span className="admin-meta">
-                The demo page promises a reply within a working day. Publish only windows you will
-                keep: a slot nobody attends is worse than no calendar.
-              </span>
-            </p>
-          ) : null}
-
-          <AvailabilityPanel windows={windows} blackouts={blackouts} />
+          <AvailabilityPanel windows={windows} blackouts={blackouts} offer={offer} />
         </div>
       </main>
     </ToastProvider>
