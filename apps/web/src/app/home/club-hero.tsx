@@ -32,6 +32,7 @@ export function ClubHero({
   seasonsInClub,
   switchable,
   footer,
+  next,
 }: {
   overview: SeasonOverviewView;
   /** How many seasons this season's club runs — the line under the name. */
@@ -40,6 +41,8 @@ export function ClubHero({
   switchable: SwitchableSeason[];
   /** Along the hero's bottom edge: the season's journey rail. */
   footer?: ReactNode;
+  /** Under the rail: the one thing waiting on this organizer. */
+  next?: ReactNode;
 }) {
   const season = overview.competition;
   const when = dateRange(season.startsOn, season.endsOn);
@@ -58,7 +61,16 @@ export function ClubHero({
       <HeroBanner
         sideAlign="start"
         testId="home-club-hero"
-        {...(footer !== undefined ? { footer } : {})}
+        {...(footer !== undefined || next !== undefined
+          ? {
+              footer: (
+                <>
+                  {footer}
+                  {next}
+                </>
+              ),
+            }
+          : {})}
         image={coverOf(season)}
         crest={<SeasonCrest name={season.name} logoUrl={overview.logoUrl} />}
         eyebrow={
