@@ -46,7 +46,11 @@ describe("focusWeek", () => {
 
   it("else on the week of the last match, for a finished season", () => {
     expect(
-      focusWeek({ requested: undefined, today, days: [{ date: "2026-08-01" }, { date: "2026-08-03" }] }),
+      focusWeek({
+        requested: undefined,
+        today,
+        days: [{ date: "2026-08-01" }, { date: "2026-08-03" }],
+      }),
     ).toBe("2026-08-03");
   });
 

@@ -3,8 +3,10 @@ import { EmptyState, IconTrophy, IconUsers, Pill, SectionCard } from "@desiaucti
 import { ScheduleViews } from "../sibling-link";
 import { notFound } from "next/navigation";
 
+import { formatWallTime } from "../../../../lib/format-date";
 import { standingsView } from "../../../../server/competition/fixture-actions";
 import { TeamCrest } from "../_tabs/team-crest";
+import { wallDay } from "../fixtures/schedule-model";
 import { standingsFootnote } from "./footnote";
 import "../../seasons.css";
 import "../_tabs/tabs.css";
@@ -39,6 +41,9 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
    * each one reported a standing nobody holds. Both wait for the first result.
    */
   const anyPlayed = standings.recorded > 0;
+  // Form is wins and losses — a lobby is a finishing place, not a W or an L.
+  const showForm = !lobby && anyPlayed;
+  const LETTER = { W: "Won", L: "Lost", T: "Tied", N: "No result" } as const;
 
   return (
     <main className="registrations-dash">
@@ -47,6 +52,14 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             from (RN-1), so this is how an organizer reaches them. */}
         <div className="st-head">
           <ScheduleViews slug={slug} active="table" />
+          {standings.live > 0 ? (
+            <p className="st-head-lede">
+              <span className="sd-live">
+                {standings.live} match{standings.live === 1 ? "" : "es"} playing now
+              </span>{" "}
+              — counted once {standings.live === 1 ? "its" : "their"} result is in.
+            </p>
+          ) : null}
         </div>
         <SectionCard
           icon={<IconTrophy />}
@@ -85,7 +98,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                   <caption>
                     The table, best first: played, won, lost, tied, no result, points
                     {standings.sport.standings.tiebreakers.length > 0 ? ", then the tiebreaks" : ""}
-                    .
+                    {showForm ? ", recent form" : ""}, and each team&apos;s next match.
                   </caption>
                   <thead>
                     <tr>
@@ -126,6 +139,14 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                           {tiebreaker.label}
                         </th>
                       ))}
+                      {showForm ? (
+                        <th scope="col" className="sd-form-col">
+                          Form
+                        </th>
+                      ) : null}
+                      <th scope="col" className="sd-next-col">
+                        Next
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -198,6 +219,52 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                             </td>
                           );
                         })}
+                        {showForm ? (
+                          <td data-label="Form" className="sd-form-col">
+                            {(view.form[row.teamId] ?? []).length === 0 ? (
+                              <span className="st-muted">—</span>
+                            ) : (
+                              <span className="sd-form">
+                                {(view.form[row.teamId] ?? []).map((letter, formIndex, all) => (
+                                  <span
+                                    key={formIndex}
+                                    className="sd-form-mark"
+                                    data-result={letter}
+                                    data-latest={formIndex === all.length - 1 ? "true" : undefined}
+                                    title={LETTER[letter]}
+                                  >
+                                    <span aria-hidden>{letter}</span>
+                                    <span className="st-sr">{LETTER[letter]}</span>
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </td>
+                        ) : null}
+                        <td data-label="Next" className="sd-next-col">
+                          {(() => {
+                            const next = view.next[row.teamId];
+                            if (next === undefined) {
+                              return <span className="st-muted">—</span>;
+                            }
+                            const opponent = next.opponent !== null ? ` v ${next.opponent}` : "";
+                            if (next.live) {
+                              return (
+                                <span className="sd-next" data-live="true">
+                                  Playing now{opponent}
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="sd-next">
+                                {next.kickoffAt !== null
+                                  ? `${wallDay(next.kickoffAt.slice(0, 10)).label}, ${formatWallTime(next.kickoffAt)}`
+                                  : "Date to be set"}
+                                {opponent}
+                              </span>
+                            );
+                          })()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

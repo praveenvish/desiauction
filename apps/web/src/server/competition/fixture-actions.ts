@@ -60,27 +60,21 @@ import {
 } from "./fixture-aggregate";
 import { commitFixtureImport, importDryRun } from "./fixture-import";
 import {
-  calendarRange,
   competitionTimeline,
   fixtureDayCounts,
   fixtureOfCompetition,
   fixtureStats,
   fixtureTimeline,
-  matchDay,
   nextFixture,
   nowWallClock,
   organizerSchedule,
   queryFixtures,
-  upcomingFixtures,
-  weekView,
   PUBLIC_FIXTURE_STATUSES,
-  type CalendarDay,
   type FixturePage,
   type FixtureSnapshot,
   type FixtureSort,
   type FixtureStats,
   type FixtureTimelineEntry,
-  type MatchDayGround,
   type NextFixture,
   type OrganizerFixture,
 } from "./fixtures";
@@ -897,93 +891,6 @@ export async function scheduleView(
       selected,
       viewer: { canManage },
     };
-  });
-}
-
-// --- Calendar / timeline / match-day views -------------------------------------------
-
-export interface CalendarView {
-  competition: CompetitionSummary;
-  view: "day" | "week" | "timeline";
-  date: string;
-  days: CalendarDay[];
-  timeline: FixtureSnapshot[];
-  upcoming: FixtureSnapshot[];
-}
-
-const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
-
-export async function calendarView(
-  slug: string,
-  params: { view?: string; date?: string },
-): Promise<CalendarView | null> {
-  const session = await requireSession();
-  const competition = await resolveMemberCompetition(session.personId, slug);
-  if (competition === null) {
-    return null;
-  }
-  const view = params.view === "week" ? "week" : params.view === "timeline" ? "timeline" : "day";
-  const date =
-    params.date !== undefined && DATE_SHAPE.test(params.date)
-      ? params.date
-      : nowWallClock().slice(0, 10);
-  return inCompetitionOrg(session.personId, competition, async (db) => {
-    // Same gate as the dashboard: the calendar is the same schedule, laid out
-    // differently, so a grantless member sees the same published subset here.
-    const canManage = await canCompetition(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "fixture.manage",
-    );
-    const visible = canManage ? undefined : PUBLIC_FIXTURE_STATUSES;
-    const [days, timeline, upcoming] = await Promise.all([
-      view === "week"
-        ? weekView(db, competition.id, date, visible)
-        : view === "day"
-          ? calendarRange(db, competition.id, date, date, visible)
-          : Promise.resolve([]),
-      view === "timeline" ? competitionTimeline(db, competition.id, visible) : Promise.resolve([]),
-      upcomingFixtures(db, competition.id, nowWallClock(), visible),
-    ]);
-    return { competition, view, date, days, timeline, upcoming };
-  });
-}
-
-export interface MatchDayView {
-  competition: CompetitionSummary;
-  date: string;
-  groundGroups: MatchDayGround[];
-  viewer: { canManage: boolean };
-}
-
-export async function matchDayView(
-  slug: string,
-  params: { date?: string },
-): Promise<MatchDayView | null> {
-  const session = await requireSession();
-  const competition = await resolveMemberCompetition(session.personId, slug);
-  if (competition === null) {
-    return null;
-  }
-  const date =
-    params.date !== undefined && DATE_SHAPE.test(params.date)
-      ? params.date
-      : nowWallClock().slice(0, 10);
-  return inCompetitionOrg(session.personId, competition, async (db) => {
-    const canManage = await canCompetition(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "fixture.manage",
-    );
-    const groundGroups = await matchDay(
-      db,
-      competition.id,
-      date,
-      canManage ? undefined : PUBLIC_FIXTURE_STATUSES,
-    );
-    return { competition, date, groundGroups, viewer: { canManage } };
   });
 }
 

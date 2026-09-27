@@ -23,17 +23,15 @@ export function SiblingLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-export type ScheduleView = "list" | "calendar" | "match-day" | "lineups" | "table";
+export type ScheduleView = "matches" | "table";
 
 /**
- * List | Calendar | Match day | Lineups | Table — the faces of the Schedule tab.
+ * Matches | Table — the two faces of the Schedule tab.
  *
- * ROUND 2 (2026-09-26): Lineups moved here from Players. A lineup is recorded
- * PER MATCH, it is gated on `fixture.manage`, and it is empty until fixtures
- * exist — it answers "who played this match", which is a Schedule question.
- * Under Players it needed a second switcher that sat inside the table card on
- * one page and outside it on the other; here it is one more face of the one
- * switcher every Schedule page already leads with.
+ * 2026-09-27: List, Calendar, Match day and Lineups were four views of the same
+ * matches and became one Matches screen (a week strip, the matches by day, and
+ * one match's lineups and score in its panel). The table stays its own face:
+ * it is what owners and players come for, and it is derived from the results.
  */
 export function ScheduleViews({ slug, active }: { slug: string; active: ScheduleView }) {
   const base = `/seasons/${slug}`;
@@ -43,32 +41,11 @@ export function ScheduleViews({ slug, active }: { slug: string; active: Schedule
       testId="season-views"
       items={[
         {
-          key: "list",
-          label: "List",
+          key: "matches",
+          label: "Matches",
           href: `${base}/fixtures`,
-          active: active === "list",
+          active: active === "matches",
           testId: "open-fixture-list",
-        },
-        {
-          key: "calendar",
-          label: "Calendar",
-          href: `${base}/fixtures/calendar`,
-          active: active === "calendar",
-          testId: "open-calendar",
-        },
-        {
-          key: "match-day",
-          label: "Match day",
-          href: `${base}/fixtures/match-day`,
-          active: active === "match-day",
-          testId: "open-match-day",
-        },
-        {
-          key: "lineups",
-          label: "Lineups",
-          href: `${base}/lineups`,
-          active: active === "lineups",
-          testId: "open-lineups",
         },
         {
           key: "table",

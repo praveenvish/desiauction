@@ -168,3 +168,59 @@
     line-height: 1.25;
   }
 }
+
+/* ---- Form and next (2026-09-27) ---- */
+
+.sd-table td.sd-minor {
+  color: var(--text-muted);
+}
+
+.sd-form {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.sd-form-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+}
+
+.sd-form-mark[data-result="W"] {
+  background: var(--success-subtle, var(--surface-sunken));
+  color: var(--success-strong);
+}
+
+.sd-form-mark[data-result="L"] {
+  background: var(--danger-subtle, var(--surface-sunken));
+  color: var(--danger-strong);
+}
+
+/* The latest result is ringed: form reads oldest to newest. */
+.sd-form-mark[data-latest="true"] {
+  box-shadow: 0 0 0 1.5px currentColor;
+}
+
+.sd-next {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.sd-next[data-live="true"],
+.sd-live {
+  font-weight: var(--font-weight-semibold);
+  color: var(--danger-strong);
+}
+
+@media (max-width: 719px) {
+  .sd-table .sd-next {
+    white-space: normal;
+  }
+}
