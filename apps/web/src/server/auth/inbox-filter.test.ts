@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ACCOUNT_ONLY_ACTIONS, inboxExclusions } from "./inbox-filter";
+import { ACCOUNT_ONLY_ACTIONS, LEDGER_ONLY_ACTIONS, inboxExclusions } from "./inbox-filter";
 import type { SecurityAction } from "./security-events";
 
 // Compile-time: every excluded action is one the ledger can actually write.
@@ -35,10 +35,16 @@ describe("inbox filter — the inbox tells people things, the security page keep
     }
   });
 
+  it("never shows the photo-upload quota ledger as a notice", () => {
+    const excluded = inboxExclusions([]);
+    expect(excluded).toContain("media.upload_requested");
+    expect(excluded).toContain("media.own_upload_requested");
+  });
+
   it("adds the person's own switched-off notices, once each", () => {
     const excluded = inboxExclusions(["auction.sold", "auth.logout"]);
     expect(excluded).toContain("auction.sold");
     expect(excluded.filter((action) => action === "auth.logout")).toHaveLength(1);
-    expect(excluded).toHaveLength(typed.length + 1);
+    expect(excluded).toHaveLength(typed.length + LEDGER_ONLY_ACTIONS.length + 1);
   });
 });
