@@ -1,7 +1,8 @@
 "use server";
 
 import { auctionOf, type AuctionRecord } from "@desiauction/auction";
-import { newId, withTenantDb, type Db } from "@desiauction/db";
+import { newId, teams as teamsTable, withTenantDb, type Db } from "@desiauction/db";
+import { eq } from "drizzle-orm";
 
 import { derivedId } from "../derived-id";
 import {
@@ -17,6 +18,7 @@ import { currentSession } from "../auth/actions";
 import { type CompetitionSummary } from "../competition/competitions";
 import { resolveMemberCompetition } from "../competition/resolve";
 import { dbHandle } from "../db";
+import { storage } from "../media";
 import { can } from "../orgs/authz";
 import { membersOf, type OrgSummary } from "../orgs/orgs";
 import { parseRupees, RUPEE_PARSE_MESSAGES } from "./amount";
@@ -33,7 +35,6 @@ import {
   caseView,
   dashboardView,
   settlementGrantsOf,
-  teamNames,
   type CaseAuditView,
   type CaseView,
   type DashboardView,
@@ -269,6 +270,11 @@ export interface ConsoleAuction {
 export interface ConsoleTeam {
   readonly id: string;
   readonly name: string;
+  /** The franchise's own mark, so the money tab shows teams as the rest of the season does. */
+  readonly shortName: string | null;
+  readonly primaryColor: string | null;
+  /** Signed at the view boundary; null when the team has no crest. */
+  readonly logoUrl: string | null;
 }
 
 export interface ConsoleView {
@@ -292,9 +298,21 @@ export async function settlementConsole(slug: string): Promise<ConsoleView | nul
     async (db) => {
       const deps = settlementDeps(db);
       const auction: AuctionRecord | null = await auctionOf(db, competition.id);
-      const names = await teamNames(db, competition.id);
-      const teamList = [...names.entries()]
-        .map(([id, name]) => ({ id, name }))
+      const identity = await db
+        .select({
+          id: teamsTable.id,
+          name: teamsTable.name,
+          shortName: teamsTable.shortName,
+          primaryColor: teamsTable.primaryColor,
+          logoKey: teamsTable.logoUrl,
+        })
+        .from(teamsTable)
+        .where(eq(teamsTable.competitionId, competition.id));
+      const teamList: ConsoleTeam[] = identity
+        .map(({ logoKey, ...team }) => ({
+          ...team,
+          logoUrl: logoKey === null ? null : storage.readUrl(logoKey),
+        }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
       if (auction === null) {

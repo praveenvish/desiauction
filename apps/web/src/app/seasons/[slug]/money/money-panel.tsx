@@ -10,28 +10,26 @@ import {
   IconAlert,
   IconArrowRight,
   IconCheck,
-  IconCheckCircle,
-  IconClock,
-  IconFileCheck,
   IconGavel,
+  IconKebab,
   IconLedger,
   IconLock,
-  IconReceipt,
+  IconPlus,
   IconRupee,
   IconShieldCheck,
   IconUsers,
-  IconWallet,
+  initialsFor,
   type KitTone,
+  paintOnFill,
   Pill,
+  PopoverMenu,
   SectionCard,
   Select,
-  StatCard,
-  StatGrid,
   useAnnouncer,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 
 import {
   attestCaptureAction,
@@ -46,9 +44,11 @@ import {
   voidCaseAction,
   waiveObligationAction,
   type ActionResult,
+  type ConsoleTeam,
   type ConsoleView,
 } from "../../../../server/settlement/actions";
 import type { CaseView, ObligationView, PaymentView } from "../../../../server/settlement/views";
+import { CrestImage } from "../../../../components/team/crest-image";
 import { formatDateTime } from "../../../../lib/format-date";
 import { useOutcomeFocus } from "../../../../lib/use-outcome-focus";
 import { ledgerINR } from "../../../../lib/inr";
@@ -65,6 +65,14 @@ import { useHydrated } from "../../../../lib/use-hydrated";
  * a step is allowed — the case's own status does, and the writer re-decides it
  * server-side regardless of what this component renders. A disabled button is a
  * courtesy, never a control.
+ *
+ * THE REDESIGN (2026-09-27). It was six stacked cards: four figure tiles, a
+ * case card whose stepper said "Settle" beside a "Settled" badge, a separate
+ * next-step card, a team table, a payment table and "Controller actions" — and
+ * the case id and date were said twice. Now: ONE hero (where the case is, how
+ * much is in, the one next step), the teams as cards with their own bars, the
+ * payments as a list, and the rare audited acts (reopen, void) in the hero's ⋯.
+ * Every command, confirm and reason is exactly what it was.
  */
 
 const STATUS_TONE: Record<string, KitTone> = {
@@ -112,6 +120,8 @@ const PAYMENT_TONE: Record<string, KitTone> = {
   disputed: "amber",
 };
 
+type Act = (run: () => Promise<ActionResult>, done: string) => Promise<boolean>;
+
 /** Money always renders with its exact value inspectable (C-7). */
 function Amount({ value, label }: { value: number; label?: string }) {
   return (
@@ -121,6 +131,52 @@ function Amount({ value, label }: { value: number; label?: string }) {
     >
       {ledgerINR(value)}
     </span>
+  );
+}
+
+/** A share of a whole as a bar. Decorative: the figure beside it says the same in words. */
+function Bar({ share, tone }: { share: number; tone: "gold" | "green" }) {
+  const pct = Math.max(0, Math.min(100, share * 100));
+  return (
+    <span className="mn-bar" data-tone={tone} aria-hidden>
+      <span style={{ inlineSize: `${String(pct)}%` }} />
+    </span>
+  );
+}
+
+/** A team's mark: its crest, else its initials on its own colour — as on the Teams tab. */
+function TeamMark({
+  team,
+  name,
+  size,
+}: {
+  team: ConsoleTeam | undefined;
+  name: string;
+  size: 40 | 30;
+}) {
+  const mono = (
+    <span
+      className="mn-mark"
+      data-size={size}
+      style={paintOnFill(team?.primaryColor ?? null)}
+      aria-hidden
+    >
+      {initialsFor(name).initials ?? "?"}
+    </span>
+  );
+  const src = team?.logoUrl ?? null;
+  return src !== null ? (
+    <CrestImage
+      className="mn-mark"
+      data-size={size}
+      src={src}
+      width={size}
+      height={size}
+      loading="lazy"
+      fallback={mono}
+    />
+  ) : (
+    mono
   );
 }
 
@@ -135,12 +191,17 @@ function CaseStepper({ status }: { status: string }) {
    * so a sealed, replay-verified case rendered "✓ Open · ✓ Verify · ✓ Collect ·
    * ✓ Settle · 5 Close" for ever: four-fifths finished, permanently, on the one
    * status that means finished. A terminal status has no current step.
+   *
+   * `settled` means the Settle step is DONE and Close is the one being worked:
+   * the stepper used to mark "Settle" as current beside a "Settled" badge.
    */
   const finished = status === "closed";
+  const current = status === "settled" ? at + 1 : at;
   return (
     <ol className="mn-stepper" data-testid="case-stepper" aria-label="Settlement progress">
       {STEPS.map((step, index) => {
-        const state = finished || index < at ? "done" : index === at ? "current" : "blocked";
+        const state =
+          finished || index < current ? "done" : index === current ? "current" : "blocked";
         return (
           <li
             key={step.key}
@@ -150,7 +211,7 @@ function CaseStepper({ status }: { status: string }) {
             {...(state === "current" ? { "aria-current": "step" as const } : {})}
           >
             <span className="mn-step-mark" aria-hidden>
-              {state === "done" ? <IconCheck size={14} /> : String(index + 1)}
+              {state === "done" ? <IconCheck size={12} /> : null}
             </span>
             <span className="mn-step-label">
               {step.label}
@@ -184,7 +245,7 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
    * and queues behind whatever is already speaking, which is the wrong urgency
    * for "that payment was rejected".
    */
-  const act = async (run: () => Promise<ActionResult>, done: string): Promise<boolean> => {
+  const act: Act = async (run, done) => {
     setBusy(true);
     const result = await run();
     setBusy(false);
@@ -240,113 +301,42 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
     );
   }
 
+  const byId = new Map(teams.map((team) => [team.id, team]));
+
   return (
     <div data-testid="money-panel" data-hydrated={hydrated ? "true" : "false"}>
-      <CaseMoney settlementCase={settlementCase} />
-
-      <SectionCard
-        icon={<IconShieldCheck />}
-        tone={STATUS_TONE[settlementCase.status] ?? "neutral"}
-        title="Settlement case"
-        description={`Case ${settlementCase.caseId.slice(-8)} · opened ${formatDateTime(settlementCase.openedAt)}`}
-        action={
-          <Pill tone={STATUS_TONE[settlementCase.status] ?? "neutral"} dot testId="case-status">
-            {CASE_STATE[settlementCase.status] ?? settlementCase.status}
-          </Pill>
-        }
-      >
-        <div className="mn-case">
-          <CaseStepper status={settlementCase.status} />
-          {/* The case's identity: number, date, what it stands on, where it is.
-              The header band above carried none of it — 110px of empty rule. */}
-          <dl className="mn-identity" data-testid="case-identity">
-            <div>
-              <dt>Case</dt>
-              <dd className="digest">{settlementCase.caseId.slice(-8)}</dd>
-            </div>
-            <div>
-              <dt>Opened</dt>
-              <dd>{formatDateTime(settlementCase.openedAt)}</dd>
-            </div>
-            <div>
-              <dt>Dues</dt>
-              <dd>
-                {settlementCase.basis === "committed"
-                  ? "From what teams committed in the auction"
-                  : settlementCase.basis === "fixed"
-                    ? "From fixed amounts set when the case opened"
-                    : "Nothing owed"}
-              </dd>
-            </div>
-          </dl>
-          <Link
-            className="st-link mn-review-link"
-            href={`/seasons/${slug}/money/case/${settlementCase.caseId}`}
-          >
-            Open the case review
-            <IconArrowRight size={16} aria-hidden />
-          </Link>
-        </div>
-      </SectionCard>
-
-      {outcomeNote}
-
-      <NextStep
+      <CaseHero
         slug={slug}
         settlementCase={settlementCase}
         readiness={readiness}
         viewer={viewer}
+        competitionName={competition.name}
         busy={busy}
         act={act}
       />
 
-      {settlementCase.status === "settling" ? (
-        <>
-          <Obligations
-            slug={slug}
-            settlementCase={settlementCase}
-            viewer={viewer}
-            busy={busy}
-            act={act}
-          />
-          <Collect
-            slug={slug}
-            settlementCase={settlementCase}
-            canCollect={viewer.canCollect}
-            busy={busy}
-            act={act}
-          />
-        </>
-      ) : (
-        <Obligations
-          slug={slug}
-          settlementCase={settlementCase}
-          viewer={viewer}
-          busy={busy}
-          act={act}
-        />
-      )}
+      {outcomeNote}
+
+      <Teams
+        slug={slug}
+        settlementCase={settlementCase}
+        teams={byId}
+        viewer={viewer}
+        busy={busy}
+        act={act}
+      />
 
       {/* Always rendered once there is a case: "no payments yet" is a fact worth
           stating, and its absence made a case with no money look unfinished. */}
       <Payments
         slug={slug}
         settlementCase={settlementCase}
+        teams={byId}
         canCollect={viewer.canCollect}
         canOverride={viewer.canOverride}
         busy={busy}
         act={act}
       />
-
-      {viewer.canOverride ? (
-        <Overrides
-          slug={slug}
-          settlementCase={settlementCase}
-          competitionName={competition.name}
-          busy={busy}
-          act={act}
-        />
-      ) : null}
     </div>
   );
 }
@@ -454,65 +444,6 @@ function OpenCase({
   );
 }
 
-// --- Money summary ------------------------------------------------------------------
-
-function CaseMoney({ settlementCase }: { settlementCase: CaseView }) {
-  const { financial } = settlementCase;
-  const collectedShare =
-    financial.totalObligations > 0
-      ? ((financial.discharged + financial.waived) / financial.totalObligations) * 100
-      : undefined;
-  return (
-    <StatGrid>
-      <StatCard
-        icon={<IconReceipt />}
-        tone="gold"
-        value={<Amount value={financial.totalObligations} />}
-        label="Total dues"
-        hint={`${String(settlementCase.obligations.length)} team${settlementCase.obligations.length === 1 ? "" : "s"}`}
-        testId="total-obligations"
-      />
-      <StatCard
-        icon={<IconWallet />}
-        concept="money"
-        value={<Amount value={financial.discharged} />}
-        label="Collected"
-        hint="Confirmed as received"
-        {...(collectedShare !== undefined ? { progress: collectedShare } : {})}
-        testId="discharged"
-      />
-      <StatCard
-        icon={<IconFileCheck />}
-        tone="blue"
-        value={<Amount value={financial.waived} />}
-        label="Waived"
-        hint="Forgiven, with a reason"
-        testId="waived"
-      />
-      <StatCard
-        icon={financial.outstanding === 0 ? <IconCheckCircle /> : <IconAlert />}
-        tone={financial.outstanding === 0 ? "green" : "red"}
-        value={<Amount value={financial.outstanding} />}
-        label="Outstanding"
-        hint={financial.outstanding === 0 ? "Nothing still owed" : "Still owed by teams"}
-        testId="outstanding"
-      />
-      {/* Recorded but not yet attested. Without it, writing ₹10,000.50 against a
-          ₹25,000 due changed no tile and no row — the money was simply invisible. */}
-      {settlementCase.pending > 0 ? (
-        <StatCard
-          icon={<IconClock />}
-          tone="amber"
-          value={<Amount value={settlementCase.pending} />}
-          label="Awaiting confirmation"
-          hint="Recorded, not yet in hand"
-          testId="pending"
-        />
-      ) : null}
-    </StatGrid>
-  );
-}
-
 /** The product's one EmptyState, inside the Settlement card. */
 function EmptyCard({
   icon,
@@ -537,7 +468,177 @@ function EmptyCard({
   );
 }
 
-// --- The one legal next step --------------------------------------------------------
+// --- The hero: where the case is, how much is in, the one next step ----------------
+
+const BASIS: Record<string, string> = {
+  committed: "dues from what teams committed in the auction",
+  fixed: "dues fixed when the case opened",
+};
+
+function CaseHero({
+  slug,
+  settlementCase,
+  readiness,
+  viewer,
+  competitionName,
+  busy,
+  act,
+}: {
+  slug: string;
+  settlementCase: CaseView;
+  readiness: { ready: boolean; status: string; blockers: readonly string[] } | null;
+  viewer: ConsoleView["viewer"];
+  competitionName: string;
+  busy: boolean;
+  act: Act;
+}) {
+  const { financial, status } = settlementCase;
+  const total = financial.totalObligations;
+  const owing = settlementCase.obligations.filter((obligation) => obligation.outstanding > 0);
+  const accounted = total > 0 ? (financial.discharged + financial.waived) / total : 0;
+  const tone = STATUS_TONE[status] ?? "neutral";
+
+  const say =
+    status === "voided"
+      ? "This case was voided. It settles nothing and moves no money."
+      : settlementCase.obligations.length === 0
+        ? "Nothing is owed yet — the dues are worked out once the case is verified."
+        : financial.outstanding > 0
+          ? `${ledgerINR(financial.outstanding)} still to collect, from ${String(owing.length)} team${owing.length === 1 ? "" : "s"}.`
+          : financial.waived > 0
+            ? `Every rupee is accounted for — ${ledgerINR(financial.waived)} waived, nothing outstanding.`
+            : "Every rupee is in — nothing waived, nothing outstanding.";
+
+  return (
+    <section className="mn-hero" data-status={status} aria-label="Settlement case">
+      <div className="mn-hero-top">
+        <CaseStepper status={status} />
+        <Pill tone={tone} dot testId="case-status">
+          {CASE_STATE[status] ?? status}
+        </Pill>
+        <span className="mn-hero-spacer" />
+        <Link
+          className="st-link mn-review-link"
+          href={`/seasons/${slug}/money/case/${settlementCase.caseId}`}
+        >
+          Open the case review
+          <IconArrowRight size={16} aria-hidden />
+        </Link>
+        {viewer.canOverride ? (
+          <CaseMenu
+            slug={slug}
+            settlementCase={settlementCase}
+            competitionName={competitionName}
+            busy={busy}
+            act={act}
+          />
+        ) : null}
+      </div>
+
+      <div className="mn-hero-figure">
+        <p className="mn-headline">
+          <Amount value={financial.discharged} />{" "}
+          <span className="mn-headline-of">
+            collected of <Amount value={total} />
+          </span>
+        </p>
+        <p className="mn-say" data-tone={financial.outstanding > 0 ? "owed" : "clear"}>
+          {say}
+        </p>
+        {total > 0 ? (
+          <Bar share={accounted} tone={financial.outstanding > 0 ? "gold" : "green"} />
+        ) : null}
+      </div>
+
+      {/* The four figures, said once. They were four tiles the size of the hero. */}
+      <dl className="mn-figures">
+        <div>
+          <dt>Dues</dt>
+          <dd data-testid="total-obligations">
+            <Amount value={total} />
+          </dd>
+        </div>
+        <div>
+          <dt>Collected</dt>
+          <dd data-testid="discharged">
+            <Amount value={financial.discharged} />
+          </dd>
+        </div>
+        <div>
+          <dt>Waived</dt>
+          <dd data-testid="waived">
+            <Amount value={financial.waived} />
+          </dd>
+        </div>
+        <div data-owed={financial.outstanding > 0 ? "" : undefined}>
+          <dt>Outstanding</dt>
+          <dd data-testid="outstanding">
+            <Amount value={financial.outstanding} />
+          </dd>
+        </div>
+        {/* Recorded but not yet attested. Without it, writing ₹10,000.50 against a
+            ₹25,000 due changed no figure and no row — the money was simply invisible. */}
+        {settlementCase.pending > 0 ? (
+          <div>
+            <dt>Awaiting confirmation</dt>
+            <dd data-testid="pending">
+              <Amount value={settlementCase.pending} />
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+
+      <NextStep
+        slug={slug}
+        settlementCase={settlementCase}
+        readiness={readiness}
+        viewer={viewer}
+        busy={busy}
+        act={act}
+      />
+
+      {/* The case's identity, said once and quietly: number, date, what it stands on. */}
+      <p className="mn-identity" data-testid="case-identity">
+        Case <span className="digest">{settlementCase.caseId.slice(-8)}</span> · opened{" "}
+        {formatDateTime(settlementCase.openedAt)}
+        {BASIS[settlementCase.basis] !== undefined
+          ? ` · ${BASIS[settlementCase.basis] ?? ""}`
+          : " · nothing owed"}
+      </p>
+    </section>
+  );
+}
+
+/** The next step's own band inside the hero: what it is, why, and the button. */
+function Next({
+  tone,
+  icon,
+  title,
+  children,
+}: {
+  tone: KitTone;
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mn-next" data-tone={tone}>
+      <h2 className="mn-next-title">
+        <span className="mn-next-icon" aria-hidden>
+          {icon}
+        </span>
+        {title}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+function focusCollect() {
+  const select = document.querySelector<HTMLSelectElement>('[data-testid="pay-team"]');
+  select?.scrollIntoView({ block: "center" });
+  select?.focus();
+}
 
 function NextStep({
   slug,
@@ -552,7 +653,7 @@ function NextStep({
   readiness: { ready: boolean; status: string; blockers: readonly string[] } | null;
   viewer: ConsoleView["viewer"];
   busy: boolean;
-  act: (run: () => Promise<ActionResult>, done: string) => Promise<boolean>;
+  act: Act;
 }) {
   const [reason, setReason] = useState("");
   /**
@@ -567,11 +668,17 @@ function NextStep({
 
   if (settlementCase.status === "opened") {
     return (
-      <Step
+      <Next
+        tone="blue"
+        icon={<IconShieldCheck size={18} />}
         title="Verify the case against the auction"
-        body="Verification re-reads the frozen auction log and checks it still matches the pin taken when the case opened. Nothing moves until it does."
-        action={
-          viewer.canManage ? (
+      >
+        <p className="section-note">
+          Verification re-reads the frozen auction log and checks it still matches the pin taken
+          when the case opened. Nothing moves until it does.
+        </p>
+        {viewer.canManage ? (
+          <div className="mn-step-actions">
             <Button
               onClick={() => {
                 void act(() => verifyCaseAction(slug, caseId), "Verified against the auction log.");
@@ -582,21 +689,17 @@ function NextStep({
             >
               Verify case
             </Button>
-          ) : null
-        }
-        denied={viewer.canManage ? null : "You need a settlement grant to verify this case."}
-      />
+          </div>
+        ) : (
+          <p className="section-note">You need a settlement grant to verify this case.</p>
+        )}
+      </Next>
     );
   }
 
   if (settlementCase.status === "discrepant") {
     return (
-      <SectionCard
-        icon={<IconAlert />}
-        tone="red"
-        title="The auction log no longer matches"
-        className="mn-step-card"
-      >
+      <Next tone="red" icon={<IconAlert size={18} />} title="The auction log no longer matches">
         <p className="section-note">
           What the auction log says today is not what this case pinned when it opened. Money is
           frozen: nothing can be collected, waived or closed while the case is discrepant. Verifying
@@ -604,7 +707,7 @@ function NextStep({
           name.
         </p>
         {viewer.canOverride ? (
-          <div className="money-form">
+          <div className="money-form mn-form">
             <Field
               label="Why are you adopting the new log?"
               value={reason}
@@ -631,17 +734,19 @@ function NextStep({
         ) : (
           <p className="section-note">Only a settlement controller can resolve a discrepancy.</p>
         )}
-      </SectionCard>
+      </Next>
     );
   }
 
   if (settlementCase.status === "verified") {
     return (
-      <Step
-        title="Work out what each team owes"
-        body="This turns the verified auction into a due for every team. It is the last step before money can be collected."
-        action={
-          viewer.canManage ? (
+      <Next tone="blue" icon={<IconUsers size={18} />} title="Work out what each team owes">
+        <p className="section-note">
+          This turns the verified auction into a due for every team. It is the last step before
+          money can be collected.
+        </p>
+        {viewer.canManage ? (
+          <div className="mn-step-actions">
             <Button
               onClick={() => {
                 void act(() => computeObligationsAction(slug, caseId), "Obligations computed.");
@@ -652,10 +757,11 @@ function NextStep({
             >
               Compute obligations
             </Button>
-          ) : null
-        }
-        denied={viewer.canManage ? null : "You need a settlement grant to compute obligations."}
-      />
+          </div>
+        ) : (
+          <p className="section-note">You need a settlement grant to compute obligations.</p>
+        )}
+      </Next>
     );
   }
 
@@ -668,15 +774,14 @@ function NextStep({
        * under a COLLECTING badge — a contradiction in one glance. The case IS
        * still collecting; what has changed is that nothing is outstanding.
        */
-      <SectionCard
-        icon={clear ? <IconCheckCircle /> : <IconWallet />}
+      <Next
         tone={clear ? "green" : "amber"}
+        icon={clear ? <IconCheck size={18} /> : <IconRupee size={18} />}
         title={clear ? "Nothing is outstanding — ready to settle" : "Collect what is still owed"}
-        className="mn-step-card"
       >
         <p className="section-note">
           {clear
-            ? "No team owes anything. Settling locks the amounts so they can no longer change."
+            ? "Settling locks the amounts so they can no longer change. Closing, the step after it, runs the financial verification and seals the evidence."
             : "Record each payment as it arrives, or waive what will never be collected. The case can settle once nothing is outstanding."}
         </p>
         {pending > 0 ? (
@@ -685,24 +790,29 @@ function NextStep({
             the books and does not count against what a team owes until someone confirms it.
           </p>
         ) : null}
-        {/* Why there are two finishing steps at all. */}
-        <p className="section-note">
-          Settling and closing are two different acts: settling locks the amounts, and closing — the
-          step after it — runs the financial verification and seals the evidence. A settled case can
-          still be reopened; a closed one has a sealed record saying it was right.
-        </p>
-        {viewer.canManage ? (
+        {viewer.canManage || viewer.canCollect ? (
           <div className="mn-step-actions">
-            <Button
-              onClick={() => {
-                setConfirming("settle");
-              }}
-              disabled={busy || !clear}
-              data-testid="settle-case"
-              size="touch"
-            >
-              Settle case
-            </Button>
+            {/* While money is owed the one useful act is collecting it; Settle
+                stays in view, disabled, so the rule is visible. */}
+            {!clear && viewer.canCollect ? (
+              <Button size="touch" onClick={focusCollect} data-testid="goto-collect">
+                <IconPlus size={16} aria-hidden />
+                Record a payment
+              </Button>
+            ) : null}
+            {viewer.canManage ? (
+              <Button
+                variant={clear ? "primary" : "secondary"}
+                onClick={() => {
+                  setConfirming("settle");
+                }}
+                disabled={busy || !clear}
+                data-testid="settle-case"
+                size="touch"
+              >
+                Settle case
+              </Button>
+            ) : null}
           </div>
         ) : (
           <p className="section-note">You need a settlement grant to settle this case.</p>
@@ -736,19 +846,14 @@ function NextStep({
             record. Closing, the step after this one, is not.
           </p>
         </Confirm>
-      </SectionCard>
+      </Next>
     );
   }
 
   if (settlementCase.status === "settled") {
     const blocked = readiness !== null && !readiness.ready;
     return (
-      <SectionCard
-        icon={<IconLock />}
-        concept="money"
-        title="Close the case"
-        className="mn-step-card"
-      >
+      <Next tone="gold" icon={<IconLock size={18} />} title="Close the case">
         <p className="section-note">
           Closing runs the full financial verification and seals an evidence package that can be
           replayed for ever. Once closed, the auction reads as Reconciled.
@@ -764,6 +869,7 @@ function NextStep({
               data-testid="close-case"
               size="touch"
             >
+              <IconLock size={16} aria-hidden />
               Close case
             </Button>
           </div>
@@ -799,18 +905,13 @@ function NextStep({
             Nothing you do later can change what was sealed here.
           </p>
         </Confirm>
-      </SectionCard>
+      </Next>
     );
   }
 
   if (settlementCase.status === "closed") {
     return (
-      <SectionCard
-        icon={<IconCheckCircle />}
-        tone="green"
-        title="Settlement complete"
-        className="mn-step-card"
-      >
+      <Next tone="green" icon={<IconCheck size={18} />} title="Settlement complete">
         <p className="section-note">
           This case is closed and the auction reads as Reconciled. The evidence sealed at closure is
           on the case review, where it can be replayed and checked against the log.
@@ -819,22 +920,22 @@ function NextStep({
           <ButtonLink
             href={`/seasons/${slug}/money/case/${caseId}`}
             size="touch"
+            variant="secondary"
             data-testid="view-evidence"
           >
             View closure evidence
           </ButtonLink>
         </div>
-      </SectionCard>
+      </Next>
     );
   }
 
   return (
-    <SectionCard
-      icon={<IconAlert />}
-      tone="neutral"
-      title="This case was voided"
-      description="A voided case settles nothing and moves no money. Its history stays on the case review."
-    />
+    <Next tone="neutral" icon={<IconAlert size={18} />} title="This case was voided">
+      <p className="section-note">
+        A voided case settles nothing and moves no money. Its history stays on the case review.
+      </p>
+    </Next>
   );
 }
 
@@ -888,26 +989,6 @@ function Confirm({
   );
 }
 
-function Step({
-  title,
-  body,
-  action,
-  denied,
-}: {
-  title: string;
-  body: string;
-  action: ReactNode;
-  denied: string | null;
-}) {
-  return (
-    <SectionCard icon={<IconShieldCheck />} tone="blue" title={title} className="mn-step-card">
-      <p className="section-note">{body}</p>
-      {action !== null ? <div className="mn-step-actions">{action}</div> : null}
-      {denied !== null ? <p className="section-note">{denied}</p> : null}
-    </SectionCard>
-  );
-}
-
 const CHECK_LABEL: Record<string, string> = {
   case_settled: "The case is settled",
   no_outstanding: "No team still owes money",
@@ -925,8 +1006,8 @@ function Readiness({
 }) {
   if (readiness.ready) {
     return (
-      <p className="section-note" data-testid="closure-ready">
-        Every closure check passes. This case is ready to close.
+      <p className="section-note mn-ready" data-testid="closure-ready">
+        <IconCheck size={14} aria-hidden /> Every closure check passes. This case is ready to close.
       </p>
     );
   }
@@ -942,20 +1023,152 @@ function Readiness({
   );
 }
 
-// --- Obligations --------------------------------------------------------------------
+// --- Reopen / void: rare, audited, in the hero's ⋯ ----------------------------------
 
-function Obligations({
+function CaseMenu({
   slug,
   settlementCase,
+  competitionName,
+  busy,
+  act,
+}: {
+  slug: string;
+  settlementCase: CaseView;
+  competitionName: string;
+  busy: boolean;
+  act: Act;
+}) {
+  const [open, setOpen] = useState<"reopen" | "void" | null>(null);
+  const [reason, setReason] = useState("");
+
+  const canReopen = settlementCase.status === "settled" || settlementCase.status === "closed";
+  const canVoid =
+    settlementCase.status === "opened" ||
+    settlementCase.status === "verified" ||
+    settlementCase.status === "discrepant";
+
+  if (!canReopen && !canVoid) {
+    return null;
+  }
+
+  return (
+    <>
+      <PopoverMenu
+        label="More case actions"
+        trigger={<IconKebab size={20} />}
+        triggerClassName="mn-kebab"
+        items={[
+          ...(canReopen
+            ? [
+                {
+                  key: "reopen",
+                  label: "Reopen case…",
+                  testId: "open-reopen",
+                  onSelect: () => {
+                    setOpen("reopen");
+                    setReason("");
+                  },
+                },
+              ]
+            : []),
+          ...(canVoid
+            ? [
+                {
+                  key: "void",
+                  label: "Void case…",
+                  danger: true,
+                  testId: "open-void",
+                  onSelect: () => {
+                    setOpen("void");
+                    setReason("");
+                  },
+                },
+              ]
+            : []),
+        ]}
+      />
+
+      {open !== null ? (
+        <Dialog
+          open
+          onClose={() => {
+            setOpen(null);
+          }}
+          title={open === "void" ? `Void the case for ${competitionName}` : "Reopen the case"}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setOpen(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={busy || reason.trim() === ""}
+                onClick={() => {
+                  const which = open;
+                  void act(
+                    () =>
+                      which === "void"
+                        ? voidCaseAction(slug, settlementCase.caseId, reason)
+                        : reopenCaseAction(slug, settlementCase.caseId, reason),
+                    which === "void" ? "Case voided." : "Case reopened for collection.",
+                  ).then((ok) => {
+                    if (ok) {
+                      setOpen(null);
+                    }
+                  });
+                }}
+                data-testid="confirm-override"
+              >
+                {open === "void" ? "Void case" : "Reopen case"}
+              </Button>
+            </>
+          }
+        >
+          <p className="section-note">
+            {open === "void"
+              ? "Voiding abandons this case. It can only be done before any money has moved, and the auction will have no settlement until a new case is opened."
+              : "Reopening takes a settled or closed case back to collecting. If it was closed, it stops reading as Reconciled and its sealed evidence no longer applies."}
+          </p>
+          <p className="section-note">
+            It is recorded against your name with the reason you give, and shows on the case for
+            ever.
+          </p>
+          <Field
+            label="Why?"
+            value={reason}
+            onChange={(event) => {
+              setReason(event.target.value);
+            }}
+            required
+            data-testid="override-reason"
+          />
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
+// --- Teams --------------------------------------------------------------------------
+
+function Teams({
+  slug,
+  settlementCase,
+  teams,
   viewer,
   busy,
   act,
 }: {
   slug: string;
   settlementCase: CaseView;
+  teams: ReadonlyMap<string, ConsoleTeam>;
   viewer: ConsoleView["viewer"];
   busy: boolean;
-  act: (run: () => Promise<ActionResult>, done: string) => Promise<boolean>;
+  act: Act;
 }) {
   const [waiving, setWaiving] = useState<ObligationView | null>(null);
   const [amount, setAmount] = useState("");
@@ -964,11 +1177,12 @@ function Obligations({
   // opens, so a timeout-then-retry dedupes server-side but a genuine second
   // waiver of the same amount is a new intent.
   const [intentKey, setIntentKey] = useState(() => crypto.randomUUID());
+  // The payment form's team, lifted here so a card's "Record payment" can pick it.
+  const [payTeam, setPayTeam] = useState("");
+  const payAmountRef = useRef<HTMLDivElement>(null);
 
   if (settlementCase.obligations.length === 0) {
     return (
-      /* The card's own body already said "what each team owes"; the heading
-         said "Obligations". The prose was the better of the two. */
       <SectionCard
         icon={<IconUsers />}
         title="What each team owes"
@@ -977,219 +1191,198 @@ function Obligations({
     );
   }
 
-  const canWaive = viewer.canOverride && settlementCase.status === "settling";
-  const anyPending = settlementCase.obligations.some((obligation) => obligation.pending > 0);
+  const settling = settlementCase.status === "settling";
+  const canWaive = viewer.canOverride && settling;
+  const canCollect = viewer.canCollect && settling;
+  const clearCount = settlementCase.obligations.filter((o) => o.outstanding === 0).length;
+  const paymentsOf = (teamId: string) =>
+    settlementCase.payments.filter((payment) => payment.teamId === teamId).length;
 
   return (
-    <SectionCard
-      icon={<IconUsers />}
-      title="What each team owes"
-      description={`${String(settlementCase.obligations.length)} team${settlementCase.obligations.length === 1 ? "" : "s"} · ${String(settlementCase.obligations.filter((o) => o.outstanding === 0).length)} clear`}
-      flush
-    >
-      <div
-        className="st-table-wrap mn-scroll"
-        tabIndex={0}
-        role="region"
-        aria-label="What each team owes"
-      >
-        <table className="st-table mn-table" data-stack="" data-testid="obligations-table">
-          <caption>
-            <VisuallyHidden>What each team owes, has paid, and still owes</VisuallyHidden>
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Team</th>
-              <th scope="col" className="st-num">
-                Owes
-              </th>
-              <th scope="col" className="st-num">
-                Collected
-              </th>
-              <th scope="col" className="st-num">
-                Waived
-              </th>
-              {anyPending ? (
-                <th scope="col" className="st-num">
-                  Awaiting confirmation
-                </th>
-              ) : null}
-              <th scope="col" className="st-num">
-                Outstanding
-              </th>
-              {canWaive ? (
-                <th scope="col" className="st-num">
-                  <VisuallyHidden>Actions</VisuallyHidden>
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {settlementCase.obligations.map((obligation) => (
-              <tr
-                key={obligation.teamId}
-                data-testid={`obligation-${obligation.teamId}`}
-                className={obligation.outstanding === 0 ? "settled-row" : undefined}
-              >
-                {/* The team is the ROW HEADER — the word that makes every
-                    figure beside it mean something to a screen reader. */}
-                <th scope="row" data-label="" data-span="full" className="mn-team">
-                  {obligation.teamName}
-                </th>
-                <td data-label="Owes" className="st-num">
-                  <Amount value={obligation.amount + obligation.increased} />
-                </td>
-                <td data-label="Collected" className="st-num">
-                  <Amount value={obligation.discharged} />
-                </td>
-                <td data-label="Waived" className="st-num">
-                  <Amount value={obligation.waived} />
-                </td>
-                {anyPending ? (
-                  <td data-label="Awaiting confirmation" className="st-num">
-                    <Amount value={obligation.pending} />
-                  </td>
-                ) : null}
-                <td
-                  data-label="Outstanding"
-                  className="st-num"
-                  data-outstanding={obligation.outstanding}
-                >
-                  {obligation.outstanding === 0 ? (
-                    <Pill tone="green" dot>
-                      Clear
-                    </Pill>
-                  ) : (
-                    <span className="mn-owed">
-                      <Amount value={obligation.outstanding} />
-                    </span>
-                  )}
-                </td>
-                {canWaive ? (
-                  <td data-label="" className="st-num">
-                    <div className="money-row-actions">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={busy || obligation.outstanding === 0}
-                        onClick={() => {
-                          setWaiving(obligation);
-                          setAmount("");
-                          setReason("");
-                          setIntentKey(crypto.randomUUID());
-                        }}
-                        data-testid={`waive-${obligation.teamId}`}
-                      >
-                        Waive
-                      </Button>
-                    </div>
-                  </td>
-                ) : null}
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <th scope="row" data-label="" data-span="full">
-                Total
-              </th>
-              <td data-label="Owes" className="st-num">
-                <Amount value={settlementCase.financial.totalObligations} />
-              </td>
-              <td data-label="Collected" className="st-num">
-                <Amount value={settlementCase.financial.discharged} />
-              </td>
-              <td data-label="Waived" className="st-num">
-                <Amount value={settlementCase.financial.waived} />
-              </td>
-              {anyPending ? (
-                <td data-label="Awaiting confirmation" className="st-num">
-                  <Amount value={settlementCase.pending} />
-                </td>
-              ) : null}
-              <td data-label="Outstanding" className="st-num">
-                <Amount value={settlementCase.financial.outstanding} />
-              </td>
-              {canWaive ? <td data-label="" /> : null}
-            </tr>
-          </tfoot>
-        </table>
+    <section className="mn-teams" aria-labelledby="mn-teams-title">
+      <div className="mn-section-head">
+        <h2 id="mn-teams-title">Teams</h2>
+        <span>
+          {String(clearCount)} of {String(settlementCase.obligations.length)} clear
+        </span>
       </div>
 
-      <Dialog
-        open={waiving !== null}
-        onClose={() => {
-          setWaiving(null);
-        }}
-        title={waiving === null ? "Waive" : `Waive part of what ${waiving.teamName} owes`}
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setWaiving(null);
-              }}
+      <ul className="mn-team-grid" data-testid="obligations-table">
+        {settlementCase.obligations.map((obligation) => {
+          const owes = obligation.amount + obligation.increased;
+          const clear = obligation.outstanding === 0;
+          const payments = paymentsOf(obligation.teamId);
+          return (
+            <li
+              key={obligation.teamId}
+              className="mn-team-card"
+              data-clear={clear ? "" : undefined}
+              data-testid={`obligation-${obligation.teamId}`}
             >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              disabled={busy || amount.trim() === "" || reason.trim() === ""}
-              onClick={() => {
-                const target = waiving;
-                if (target === null) {
-                  return;
-                }
-                void act(
-                  () =>
-                    waiveObligationAction(
-                      slug,
-                      settlementCase.caseId,
-                      target.teamId,
-                      amount,
-                      reason,
-                      intentKey,
-                    ),
-                  "Waived. The books were updated.",
-                ).then((ok) => {
-                  if (ok) {
-                    setWaiving(null);
-                  }
-                });
-              }}
-              data-testid="confirm-waive"
-            >
-              Waive amount
-            </Button>
-          </>
-        }
-      >
-        <p className="section-note">
-          Waiving forgives money this team owes. It is recorded against your name with the reason
-          you give, it posts to the books, and it cannot be undone — only reopened.
-          {waiving !== null ? ` They still owe ${ledgerINR(waiving.outstanding)}.` : ""}
-        </p>
-        <Field
-          label="Amount to waive (₹)"
-          inputMode="decimal"
-          value={amount}
-          onChange={(event) => {
-            setAmount(event.target.value);
-          }}
-          required
-          data-testid="waive-amount"
+              <div className="mn-team-top">
+                <TeamMark
+                  team={teams.get(obligation.teamId)}
+                  name={obligation.teamName}
+                  size={40}
+                />
+                <div className="mn-team-name">
+                  <strong>{obligation.teamName}</strong>
+                  <span>
+                    owes <Amount value={owes} /> · {String(payments)} payment
+                    {payments === 1 ? "" : "s"}
+                  </span>
+                </div>
+                {clear ? (
+                  <Pill tone="green" dot>
+                    Clear
+                  </Pill>
+                ) : (
+                  <Pill tone="amber">{`${ledgerINR(obligation.outstanding)} to collect`}</Pill>
+                )}
+              </div>
+              {owes > 0 ? (
+                <Bar
+                  share={(obligation.discharged + obligation.waived) / owes}
+                  tone={clear ? "green" : "gold"}
+                />
+              ) : null}
+              <div className="mn-team-foot">
+                <span className="mn-team-sums">
+                  <strong>
+                    <Amount value={obligation.discharged} />
+                  </strong>{" "}
+                  collected · <Amount value={obligation.waived} /> waived
+                  {obligation.pending > 0 ? (
+                    <>
+                      {" "}
+                      · <Amount value={obligation.pending} /> awaiting confirmation
+                    </>
+                  ) : null}
+                </span>
+                {canCollect && !clear ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    aria-label={`Record a payment from ${obligation.teamName}`}
+                    onClick={() => {
+                      setPayTeam(obligation.teamId);
+                      payAmountRef.current?.querySelector("input")?.focus();
+                      payAmountRef.current?.scrollIntoView({ block: "center" });
+                    }}
+                    data-testid={`collect-${obligation.teamId}`}
+                  >
+                    <IconPlus size={14} aria-hidden />
+                    Record payment
+                  </Button>
+                ) : null}
+                {canWaive ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy || clear}
+                    onClick={() => {
+                      setWaiving(obligation);
+                      setAmount("");
+                      setReason("");
+                      setIntentKey(crypto.randomUUID());
+                    }}
+                    data-testid={`waive-${obligation.teamId}`}
+                  >
+                    Waive
+                  </Button>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {canCollect ? (
+        <Collect
+          slug={slug}
+          settlementCase={settlementCase}
+          teamId={payTeam}
+          setTeamId={setPayTeam}
+          amountRef={payAmountRef}
+          busy={busy}
+          act={act}
         />
-        <Field
-          label="Why is this being waived?"
-          value={reason}
-          onChange={(event) => {
-            setReason(event.target.value);
+      ) : null}
+
+      {waiving !== null ? (
+        <Dialog
+          open
+          onClose={() => {
+            setWaiving(null);
           }}
-          required
-          data-testid="waive-reason"
-        />
-      </Dialog>
-    </SectionCard>
+          title={`Waive part of what ${waiving.teamName} owes`}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setWaiving(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={busy || amount.trim() === "" || reason.trim() === ""}
+                onClick={() => {
+                  const target = waiving;
+                  void act(
+                    () =>
+                      waiveObligationAction(
+                        slug,
+                        settlementCase.caseId,
+                        target.teamId,
+                        amount,
+                        reason,
+                        intentKey,
+                      ),
+                    "Waived. The books were updated.",
+                  ).then((ok) => {
+                    if (ok) {
+                      setWaiving(null);
+                    }
+                  });
+                }}
+                data-testid="confirm-waive"
+              >
+                Waive amount
+              </Button>
+            </>
+          }
+        >
+          <p className="section-note">
+            Waiving forgives money this team owes. It is recorded against your name with the reason
+            you give, it posts to the books, and it cannot be undone — only reopened. They still owe{" "}
+            {ledgerINR(waiving.outstanding)}.
+          </p>
+          <Field
+            label="Amount to waive (₹)"
+            inputMode="decimal"
+            value={amount}
+            onChange={(event) => {
+              setAmount(event.target.value);
+            }}
+            required
+            data-testid="waive-amount"
+          />
+          <Field
+            label="Why is this being waived?"
+            value={reason}
+            onChange={(event) => {
+              setReason(event.target.value);
+            }}
+            required
+            data-testid="waive-reason"
+          />
+        </Dialog>
+      ) : null}
+    </section>
   );
 }
 
@@ -1198,18 +1391,21 @@ function Obligations({
 function Collect({
   slug,
   settlementCase,
-  canCollect,
+  teamId,
+  setTeamId,
+  amountRef,
   busy,
   act,
 }: {
   slug: string;
   settlementCase: CaseView;
-  canCollect: boolean;
+  teamId: string;
+  setTeamId: (teamId: string) => void;
+  amountRef: RefObject<HTMLDivElement | null>;
   busy: boolean;
-  act: (run: () => Promise<ActionResult>, done: string) => Promise<boolean>;
+  act: Act;
 }) {
   const owing = settlementCase.obligations.filter((obligation) => obligation.outstanding > 0);
-  const [teamId, setTeamId] = useState("");
   const [method, setMethod] = useState("manual:cash");
   const [amount, setAmount] = useState("");
   /*
@@ -1224,20 +1420,19 @@ function Collect({
    */
   const [intentKey, setIntentKey] = useState(() => crypto.randomUUID());
 
-  if (!canCollect) {
-    return null;
-  }
   if (owing.length === 0) {
     return null;
   }
 
   return (
-    <SectionCard
-      icon={<IconRupee />}
-      concept="money"
-      title="Record a payment"
-      description="Record the money as it arrives. It is confirmed once it is actually in hand — confirming puts it on the books and takes it off what the team owes."
-    >
+    <div className="mn-collect" id="record-payment">
+      <div className="mn-collect-head">
+        <h3>Record a payment</h3>
+        <p className="section-note">
+          Record the money as it arrives. It is confirmed once it is actually in hand — confirming
+          puts it on the books and takes it off what the team owes.
+        </p>
+      </div>
       <div className="money-form mn-form">
         <Select
           label="Which team paid?"
@@ -1268,7 +1463,7 @@ function Collect({
             </option>
           ))}
         </Select>
-        <div className="money-form-amount">
+        <div className="money-form-amount" ref={amountRef}>
           <Field
             label="Amount (₹)"
             inputMode="decimal"
@@ -1302,7 +1497,7 @@ function Collect({
           Record payment
         </Button>
       </div>
-    </SectionCard>
+    </div>
   );
 }
 
@@ -1311,6 +1506,7 @@ function Collect({
 function Payments({
   slug,
   settlementCase,
+  teams,
   canCollect,
   canOverride,
   busy,
@@ -1318,10 +1514,11 @@ function Payments({
 }: {
   slug: string;
   settlementCase: CaseView;
+  teams: ReadonlyMap<string, ConsoleTeam>;
   canCollect: boolean;
   canOverride: boolean;
   busy: boolean;
-  act: (run: () => Promise<ActionResult>, done: string) => Promise<boolean>;
+  act: Act;
 }) {
   const [refunding, setRefunding] = useState<PaymentView | null>(null);
   const [amount, setAmount] = useState("");
@@ -1341,64 +1538,37 @@ function Payments({
     );
   }
 
+  // Newest first: the one just recorded is the one about to be confirmed.
+  const payments = [...settlementCase.payments].sort((a, b) =>
+    b.recordedAt.localeCompare(a.recordedAt),
+  );
+
   return (
-    <SectionCard
-      icon={<IconLedger />}
-      tone="purple"
-      title="Payments"
-      description={`${String(settlementCase.payments.length)} recorded against this case`}
-      flush
-    >
-      <div
-        className="st-table-wrap mn-scroll"
-        tabIndex={0}
-        role="region"
-        aria-label="Payments recorded against this case"
-      >
-        <table className="st-table mn-table" data-stack="" data-testid="payments-table">
-          <caption>
-            <VisuallyHidden>Every payment recorded against this case</VisuallyHidden>
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Team</th>
-              {/* The money surfaces carried no date at all: the only timestamps
-                  in the product were on the Timeline tab, a page away. */}
-              <th scope="col">Recorded</th>
-              <th scope="col">Method</th>
-              <th scope="col">State</th>
-              <th scope="col" className="st-num">
-                Amount
-              </th>
-              <th scope="col" className="st-num">
-                Collected
-              </th>
-              <th scope="col" className="st-num">
-                <VisuallyHidden>Actions</VisuallyHidden>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {settlementCase.payments.map((payment) => (
-              <PaymentRow
-                key={payment.paymentId}
-                slug={slug}
-                payment={payment}
-                canCollect={canCollect}
-                canOverride={canOverride}
-                busy={busy}
-                act={act}
-                onRefund={() => {
-                  setRefunding(payment);
-                  setAmount("");
-                  setReason("");
-                  setIntentKey(crypto.randomUUID());
-                }}
-              />
-            ))}
-          </tbody>
-        </table>
+    <section className="mn-payments" aria-labelledby="mn-payments-title">
+      <div className="mn-section-head">
+        <h2 id="mn-payments-title">Payments</h2>
+        <span>{String(payments.length)} recorded · newest first</span>
       </div>
+      <ul className="mn-pay-list" data-testid="payments-table">
+        {payments.map((payment) => (
+          <PaymentRow
+            key={payment.paymentId}
+            slug={slug}
+            payment={payment}
+            team={teams.get(payment.teamId)}
+            canCollect={canCollect}
+            canOverride={canOverride}
+            busy={busy}
+            act={act}
+            onRefund={() => {
+              setRefunding(payment);
+              setAmount("");
+              setReason("");
+              setIntentKey(crypto.randomUUID());
+            }}
+          />
+        ))}
+      </ul>
 
       {/*
        * The refund path. `refundPaymentAction` has been exported on the server
@@ -1407,85 +1577,82 @@ function Payments({
        * outstanding, Waive disables, and Overrides renders nothing while the
        * case is still collecting. Money that went in wrong could not be said.
        */}
-      <Dialog
-        open={refunding !== null}
-        onClose={() => {
-          setRefunding(null);
-        }}
-        title={refunding === null ? "Refund" : `Refund part of what ${refunding.teamName} paid`}
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setRefunding(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              disabled={busy || amount.trim() === "" || reason.trim() === ""}
-              onClick={() => {
-                const target = refunding;
-                if (target === null) {
-                  return;
-                }
-                void act(
-                  () => refundPaymentAction(slug, target.paymentId, amount, reason, intentKey),
-                  "Refunded. The money was put back on what the team owes.",
-                ).then((ok) => {
-                  if (ok) {
-                    setRefunding(null);
-                  }
-                });
-              }}
-              data-testid="confirm-refund"
-            >
-              Refund amount
-            </Button>
-          </>
-        }
-      >
-        <p className="section-note">
-          Refunding gives money back that this case already collected. It posts to the books, it
-          puts the amount back on what the team owes, and it is recorded against your name with the
-          reason you give.
-          {refunding !== null
-            ? ` This payment collected ${ledgerINR(refunding.captured)}${
-                refunding.refundedTotal > 0
-                  ? `, of which ${ledgerINR(refunding.refundedTotal)} is already refunded`
-                  : ""
-              }.`
-            : ""}
-        </p>
-        <Field
-          label="Amount to refund (₹)"
-          inputMode="decimal"
-          value={amount}
-          onChange={(event) => {
-            setAmount(event.target.value);
+      {refunding !== null ? (
+        <Dialog
+          open
+          onClose={() => {
+            setRefunding(null);
           }}
-          required
-          data-testid="refund-amount"
-        />
-        <Field
-          label="Why is this being refunded?"
-          value={reason}
-          onChange={(event) => {
-            setReason(event.target.value);
-          }}
-          required
-          data-testid="refund-reason"
-        />
-      </Dialog>
-    </SectionCard>
+          title={`Refund part of what ${refunding.teamName} paid`}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setRefunding(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={busy || amount.trim() === "" || reason.trim() === ""}
+                onClick={() => {
+                  const target = refunding;
+                  void act(
+                    () => refundPaymentAction(slug, target.paymentId, amount, reason, intentKey),
+                    "Refunded. The money was put back on what the team owes.",
+                  ).then((ok) => {
+                    if (ok) {
+                      setRefunding(null);
+                    }
+                  });
+                }}
+                data-testid="confirm-refund"
+              >
+                Refund amount
+              </Button>
+            </>
+          }
+        >
+          <p className="section-note">
+            Refunding gives money back that this case already collected. It posts to the books, it
+            puts the amount back on what the team owes, and it is recorded against your name with
+            the reason you give. This payment collected {ledgerINR(refunding.captured)}
+            {refunding.refundedTotal > 0
+              ? `, of which ${ledgerINR(refunding.refundedTotal)} is already refunded`
+              : ""}
+            .
+          </p>
+          <Field
+            label="Amount to refund (₹)"
+            inputMode="decimal"
+            value={amount}
+            onChange={(event) => {
+              setAmount(event.target.value);
+            }}
+            required
+            data-testid="refund-amount"
+          />
+          <Field
+            label="Why is this being refunded?"
+            value={reason}
+            onChange={(event) => {
+              setReason(event.target.value);
+            }}
+            required
+            data-testid="refund-reason"
+          />
+        </Dialog>
+      ) : null}
+    </section>
   );
 }
 
 function PaymentRow({
   slug,
   payment,
+  team,
   canCollect,
   canOverride,
   busy,
@@ -1494,10 +1661,11 @@ function PaymentRow({
 }: {
   slug: string;
   payment: PaymentView;
+  team: ConsoleTeam | undefined;
   canCollect: boolean;
   canOverride: boolean;
   busy: boolean;
-  act: (run: () => Promise<ActionResult>, done: string) => Promise<boolean>;
+  act: Act;
   onRefund: () => void;
 }) {
   const methodLabel =
@@ -1506,200 +1674,77 @@ function PaymentRow({
   const retryable = payment.status === "failed";
   const refundable = canOverride && payment.captured - payment.refundedTotal > 0;
   return (
-    <tr data-testid={`payment-${payment.paymentId}`}>
-      <th scope="row" data-label="" data-span="full" className="mn-team">
-        {payment.teamName}
-      </th>
-      <td data-label="Recorded" className="money-when">
-        {formatDateTime(payment.recordedAt)}
-      </td>
-      <td data-label="Method">{methodLabel}</td>
-      <td data-label="State">
-        <Pill tone={PAYMENT_TONE[payment.status] ?? "neutral"}>
-          {PAYMENT_STATE[payment.status] ?? payment.status}
-        </Pill>
-        {/* The action promises the money is "recorded against your name". The
-            name was fetched and thrown away; here it is. */}
-        {payment.attested ? (
-          <span className="section-note" data-testid={`attested-by-${payment.paymentId}`}>
-            {" "}
-            confirmed by {payment.attestedByName ?? "a settlement controller"}
-          </span>
-        ) : null}
-      </td>
-      <td data-label="Amount" className="st-num">
-        <Amount value={payment.amount} />
-      </td>
-      <td data-label="Collected" className="st-num">
-        <Amount value={payment.captured} />
-        {payment.refundedTotal > 0 ? (
-          <span className="section-note"> less {ledgerINR(payment.refundedTotal)} refunded</span>
-        ) : null}
-      </td>
-      <td data-label="" className="st-num" data-span="full">
-        <div className="money-row-actions">
-          {canCollect && payment.status === "created" ? (
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={() => {
-                void act(
-                  () => attestCaptureAction(slug, payment.paymentId),
-                  "Money confirmed as received. The books were updated.",
-                );
-              }}
-              data-testid={`attest-${payment.paymentId}`}
-            >
-              Confirm received
-            </Button>
-          ) : null}
-          {refundable ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={busy}
-              onClick={onRefund}
-              data-testid={`refund-${payment.paymentId}`}
-            >
-              Refund
-            </Button>
-          ) : null}
-          {retryable ? (
-            <span className="section-note" data-testid={`retry-${payment.paymentId}`}>
-              Failed — record a new payment to try again.
+    <li className="mn-pay" data-testid={`payment-${payment.paymentId}`}>
+      <TeamMark team={team} name={payment.teamName} size={30} />
+      <div className="mn-pay-body">
+        <strong>
+          {payment.teamName} · {methodLabel}
+        </strong>
+        {/* The money surfaces carried no date at all: the only timestamps in the
+            product were on the Timeline tab, a page away. */}
+        <span className="mn-pay-meta">
+          <span className="money-when">{formatDateTime(payment.recordedAt)}</span>
+          <Pill tone={PAYMENT_TONE[payment.status] ?? "neutral"}>
+            {PAYMENT_STATE[payment.status] ?? payment.status}
+          </Pill>
+          {/* The action promises the money is "recorded against your name". The
+              name was fetched and thrown away; here it is. */}
+          {payment.attested ? (
+            <span data-testid={`attested-by-${payment.paymentId}`}>
+              confirmed by {payment.attestedByName ?? "a settlement controller"}
             </span>
           ) : null}
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-// --- Overrides ----------------------------------------------------------------------
-
-function Overrides({
-  slug,
-  settlementCase,
-  competitionName,
-  busy,
-  act,
-}: {
-  slug: string;
-  settlementCase: CaseView;
-  competitionName: string;
-  busy: boolean;
-  act: (run: () => Promise<ActionResult>, done: string) => Promise<boolean>;
-}) {
-  const [open, setOpen] = useState<"reopen" | "void" | null>(null);
-  const [reason, setReason] = useState("");
-
-  const canReopen = settlementCase.status === "settled" || settlementCase.status === "closed";
-  const canVoid =
-    settlementCase.status === "opened" ||
-    settlementCase.status === "verified" ||
-    settlementCase.status === "discrepant";
-
-  if (!canReopen && !canVoid) {
-    return null;
-  }
-
-  return (
-    <SectionCard
-      icon={<IconAlert />}
-      tone="red"
-      title="Controller actions"
-      description="These undo settled money. Every one is recorded against your name with the reason you give, and shows on the case for ever."
-    >
-      <div>
-        <div className="mn-step-actions">
-          {canReopen ? (
-            <Button
-              // The trigger opens the reason form; red is for the confirm there.
-              variant="secondary"
-              disabled={busy}
-              onClick={() => {
-                setOpen("reopen");
-                setReason("");
-              }}
-              data-testid="open-reopen"
-            >
-              Reopen case
-            </Button>
-          ) : null}
-          {canVoid ? (
-            <Button
-              variant="secondary"
-              disabled={busy}
-              onClick={() => {
-                setOpen("void");
-                setReason("");
-              }}
-              data-testid="open-void"
-            >
-              Void case
-            </Button>
-          ) : null}
-        </div>
+        </span>
+        {retryable ? (
+          <span className="mn-pay-meta" data-testid={`retry-${payment.paymentId}`}>
+            Failed — record a new payment to try again.
+          </span>
+        ) : null}
       </div>
-
-      <Dialog
-        open={open !== null}
-        onClose={() => {
-          setOpen(null);
-        }}
-        title={open === "void" ? `Void the case for ${competitionName}` : "Reopen the case"}
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setOpen(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              disabled={busy || reason.trim() === ""}
-              onClick={() => {
-                const which = open;
-                if (which === null) {
-                  return;
-                }
-                void act(
-                  () =>
-                    which === "void"
-                      ? voidCaseAction(slug, settlementCase.caseId, reason)
-                      : reopenCaseAction(slug, settlementCase.caseId, reason),
-                  which === "void" ? "Case voided." : "Case reopened for collection.",
-                ).then((ok) => {
-                  if (ok) {
-                    setOpen(null);
-                  }
-                });
-              }}
-              data-testid="confirm-override"
-            >
-              {open === "void" ? "Void case" : "Reopen case"}
-            </Button>
-          </>
-        }
-      >
-        <p className="section-note">
-          {open === "void"
-            ? "Voiding abandons this case. It can only be done before any money has moved, and the auction will have no settlement until a new case is opened."
-            : "Reopening takes a settled or closed case back to collecting. If it was closed, it stops reading as Reconciled and its sealed evidence no longer applies."}
-        </p>
-        <Field
-          label="Why?"
-          value={reason}
-          onChange={(event) => {
-            setReason(event.target.value);
-          }}
-          required
-          data-testid="override-reason"
-        />
-      </Dialog>
-    </SectionCard>
+      <div className="mn-pay-amount">
+        <Amount value={payment.amount} />
+        {payment.captured !== payment.amount && payment.captured > 0 ? (
+          <span>
+            <Amount value={payment.captured} /> collected
+          </span>
+        ) : null}
+        {payment.refundedTotal > 0 ? (
+          <span>less {ledgerINR(payment.refundedTotal)} refunded</span>
+        ) : null}
+      </div>
+      <div className="mn-pay-actions">
+        {canCollect && payment.status === "created" ? (
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              void act(
+                () => attestCaptureAction(slug, payment.paymentId),
+                "Money confirmed as received. The books were updated.",
+              );
+            }}
+            data-testid={`attest-${payment.paymentId}`}
+          >
+            Confirm received
+          </Button>
+        ) : null}
+        {refundable ? (
+          <PopoverMenu
+            label={`More for ${payment.teamName}'s payment`}
+            trigger={<IconKebab size={18} />}
+            triggerClassName="mn-kebab"
+            items={[
+              {
+                key: "refund",
+                label: "Refund…",
+                danger: true,
+                testId: `refund-${payment.paymentId}`,
+                onSelect: onRefund,
+              },
+            ]}
+          />
+        ) : null}
+      </div>
+    </li>
   );
 }

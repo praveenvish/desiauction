@@ -1,10 +1,4 @@
-import {
-  AnnouncerProvider,
-  ButtonLink,
-  EmptyState,
-  IconFileCheck,
-  ToastProvider,
-} from "@desiauction/ui";
+import { AnnouncerProvider, ButtonLink, EmptyState, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { currentSession } from "../../../../server/auth/actions";
@@ -99,19 +93,6 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
           <div className="dash-stack money-stack">
             <div className="st-head">
               <p className="st-head-lede">Settlement — what was owed, what came in, what closed.</p>
-              {view.case !== null ? (
-                <div className="st-actions">
-                  <ButtonLink
-                    href={`/seasons/${slug}/money/case/${view.case.caseId}`}
-                    variant="secondary"
-                    size="sm"
-                    data-testid="open-case-review"
-                  >
-                    <IconFileCheck size={16} aria-hidden />
-                    Case review
-                  </ButtonLink>
-                </div>
-              ) : null}
             </div>
             <MoneyPanel slug={slug} console={view} />
           </div>

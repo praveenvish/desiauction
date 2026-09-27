@@ -16,128 +16,406 @@
 }
 
 .mn-review-link {
-  align-self: flex-start;
-  white-space: normal;
+  white-space: nowrap;
+  font-size: var(--text-sm-size);
 }
 
-/* ---- The case card ---- */
+/* ---- The hero: where the case is, how much is in, the one next step ---- */
 
-.mn-case {
+.mn-hero {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.mn-hero-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mn-hero-spacer {
+  flex: 1 1 0;
 }
 
 .mn-stepper {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
-  padding: var(--space-1);
+  padding: 0;
   list-style: none;
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
 }
 
 .mn-step {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm-size);
+  gap: 6px;
+  font-size: var(--text-xs-size);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
-.mn-step[data-state="current"] {
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-1);
-  color: var(--text-heading);
+.mn-step + .mn-step::before {
+  content: "";
+  width: 14px;
+  height: 1px;
+  margin-inline-end: 2px;
+  background: var(--border-strong);
 }
 
 .mn-step[data-state="done"] {
-  color: var(--text-heading);
+  color: var(--success-strong);
+}
+
+.mn-step[data-state="current"] {
+  color: var(--accent-ink);
 }
 
 .mn-step-mark {
   flex: none;
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1.5px solid var(--border-strong);
+  width: 18px;
+  height: 18px;
   border-radius: var(--radius-full);
-  font-size: var(--text-xs-size);
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
 }
 
 .mn-step[data-state="done"] .mn-step-mark {
-  border-color: var(--success-base);
-  background: var(--success-base);
-  color: var(--surface-raised);
+  box-shadow: none;
+  background: var(--success-subtle);
+  color: var(--success-strong);
 }
 
 .mn-step[data-state="current"] .mn-step-mark {
-  border-color: var(--accent-line);
-  background: var(--accent);
-  color: var(--text-on-accent);
+  box-shadow: inset 0 0 0 2px var(--accent-line);
+  background: var(--accent-subtle);
 }
 
 .mn-step-label {
-  overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
-.mn-identity {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+.mn-kebab {
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+.mn-hero-figure {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
+}
+
+.mn-headline {
+  margin: 0;
+  font-size: var(--text-3xl-size);
+  line-height: 1.1;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.mn-headline-of {
+  font-size: var(--text-lg-size);
+  color: var(--text-secondary);
+}
+
+.mn-say {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--success-strong);
+}
+
+.mn-say[data-tone="owed"] {
+  color: var(--warning-strong);
+}
+
+.mn-hero[data-status="voided"] .mn-say {
+  color: var(--text-secondary);
+}
+
+.mn-bar {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.mn-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success-base);
+}
+
+.mn-bar[data-tone="gold"] > span {
+  background: var(--accent);
+}
+
+.mn-team-card .mn-bar {
+  height: 8px;
+}
+
+.mn-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
   margin: 0;
 }
 
-.mn-identity > div {
+.mn-figures > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
 }
 
-.mn-identity dt {
+.mn-figures dt {
   font-size: var(--text-xs-size);
   color: var(--text-secondary);
 }
 
-.mn-identity dd {
+.mn-figures dd {
   margin: 0;
-  font-size: var(--text-sm-size);
+  font-size: var(--text-md-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
-  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
-/* ---- Next step ---- */
+.mn-figures > [data-owed] dd {
+  color: var(--danger-strong);
+}
 
-.mn-step-card .section-note + .section-note {
-  margin-top: var(--space-2);
+/* The next step: a band inside the hero, its own colour by what it asks. */
+.mn-next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  border-inline-start: 3px solid var(--border-strong);
+}
+
+.mn-next[data-tone="gold"] {
+  border-inline-start-color: var(--accent-line);
+}
+
+.mn-next[data-tone="green"] {
+  border-inline-start-color: var(--success-base);
+}
+
+.mn-next[data-tone="amber"] {
+  border-inline-start-color: var(--warning-base);
+}
+
+.mn-next[data-tone="blue"] {
+  border-inline-start-color: var(--info-base);
+}
+
+.mn-next[data-tone="red"] {
+  border-inline-start-color: var(--danger-base);
+}
+
+.mn-next-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mn-next-icon {
+  display: inline-flex;
+  color: var(--text-secondary);
+}
+
+.mn-next .section-note {
+  margin: 0;
 }
 
 .mn-step-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
 }
 
 .mn-checks {
-  margin: var(--space-3) 0 0;
+  margin: var(--space-1) 0 0;
 }
 
-/* ---- Forms ---- */
+.mn-ready {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--success-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mn-identity {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Section heads (Teams, Payments) ---- */
+
+.mn-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.mn-section-head h2 {
+  margin: 0;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mn-section-head span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+/* ---- Teams ---- */
+
+.mn-teams,
+.mn-payments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.mn-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mn-team-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.mn-team-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mn-mark {
+  flex: none;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.mn-mark[data-size="30"] {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs-size);
+}
+
+.mn-team-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mn-team-name strong {
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.mn-team-name span {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mn-team-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mn-team-sums {
+  flex: 1 1 auto;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mn-team-sums strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ---- Record a payment ---- */
+
+.mn-collect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.mn-collect-head h3 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mn-collect-head .section-note {
+  margin: var(--space-1) 0 0;
+}
 
 .mn-form {
   display: flex;
@@ -157,6 +435,135 @@
 
 .mn-fixed {
   margin-top: var(--space-4);
+}
+
+/* ---- Payments ---- */
+
+.mn-pay-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.mn-pay {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+}
+
+.mn-pay + .mn-pay {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mn-pay-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mn-pay-body strong {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.mn-pay-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.mn-pay-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mn-pay-amount > span + span {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+.mn-pay-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+
+@media (max-width: 719px) {
+  .mn-hero {
+    padding: var(--space-4);
+  }
+
+  /* On a phone the stages wrap: a connector at the start of a line reads as a dash. */
+  .mn-stepper {
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .mn-step + .mn-step::before {
+    display: none;
+  }
+
+  .mn-hero-spacer {
+    display: none;
+  }
+
+  .mn-headline {
+    font-size: var(--text-2xl-size);
+  }
+
+  .mn-headline-of {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--text-sm-size);
+  }
+
+  .mn-figures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mn-step-actions > * {
+    flex: 1 1 100%;
+  }
+
+  .mn-team-card,
+  .mn-collect {
+    padding: var(--space-4);
+  }
+
+  .mn-pay {
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .mn-pay-body {
+    flex-basis: calc(100% - 30px - var(--space-3));
+  }
+
+  .mn-pay-amount {
+    align-items: flex-start;
+    margin-inline-start: calc(30px + var(--space-3));
+    flex: 1 1 auto;
+  }
 }
 
 /* ---- Tables ---- */
@@ -195,22 +602,6 @@
 }
 
 @media (max-width: 719px) {
-  .mn-stepper {
-    grid-auto-columns: minmax(0, 1fr);
-  }
-
-  .mn-step {
-    flex-direction: column;
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-1);
-    font-size: var(--text-xs-size);
-    text-align: center;
-  }
-
-  .mn-step-label {
-    max-width: 100%;
-  }
-
   .mn-table .money-row-actions {
     justify-content: flex-start;
   }
