@@ -119,13 +119,20 @@
   cursor: default;
 }
 
-.rp-lot[data-state="waiting"] {
-  opacity: 0.55;
+/* Still to come: quieter by colour, never by opacity (a faded row fails contrast). */
+.rp-lot[data-state="waiting"] .rp-lot-name {
+  color: var(--text-secondary);
 }
 
 .rp-lot[aria-current="true"] {
   background: var(--accent-subtle);
   box-shadow: inset 3px 0 0 var(--accent-line);
+}
+
+/* On the gold tint the muted grey falls under 4.5:1; the number steps up. */
+.rp-lot[aria-current="true"] .rp-lot-no,
+.rp-lot[aria-current="true"] .rp-lot-state {
+  color: var(--text-secondary);
 }
 
 .rp-lot:focus-visible {
