@@ -1,239 +1,178 @@
 "use client";
 
-import {
-  maxAffordableBid,
-  nextMinimumBid as snapshotNextMinimumBid,
-  paise,
-} from "@desiauction/core";
-import { Card } from "@desiauction/ui";
-import type { AuctionSnapshot, PlanState } from "@desiauction/core";
+import { IconHand } from "@desiauction/ui";
+import type { PlanState } from "@desiauction/core";
+import { useEffect, useReducer } from "react";
 
-import { PlanLine } from "./plan-line";
-import { PurseTeamCrest, type TeamIdentity } from "./purse-board";
+import { activeJump, jumpReducer, type BlockReason, type OwnerStance } from "./owner-state";
 
 import type { AuctionRules } from "../../../../server/auction/live-summary";
 import { useMoney } from "../../../../components/money-unit";
 
-// YOUR PADDLE — the bidder's one control. The raise is a single large button
-// carrying its own amount, because the owner is watching the room and the
-// timer, not reading a form: the previous version asked them to parse a
-// "Ladder: ₹20L → ₹25L → ₹30L" sentence and then find a separate button.
+// YOUR PADDLE — the bidder's one control, laid out for a thumb (live-room
+// stage 1). On a phone it is pinned to the foot of the screen: what the owner
+// can spend, three bigger amounts, and ONE big button that says exactly what it
+// will do — "Bid 2,000 pts". On a laptop the same bar is a card beside the
+// player card, the big button above the bigger amounts.
 //
-// The jump-ahead chips are the same ladder made pressable. A free-text paise
-// field is deliberately NOT here — the engine rejects off-ladder amounts, so
-// offering the field only invites a rejection mid-lot.
+// THE NEXT BID IS ONE TAP. A BIGGER BID IS TWO. Tapping a chip only CHOOSES
+// that amount (aria-pressed); the big button then names it and commits it, and
+// "Back to the next bid" takes the choice away. A fat-fingered jump spends real
+// money and a mistaken next bid costs one rung, so only the dear one asks
+// twice. The choice lapses by itself the moment it stops applying — see
+// `activeJump`. Both paths send through the same `onBid`, and so through the
+// room's one bid sender and its intent ids: nothing about the protocol moved.
+//
+// A free-text amount is deliberately NOT here: the engine rejects off-ladder
+// amounts, so offering the field only invites a rejection mid-lot.
 
-/** How many rungs of the increment ladder to offer as jump-ahead chips. */
-const JUMP_RUNGS = 3;
+/** The big button's words when the paddle is locked. */
+const LOCKED_LABEL: Record<BlockReason, string> = {
+  paused: "Bidding paused",
+  closed: "Not taking bids",
+  leading: "You're in the lead",
+  "squad-full": "Your squad is full",
+  "too-dear": "Past your budget",
+};
 
 export function PaddleControl({
-  lot,
+  lotId,
+  stance,
   rules,
-  snapshot,
-  myPaddleNumber,
-  myTeam,
   squadSigned,
-  disabled,
+  readOnly,
+  busy,
   onBid,
   plan = null,
-  planNames = () => "a player",
 }: {
-  lot: NonNullable<AuctionSnapshot["currentLot"]>;
+  lotId: string;
+  /** Where the owner stands on this lot (`ownerStanceOf`) — shared with the state line. */
+  stance: OwnerStance;
   rules: AuctionRules;
-  snapshot: AuctionSnapshot | null;
-  myPaddleNumber: string;
-  myTeam: TeamIdentity | undefined;
   squadSigned: number;
-  disabled: boolean;
+  /** The feed is stale: nothing may be sent, and a chosen amount lapses. */
+  readOnly: boolean;
+  /** A bid from this room is in flight. */
+  busy: boolean;
   onBid: (amount: number) => void;
   /** WR-1: the owner's plan folded against this frame; null when they have none. */
   plan?: PlanState | null;
-  planNames?: (registrationId: string) => string;
 }) {
   const money = useMoney();
-  const paiseSlabs = rules.slabs.map((slab) => ({
-    upTo: slab.upTo === null ? null : paise(slab.upTo),
-    step: paise(slab.step),
-  }));
-  const rungs: number[] = [];
-  let leading: number | null = lot.currentBid?.amount ?? null;
-  for (let i = 0; i < JUMP_RUNGS + 1; i += 1) {
-    const next = Number(
-      snapshotNextMinimumBid(
-        paise(lot.basePrice),
-        paiseSlabs,
-        leading === null ? null : paise(leading),
-      ),
-    );
-    rungs.push(next);
-    leading = next;
-  }
-  const [raise, ...jumps] = rungs;
-  const paddle = snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddleNumber) ?? null;
-  // DA: the engine decides "am I leading?" by TEAM, not by paddle — a holder
-  // with two paddles for one franchise cannot outbid himself. Comparing paddle
-  // numbers here made the room and the engine answer the same question two
-  // different ways. Team identity is the engine's, so it is ours.
-  const iAmLeading =
-    lot.currentBid !== null &&
-    (paddle === null
-      ? lot.currentBid.paddleNumber === myPaddleNumber
-      : snapshot?.paddles.some(
-          (entry) =>
-            entry.teamId === paddle.teamId && entry.paddleNumber === lot.currentBid?.paddleNumber,
-        ) === true);
-  // DA-12: the raise buttons stayed live when the server was certain to refuse
-  // — already leading, or a full squad — so the room invited the rejection
-  // instead of preventing it, then showed it as an enum (DA-11).
-  //
-  // DA: and the biggest of those refusals was missing. A PAUSED auction left
-  // `RAISE TO ₹15,000` gold and enabled, and the engine answered the tap with
-  // "That lot has already closed." It had not closed — it was paused. The one
-  // state the button never consulted was the auction's own.
-  const paused = snapshot !== null && snapshot.auctionStatus !== "live";
-  const squadFull = squadSigned >= rules.squadMax;
-  // MONEY IS A REFUSAL THE ROOM CAN PREDICT, TOO.
-  //
-  // The list above covers paused, already-leading and squad-full — every state
-  // where the engine is certain to say no. It never covered the purse, which
-  // is the refusal that actually happens late in a night: a captain holding
-  // ₹45,000 was shown "RAISE TO ₹50,000" in gold, enabled, with three
-  // jump-ahead rungs above it, and every press came back "That would take you
-  // past your remaining purse." The ceiling is the engine's own arithmetic
-  // (gauntlet 8 + 9) read backwards, so the two cannot drift.
-  //
-  // `purseRemaining === null` means the money was sealed for this viewer, which
-  // never happens for their OWN paddle — but if it ever did, the honest answer
-  // is to gate nothing rather than to guess a ceiling.
-  const ceiling =
-    paddle?.purseRemaining == null
-      ? null
-      : Number(
-          maxAffordableBid({
-            purseRemaining: paddle.purseRemaining,
-            squadSize: squadSigned,
-            squadMin: rules.squadMin,
-            minPossiblePrice: rules.minPossiblePrice,
-          }),
-        );
-  const tooDear = ceiling !== null && raise !== undefined && raise > ceiling;
-  const blocked = paused
-    ? snapshot.auctionStatus === "paused"
-      ? "The clock is stopped. Bidding resumes when the auctioneer restarts it."
-      : "This auction is not taking bids."
-    : iAmLeading
-      ? "You're already the highest bidder."
-      : squadFull
-        ? "Your squad is full."
-        : tooDear
-          ? ceiling === 0
-            ? "Your purse can't cover another signing at this price."
-            : `Beyond your purse. The most you can bid is ${money.ledger(ceiling)}.`
-          : null;
-  const bidsDisabled = disabled || blocked !== null;
+  const { raise, jumps, ceiling, reason } = stance;
+  const [choice, dispatch] = useReducer(jumpReducer, null);
+  const chosen = activeJump(choice, { lotId, stance, disabled: readOnly });
+  // A choice that stopped applying is gone, not dormant: it must not come back
+  // to life if the frame that invalidated it is itself undone.
+  useEffect(() => {
+    if (choice !== null && chosen === null) {
+      dispatch({ type: "clear" });
+    }
+  }, [choice, chosen]);
+
+  const locked = reason !== null;
+  const bidsDisabled = readOnly || busy || locked;
+  const amount = chosen ?? raise;
+  const label = readOnly
+    ? "Reconnecting…"
+    : reason !== null
+      ? LOCKED_LABEL[reason]
+      : amount === undefined
+        ? "—"
+        : `Bid ${money.ledger(amount)}`;
+  const planMax = plan?.currentLot?.target?.maxBid ?? null;
+  const toBuy = Math.max(0, rules.squadMin - squadSigned);
 
   return (
-    <Card data-testid="paddle-control">
-      <div className="competition-head">
-        <h2>Your paddle</h2>
-        <span className="paddle-who">
-          <PurseTeamCrest team={myTeam} fallback={myPaddleNumber} />
-          {myTeam?.name ?? myPaddleNumber}
-        </span>
+    <section
+      className="owner-bidbar"
+      data-testid="paddle-control"
+      data-chosen={chosen === null ? undefined : "true"}
+      aria-label="Your paddle"
+    >
+      <p className="owner-budget" data-testid="bid-budget">
+        {ceiling !== null ? (
+          <span>
+            You can spend up to <b>{money.ledger(ceiling)}</b>
+            {/* The purse, squad and spend are the Your-team card's (stage 3);
+                a laptop says here only why the ceiling is lower than the
+                purse. */}
+            {toBuy > 0 ? (
+              <span className="owner-budget-need">
+                {" "}
+                · {toBuy} {toBuy === 1 ? "player" : "players"} still to buy
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          <span>Your paddle</span>
+        )}
+        {planMax !== null ? (
+          <span data-testid="bid-plan-max">
+            Your plan: <b>{money.ledger(planMax)}</b>
+          </span>
+        ) : null}
+      </p>
+
+      {/* The increment ladder, made choosable — same handle it had as prose. */}
+      <div className="owner-chips" data-testid="bid-ladder" role="group" aria-label="Bigger bids">
+        {jumps.map((rung) => {
+          const unaffordable = ceiling !== null && rung > ceiling;
+          return (
+            <button
+              key={rung}
+              type="button"
+              className="owner-chip"
+              aria-pressed={chosen === rung}
+              // Each rung answers for itself: the next bid may be affordable
+              // and the third rung not.
+              disabled={bidsDisabled || unaffordable}
+              data-unaffordable={unaffordable ? "true" : undefined}
+              title={
+                unaffordable
+                  ? `Beyond your purse — the most you can bid is ${money.ledger(ceiling)}.`
+                  : undefined
+              }
+              onClick={() => {
+                dispatch({ type: "select", lotId, amount: rung });
+              }}
+              data-testid={`bid-jump-${String(rung)}`}
+            >
+              {money.ledger(rung)}
+            </button>
+          );
+        })}
       </div>
 
-      {blocked !== null ? (
-        <p
-          className="paddle-leading"
-          id="paddle-blocked"
-          data-testid="paddle-leading"
-          data-reason={
-            paused ? "paused" : iAmLeading ? "leading" : squadFull ? "squad-full" : "too-dear"
+      <button
+        type="button"
+        className="owner-bid"
+        disabled={bidsDisabled || amount === undefined}
+        aria-describedby={locked ? "paddle-blocked" : undefined}
+        onClick={() => {
+          if (amount !== undefined) {
+            onBid(amount);
           }
-          role={paused ? "status" : undefined}
-        >
-          {paused || !iAmLeading ? blocked : "You're leading this lot."}
-        </p>
-      ) : null}
+        }}
+        data-testid="bid-next"
+        data-amount={amount === undefined ? undefined : String(amount)}
+      >
+        {bidsDisabled ? null : <IconHand size={22} weight="fill" />}
+        <span>{busy && !locked && !readOnly ? "Sending your bid…" : label}</span>
+      </button>
 
-      <div className="paddle-actions">
+      {chosen !== null && raise !== undefined ? (
         <button
           type="button"
-          className="paddle-raise"
-          disabled={bidsDisabled || raise === undefined}
-          title={blocked ?? undefined}
-          aria-describedby={blocked !== null ? "paddle-blocked" : undefined}
+          className="owner-bid-back"
           onClick={() => {
-            if (raise !== undefined) {
-              onBid(raise);
-            }
+            dispatch({ type: "clear" });
           }}
-          data-testid="bid-next"
+          data-testid="bid-back"
         >
-          <span className="paddle-raise-label">Raise to</span>
-          <span className="paddle-raise-amount">
-            {raise === undefined ? "—" : money.ledger(raise)}
-          </span>
+          Back to the next bid ({money.ledger(raise)})
         </button>
-        <div className="paddle-jump">
-          <p className="paddle-jump-label">Jump ahead</p>
-          {/* The increment ladder, made pressable — same handle it had as prose. */}
-          <div className="paddle-jump-row" data-testid="bid-ladder">
-            {jumps.map((amount) => (
-              <button
-                key={amount}
-                type="button"
-                className="paddle-jump-chip"
-                // Each rung answers for itself: the raise may be affordable and
-                // the third jump not, and offering it anyway is the same
-                // invitation-to-a-refusal in miniature.
-                disabled={bidsDisabled || (ceiling !== null && amount > ceiling)}
-                title={
-                  ceiling !== null && amount > ceiling && blocked === null
-                    ? `Beyond your purse — the most you can bid is ${money.ledger(ceiling)}.`
-                    : (blocked ?? undefined)
-                }
-                onClick={() => {
-                  onBid(amount);
-                }}
-                data-testid={`bid-jump-${String(amount)}`}
-              >
-                {money.ledger(amount)}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* WR-1: the plan's one line, BELOW the raise button and above the stats —
-          never above the button, whose place at the fold is a measured budget. */}
-      {plan !== null ? <PlanLine state={plan} names={planNames} /> : null}
-
-      {/* Distinct testids from MyTeamCard's: the same three figures appear in
-          both (deliberately — a bidder shouldn't look away mid-lot), and a
-          shared handle would match twice and fail Playwright's strict mode. */}
-      {paddle !== null ? (
-        <dl className="paddle-stats">
-          <div>
-            <dt>Purse left</dt>
-            <dd className="paddle-stat-remaining" data-testid="paddle-purse">
-              {paddle.purseRemaining === null ? "—" : money.ledger(paddle.purseRemaining)}
-            </dd>
-          </div>
-          <div>
-            <dt>Committed</dt>
-            <dd data-testid="paddle-committed">
-              {paddle.committed === null ? "—" : money.ledger(paddle.committed)}
-            </dd>
-          </div>
-          <div>
-            <dt>Signed</dt>
-            <dd data-testid="paddle-signed">
-              {squadSigned}/{rules.squadMax}
-            </dd>
-          </div>
-        </dl>
       ) : null}
-    </Card>
+    </section>
   );
 }

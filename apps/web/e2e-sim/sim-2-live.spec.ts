@@ -157,11 +157,20 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
     await expect.poll(async () => leadingAmount(who.page), { timeout: 10_000 }).toBe(amount);
   };
 
-  /** One bid by `o`. `jump` = amount of a jump chip, otherwise "raise to". */
+  /**
+   * One bid by `o`. `jump` = amount of a bigger-bid chip, otherwise the next bid.
+   * A bigger bid is two steps: the chip only CHOOSES the amount, and the big
+   * button — which then names it — commits it.
+   */
   async function bid(o: Owner, expectAmount: number, jump?: number): Promise<void> {
-    const btn: Locator = jump
-      ? o.page.getByTestId(`bid-jump-${String(jump * 100)}`)
-      : o.page.getByTestId("bid-next");
+    const btn: Locator = o.page.getByTestId("bid-next");
+    if (jump) {
+      const chip = o.page.getByTestId(`bid-jump-${String(jump * 100)}`);
+      await expect(chip).toBeEnabled({ timeout: 10_000 });
+      await chip.click();
+      await expect(chip).toHaveAttribute("aria-pressed", "true");
+      await expect(btn).toHaveAttribute("data-amount", String(jump * 100));
+    }
     await expect(btn).toBeEnabled({ timeout: 10_000 });
     if (!jump) {
       const shown = points(await btn.textContent());
@@ -177,13 +186,23 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
     propagation.push(Date.now() - t);
   }
 
+  // Stage 4: a bid landing mid-hold aborts the hold ("New bid — hold again").
+  // The conductor then holds again, for the leader the label now names.
+  let gavelRestarts = 0;
   async function gavel(): Promise<void> {
     const g = org.getByTestId("cockpit-gavel");
-    await expect(g).toBeEnabled();
-    await g.hover();
-    await org.mouse.down();
-    await org.waitForTimeout(900);
-    await org.mouse.up();
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await expect(g).toBeEnabled();
+      await g.hover();
+      await org.mouse.down();
+      await org.waitForTimeout(900);
+      await org.mouse.up();
+      if (!(await org.getByTestId("cockpit-gavel-restart").isVisible())) break;
+      gavelRestarts += 1;
+      log(`   gavel: a new bid landed mid-hold — holding again (restart ${gavelRestarts})`);
+      await expect(g).toHaveAttribute("data-holding", "false");
+      if (!(await g.isVisible())) break;
+    }
     await expect(g).toBeHidden({ timeout: 20_000 });
   }
 
@@ -409,9 +428,12 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
 
   async function runRound(round: number): Promise<void> {
     for (;;) {
+      // The desk's one button names the next act: "Open next: <name>" while
+      // anyone is queued, "Complete the auction" once the queue is empty.
       const openNext = org.getByTestId("cockpit-open-next");
-      await expect(openNext).toBeVisible({ timeout: 30_000 });
-      if (await openNext.isDisabled()) break;
+      const queueDone = org.getByTestId("desk-complete");
+      await expect(openNext.or(queueDone)).toBeVisible({ timeout: 30_000 });
+      if (!(await openNext.isVisible()) || (await openNext.isDisabled())) break;
       const t0 = Date.now();
       await openNext.click();
       opened += 1;
@@ -564,10 +586,13 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
         })
         .toBe(buyer.purse);
       if (name === STAR) {
+        // The outbid toast is gone (it covered the bid controls on a phone);
+        // each owner's state line says where they stand instead — once.
         for (const o of owners) {
+          const lines = o.page.getByTestId("owner-state");
           const outbids = await o.page.getByText(/^Outbid —/).count();
-          log(`   ${o.team} sees ${outbids} "Outbid" toast(s) after the star war`);
-          if (outbids > 1) note(`${o.team}: ${outbids} Outbid toasts stacked`);
+          log(`   ${o.team} after the star war: ${await lines.count()} state line(s)`);
+          if (outbids > 0) note(`${o.team}: ${outbids} Outbid toast(s) still shown`);
         }
         await shot(board, "25-board-after-star");
         await shot(winner.page, "26-owner-after-star");
@@ -575,6 +600,7 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
 
       if (scenario === "undo") {
         // The conductor realises the gavel came down too early, and undoes it.
+        await org.getByTestId("cockpit-more").click();
         await org.getByTestId("cockpit-undo").click();
         await expect(org.getByTestId("undo-summary")).toBeVisible(COLD);
         log(`   undo: ${(await org.getByTestId("undo-summary").textContent())?.trim()}`);
@@ -624,6 +650,7 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
   for (const o of owners) await shot(o.page, `47-owner-end-${o.team.split(" ")[0]}`);
 
   // --- Close the night ----------------------------------------------------------------
+  await org.getByTestId("cockpit-more").click();
   await org.getByTestId("cockpit-complete").click();
   await org.getByRole("dialog").waitFor({ state: "visible", timeout: 20_000 });
   await shot(org, "48-complete-dialog");
@@ -656,6 +683,7 @@ test("stage 2 — the live auction, end to end", async ({ browser }) => {
     seenByRivalMs: { p50: ppct(50), p90: ppct(90), max: psorted.at(-1) },
     issues,
     budgetChecks,
+    gavelRestarts,
   };
   writeFileSync(path.join(OUT, "live-summary.json"), JSON.stringify(summary, null, 2));
   log(

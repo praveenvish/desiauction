@@ -8,18 +8,13 @@ import {
   Card,
   Dialog,
   Field,
-  IconClock,
-  IconGavel,
-  IconHome,
-  IconUser,
-  IconUsers,
-  IconWallet,
   Select,
+  Tabs,
   TeamChip,
   useToast,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import {
   submitAuctionCommand,
@@ -28,19 +23,19 @@ import {
 import { CeremonyStage } from "../ceremony-stage";
 import { useIntentIds } from "../use-intent-ids";
 import {
-  AuctionProgress,
   AuctionSummaryCard,
   AuctionTimeline,
   BidFeedList,
   ConnectionQuality,
   MyTeamCard,
+  UpNext,
   useLiveFeed,
 } from "../live-experience";
 import { PageStatus } from "../../../../../components/shell/page-status";
+import { gavelResetKey } from "../../../../../components/auction/desk-action";
 import { AuctionAnnouncer } from "../auction-announcer";
 import { GavelButton } from "../cockpit/gavel-button";
-import { LotHero } from "../lot-hero";
-import { PaddleControl } from "../paddle-control";
+import { OwnerStage, OwnerWon } from "../owner-stage";
 import { evaluateLivePlan, planNameOf } from "../plan-live";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
@@ -66,48 +61,9 @@ const AUCTION_TONE = {
   abandoned: "danger",
 } as const;
 
-/** The room's in-page map (founder mockup 5) — anchors, wide screens only. */
-const ROOM_NAV = [
-  { href: "#live-top", label: "Overview", icon: <IconHome size={18} /> },
-  { href: "#live-stage", label: "Live auction", icon: <IconGavel size={18} /> },
-  { href: "#live-squads", label: "Squads", icon: <IconUsers size={18} /> },
-  { href: "#live-pool", label: "Players", icon: <IconUser size={18} /> },
-  { href: "#live-purses", label: "Purses", icon: <IconWallet size={18} /> },
-  { href: "#live-timeline", label: "Timeline", icon: <IconClock size={18} /> },
-];
-
-/**
- * WHERE YOU ARE IN THE ROOM. The rail listed the room's sections with none
- * marked, so it read as a menu of other pages. The section nearest the top of
- * the viewport is the current one — "Overview" until anything else is.
- */
-function useActiveAnchor(hrefs: string): string {
-  const first = hrefs.split(" ")[0] ?? "";
-  const [active, setActive] = useState(first);
-  useEffect(() => {
-    const targets = hrefs
-      .split(" ")
-      .map((href) => document.getElementById(href.slice(1)))
-      .filter((node): node is HTMLElement => node !== null);
-    if (targets.length === 0 || typeof IntersectionObserver === "undefined") return undefined;
-    const visible = new Map<string, number>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) visible.set(entry.target.id, entry.boundingClientRect.top);
-          else visible.delete(entry.target.id);
-        }
-        const inView = targets.find((node) => visible.has(node.id));
-        setActive(inView === undefined ? first : `#${inView.id}`);
-      },
-      { rootMargin: "0px 0px -60% 0px" },
-    );
-    for (const node of targets) observer.observe(node);
-    return () => {
-      observer.disconnect();
-    };
-  }, [hrefs, first]);
-  return active;
+/** Scrolling that respects reduced motion. */
+function scrollBehaviour(): ScrollBehavior {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 }
 
 export function LivePanel({
@@ -138,6 +94,7 @@ export function LivePanel({
    * key names the ONE control that is actually working.
    */
   const [pending, setPending] = useState<string | null>(null);
+  const [roomTab, setRoomTab] = useState("bids");
   const intents = useIntentIds();
   const hydrated = useHydrated();
 
@@ -325,41 +282,14 @@ export function LivePanel({
     await send("bid", "PlaceBid", { lotId, paddleId: myPaddle.paddleId, amountRaw: amount });
   };
 
-  // PX-6 bidder notifications: outbid (I was leading, now someone else) and
-  // won (last outcome SOLD to my paddle). Pure observation of server truth.
-  const prevLeaderRef = useRef<string | null>(null);
-  const wonSeqRef = useRef<number>(0);
-  useEffect(() => {
-    if (snapshot === null || myPaddle === null) {
-      return;
-    }
-    const mine = myPaddle.paddleNumber;
-    const leader = snapshot.currentLot?.currentBid?.paddleNumber ?? null;
-    if (prevLeaderRef.current === mine && leader !== null && leader !== mine) {
-      const amount = snapshot.currentLot?.currentBid?.amount;
-      toast({
-        title: `Outbid — ${snapshot.currentLot?.currentBid?.teamName ?? "another team"}${amount !== undefined ? ` at ${money.ledger(amount)}` : ""}`,
-        tone: "info",
-        // One slot for "where do I stand on this lot": the newest price only.
-        group: "bid-status",
-      });
-    }
-    prevLeaderRef.current = leader;
-    const outcome = snapshot.lastOutcome;
-    if (
-      outcome !== null &&
-      outcome.atSeq > wonSeqRef.current &&
-      outcome.kind.toLowerCase() === "sold" &&
-      outcome.paddleNumber === mine
-    ) {
-      wonSeqRef.current = outcome.atSeq;
-      toast({
-        title: `You signed ${outcome.playerName ?? outcome.lotNumber}${outcome.amount !== null ? ` for ${money.ledger(outcome.amount)}` : ""}!`,
-        tone: "success",
-        group: "bid-status",
-      });
-    }
-  }, [snapshot, myPaddle, toast, money]);
+  // NO TOASTS FOR WHERE THE OWNER STANDS (live-room stage 1).
+  //
+  // The outbid toast landed at the foot of a phone — on the raise button and
+  // the jump chips, the exact controls an outbid owner reaches for next; the
+  // state line says it in place instead. The "You signed X for N!" toast went
+  // the same way: it arrived on top of the owner's own YOU WON moment
+  // (`OwnerWon`, below), which already says who, for how much, and what is left
+  // in the purse. The room's announcer says each of them for the ear.
 
   const lot = snapshot?.currentLot ?? null;
 
@@ -380,12 +310,10 @@ export function LivePanel({
     ? view.teams
     : view.teams.filter((team) => view.myTeamIds.includes(team.id));
   const myTeam = view.teams.find((team) => team.id === myPaddle?.teamId);
-  // The ring measures against the window the lot is actually running: an
+  // The clock measures against the window the lot is actually running: an
   // extended lot restarts on the anti-snipe clock, not the opening one.
   const lotDurationMs =
     ((lot?.extensions ?? 0) > 0 ? view.rules.extensionSeconds : view.rules.initialSeconds) * 1000;
-  const leadColor =
-    view.teams.find((team) => team.name === lot?.currentBid?.teamName)?.primaryColor ?? null;
   // Squad sizes counted the way the ENGINE counts them — auction buys PLUS
   // pre-signed players (aggregate.ts:835) — so every ceiling drawn from them is
   // the amount the engine will actually accept.
@@ -424,15 +352,6 @@ export function LivePanel({
   const finished = status === "completed" || status === "reconciled" || status === "abandoned";
   /** Over, and the engine never answered: say so from the record, not a skeleton. */
   const overOffline = finished && snapshot === null;
-  // The anchors this room actually draws: the timeline and pool stand down
-  // once the night is over, and a room read without the engine has no purses.
-  const roomNav = ROOM_NAV.filter(
-    (item) =>
-      (!finished || (item.href !== "#live-timeline" && item.href !== "#live-pool")) &&
-      (!overOffline || item.href !== "#live-purses"),
-  );
-  const roomNavKey = roomNav.map((item) => item.href).join(" ");
-  const activeAnchor = useActiveAnchor(roomNavKey);
   const soldCount = feed.resolved.filter((row) => row.status === "sold").length;
   const unsoldCount = feed.resolved.filter((row) => row.status === "unsold").length;
   /** The viewer's own team on a finished night: its squad and what it spent. */
@@ -446,6 +365,140 @@ export function LivePanel({
             .filter((row) => row.status === "sold" && row.teamId === myPaddle.teamId)
             .reduce((sum, row) => sum + (row.soldPrice ?? 0), 0),
         };
+
+  /**
+   * The lot just went to THIS owner's team: the ceremony is on its SOLD beat
+   * and the outcome names one of the team's paddles. Decided by team, as the
+   * engine decides leading, so a second paddle's win is still "yours".
+   */
+  const lastOutcome = snapshot?.lastOutcome ?? null;
+  const myTeamPaddles = new Set(
+    myPaddle === null
+      ? []
+      : (snapshot?.paddles ?? [])
+          .filter((entry) => entry.teamId === myPaddle.teamId)
+          .map((entry) => entry.paddleNumber)
+          .concat(myPaddle.paddleNumber),
+  );
+  const wonOutcome =
+    lot === null &&
+    ceremony.phase === "sold" &&
+    lastOutcome !== null &&
+    lastOutcome.kind === "sold" &&
+    lastOutcome.paddleNumber !== null &&
+    myTeamPaddles.has(lastOutcome.paddleNumber)
+      ? lastOutcome
+      : null;
+
+  /*
+   * THE ROOM'S TABS (stage 3) — Bids · Teams · My squad. They replace the
+   * in-page map and a phone's long scroll through every card: one panel at a
+   * time under the paddle. Every panel stays mounted (hidden, not removed), so
+   * the room's live regions and the suites' handles are always in the page.
+   */
+  const bidsPanel = (
+    <div className="live-tab-stack">
+      <div data-testid="bid-feed" className="live-bids">
+        <div className="room-card-head">
+          <h2>{lot === null ? "Bids" : `Bids on ${lot.playerName ?? lot.lotNumber}`}</h2>
+          {/* "Live" is a claim about the AUCTION, not the socket: a finished
+              room keeps its connection open. */}
+          {connection === "open" && snapshot?.auctionStatus === "live" ? (
+            <span className="live-feed-live">
+              <span className="live-pulse" aria-hidden />
+              Live
+            </span>
+          ) : null}
+        </div>
+        {lot === null || lot.bidHistory.length === 0 ? (
+          <p className="room-muted" data-testid="bid-feed-empty">
+            {lot === null
+              ? "Bids appear here once a lot opens."
+              : "Bids will appear here the moment they land."}
+          </p>
+        ) : (
+          <BidFeedList
+            bids={lot.bidHistory}
+            playerName={null}
+            teamColors={colorOfTeamName}
+            testId="bid-history"
+          />
+        )}
+      </div>
+      <div id="live-timeline">
+        <AuctionTimeline
+          feed={feed}
+          lotMedia={view.lotMedia}
+          teamColors={new Map(view.teams.map((team) => [team.name, team.primaryColor]))}
+          limit={8}
+        />
+      </div>
+    </div>
+  );
+  const teamsPanel = (
+    <div className="live-tab-stack">
+      {/* THE SEAL. A bidder sees their own purse and committed spend, the lot
+          on the block and the public bid feed — not every rival's remaining
+          money. Decided on the server (`viewer.canSeeAllPurses`) and obeyed
+          here; the conductor's board is unchanged. */}
+      {overOffline ? null : (
+        <div id="live-purses">
+          <PurseBoard
+            snapshot={snapshot}
+            teams={view.teams}
+            myPaddleNumber={myPaddle?.paddleNumber ?? null}
+            visibleTeamIds={view.viewer.canSeeAllPurses ? null : view.myTeamIds}
+            heading={view.viewer.canSeeAllPurses ? "Purses" : "Your purse"}
+            rules={view.rules}
+            squadSizes={squadSizes}
+            note={
+              view.viewer.canSeeAllPurses
+                ? null
+                : "Rivals' remaining purses are sealed — you see your own."
+            }
+          />
+        </div>
+      )}
+      {/* Sold / passed / spend / top buy are the summary's tiles once the
+          night is over — a second copy here said them all again. */}
+      {finished ? null : (
+        <div id="live-pool">
+          <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={view.preSigned} />
+        </div>
+      )}
+    </div>
+  );
+  const squadsPanel = (
+    <div id="live-squads">
+      <SquadBoard
+        roles={view.roles}
+        teams={boardTeams}
+        lotMedia={view.lotMedia}
+        preSigned={view.preSigned}
+        resolved={feed.resolved}
+        snapshot={snapshot}
+        squadMax={view.rules.squadMax}
+        showPurse={view.viewer.canSeeAllPurses}
+        collapsible={boardTeams.length > 1}
+        note={
+          view.viewer.canSeeAllSquads
+            ? null
+            : "Your squad. Every sale is called out in the room and appears in the bid feed."
+        }
+      />
+    </div>
+  );
+  const squadsLabel = view.viewer.canSeeAllSquads ? "Squads" : "My squad";
+  const roomTabs = finished
+    ? [
+        { id: "squads", label: squadsLabel, content: squadsPanel },
+        ...(overOffline ? [] : [{ id: "teams", label: "Teams", content: teamsPanel }]),
+      ]
+    : [
+        { id: "bids", label: "Bids", content: bidsPanel },
+        { id: "teams", label: "Teams", content: teamsPanel },
+        { id: "squads", label: squadsLabel, content: squadsPanel },
+      ];
 
   return (
     <div
@@ -467,6 +520,15 @@ export function LivePanel({
           offline={offline}
           lotMedia={view.lotMedia}
           settledStatus={overOffline ? status : undefined}
+          room
+          viewer={
+            myPaddle === null
+              ? undefined
+              : {
+                  teamName: myTeam?.shortName ?? myPaddle.teamName,
+                  paddleNumber: myPaddle.paddleNumber,
+                }
+          }
         />
       </PageStatus>
 
@@ -477,204 +539,181 @@ export function LivePanel({
         </p>
       ) : null}
 
-      <div className="live-layout">
-        {/* The room's map: anchors into this one page, on screens wide enough
-            to give it a column. A phone scrolls; it never sees this rail. */}
-        <nav className="live-roomnav" aria-label="In this room">
-          <ul>
-            {/* The timeline and pool cards stand down once the night is over,
-                so their anchors do too. */}
-            {roomNav.map((item) => (
-              <li key={item.href}>
-                <a
-                  href={item.href}
-                  aria-current={activeAnchor === item.href ? "location" : undefined}
-                >
-                  {item.icon}
-                  {item.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-          {/* The floating "Great auction!" rail card is gone: the wrap band
-              above the room already says it, and the card hung alone halfway
-              down an otherwise empty rail. */}
-        </nav>
+      <div className="live-main" id="live-top">
+        {snapshot !== null && snapshot.auctionStatus === "completed" ? (
+          <AuctionSummaryCard
+            snapshot={snapshot}
+            feed={feed}
+            slug={slug}
+            canConduct={view.viewer.canConduct}
+            viewerTeamName={myPaddle?.teamName ?? null}
+            teamColors={teamColors}
+          />
+        ) : null}
 
-        <div className="live-main" id="live-top">
-          {snapshot !== null && snapshot.auctionStatus === "completed" ? (
-            <AuctionSummaryCard
-              snapshot={snapshot}
-              feed={feed}
-              slug={slug}
-              canConduct={view.viewer.canConduct}
-              viewerTeamName={myPaddle?.teamName ?? null}
-              teamColors={teamColors}
-            />
-          ) : null}
-
-          {/* Two columns, as the Owner Room comp has it: the lot and the paddle
-              on the left where the eye lives, the board on the right. */}
-          <div className="live-grid" data-single={overOffline ? "" : undefined}>
-            <div className="live-col" id="live-stage">
-              {overOffline ? (
-                /* The stage used to hold a "Connecting to the auction room…"
+        {/* THE ROOM (live-room stage 3, the owner-laptop mockup): the player
+              card | the price, the sentence, the paddle and the room's tabs |
+              your team and who is up next. A phone reads the same three in
+              that order, with the paddle pinned under the thumb. */}
+        <div className="live-room-grid" data-single={overOffline ? "" : undefined}>
+          <div className="live-room-stage" id="live-stage">
+            {overOffline ? (
+              /* The stage used to hold a "Connecting to the auction room…"
                    skeleton over a finished night, and the purses a column of
                    dashes: the socket is not what a finished room needs. The
                    record is — sold and unsold from the server's own read, and
                    the doors to the full story. */
-                <Card className="live-card live-over" data-testid="live-over">
-                  <h2>This auction is over</h2>
-                  {myOutcome !== null ? (
-                    /* AN OWNER'S RESULT, not a pointer to the squads. The card
+              <Card className="live-card live-over" data-testid="live-over">
+                <h2>This auction is over</h2>
+                {myOutcome !== null ? (
+                  /* AN OWNER'S RESULT, not a pointer to the squads. The card
                        held two lines and a "See the squads" button that led to
                        the list directly beneath it; what an owner opens a
                        finished room for is where their own team landed. */
-                    <>
-                      <p className="competitions-hint">
-                        {/* The team names the figures below; the night's
+                  <>
+                    <p className="competitions-hint">
+                      {/* The team names the figures below; the night's
                             count is its own sentence (round-5 review: "Mumbai
                             Mavericks · 30 sold" read as Mumbai's 30). */}
-                        Your team: {myOutcome.teamName}. The night: {soldCount} sold · {unsoldCount}{" "}
-                        unsold. Every squad below is final.
-                      </p>
-                      <dl className="live-over-figures" data-testid="live-over-mine">
-                        <div>
-                          <dt>Squad</dt>
-                          <dd>
-                            {myOutcome.squad}
-                            <span>/{view.rules.squadMax}</span>
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Spent</dt>
-                          <dd>{money.ledger(myOutcome.spent)}</dd>
-                        </div>
-                        <div>
-                          <dt>Purse left</dt>
-                          <dd>
-                            {money.ledger(Math.max(0, view.rules.pursePerTeam - myOutcome.spent))}
-                          </dd>
-                        </div>
-                      </dl>
-                    </>
-                  ) : (
-                    <p className="competitions-hint">
-                      {soldCount} sold · {unsoldCount} unsold. Every squad below is final.
+                      Your team: {myOutcome.teamName}. The night: {soldCount} sold · {unsoldCount}{" "}
+                      unsold. Every squad below is final.
                     </p>
-                  )}
-                  {view.viewer.canConduct ? (
-                    <div className="live-over-actions">
-                      <ButtonLink
-                        href={`/seasons/${slug}/auction/ledger`}
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Read the ledger
-                      </ButtonLink>
-                      <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
-                        See the squads
-                      </ButtonLink>
-                    </div>
-                  ) : null}
-                </Card>
-              ) : lot !== null ? (
-                <>
-                  <LotHero
-                    roles={view.roles}
-                    lot={lot}
-                    remainingMs={remainingMs}
-                    lotDurationMs={lotDurationMs}
-                    leadColor={leadColor}
-                    frozen={notTakingBids}
-                    clock={clock}
-                    media={view.lotMedia[lot.lotId]}
-                  />
-                  {myPaddle !== null ? (
-                    <PaddleControl
-                      lot={lot}
-                      rules={view.rules}
-                      snapshot={snapshot}
-                      myPaddleNumber={myPaddle.paddleNumber}
-                      myTeam={myTeam}
-                      squadSigned={mySquadSigned}
-                      plan={planState}
-                      planNames={planNames}
-                      disabled={readOnly || bidBusy}
-                      onBid={(amount) => {
-                        void bid(amount);
-                      }}
-                    />
-                  ) : null}
-                </>
-              ) : (
-                /* Between lots the owner sees exactly what the room sees. */
-                <CeremonyStage
-                  roles={view.roles}
-                  snapshot={snapshot}
-                  ceremony={ceremony}
-                  remainingMs={remainingMs}
-                  lotMedia={view.lotMedia}
-                  resolved={feed.resolved}
-                  teams={view.teams}
-                />
-              )}
-
-              {/* A finished room has no bids to feed: the card used to say
-                  "Bids appear here once a lot opens" under a completed night. */}
-              {finished ? null : (
-                <Card data-testid="bid-feed" className="live-card">
-                  <div className="competition-head">
-                    <h2>Bid feed</h2>
-                    {/* "Live" is a claim about the AUCTION, not the socket: a
-                      finished room keeps its connection open, and the pill
-                      used to glow green over a completed night. */}
-                    {connection === "open" && snapshot?.auctionStatus === "live" ? (
-                      <span className="live-feed-live">
-                        <span className="live-pulse" aria-hidden />
-                        Live
-                      </span>
-                    ) : null}
+                    <dl className="live-over-figures" data-testid="live-over-mine">
+                      <div>
+                        <dt>Squad</dt>
+                        <dd>
+                          {myOutcome.squad}
+                          <span>/{view.rules.squadMax}</span>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Spent</dt>
+                        <dd>{money.ledger(myOutcome.spent)}</dd>
+                      </div>
+                      <div>
+                        <dt>Purse left</dt>
+                        <dd>
+                          {money.ledger(Math.max(0, view.rules.pursePerTeam - myOutcome.spent))}
+                        </dd>
+                      </div>
+                    </dl>
+                  </>
+                ) : (
+                  <p className="competitions-hint">
+                    {soldCount} sold · {unsoldCount} unsold. Every squad below is final.
+                  </p>
+                )}
+                {view.viewer.canConduct ? (
+                  <div className="live-over-actions">
+                    <ButtonLink
+                      href={`/seasons/${slug}/auction/ledger`}
+                      variant="secondary"
+                      size="sm"
+                    >
+                      Read the ledger
+                    </ButtonLink>
+                    <ButtonLink href={`/seasons/${slug}/teams`} variant="secondary" size="sm">
+                      See the squads
+                    </ButtonLink>
                   </div>
-                  {lot === null || lot.bidHistory.length === 0 ? (
-                    <p className="competitions-hint" data-testid="bid-feed-empty">
-                      {lot === null
-                        ? "Bids appear here once a lot opens."
-                        : "Bids will appear here the moment they land."}
-                    </p>
-                  ) : (
-                    <BidFeedList
-                      bids={lot.bidHistory}
-                      playerName={lot.playerName}
-                      teamColors={colorOfTeamName}
-                      testId="bid-history"
-                    />
-                  )}
-                </Card>
-              )}
+                ) : null}
+              </Card>
+            ) : lot !== null ? (
+              <OwnerStage
+                part="card"
+                roles={view.roles}
+                lot={lot}
+                media={view.lotMedia[lot.lotId]}
+                snapshot={snapshot}
+                rules={view.rules}
+                teams={view.teams}
+                myPaddleNumber={myPaddle?.paddleNumber ?? null}
+                squadSigned={mySquadSigned}
+                remainingMs={remainingMs}
+                lotDurationMs={lotDurationMs}
+                clock={clock}
+                frozen={notTakingBids}
+                readOnly={readOnly}
+                busy={bidBusy}
+                onBid={(amount) => {
+                  void bid(amount);
+                }}
+                plan={planState}
+                planNames={planNames}
+              />
+            ) : wonOutcome !== null && myPaddle !== null ? (
+              /* The owner's own SOLD: the same ceremony moment, told to them. */
+              <OwnerWon
+                roles={view.roles}
+                outcome={wonOutcome}
+                ceremonyKey={ceremony.key}
+                media={view.lotMedia[wonOutcome.lotId]}
+                lotMedia={view.lotMedia}
+                resolved={feed.resolved}
+                rules={view.rules}
+                purseRemaining={
+                  snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddle.paddleNumber)
+                    ?.purseRemaining ?? null
+                }
+                squadSize={squadSizes[myPaddle.teamId] ?? 0}
+              />
+            ) : (
+              /* Between lots the owner sees exactly what the room sees. */
+              <CeremonyStage
+                roles={view.roles}
+                snapshot={snapshot}
+                ceremony={ceremony}
+                remainingMs={remainingMs}
+                lotMedia={view.lotMedia}
+                resolved={feed.resolved}
+                teams={view.teams}
+              />
+            )}
+          </div>
 
-              {/* Once the night is over the timeline held one row ("passes for
-                  now"); the summary's "Watch the replay" is the full story. */}
-              {finished ? null : (
-                <div id="live-timeline" className="live-anchor">
-                  <AuctionTimeline
-                    feed={feed}
-                    lotMedia={view.lotMedia}
-                    teamColors={new Map(view.teams.map((team) => [team.name, team.primaryColor]))}
-                  />
-                </div>
-              )}
-            </div>
+          <div className="live-room-main">
+            {lot !== null && !overOffline ? (
+              <OwnerStage
+                part="bidding"
+                roles={view.roles}
+                lot={lot}
+                media={view.lotMedia[lot.lotId]}
+                snapshot={snapshot}
+                rules={view.rules}
+                teams={view.teams}
+                myPaddleNumber={myPaddle?.paddleNumber ?? null}
+                squadSigned={mySquadSigned}
+                remainingMs={remainingMs}
+                lotDurationMs={lotDurationMs}
+                clock={clock}
+                frozen={notTakingBids}
+                readOnly={readOnly}
+                busy={bidBusy}
+                onBid={(amount) => {
+                  void bid(amount);
+                }}
+                plan={planState}
+                planNames={planNames}
+              />
+            ) : null}
 
-            <div className="live-col">
+            <section className="room-card room-tabs" id="live-tabs" aria-label="The room">
+              <Tabs
+                label="The room"
+                selectedId={
+                  roomTabs.some((tab) => tab.id === roomTab) ? roomTab : (roomTabs[0]?.id ?? "")
+                }
+                onSelect={setRoomTab}
+                tabs={roomTabs}
+              />
+            </section>
+          </div>
+
+          {overOffline ? null : (
+            <aside className="live-room-rail" aria-label="Your team and who is next">
               {/* The owner workspace exists from the moment the paddle is
-                  claimed — lot or no lot. Bidding (PaddleControl, left) comes
-                  and goes with the lot; "what have I got and what can I spend"
-                  does not. */}
-              {/* Over and read from the record: the squad board below holds
-                  all twelve with their badges — a second, shorter copy of the
-                  same squad here said "10" beside "12/12". */}
-              {myPaddle !== null && !overOffline ? (
+                    claimed — lot or no lot. */}
+              {myPaddle !== null ? (
                 <MyTeamCard
                   snapshot={snapshot}
                   myTeamId={myPaddle.teamId}
@@ -685,58 +724,29 @@ export function LivePanel({
                   squadSize={squadSizes[myPaddle.teamId] ?? 0}
                   plan={planState}
                   lotMedia={view.lotMedia}
+                  team={myTeam}
+                  onShowSquad={() => {
+                    setRoomTab("squads");
+                    document
+                      .getElementById("live-tabs")
+                      ?.scrollIntoView({ behavior: scrollBehaviour(), block: "start" });
+                  }}
                 />
               ) : null}
-              {/* Unconditional now: AuctionProgress renders its own connecting
-                  state, and the guard here was what made the column re-flow when
-                  the socket answered — this component sits above the purse
-                  board, the pool summary and the squad board, so its arrival
-                  moved all three. */}
-              {finished ? null : <AuctionProgress snapshot={snapshot} />}
-              {/* THE SEAL. A bidder sees their own purse and committed spend,
-                  the lot on the block and the public bid feed — not every
-                  rival's remaining money. Decided on the server
-                  (`viewer.canSeeAllPurses`) and obeyed here; the conductor's
-                  board is unchanged. */}
-              {overOffline ? null : (
-                <div id="live-purses" className="live-anchor">
-                  <PurseBoard
-                    snapshot={snapshot}
-                    teams={view.teams}
-                    myPaddleNumber={myPaddle?.paddleNumber ?? null}
-                    visibleTeamIds={view.viewer.canSeeAllPurses ? null : view.myTeamIds}
-                    heading={view.viewer.canSeeAllPurses ? "Purses" : "Your purse"}
-                    rules={view.rules}
-                    squadSizes={squadSizes}
-                    note={
-                      view.viewer.canSeeAllPurses
-                        ? null
-                        : "Rivals' remaining purses are sealed — you see your own."
-                    }
-                  />
-                </div>
-              )}
-              {/* Sold / passed / spend / top buy are the summary's tiles once the
-                  night is over — a second copy here said them all again. */}
               {finished ? null : (
-                <div id="live-pool" className="live-anchor">
-                  <PoolSummary
-                    snapshot={snapshot}
-                    resolved={feed.resolved}
-                    preSigned={view.preSigned}
-                  />
-                </div>
+                <UpNext snapshot={snapshot} lotMedia={view.lotMedia} roles={view.roles} limit={3} />
               )}
-            </div>
-          </div>
+            </aside>
+          )}
+        </div>
 
-          {/* THE ROOM'S CONTROLS BEFORE ITS RECORD (round 3C): Conduct sat
+        {/* THE ROOM'S CONTROLS BEFORE ITS RECORD (round 3C): Conduct sat
               under three full squads — y≈2900 on a laptop, the end of a
               13,000px phone page. It follows the stage now, and on a phone a
               conductor's card leads the room (live.css). Position only: the
               gavel inside keeps its size, label and hold behaviour. */}
-          <div className="live-controls" data-conduct={view.viewer.canConduct ? "true" : "false"}>
-            {/* The claim door. Once a paddle is held, PaddleControl above owns
+        <div className="live-controls" data-conduct={view.viewer.canConduct ? "true" : "false"}>
+          {/* The claim door. Once a paddle is held, PaddleControl above owns
                 the "Your paddle" heading and states the same fact in its header,
                 so this card would be a second panel of the same name saying the
                 same thing.
@@ -745,302 +755,284 @@ export function LivePanel({
                 paddle grant yet" on a finished room. A held paddle is gone too:
                 there is nothing left to hand back, and the owner's final account
                 is the My-team card and the squads below. */}
-            {/* An organizer with no paddle grant and no team was told to "ask
+          {/* An organizer with no paddle grant and no team was told to "ask
                 the organizer" — themselves. A conductor who could only ever
                 read that sentence gets the Conduct card on its own (round 2). */}
-            {finished ||
-            (myPaddle === null &&
-              grantedTeams.length === 0 &&
-              view.myTeamIds.length === 0 &&
-              view.viewer.canConduct) ? null : (
-              <Card data-testid="paddle-panel" className="live-card">
-                <h2>{myPaddle !== null ? "Paddle status" : "Claim your paddle"}</h2>
-                {myPaddle !== null ? (
-                  <div className="paddle-status-row">
-                    <p className="paddle-status-current">
-                      <span className="paddle-status-caption">Current paddle</span>
-                      <span data-testid="my-paddle" className="registration-name">
-                        {myPaddle.paddleNumber} · bidding for {myPaddle.teamName}
-                      </span>
-                    </p>
-                    {/* Holding several paddles is legitimate — one laptop, one
+          {finished ||
+          (myPaddle === null &&
+            grantedTeams.length === 0 &&
+            view.myTeamIds.length === 0 &&
+            view.viewer.canConduct) ? null : (
+            <Card data-testid="paddle-panel" className="live-card">
+              <h2>{myPaddle !== null ? "Paddle status" : "Claim your paddle"}</h2>
+              {myPaddle !== null ? (
+                <div className="paddle-status-row">
+                  <p className="paddle-status-current">
+                    <span className="paddle-status-caption">Current paddle</span>
+                    <span data-testid="my-paddle" className="registration-name">
+                      {myPaddle.paddleNumber} · bidding for {myPaddle.teamName}
+                    </span>
+                  </p>
+                  {/* Holding several paddles is legitimate — one laptop, one
                       auctioneer, a small club. What was missing is the way to
                       say which one is bidding right now. */}
-                    {view.myPaddles.length > 1 ? (
-                      <Select
-                        label="Bidding as"
-                        name="activePaddle"
-                        value={myPaddle.paddleId}
-                        onChange={(event) => {
-                          setActivePaddleId(event.target.value);
-                        }}
-                        data-testid="paddle-switcher"
-                      >
-                        {view.myPaddles.map((entry) => (
-                          <option key={entry.paddleId} value={entry.paddleId}>
-                            {entry.paddleNumber} · {entry.teamName}
-                          </option>
-                        ))}
-                      </Select>
-                    ) : null}
-                    <Button
-                      variant="ghost"
-                      onClick={() => void release()}
-                      loading={pending === "release"}
-                      data-testid="release-paddle"
-                    >
-                      Hand back paddle
-                    </Button>
-                  </div>
-                ) : grantedTeams.length > 0 ? (
-                  <div className="date-row">
+                  {view.myPaddles.length > 1 ? (
                     <Select
-                      label="Team"
-                      name="claimTeam"
-                      value={claimTeam}
+                      label="Bidding as"
+                      name="activePaddle"
+                      value={myPaddle.paddleId}
                       onChange={(event) => {
-                        setClaimTeam(event.target.value);
+                        setActivePaddleId(event.target.value);
                       }}
+                      data-testid="paddle-switcher"
                     >
-                      <option value="">Choose…</option>
-                      {grantedTeams.map((team) => (
-                        <option key={team.id} value={team.id}>
-                          {team.name}
+                      {view.myPaddles.map((entry) => (
+                        <option key={entry.paddleId} value={entry.paddleId}>
+                          {entry.paddleNumber} · {entry.teamName}
                         </option>
                       ))}
                     </Select>
-                    <Button
-                      onClick={() => void claim()}
-                      loading={pending === "claim"}
-                      disabled={claimTeam === ""}
-                      data-testid="claim-paddle"
-                    >
-                      Claim paddle
-                    </Button>
-                  </div>
-                ) : (
-                  /* DERIVED, not asserted. This told a freshly-accepted owner to
+                  ) : null}
+                  <Button
+                    variant="ghost"
+                    onClick={() => void release()}
+                    loading={pending === "release"}
+                    data-testid="release-paddle"
+                  >
+                    Hand back paddle
+                  </Button>
+                </div>
+              ) : grantedTeams.length > 0 ? (
+                <div className="date-row">
+                  <Select
+                    label="Team"
+                    name="claimTeam"
+                    value={claimTeam}
+                    onChange={(event) => {
+                      setClaimTeam(event.target.value);
+                    }}
+                  >
+                    <option value="">Choose…</option>
+                    {grantedTeams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button
+                    onClick={() => void claim()}
+                    loading={pending === "claim"}
+                    disabled={claimTeam === ""}
+                    data-testid="claim-paddle"
+                  >
+                    Claim paddle
+                  </Button>
+                </div>
+              ) : (
+                /* DERIVED, not asserted. This told a freshly-accepted owner to
                    "accept your owner invitation" — the act they had just
                    completed to get to this page. They are in this room
                    precisely BECAUSE they accepted (`myTeamIds` is non-empty for
                    anyone who did), so the only thing left to say is the one
                    thing they can't do themselves. */
-                  <p className="competitions-hint" data-testid="no-grant-hint">
-                    {view.myTeamIds.length > 0
-                      ? "You're the owner — but a paddle is a separate step. Ask the organizer to grant your paddle; you'll be able to claim it here the moment they do."
-                      : "No paddle grant yet — ask the organizer to grant your paddle."}
-                  </p>
-                )}
-                {snapshot !== null ? (
-                  <ul className="paddle-chips">
-                    {snapshot.paddles.map((paddle) => {
-                      const mineEntry = view.myPaddles.find(
-                        (entry) => entry.paddleId === paddle.paddleId,
-                      );
-                      const active = myPaddle?.paddleId === paddle.paddleId;
-                      const body = (
-                        <>
-                          <span className="paddle-chip-head">
-                            <TeamChip color={teamColors[paddle.teamId] ?? null}>
-                              {paddle.paddleNumber}
-                            </TeamChip>
-                            <span className="paddle-chip-team">{paddle.teamName}</span>
+                <p className="competitions-hint" data-testid="no-grant-hint">
+                  {view.myTeamIds.length > 0
+                    ? "You're the owner — but a paddle is a separate step. Ask the organizer to grant your paddle; you'll be able to claim it here the moment they do."
+                    : "No paddle grant yet — ask the organizer to grant your paddle."}
+                </p>
+              )}
+              {snapshot !== null ? (
+                <ul className="paddle-chips">
+                  {snapshot.paddles.map((paddle) => {
+                    const mineEntry = view.myPaddles.find(
+                      (entry) => entry.paddleId === paddle.paddleId,
+                    );
+                    const active = myPaddle?.paddleId === paddle.paddleId;
+                    const body = (
+                      <>
+                        <span className="paddle-chip-head">
+                          <TeamChip color={teamColors[paddle.teamId] ?? null}>
+                            {paddle.paddleNumber}
+                          </TeamChip>
+                          <span className="paddle-chip-team">{paddle.teamName}</span>
+                        </span>
+                        <span className="paddle-chip-money">
+                          {paddle.purseRemaining === null || paddle.committed === null
+                            ? "purse sealed"
+                            : `purse ${money.ledger(paddle.purseRemaining)} · committed ${money.ledger(paddle.committed)}`}
+                          {paddle.released ? " · released" : ""}
+                        </span>
+                      </>
+                    );
+                    return (
+                      <li
+                        key={paddle.paddleId}
+                        data-testid={`live-paddle-${paddle.paddleNumber}`}
+                        data-released={paddle.released ? "true" : undefined}
+                      >
+                        {/* One of MY paddles is a switch; anyone else's is a fact. */}
+                        {mineEntry !== undefined && view.myPaddles.length > 1 ? (
+                          <button
+                            type="button"
+                            className="paddle-chip"
+                            aria-pressed={active}
+                            onClick={() => {
+                              setActivePaddleId(mineEntry.paddleId);
+                            }}
+                          >
+                            {body}
+                          </button>
+                        ) : (
+                          <span className="paddle-chip" data-active={active ? "true" : undefined}>
+                            {body}
                           </span>
-                          <span className="paddle-chip-money">
-                            {paddle.purseRemaining === null || paddle.committed === null
-                              ? "purse sealed"
-                              : `purse ${money.ledger(paddle.purseRemaining)} · committed ${money.ledger(paddle.committed)}`}
-                            {paddle.released ? " · released" : ""}
-                          </span>
-                        </>
-                      );
-                      return (
-                        <li
-                          key={paddle.paddleId}
-                          data-testid={`live-paddle-${paddle.paddleNumber}`}
-                          data-released={paddle.released ? "true" : undefined}
-                        >
-                          {/* One of MY paddles is a switch; anyone else's is a fact. */}
-                          {mineEntry !== undefined && view.myPaddles.length > 1 ? (
-                            <button
-                              type="button"
-                              className="paddle-chip"
-                              aria-pressed={active}
-                              onClick={() => {
-                                setActivePaddleId(mineEntry.paddleId);
-                              }}
-                            >
-                              {body}
-                            </button>
-                          ) : (
-                            <span className="paddle-chip" data-active={active ? "true" : undefined}>
-                              {body}
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </Card>
-            )}
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </Card>
+          )}
 
-            {/* Conducting ends with the auction. The card used to stay up on a
+          {/* Conducting ends with the auction. The card used to stay up on a
                 completed room — Queue lots, a gold "Open next lot", a gavel —
                 every one of them a button with nothing left to act on. */}
-            {view.viewer.canConduct && !finished ? (
-              <Card data-testid="conduct-panel" className="live-card">
-                <h2>Conduct</h2>
-                <div className="conduct-row">
-                  <Button
-                    variant="secondary"
-                    onClick={() => void send("queue", "QueueLots", {}, "Lots queued")}
-                    loading={pending === "queue"}
-                    data-testid="conduct-queue"
-                  >
-                    Queue lots
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      void send(
-                        "open-lot",
-                        "OpenLot",
-                        { lotId: snapshot?.queue[0]?.lotId ?? "" },
-                        "Lot opened",
-                      )
-                    }
-                    loading={pending === "open-lot"}
-                    disabled={(snapshot?.queue.length ?? 0) === 0 || lot !== null || notTakingBids}
-                    data-testid="conduct-open-lot"
-                  >
-                    Open next lot{snapshot?.queue[0] ? ` (${snapshot.queue[0].lotNumber})` : ""}
-                  </Button>
-                  {/* v1.1 G2: closing a lot is a HOLD, not a click — the same
+          {view.viewer.canConduct && !finished ? (
+            <Card data-testid="conduct-panel" className="live-card">
+              <h2>Conduct</h2>
+              <div className="conduct-row">
+                <Button
+                  variant="secondary"
+                  onClick={() => void send("queue", "QueueLots", {}, "Lots queued")}
+                  loading={pending === "queue"}
+                  data-testid="conduct-queue"
+                >
+                  Queue lots
+                </Button>
+                <Button
+                  onClick={() =>
+                    void send(
+                      "open-lot",
+                      "OpenLot",
+                      { lotId: snapshot?.queue[0]?.lotId ?? "" },
+                      "Lot opened",
+                    )
+                  }
+                  loading={pending === "open-lot"}
+                  disabled={(snapshot?.queue.length ?? 0) === 0 || lot !== null || notTakingBids}
+                  data-testid="conduct-open-lot"
+                >
+                  Open next lot{snapshot?.queue[0] ? ` (${snapshot.queue[0].lotNumber})` : ""}
+                </Button>
+                {/* v1.1 G2: closing a lot is a HOLD, not a click — the same
                       gate the cockpit has had all along. This panel was the one
                       place in the product where the gavel was still a single
                       tap, so the rule the cockpit enforces could be walked
                       around by opening /live. */}
-                  <GavelButton
-                    onConfirm={() => {
-                      void send("close-lot", "CloseLot", { lotId: lot?.lotId ?? "" }, "Lot closed");
-                    }}
-                    disabled={lot === null || pending === "close-lot"}
-                    testId="conduct-close-lot"
-                    describedBy="live-gavel-hint"
-                  />
-                </div>
-                <p className="competitions-hint" id="live-gavel-hint">
-                  Hold the gavel for a moment to close the lot — a tap will not do it.
-                </p>
-                <div className="conduct-row conduct-row--quiet">
-                  {snapshot?.auctionStatus === "live" ? (
-                    <Button
-                      variant="ghost"
-                      onClick={() => void send("pause", "PauseAuction", {}, "Paused")}
-                      loading={pending === "pause"}
-                      data-testid="conduct-pause"
-                    >
-                      Pause
-                    </Button>
-                  ) : null}
-                  {snapshot?.auctionStatus === "paused" ? (
-                    <Button
-                      variant="ghost"
-                      onClick={() => void send("resume", "ResumeAuction", {}, "Resumed")}
-                      loading={pending === "resume"}
-                      data-testid="conduct-resume"
-                    >
-                      Resume
-                    </Button>
-                  ) : null}
-                  {/* A finished auction cannot be completed, undone or
+                <GavelButton
+                  onConfirm={() => {
+                    void send("close-lot", "CloseLot", { lotId: lot?.lotId ?? "" }, "Lot closed");
+                  }}
+                  disabled={lot === null || pending === "close-lot"}
+                  testId="conduct-close-lot"
+                  describedBy="live-gavel-hint"
+                  resetKey={gavelResetKey(lot)}
+                />
+              </div>
+              <p className="competitions-hint" id="live-gavel-hint">
+                Hold the gavel for a moment to close the lot — a tap will not do it.
+              </p>
+              <div className="conduct-row conduct-row--quiet">
+                {snapshot?.auctionStatus === "live" ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => void send("pause", "PauseAuction", {}, "Paused")}
+                    loading={pending === "pause"}
+                    data-testid="conduct-pause"
+                  >
+                    Pause
+                  </Button>
+                ) : null}
+                {snapshot?.auctionStatus === "paused" ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => void send("resume", "ResumeAuction", {}, "Resumed")}
+                    loading={pending === "resume"}
+                    data-testid="conduct-resume"
+                  >
+                    Resume
+                  </Button>
+                ) : null}
+                {/* A finished auction cannot be completed, undone or
                       recovered — the whole card is gone once it is over. */}
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setCompleteOpen(true);
-                    }}
-                    data-testid="conduct-complete"
-                  >
-                    Close auction
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      void send("recover", "RecoverAuction", {}, "Recovered — state verified")
-                    }
-                    loading={pending === "recover"}
-                    data-testid="conduct-recover"
-                  >
-                    Recover
-                  </Button>
-                </div>
-              </Card>
-            ) : null}
-          </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setCompleteOpen(true);
+                  }}
+                  data-testid="conduct-complete"
+                >
+                  Close auction
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    void send("recover", "RecoverAuction", {}, "Recovered — state verified")
+                  }
+                  loading={pending === "recover"}
+                  data-testid="conduct-recover"
+                >
+                  Recover
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+        </div>
 
-          <div id="live-squads" className="live-anchor">
-            <SquadBoard
-              roles={view.roles}
-              teams={boardTeams}
-              lotMedia={view.lotMedia}
-              preSigned={view.preSigned}
-              resolved={feed.resolved}
-              snapshot={snapshot}
-              squadMax={view.rules.squadMax}
-              showPurse={view.viewer.canSeeAllPurses}
-              note={
-                view.viewer.canSeeAllSquads
-                  ? null
-                  : "Your squad. Every sale is called out in the room and appears in the bid feed."
-              }
-            />
-          </div>
-
-          {/* THE ROOM'S BOTTOM BAR: the doors to the other views on the left,
+        {/* THE ROOM'S BOTTOM BAR: the doors to the other views on the left,
               and — the only place raw transport words appear — the feed
               diagnostics on the right. The strip used to sit ABOVE the lot,
               restating `live`, `open`, a version and a drift figure that the
               ribbon already says in the room's own language. */}
-          <div className="live-bottombar">
-            {exits}
-            {/* A finished night the engine never answered for has no feed to
+        <div className="live-bottombar">
+          {exits}
+          {/* A finished night the engine never answered for has no feed to
                 diagnose, and the room's header already says COMPLETED — the
                 bar keeps only its doors. */}
-            {overOffline ? null : (
-              <div className="live-diagnostics" data-testid="live-diagnostics">
-                <span className="live-diagnostics-label">Feed diagnostics</span>
-                <span className="live-substatus-meta">
-                  <ConnectionQuality
-                    connection={connection}
-                    drift={drift}
-                    stale={stale}
-                    offline={offline}
-                  />
-                  <span className="competitions-hint" data-testid="snapshot-version">
-                    v{version}
-                  </span>
-                  {snapshot !== null ? (
-                    <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
-                      {snapshot.auctionStatus}
-                    </Badge>
-                  ) : null}
-                  {/* The raw socket word ("open") read like a status of the
+          {overOffline ? null : (
+            <div className="live-diagnostics" data-testid="live-diagnostics">
+              <span className="live-diagnostics-label">Feed diagnostics</span>
+              <span className="live-substatus-meta">
+                <ConnectionQuality
+                  connection={connection}
+                  drift={drift}
+                  stale={stale}
+                  offline={offline}
+                />
+                <span className="competitions-hint" data-testid="snapshot-version">
+                  v{version}
+                </span>
+                {snapshot !== null ? (
+                  <Badge tone={AUCTION_TONE[snapshot.auctionStatus]} data-testid="live-status">
+                    {snapshot.auctionStatus}
+                  </Badge>
+                ) : null}
+                {/* The raw socket word ("open") read like a status of the
                     AUCTION — it sat beside COMPLETED as "OPEN". Say what it is
                     about: the link to the room. The raw value stays on
                     data-connection for anything that needs to tell
                     "connecting" from "reconnecting". */}
-                  <Badge
-                    tone={connection === "open" ? "success" : "warning"}
-                    data-testid="connection-state"
-                    data-connection={connection}
-                  >
-                    {connection === "open" ? "Connected" : "Reconnecting"}
-                  </Badge>
-                </span>
-              </div>
-            )}
-          </div>
+                <Badge
+                  tone={connection === "open" ? "success" : "warning"}
+                  data-testid="connection-state"
+                  data-connection={connection}
+                >
+                  {connection === "open" ? "Connected" : "Reconnecting"}
+                </Badge>
+              </span>
+            </div>
+          )}
         </div>
       </div>
       <Dialog
@@ -1100,9 +1092,7 @@ export function LivePanel({
 
 /** Scroll the bidding area into view, if it is not already; instant under reduced motion. */
 function bringBiddingIntoView(target: "top" | "lot"): void {
-  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ? "auto"
-    : "smooth";
+  const behavior = scrollBehaviour();
   if (target === "top") {
     window.scrollTo({ top: 0, behavior });
     return;

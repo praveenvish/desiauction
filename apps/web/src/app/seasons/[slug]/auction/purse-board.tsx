@@ -1,7 +1,7 @@
 "use client";
 
 import { maxAffordableBid } from "@desiauction/core";
-import { Card, paintOnFill } from "@desiauction/ui";
+import { paintOnFill } from "@desiauction/ui";
 import type { AuctionSnapshot } from "@desiauction/core";
 import { CrestImage } from "../../../../components/team/crest-image";
 import { useMoney } from "../../../../components/money-unit";
@@ -352,7 +352,7 @@ export function PurseBoard({
   const rows =
     visibleTeamIds === null ? all : all.filter((row) => visibleTeamIds.includes(row.teamId));
   return (
-    <Card data-testid="purse-board">
+    <section data-testid="purse-board" className="room-card" aria-label={heading}>
       <h2>{heading}</h2>
       {note === null ? null : (
         <p className="competitions-hint" data-testid="purse-board-note">
@@ -416,6 +416,7 @@ export function PurseBoard({
                   }),
                 );
           const reserved = ceiling === null || remaining === null ? null : remaining - ceiling;
+          const phrase = row.purseRemaining === null ? null : "left";
           return (
             <li
               key={row.teamId}
@@ -445,6 +446,9 @@ export function PurseBoard({
                     : row.purseRemaining === null
                       ? "sealed"
                       : money.ledger(row.purseRemaining)}
+                  {connecting || phrase === null ? null : (
+                    <span className="purse-left-word"> {phrase}</span>
+                  )}
                 </span>
               </div>
               <div
@@ -472,17 +476,19 @@ export function PurseBoard({
                       owner deciding whether to raise, and an abbreviation they
                       have to decode is the wrong thing to put next to money. */}
                   <span>
-                    Max bid <b>{money.ledger(ceiling)}</b>
+                    Can bid up to <b>{money.ledger(ceiling)}</b>
                   </span>
-                  <span>
-                    Reserved <b>{money.ledger(reserved)}</b>
-                  </span>
+                  {reserved > 0 ? (
+                    <span>
+                      <b>{money.ledger(reserved)}</b> kept to fill the squad
+                    </span>
+                  ) : null}
                 </p>
               )}
             </li>
           );
         })}
       </ul>
-    </Card>
+    </section>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export interface HoldGateOptions {
   /** Real elapsed milliseconds required before the gate opens. */
@@ -8,6 +8,17 @@ export interface HoldGateOptions {
   /** Fired exactly once when the hold completes. */
   onConfirm: () => void;
   disabled?: boolean;
+  /**
+   * WHAT the hold is confirming. When it changes while a hold is in progress
+   * the hold ABORTS — no fire, progress back to zero — and has to be started
+   * again from nothing (a pointer press or a fresh key press; a held key's
+   * auto-repeat never restarts it). The gavel keys it on the lot, the leader
+   * and the amount, so a conductor who began selling to one team can never
+   * end up selling to another. A change while idle does nothing.
+   */
+  resetKey?: string;
+  /** Called once each time a `resetKey` change aborts a hold in progress. */
+  onReset?: () => void;
 }
 
 export interface HoldGateBind {
@@ -38,13 +49,23 @@ export function useHoldGate({
   durationMs,
   onConfirm,
   disabled = false,
+  resetKey = "",
+  onReset,
 }: HoldGateOptions): HoldGate {
   const [holding, setHolding] = useState(false);
   const [progress, setProgress] = useState(0);
   const startedAt = useRef<number | null>(null);
+  /** The `resetKey` the hold in progress was started under. */
+  const startedKey = useRef(resetKey);
   const frame = useRef<number>(0);
+  // Written during render, together: the confirm the gate would fire and the
+  // key it would fire under always come from the same render.
   const confirmRef = useRef(onConfirm);
   confirmRef.current = onConfirm;
+  const keyRef = useRef(resetKey);
+  keyRef.current = resetKey;
+  const resetRef = useRef(onReset);
+  resetRef.current = onReset;
 
   const stop = useCallback(() => {
     startedAt.current = null;
@@ -53,8 +74,24 @@ export function useHoldGate({
     setProgress(0);
   }, []);
 
+  /** The thing being confirmed changed under the hold: abort, and say so once. */
+  const abort = useCallback(() => {
+    if (startedAt.current === null) {
+      return;
+    }
+    stop();
+    resetRef.current?.();
+  }, [stop]);
+
   const tick = useCallback(() => {
     if (startedAt.current === null) {
+      return;
+    }
+    // Belt and braces with the layout effect below: a frame that lands after
+    // a render with a new key but before its commit must not fire the NEW
+    // confirm on the strength of a hold begun under the old key.
+    if (keyRef.current !== startedKey.current) {
+      abort();
       return;
     }
     const elapsed = performance.now() - startedAt.current;
@@ -65,17 +102,27 @@ export function useHoldGate({
     }
     setProgress(elapsed / durationMs);
     frame.current = requestAnimationFrame(tick);
-  }, [durationMs, stop]);
+  }, [abort, durationMs, stop]);
 
   const start = useCallback(() => {
     if (disabled || startedAt.current !== null) {
       return;
     }
     startedAt.current = performance.now();
+    startedKey.current = keyRef.current;
     setHolding(true);
     setProgress(0);
     frame.current = requestAnimationFrame(tick);
   }, [disabled, tick]);
+
+  // A layout effect, so the abort lands in the same commit that shows the new
+  // key (the new leader on the label) — before the browser paints a fill
+  // that belongs to the old one.
+  useLayoutEffect(() => {
+    if (startedAt.current !== null && startedKey.current !== resetKey) {
+      abort();
+    }
+  }, [abort, resetKey]);
 
   useEffect(() => {
     return () => {

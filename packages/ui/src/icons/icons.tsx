@@ -31,6 +31,7 @@ export { IconChevronLeft } from "./glyphs/IconChevronLeft";
 export { IconArrowLeft } from "./glyphs/IconArrowLeft";
 export { IconArrowRight } from "./glyphs/IconArrowRight";
 export { IconArrowUp } from "./glyphs/IconArrowUp";
+export { IconHand } from "./glyphs/IconHand";
 export { IconExternal } from "./glyphs/IconExternal";
 export { IconList } from "./glyphs/IconList";
 export { IconGrid } from "./glyphs/IconGrid";

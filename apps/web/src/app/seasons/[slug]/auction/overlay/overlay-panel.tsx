@@ -4,7 +4,7 @@ import { useMemo } from "react";
 
 import { lotSeed } from "../../../../../lib/player-seed";
 import { roleLabeller } from "../../../../../lib/role-label";
-import { GoldDrift, PlayerImage } from "@desiauction/ui";
+import { GoldDrift, PlayerImage, PlayerPortrait } from "@desiauction/ui";
 
 import { BrandLockup } from "../../../../../components/shell/brand";
 import { OUTCOME_TITLE, outcomeMeta } from "../ceremony-stage";
@@ -192,13 +192,13 @@ export function OverlayPanel({
           <div className="obs-lt-who">
             {facing !== null ? (
               // Compact by design: a lower third is furniture at the bottom of
-              // someone else's video, so this is the 96px step, not the hall
-              // portrait /board carries. Photo or branded mark, same box.
+              // someone else's video, so this is a small player card, not the
+              // hall portrait /board carries — the same seeded identity (or
+              // the consented photo) every phone in the room is showing.
               <figure className="obs-lt-face" data-testid="obs-lt-face">
-                <PlayerImage
+                <PlayerPortrait
                   name={facing.playerName ?? facing.lotNumber}
                   seed={lotSeed(facing.lotId, lotMedia)}
-                  size="xl"
                   src={facePhoto}
                 />
                 {/* The REGISTRATION number — the identity the player already

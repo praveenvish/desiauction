@@ -1561,8 +1561,14 @@
 .squad-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  align-items: start;
   gap: var(--space-5);
-  margin-top: var(--space-3);
+  margin: 0;
+}
+
+/* Folded teams sit closer: each is one line until it is opened. */
+.squad-grid:has(> details) {
+  gap: var(--space-2);
 }
 
 .squad-team {
@@ -1573,7 +1579,60 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.squad-team-words {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* A folded team (the conductor's page): one tappable line per franchise. */
+details.squad-team {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+details.squad-team > summary {
+  min-height: 52px;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: inherit;
+  list-style: none;
+  cursor: pointer;
+}
+
+details.squad-team > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.squad-team > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+details.squad-team > .squad-list,
+details.squad-team > .competitions-hint {
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.squad-team-caret {
+  flex: none;
+  color: var(--text-muted);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+details.squad-team[open] .squad-team-caret {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .squad-team-caret {
+    transition: none;
+  }
 }
 
 .squad-team-name {
@@ -1582,24 +1641,22 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
 
 .squad-team-count {
   flex: none;
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--text-sm-size);
   color: var(--text-muted);
 }
 
 .squad-team-purse {
-  margin: 0 0 var(--space-2);
   font-variant-numeric: tabular-nums;
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--money-remaining);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
 }
 
 /* What a squad SPENT is a fact, not a balance: ink, not the remaining-purse green. */
@@ -1703,7 +1760,7 @@
 }
 
 .squad-board-caption {
-  margin: calc(var(--space-1) * -1) 0 0;
+  margin: calc(var(--space-2) * -1) 0 0;
   font-size: var(--text-xs-size);
 }
 
@@ -1717,31 +1774,33 @@
 
 /* --- the pool: sold, unsold, still to come -------------------------------- */
 .pool-stats {
-  display: flex;
-  gap: var(--space-6);
-  flex-wrap: wrap;
-  margin: var(--space-3) 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
 }
 
 .pool-stats div {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
 }
 
 .pool-stats dt {
-  font-size: var(--text-xs-size);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .pool-stats dd {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-2xl-size);
-  line-height: 1;
-  font-weight: 600;
+  font-family: var(--font-text);
+  font-size: var(--text-xl-size);
+  line-height: 1.2;
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   color: var(--text-heading);
 }
@@ -1756,11 +1815,9 @@
 
 .pool-money {
   display: flex;
-  gap: var(--space-5);
+  gap: var(--space-1) var(--space-5);
   flex-wrap: wrap;
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border-strong);
+  margin: 0;
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
@@ -1783,14 +1840,30 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+}
+
+/* Hairline rows, as the desk's paddle list reads (stage 3). */
+.purse-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.purse-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.purse-row:last-child {
+  padding-bottom: 0;
 }
 
 .purse-head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-1);
 }
 
 /* The franchise crest. The label colour is NOT set here: it is organizer data
@@ -1805,9 +1878,10 @@
   width: 30px;
   height: 30px;
   border-radius: var(--radius-md);
-  font-family: var(--font-mono);
+  font-family: var(--font-text);
   font-size: 11px;
   font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
 }
 
 /* The uploaded crest, in the SAME 30px box as the initials chip it replaces —
@@ -1830,14 +1904,9 @@
 
 .purse-leading {
   flex: none;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent-ink);
-  font-size: 10px;
+  font-size: var(--text-xs-size);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  color: var(--text-accent);
 }
 
 .purse-team {
@@ -1846,8 +1915,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
 }
 
 /* One row per TEAM now, so the paddle numbers it holds become an attribute of
@@ -1855,10 +1925,9 @@
    paddles reads "P01 · P03 · P05" on one line with one purse. */
 .purse-paddles {
   flex: none;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .purse-paddles--none {
@@ -1869,14 +1938,20 @@
 
 .purse-left {
   flex: none;
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: var(--text-sm-size);
-  color: var(--money-remaining);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.purse-left-word {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-muted);
 }
 
 .purse-bar {
-  height: 6px;
+  height: 4px;
   border-radius: var(--radius-full);
   background: var(--surface-sunken);
   overflow: hidden;
@@ -1898,16 +1973,15 @@
   display: flex;
   flex-wrap: wrap;
   gap: 2px var(--space-4);
-  margin: var(--space-1) 0 0;
+  margin: 0;
   font-size: var(--text-xs-size);
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .purse-ceiling b {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
+  color: var(--text-heading);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2014,56 +2088,7 @@
    lot's Open button in the queue landed on the dock instead. Static keeps
    the controls reachable at the cost of the travel-with-you convenience. */
 
-.cockpit-queue {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* THE 112px BREAK, and the seven contrast failures it caused.
- *
- * `display: flex` with no `flex-wrap` on a row holding a badge, a player name,
- * a base price and two buttons cannot fit 390px, so the Withdraw button was
- * laid out at `right: 502` — outside the dark card AND outside the dark shell.
- * axe then resolved its backdrop to the light <body> behind everything and
- * reported 7 × color-contrast at 1.36 (#f3d078 on #f3f5fb). ONE missing
- * property produced both the horizontal overflow and the only axe violation on
- * the surface. The row wraps now, and the page does not. */
-.cockpit-queue li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-/* The name is what yields: it may shrink and ellipsise so the row wraps at the
-   ACTION boundary rather than mid-word. */
-.cockpit-queue li > .registration-name {
-  flex: 1 1 8ch;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cockpit-queue .queue-actions {
-  margin-left: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* WCAG 2.5.8. The 14 queue buttons measured 32px — 22 sub-44px targets on the
-   cockpit at 390 — and they are the controls an auctioneer hits fastest, under
-   the most pressure, on the smallest screen. `size="sm"` is right for the
-   density; the TARGET is what has to be 44. */
-.cockpit-queue .queue-actions button,
+.lot-queue .queue-actions button,
 .owner-row button {
   min-height: 44px;
   min-width: 44px;
@@ -2842,31 +2867,6 @@
   color: var(--text-muted);
 }
 
-/* PX-6 live experience */
-
-.live-progress {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.live-progress-bar {
-  flex: 1;
-  min-width: 120px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  overflow: hidden;
-}
-
-.live-progress-bar span {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  transition: width var(--duration-slow) var(--ease-out);
-}
-
 .live-readonly {
   margin: var(--space-2) 0 0;
   color: var(--warning-strong);
@@ -3281,98 +3281,6 @@
   outline-offset: 2px;
 }
 
-/* --- Up next: the queue that was always on the wire ------------------------ */
-.up-next-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.up-next-list li {
-  display: flex;
-  /* Centre: each line opens with the player's face (see `.squad-row`). */
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px var(--space-2);
-  padding: var(--space-2) 0;
-  border-top: 1px solid var(--border-subtle);
-  font-size: var(--text-sm-size);
-}
-
-/* The live timeline and the owner's squad list open lines with a face; a
-   baseline (or top) row would hang the text off the image's edge. Scoped by
-   modifier because `.timeline` and `.conflict-list` are shared app-wide. */
-.timeline--faces li,
-.my-squad-list li {
-  align-items: center;
-}
-
-/* One line per signing, price on the right. `.conflict-list li` wraps and
-   `.registration-name` holds a 140px floor, so on a phone every price dropped
-   under its name (~90px rows; carried over from round 1). The name gives way
-   with an ellipsis; the lot chip, face and price keep their size. */
-.my-squad-list li {
-  flex-wrap: nowrap;
-}
-
-.my-squad-list li > * {
-  flex: none;
-}
-
-/* Lot chips share one width, so the faces and names line up down the list. */
-.my-squad-list li > :first-child {
-  min-width: 5ch;
-  justify-content: center;
-}
-
-.my-squad-list .registration-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.my-squad-list .registration-phone {
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.up-next-list li:first-child {
-  border-top: 0;
-}
-
-.up-next-pos {
-  flex: none;
-  min-width: 1.5em;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-}
-
-.up-next-name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--text-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.up-next-role {
-  flex: none;
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-  text-transform: capitalize;
-}
-
-.up-next-base {
-  margin-left: auto;
-  flex: none;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-}
-
 /* The lot that just resolved, collapsed to one line above its own bid ladder —
    so the four bids that made the price survive the gavel. */
 .feed-resolved {
@@ -3380,7 +3288,6 @@
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-heading);
-  font-family: var(--font-mono);
   font-size: var(--text-sm-size);
   font-variant-numeric: tabular-nums;
 }
@@ -3411,6 +3318,30 @@
   min-height: 44px;
   touch-action: manipulation;
   user-select: none;
+}
+
+/* "New bid — hold again": a new bid aborted the hold. The region sits OUT OF
+   FLOW against the caller's positioned container (the desk bar, the /live
+   conduct row), above the gavel's top edge — it can never push, shrink or
+   move the button under a held pointer. No animation: it is a sentence. */
+.gavel-restart {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.gavel-restart-cue {
+  display: block;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--warning-base);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
 }
 
 .cockpit-gavel:disabled {

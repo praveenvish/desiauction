@@ -1,6 +1,8 @@
 .region {
   position: fixed;
-  bottom: var(--space-6);
+  /* A surface with its own controls pinned to the foot (the live room's paddle
+     on a phone) lifts toasts above them, so a notice never covers the button. */
+  bottom: var(--toast-inset-bottom, var(--space-6));
   /* A surface that owns the right edge (a side sheet) moves toasts beside it,
      so a confirmation never lands on the next control the reader reaches for. */
   right: var(--toast-inset-end, var(--space-6));

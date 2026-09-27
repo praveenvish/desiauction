@@ -289,6 +289,9 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
   await expect(organizer.getByTestId("squad-board")).toContainText(signedName);
   // DA-P0-5: undo reverses a sale, a squad and a team's money in front of a
   // hall, so it asks first and NAMES what it is about to reverse.
+  // Undo lives in the desk's More menu (live-room stage 2): a correction is
+  // one deliberate tap further away than the gavel.
+  await organizer.getByTestId("cockpit-more").click();
   await organizer.getByTestId("cockpit-undo").click();
   await expect(organizer.getByTestId("undo-summary")).toContainText("reverses the sale");
   await organizer.getByTestId("confirm-undo").click();

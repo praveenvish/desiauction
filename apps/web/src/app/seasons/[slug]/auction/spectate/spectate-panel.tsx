@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import type { AuctionSnapshot, AuctionStatus } from "@desiauction/core";
-import { Badge, Card, IconArrowRight } from "@desiauction/ui";
-import { useEffect, useState } from "react";
+import { IconArrowRight, IconUsers, PlayerPortrait } from "@desiauction/ui";
+import { useEffect, useMemo, useState } from "react";
 
 import { PageStatus } from "../../../../../components/shell/page-status";
 import { CeremonyStage } from "../ceremony-stage";
@@ -15,8 +15,8 @@ import {
   UpNext,
   useLiveFeed,
 } from "../live-experience";
-import { LotHero } from "../lot-hero";
-import { PurseBoard } from "../purse-board";
+import { LotCard, LotPrice } from "../lot-card";
+import { PurseBoard, PurseTeamCrest } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
@@ -31,6 +31,8 @@ import type {
   ResolvedLot,
 } from "../../../../../server/auction/live-summary";
 import { useHydrated } from "../../../../../lib/use-hydrated";
+import { lotSeed } from "../../../../../lib/player-seed";
+import { roleLabeller } from "../../../../../lib/role-label";
 import { useMoney } from "../../../../../components/money-unit";
 import type { MoneyFormat } from "../../../../../lib/money";
 
@@ -131,6 +133,65 @@ function ResolvedBidHeader({ outcome }: { outcome: NonNullable<AuctionSnapshot["
   );
 }
 
+/**
+ * THE LATEST SALES — who went where, for how much, newest first. What a guest
+ * who looked away for a minute asks first.
+ */
+function LatestSales({
+  resolved,
+  teams,
+  lotMedia,
+}: {
+  resolved: readonly ResolvedLot[];
+  teams: readonly TeamIdentity[];
+  lotMedia: Readonly<Record<string, LotMedia>>;
+}) {
+  const money = useMoney();
+  const sold = resolved
+    .filter((row) => row.status === "sold")
+    .slice(-3)
+    .reverse();
+  if (sold.length === 0) {
+    return null;
+  }
+  return (
+    <section
+      className="room-card"
+      data-testid="spectate-latest"
+      aria-labelledby="spectate-latest-title"
+    >
+      <h2 id="spectate-latest-title">Latest sales</h2>
+      <ul className="spectate-sales">
+        {sold.map((row) => (
+          <li key={row.lotId}>
+            <span className="room-thumb">
+              <PlayerPortrait
+                name={row.playerName ?? row.lotNumber}
+                seed={row.registrationId ?? lotSeed(row.lotId, lotMedia)}
+                src={lotMedia[row.lotId]?.photoUrl ?? null}
+                decorative
+              />
+            </span>
+            <span className="room-row-words">
+              <span className="room-row-name">{row.playerName ?? row.lotNumber}</span>
+              <span className="spectate-sale-team">
+                <PurseTeamCrest
+                  team={teams.find((team) => team.name === row.teamName)}
+                  fallback={row.teamName ?? "—"}
+                />
+                {row.teamName}
+              </span>
+            </span>
+            <span className="spectate-sale-price">
+              {row.soldPrice === null ? "—" : money.ledger(row.soldPrice)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function SpectatePanel({
   wsUrl,
   slug,
@@ -171,6 +232,7 @@ export function SpectatePanel({
   location: string | null;
 }) {
   const money = useMoney();
+  const labelOf = useMemo(() => roleLabeller(roles), [roles]);
   const { snapshot, connection, remainingMs, ceremony, stale, offline, clock } =
     useAuctionSocket(wsUrl);
   useCeremonySound({ ceremony, remainingMs, lotId: snapshot?.currentLot?.lotId ?? null });
@@ -225,8 +287,6 @@ export function SpectatePanel({
 
   const lotDurationMs =
     ((lot?.extensions ?? 0) > 0 ? rules.extensionSeconds : rules.initialSeconds) * 1000;
-  const leadColor =
-    teams.find((team) => team.name === lot?.currentBid?.teamName)?.primaryColor ?? null;
   const status = snapshot?.auctionStatus ?? null;
   // Over is decided by the snapshot when there is one, and by the server's
   // record until then: a finished night used to open on the live layout — an
@@ -259,7 +319,7 @@ export function SpectatePanel({
   const bids = liveBids ?? heldBids;
 
   const squadBoard = (
-    <div className="stage-hide">
+    <div className="stage-hide" id="spectate-squads">
       <SquadBoard
         roles={roles}
         teams={teams}
@@ -293,6 +353,10 @@ export function SpectatePanel({
           offline={offline}
           lotMedia={lotMedia}
           settledStatus={auctionStatus}
+          /* The room's one-line header (stage 3): the lot, the bid and the
+             clock are on the player card right under it, so the strip keeps
+             them for the ear (its live region) and not twice for the eye. */
+          room
         />
       </PageStatus>
       <SaleAnnouncer snapshot={snapshot} />
@@ -346,34 +410,130 @@ export function SpectatePanel({
           ₹50,000 · 9s" on screen twice, one above the other. The hero is the
           windowed view; the ceremony is the big screen, the paused freeze, the
           completed wrap and the between-lot SOLD/UNSOLD splash. */}
-      {showCeremony ? (
-        <CeremonyStage
-          roles={roles}
-          snapshot={snapshot}
-          ceremony={ceremony}
-          remainingMs={remainingMs}
-          lotMedia={lotMedia}
-          stampSize={stage ? "stage" : "lg"}
-          resolved={feed.resolved}
-          teams={teams}
-          serverStatus={auctionStatus}
-        />
-      ) : (
-        <div className="stage-hide">
-          <LotHero
-            roles={roles}
-            lot={lot}
-            remainingMs={remainingMs}
-            lotDurationMs={lotDurationMs}
-            leadColor={leadColor}
-            clock={clock}
-            media={lotMedia[lot.lotId]}
-            /* The guest's stage: the person on the block, large. */
-            face="lg"
-            testId="spectate-lot"
-          />
+      {/* THE STAGE (live-room stage 3): the player card every role reads, the
+          price and who holds it, the bids as they land, the latest sales and
+          the two things a guest does next — see the squads, send the link.
+          A phone reads it top to bottom; a laptop puts the card beside it. */}
+      <div className="spectate-room" data-lot={showCeremony ? "false" : "true"}>
+        <div className="spectate-room-stage">
+          {showCeremony ? (
+            <CeremonyStage
+              roles={roles}
+              snapshot={snapshot}
+              ceremony={ceremony}
+              remainingMs={remainingMs}
+              lotMedia={lotMedia}
+              stampSize={stage ? "stage" : "lg"}
+              resolved={feed.resolved}
+              teams={teams}
+              serverStatus={auctionStatus}
+            />
+          ) : (
+            <section
+              key={lot.lotId}
+              className="stage-hide spectate-lot"
+              data-testid="spectate-lot"
+              aria-label="On the block"
+            >
+              <LotCard
+                name={lot.playerName ?? "Unnamed"}
+                seed={lotSeed(lot.lotId, lotMedia)}
+                photoUrl={lotMedia[lot.lotId]?.photoUrl ?? null}
+                roleLabel={lot.role === "" ? null : labelOf(lot.role)}
+                onBlock
+                kicker={
+                  <>
+                    {lot.lotNumber}
+                    {(lotMedia[lot.lotId]?.number ?? null) === null
+                      ? null
+                      : ` · #${String(lotMedia[lot.lotId]?.number)}`}{" "}
+                    · base {money.ledger(lot.basePrice)}
+                    {lot.extensions > 0 ? (
+                      <span className="lot-card-ext" data-testid="lot-extensions">
+                        {" "}
+                        · +{lot.extensions} extension{lot.extensions === 1 ? "" : "s"}
+                      </span>
+                    ) : null}
+                  </>
+                }
+                clock={{
+                  remainingMs,
+                  totalMs: lotDurationMs,
+                  clock,
+                  frozen,
+                  extensions: lot.extensions,
+                }}
+              />
+            </section>
+          )}
         </div>
-      )}
+
+        {finished ? null : (
+          <div className="spectate-room-main stage-hide">
+            {!showCeremony ? (
+              <LotPrice basePrice={lot.basePrice} bid={lot.currentBid} teams={teams} />
+            ) : null}
+            <section
+              className="room-card"
+              data-testid="spectate-history"
+              aria-labelledby="spectate-bids-title"
+            >
+              <div className="room-card-head">
+                <h2 id="spectate-bids-title">Bids</h2>
+                {connection === "open" && status === "live" ? (
+                  <span className="live-pulse" aria-hidden />
+                ) : null}
+              </div>
+              {/* A log region, permanently mounted (a screen reader only tracks
+                  regions that existed at load), so bids are heard as they land
+                  rather than discovered afterwards. The role goes on the wrapper,
+                  never on the <ol> — `role="log"` there replaces the list's own
+                  role and orphans every <li> under it. */}
+              <div role="log" aria-live="polite" aria-label="Bid feed, newest first">
+                {heldBids !== null && outcome !== null ? (
+                  <ResolvedBidHeader outcome={outcome} />
+                ) : null}
+                {bids === null ? (
+                  <p className="room-muted" data-testid="spectate-feed-empty">
+                    {/* No "the auction is over" branch: a finished auction
+                        never renders this card (see above). */}
+                    {lot !== null
+                      ? "Bids will appear here the moment they land."
+                      : // The guard asks whether there is anyone left to sell,
+                        // not whether the AUCTION is over.
+                        (snapshot?.queue.length ?? 0) > 0
+                        ? "That lot is done. The next player is coming up."
+                        : (snapshot?.lotsResolved ?? 0) > 0
+                          ? "That was the last player in the queue."
+                          : "Bids appear here once a lot opens."}
+                  </p>
+                ) : (
+                  <ol className="spectate-bids">
+                    {[...bids]
+                      .reverse()
+                      .slice(0, 6)
+                      .map((entry, index) => (
+                        <li key={entry.bidId} data-leading={index === 0 ? "true" : undefined}>
+                          <PurseTeamCrest
+                            team={teams.find((team) => team.name === entry.teamName)}
+                            fallback={entry.teamName}
+                          />
+                          <span className="spectate-bid-team">{entry.teamName}</span>
+                          <span className="spectate-bid-amount">{money.ledger(entry.amount)}</span>
+                        </li>
+                      ))}
+                  </ol>
+                )}
+              </div>
+            </section>
+            <LatestSales resolved={feed.resolved} teams={teams} lotMedia={lotMedia} />
+            <a className="room-more spectate-squads-link" href="#spectate-squads">
+              <IconUsers size={18} aria-hidden />
+              See every team&apos;s squad
+            </a>
+          </div>
+        )}
+      </div>
 
       <div className="stage-hide">
         <ShareAuction
@@ -418,52 +578,6 @@ export function SpectatePanel({
         <div className="live-grid stage-hide">
           <>
             <div className="live-col">
-              <Card data-testid="spectate-history">
-                <div className="competition-head">
-                  <h2>Bid feed</h2>
-                  {connection === "open" && status === "live" ? (
-                    <span className="live-pulse" aria-hidden />
-                  ) : null}
-                </div>
-                {/* A log region, permanently mounted (a screen reader only tracks
-                  regions that existed at load), so bids are heard as they land
-                  rather than discovered afterwards. The role goes on the wrapper,
-                  never on the <ol> — `role="log"` there replaces the list's own
-                  role and orphans every <li> under it. */}
-                <div role="log" aria-live="polite" aria-label="Bid feed, newest first">
-                  {heldBids !== null && outcome !== null ? (
-                    <ResolvedBidHeader outcome={outcome} />
-                  ) : null}
-                  {bids === null ? (
-                    <p className="competitions-hint" data-testid="spectate-feed-empty">
-                      {/* No "the auction is over" branch: a finished auction
-                          never renders this card (see above). */}
-                      {lot !== null
-                        ? "Bids will appear here the moment they land."
-                        : // "The next player is coming up" rendered 400px from
-                          // "REMAINING 0" and "2/2 lots · 0 in queue": the guard
-                          // asked whether the AUCTION was over, not whether there
-                          // was anyone left to sell.
-                          (snapshot?.queue.length ?? 0) > 0
-                          ? "That lot is done. The next player is coming up."
-                          : (snapshot?.lotsResolved ?? 0) > 0
-                            ? "That was the last player in the queue."
-                            : "Bids appear here once a lot opens."}
-                    </p>
-                  ) : (
-                    <ol className="timeline">
-                      {[...bids].reverse().map((entry) => (
-                        <li key={entry.bidId}>
-                          <Badge tone="neutral">{entry.paddleNumber}</Badge>
-                          <span>{entry.teamName}</span>
-                          <span className="timeline-at">{money.ledger(entry.amount)}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </div>
-              </Card>
-
               <AuctionTimeline
                 feed={feed}
                 lotMedia={lotMedia}
@@ -484,7 +598,7 @@ export function SpectatePanel({
                   squadSizes={squadSizesOf(teams, preSigned, feed.resolved)}
                 />
               </div>
-              <UpNext snapshot={snapshot} lotMedia={lotMedia} />
+              <UpNext snapshot={snapshot} lotMedia={lotMedia} roles={roles} />
               <PoolSummary snapshot={snapshot} resolved={feed.resolved} preSigned={preSigned} />
               {/* Same reason as the live room and the cockpit: the component renders
                 its own connecting state, so guarding it here would move everything

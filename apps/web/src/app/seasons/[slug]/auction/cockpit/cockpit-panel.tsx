@@ -12,25 +12,22 @@ import {
   Field,
   IconClock,
   IconList,
-  PlayerImage,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  COCKPIT_SHORTCUTS,
-  resolveKeyDown,
-  resolveKeyUp,
-} from "../../../../../components/auction/cockpit-keys";
+import { resolveKeyDown, resolveKeyUp } from "../../../../../components/auction/cockpit-keys";
+import { deskActionOf } from "../../../../../components/auction/desk-action";
 import {
   lotsNeedingResolution,
   unsoldToRequeue,
 } from "../../../../../components/auction/needs-resolution";
 import { HashTabs } from "../../../../../components/hash-tabs/hash-tabs";
 import { formatDateTime } from "../../../../../lib/format-date";
-import { lotSeed } from "../../../../../lib/player-seed";
 import { personContact } from "../../../../../lib/person-label";
-import { GavelButton, type GavelHandle } from "./gavel-button";
+import { ConductorDesk, type DeskControls } from "./conductor-desk";
+import { BaseDetail, LotQueueList } from "./lot-queue";
+import type { GavelHandle } from "./gavel-button";
 import type { CockpitView } from "../../../../../server/auction/conduct-actions";
 // Straight from its own module: a "use server" file may export only async
 // functions, and Turbopack compiled its `export type` re-export into a real
@@ -48,7 +45,7 @@ import { BroadcastLinks } from "../broadcast-links";
 import { CeremonyStage } from "../ceremony-stage";
 import { PurseBoard } from "../purse-board";
 import { PoolSummary, SquadBoard, squadSizesOf } from "../squad-board";
-import { AuctionProgress, BidFeedList, useLiveFeed } from "../live-experience";
+import { useLiveFeed } from "../live-experience";
 import { StatusRibbon } from "../status-ribbon";
 import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
@@ -90,7 +87,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
   // neither. The auctioneer could hold the gavel over a snapshot the engine had
   // stopped confirming, with a green badge on screen — /live has had a
   // role="alert" staleness banner all along and the CONDUCTING surface had none.
-  const { snapshot, connection, remainingMs, ceremony, stale, offline } = useAuctionSocket(
+  const { snapshot, connection, remainingMs, ceremony, stale, offline, clock } = useAuctionSocket(
     view.wsUrl,
   );
   /*
@@ -376,12 +373,6 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
    * skeleton under a RECONNECTING chip, beside a card saying the night was over.
    */
   const overOffline = finished && snapshot === null;
-  /**
-   * Nothing told the auctioneer that NOBODY was holding a paddle. Opening the
-   * first lot into an empty room is a mistake you only discover from silence.
-   */
-  const claimedPaddles = (snapshot?.paddles ?? []).filter((paddle) => !paddle.released);
-  const nextLot = queue[0] ?? null;
   // Reconciled with the socket so it moves on the same frame as the queue —
   // see needs-resolution.ts for the double listing this used to show.
   const needsResolution = useMemo(
@@ -470,6 +461,63 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       ),
   );
 
+  /*
+   * THE DESK'S ONE BUTTON (live-room stage 2): which act the room is waiting
+   * for, named. Pure (desk-action.ts, unit-tested); the handlers below are the
+   * same commands the old Conduct card's buttons sent, keyed the same way.
+   */
+  const action = deskActionOf({
+    status,
+    connected: snapshot !== null,
+    lot,
+    queue,
+  });
+  const squadSizes = squadSizesOf(view.teams, view.preSigned, feed.resolved);
+  const deskControls: DeskControls = {
+    primary: () => {
+      switch (action.kind) {
+        case "queue-lots":
+          void send("queue", "QueueLots", {}, "Lots queued");
+          return;
+        case "open-auction":
+          void send("open-auction", "OpenAuction", {}, "Auction opened");
+          return;
+        case "resume":
+          void send("resume", "ResumeAuction", {}, "Resumed");
+          return;
+        case "open-next":
+          void send(
+            "open-next",
+            "OpenLot",
+            { lotId: action.lotId },
+            `${action.lotNumber} on the block`,
+          );
+          return;
+        default:
+          return;
+      }
+    },
+    gavel: () => {
+      if (lot !== null) {
+        void send("close-lot", "CloseLot", { lotId: lot.lotId }, "Gavel — lot closed");
+      }
+    },
+    pause: () => void send("pause", "PauseAuction", {}, "Paused"),
+    freeze: () => {
+      if (lot !== null) {
+        void send("freeze", "HoldLot", { lotId: lot.lotId }, "Lot frozen");
+      }
+    },
+    undo: () => {
+      setUndoOpen(true);
+    },
+    recover: () => void send("recover", "RecoverAuction", {}, "Recovered — state verified"),
+    complete: () => {
+      setCompleteOpen(true);
+    },
+    queueLots: () => void send("queue", "QueueLots", {}, "Lots queued"),
+  };
+
   return (
     <div
       className="competitions-stack"
@@ -489,6 +537,8 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
           offline={offline}
           lotMedia={view.lotMedia}
           settledStatus={overOffline ? status : undefined}
+          room
+          viewer={{ label: "Conducting" }}
         />
       </PageStatus>
 
@@ -503,289 +553,106 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         </p>
       ) : null}
 
-      <div className="cockpit-grid">
-        <div className="cockpit-col">
-          {/* THE DOCK. The cockpit runs to 1831px — two full screens at 1440×900
-              — and at the moment the gavel was pressed the ceremony was entirely
-              off-screen: the auctioneer could not see the lot and reach the
-              gavel at the same time. The lot and the controls that act on it now
-              travel together down the page. */}
-          <div className="cockpit-dock">
-            {overOffline ? null : (
-              <CeremonyStage
-                roles={view.roles}
-                snapshot={snapshot}
-                ceremony={ceremony}
-                remainingMs={remainingMs}
-                lotMedia={view.lotMedia}
-                resolved={feed.resolved}
-                teams={view.teams}
-              />
-            )}
-
-            {/* THE CONDUCT CARD, in three tiers.
-              It used to be one flat row at equal weight — Pause · Queue lots ·
-              Undo · Recover engine · Complete — every one of them enabled on a
-              `scheduled` auction the engine would refuse, with the routine and
-              the irreversible pressed against each other. And the primary act of
-              the night, opening the next lot, HAD NO BUTTON HERE AT ALL: the
-              auctioneer had to find it in the queue list below, while /live's
-              weaker panel had "Open next lot (L001)" all along. */}
-            <Card data-testid="conduct-card">
-              {/* Once the night is over this card is the door to the record,
-                  not a panel of controls: "Conduct" over nothing to conduct. */}
-              <h2>{finished ? "The record" : "Conduct"}</h2>
-
-              {live && claimedPaddles.length === 0 ? (
-                <p className="cockpit-warn" data-testid="cockpit-no-paddles">
-                  No paddles are claimed. Opening a lot now puts a player on the block in an empty
-                  room.
+      {finished ? (
+        /* Once the night is over the desk is the door to the record, not a
+           panel of controls: "Conduct" over nothing to conduct. */
+        <div className="cockpit-over">
+          {overOffline ? null : (
+            <CeremonyStage
+              roles={view.roles}
+              snapshot={snapshot}
+              ceremony={ceremony}
+              remainingMs={remainingMs}
+              lotMedia={view.lotMedia}
+              resolved={feed.resolved}
+              teams={view.teams}
+            />
+          )}
+          <Card data-testid="conduct-card">
+            <h2>The record</h2>
+            <div className="cockpit-record">
+              <p className="competitions-hint" data-testid="cockpit-finished">
+                This auction is {status}. Nothing here can be opened, undone or recovered — the
+                ledger and the replay are the record now.
+              </p>
+              {overOffline ? (
+                <p className="cockpit-record-line" data-testid="cockpit-record-line">
+                  <strong>{feed.resolved.filter((row) => row.status === "sold").length}</strong>{" "}
+                  sold ·{" "}
+                  <strong>{feed.resolved.filter((row) => row.status === "unsold").length}</strong>{" "}
+                  unsold · every squad below is final
                 </p>
               ) : null}
-
-              <div className="cockpit-actions cockpit-actions--primary">
-                {status === "scheduled" ? (
-                  <Button
-                    onClick={() => void send("open-auction", "OpenAuction", {}, "Auction opened")}
-                    loading={pending === "open-auction"}
-                    disabled={stale}
-                    data-testid="cockpit-open-auction"
-                  >
-                    Open auction
-                  </Button>
-                ) : null}
-                {lot === null && !finished ? (
-                  <Button
-                    onClick={() => {
-                      if (nextLot !== null) {
-                        void send(
-                          "open-next",
-                          "OpenLot",
-                          { lotId: nextLot.lotId },
-                          `${nextLot.lotNumber} on the block`,
-                        );
-                      }
-                    }}
-                    loading={pending === "open-next"}
-                    disabled={nextLot === null || !live || stale}
-                    data-testid="cockpit-open-next"
-                  >
-                    Open next lot{nextLot !== null ? ` (${nextLot.lotNumber})` : ""}
-                  </Button>
-                ) : null}
-                {lot !== null ? (
-                  <>
-                    {/* v1.1 G2: closing a lot is a HOLD, not a click. It is no
-                      longer taken away because some other command is in flight —
-                      only because the snapshot under it cannot be trusted. */}
-                    <GavelButton
-                      ref={gavelRef}
-                      disabled={stale || pending === "close-lot"}
-                      onConfirm={() => {
-                        void send(
-                          "close-lot",
-                          "CloseLot",
-                          { lotId: lot.lotId },
-                          "Gavel — lot closed",
-                        );
-                      }}
-                    />
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        void send("freeze", "HoldLot", { lotId: lot.lotId }, "Lot frozen")
-                      }
-                      loading={pending === "freeze"}
-                      disabled={stale}
-                      data-testid="cockpit-freeze"
-                    >
-                      Freeze lot
-                    </Button>
-                  </>
-                ) : null}
-                {live ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => void send("pause", "PauseAuction", {}, "Paused")}
-                    loading={pending === "pause"}
-                    disabled={stale}
-                    data-testid="cockpit-pause"
-                  >
-                    Pause
-                  </Button>
-                ) : null}
-                {status === "paused" ? (
-                  <Button
-                    onClick={() => void send("resume", "ResumeAuction", {}, "Resumed")}
-                    loading={pending === "resume"}
-                    disabled={stale}
-                    data-testid="cockpit-resume"
-                  >
-                    Resume
-                  </Button>
-                ) : null}
+              <div className="cockpit-actions">
+                <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
+                  <IconList size={16} />
+                  Open the ledger
+                </ButtonLink>
+                <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="ghost">
+                  <IconClock size={16} />
+                  Watch the replay
+                </ButtonLink>
               </div>
+            </div>
+          </Card>
+        </div>
+      ) : (
+        <ConductorDesk
+          roles={view.roles}
+          snapshot={snapshot}
+          ceremony={ceremony}
+          remainingMs={remainingMs}
+          clock={clock}
+          lotMedia={view.lotMedia}
+          teams={view.teams}
+          rules={view.rules}
+          squadSizes={squadSizes}
+          status={status}
+          action={action}
+          stale={stale}
+          pending={pending}
+          canOverride={view.viewer.canOverride}
+          undoable={undoTarget !== null}
+          gavelRef={gavelRef}
+          controls={deskControls}
+        />
+      )}
 
-              {/* v1.1 G1: shortcuts are discoverable, not folklore. And
-                  absent once the night is over: key hints for opening lots
-                  sat directly above "Nothing here can be opened". */}
-              {finished ? null : (
-                <p className="cockpit-keys" id="cockpit-gavel-hint" data-testid="cockpit-shortcuts">
-                  {COCKPIT_SHORTCUTS.map((shortcut) => (
-                    <span key={shortcut.keys}>
-                      <kbd>{shortcut.keys}</kbd> {shortcut.label}
-                    </span>
-                  ))}
-                </p>
-              )}
-
-              {finished ? (
-                <div className="cockpit-record">
-                  <p className="competitions-hint" data-testid="cockpit-finished">
-                    This auction is {status}. Nothing here can be opened, undone or recovered — the
-                    ledger and the replay are the record now.
-                  </p>
-                  {overOffline ? (
-                    <p className="cockpit-record-line" data-testid="cockpit-record-line">
-                      <strong>{feed.resolved.filter((row) => row.status === "sold").length}</strong>{" "}
-                      sold ·{" "}
-                      <strong>
-                        {feed.resolved.filter((row) => row.status === "unsold").length}
-                      </strong>{" "}
-                      unsold · every squad below is final
-                    </p>
-                  ) : null}
-                  <div className="cockpit-actions">
-                    <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
-                      <IconList size={16} />
-                      Open the ledger
-                    </ButtonLink>
-                    <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="ghost">
-                      <IconClock size={16} />
-                      Watch the replay
-                    </ButtonLink>
-                  </div>
-                </div>
-              ) : (
-                <div className="cockpit-secondary">
-                  <h3 className="cockpit-group-title">Setup</h3>
-                  <div className="cockpit-actions">
-                    <Button
-                      variant="secondary"
-                      onClick={() => void send("queue", "QueueLots", {}, "Lots queued")}
-                      loading={pending === "queue"}
-                      disabled={stale}
-                      data-testid="cockpit-queue-lots"
-                    >
-                      Queue lots
-                    </Button>
-                  </div>
-
-                  <h3 className="cockpit-group-title cockpit-group-title--grave">
-                    Corrections — these change the record
-                  </h3>
-                  <div className="cockpit-actions">
-                    {view.viewer.canOverride ? (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          setUndoOpen(true);
-                        }}
-                        disabled={undoTarget === null || !live || stale}
-                        data-testid="cockpit-undo"
-                      >
-                        Undo last action
-                      </Button>
-                    ) : null}
-                    <Button
-                      variant="ghost"
-                      onClick={() =>
-                        void send("recover", "RecoverAuction", {}, "Recovered — state verified")
-                      }
-                      loading={pending === "recover"}
-                      disabled={stale}
-                      data-testid="cockpit-recover"
-                    >
-                      Recover engine
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setCompleteOpen(true);
-                      }}
-                      disabled={stale}
-                      data-testid="cockpit-complete"
-                    >
-                      Complete auction
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </div>
-
-          {/* The auctioneer was the only surface without a running record of
-              the bidding — owner, spectate and replay all had one. */}
-          {/* Over is over: the feed only ever said "every bid is in the
-              ledger", and the record card above is that door. */}
-          {finished ? null : (
-            <Card data-testid="cockpit-bid-feed">
-              <div className="competition-head">
-                <h2>Bid feed</h2>
-                {lot !== null ? (
-                  <span className="competitions-hint">{lot.lotNumber} on the block</span>
-                ) : null}
-              </div>
-              {lot === null || lot.bidHistory.length === 0 ? (
-                <p className="competitions-hint" data-testid="cockpit-bid-feed-empty">
-                  {lot === null
-                    ? "Open a lot and the bidding shows up here."
-                    : "Awaiting the first paddle…"}
-                </p>
-              ) : (
-                <BidFeedList
-                  bids={lot.bidHistory}
-                  playerName={lot.playerName}
-                  teamColors={new Map(view.teams.map((team) => [team.name, team.primaryColor]))}
-                />
-              )}
-            </Card>
-          )}
-
+      <div className="cockpit-grid cockpit-lower">
+        <div className="cockpit-col">
           {finished && queue.length === 0 && needsResolution.length === 0 ? null : (
-            <Card data-testid="queue-card">
+            <section data-testid="queue-card" className="room-card" aria-label="Lot queue">
               {/* A finished night has no queue: the card keeps only its list of
-                who went unsold. */}
+                  who went unsold. */}
               {finished && queue.length === 0 ? null : (
-                <div className="competition-head">
+                <div className="room-card-head">
                   <h2>Lot queue</h2>
-                  <span className="competitions-hint">skip &amp; bring-forward</span>
+                  <span className="room-muted">
+                    {queue.length === 0 ? "empty" : `${String(queue.length)} to go`}
+                  </span>
                 </div>
               )}
               {finished && queue.length === 0 ? null : queue.length === 0 ? (
-                <p className="competitions-hint" data-testid="queue-empty">
+                <p className="room-muted" data-testid="queue-empty">
                   No queued lots.
                 </p>
               ) : (
-                <ol className="cockpit-queue">
-                  {queue.map((entry) => (
-                    <li key={entry.lotId} data-testid={`queue-${entry.lotNumber}`}>
-                      <Badge tone="info">{entry.lotNumber}</Badge>
-                      <PlayerImage
-                        name={entry.playerName ?? "Unnamed"}
-                        seed={lotSeed(entry.lotId, view.lotMedia)}
-                        src={view.lotMedia[entry.lotId]?.photoUrl}
-                        size="sm"
-                        shape="round"
-                        decorative
-                      />
-                      <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
-                      <span className="competitions-hint">
-                        base {money.ledger(entry.basePrice)}
-                      </span>
-                      <span className="queue-actions">
+                <LotQueueList
+                  label="Queued lots"
+                  roles={view.roles}
+                  lotMedia={view.lotMedia}
+                  rows={queue.map((entry) => ({
+                    id: entry.lotId,
+                    lotNumber: entry.lotNumber,
+                    playerName: entry.playerName,
+                    role: entry.role,
+                    detail: <BaseDetail basePrice={entry.basePrice} />,
+                    testId: `queue-${entry.lotNumber}`,
+                    actions: (
+                      <>
                         <Button
                           size="sm"
+                          variant="secondary"
                           onClick={() =>
                             void send(
                               `open-${entry.lotId}`,
@@ -797,6 +664,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                           loading={pending === `open-${entry.lotId}`}
                           disabled={lot !== null || !live || stale}
                           data-testid={`open-${entry.lotNumber}`}
+                          aria-label={`Open ${entry.lotNumber}, ${entry.playerName ?? "unnamed"}`}
                         >
                           Open
                         </Button>
@@ -814,13 +682,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                           loading={pending === `withdraw-${entry.lotId}`}
                           disabled={stale}
                           data-testid={`withdraw-${entry.lotNumber}`}
+                          aria-label={`Withdraw ${entry.lotNumber}, ${entry.playerName ?? "unnamed"}`}
                         >
                           Withdraw
                         </Button>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
+                      </>
+                    ),
+                  }))}
+                />
               )}
               {needsResolution.length > 0 ? (
                 <>
@@ -877,35 +746,36 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                       </Button>
                     </div>
                   ) : null}
-                  <ol className="cockpit-queue">
-                    {needsResolution.map((entry) => (
-                      <li key={entry.id} data-testid={`resolve-${entry.lotNumber}`}>
-                        <Badge tone={finished ? "neutral" : "warning"}>{entry.lotNumber}</Badge>
-                        <PlayerImage
-                          name={entry.playerName ?? "Unnamed"}
-                          seed={lotSeed(entry.id, view.lotMedia)}
-                          src={view.lotMedia[entry.id]?.photoUrl}
-                          size="sm"
-                          shape="round"
-                          decorative
-                        />
-                        <span className="registration-name">{entry.playerName ?? "Unnamed"}</span>
-                        <span className="competitions-hint">{entry.status}</span>
-                        {finished ? null : (
-                          <span className="queue-actions">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() =>
-                                void send(
-                                  `requeue-${entry.id}`,
-                                  "RequeueLot",
-                                  { lotId: entry.id },
-                                  `${entry.lotNumber} requeued`,
-                                )
-                              }
-                              loading={pending === `requeue-${entry.id}`}
-                              /* `finished` for the same reason "Invite owner"
+                  <LotQueueList
+                    label={finished ? "Lots not sold" : "Lots that need resolving"}
+                    tone="attention"
+                    roles={view.roles}
+                    lotMedia={view.lotMedia}
+                    rows={needsResolution.map((entry) => ({
+                      id: entry.id,
+                      lotNumber: entry.lotNumber,
+                      playerName: entry.playerName,
+                      role: "",
+                      detail: entry.status,
+                      testId: `resolve-${entry.lotNumber}`,
+                      ...(finished
+                        ? {}
+                        : {
+                            actions: (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() =>
+                                    void send(
+                                      `requeue-${entry.id}`,
+                                      "RequeueLot",
+                                      { lotId: entry.id },
+                                      `${entry.lotNumber} requeued`,
+                                    )
+                                  }
+                                  loading={pending === `requeue-${entry.id}`}
+                                  /* `finished` for the same reason "Invite owner"
                                  carries it: the control was offered on a
                                  completed auction, directly under a banner
                                  saying nothing here can be opened or undone, and
@@ -914,48 +784,44 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                  the refusal never reached the screen, so the
                                  conductor's only evidence was a button that did
                                  not respond. */
-                              disabled={stale || finished}
-                              data-testid={`requeue-${entry.lotNumber}`}
-                            >
-                              Requeue
-                            </Button>
-                            {entry.status === "frozen" ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  void send(
-                                    `withdraw-${entry.id}`,
-                                    "WithdrawLot",
-                                    { lotId: entry.id },
-                                    `${entry.lotNumber} withdrawn`,
-                                  )
-                                }
-                                loading={pending === `withdraw-${entry.id}`}
-                                disabled={stale || finished}
-                                data-testid={`withdraw-frozen-${entry.lotNumber}`}
-                              >
-                                Withdraw
-                              </Button>
-                            ) : null}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
+                                  disabled={stale || finished}
+                                  data-testid={`requeue-${entry.lotNumber}`}
+                                >
+                                  Requeue
+                                </Button>
+                                {entry.status === "frozen" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      void send(
+                                        `withdraw-${entry.id}`,
+                                        "WithdrawLot",
+                                        { lotId: entry.id },
+                                        `${entry.lotNumber} withdrawn`,
+                                      )
+                                    }
+                                    loading={pending === `withdraw-${entry.id}`}
+                                    disabled={stale || finished}
+                                    data-testid={`withdraw-frozen-${entry.lotNumber}`}
+                                  >
+                                    Withdraw
+                                  </Button>
+                                ) : null}
+                              </>
+                            ),
+                          }),
+                    }))}
+                  />
                 </>
               ) : null}
-            </Card>
+            </section>
           )}
         </div>
 
         <div className="cockpit-col">
-          {/* Same reason as the live room: the component renders its own
-              connecting state, and guarding it here reintroduces the re-flow. */}
-          {/* A finished night read from the record has no progress to report:
-              the bar printed "— / — lots · — in queue" over the result. */}
-          {overOffline ? null : <AuctionProgress snapshot={snapshot} />}
-
+          {/* No progress bar here: the room's header says "n of N done" and
+              the queue card says how many are to go (stage 3). */}
           {/* One panel at a time on the right: purses while the room is live,
               owners while it is being set up, and the two broadcast screens
               (DA-20 — their only door) a tab away instead of above both. */}
@@ -974,12 +840,10 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     {/* Without the engine a purse is a column of dashes; the
                         squads below already say what each team spent. */}
                     {overOffline ? null : (
-                      <PurseBoard
-                        snapshot={snapshot}
-                        teams={view.teams}
-                        rules={view.rules}
-                        squadSizes={squadSizesOf(view.teams, view.preSigned, feed.resolved)}
-                      />
+                      /* No "can bid up to" line: the desk's paddle rail says it
+                         beside every team already. The board keeps what the
+                         desk does not — the purse left and what is spent. */
+                      <PurseBoard snapshot={snapshot} teams={view.teams} />
                     )}
                     <PoolSummary
                       snapshot={snapshot}
@@ -1227,6 +1091,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         resolved={feed.resolved}
         snapshot={snapshot}
         squadMax={view.rules.squadMax}
+        collapsible
       />
 
       {/* UNDO's confirmation — it names what is about to be reversed. */}

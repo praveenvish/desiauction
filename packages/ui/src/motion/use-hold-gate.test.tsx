@@ -6,11 +6,21 @@ import { useHoldGate } from "./use-hold-gate";
 function HoldButton({
   onConfirm,
   disabled = false,
+  resetKey,
+  onReset,
 }: {
   onConfirm: () => void;
   disabled?: boolean;
+  resetKey?: string;
+  onReset?: () => void;
 }) {
-  const gate = useHoldGate({ durationMs: 1000, onConfirm, disabled });
+  const gate = useHoldGate({
+    durationMs: 1000,
+    onConfirm,
+    disabled,
+    ...(resetKey === undefined ? {} : { resetKey }),
+    ...(onReset === undefined ? {} : { onReset }),
+  });
   return (
     <button type="button" data-holding={gate.holding} data-progress={gate.progress} {...gate.bind}>
       Hold to confirm
@@ -127,5 +137,137 @@ describe("useHoldGate", () => {
       vi.advanceTimersByTime(2000);
     });
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  describe("resetKey — what is being confirmed changed under the hold", () => {
+    it("a key change mid-hold aborts: no fire, fill back to zero, onReset once", () => {
+      const onConfirm = vi.fn();
+      const onReset = vi.fn();
+      const { rerender } = render(
+        <HoldButton onConfirm={onConfirm} resetKey="lot1:P1:100" onReset={onReset} />,
+      );
+      const button = screen.getByRole("button");
+      fireEvent.pointerDown(button);
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+      rerender(<HoldButton onConfirm={onConfirm} resetKey="lot1:P2:110" onReset={onReset} />);
+      expect(button).toHaveAttribute("data-holding", "false");
+      expect(button).toHaveAttribute("data-progress", "0");
+      expect(onReset).toHaveBeenCalledTimes(1);
+      // The pointer is STILL down: time passing must not fire it.
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(onReset).toHaveBeenCalledTimes(1);
+      fireEvent.pointerUp(button);
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it("a key change while idle does nothing", () => {
+      const onConfirm = vi.fn();
+      const onReset = vi.fn();
+      const { rerender } = render(
+        <HoldButton onConfirm={onConfirm} resetKey="lot1:none:100" onReset={onReset} />,
+      );
+      rerender(<HoldButton onConfirm={onConfirm} resetKey="lot1:P1:100" onReset={onReset} />);
+      rerender(<HoldButton onConfirm={onConfirm} resetKey="lot1:P2:110" onReset={onReset} />);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(onReset).not.toHaveBeenCalled();
+      expect(onConfirm).not.toHaveBeenCalled();
+      // …and a hold begun under the new key fires as normal.
+      const button = screen.getByRole("button");
+      fireEvent.pointerDown(button);
+      act(() => {
+        vi.advanceTimersByTime(1200);
+      });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("after an abort, a fresh full hold fires exactly once — the new confirm", () => {
+      const first = vi.fn();
+      const second = vi.fn();
+      const { rerender } = render(<HoldButton onConfirm={first} resetKey="lot1:P1:100" />);
+      const button = screen.getByRole("button");
+      fireEvent.pointerDown(button);
+      act(() => {
+        vi.advanceTimersByTime(900);
+      });
+      rerender(<HoldButton onConfirm={second} resetKey="lot1:P2:110" />);
+      fireEvent.pointerUp(button);
+      // A fresh press starts the clock from zero: 900ms is not enough.
+      fireEvent.pointerDown(button);
+      act(() => {
+        vi.advanceTimersByTime(900);
+      });
+      expect(first).not.toHaveBeenCalled();
+      expect(second).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(second).toHaveBeenCalledTimes(1);
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+
+    it("an unchanged key (a re-render mid-hold) fires once, as before", () => {
+      const onConfirm = vi.fn();
+      const onReset = vi.fn();
+      const { rerender } = render(
+        <HoldButton onConfirm={onConfirm} resetKey="lot1:P1:100" onReset={onReset} />,
+      );
+      const button = screen.getByRole("button");
+      fireEvent.pointerDown(button);
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      rerender(<HoldButton onConfirm={onConfirm} resetKey="lot1:P1:100" onReset={onReset} />);
+      act(() => {
+        vi.advanceTimersByTime(700);
+      });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onReset).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("keyboard: a key change aborts a Space hold; auto-repeat cannot restart it; a fresh press can", () => {
+      const onConfirm = vi.fn();
+      const onReset = vi.fn();
+      const { rerender } = render(
+        <HoldButton onConfirm={onConfirm} resetKey="lot1:none:100" onReset={onReset} />,
+      );
+      const button = screen.getByRole("button");
+      fireEvent.keyDown(button, { key: " ", repeat: false });
+      act(() => {
+        vi.advanceTimersByTime(700);
+      });
+      rerender(<HoldButton onConfirm={onConfirm} resetKey="lot1:P1:100" onReset={onReset} />);
+      expect(onReset).toHaveBeenCalledTimes(1);
+      // The key is still down; the OS keeps auto-repeating it.
+      fireEvent.keyDown(button, { key: " ", repeat: true });
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      fireEvent.keyDown(button, { key: " ", repeat: true });
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(button).toHaveAttribute("data-holding", "false");
+      fireEvent.keyUp(button, { key: " " });
+      // Press again, hold the full time: it fires once.
+      fireEvent.keyDown(button, { key: " ", repeat: false });
+      act(() => {
+        vi.advanceTimersByTime(1200);
+      });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onReset).toHaveBeenCalledTimes(1);
+    });
   });
 });

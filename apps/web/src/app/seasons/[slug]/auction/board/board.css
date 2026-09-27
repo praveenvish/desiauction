@@ -462,18 +462,32 @@
    projector byte-identical to the frame before it opened. This is the largest
    block on the wall because it is the reason the room is in the room. */
 .board-block {
+  /* Stage 3: the player card at hall size on the left, and beside it who they
+     are over the money and the clock. The card is a FIXED column, rendered
+     whether or not a photo exists, so opening a lot cannot re-flow the block. */
   display: grid;
-  /* The face is a FIXED column and it is always rendered while a lot is open —
-     photo or branded mark, same box — so opening a lot cannot re-flow the three
-     columns beside it and a consent-gated null cannot resize the block halfway
-     through a bid. */
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: clamp(16px, 3vw, 40px);
-  padding: clamp(16px, 2.4vw, 30px) clamp(18px, 2.6vw, 34px);
-  border-radius: var(--radius-lg, 16px);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(16px, 2.6vw, 44px);
+  padding: clamp(16px, 2vw, 28px);
+  border-radius: var(--radius-2xl, 24px);
   background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
   border: 1px solid color-mix(in srgb, var(--live) 34%, var(--border-subtle));
+}
+.board-block-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: clamp(12px, 1.6vw, 28px);
+  min-width: 0;
+}
+.board-block-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(16px, 3vw, 48px);
+  padding-top: clamp(12px, 1.4vw, 24px);
+  border-top: 1px solid var(--border-subtle);
 }
 .board[data-status="paused"] .board-block,
 .board[data-stale="true"] .board-block {
@@ -509,32 +523,26 @@
    The largest photograph on the wall, because it is the person the room is
    bidding on. */
 .board-block-face {
-  /* MEASURED FOR THE HALL, AND BUDGETED FOR THE FRAME. At 1920x1080 on a 100"
-     screen 1px is 1.151mm, so 8vw lands the frame at 154px ≈ 177mm tall — a
-     face that reads from the back of a 200-seat room. That figure is also, and
-     deliberately, about the height the name/role stack beside it already
-     occupies at that width, so the face costs the projector almost nothing: a
-     venue screen is ONE frame and the standings below it are not allowed to be
-     clipped to make room for a photograph. The floor keeps it usable on a
-     laptop; the ceiling stops it eating a 4K frame. */
-  --board-face: clamp(88px, 8vw, 184px);
+  /* MEASURED FOR THE HALL. At 1920x1080 on a 100" screen 1px is 1.151mm, so
+     the card lands ~300mm tall — a face (or its initials) that reads from the
+     back of a 200-seat room. A projector is ONE frame: the headline tiles stand
+     down while a lot is open (below) to pay for it. */
+  --board-card-w: clamp(140px, 13vw, 250px);
   position: relative;
-  /* A `figure` carries 1em/40px of user-agent margin, which on this grid would
-     silently push the whole block wider than the frame. */
+  overflow: hidden;
+  isolation: isolate;
+  /* A `figure` carries user-agent margin, which would push the block wide. */
   margin: 0;
-  width: var(--board-face);
-  height: var(--board-face);
+  width: var(--board-card-w);
+  aspect-ratio: 4 / 5;
+  border: 3px solid var(--border-strong);
+  border-radius: var(--radius-xl, 20px);
+  background: var(--identity-field);
+  box-shadow: var(--shadow-2);
 }
-/* The shared `PlayerImage` owns the photo, the branded fallback mark and the
-   broken-source recovery, and it sizes itself from a fixed px scale whose
-   largest step is 160 — a PAGE unit. A projector is a viewport-scaled surface,
-   so the frame is restated here in vw. The px size is set inline by the
-   primitive, and inline styles are only reachable with `!important`; the
-   photo and the mark inside it are both 100% of the frame, so one override
-   scales the whole thing without touching the component. */
-.board-block-face [data-testid="player-image"] {
-  width: 100% !important;
-  height: 100% !important;
+.board-block-face [data-testid="player-portrait"] {
+  position: absolute;
+  inset: 0;
 }
 /* The registration number, over the corner of the frame rather than under it:
    a badge in flow would add its own height to a block whose budget is one
@@ -558,7 +566,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  text-align: right;
+  min-width: 0;
 }
 .board-block-label {
   font-size: var(--text-base-size);
@@ -575,6 +583,10 @@
   color: var(--money-value);
 }
 .board-block-leader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
   font-size: var(--text-2xl-size);
   font-weight: 700;
   color: var(--ceremony-gold);
@@ -745,7 +757,13 @@
     font-size: clamp(var(--text-3xl-size), 4.4vw, var(--display-lg-size));
   }
   .board:has(.board-block) .board-block {
-    padding: 20px clamp(18px, 2.6vw, 34px);
+    padding: 22px 28px;
+  }
+  /* The room is watching the block, not the history: the headline tiles stand
+     down for the duration of a lot (as the recent sales already do) and come
+     back between lots, which is when they are read. */
+  .board:has(.board-block) .board-tiles {
+    display: none;
   }
 }
 
@@ -923,8 +941,11 @@
   .board-block {
     grid-template-columns: 1fr;
   }
-  .board-block-clock {
-    justify-self: start;
+  .board-block-face {
+    --board-card-w: min(100%, 280px);
+  }
+  .board-block-row {
+    flex-wrap: wrap;
   }
 }
 

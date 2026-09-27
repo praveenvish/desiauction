@@ -48,6 +48,7 @@ const ICONS = {
   IconArrowLeft: "ArrowLeft",
   IconArrowRight: "ArrowRight",
   IconArrowUp: "ArrowUp",
+  IconHand: "HandPalm",
   IconExternal: "ArrowSquareOut",
   IconList: "ListBullets",
   IconGrid: "SquaresFour",
