@@ -1,20 +1,5 @@
 /* The tournaments accordion (Tournaments & Orgs.dc.html). */
 
-/* --- the list head: status tabs, then ONE toolbar row (round 2) ---------- */
-.tg-listhead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.tg-tabs-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  min-width: 0;
-}
-
 /* Phone: the search takes its own row, the view pair and sort share the
    next — two full-width rows at most, never a ragged third. */
 @media (max-width: 719px) {
@@ -455,31 +440,6 @@
   height: 100%;
 }
 
-/* --- footnote ------------------------------------------------------------- */
-.tg-footnote {
-  margin: 0;
-  padding-top: var(--space-2);
-  text-align: center;
-  font-size: var(--text-sm-size);
-  color: var(--text-muted);
-}
-
-/* SC 2.5.8 asks for 24x24; this link measured 139x16. Padding is the cheapest
-   honest fix — the target grows, the type does not. */
-.tg-footnote a {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 24px;
-  padding: var(--space-1) var(--space-2);
-  color: var(--text-accent);
-  text-decoration: none;
-}
-
-.tg-footnote a:hover {
-  text-decoration: underline;
-}
-
 /* Things leave in the order an organizer can spare them. The header figures go
    first (the panel below repeats them per season), then dates and locations.
    The name, status and target never wrap and never leave. `.tg-meta` now
@@ -705,32 +665,6 @@
   }
 }
 
-/* --- tournament page ------------------------------------------------------ */
-.tg-backlink {
-  margin: 0;
-}
-
-.tg-backlink a {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  padding: var(--space-2) var(--space-3) var(--space-2) 0;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-  text-decoration: none;
-}
-
-.tg-backlink a:hover {
-  color: var(--text-accent);
-}
-
-.tg-backlink a:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
 /* The sentence that explains what a tournament is, kept once the page is
    populated instead of disappearing with the empty state that carried it. */
 .tg-what {
@@ -755,150 +689,6 @@
 }
 
 /* --- featured season (founder mockup 6) ----------------------------------- */
-/* One floodlit banner (the kit's HeroBanner) with the season's road along its
-   bottom edge — no white side panel, no separate stepper band. */
-.tg-feature {
-  display: block;
-}
-
-/* `.competitions h2` (seasons.css) is written for the page's own section
-   headings and outranks the kit's single-class hero title; the banner's title
-   gets its own size back here. */
-.competitions .tg-feature h2 {
-  margin: 0;
-  font-size: var(--text-3xl-size);
-  line-height: 1.15;
-  color: var(--hero-ink);
-}
-
-.tg-feature .sh-ghost {
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.tg-feature .tg-feature-open {
-  background: var(--hero-ink);
-  border-color: var(--hero-ink);
-  color: var(--hero-night);
-  font-weight: var(--font-weight-semibold);
-}
-
-.tg-feature .tg-feature-open:hover {
-  background: var(--hero-ink-soft);
-}
-
-@media (max-width: 719px) {
-  .competitions .tg-feature h2 {
-    font-size: var(--text-xl-size);
-  }
-}
-
-/* --- one tournament: a compact section head over its season cards ---------- */
-.tg-section-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-3);
-}
-
-.competitions .tg-section-head .tg-section-title {
-  margin: 0;
-  font-size: var(--text-md-size);
-  line-height: 1.3;
-}
-
-.tg-section-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 22px;
-  height: 22px;
-  margin-inline-start: 4px;
-  padding: 0 6px;
-  box-sizing: border-box;
-  border-radius: var(--radius-full);
-  background: var(--surface-sunken);
-  font-size: var(--text-xs-size);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-  vertical-align: 2px;
-}
-
-.tg-section-head .tg-what {
-  font-size: var(--text-sm-size);
-}
-
-.tg-section-head {
-  align-items: center;
-}
-
-.tg-section-action {
-  margin-inline-start: auto;
-}
-
-/* ---- one tournament (/tournaments/[slug]) — round 3C ------------------- */
-.tg-detail {
-  display: grid;
-  gap: var(--space-5);
-  align-items: start;
-}
-
-@media (min-width: 1100px) {
-  .tg-detail {
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-  }
-}
-
-.tg-desk {
-  box-sizing: border-box;
-  min-width: 0;
-  padding: var(--space-5);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-1);
-}
-
-.tg-desk-kicker {
-  margin: 0;
-  color: var(--text-accent);
-  font-size: var(--text-xs-size);
-  line-height: var(--text-xs-line);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.tg-desk-title {
-  margin: var(--space-1) 0 var(--space-3);
-  font-size: var(--text-lg-size);
-  line-height: var(--text-lg-line);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.tg-desk-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tg-desk-list > li + li {
-  border-top: 1px solid var(--border-subtle);
-}
-
-/* Phone: "Add a season" takes the width under the line, not a lone button
-   pinned to the right edge (round 2 "orphaned"). */
-@media (max-width: 599px) {
-  .tg-section-action {
-    flex: 1 1 100%;
-    margin-inline-start: 0;
-  }
-
-  .tg-section-action > * {
-    width: 100%;
-    justify-content: center;
-  }
-}
 
 /* Phone: the tournament's three figures as one compact strip — they took
    ~320px as three wrapped tiles. Figure over label; the hints are the
@@ -944,7 +734,7 @@
 .tx-section-head h2 {
   margin: 0;
   font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
 
@@ -971,7 +761,7 @@
   background: var(--surface-inverse, #1a1814);
   color: var(--accent, #f0b43c);
   font-size: 15px;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: 0.02em;
 }
 
@@ -1012,7 +802,7 @@
   background: var(--surface-sunken);
   color: var(--text-secondary);
   font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
 }
 
@@ -1125,11 +915,6 @@
 
 .tx-figures strong {
   color: var(--text-heading);
-  font-weight: var(--font-weight-bold);
-}
-
-.tx-live {
-  color: var(--danger-strong);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -1160,7 +945,7 @@
 
 .tx-now-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
   gap: var(--space-4);
 }
 
@@ -1192,7 +977,7 @@
 
 .tx-now-name {
   font-size: var(--text-md-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   text-decoration: none;
 }
@@ -1228,7 +1013,7 @@
 }
 
 .tx-now-why {
-  flex: 1 1 12rem;
+  flex: 1 1 8rem;
   font-size: var(--text-sm-size);
   color: var(--text-secondary);
 }
@@ -1285,7 +1070,7 @@
   align-items: center;
   width: 40px;
   font-size: 11px;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-muted);
 }
 
@@ -1383,7 +1168,7 @@
 
 .tx-card-name {
   font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   text-decoration: none;
 }
@@ -1522,7 +1307,7 @@ a.tx-card-name:hover {
 .tx-next-edition h3 {
   margin: 0;
   font-size: var(--text-md-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
 
@@ -1555,6 +1340,12 @@ a.tx-card-name:hover {
 }
 
 .tx-start-alt {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
   font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-accent);
@@ -1611,9 +1402,16 @@ a.tx-card-name:hover {
   min-width: 0;
 }
 
+.tx-season-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .tx-season-name {
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   text-decoration: none;
 }
@@ -1674,7 +1472,7 @@ a.tx-card-name:hover {
 .tx-band-name {
   margin: 0;
   font-size: var(--text-2xl-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.2;
   color: var(--text-heading);
 }
@@ -1705,7 +1503,7 @@ a.tx-card-name:hover {
 .tx-band-figures dd {
   margin: 0;
   font-size: var(--text-2xl-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   font-variant-numeric: tabular-nums;
 }
@@ -1759,7 +1557,7 @@ a.tx-card-name:hover {
 
 .tx-latest-name {
   font-size: var(--text-lg-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   text-decoration: none;
 }
@@ -1866,7 +1664,7 @@ a.tx-desk:hover {
 .tx-table-pos {
   width: 18px;
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1883,12 +1681,12 @@ a.tx-desk:hover {
 }
 
 .tx-table li[data-lead="true"] .tx-table-name {
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
 }
 
 .tx-table-pts {
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
   font-variant-numeric: tabular-nums;
 }

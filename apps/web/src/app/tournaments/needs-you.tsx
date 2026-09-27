@@ -1,4 +1,4 @@
-import { IconArrowRight, IconCheckCircle, IconPin, buttonClassName } from "@desiauction/ui";
+import { ButtonLink, IconArrowRight, IconCheckCircle, IconPin } from "@desiauction/ui";
 import Link from "next/link";
 
 import { formatWallTime } from "../../lib/format-date";
@@ -80,7 +80,6 @@ export function NeedsYou({
 function NowCard({ season, parent, today }: { season: SeasonRow; parent: string; today: string }) {
   const stage = seasonStage(season, today);
   const step = nextStep(season, today);
-  const live = season.counts.live ?? 0;
   const when = dateRange(season.startsOn, season.endsOn);
   return (
     <article className="tx-now-card" data-testid="tx-now-card" data-stage={stage}>
@@ -120,31 +119,21 @@ function NowCard({ season, parent, today }: { season: SeasonRow; parent: string;
             <strong>{formatCount(season.counts.approved ?? 0)}</strong> players
           </li>
         ) : null}
-        {live > 0 ? (
-          <li className="tx-live">
-            {formatCount(live)} {live === 1 ? "match" : "matches"} playing now
-          </li>
-        ) : null}
       </ul>
       {step !== null ? (
         <div className="tx-now-step">
           <span className="tx-now-why">{step.why}</span>
-          <Link
-            href={`/seasons/${season.slug}`}
-            className={buttonClassName({ variant: "ghost", size: "sm" })}
-          >
+          <ButtonLink href={`/seasons/${season.slug}`} variant="ghost" size="sm">
             Open
-          </Link>
-          <Link
+          </ButtonLink>
+          <ButtonLink
             href={step.href}
-            className={buttonClassName({
-              variant: step.urgent ? "primary" : "secondary",
-              size: "sm",
-            })}
+            variant={step.urgent ? "primary" : "secondary"}
+            size="sm"
             data-testid="tx-next-step"
           >
             {step.label}
-          </Link>
+          </ButtonLink>
         </div>
       ) : null}
     </article>

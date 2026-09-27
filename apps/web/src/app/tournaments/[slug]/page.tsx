@@ -1,5 +1,5 @@
 import { sportPackFor } from "@desiauction/core";
-import { Card, EmptyState, IconArrowRight, IconPlus, buttonClassName } from "@desiauction/ui";
+import { ButtonLink, Card, EmptyState, IconArrowRight, IconPlus } from "@desiauction/ui";
 import Link from "next/link";
 import { enabledSports } from "../../../server/competition/sports";
 import { notFound } from "next/navigation";
@@ -382,10 +382,10 @@ function LatestEdition({
               .join(" · ") || "Dates to be set"}
           </span>
         </div>
-        <Link href={base} className={buttonClassName({ variant: "secondary", size: "sm" })}>
+        <ButtonLink href={base} variant="secondary" size="sm">
           Open season
           <IconArrowRight size={16} aria-hidden />
-        </Link>
+        </ButtonLink>
       </header>
       <div className="tx-now-road">
         <SeasonRoad season={season} />
@@ -394,12 +394,9 @@ function LatestEdition({
           {live > 0 ? ` · ${formatCount(live)} playing now` : ""}
         </span>
         {step !== null && doors ? (
-          <Link
-            href={step.href}
-            className={buttonClassName({ variant: step.urgent ? "primary" : "ghost", size: "sm" })}
-          >
+          <ButtonLink href={step.href} variant={step.urgent ? "primary" : "ghost"} size="sm">
             {step.label}
-          </Link>
+          </ButtonLink>
         ) : null}
       </div>
       <ul className="tx-desks">

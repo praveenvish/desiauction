@@ -373,9 +373,16 @@ function SeasonList({
                 {initialsOf(season.name)}
               </span>
               <span className="tx-season-names">
-                <Link href={`/seasons/${season.slug}`} className="tx-season-name">
-                  {season.name}
-                </Link>
+                <span className="tx-season-title">
+                  <Link href={`/seasons/${season.slug}`} className="tx-season-name">
+                    {season.name}
+                  </Link>
+                  {season.running ? (
+                    <span className="tx-pill" data-tone="running">
+                      Now running
+                    </span>
+                  ) : null}
+                </span>
                 <span>
                   {[parent, season.orgName, season.location]
                     .filter((part) => part !== null && part !== "")
@@ -388,11 +395,6 @@ function SeasonList({
             </span>
             <span className="tx-season-stage" role="cell">
               <SeasonRoad season={season} size="sm" />
-              {season.running ? (
-                <span className="tx-pill" data-tone="running">
-                  Now running
-                </span>
-              ) : null}
               <StagePill stage={stage} />
             </span>
             <span className="tx-season-size" role="cell">

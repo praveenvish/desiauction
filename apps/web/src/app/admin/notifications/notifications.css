@@ -183,7 +183,7 @@
   overflow: hidden;
   color: var(--text-heading);
   font-size: var(--text-md-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -276,7 +276,7 @@
   margin: 0;
   color: var(--text-heading);
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
 }
 
 .msg-group-head span {
@@ -443,7 +443,7 @@
   color: var(--text-heading);
   font-size: var(--text-lg-size);
   line-height: var(--text-lg-line);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
 }
 
 .msg-panel-title:focus-visible {
@@ -722,7 +722,7 @@
   margin: 0;
   color: var(--text-heading);
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
 }
 
 .msg-recent-head span {
@@ -1125,7 +1125,7 @@
 .dla-fig-value {
   color: var(--text-heading);
   font-size: var(--text-2xl-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
@@ -1163,7 +1163,7 @@
   margin: 0;
   color: var(--text-heading);
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
 }
 
 .dla-channel dl {
@@ -1248,7 +1248,7 @@
   flex: none;
   color: var(--text-heading);
   font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
