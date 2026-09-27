@@ -646,50 +646,6 @@ p.admin-warning {
   border-radius: var(--radius-sm);
 }
 
-/* ---- A label / value line (health, messaging verdicts) ---- */
-
-.admin-kv {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-}
-
-.admin-kv > div {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.admin-kv > div:first-child {
-  padding-top: 0;
-}
-
-.admin-kv > div:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-
-.admin-kv dt {
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-}
-
-.admin-kv dd {
-  margin: 0;
-  min-width: 0;
-}
-
-/* A value that is a set of chips rather than one. */
-.admin-kv > div.is-block {
-  flex-direction: column;
-  align-items: flex-start;
-}
-
 /* ---- Text roles ---- */
 
 .admin-action {
@@ -772,16 +728,8 @@ p.admin-warning {
   overflow-wrap: anywhere;
 }
 
-.admin-attention-kind {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs-size);
-  color: var(--text-muted);
-  word-break: break-all;
-}
-
 /* Inline links in a running line cannot become 44px tall without breaking the
    sentence they sit in; they get the width and as much height as fits. */
-.admin-attention-kind a,
 .admin-attention-subject .admin-meta a {
   display: inline-block;
   min-height: 24px;
@@ -1436,22 +1384,6 @@ a.admin-log-id:hover {
   }
 }
 
-.admin-follow-summary {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  font-variant-numeric: tabular-nums;
-}
-
-.admin-follow-summary strong {
-  color: var(--text-heading);
-  font-weight: var(--font-weight-semibold);
-}
-
-.admin-follow-summary [data-zero] strong {
-  color: var(--text-muted);
-}
-
 .admin-follow-list {
   margin: 0;
   padding: 0;
@@ -1521,17 +1453,6 @@ a.admin-log-id:hover {
   min-width: 0;
 }
 
-.admin-follow-cert {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.admin-digest {
-  word-break: normal;
-}
-
 .admin-follow-chans {
   display: flex;
   flex-wrap: wrap;
@@ -1569,42 +1490,6 @@ a.admin-log-id:hover {
 
 .admin-chan[data-state="bad"] .admin-chan-n {
   color: var(--danger-strong);
-}
-
-.admin-follow-fails > summary {
-  display: inline-flex;
-  list-style: none;
-  cursor: pointer;
-  border-radius: var(--radius-full);
-}
-
-.admin-follow-fails > summary::-webkit-details-marker {
-  display: none;
-}
-
-.admin-follow-fails > summary:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.admin-follow-fails ul {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-xs-size);
-}
-
-.admin-follow-fails li {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.admin-follow-row:has(.admin-follow-fails[open]) .admin-follow-facts > div:last-child {
-  grid-column: 1 / -1;
 }
 
 @media (max-width: 1100px) {
@@ -1721,10 +1606,6 @@ a.admin-quiet-link:hover {
 
   .admin-follow-facts {
     align-items: center;
-  }
-
-  .admin-follow-cert {
-    flex-wrap: nowrap;
   }
 }
 
@@ -2432,10 +2313,6 @@ a.admin-quiet-link:hover {
     white-space: nowrap;
   }
 
-  .admin-follow-facts .admin-digest {
-    display: none;
-  }
-
   /* THE LIST ROW (round 3C): name over ONE line of facts — it still wrapped
      to three. The quiet facts share the line and ellipsize; the one that asks
      for action ("1 to recover") never shrinks and sits at the line's end. */
@@ -2465,19 +2342,12 @@ a.admin-quiet-link:hover {
     text-overflow: ellipsis;
   }
 
-  .admin-follow-row:has(.admin-follow-fails[open]) .admin-follow-facts {
-    flex-wrap: wrap;
-  }
-
   /* Healthy says nothing on a phone: a green "Current" and "Pass" on every
      one of 26 rows crowded out the facts that differ (round 2 "healthy rows
      shout"). They stay for assistive tech; problems still show as pills. */
   .admin-follow-row:not(.admin-follow-head)
     .admin-follow-facts
-    > div:has(> dd > .admin-state[data-tone="green"]),
-  .admin-follow-row:not(.admin-follow-head)
-    .admin-follow-facts
-    > div:has(> dd > .admin-follow-cert > .admin-state[data-tone="green"]) {
+    > div:has(> dd > .admin-state[data-tone="green"]) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -3268,6 +3138,319 @@ a.admin-quiet-link:hover {
   }
 
   .admin-watch-fold-hint {
+    display: none;
+  }
+}
+
+/* ---- Health: the verdict first (redesign 2026-09-27) ----------------------
+   What needs a look and who fixes it, then what is fine; the workers and
+   schedules beside each other; problem clubs first, the healthy ones folded. */
+
+.admin-health-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: clamp(var(--space-4), 3vw, var(--space-6));
+  border: 1px solid var(--success-base);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--success-base) 12%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.admin-health-verdict[data-tone="red"] {
+  border-color: var(--accent-line);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+}
+
+.admin-health-verdict-title {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-2xl-size);
+  line-height: var(--text-2xl-line);
+  font-weight: var(--font-weight-semibold);
+}
+
+.admin-health-findings,
+.admin-health-checks,
+.admin-health-schedules {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-health-findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-health-findings > li {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.admin-health-findings > li > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.admin-health-findings strong {
+  color: var(--text-heading);
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.admin-health-finding-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 7px;
+  border-radius: var(--radius-full);
+  background: var(--danger-base);
+}
+
+.admin-health-findings > li[data-tone="amber"] .admin-health-finding-dot {
+  background: var(--warning-base);
+}
+
+.admin-health-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-health-checks > li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-health-checks > li > svg {
+  color: var(--success-base);
+}
+
+.admin-health-checks > li[data-off] > svg {
+  color: var(--text-muted);
+}
+
+.admin-health-checks > li.is-note {
+  color: var(--text-muted);
+}
+
+/* Workers: four figures, zeros quiet, a dead job loud. */
+.admin-health-jobs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.admin-health-jobs > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+}
+
+.admin-health-jobs dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  text-transform: capitalize;
+}
+
+.admin-health-jobs dd {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-health-jobs > div[data-zero] dd {
+  color: var(--text-muted);
+}
+
+.admin-health-jobs dd[data-bad] {
+  color: var(--danger-strong);
+}
+
+.admin-health-schedules > li {
+  display: grid;
+  grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr);
+  gap: 2px var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.admin-health-schedules > li > strong {
+  grid-row: span 2;
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.admin-health-schedules [data-tone="amber"] {
+  color: var(--warning-strong);
+}
+
+.admin-health-schedules [data-tone="amber"] time {
+  color: inherit;
+}
+
+/* A problem club's items: a full-width line under its row. */
+.admin-health-items {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm-size);
+}
+
+.admin-health-items > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+  list-style: none;
+  cursor: pointer;
+}
+
+.admin-health-items > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-health-items > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.admin-health-items ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.admin-health-items li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--border-subtle);
+}
+
+.admin-health-items li strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-medium);
+}
+
+.admin-health-items li span {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.admin-health-caret {
+  transition: transform var(--duration-fast) ease;
+}
+
+details[open] > summary .admin-health-caret {
+  transform: rotate(180deg);
+}
+
+/* The healthy clubs: one row that opens to the full list. */
+.admin-health-clear {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.admin-health-clear > summary {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: 0 var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  list-style: none;
+  cursor: pointer;
+}
+
+.admin-health-clear > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-health-clear > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.admin-health-clear > summary > svg:first-child {
+  color: var(--success-base);
+}
+
+.admin-health-clear > summary strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.admin-health-clear-hint {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: end;
+}
+
+@media (max-width: 719px) {
+  .admin-health-verdict-title {
+    font-size: var(--text-xl-size);
+    line-height: var(--text-xl-line);
+  }
+
+  .admin-health-jobs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-health-schedules > li {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: var(--space-4);
+  }
+
+  .admin-health-schedules > li > strong {
+    grid-row: auto;
+  }
+
+  .admin-health-clear > summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0 var(--space-4);
+  }
+
+  .admin-health-clear-hint {
     display: none;
   }
 }
