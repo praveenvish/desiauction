@@ -688,37 +688,6 @@
   color: var(--text-secondary);
 }
 
-/* --- featured season (founder mockup 6) ----------------------------------- */
-
-/* Phone: the tournament's three figures as one compact strip — they took
-   ~320px as three wrapped tiles. Figure over label; the hints are the
-   laptop's detail. */
-@media (max-width: 599px) {
-  .competitions [data-testid="tournament-figures"] {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-2);
-  }
-
-  .competitions [data-testid="tournament-figures"] > * {
-    min-height: 0;
-    padding: var(--space-3);
-  }
-
-  /* The kit spans an odd last tile across the row on a phone; three
-     figures share one row here. */
-  .competitions [data-testid="tournament-figures"] > :last-child:nth-child(odd) {
-    grid-column: auto;
-  }
-
-  .competitions [data-testid="tournament-figures"] > * > :first-child {
-    display: none;
-  }
-
-  .competitions [data-testid="tournament-figures"] > * :is([class*="stat-hint"]) {
-    display: none;
-  }
-}
-
 /* ==== The tournaments index and a tournament's page (2026-09-27) ==========
    "Needs you now", tournament cards, the flat season list, the identity band.
    Tokens only. */
@@ -1536,13 +1505,18 @@ a.tx-card-name:hover {
 
 .tx-latest-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-3);
 }
 
+.tx-latest-head > a {
+  white-space: nowrap;
+}
+
 .tx-latest-id {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 12rem;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
