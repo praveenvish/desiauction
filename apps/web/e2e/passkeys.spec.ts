@@ -26,7 +26,7 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page).toHaveURL(/\/home/);
   }
-  await page.goto("/account");
+  await page.goto("/account?section=security");
 }
 
 test("the founder journey: enroll passkey, sign out, passkey-only sign in", async ({ page }) => {
@@ -80,7 +80,7 @@ test("the founder journey: enroll passkey, sign out, passkey-only sign in", asyn
 
   await page.getByTestId("passkey-login").click();
   await expect(page).toHaveURL(/\/(home|onboarding)/, { timeout: 10_000 });
-  await page.goto("/account");
+  await page.goto("/account?section=security");
   await expect(page.getByTestId("account-phone")).toHaveText(formatPhone(`+91${PHONE}`));
   await expect(page.getByTestId("events-panel")).toContainText("Signed in with a passkey");
 });

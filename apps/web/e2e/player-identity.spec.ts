@@ -47,7 +47,7 @@ test("the cricket profile saves, counts, and frames the career page", async ({ p
   // The login form carries the terms notice the consent record is minted from.
   // (Asserted on the way in: it is login furniture, not account furniture.)
 
-  await page.goto("/account");
+  await page.goto("/account?section=player");
   await expect(page.getByTestId("profile-completion")).toContainText("Profile 1 of 8");
 
   /*
@@ -127,7 +127,7 @@ test("a gendered category refuses a declared mismatch, and the profile fix opens
 
   // Declare the mismatch on the profile first.
   await otpLogin(page, PLAYER);
-  await page.goto("/account");
+  await page.goto("/account?section=player");
   await page.getByLabel("Gender").selectOption("male");
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(page.getByText("Profile saved")).toBeVisible();
@@ -150,7 +150,7 @@ test("a gendered category refuses a declared mismatch, and the profile fix opens
   await expect(page.locator(".register-error")).toContainText("gendered category");
 
   // Correct the profile; the same door opens.
-  await page.goto("/account");
+  await page.goto("/account?section=player");
   await page.getByLabel("Gender").selectOption("female");
   await page.getByRole("button", { name: "Save profile", exact: true }).click();
   await expect(page.getByText("Profile saved")).toBeVisible();

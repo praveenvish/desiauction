@@ -86,7 +86,7 @@ test("a player asks to be deleted, the desk erases them, and they are gone", asy
   // --- The player asks --------------------------------------------------------
   await otpLogin(player, PLAYER);
   await clearNameGate(player, PLAYER_NAME);
-  await player.goto("/account");
+  await player.goto("/account?section=data");
   await player.getByTestId("erasure-open").click();
   const dialog = player.getByRole("dialog");
   // The consequence is said BEFORE anything is sent.
