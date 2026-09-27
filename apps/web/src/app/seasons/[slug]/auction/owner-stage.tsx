@@ -78,6 +78,7 @@ function OwnerStateLine({ line, reason }: { line: StateLine; reason: string | nu
 }
 
 export function OwnerStage({
+  part,
   roles,
   lot,
   media,
@@ -96,6 +97,12 @@ export function OwnerStage({
   plan,
   planNames,
 }: {
+  /**
+   * Which half of the stage (stage 3): the player card, or the bidding beside
+   * it — the price, the sentence and the paddle. The room lays the two out in
+   * its own columns; a phone reads them one after the other.
+   */
+  part: "card" | "bidding";
   roles: readonly { key: string; label: string }[];
   lot: Lot;
   media: LotMedia | undefined;
@@ -124,16 +131,12 @@ export function OwnerStage({
     myPaddleNumber === null
       ? null
       : ownerStanceOf({ lot, snapshot, rules, myPaddleNumber, squadSigned });
-  const paddle =
-    myPaddleNumber === null
-      ? null
-      : (snapshot?.paddles.find((entry) => entry.paddleNumber === myPaddleNumber) ?? null);
 
-  return (
-    <div className="owner-stage" data-has-paddle={stance === null ? "false" : "true"}>
-      {/* `current-lot` is the long-standing handle for "the lot on the block"
-          — the suites read the player and the lot number off it. Keyed on the
-          lot so a new player remounts the card and its clock starts fresh. */}
+  if (part === "card") {
+    return (
+      // `current-lot` is the long-standing handle for "the lot on the block"
+      // — the suites read the player and the lot number off it. Keyed on the
+      // lot so a new player remounts the card and its clock starts fresh.
       <section
         key={lot.lotId}
         className="owner-lot"
@@ -170,26 +173,30 @@ export function OwnerStage({
           }}
         />
       </section>
-      <LotPrice basePrice={lot.basePrice} bid={bid} teams={teams} />
+    );
+  }
 
-      {stance !== null ? (
-        <>
+  return (
+    <div className="owner-stage" data-has-paddle={stance === null ? "false" : "true"}>
+      <section className="owner-standing" aria-label="The bidding">
+        <LotPrice basePrice={lot.basePrice} bid={bid} teams={teams} />
+        {stance !== null ? (
           <OwnerStateLine line={stateLineOf(stance, money.ledger)} reason={stance.reason} />
-          {/* WR-1: the plan's line sits under the sentence, never above it. */}
-          {plan !== null ? <PlanLine state={plan} names={planNames} /> : null}
-          <PaddleControl
-            lotId={lot.lotId}
-            stance={stance}
-            rules={rules}
-            squadSigned={squadSigned}
-            purseRemaining={paddle?.purseRemaining ?? null}
-            committed={paddle?.committed ?? null}
-            readOnly={readOnly}
-            busy={busy}
-            onBid={onBid}
-            plan={plan}
-          />
-        </>
+        ) : null}
+        {/* WR-1: the plan's line sits under the sentence, never above it. */}
+        {stance !== null && plan !== null ? <PlanLine state={plan} names={planNames} /> : null}
+      </section>
+      {stance !== null ? (
+        <PaddleControl
+          lotId={lot.lotId}
+          stance={stance}
+          rules={rules}
+          squadSigned={squadSigned}
+          readOnly={readOnly}
+          busy={busy}
+          onBid={onBid}
+          plan={plan}
+        />
       ) : null}
     </div>
   );

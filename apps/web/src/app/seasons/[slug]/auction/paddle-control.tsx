@@ -12,7 +12,8 @@ import { useMoney } from "../../../../components/money-unit";
 // YOUR PADDLE — the bidder's one control, laid out for a thumb (live-room
 // stage 1). On a phone it is pinned to the foot of the screen: what the owner
 // can spend, three bigger amounts, and ONE big button that says exactly what it
-// will do — "Bid 2,000 pts". On a laptop the same bar sits in the stage.
+// will do — "Bid 2,000 pts". On a laptop the same bar is a card beside the
+// player card, the big button above the bigger amounts.
 //
 // THE NEXT BID IS ONE TAP. A BIGGER BID IS TWO. Tapping a chip only CHOOSES
 // that amount (aria-pressed); the big button then names it and commits it, and
@@ -39,8 +40,6 @@ export function PaddleControl({
   stance,
   rules,
   squadSigned,
-  purseRemaining,
-  committed,
   readOnly,
   busy,
   onBid,
@@ -51,9 +50,6 @@ export function PaddleControl({
   stance: OwnerStance;
   rules: AuctionRules;
   squadSigned: number;
-  /** This paddle's purse and committed spend; null when unknown. */
-  purseRemaining: number | null;
-  committed: number | null;
   /** The feed is stale: nothing may be sent, and a chosen amount lapses. */
   readOnly: boolean;
   /** A bid from this room is in flight. */
@@ -85,6 +81,7 @@ export function PaddleControl({
         ? "—"
         : `Bid ${money.ledger(amount)}`;
   const planMax = plan?.currentLot?.target?.maxBid ?? null;
+  const toBuy = Math.max(0, rules.squadMin - squadSigned);
 
   return (
     <section
@@ -97,6 +94,15 @@ export function PaddleControl({
         {ceiling !== null ? (
           <span>
             You can spend up to <b>{money.ledger(ceiling)}</b>
+            {/* The purse, squad and spend are the Your-team card's (stage 3);
+                a laptop says here only why the ceiling is lower than the
+                purse. */}
+            {toBuy > 0 ? (
+              <span className="owner-budget-need">
+                {" "}
+                · {toBuy} {toBuy === 1 ? "player" : "players"} still to buy
+              </span>
+            ) : null}
           </span>
         ) : (
           <span>Your paddle</span>
@@ -167,29 +173,6 @@ export function PaddleControl({
           Back to the next bid ({money.ledger(raise)})
         </button>
       ) : null}
-
-      {/* The laptop keeps the three figures under the bar; on a phone the
-          budget line above says what matters and My team holds the rest. */}
-      <dl className="paddle-stats">
-        <div>
-          <dt>Purse left</dt>
-          <dd className="paddle-stat-remaining" data-testid="paddle-purse">
-            {purseRemaining === null ? "—" : money.ledger(purseRemaining)}
-          </dd>
-        </div>
-        <div>
-          <dt>Committed</dt>
-          <dd data-testid="paddle-committed">
-            {committed === null ? "—" : money.ledger(committed)}
-          </dd>
-        </div>
-        <div>
-          <dt>Signed</dt>
-          <dd data-testid="paddle-signed">
-            {squadSigned}/{rules.squadMax}
-          </dd>
-        </div>
-      </dl>
     </section>
   );
 }

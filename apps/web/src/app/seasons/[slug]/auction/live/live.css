@@ -1,21 +1,14 @@
 /* ==========================================================================
    THE LIVE ROOM (founder mockup 5). Dark by design — the Live shell pins
    Floodlight — so everything here is tokens only and reads in both themes.
-   Layout: an in-page room map on wide screens, the wrap-up hero when the
-   night is over, the stage beside the owner's column, the final squads, the
-   paddle + conduct pair, and a bottom bar of doors and diagnostics.
+   Layout (stage 3): the wrap-up hero when the night is over; the room as
+   card | bidding + tabs (Bids · Teams · Squad) | your team + up next; the
+   paddle + conduct pair; and a bottom bar of doors and diagnostics.
    ========================================================================== */
 
 .live-page .dash-stack,
 .live-page .competitions-stack {
   max-width: 1440px;
-}
-
-.live-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-6);
-  align-items: start;
 }
 
 .live-main {
@@ -26,86 +19,95 @@
 }
 
 /* Anchors land below the Live shell's strip, not under it. */
-.live-anchor,
 .live-main,
-.live-col[id],
-.live-layout [data-testid="current-lot"] {
+.live-room-grid [id],
+.live-room-grid [data-testid="current-lot"] {
   scroll-margin-top: var(--space-16);
 }
 
-.live-anchor {
+/* ---- The room: card | bidding + tabs | your team (stage 3) ------------------ */
+
+.live-room-grid {
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
   min-width: 0;
 }
 
-/* ---- Room map (≥1100px only) --------------------------------------------- */
-
-.live-roomnav {
-  display: none;
-}
-
-@media (min-width: 1100px) {
-  .live-layout {
-    grid-template-columns: 200px minmax(0, 1fr);
-  }
-
-  .live-roomnav {
-    position: sticky;
-    top: var(--space-4);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: var(--space-6);
-    min-height: min(640px, calc(100dvh - var(--space-24)));
-  }
-}
-
-.live-roomnav ul {
+.live-room-stage,
+.live-room-main,
+.live-room-rail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.live-roomnav a {
-  display: flex;
-  align-items: center;
   gap: var(--space-3);
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-lg);
-  color: var(--text-secondary);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
-  transition: background-color var(--duration-fast) ease;
+  min-width: 0;
 }
 
-.live-roomnav a:hover {
-  background: var(--surface-sunken);
-  color: var(--text-heading);
+.live-tab-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
 }
 
-.live-roomnav a:focus-visible {
+/* The tabs are the card; what sits in a panel is its content, not a second
+   card inside the first. */
+.room-tabs .room-card,
+.room-tabs [data-testid="auction-timeline"] {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.room-tabs [role="tabpanel"] {
+  padding-top: var(--space-4);
+}
+
+.room-tabs [role="tabpanel"]:focus-visible {
   outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: 4px;
 }
 
-.live-roomnav a svg {
-  color: var(--text-muted);
+@media (min-width: 900px) {
+  .live-room-grid {
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    grid-template-areas:
+      "stage main"
+      "rail main";
+    align-items: start;
+    gap: var(--space-5);
+  }
+
+  .live-room-grid[data-single] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "stage"
+      "main";
+  }
+
+  .live-room-stage {
+    grid-area: stage;
+  }
+
+  .live-room-main {
+    grid-area: main;
+    gap: var(--space-4);
+  }
+
+  .live-room-rail {
+    grid-area: rail;
+    gap: var(--space-4);
+  }
 }
 
-.live-roomnav a[aria-current="location"] {
-  background: var(--accent-subtle);
-  color: var(--text-heading);
-  font-weight: var(--font-weight-semibold);
-}
-
-.live-roomnav a[aria-current="location"] svg {
-  color: var(--accent-ink);
+@media (min-width: 1280px) {
+  .live-room-grid {
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr) minmax(300px, 360px);
+    grid-template-areas: "stage main rail";
+  }
 }
 
 /* An owner's own result on a finished night: three figures, one row. */
@@ -162,45 +164,6 @@
 
 .live-card-link:hover {
   text-decoration: underline;
-}
-
-/* ---- The owner's team card ------------------------------------------------ */
-
-.my-team-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin-block: var(--space-3);
-}
-
-.my-team-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-}
-
-.my-team-stat--pill {
-  align-items: center;
-  justify-content: center;
-}
-
-.my-team-value {
-  font-size: var(--text-xl-size);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.2;
-  color: var(--text-heading);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.my-team-label {
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
 }
 
 /* ---- Bid feed ------------------------------------------------------------- */
@@ -550,7 +513,8 @@ button.paddle-chip:focus-visible {
 
 /* ---- Stage layout --------------------------------------------------------- */
 
-.owner-stage {
+.owner-stage,
+.owner-standing {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -761,22 +725,6 @@ button.paddle-chip:focus-visible {
   cursor: pointer;
 }
 
-.owner-bidbar .paddle-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, max-content));
-  gap: var(--space-2) var(--space-6);
-  margin-top: var(--space-2);
-}
-
-.owner-bidbar .paddle-stats dt,
-.owner-bidbar .paddle-stats dd {
-  white-space: nowrap;
-}
-
-.owner-bidbar .paddle-stats dd {
-  font-family: var(--font-text);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .owner-chip,
   .owner-bid {
@@ -788,22 +736,20 @@ button.paddle-chip:focus-visible {
   }
 }
 
-/* ---- Laptop: the card beside the price, the sentence and the paddle -------- */
+/* ---- Laptop: the bidding in two cards beside the player card -------------- */
 
 @media (min-width: 900px) {
-  .owner-stage {
-    display: grid;
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-    align-content: start;
-    gap: var(--space-4) var(--space-5);
+  .owner-standing,
+  .owner-bidbar {
+    box-sizing: border-box;
     padding: var(--space-5);
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-2xl);
+    border-radius: var(--radius-xl);
     background: var(--surface-raised);
   }
 
-  .owner-stage > .owner-lot {
-    grid-row: 1 / span 5;
+  .owner-standing {
+    gap: var(--space-4);
   }
 
   .owner-lot .lot-card {
@@ -813,6 +759,29 @@ button.paddle-chip:focus-visible {
 
   .owner-price-amount {
     font-size: 44px;
+  }
+
+  /* The mockup's order on a laptop: what you can spend, the one big button,
+     then the bigger amounts under it. */
+  .owner-bidbar {
+    gap: var(--space-3);
+  }
+
+  .owner-bidbar .owner-bid {
+    order: 1;
+    min-height: 72px;
+  }
+
+  .owner-bidbar .owner-chips {
+    order: 2;
+  }
+
+  .owner-bidbar .owner-bid-back {
+    order: 3;
+  }
+
+  .owner-budget {
+    font-size: var(--text-sm-size);
   }
 }
 
@@ -851,7 +820,7 @@ button.paddle-chip:focus-visible {
     pointer-events: none;
   }
 
-  .owner-bidbar .paddle-stats {
+  .owner-budget-need {
     display: none;
   }
 
