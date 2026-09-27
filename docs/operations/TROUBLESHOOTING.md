@@ -51,8 +51,12 @@ orgs are gone — that is the point of this reset.
 
 ### MinIO / object storage
 
+The `storage` service runs Silo (`pgsty/silo`), the community fork of MinIO —
+`quay.io/minio/minio` and `minio/minio` no longer pull (see DEPLOYMENT.md). A
+`401 UNAUTHORIZED` from quay.io on `docker compose up` means a stale checkout.
+
 ```sh
-docker compose down storage && docker volume rm desiauction-next_miniodata
+docker compose down storage && docker volume rm desiauction_miniodata
 docker compose up -d
 ```
 

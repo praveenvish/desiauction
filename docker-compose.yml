@@ -58,10 +58,13 @@ services:
       retries: 10
 
   storage:
-    # The build production runs (ops/deploy/docker-compose.production.yml), from
-    # quay.io: MinIO removed minio/minio from Docker Hub, so the old
-    # `minio/minio:latest` no longer pulls at all.
-    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    # The build production runs (ops/deploy/docker-compose.production.yml):
+    # Silo, the community-maintained fork of MinIO. MinIO withdrew every public
+    # image — Docker Hub (2026-09-11), then quay.io (401 for anonymous pulls,
+    # 2026-09) — so neither `minio/minio` nor `quay.io/minio/minio` pulls. Silo
+    # keeps the S3 API, MINIO_* env vars, `server /data --console-address`,
+    # /minio/health/live and the on-disk format. Why and how: DEPLOYMENT.md.
+    image: pgsty/silo@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46 # RELEASE.2026-09-16T00-00-00Z
     container_name: desiauction-minio
     command: server /data --console-address ":9001"
     ports:
