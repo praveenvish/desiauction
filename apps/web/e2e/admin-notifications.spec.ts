@@ -48,6 +48,13 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   });
 }
 
+/** Open one message's panel from its row in the list. */
+async function openMessage(page: Page, kind: string): Promise<void> {
+  await page.getByTestId(`notify-kind-${kind}`).click();
+  await expect(page).toHaveURL(new RegExp(`[?&]kind=${kind.replaceAll(".", "\\.")}$`));
+  await expect(page.getByTestId("notify-panel")).toBeVisible();
+}
+
 test.afterAll(async () => {
   // A backstop only: the tests revert through the page. A row left here would
   // hold a platform-wide switch off for every later spec.
@@ -65,15 +72,19 @@ test("an admin switches a message off, sees it hold across a reload, and reverts
   await otpLogin(page, FOUNDER);
   await page.goto("/admin/notifications");
   await expect(page.getByTestId("notify-channels")).toBeVisible();
+  // A message's switches live in its panel, opened from its row (?kind=).
+  await openMessage(page, "auth.email_code");
   await expect(page.getByTestId("notify-state-auth.email_code-email")).toHaveText(/Locked/);
   // A sign-in code has no control to reach for.
   await expect(page.getByTestId("notify-cell-auth.email_code-email")).toHaveCount(0);
 
+  await openMessage(page, KIND);
   const cell = page.getByTestId(`notify-cell-${KIND}-email`);
   await expect(cell).toBeChecked();
   await cell.uncheck();
   await expect(page.getByTestId(`notify-state-${KIND}-email`)).toHaveText(/Off by admin/);
 
+  // The open message is in the address, so a reload keeps it open.
   await page.reload();
   await expect(page.getByTestId(`notify-cell-${KIND}-email`)).not.toBeChecked();
   await expect(page.getByTestId(`notify-state-${KIND}-email`)).toHaveText(/Off by admin/);
@@ -95,6 +106,7 @@ test("a security alert will not switch off without a written reason", async ({ p
   test.setTimeout(180_000);
   await otpLogin(page, FOUNDER);
   await page.goto("/admin/notifications");
+  await openMessage(page, SECURITY);
 
   // A click, not uncheck(): a security alert's switch stays ON while the dialog
   // asks for a reason — it only goes off once the reason is confirmed.

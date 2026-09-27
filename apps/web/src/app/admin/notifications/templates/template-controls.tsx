@@ -1,6 +1,15 @@
 "use client";
 
-import { Button, Dialog, Field, IconAlert, Notice, useToast } from "@desiauction/ui";
+import {
+  Button,
+  Dialog,
+  Field,
+  IconAlert,
+  IconKebab,
+  Notice,
+  PopoverMenu,
+  useToast,
+} from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -251,36 +260,80 @@ export function MapTemplate({
   );
 }
 
-/** Drop the mapping: the server setting decides again. */
-export function ClearTemplate({
+/**
+ * A row's rarer doors, behind one ⋯: the message in Messages, Clear (drop the
+ * mapping — the server setting decides again) and Submit to Meta. Map and a
+ * ready "Use <name>" stay on the row; these do not need to shout.
+ */
+export function TemplateRowMenu({
   kind,
   kindLabel,
   channel,
-  fallback,
+  clear,
+  submit,
 }: {
   kind: string;
   kindLabel: string;
   channel: "whatsapp" | "sms";
-  fallback: string | null;
+  /** The Clear item's words, or null when nothing was mapped here. */
+  clear: string | null;
+  /** What Submit sends, or null when it cannot be offered. */
+  submit: { suggestedName: string; preview: readonly PreviewLanguage[] } | null;
 }) {
-  const { pending, run } = useRun();
+  const { run } = useRun();
+  const [submitting, setSubmitting] = useState(false);
+  const channelLabel = channel === "whatsapp" ? "WhatsApp" : "SMS";
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      loading={pending}
-      onClick={() => {
-        run(() => clearProviderTemplate(kind, channel));
-      }}
-      data-testid={`tpl-clear-${channel}-${kind}`}
-      title={
-        fallback === null
-          ? "No server setting underneath: the moment will have no template."
-          : `Falls back to the server setting: ${fallback}`
-      }
-    >
-      Clear mapping<span className="admin-sr-only"> for {kindLabel}</span>
-    </Button>
+    <>
+      <PopoverMenu
+        label={`More for ${kindLabel} on ${channelLabel}`}
+        trigger={<IconKebab size={20} />}
+        triggerClassName="ntc-kebab"
+        items={[
+          {
+            key: "messages",
+            label: "Open in Messages",
+            href: `/admin/notifications?kind=${encodeURIComponent(kind)}`,
+          },
+          ...(submit === null
+            ? []
+            : [
+                {
+                  key: "submit",
+                  label: "Submit to Meta…",
+                  testId: `tpl-submit-${kind}-open`,
+                  onSelect: () => {
+                    setSubmitting(true);
+                  },
+                },
+              ]),
+          ...(clear === null
+            ? []
+            : [
+                {
+                  key: "clear",
+                  label: clear,
+                  danger: true,
+                  testId: `tpl-clear-${channel}-${kind}`,
+                  onSelect: () => {
+                    run(() => clearProviderTemplate(kind, channel));
+                  },
+                },
+              ]),
+        ]}
+      />
+      {submit !== null && submitting ? (
+        <SubmitDialog
+          kind={kind}
+          kindLabel={kindLabel}
+          suggestedName={submit.suggestedName}
+          preview={submit.preview}
+          onClose={() => {
+            setSubmitting(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -340,126 +393,99 @@ export interface PreviewLanguage {
 }
 
 /**
- * Submit the catalogue's own template to Meta. The dialog shows EXACTLY what
+ * Submit the catalogue's own template to Meta — opened from a row's ⋯. The dialog shows EXACTLY what
  * goes — the body per language, its samples, footer and button, and the JSON
  * itself — because an approved template cannot be edited afterwards.
  */
-export function SubmitTemplate({
+function SubmitDialog({
   kind,
   kindLabel,
   suggestedName,
   preview,
+  onClose,
 }: {
   kind: string;
   kindLabel: string;
   suggestedName: string;
   preview: readonly PreviewLanguage[];
+  onClose: () => void;
 }) {
   const { pending, run } = useRun();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(suggestedName);
   const [languages, setLanguages] = useState<string[]>(["en", "hi"]);
   const problem = nameProblem("whatsapp", name);
   const valid = name.trim() !== "" && problem === undefined && languages.length > 0;
   const idPrefix = `tpl-submit-${kind}`;
   return (
-    <>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => {
-          setName(suggestedName);
-          setLanguages(["en", "hi"]);
-          setOpen(true);
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Submit ${kindLabel} to Meta for approval`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            loading={pending}
+            disabled={!valid}
+            onClick={() => {
+              run(() => submitProviderTemplate(kind, name.trim(), languages), onClose);
+            }}
+            data-testid={`${idPrefix}-confirm`}
+          >
+            Submit for approval
+          </Button>
+        </>
+      }
+    >
+      <p>
+        Meta reviews it as a <strong>Utility</strong> template, usually within a day. An approved
+        template cannot be edited — a new wording is a new name. Once Meta approves it, map the name
+        here; nothing changes for players until you do.
+      </p>
+      <Field
+        label="Template name"
+        name={`${idPrefix}-name`}
+        value={name}
+        required
+        autoComplete="off"
+        spellCheck={false}
+        maxLength={NAME_MAX}
+        data-testid={`${idPrefix}-name`}
+        {...(problem === undefined ? {} : { error: problem })}
+        help="Lowercase letters, digits and underscores. One name holds both languages."
+        onChange={(event) => {
+          setName(event.target.value);
         }}
-        data-testid={`${idPrefix}-open`}
-      >
-        Submit to Meta…<span className="admin-sr-only"> — {kindLabel}</span>
-      </Button>
-      <Dialog
-        open={open}
-        onClose={() => {
-          setOpen(false);
-        }}
-        title={`Submit ${kindLabel} to Meta for approval`}
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setOpen(false);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              loading={pending}
-              disabled={!valid}
-              onClick={() => {
-                run(
-                  () => submitProviderTemplate(kind, name.trim(), languages),
-                  () => {
-                    setOpen(false);
-                  },
-                );
-              }}
-              data-testid={`${idPrefix}-confirm`}
-            >
-              Submit for approval
-            </Button>
-          </>
-        }
-      >
-        <p>
-          Meta reviews it as a <strong>Utility</strong> template, usually within a day. An approved
-          template cannot be edited — a new wording is a new name. Once Meta approves it, map the
-          name here; nothing changes for players until you do.
-        </p>
-        <Field
-          label="Template name"
-          name={`${idPrefix}-name`}
-          value={name}
-          required
-          autoComplete="off"
-          spellCheck={false}
-          maxLength={NAME_MAX}
-          data-testid={`${idPrefix}-name`}
-          {...(problem === undefined ? {} : { error: problem })}
-          help="Lowercase letters, digits and underscores. One name holds both languages."
-          onChange={(event) => {
-            setName(event.target.value);
-          }}
-        />
-        <LanguageChecks idPrefix={idPrefix} chosen={languages} onChange={setLanguages} />
-        {preview
-          .filter((p) => languages.includes(p.language))
-          .map((p) => (
-            <section
-              key={p.language}
-              className="ptpl-preview"
-              aria-label={`What Meta receives in ${p.languageLabel}`}
-              data-testid={`${idPrefix}-preview-${p.language}`}
-            >
-              <h3 className="ptpl-preview-title">{p.languageLabel}</h3>
-              <p className="ptpl-preview-body" lang={p.language}>
-                {p.body}
-              </p>
-              <p className="admin-meta">
-                Footer: {p.footer} · Button: <span lang={p.language}>{p.button}</span> →{" "}
-                {p.buttonUrl}
-              </p>
-              <p className="admin-meta">
-                Samples:{" "}
-                {p.samples.map((sample, i) => `{{${String(i + 1)}}} ${sample}`).join(" · ")}
-              </p>
-              <details className="ptpl-json">
-                <summary>The exact request</summary>
-                <pre>{p.json.replace(/"name": "[^"]*"/, `"name": "${name.trim()}"`)}</pre>
-              </details>
-            </section>
-          ))}
-      </Dialog>
-    </>
+      />
+      <LanguageChecks idPrefix={idPrefix} chosen={languages} onChange={setLanguages} />
+      {preview
+        .filter((p) => languages.includes(p.language))
+        .map((p) => (
+          <section
+            key={p.language}
+            className="ptpl-preview"
+            aria-label={`What Meta receives in ${p.languageLabel}`}
+            data-testid={`${idPrefix}-preview-${p.language}`}
+          >
+            <h3 className="ptpl-preview-title">{p.languageLabel}</h3>
+            <p className="ptpl-preview-body" lang={p.language}>
+              {p.body}
+            </p>
+            <p className="admin-meta">
+              Footer: {p.footer} · Button: <span lang={p.language}>{p.button}</span> → {p.buttonUrl}
+            </p>
+            <p className="admin-meta">
+              Samples: {p.samples.map((sample, i) => `{{${String(i + 1)}}} ${sample}`).join(" · ")}
+            </p>
+            <details className="ptpl-json">
+              <summary>The exact request</summary>
+              <pre>{p.json.replace(/"name": "[^"]*"/, `"name": "${name.trim()}"`)}</pre>
+            </details>
+          </section>
+        ))}
+    </Dialog>
   );
 }
 

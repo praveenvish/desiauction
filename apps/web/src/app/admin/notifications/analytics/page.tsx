@@ -1,18 +1,14 @@
 import {
   EmptyState,
-  IconAlert,
-  SegmentedTabs,
-  IconBroadcast,
-  IconChart,
-  IconClock,
-  IconLock,
-  IconSend,
+  IconMail,
+  IconSms,
+  IconTile,
+  IconWhatsApp,
   Pill,
-  SectionCard,
-  StatCard,
-  StatGrid,
+  SegmentedTabs,
 } from "@desiauction/ui";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { platformAdminPageGate } from "../../../../server/admin/authz";
 import { ANALYTICS_WINDOWS, parseWindow, rate } from "../../../../server/admin/delivery-analytics";
@@ -23,6 +19,7 @@ import {
   type ReasonRow,
 } from "../../../../server/admin/delivery-analytics-views";
 import { TrendChart } from "./trend-chart";
+import { headlineFigures, totalsOf } from "./analytics-model";
 import { AdminPageHead, humanAction, KpiValue, TableCount } from "../../admin-ui";
 import { formatCount } from "../../../../server/admin/format";
 import { NotifySubnav } from "../notify-subnav";
@@ -53,6 +50,12 @@ const CHANNEL_LABEL: Record<AnalyticsChannel, string> = {
   sms: "SMS",
 };
 
+const CHANNEL_ICON: Record<AnalyticsChannel, ReactNode> = {
+  email: <IconMail />,
+  whatsapp: <IconWhatsApp />,
+  sms: <IconSms />,
+};
+
 const STATUS_LABEL: Record<ReasonRow["status"], { label: string; tone: "red" | "amber" }> = {
   failed: { label: "Failed", tone: "red" },
   suppressed: { label: "Suppressed", tone: "amber" },
@@ -73,15 +76,7 @@ export default async function AdminDeliveryAnalyticsPage({
     notFound();
   }
   const anything = view.channels.some((c) => c.sent + c.failed + c.suppressed + c.pending > 0);
-  const totals = view.channels.reduce(
-    (acc, c) => ({
-      queued: acc.queued + c.sent + c.failed + c.suppressed + c.pending,
-      sent: acc.sent + c.sent,
-      suppressed: acc.suppressed + c.suppressed,
-      failed: acc.failed + c.failed,
-    }),
-    { queued: 0, sent: 0, suppressed: 0, failed: 0 },
-  );
+  const figures = headlineFigures(totalsOf(view.channels), windowDays);
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
@@ -102,50 +97,41 @@ export default async function AdminDeliveryAnalyticsPage({
           <NotifySubnav current="analytics" />
         </AdminPageHead>
         <p className="admin-lede admin-lede-under">
-          Queued messages by channel and kind, and why the ones that did not go did not. Sign-in
-          codes, receipts and security emails are not counted. Days are India time.
+          How queued messages went, by channel and kind, and why the ones that did not go did not.
+          Sign-in codes, receipts and security emails are not counted. Days are India time.
         </p>
 
-        {/* The headline first: how much went out and how much did not, in
-            the console's one KPI tile — the channel cards break it down. */}
-        <StatGrid testId="analytics-headline">
-          <StatCard
-            icon={<IconBroadcast />}
-            concept="neutral"
-            value={<KpiValue n={totals.queued} />}
-            label="Queued"
-            hint={`Last ${String(windowDays)} days`}
-          />
-          <StatCard
-            icon={<IconSend />}
-            concept={totals.sent > 0 ? "done" : "neutral"}
-            value={<KpiValue n={totals.sent} />}
-            label="Sent"
-            hint={`${rate(totals.failed, totals.sent + totals.failed)} failure rate`}
-          />
-          <StatCard
-            icon={<IconLock />}
-            concept="neutral"
-            value={<KpiValue n={totals.suppressed} />}
-            label="Suppressed"
-            hint="Held back on purpose"
-          />
-          <StatCard
-            icon={<IconAlert />}
-            concept={totals.failed > 0 ? "alert" : "neutral"}
-            value={<KpiValue n={totals.failed} />}
-            label="Failed"
-          />
-        </StatGrid>
+        {/* The headline: one strip of four figures, each with the one fact
+            that reads it. The channel rows under it break it down. */}
+        <section
+          className="msg-card dla-headline"
+          aria-label="In total"
+          data-testid="analytics-headline"
+        >
+          <dl className="dla-figs">
+            {figures.map((figure) => (
+              <div key={figure.key} className="dla-fig" data-alarm={figure.alarm || undefined}>
+                <dt>{figure.label}</dt>
+                <dd className="dla-fig-value">
+                  <KpiValue n={figure.value} />
+                </dd>
+                <dd className="dla-fig-hint">{figure.hint}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
 
-        <SectionCard
-          icon={<IconBroadcast />}
-          tone="neutral"
-          title="By channel"
-          description={`The last ${String(windowDays)} days, from ${istDay(view.since)}, India time.`}
-          flush
+        <section
+          className="msg-card"
+          aria-labelledby="dla-channels-title"
           data-testid="analytics-channels"
         >
+          <header className="msg-group-head">
+            <h2 id="dla-channels-title">By channel</h2>
+            <span>
+              Last {String(windowDays)} days, from {istDay(view.since)}
+            </span>
+          </header>
           <div className="dla-figures">
             {view.channels.map((c) => {
               const settled = c.sent + c.failed;
@@ -156,7 +142,8 @@ export default async function AdminDeliveryAnalyticsPage({
                   aria-labelledby={`analytics-channel-${c.channel}`}
                   data-testid={`analytics-channel-${c.channel}`}
                 >
-                  <h3 id={`analytics-channel-${c.channel}`} className="admin-name">
+                  <h3 id={`analytics-channel-${c.channel}`} className="dla-channel-name">
+                    <IconTile icon={CHANNEL_ICON[c.channel]} tone="neutral" size="sm" />
                     {CHANNEL_LABEL[c.channel]}
                   </h3>
                   <dl>
@@ -182,15 +169,17 @@ export default async function AdminDeliveryAnalyticsPage({
                       </>
                     ) : null}
                     <dt>Failure rate</dt>
-                    <dd>{rate(c.failed, settled)}</dd>
+                    <dd data-zero={settled === 0 || undefined}>{rate(c.failed, settled)}</dd>
                     {c.channel === "whatsapp" ? (
                       <>
                         <dt>Delivered</dt>
-                        <dd data-testid="analytics-whatsapp-delivered">
+                        <dd data-testid="analytics-whatsapp-delivered" data-zero={zero(c.sent)}>
                           {rate(c.delivered, c.sent)}
                         </dd>
                         <dt>Read</dt>
-                        <dd data-testid="analytics-whatsapp-read">{rate(c.read, c.sent)}</dd>
+                        <dd data-testid="analytics-whatsapp-read" data-zero={zero(c.sent)}>
+                          {rate(c.read, c.sent)}
+                        </dd>
                       </>
                     ) : null}
                   </dl>
@@ -198,85 +187,71 @@ export default async function AdminDeliveryAnalyticsPage({
               );
             })}
           </div>
-        </SectionCard>
+        </section>
 
-        <SectionCard
-          icon={<IconClock />}
-          tone="neutral"
-          title="By day"
-          description="Queued messages each day, by how they ended."
-          flush
-        >
-          <TrendChart days={view.daily} windowDays={windowDays} />
-        </SectionCard>
+        {/* The trend and its reasons side by side on a laptop: what happened
+            each day, and why what did not go did not. */}
+        <div className="dla-pair">
+          <section className="msg-card" aria-labelledby="dla-trend-title">
+            <header className="msg-group-head">
+              <h2 id="dla-trend-title">By day</h2>
+              <span>Queued each day, by how it ended</span>
+            </header>
+            <TrendChart days={view.daily} windowDays={windowDays} />
+          </section>
 
-        <SectionCard
-          icon={<IconAlert />}
-          tone="neutral"
-          title="Why messages did not go"
-          description="The most common reasons, grouped. Never the recipient or the message."
-          flush
-          data-testid="analytics-reasons"
-        >
-          {view.reasons.length === 0 ? (
-            <div className="admin-card-empty">
-              <EmptyState
-                size="compact"
-                headingLevel={3}
-                title="Nothing failed or was suppressed"
-                description={`In the last ${String(windowDays)} days every queued message that settled was sent.`}
-              />
-            </div>
-          ) : (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Reason</th>
-                    <th scope="col">Outcome</th>
-                    <th scope="col">Channels</th>
-                    <th scope="col" className="admin-num">
-                      Count
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.reasons.map((r) => (
-                    <tr key={`${r.status}|${r.label}`} data-testid={`analytics-reason-${r.label}`}>
-                      <td data-label="Reason">
-                        <span className="dla-code" title={r.label}>
-                          {humanAction(r.label)}
-                        </span>
-                      </td>
-                      <td data-label="Outcome">
+          <section
+            className="msg-card"
+            aria-labelledby="dla-reasons-title"
+            data-testid="analytics-reasons"
+          >
+            <header className="msg-group-head">
+              <h2 id="dla-reasons-title">Why messages did not go</h2>
+              <span>Grouped · never who or what</span>
+            </header>
+            {view.reasons.length === 0 ? (
+              <div className="dla-empty">
+                <EmptyState
+                  size="compact"
+                  headingLevel={3}
+                  title="Nothing failed or was suppressed"
+                  description={`In the last ${String(windowDays)} days every queued message that settled was sent.`}
+                />
+              </div>
+            ) : (
+              <ul className="dla-reasons">
+                {view.reasons.map((r) => (
+                  <li key={`${r.status}|${r.label}`} data-testid={`analytics-reason-${r.label}`}>
+                    <span className="dla-reason-main">
+                      <span className="dla-reason-name" title={r.label}>
+                        {humanAction(r.label)}
+                      </span>
+                      <span className="dla-reason-meta">
                         <Pill tone={STATUS_LABEL[r.status].tone}>
                           {STATUS_LABEL[r.status].label}
                         </Pill>
-                      </td>
-                      <td data-label="Channels">
-                        {r.channels.map((c) => CHANNEL_LABEL[c]).join(", ")}
-                      </td>
-                      <td data-label="Count" className="admin-count admin-num">
-                        {formatCount(r.count)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
+                        <span>{r.channels.map((c) => CHANNEL_LABEL[c]).join(", ")}</span>
+                      </span>
+                    </span>
+                    <span className="dla-reason-count">{formatCount(r.count)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
 
-        <SectionCard
-          icon={<IconChart />}
-          tone="neutral"
-          title="By kind"
-          description="Each message kind on each channel, busiest first."
-          flush
+        <section
+          className="msg-card"
+          aria-labelledby="dla-kinds-title"
           data-testid="analytics-kinds"
         >
+          <header className="msg-group-head">
+            <h2 id="dla-kinds-title">By kind</h2>
+            <span>Each message on each channel, busiest first</span>
+          </header>
           {!anything ? (
-            <div className="admin-card-empty">
+            <div className="dla-empty">
               <EmptyState
                 size="compact"
                 headingLevel={3}
@@ -286,7 +261,7 @@ export default async function AdminDeliveryAnalyticsPage({
             </div>
           ) : (
             <div className="admin-table-wrap">
-              <table className="admin-table">
+              <table className="admin-table dla-table">
                 <thead>
                   <tr>
                     <th scope="col">Kind</th>
@@ -333,7 +308,7 @@ export default async function AdminDeliveryAnalyticsPage({
               </table>
             </div>
           )}
-        </SectionCard>
+        </section>
       </div>
     </main>
   );

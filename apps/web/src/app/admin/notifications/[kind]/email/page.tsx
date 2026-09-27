@@ -1,12 +1,13 @@
 import {
   EmptyState,
-  IconClock,
+  IconChevronLeft,
   IconMail,
+  IconTile,
   Pill,
-  SectionCard,
   ToastProvider,
   type KitTone,
 } from "@desiauction/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -89,52 +90,66 @@ export default async function EmailWordingPage({ params }: { params: Promise<{ k
             be undone.
           </p>
 
-          <SectionCard
-            icon={<IconMail />}
-            tone="blue"
-            title={view.label}
-            description={view.description}
-            data-testid="template-kind"
-          >
-            <div className="tpl-kind-facts">
-              <Pill tone={category.tone}>{category.label}</Pill>
-              <Pill tone="neutral">
-                {view.spec.format === "layout" ? "Branded email" : "Plain-text email"}
-              </Pill>
+          {/* The email, named once, with the way back to its message — the
+              page is a message's wording, opened from its panel. */}
+          <header className="msg-card tpl-kind" data-testid="template-kind">
+            <Link
+              href={`/admin/notifications?kind=${encodeURIComponent(view.kind)}`}
+              className="msg-link tpl-kind-back"
+            >
+              <IconChevronLeft size={16} />
+              Back to the message
+            </Link>
+            <div className="tpl-kind-main">
+              <IconTile icon={<IconMail />} tone="neutral" size="sm" />
+              <div className="tpl-kind-text">
+                <span className="msg-eyebrow">Email wording</span>
+                <h2 className="tpl-kind-title">{view.label}</h2>
+                <p className="tpl-kind-desc">{view.description}</p>
+              </div>
+              <div className="tpl-kind-facts">
+                <Pill tone={category.tone}>{category.label}</Pill>
+                <Pill tone="neutral">
+                  {view.spec.format === "layout" ? "Branded email" : "Plain-text email"}
+                </Pill>
+              </div>
             </div>
             {view.spec.note === undefined ? null : (
               <p className="tpl-kind-note" data-testid="template-note">
                 {view.spec.note}
               </p>
             )}
-          </SectionCard>
+          </header>
 
           <TemplateEditor view={view} history={history} />
 
-          <SectionCard
-            icon={<IconClock />}
-            tone="neutral"
-            title="Recent changes"
-            description="The last twenty publishes, restores, resets and test sends of this email, newest first."
-            flush
+          <section
+            className="msg-card msg-recent"
+            aria-labelledby="tpl-changes-title"
             data-testid="template-changes"
           >
+            <header className="msg-recent-head">
+              <h2 id="tpl-changes-title">Recent changes</h2>
+              <span>
+                The last twenty publishes, restores, resets and test sends of this email, newest
+                first
+              </span>
+            </header>
             {view.changes.length === 0 ? (
-              <div className="admin-card-empty">
-                <EmptyState
-                  size="compact"
-                  headingLevel={3}
-                  title="Nothing changed yet"
-                  description="This email still uses DesiAuction's default wording in every language."
-                />
-              </div>
+              <EmptyState
+                size="compact"
+                headingLevel={3}
+                title="Nothing changed yet"
+                description="This email still uses DesiAuction's default wording in every language."
+              />
             ) : (
-              <ul className="admin-rows is-stacked">
+              <ul className="msg-recent-list">
                 {view.changes.map((change) => (
                   <li key={change.id}>
-                    <span className="admin-cell-main">
-                      <span className="admin-name">{change.summary}</span>
-                      <span className="admin-meta">
+                    <span className="msg-recent-dot" aria-hidden />
+                    <span className="msg-recent-text">
+                      <span className="msg-change-line">{change.summary}</span>
+                      <span className="msg-change-meta">
                         {change.actorName ?? "An operator"} · <RelativeTime at={change.at} />
                       </span>
                     </span>
@@ -142,7 +157,7 @@ export default async function EmailWordingPage({ params }: { params: Promise<{ k
                 ))}
               </ul>
             )}
-          </SectionCard>
+          </section>
         </div>
       </main>
     </ToastProvider>

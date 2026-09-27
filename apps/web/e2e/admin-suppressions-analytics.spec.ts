@@ -155,7 +155,7 @@ test("delivery analytics renders, and the window switch is a link", async ({ pag
   test.setTimeout(180_000);
   await otpLogin(page, FOUNDER);
   await page.goto("/admin/notifications");
-  await page.getByRole("link", { name: "Delivery analytics", exact: true }).click();
+  await page.getByRole("link", { name: "Delivery", exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/notifications\/analytics$/);
   await expect(page.getByTestId("analytics-channels")).toBeVisible();
   await expect(page.getByTestId("analytics-channel-whatsapp")).toContainText("Delivered");

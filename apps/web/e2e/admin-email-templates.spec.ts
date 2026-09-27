@@ -79,6 +79,8 @@ test("an admin publishes, restores and resets an email's wording, and a foreign 
 
   await otpLogin(page, FOUNDER);
   await page.goto("/admin/notifications");
+  // The wording link lives in the message's panel, opened from its row.
+  await page.getByTestId(`notify-kind-${KIND}`).click();
   const line = page.getByTestId(`notify-wording-${KIND}`);
   await expect(line).toContainText("Default");
   await line.getByRole("link", { name: /Edit email wording/ }).click();
@@ -141,8 +143,8 @@ test("an admin publishes, restores and resets an email's wording, and a foreign 
   await page.getByTestId("template-discard").click();
   await expect(page.getByTestId("template-publish")).toBeEnabled();
 
-  // And the grid says so.
-  await page.goto("/admin/notifications");
+  // And the message's panel says so.
+  await page.goto(`/admin/notifications?kind=${KIND}`);
   await expect(page.getByTestId(`notify-wording-${KIND}`)).not.toContainText("Published");
 });
 
