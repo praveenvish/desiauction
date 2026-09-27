@@ -759,3 +759,263 @@
     display: none;
   }
 }
+
+/* ---- After the night (overview-dashboard.tsx, terminal branch) ------------ */
+
+/* The result band: the one answer a finished night gives, on the same warm
+   floodlight as the home heroes — a gold glow on the page's own surface, so it
+   reads in both themes without a second palette. */
+.dash-result-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: clamp(var(--space-5), 3vw, var(--space-6));
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 20%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      50% 120% at 0% 100%,
+      color-mix(in srgb, var(--accent) 10%, transparent),
+      transparent 65%
+    ),
+    var(--surface-raised);
+  box-shadow: var(--shadow-2);
+}
+
+.dash-result-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.dash-result-log {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.dash-result-log:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dash-result-log:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.dash-result-title {
+  margin: 0;
+  font-size: var(--text-3xl-size);
+  line-height: var(--text-3xl-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-result-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-result-bar {
+  margin-top: var(--space-2);
+}
+
+/* Teams: one row per team — paddle, name, owner and squad, the spend bar in
+   the team's colour, and spent over left at the end. */
+.dash-teams,
+.dash-buys {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-teams li,
+.dash-buys li {
+  display: grid;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.dash-teams li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.dash-team-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.dash-team-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-width: 0;
+}
+
+.dash-team-name strong,
+.dash-buy-who strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dash-team-meta,
+.dash-buy-who span {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.dash-team-money {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dash-team-money strong {
+  color: var(--text-heading);
+}
+
+.dash-team-money span {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.dash-buys {
+  counter-reset: buy;
+}
+
+.dash-buys li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.dash-buy-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dash-buy-price {
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Rules and screens are reference once the night is over: two rows that
+   open, each holding its full card with the card's own header folded away. */
+.dash-folds {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.dash-fold + .dash-fold {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.dash-fold summary {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 0 var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  list-style: none;
+  cursor: pointer;
+}
+
+.dash-fold summary::-webkit-details-marker {
+  display: none;
+}
+
+.dash-fold summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.dash-fold summary strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dash-fold-hint {
+  overflow: hidden;
+  text-align: end;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-fold-caret {
+  transition: transform var(--duration-fast) ease;
+}
+
+.dash-fold[open] .dash-fold-caret {
+  transform: rotate(180deg);
+}
+
+.dash-fold > section {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dash-fold > section > header {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .dash-result-title {
+    font-size: var(--text-2xl-size);
+    line-height: var(--text-2xl-line);
+  }
+
+  .dash-teams li,
+  .dash-buys li {
+    padding-inline: var(--space-4);
+  }
+
+  .dash-fold summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0 var(--space-4);
+  }
+
+  .dash-fold-hint {
+    display: none;
+  }
+}

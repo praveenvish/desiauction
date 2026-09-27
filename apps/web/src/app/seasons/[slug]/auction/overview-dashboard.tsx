@@ -5,8 +5,10 @@ import {
   CardGrid,
   IconArrowRight,
   IconCheck,
+  IconChevronDown,
   IconClock,
   IconCrown,
+  IconFile,
   IconFlag,
   IconGavel,
   IconImage,
@@ -15,6 +17,7 @@ import {
   IconPlay,
   IconSend,
   IconTrophy,
+  IconTv,
   IconUsers,
   IconWallet,
   Pill,
@@ -33,7 +36,7 @@ import { LotStatusPill, PaddleChip, eventLabel } from "./auction-bits";
 import { BroadcastLinks } from "./broadcast-links";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 import { useMoney } from "../../../../components/money-unit";
-import { formatCount } from "../../../../lib/plural";
+import { countNoun, formatCount } from "../../../../lib/plural";
 
 /*
  * THE OVERVIEW TAB AS A DASHBOARD (founder mockup 4).
@@ -52,6 +55,7 @@ import { formatCount } from "../../../../lib/plural";
 
 const QUEUE_PREVIEW = 8;
 const LOG_PREVIEW = 5;
+const TOP_BUYS = 5;
 
 function TabLink({ tab, children }: { tab: string; children: string }) {
   return (
@@ -118,16 +122,8 @@ export function OverviewDashboard({
       data-testid="auction-progress-summary"
       action={
         <span className="auc-card-meta" data-testid="auction-progress-counts">
-          {terminal ? (
-            <>
-              {counts.sold} sold · {counts.unsold} unsold
-            </>
-          ) : (
-            <>
-              {counts.sold} sold · {counts.onBlock} on block · {counts.queued} queued ·{" "}
-              {counts.prepared} prepared · {counts.unsold} unsold
-            </>
-          )}
+          {counts.sold} sold · {counts.onBlock} on block · {counts.queued} queued ·{" "}
+          {counts.prepared} prepared · {counts.unsold} unsold
         </span>
       }
     >
@@ -173,7 +169,7 @@ export function OverviewDashboard({
           )}
         </span>
       </div>
-      {counts.queued === 0 && counts.prepared > 0 && !terminal ? (
+      {counts.queued === 0 && counts.prepared > 0 ? (
         <p className="auc-card-note" data-testid="nothing-queued-hint">
           Nothing is queued yet. {counts.prepared} prepared lot
           {counts.prepared === 1 ? " is" : "s are"} waiting for “Queue all prepared” on the Players
@@ -233,13 +229,6 @@ export function OverviewDashboard({
         <div className="dash-block-actions">
           <ButtonLink href={`/seasons/${slug}/auction/cockpit`} size="touch">
             Open auction cockpit
-            <IconArrowRight size={18} />
-          </ButtonLink>
-        </div>
-      ) : terminal ? (
-        <div className="dash-block-actions">
-          <ButtonLink href={`/seasons/${slug}/auction/live`} variant="secondary" size="touch">
-            See the final room
             <IconArrowRight size={18} />
           </ButtonLink>
         </div>
@@ -690,57 +679,251 @@ export function OverviewDashboard({
       />
     ) : null;
 
+  /*
+   * AFTER THE NIGHT (auction hub redesign, 2026-09-27).
+   *
+   * A finished auction used to stack eight cards: progress, the follow-up
+   * doors, a purse breakdown and a paddles table that listed the same three
+   * teams twice, the rules, the room screens, the lot queue still in
+   * registration order (L001–L008 of a night that is over) and the raw engine
+   * log ("Lot opened", "Lot unsold"). On a phone that ran 8,500px. What the
+   * organizer asks the morning after is: how did it end, what is left to do,
+   * where did each team land, who went for the most. The rules and screens
+   * are reference now, so they fold; the log keeps its own tab.
+   */
+  if (terminal) {
+    const heldBy = new Map(view.paddles.map((paddle) => [paddle.paddleNumber, paddle]));
+    const teamOfPaddle = new Map(paddles.map((row) => [row.paddleNumber, row.teamName]));
+
+    const usedPct =
+      purseTotal !== null && purseTotal > 0
+        ? ((moneyMoved / purseTotal) * 100).toFixed(1).replace(/\.0$/, "")
+        : null;
+    const spentText = points ? money.exact(moneyMoved) : money.compact(moneyMoved);
+
+    const resultBand = (
+      <section
+        className="dash-result-band"
+        data-testid="auction-progress-summary"
+        data-status={status}
+        aria-labelledby="dash-result-title"
+      >
+        <div className="dash-result-top">
+          <h2 id="dash-result-title" className="dash-result-title">
+            {counts.sold} of {totalLots} sold
+          </h2>
+          <a className="dash-result-log" href="#log">
+            {countNoun(view.eventCount, "event")} in the log
+            <IconArrowRight size={14} />
+          </a>
+        </div>
+        <p className="dash-result-sub" data-testid="auction-progress-counts">
+          <span>
+            {counts.sold} sold · {counts.unsold} unsold
+          </span>
+          <span>
+            {spentText} spent
+            {usedPct !== null ? ` · ${usedPct}% of every purse` : ""}
+          </span>
+        </p>
+        <span className="dash-progress dash-result-bar" aria-hidden>
+          {segments.map((segment) =>
+            segment.n > 0 ? (
+              <span
+                key={segment.key}
+                className="dash-progress-seg"
+                data-kind={segment.key}
+                style={{ width: `${String(pct(segment.n))}%` }}
+              />
+            ) : null,
+          )}
+        </span>
+      </section>
+    );
+
+    /* One card per team: the purse breakdown and the paddles table were the
+       same three rows twice. The purse figures stay sealed (DA-30) exactly as
+       before — without money sight they were never sent. */
+    const teamsCard = (
+      <SectionCard
+        icon={<IconUsers />}
+        concept="teams"
+        title="Teams"
+        data-testid="purse-burndown"
+        action={<TabLink tab="paddles">Paddles</TabLink>}
+        flush
+      >
+        {paddles.length === 0 ? (
+          <p className="auc-card-note dash-pad">No paddles issued yet.</p>
+        ) : (
+          <ul className="dash-teams">
+            {paddles.map((paddle) => {
+              const held = heldBy.get(paddle.paddleNumber);
+              const used =
+                paddle.purseTotal !== undefined &&
+                paddle.spent !== undefined &&
+                paddle.purseTotal > 0
+                  ? Math.round((paddle.spent / paddle.purseTotal) * 100)
+                  : null;
+              return (
+                <li key={paddle.paddleNumber}>
+                  <PaddleChip number={paddle.paddleNumber} color={paddle.color} />
+                  <span className="dash-team-main">
+                    <span className="dash-team-name">
+                      <strong>{paddle.teamName}</strong>
+                      <span className="dash-team-meta">
+                        {held?.holderName ?? "Not claimed"}
+                        {/* Bought on the night — pre-signed captains never
+                            went under the hammer, so this is not the squad. */}
+                        {held !== undefined ? ` · ${String(held.squadSize)} bought` : ""}
+                      </span>
+                    </span>
+                    {used !== null ? (
+                      <span
+                        className="dash-bar"
+                        style={paddle.color !== null ? { ["--team" as string]: paddle.color } : {}}
+                        aria-hidden
+                      >
+                        <span style={{ width: `${String(used)}%` }} />
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="dash-team-money">
+                    {paddle.spent !== undefined ? (
+                      <>
+                        <strong>{money.exact(paddle.spent)}</strong>
+                        <span>
+                          {paddle.remaining !== undefined
+                            ? `${money.compactFloor(paddle.remaining)} left`
+                            : "spent"}
+                        </span>
+                      </>
+                    ) : (
+                      <span>sealed</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </SectionCard>
+    );
+
+    /* The five dearest signings — the question the night gets asked most. The
+       full list, in any order, is the Players tab. */
+    const topBuys = view.lots
+      .filter((lot) => lot.soldPrice !== null)
+      .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0))
+      .slice(0, TOP_BUYS);
+    const topBuysCard = (
+      <SectionCard
+        icon={<IconTrophy />}
+        concept="auction"
+        title="Top buys"
+        data-testid="top-buys"
+        action={<TabLink tab="players">{`All ${String(view.lots.length)} lots`}</TabLink>}
+        flush
+      >
+        {topBuys.length === 0 ? (
+          <p className="auc-card-note dash-pad">Nobody was sold.</p>
+        ) : (
+          <ol className="dash-buys">
+            {topBuys.map((lot) => (
+              <li key={lot.id}>
+                <PlayerImage
+                  name={lot.playerName ?? "Unnamed"}
+                  seed={lotSeed(lot.id, dashboard.lotMedia)}
+                  src={dashboard.lotMedia[lot.id]?.photoUrl ?? null}
+                  size="sm"
+                  shape="round"
+                  decorative
+                />
+                <span className="dash-buy-who">
+                  <strong>{lot.playerName ?? "Unnamed"}</strong>
+                  <span>
+                    {labelOf(lot.role)}
+                    {lot.soldToPaddle !== null
+                      ? ` · ${teamOfPaddle.get(lot.soldToPaddle) ?? lot.soldToPaddle}`
+                      : ""}
+                  </span>
+                </span>
+                <strong className="dash-buy-price">{money.exact(lot.soldPrice ?? 0)}</strong>
+              </li>
+            ))}
+          </ol>
+        )}
+      </SectionCard>
+    );
+
+    const rules = dashboard.rules;
+    const folds = (
+      <div className="dash-folds">
+        {rules !== null ? (
+          <details className="dash-fold">
+            <summary>
+              <IconFile size={18} aria-hidden />
+              <strong>Rules of the night</strong>
+              <span className="dash-fold-hint">
+                {rules.pursePerTeam !== undefined
+                  ? `${money.exact(rules.pursePerTeam)} purse · `
+                  : ""}
+                squad {rules.squadMax} · {rules.initialSeconds}s a lot
+              </span>
+              <IconChevronDown size={16} aria-hidden className="dash-fold-caret" />
+            </summary>
+            <RulesCard rules={rules} />
+          </details>
+        ) : null}
+        {showScreens ? (
+          <details className="dash-fold">
+            <summary>
+              <IconTv size={18} aria-hidden />
+              <strong>Screens for the room</strong>
+              <span className="dash-fold-hint">Venue board · broadcast overlay</span>
+              <IconChevronDown size={16} aria-hidden className="dash-fold-caret" />
+            </summary>
+            <BroadcastLinks slug={slug} />
+          </details>
+        ) : null}
+      </div>
+    );
+
+    return (
+      <div className="dash" data-testid="auction-dashboard">
+        {resultBand}
+        {afterCard ?? appointmentsCard}
+        <CardGrid>
+          {teamsCard}
+          {topBuysCard}
+        </CardGrid>
+        {folds}
+      </div>
+    );
+  }
+
   return (
     <div className="dash" data-testid="auction-dashboard">
       {progress}
-      {terminal ? afterCard : null}
-      {/* A finished night has nothing on the block: that card said so in a
-          165px box. The purses pair with the rules instead, and the paddles
-          with the room screens, so every row is balanced. */}
-      {terminal ? (
-        <>
-          <CardGrid>
-            {purseCard}
-            {rulesCard}
-          </CardGrid>
-          <CardGrid>
-            {showScreens ? <BroadcastLinks slug={slug} /> : null}
-            {paddlesCard}
-          </CardGrid>
-        </>
-      ) : (
-        <>
-          <CardGrid>
-            {blockCard}
-            {purseCard}
-          </CardGrid>
-          <CardGrid>
-            {showScreens ? <BroadcastLinks slug={slug} /> : null}
-            {rulesCard}
-          </CardGrid>
-        </>
-      )}
+      <CardGrid>
+        {blockCard}
+        {purseCard}
+      </CardGrid>
+      <CardGrid>
+        {showScreens ? <BroadcastLinks slug={slug} /> : null}
+        {rulesCard}
+      </CardGrid>
       {/* Readiness, this device's link to the room and the owners' plans are
           all questions about a night still to come. */}
-      {terminal ? null : (
-        <CardGrid>
-          {dashboard.wsUrl !== null ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
-          {readyCard}
-        </CardGrid>
-      )}
-      {terminal ? null : plansCard}
-      {terminal ? (
-        afterCard !== null ? null : (
-          appointmentsCard
-        )
-      ) : (
-        <CardGrid>
-          {paddlesCard}
-          {/* Once the night is settled the After-the-auction card carries this
-              door with its count; a second card of the same name would repeat it. */}
-          {appointmentsCard}
-        </CardGrid>
-      )}
+      <CardGrid>
+        {dashboard.wsUrl !== null ? <ConnectionCheck wsUrl={dashboard.wsUrl} /> : null}
+        {readyCard}
+      </CardGrid>
+      {plansCard}
+      <CardGrid>
+        {paddlesCard}
+        {appointmentsCard}
+      </CardGrid>
       {queueCard}
       {logCard}
     </div>
