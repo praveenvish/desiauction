@@ -129,11 +129,6 @@ a.ov-hero-club:focus-visible {
 
 /* ---- Figures -------------------------------------------------------------- */
 
-.ov-stat-of {
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
 /* Cards side by side share a height, as in the mockup: a short card beside a
    tall one otherwise leaves a ragged hole in the row. */
 .ov-grid > * {
@@ -166,13 +161,6 @@ a.ov-hero-club:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
-}
-
-.ov-muted {
-  margin: 0;
-  font-size: var(--text-sm-size);
-  line-height: 1.5;
-  color: var(--text-secondary);
 }
 
 /* ---- Rows: teams and roles ------------------------------------------------ */
@@ -272,31 +260,6 @@ a.ov-hero-club:focus-visible {
 
 /* ---- Public page ---------------------------------------------------------- */
 
-.ov-public {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.ov-url-row {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.ov-url {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  box-sizing: border-box;
-  padding-inline: var(--space-3) var(--space-1);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-
 .ov-url-text {
   flex: 1;
   min-width: 0;
@@ -330,24 +293,6 @@ a.ov-hero-club:focus-visible {
 .ov-icon-btn:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-}
-
-.ov-icon-btn-boxed {
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-raised);
-}
-
-.ov-icon-btn-boxed:hover {
-  border-color: var(--border-strong);
-}
-
-.ov-public-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  padding-top: var(--space-1);
 }
 
 /* ---- Retrospective -------------------------------------------------------- */
@@ -388,12 +333,6 @@ a.ov-hero-club:focus-visible {
 
 /* ---- The two pictures ----------------------------------------------------- */
 
-.ov-image {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-5);
-}
-
 .ov-logo-frame {
   flex: none;
   display: inline-flex;
@@ -423,36 +362,6 @@ a.ov-hero-club:focus-visible {
   object-fit: cover;
 }
 
-.ov-image-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.ov-image-text p {
-  margin: 0;
-  font-size: var(--text-sm-size);
-  line-height: 1.5;
-  color: var(--text-secondary);
-}
-
-.ov-image-text .ov-image-hint {
-  font-size: var(--text-xs-size);
-  color: var(--text-muted);
-}
-
-.ov-image-text .ov-image-error {
-  font-size: var(--text-xs-size);
-  color: var(--danger-strong);
-}
-
-.ov-image-remove {
-  margin-inline-start: calc(var(--space-3) * -1);
-}
-
 .ov-image-input {
   display: none;
 }
@@ -476,16 +385,8 @@ a.ov-hero-club:focus-visible {
     min-height: 0;
   }
 
-  .ov-image {
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
   /* The logo keeps its text beside it on a phone (round 2: stacked, the
      logo card alone ran ~250pt). Only the wide cover needs the full row. */
-  .ov-image[data-shape="square"] {
-    flex-direction: row;
-  }
 
   .ov-cover-frame {
     width: 100%;
@@ -493,11 +394,6 @@ a.ov-hero-club:focus-visible {
 
   .ov-team-figs {
     gap: var(--space-2);
-  }
-
-  .ov-public-actions > * {
-    flex: 1 1 auto;
-    white-space: nowrap;
   }
 }
 
@@ -553,4 +449,478 @@ a.ov-hero-club:focus-visible {
   font-size: var(--text-xs-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-accent);
+}
+
+/* ======================================================================
+   THE OVERVIEW REDESIGN (2026-09-27): the next step inside the hero,
+one
+   figure strip,
+what is on now,
+and "How the season looks".
+   ====================================================================== */
+
+/* ---- The next step,
+on the hero's glass ---- */
+
+.ov-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--hero-crest-line);
+  border-radius: var(--radius-lg);
+  background: var(--hero-crest-bed);
+  color: var(--hero-ink);
+}
+
+.ov-next-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.ov-next-title {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--hero-ink);
+}
+
+.ov-next-body {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--hero-ink-soft);
+}
+
+.ov-next-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--hero-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ov-next-link:focus-visible {
+  outline: 2px solid var(--hero-ink);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.ov-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ov-next .ov-hero-btn[data-tone="glass"] {
+  background: transparent;
+  border-color: var(--hero-crest-line);
+  color: var(--hero-ink);
+}
+
+.ov-next .ov-hero-btn[data-tone="glass"]:hover {
+  background: var(--hero-crest-bed);
+  border-color: var(--hero-ink-soft);
+}
+
+/* ---- One figure strip ---- */
+
+.ov-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.ov-figure {
+  min-width: 0;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.ov-figure:first-child {
+  border-left: none;
+}
+
+.ov-figure-link,
+.ov-figure-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-4) var(--space-5);
+}
+
+.ov-figure-link {
+  height: 100%;
+  box-sizing: border-box;
+  color: inherit;
+  text-decoration: none;
+}
+
+.ov-figure-link:hover {
+  background: var(--surface-sunken);
+}
+
+.ov-figure-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.ov-figure-value {
+  font-size: var(--text-2xl-size);
+  line-height: 1.15;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-figure[data-tone="warm"] .ov-figure-value {
+  color: var(--accent-ink);
+}
+
+.ov-figure-label {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.ov-figure-hint {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+/* ---- What is on now: matches and the table ---- */
+
+.ov-now {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (min-width: 1000px) {
+  .ov-now {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+}
+
+.ov-now-card {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+
+.ov-now-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-2);
+}
+
+.ov-now-head h2 {
+  margin: 0;
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.ov-now-list {
+  margin: 0;
+  padding: 0 0 var(--space-2);
+  list-style: none;
+}
+
+.ov-now-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ov-now-when {
+  flex: none;
+  width: 104px;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-now-row[data-state="live"] .ov-now-when {
+  color: var(--danger-strong);
+}
+
+.ov-now-teams {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+  text-decoration: none;
+}
+
+.ov-now-teams:hover {
+  text-decoration: underline;
+}
+
+.ov-now-v {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+.ov-now-result,
+.ov-now-ground {
+  flex: none;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.ov-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-table th,
+.ov-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: right;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.ov-table thead th {
+  border-top: none;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ov-table abbr {
+  text-decoration: none;
+}
+
+.ov-table th:first-child,
+.ov-table td:first-child {
+  width: 24px;
+  padding-left: var(--space-5);
+  text-align: left;
+}
+
+.ov-table thead th:nth-child(2),
+.ov-table tbody th {
+  text-align: left;
+}
+
+.ov-table tbody th {
+  width: 100%;
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.ov-table th:last-child,
+.ov-table td:last-child {
+  padding-right: var(--space-5);
+}
+
+.ov-table-team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ov-table-team > :first-child {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+
+.ov-table-pts {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading) !important;
+}
+
+/* ---- How the season looks ---- */
+
+.ov-looks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-look {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ov-look:first-child {
+  border-top: none;
+}
+
+.ov-look-thumb {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.ov-look-thumb.ov-logo-frame {
+  padding: 0;
+}
+
+.ov-look-thumb.ov-cover-frame {
+  width: 72px;
+  height: 40px;
+  aspect-ratio: auto;
+}
+
+.ov-look[data-set] > .ov-look-thumb:not(.ov-logo-frame):not(.ov-cover-frame) {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.ov-look-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.ov-look-text > strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.ov-look-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ov-looks .season-blockers {
+  margin: var(--space-2) 0 0;
+}
+
+.ov-pass {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 var(--space-5) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.ov-pass-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--accent-ink);
+}
+
+.ov-pass-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.ov-pass-tier {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.ov-pass-usage[data-full] {
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent-ink);
+}
+
+@media (max-width: 719px) {
+  .ov-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ov-figure:nth-child(odd) {
+    border-left: none;
+  }
+
+  .ov-figure:nth-child(n + 3) {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .ov-figure-value {
+    font-size: var(--text-xl-size);
+  }
+
+  .ov-next {
+    padding: var(--space-4);
+  }
+
+  .ov-next-actions {
+    flex: 1 1 100%;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .ov-now-when {
+    width: 72px;
+  }
+
+  .ov-look,
+  .ov-now-row {
+    padding-inline: var(--space-4);
+  }
+
+  .ov-look-actions {
+    flex: 1 1 100%;
+    padding-left: calc(40px + var(--space-3));
+  }
+
+  .ov-look-thumb.ov-cover-frame {
+    width: 40px;
+  }
+
+  .ov-pass {
+    margin-inline: var(--space-4);
+  }
 }

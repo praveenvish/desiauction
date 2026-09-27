@@ -119,7 +119,7 @@ test("the full night: lobby → owners → bidding with notifications → public
   // a two-step act now — putting a season on the public internet is confirmed.
   await organizer.getByTestId("toggle-visibility").click();
   await organizer.getByTestId("confirm-publish").click();
-  await expect(organizer.getByTestId("visibility-row")).toContainText("LIVE");
+  await expect(organizer.getByTestId("visibility-row")).toContainText("Live");
 
   await organizer.getByTestId("open-dashboard").click();
   await expect(organizer.getByTestId("stat-row")).toHaveAttribute("data-hydrated", "true", {

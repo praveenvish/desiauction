@@ -6,6 +6,9 @@ import { requireOnboarded } from "../../../server/auth/onboarding-gate";
 import { rolesOf } from "../../../server/roles/roles";
 import { seasonOverviewView } from "../../../server/competition/actions";
 import { seasonPass } from "../../../server/competition/pass";
+import { scheduleView, standingsView } from "../../../server/competition/fixture-actions";
+import { nowWallClock } from "../../../server/competition/fixtures";
+import { SeasonNow } from "./season-now";
 import { CreatedToast } from "./created-toast";
 import { OverviewPanel } from "./overview-panel";
 import { SeasonPassCard } from "./season-pass";
@@ -38,6 +41,12 @@ export default async function CompetitionHomePage({
     // Non-members and unknown slugs are indistinguishable (tenancy, IP-2 pattern).
     notFound();
   }
+  // Once matches exist, the overview shows what is on and who is top — read
+  // from the same views the Schedule and Table tabs render.
+  const [schedule, standings] =
+    view.fixtureCount > 0
+      ? await Promise.all([scheduleView(slug, {}), standingsView(slug)])
+      : [null, null];
   return (
     <ToastProvider>
       <CreatedToast />
@@ -52,6 +61,16 @@ export default async function CompetitionHomePage({
             view={view}
             slug={slug}
             mineTeamIds={mineTeamIds}
+            now={
+              view.fixtureCount > 0 ? (
+                <SeasonNow
+                  slug={slug}
+                  schedule={schedule}
+                  standings={standings}
+                  now={nowWallClock()}
+                />
+              ) : null
+            }
             // What the season's pass covers, and how close it is — visible at 2
             // of 4 teams, not only at the refusal. The pass is the club's
             // commercial arrangement, so it is shown only to the people who run
