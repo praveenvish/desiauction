@@ -237,9 +237,14 @@ logging `BACKUP_REFUSED`, unless `PGBACKREST_ALLOW_ONBOX_REPO=1` says in writing
 that this is an interim state. The database's own `archive_command` reads the
 same file, so WAL goes wherever the sidecar's backups go.
 
-Any S3-compatible bucket in a **different account** works (Backblaze B2,
-Cloudflare R2, AWS S3, a second provider's object storage). pgBackRest needs
-TLS for an S3 repo, which every hosted one serves:
+Any S3-compatible bucket with a **different provider from the host** works.
+Production uses **AWS S3 in Mumbai** (ap-south-1) — the data stays in India —
+with two versioned, private, encrypted buckets (`desiauction-prod-pitr`,
+`desiauction-prod-copies`), a 30-day non-current-version expiry, and an IAM
+user that can write and delete-mark but NOT erase versions, so a stolen host
+key cannot destroy history. pgBackRest needs TLS for an S3 repo (and the db
+image needs `ca-certificates` to verify it). Prove it with
+`sudo bash ops/deploy/backup-drill.sh production` from a checkout on the host:
 
 ```sh
 PGBACKREST_STANZA=desiauction
@@ -247,12 +252,12 @@ PGBACKREST_PG1_PATH=/var/lib/postgresql/data
 PGBACKREST_PG1_SOCKET_PATH=/var/run/postgresql
 PGBACKREST_REPO1_TYPE=s3
 PGBACKREST_REPO1_PATH=/pgbackrest
-PGBACKREST_REPO1_S3_ENDPOINT=s3.eu-central-003.backblazeb2.com   # off-box
-PGBACKREST_REPO1_S3_BUCKET=desiauction-pitr
+PGBACKREST_REPO1_S3_ENDPOINT=s3.ap-south-1.amazonaws.com   # off-box, India
+PGBACKREST_REPO1_S3_BUCKET=desiauction-prod-pitr
 PGBACKREST_REPO1_S3_KEY=...
 PGBACKREST_REPO1_S3_KEY_SECRET=...
-PGBACKREST_REPO1_S3_REGION=eu-central-003
-PGBACKREST_REPO1_S3_URI_STYLE=path
+PGBACKREST_REPO1_S3_REGION=ap-south-1
+PGBACKREST_REPO1_S3_URI_STYLE=host
 PGBACKREST_REPO1_RETENTION_FULL=2
 # PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc   # recommended off-box
 # PGBACKREST_REPO1_CIPHER_PASS=...           # keep a copy OFF this box too
@@ -283,11 +288,11 @@ hours; `backup-production.yml` checks the same from outside every night.
 or `MIRROR_FAILED`; unconfigured, it refuses (`MIRROR_REFUSED`) and restarts:
 
 ```sh
-MIRROR_S3_ENDPOINT=https://s3.eu-central-003.backblazeb2.com
+MIRROR_S3_ENDPOINT=https://s3.ap-south-1.amazonaws.com
 MIRROR_S3_ACCESS_KEY=...
 MIRROR_S3_SECRET_KEY=...
-MIRROR_MEDIA_BUCKET=desiauction-media-copy
-MIRROR_FINOPS_BUCKET=desiauction-finops-copy
+MIRROR_MEDIA_BUCKET=desiauction-prod-copies/media    # bucket/prefix works
+MIRROR_FINOPS_BUCKET=desiauction-prod-copies/finops
 ```
 
 The finops copy never deletes (artifacts are append-only records, and a delete

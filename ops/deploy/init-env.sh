@@ -185,14 +185,14 @@ PGBACKREST_PG1_PATH=/var/lib/postgresql/data
 PGBACKREST_PG1_SOCKET_PATH=/var/run/postgresql
 PGBACKREST_REPO1_TYPE=s3
 PGBACKREST_REPO1_PATH=/pgbackrest/$STACK
-PGBACKREST_REPO1_S3_URI_STYLE=path
+PGBACKREST_REPO1_S3_URI_STYLE=host
 PGBACKREST_REPO1_RETENTION_FULL=2
 # Encrypted before it leaves the box. KEEP A COPY OF THIS PASSPHRASE OFF THIS
 # MACHINE (password manager): without it the off-box backups cannot be read.
 PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc
 PGBACKREST_REPO1_CIPHER_PASS=$(secret 32)
 
-# ---- FOUNDER: the off-box bucket (Backblaze B2) ----
+# ---- FOUNDER: the off-box bucket (production: S3 Mumbai, desiauction-prod-pitr) ----
 # PGBACKREST_REPO1_S3_ENDPOINT=
 # PGBACKREST_REPO1_S3_BUCKET=
 # PGBACKREST_REPO1_S3_REGION=
@@ -203,7 +203,7 @@ EOF
 write mirror.env <<EOF
 MIRROR_INTERVAL_SECONDS=3600
 
-# ---- FOUNDER: the off-box bucket (Backblaze B2) ----
+# ---- FOUNDER: the off-box bucket (production: S3 Mumbai, desiauction-prod-copies/{media,finops}) ----
 # MIRROR_S3_ENDPOINT=
 # MIRROR_S3_ACCESS_KEY=
 # MIRROR_S3_SECRET_KEY=

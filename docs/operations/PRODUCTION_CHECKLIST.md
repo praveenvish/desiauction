@@ -64,12 +64,12 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   but a restore overwrites the WHOLE VPS — every project at once — so it is the
   coarse last resort under the two off-box copies below, never the way to
   recover one project's data.
-- ☐F **An off-box S3 bucket for pgBackRest** (different account/provider —
+- ☑ (2026-09-29, S3 Mumbai `desiauction-prod-pitr`; real PITR drill passed) **An off-box S3 bucket for pgBackRest** (different account/provider —
   B2, R2, S3), keys in `pgbackrest.env` (ops/deploy/README "Backups"). ☑ The
   sidecar is automated: WAL archive, nightly full/diff, `BACKUP_OK`/`FAILED`
   lines, and it **refuses** an on-box repo unless `PGBACKREST_ALLOW_ONBOX_REPO=1`
   records the interim in writing.
-- ☐F **An off-box S3 bucket for object storage**, keys in `mirror.env`. ☑ The
+- ☑ (2026-09-29, S3 Mumbai `desiauction-prod-copies`) **An off-box S3 bucket for object storage**, keys in `mirror.env`. ☑ The
   `minio-mirror` sidecar copies the media and finops buckets hourly and refuses
   to run unconfigured.
 - ☑ **`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` / `DEPLOY_HOST_FINGERPRINT`**
