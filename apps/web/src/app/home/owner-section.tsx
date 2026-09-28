@@ -1,10 +1,12 @@
 import {
   ButtonLink,
   IconArrowRight,
+  IconCalendar,
   IconChart,
   IconTrophy,
   Pill,
   PlayerImage,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import Link from "next/link";
 
@@ -12,6 +14,8 @@ import { moneyFormat } from "../../lib/money";
 import { planView } from "../../server/auction/owner-plan-actions";
 import { publicTeam, teamSlugOf } from "../../server/competition/public";
 import { seasonUnit } from "../../server/competition/season-unit";
+import { teamSeason, type TeamSeason, type TeamSeasonMatch } from "../../server/player/career";
+import { dateTile, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
 import type { OwnedTeam } from "../../server/roles/roles";
 import type { Tone } from "./home-parts";
 import "./home-duo.css";
@@ -98,20 +102,36 @@ function crestOf(name: string): string {
  * squad's faces as a strip; and the doors. No card inside a card.
  */
 export async function OwnerSection({ team }: { team: OwnedTeam }) {
-  const [plan, unit, squad] = await Promise.all([
+  const over = team.auctionStatus === "completed" || team.auctionStatus === "reconciled";
+  const today = istCalendarDate();
+  const [plan, unit, squad, season] = await Promise.all([
     planView(team.competitionSlug, team.teamId),
     seasonUnit(team.competitionSlug),
     // The whole squad, pre-signed included, from the read the season's public
     // team page publishes (null for a private season — the strip then shows
     // the night's buys, as before).
     publicTeam(team.competitionSlug, teamSlugOf(team.teamName)),
+    // After the night, the team's season — the owner's own team, from roles.
+    over ? teamSeason(team.teamId, today) : Promise.resolve(null),
   ]);
+  /** The season is on once the club has published a match for this team. */
+  const seasonOn =
+    season !== null && season.upcoming.length + season.results.length > 0 ? season : null;
   // The purse counts in the season's own unit — rupees or points (0091).
   const money = moneyFormat(unit);
   const base = `/seasons/${team.competitionSlug}`;
   const live = team.auctionStatus === "live" || team.auctionStatus === "paused";
-  const over = team.auctionStatus === "completed" || team.auctionStatus === "reconciled";
-  const status = STATUS[team.auctionStatus] ?? { label: "Auction", tone: "neutral" };
+  const status =
+    seasonOn !== null
+      ? {
+          label:
+            seasonOn.place !== null
+              ? `Season on · ${ordinal(seasonOn.place.position)}`
+              : "Season on",
+          tone: "green" as Tone,
+          dot: true,
+        }
+      : (STATUS[team.auctionStatus] ?? { label: "Auction", tone: "neutral" });
   const squadHref = `${base}/teams?team=${encodeURIComponent(team.teamId)}`;
   const bought =
     plan === null
@@ -167,7 +187,42 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
           </Pill>
         </header>
 
-        {plan !== null ? (
+        {seasonOn !== null ? <NextStrip season={seasonOn} today={today} /> : null}
+
+        {seasonOn !== null ? (
+          <dl className="ow-season-figs" data-testid="home-owner-figures">
+            <div>
+              <dt>won – lost</dt>
+              <dd>
+                {seasonOn.record.won} – {seasonOn.record.lost}
+              </dd>
+            </div>
+            {seasonOn.place !== null ? (
+              <div>
+                <dt>in the table · {seasonOn.place.points} pts</dt>
+                <dd>
+                  {ordinal(seasonOn.place.position)} of {seasonOn.place.of}
+                </dd>
+              </div>
+            ) : null}
+            {plan !== null ? (
+              <div>
+                <dt>purse left of {money.ledger(plan.rules.pursePerTeam)}</dt>
+                <dd>{money.compactFloor(plan.standing.purseRemaining)}</dd>
+              </div>
+            ) : null}
+            {plan !== null ? (
+              <div>
+                <dt>
+                  {squadHint(plan.standing.squadSize, plan.rules.squadMin, plan.rules.squadMax)}
+                </dt>
+                <dd>
+                  {plan.standing.squadSize} / {plan.rules.squadMax}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : plan !== null ? (
           <div className="ow-figures" data-testid="home-owner-figures">
             <div className="ow-purse">
               <PurseRing left={plan.standing.purseRemaining} whole={plan.rules.pursePerTeam} />
@@ -271,8 +326,13 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
                 <IconArrowRight size={16} />
               </ButtonLink>
               <ButtonLink href={`${base}/fixtures`} variant="secondary">
-                Fixtures
+                {seasonOn !== null ? "Schedule" : "Fixtures"}
               </ButtonLink>
+              {seasonOn?.place !== null && seasonOn !== null ? (
+                <ButtonLink href={`${base}/standings`} variant="secondary">
+                  Table
+                </ButtonLink>
+              ) : null}
             </>
           ) : (
             <ButtonLink href={`${base}/auction/live`} variant={live ? "primary" : "secondary"}>
@@ -301,6 +361,10 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
           media={plan.lotMedia}
           spent={plan.rules.pursePerTeam - plan.standing.purseRemaining}
           money={money}
+          season={seasonOn}
+          fixturesHref={`${base}/fixtures`}
+          planHref={`${base}/auction/plan?team=${encodeURIComponent(team.teamId)}`}
+          today={today}
         />
       ) : null}
     </>
@@ -322,6 +386,10 @@ function OwnerDuo({
   media,
   spent,
   money,
+  season,
+  fixturesHref,
+  planHref,
+  today,
 }: {
   teamId: string;
   bought: Bought;
@@ -330,6 +398,11 @@ function OwnerDuo({
   media: Record<string, { photoUrl: string | null } | undefined>;
   spent: number;
   money: ReturnType<typeof moneyFormat>;
+  /** Once the season is on, the matches take the balance card's place. */
+  season: TeamSeason | null;
+  fixturesHref: string;
+  planHref: string;
+  today: string;
 }) {
   const labelOf = (role: string | null): string =>
     role === null
@@ -356,13 +429,23 @@ function OwnerDuo({
   const heaviestShare = spent > 0 ? Math.round((heaviestSpend / spent) * 100) : 0;
   const average = bought.length === 0 ? 0 : Math.round(spent / bought.length);
   return (
-    <div className="hd-duo" data-testid="home-owner-duo">
+    <div
+      className="hd-duo"
+      data-testid="home-owner-duo"
+      data-season={season !== null ? "" : undefined}
+    >
       <section className="hd-card" aria-labelledby={`hd-top-${teamId}`}>
         <div className="hd-head">
           <h2 id={`hd-top-${teamId}`} className="hd-title">
             <IconTrophy size={20} />
             Top buys
           </h2>
+          {season !== null ? (
+            <Link className="hd-link" href={planHref}>
+              The night in full
+              <IconArrowRight size={16} />
+            </Link>
+          ) : null}
         </div>
         <ol className="hd-rows">
           {top.map((lot, index) => (
@@ -389,7 +472,9 @@ function OwnerDuo({
           {bought.length === 1 ? "player" : "players"}.
         </p>
       </section>
-      {balance.length > 0 ? (
+      {season !== null ? (
+        <OurMatches teamId={teamId} season={season} href={fixturesHref} today={today} />
+      ) : balance.length > 0 ? (
         <section className="hd-card" aria-labelledby={`hd-bal-${teamId}`}>
           <div className="hd-head">
             <h2 id={`hd-bal-${teamId}`} className="hd-title">
@@ -419,5 +504,143 @@ function OwnerDuo({
         </section>
       ) : null}
     </div>
+  );
+}
+
+/** "1st", "2nd", "3rd", "11th". */
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${String(n)}${suffix}`;
+}
+
+function tomorrowOf(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+/** "Today", "Tomorrow" or "Mon, 29 Sep", then the time. */
+function whenLabel(kickoffAt: string | null, today: string): string {
+  if (kickoffAt === null) return "Date to be announced";
+  const day = kickoffAt.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return kickoffAt;
+  const time =
+    kickoffAt.length > 10 ? formatWallTime(kickoffAt.replace(" ", "T").slice(0, 16)) : null;
+  const date =
+    day === today ? "Today" : day === tomorrowOf(today) ? "Tomorrow" : formatDayDate(day);
+  return time === null ? date : `${date} · ${time}`;
+}
+
+/** The next match, as a strip inside the team hero. */
+function NextStrip({ season, today }: { season: TeamSeason; today: string }) {
+  const next = season.upcoming[0];
+  if (next === undefined) {
+    return (
+      <p className="ow-next" data-testid="home-owner-next">
+        <span className="ow-next-when">No more matches published</span>
+        <span className="ow-next-meta">The club adds them on the schedule.</span>
+      </p>
+    );
+  }
+  const rest = season.upcoming.length - 1;
+  return (
+    <p className="ow-next" data-testid="home-owner-next">
+      <span className="ow-next-when">
+        {next.live ? "Live now" : `Next · ${whenLabel(next.kickoffAt, today)}`}
+      </span>
+      <span className="ow-next-vs">
+        <span className="ow-next-word">vs</span>
+        <i style={{ background: next.opponentColor ?? "currentColor" }} aria-hidden />
+        {next.opponentName}
+      </span>
+      <span className="ow-next-meta">
+        {[next.groundName, rest > 0 ? `${String(rest)} more to come` : null]
+          .filter((part): part is string => part !== null && part !== "")
+          .join(" · ")}
+      </span>
+    </p>
+  );
+}
+
+const RESULT_WORD = { won: "Won", lost: "Lost", tied: "Tied", no_result: "No result" } as const;
+
+/** Next matches, then results — the team's season in rows. */
+function OurMatches({
+  teamId,
+  season,
+  href,
+  today,
+}: {
+  teamId: string;
+  season: TeamSeason;
+  href: string;
+  today: string;
+}) {
+  const next = season.upcoming.slice(0, 2);
+  const done = season.results.slice(0, next.length > 0 ? 2 : 4);
+  const row = (match: TeamSeasonMatch, upcoming: boolean) => {
+    const day = match.kickoffAt?.slice(0, 10) ?? null;
+    const tile = day !== null && /^\d{4}-\d{2}-\d{2}$/.test(day) ? dateTile(day) : null;
+    return (
+      <li key={match.fixtureId} className="ow-match">
+        <span className="ow-match-when">
+          {day === today ? "Today" : tile === null ? "TBA" : `${tile.day} ${tile.month}`}
+        </span>
+        <span className="hd-who">
+          <span className="hd-name">vs {match.opponentName}</span>
+          <span className="hd-meta">
+            {upcoming
+              ? [whenLabel(match.kickoffAt, today).split(" · ")[1] ?? null, match.groundName]
+                  .filter((part): part is string => part !== null && part !== "")
+                  .join(" · ") || "Time to be announced"
+              : (match.groundName ?? "Played")}
+          </span>
+        </span>
+        {upcoming || match.result === null ? (
+          <span className="ow-match-next">{match.live ? "Live" : "Next"}</span>
+        ) : (
+          <span className="ow-result" data-result={match.result}>
+            <span aria-hidden>
+              {match.result === "won"
+                ? "W"
+                : match.result === "lost"
+                  ? "L"
+                  : match.result === "tied"
+                    ? "T"
+                    : "–"}
+            </span>
+            <VisuallyHidden>{RESULT_WORD[match.result]}</VisuallyHidden>
+          </span>
+        )}
+      </li>
+    );
+  };
+  return (
+    <section
+      className="hd-card"
+      aria-labelledby={`hd-matches-${teamId}`}
+      data-testid="home-owner-matches"
+    >
+      <div className="hd-head">
+        <h2 id={`hd-matches-${teamId}`} className="hd-title">
+          <IconCalendar size={20} />
+          Our matches
+          {season.record.played > 0 ? (
+            <span className="hd-title-sub">
+              · {season.record.played} played · {season.record.won} won
+            </span>
+          ) : null}
+        </h2>
+        <Link className="hd-link" href={href}>
+          Schedule
+          <IconArrowRight size={16} />
+        </Link>
+      </div>
+      <ol className="ow-matches">
+        {next.map((match) => row(match, true))}
+        {done.map((match) => row(match, false))}
+      </ol>
+    </section>
   );
 }
