@@ -153,7 +153,15 @@ afterAll(async () => {
 describe("/players — the cross-season player index", () => {
   it("counts the scope the way the desk does, ignoring the filters", async () => {
     const slice = await playersIn(db, [ref], { page: 1, limit: 25, status: "submitted" }, readUrl);
-    expect(slice.stats).toEqual({ total: 5, approved: 3, sold: 1, preSigned: 1 });
+    expect(slice.stats).toEqual({
+      total: 5,
+      approved: 3,
+      sold: 1,
+      preSigned: 1,
+      unsold: 1,
+      toReview: 1,
+      spent: 2_500_000,
+    });
     expect(slice.total).toBe(1);
     expect(slice.rows.map((row) => row.name)).toEqual(["New Nikhil"]);
   });
@@ -168,9 +176,25 @@ describe("/players — the cross-season player index", () => {
     expect(slice.rows[0]?.role).toBe("Batter");
   });
 
-  it("filters by the two squad routes and by a literal search term", async () => {
+  it("reads dearest first, then the pre-signed, then by name — with each sale's price", async () => {
+    const slice = await playersIn(db, [ref], { page: 1, limit: 25 }, readUrl);
+    expect(slice.rows.map((row) => row.name)).toEqual([
+      "Sold Sunil",
+      "Icon Ivan",
+      "Gone Gopal",
+      "New Nikhil",
+      "Unsold Umar",
+    ]);
+    expect(slice.rows[0]?.soldPrice).toBe(2_500_000);
+    expect(slice.rows[0]?.auctionUnit).toBe("inr");
+    expect(slice.rows[1]?.soldPrice).toBeNull();
+  });
+
+  it("filters by the squad routes and by a literal search term", async () => {
     const sold = await playersIn(db, [ref], { page: 1, limit: 25, mark: "sold" }, readUrl);
     expect(sold.rows.map((row) => row.name)).toEqual(["Sold Sunil"]);
+    const unsold = await playersIn(db, [ref], { page: 1, limit: 25, mark: "unsold" }, readUrl);
+    expect(unsold.rows.map((row) => row.name)).toEqual(["Unsold Umar"]);
     const signed = await playersIn(db, [ref], { page: 1, limit: 25, mark: "presigned" }, readUrl);
     expect(signed.rows.map((row) => row.name)).toEqual(["Icon Ivan"]);
     const search = await playersIn(db, [ref], { page: 1, limit: 25, search: "umar" }, readUrl);

@@ -9,6 +9,9 @@ import { seasonPass } from "../../../server/competition/pass";
 import { scheduleView, standingsView } from "../../../server/competition/fixture-actions";
 import { nowWallClock } from "../../../server/competition/fixtures";
 import { SeasonNow } from "./season-now";
+import { YourTeam } from "./your-team";
+import { teamSeason } from "../../../server/player/career";
+import { istCalendarDate } from "../../../lib/format-date";
 import { CreatedToast } from "./created-toast";
 import { OverviewPanel } from "./overview-panel";
 import { SeasonPassCard } from "./season-pass";
@@ -43,10 +46,19 @@ export default async function CompetitionHomePage({
   }
   // Once matches exist, the overview shows what is on and who is top — read
   // from the same views the Schedule and Table tabs render.
-  const [schedule, standings] =
-    view.fixtureCount > 0
-      ? await Promise.all([scheduleView(slug, {}), standingsView(slug)])
-      : [null, null];
+  // The owner's own team, once the room has run: `teamSeason` takes a team id
+  // the SERVER resolved from the session's roles, never one from the request.
+  const ownTeam = view.topTeams.find((team) => mineTeamIds.includes(team.teamId));
+  const auctionOver = view.auctionStatus === "completed" || view.auctionStatus === "reconciled";
+  const today = istCalendarDate();
+  const [schedule, standings, ownSeason] = await Promise.all([
+    view.fixtureCount > 0 ? scheduleView(slug, {}) : null,
+    view.fixtureCount > 0 ? standingsView(slug) : null,
+    ownTeam !== undefined && auctionOver && !view.viewer.canManage
+      ? teamSeason(ownTeam.teamId, today)
+      : null,
+  ]);
+  const liveMatches = schedule?.rows.filter((row) => row.status === "in_progress").length ?? 0;
   return (
     <ToastProvider>
       <CreatedToast />
@@ -61,6 +73,24 @@ export default async function CompetitionHomePage({
             view={view}
             slug={slug}
             mineTeamIds={mineTeamIds}
+            liveMatches={liveMatches}
+            {...(ownTeam !== undefined
+              ? {
+                  yours: (
+                    <YourTeam
+                      slug={slug}
+                      team={{
+                        id: ownTeam.teamId,
+                        name: ownTeam.name,
+                        shortName: ownTeam.shortName,
+                        color: ownTeam.color,
+                      }}
+                      season={ownSeason}
+                      today={today}
+                    />
+                  ),
+                }
+              : {})}
             now={
               view.fixtureCount > 0 ? (
                 <SeasonNow
@@ -68,6 +98,7 @@ export default async function CompetitionHomePage({
                   schedule={schedule}
                   standings={standings}
                   now={nowWallClock()}
+                  mine={mineTeamIds}
                 />
               ) : null
             }

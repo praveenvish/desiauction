@@ -17,9 +17,9 @@ import { PLAYERS_PAGE_SIZE, type PlayerIndexRow } from "../../server/console/pla
 import { FEE_LABEL, STATUS_LABEL } from "../seasons/[slug]/_players/labels";
 import { NavButton } from "./nav-button";
 import { PlayersFilters } from "./players-filters";
-import { RegistrationStatusGlyph } from "../../components/status/registration-status-glyph";
 import "./players.css";
 import { formatCount } from "../../lib/plural";
+import { moneyFormat } from "../../lib/money";
 
 export const metadata = { title: "Players · DesiAuction" };
 
@@ -42,7 +42,7 @@ const FEE_TONE: Record<PlayerIndexRow["feeStatus"], KitTone> = {
 };
 
 const ROUTE_LABEL: Record<NonNullable<PlayerIndexRow["squadRoute"]>, string> = {
-  auction: "Bought at auction",
+  auction: "Bought",
   icon: "Icon",
   captain: "Captain",
   retained: "Retained",
@@ -144,43 +144,97 @@ export default async function PlayersPage({
   /* Fees are a column only where some fee was ever recorded: a points season
      printed "Not paid" on every row — noise, and slightly alarming. */
   const showFee = result.rows.some((row) => row.feeStatus !== "pending");
+  /* THE TABS SPLIT THE LIST (2026-09-28). "Approved 43" beside "All 43" was
+     the same list twice; the organizer's questions after a room are sold,
+     unsold and pre-signed — and before one, who is still waiting. */
+  const { stats } = result;
   const segments = [
     {
       key: "all",
       label: "All",
-      count: count(result.stats.total),
+      count: count(stats.total),
       href: hrefWith(current, { status: "", mark: "", page: "" }),
       active: isAll,
       testId: "players-stat-all",
     },
-    {
-      key: "approved",
-      label: "Approved",
-      count: count(result.stats.approved),
-      href: hrefWith(current, { status: "approved", mark: "", page: "" }),
-      active: filters.status === "approved" && filters.mark === "",
-      testId: "players-stat-approved",
-    },
-    {
-      key: "sold",
-      label: "Sold",
-      count: count(result.stats.sold),
-      href: hrefWith(current, { mark: "sold", status: "", page: "" }),
-      active: filters.mark === "sold",
-      testId: "players-stat-sold",
-    },
+    ...(stats.toReview > 0
+      ? [
+          {
+            key: "review",
+            label: "To review",
+            count: count(stats.toReview),
+            href: hrefWith(current, { status: "submitted", mark: "", page: "" }),
+            active: filters.status === "submitted" && filters.mark === "",
+            testId: "players-stat-review",
+          },
+        ]
+      : []),
+    ...(stats.sold > 0 || stats.unsold > 0
+      ? [
+          {
+            key: "sold",
+            label: "Sold",
+            count: count(stats.sold),
+            href: hrefWith(current, { mark: "sold", status: "", page: "" }),
+            active: filters.mark === "sold",
+            testId: "players-stat-sold",
+          },
+          {
+            key: "unsold",
+            label: "Unsold",
+            count: count(stats.unsold),
+            href: hrefWith(current, { mark: "unsold", status: "", page: "" }),
+            active: filters.mark === "unsold",
+            testId: "players-stat-unsold",
+          },
+        ]
+      : []),
     {
       key: "presigned",
       label: "Pre-signed",
-      count: count(result.stats.preSigned),
+      count: count(stats.preSigned),
       href: hrefWith(current, { mark: "presigned", status: "", page: "" }),
       active: filters.mark === "presigned",
       testId: "players-stat-presigned",
     },
   ];
+  /* One season in view: the line names it and its spend, and the door to add
+     players goes to that season's desk (where Add player and the import are).
+     Across seasons a sum of rupees and points would be no number at all. */
+  const oneSeason = view.seasons.length === 1 ? view.seasons[0] : undefined;
+  const scopedSeason = oneSeason ?? view.seasons.find((season) => season.slug === filters.season);
+  const unit = result.rows[0]?.auctionUnit ?? "inr";
+  const summary = [
+    stats.sold > 0
+      ? `${count(stats.sold)} sold${
+          scopedSeason !== undefined ? ` for ${moneyFormat(unit).ledger(stats.spent)}` : ""
+        }`
+      : null,
+    stats.unsold > 0 ? `${count(stats.unsold)} unsold` : null,
+    stats.preSigned > 0 ? `${count(stats.preSigned)} pre-signed` : null,
+    stats.toReview > 0 ? `${count(stats.toReview)} to review` : null,
+  ].filter((part): part is string => part !== null);
 
   return (
     <main className="px-players">
+      <header className="px-head">
+        <p className="px-summary" data-testid="players-summary">
+          <strong>{stats.total === 1 ? "1 player" : `${count(stats.total)} players`}</strong>{" "}
+          {scopedSeason !== undefined
+            ? `in ${scopedSeason.name}`
+            : `across ${count(view.seasons.length)} seasons`}
+          {summary.length > 0 ? ` · ${summary.join(" · ")}` : ""}
+        </p>
+        {scopedSeason !== undefined ? (
+          <NavButton
+            href={`/seasons/${scopedSeason.slug}/registrations`}
+            variant="primary"
+            size="sm"
+          >
+            + Add players
+          </NavButton>
+        ) : null}
+      </header>
       <section className="px-card" data-testid="players-card" aria-label="All players">
         {/* The shared list head (round 2): the status tabs are the card's
             first row and the toolbar its second — the same geometry as the
@@ -211,9 +265,10 @@ export default async function PlayersPage({
                 <tr>
                   <th scope="col">Player</th>
                   {multiSeason ? <th scope="col">Season</th> : null}
-                  <th scope="col">Role</th>
                   <th scope="col">Team</th>
-                  <th scope="col">Status</th>
+                  <th scope="col" className="px-num">
+                    Price
+                  </th>
                   {showFee ? <th scope="col">Fee</th> : null}
                 </tr>
               </thead>
@@ -238,18 +293,23 @@ export default async function PlayersPage({
                           >
                             {row.name ?? "Unnamed player"}
                           </Link>
+                          {/* The role, not "RA67NAW": the registration
+                              number is an internal handle (still searchable,
+                              and on the sheet). Status speaks only when it is
+                              not the usual "approved". */}
                           <span className="px-sub">
-                            {row.number}
-                            {/* The phone row's second line carries the role
-                                and team the hidden cells hold on a laptop. */}
+                            {row.role ?? "Player"}
                             <span className="px-sub-phone">
-                              {row.role !== null ? ` · ${row.role}` : ""}
-                              {row.teamName !== null
-                                ? ` · ${row.teamName}`
-                                : row.auctionDone && row.status === "approved"
-                                  ? " · Unsold"
-                                  : ""}
+                              {row.teamName !== null ? ` · ${row.teamName}` : ""}
                             </span>
+                            {row.status !== "approved" ? (
+                              <>
+                                {" "}
+                                <Pill tone={STATUS_TONE[row.status]} dot>
+                                  {STATUS_LABEL[row.status]}
+                                </Pill>
+                              </>
+                            ) : null}
                           </span>
                         </span>
                       </div>
@@ -259,34 +319,23 @@ export default async function PlayersPage({
                         {row.seasonName}
                       </td>
                     ) : null}
-                    <td className="px-cell-role" data-label="Role">
-                      {row.role !== null ? (
-                        <span className="px-role">{row.role}</span>
-                      ) : (
-                        <span className="px-dash">—</span>
-                      )}
-                    </td>
                     <td className="px-cell-team" data-label="Team">
                       {row.teamName !== null ? (
-                        <span className="px-team">
-                          <TeamChip color={row.teamColor}>{row.teamName}</TeamChip>
-                          {row.squadRoute !== null && row.squadRoute !== "auction" ? (
-                            <span className="px-route">{ROUTE_LABEL[row.squadRoute]}</span>
-                          ) : null}
-                        </span>
-                      ) : row.auctionDone && row.status === "approved" ? (
-                        // "Unsold" once the room has run — the season desk's word
-                        // too — and a dash before it, when nobody is placed yet.
-                        <Pill tone="neutral">Unsold</Pill>
+                        <TeamChip color={row.teamColor}>{row.teamName}</TeamChip>
                       ) : (
                         <span className="px-dash">—</span>
                       )}
                     </td>
-                    <td className="px-cell-status" data-label="Status">
-                      <RegistrationStatusGlyph status={row.status} />
-                      <Pill tone={STATUS_TONE[row.status]} dot>
-                        {STATUS_LABEL[row.status]}
-                      </Pill>
+                    <td className="px-cell-price px-num" data-label="Price">
+                      {row.soldPrice !== null ? (
+                        <strong>{moneyFormat(row.auctionUnit).ledger(row.soldPrice)}</strong>
+                      ) : row.squadRoute !== null && row.squadRoute !== "auction" ? (
+                        <span className="px-route">{ROUTE_LABEL[row.squadRoute]}</span>
+                      ) : row.status === "approved" && row.auctionDone ? (
+                        <span className="px-how">Unsold</span>
+                      ) : (
+                        <span className="px-dash">—</span>
+                      )}
                     </td>
                     {showFee ? (
                       <td className="px-cell-fee" data-label="Fee">

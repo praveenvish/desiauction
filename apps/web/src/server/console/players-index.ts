@@ -1,6 +1,6 @@
-import { roleOptions, type FeeStatus } from "@desiauction/core";
+import { roleOptions, type FeeStatus, type MoneyUnit } from "@desiauction/core";
 import { people, registrations, teams, type Db } from "@desiauction/db";
-import { and, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 
 import { preSignedSql } from "../competition/pre-signed";
 import {
@@ -35,7 +35,7 @@ export const PLAYER_STATUSES = [
 export type PlayerStatus = (typeof PLAYER_STATUSES)[number];
 
 /** The two squad routes a stat card can filter by. */
-export const PLAYER_MARKS = ["sold", "presigned"] as const;
+export const PLAYER_MARKS = ["sold", "unsold", "presigned"] as const;
 export type PlayerMark = (typeof PLAYER_MARKS)[number];
 
 export const PLAYERS_PAGE_SIZE = 25;
@@ -76,6 +76,10 @@ export interface PlayerIndexRow {
    * it and simply not placed yet before it — the two need different words.
    */
   auctionDone: boolean;
+  /** What the room paid, on the season's own scale (paise or points×100); null unless sold. */
+  soldPrice: number | null;
+  /** The season's money unit, so a price reads "50,000 pts" or "₹5,000". */
+  auctionUnit: MoneyUnit;
   /** Epoch ms — sorts and merges across orgs without a Date crossing the wire. */
   createdAt: number;
 }
@@ -85,7 +89,23 @@ export interface PlayersStats {
   approved: number;
   sold: number;
   preSigned: number;
+  /** Approved, the season's auction over, and no team. */
+  unsold: number;
+  /** Registrations still waiting for a decision. */
+  toReview: number;
+  /** Sum of sold prices — meaningful only within one season's unit. */
+  spent: number;
 }
+
+const NO_STATS: PlayersStats = {
+  total: 0,
+  approved: 0,
+  sold: 0,
+  preSigned: 0,
+  unsold: 0,
+  toReview: 0,
+  spent: 0,
+};
 
 export interface PlayersSlice {
   rows: PlayerIndexRow[];
@@ -106,6 +126,16 @@ const auctionDoneSql = sql<boolean>`exists (select 1 from auctions done_auction 
 
 const soldSql = sql<boolean>`exists (select 1 from lots sold_lot inner join auctions sold_auction on sold_auction.id = sold_lot.auction_id where sold_lot.registration_id = "registrations"."id" and sold_lot.status = 'sold' and sold_auction.status <> 'abandoned')`;
 
+/** The sold lot's price — the same lot `soldSql` finds, so the two cannot disagree. */
+const soldPriceSql = sql<
+  number | null
+>`(select price_lot.sold_price::float8 from lots price_lot inner join auctions price_auction on price_auction.id = price_lot.auction_id where price_lot.registration_id = "registrations"."id" and price_lot.status = 'sold' and price_auction.status <> 'abandoned' limit 1)`;
+
+const auctionUnitSql = sql<MoneyUnit>`(select unit_season.auction_unit from competitions unit_season where unit_season.id = "registrations"."competition_id")`;
+
+/** Approved, the room has run, and no team: the desk's "Unsold". */
+const unsoldSql = sql<boolean>`("registrations"."status" = 'approved' and "registrations"."team_id" is null and ${auctionDoneSql})`;
+
 function filtersOf(seasonIds: readonly string[], query: Omit<PlayersQuery, "page">): SQL[] {
   const filters: SQL[] = [
     inArray(registrations.competitionId, [...seasonIds]),
@@ -120,6 +150,8 @@ function filtersOf(seasonIds: readonly string[], query: Omit<PlayersQuery, "page
   }
   if (query.mark === "sold") {
     filters.push(soldSql);
+  } else if (query.mark === "unsold") {
+    filters.push(unsoldSql);
   } else if (query.mark === "presigned") {
     filters.push(and(preSignedSql, sql`${registrations.teamId} is not null`) as SQL);
   }
@@ -147,7 +179,7 @@ export async function playersIn(
   readUrl: (key: string) => string,
 ): Promise<PlayersSlice> {
   if (seasons.length === 0) {
-    return { rows: [], total: 0, stats: { total: 0, approved: 0, sold: 0, preSigned: 0 } };
+    return { rows: [], total: 0, stats: NO_STATS };
   }
   const seasonIds = seasons.map((season) => season.id);
   const where = and(...filtersOf(seasonIds, query));
@@ -175,13 +207,24 @@ export async function playersIn(
         isRetained: registrations.isRetained,
         sold: soldSql,
         auctionDone: auctionDoneSql,
+        soldPrice: soldPriceSql,
+        auctionUnit: auctionUnitSql,
         createdAt: registrations.createdAt,
       })
       .from(registrations)
       .innerJoin(people, eq(people.id, registrations.personId))
       .leftJoin(teams, eq(teams.id, registrations.teamId))
       .where(where)
-      .orderBy(desc(registrations.createdAt), desc(registrations.id))
+      // THE ORDER A ROOM READS (2026-09-28): the dearest buys first, then the
+      // pre-signed (a team, no price), then everyone else — by name. Newest
+      // registration first answered nothing an organizer asks of this list.
+      // `mergePlayerSlices` sorts the merged page by the same rule.
+      .orderBy(
+        sql`${soldPriceSql} desc nulls last`,
+        sql`(${registrations.teamId} is null)`,
+        sql`lower(${shownName})`,
+        registrations.id,
+      )
       .limit(Math.max(query.limit, 1)),
     db
       .select({
@@ -189,6 +232,9 @@ export async function playersIn(
         approved: sql<number>`count(*) filter (where ${registrations.status} = 'approved')::int`,
         sold: sql<number>`count(*) filter (where ${soldSql})::int`,
         preSigned: sql<number>`count(*) filter (where ${preSignedSql} and ${registrations.teamId} is not null)::int`,
+        unsold: sql<number>`count(*) filter (where ${unsoldSql})::int`,
+        toReview: sql<number>`count(*) filter (where ${registrations.status} = 'submitted')::int`,
+        spent: sql<number>`coalesce(sum(${soldPriceSql}), 0)::float8`,
       })
       .from(registrations)
       .where(
@@ -240,6 +286,8 @@ export async function playersIn(
         feeStatus: row.feeStatus,
         squadRoute,
         auctionDone: row.auctionDone,
+        soldPrice: row.soldPrice,
+        auctionUnit: row.auctionUnit,
         createdAt: row.createdAt.getTime(),
       },
     ];
@@ -248,28 +296,41 @@ export async function playersIn(
   return {
     rows,
     total: countRows[0]?.count ?? 0,
-    stats: {
-      total: stat?.total ?? 0,
-      approved: stat?.approved ?? 0,
-      sold: stat?.sold ?? 0,
-      preSigned: stat?.preSigned ?? 0,
-    },
+    stats:
+      stat === undefined
+        ? NO_STATS
+        : {
+            total: stat.total,
+            approved: stat.approved,
+            sold: stat.sold,
+            preSigned: stat.preSigned,
+            unsold: stat.unsold,
+            toReview: stat.toReview,
+            spent: stat.spent,
+          },
   };
 }
 
-/** Merge per-org slices into one page: newest first, stable on id. */
+/**
+ * The list's order, for merging slices from several orgs: the dearest buys
+ * first, then anyone with a team, then by name — the same rule as the query.
+ */
+export function playerOrder(a: PlayerIndexRow, b: PlayerIndexRow): number {
+  return (
+    (b.soldPrice ?? -1) - (a.soldPrice ?? -1) ||
+    Number(a.teamName === null) - Number(b.teamName === null) ||
+    (a.name ?? "").localeCompare(b.name ?? "", undefined, { sensitivity: "base" }) ||
+    (a.registrationId < b.registrationId ? -1 : a.registrationId > b.registrationId ? 1 : 0)
+  );
+}
+
+/** Merge per-org slices into one page, in `playerOrder`. */
 export function mergePlayerSlices(
   slices: readonly PlayersSlice[],
   page: number,
   pageSize: number,
 ): PlayersSlice {
-  const all = slices
-    .flatMap((slice) => slice.rows)
-    .sort(
-      (a, b) =>
-        b.createdAt - a.createdAt ||
-        (a.registrationId < b.registrationId ? 1 : a.registrationId > b.registrationId ? -1 : 0),
-    );
+  const all = slices.flatMap((slice) => slice.rows).sort(playerOrder);
   const start = (page - 1) * pageSize;
   return {
     rows: all.slice(start, start + pageSize),
@@ -280,8 +341,11 @@ export function mergePlayerSlices(
         approved: sum.approved + slice.stats.approved,
         sold: sum.sold + slice.stats.sold,
         preSigned: sum.preSigned + slice.stats.preSigned,
+        unsold: sum.unsold + slice.stats.unsold,
+        toReview: sum.toReview + slice.stats.toReview,
+        spent: sum.spent + slice.stats.spent,
       }),
-      { total: 0, approved: 0, sold: 0, preSigned: 0 },
+      NO_STATS,
     ),
   };
 }
