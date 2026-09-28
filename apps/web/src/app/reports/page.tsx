@@ -1,30 +1,22 @@
 import {
   ButtonLink,
-  CardGrid,
   EmptyState,
   IconArrowRight,
   IconChart,
   IconCheckCircle,
   IconDownload,
-  IconGavel,
   IconLock,
-  IconReceipt,
-  IconStar,
-  IconUsers,
-  IconWallet,
   type KitTone,
   Notice,
   PlayerImage,
-  SectionCard,
-  StatCard,
-  StatGrid,
   Toolbar,
   ToolbarSpacer,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
-import { compactINR, exactINR } from "../../lib/inr";
+import { exactINR } from "../../lib/inr";
 import { cardAmount, moneyFormat } from "../../lib/money";
 import type { ReportTable } from "../../server/console/reports";
 import { reportsView } from "../../server/console/views";
@@ -33,6 +25,8 @@ import { NavButton } from "../players/nav-button";
 import "../players/players.css";
 import "./reports.css";
 import { formatCount } from "../../lib/plural";
+import { formatDate } from "../../lib/format-date";
+import { auctionStage, registrationStage, resultSentence, seasonStage } from "./reports-model";
 
 export const metadata = { title: "Reports · DesiAuction" };
 
@@ -88,7 +82,18 @@ function Bars({ bars, label, testId }: { bars: readonly Bar[]; label: string; te
   );
 }
 
-function CsvLink({ slug, table, label }: { slug: string; table: ReportTable; label: string }) {
+function CsvLink({
+  slug,
+  table,
+  label,
+  text = "CSV",
+}: {
+  slug: string;
+  table: ReportTable;
+  label: string;
+  /** The words on the button — say which file when a card offers two. */
+  text?: string;
+}) {
   return (
     <ButtonLink
       href={`/reports/export?season=${encodeURIComponent(slug)}&table=${table}`}
@@ -97,7 +102,7 @@ function CsvLink({ slug, table, label }: { slug: string; table: ReportTable; lab
       download
       aria-label={`Download ${label} as CSV`}
     >
-      <IconDownload size={16} aria-hidden /> CSV
+      <IconDownload size={16} aria-hidden /> {text}
     </ButtonLink>
   );
 }
@@ -148,23 +153,6 @@ export default async function ReportsPage({
 
   const { season, report, money } = view;
   const regs = report.registrations;
-  const statusRows: [string, string, number, KitTone][] = [
-    ["submitted", "Submitted", regs.submitted, "blue"],
-    ["approved", "Approved", regs.approved, "green"],
-    ["waitlisted", "Waitlisted", regs.waitlisted, "amber"],
-    ["rejected", "Declined", regs.rejected, "red"],
-    ["withdrawn", "Withdrawn", regs.withdrawn, "neutral"],
-  ];
-  const statusMax = Math.max(...statusRows.map((row) => row[2]), 1);
-  /** Statuses nobody is in: one quiet line, not four empty bars. */
-  const zeroStatuses = statusRows.filter((row) => row[2] === 0).map((row) => row[1].toLowerCase());
-  const statusBars: Bar[] = statusRows.map(([key, label, value, tone]) => ({
-    key,
-    label,
-    value: count(value),
-    share: value / statusMax,
-    tone,
-  }));
 
   const fees = report.fees;
   const feeHeads = fees.paid + fees.pending + fees.waived + fees.refunded;
@@ -201,11 +189,45 @@ export default async function ReportsPage({
     ...report.teams.map((team) => Math.max(team.squad, team.squadMax ?? 0)),
     1,
   );
+  const play = view.play;
+  const matchesAll = play === null ? 0 : play.played + play.live + play.toCome;
+
+  const stages = [
+    {
+      ...registrationStage(season.status, regs.total),
+      figure: count(regs.total),
+      detail: regs.total === 1 ? "registered" : "registered",
+    },
+    {
+      ...auctionStage(auction.status, auction.sold, auction.unsold, auction.remaining),
+      figure: auction.status === null ? "—" : `${count(auction.sold)} of ${count(lotsAll)}`,
+      detail:
+        auction.status === null
+          ? "no auction yet"
+          : auction.moneyMoved !== undefined
+            ? `sold · ${cardAmount(report.auctionUnit, auction.moneyMoved)}`
+            : "sold",
+    },
+    ...(play === null
+      ? []
+      : [
+          {
+            ...seasonStage(play),
+            figure: matchesAll === 0 ? "—" : `${count(play.played)} of ${count(matchesAll)}`,
+            detail: matchesAll === 0 ? "no fixtures yet" : "matches played",
+          },
+        ]),
+  ];
+  const stateOf = (key: string) => stages.find((stage) => stage.key === key);
+  const avgSale =
+    auction.moneyMoved !== undefined && auction.sold > 0
+      ? Math.round(auction.moneyMoved / auction.sold)
+      : null;
+  const leader = play?.table?.[0];
 
   return (
-    <main className="px-players">
-      {/* ONE ROW: which season, and the switch to another. The title band
-          above the tiles (~70px) was the season's name in a heading. */}
+    <main className="px-players rp-page">
+      {/* ONE ROW: which season, and the switch to another. */}
       <Toolbar className="rp-toolbar">
         {view.seasons.length > 1 ? (
           <SeasonPicker current={season.slug} seasons={view.seasons} />
@@ -234,260 +256,524 @@ export default async function ReportsPage({
         </Notice>
       ) : null}
 
-      <StatGrid testId="reports-stats">
-        <StatCard
-          icon={<IconUsers />}
-          tone="gold"
-          value={count(regs.total)}
-          label="Registrations"
-          hint={`${count(regs.approved)} approved · ${count(regs.submitted)} to review`}
-        />
-        {feesInUse ? (
-          <StatCard
-            icon={<IconReceipt />}
-            tone="gold"
-            value={
-              // rupees-always: registration fees are real money in every season
-              fees.collectedPaise !== undefined ? compactINR(fees.collectedPaise) : count(fees.paid)
-            }
-            label={fees.collectedPaise !== undefined ? "Fees collected" : "Fees paid"}
-            hint={`${count(fees.paid)} of ${count(feeHeads)} players paid`}
-            progress={pctOf(fees.paid, feeHeads)}
-          />
-        ) : null}
-        <StatCard
-          icon={<IconGavel />}
-          tone="gold"
-          value={`${count(auction.sold)} / ${count(lotsAll)}`}
-          label="Lots sold"
-          hint={auction.status === null ? "No auction yet" : `${count(auction.unsold)} unsold`}
-          progress={pctOf(auction.sold, lotsAll)}
-        />
-        <StatCard
-          icon={<IconWallet />}
-          tone="gold"
-          value={
-            auction.moneyMoved !== undefined
-              ? cardAmount(report.auctionUnit, auction.moneyMoved)
-              : "—"
-          }
-          label="Auction spend"
-          hint={
-            auction.pursePct !== undefined && auction.pursePct !== null
-              ? `${String(auction.pursePct)}% of all purses`
-              : money
-                ? "No purse set yet"
-                : "Owners and finance only"
-          }
-          {...(auction.pursePct !== undefined && auction.pursePct !== null
-            ? { progress: auction.pursePct }
-            : {})}
-        />
-      </StatGrid>
+      {/* THE JOURNEY — where the season stands, stage by stage; each stage
+          is the door to its chapter below. */}
+      <nav className="rp-journey" aria-label="Season stages" data-testid="reports-stats">
+        {stages.map((stage, index) => (
+          <a key={stage.key} href={`#rp-${stage.key}`} className="rp-stage" data-tone={stage.tone}>
+            <span className="rp-stage-top">
+              <span className="rp-stage-n">{index + 1}</span>
+              <span className="rp-stage-title">{stage.title}</span>
+              <span className="rp-stage-state">{stage.state}</span>
+            </span>
+            <span className="rp-stage-fig">
+              <b>{stage.figure}</b> {stage.detail}
+            </span>
+            <span className="rp-stage-bar" aria-hidden>
+              <i style={{ transform: `scaleX(${String(stage.pct / 100)})` }} />
+            </span>
+          </a>
+        ))}
+      </nav>
 
-      {/* Rebalanced (wow pass): no Fees card when no fee was ever recorded,
-          spend and purse are ONE card (they charted the same bars twice), and
-          every row is a pair, so the masonry leaves no hole. */}
-      <CardGrid>
-        <SectionCard
-          icon={<IconUsers />}
-          title="Registrations by status"
-          description={`${count(regs.total)} in total · ${count(regs.auctionPool)} in the auction pool · ${count(regs.preSigned)} pre-signed`}
-          action={<CsvLink slug={season.slug} table="registrations" label="registrations" />}
-          data-testid="report-registrations"
-        >
-          <Bars
-            bars={statusBars.filter((bar) => bar.value !== "0")}
-            label="Registrations by status"
-            testId="report-status-bars"
-          />
-          {zeroStatuses.length > 0 ? (
-            <p className="rp-zero">{zeroStatuses.map((label) => `0 ${label}`).join(" · ")}</p>
-          ) : null}
-        </SectionCard>
-
-        {feesInUse ? (
-          <SectionCard
-            icon={<IconReceipt />}
-            title="Fees"
-            description={
-              fees.collectedPaise !== undefined && fees.duePaise !== undefined
-                ? // rupees-always: registration fees are real money in every season
-                  `${exactINR(fees.collectedPaise)} collected · ${exactINR(fees.duePaise)} still due`
-                : "Who has paid, by head count"
-            }
-            data-testid="report-fees"
-          >
-            <Bars label="Fees by state" testId="report-fee-bars" bars={feeBars} />
-          </SectionCard>
-        ) : (
-          <SectionCard
-            icon={<IconGavel />}
-            title="Sold and unsold"
-            description="How the auction pool went"
-            data-testid="report-lots"
-          >
-            <LotBars sold={auction.sold} unsold={auction.unsold} remaining={auction.remaining} />
-          </SectionCard>
-        )}
-      </CardGrid>
-
-      <CardGrid>
-        <SectionCard
-          icon={<IconWallet />}
-          title={money ? "Purse by team" : "Squads by team"}
-          description={
-            report.teams.length === 0
-              ? "No teams yet"
-              : money
-                ? report.teams[0]?.purse !== undefined
-                  ? `What each team spent of its ${unitMoney.exact(report.teams[0].purse)} purse`
-                  : "What each team spent at the auction"
-                : "Players signed to each team"
-          }
-          {...(money && report.teams.length > 0
-            ? { action: <CsvLink slug={season.slug} table="teams" label="team spend" /> }
-            : {})}
-          data-testid="report-teams"
-        >
-          {report.teams.length === 0 ? (
-            <EmptyState
-              size="compact"
-              icon={<IconUsers />}
-              title="Teams appear here once they are created"
+      <Chapter
+        id="rp-registration"
+        n={1}
+        title="Registration"
+        stage={stateOf("registration")}
+        summary={`${count(regs.total)} registered · ${count(regs.auctionPool)} in the pool · ${count(regs.preSigned)} pre-signed${regs.submitted > 0 ? ` · ${count(regs.submitted)} to review` : ""}`}
+        actions={
+          <>
+            <CsvLink slug={season.slug} table="registrations" label="registrations" />
+            <Link href={`/seasons/${season.slug}/registrations`} className="rp-door">
+              Players <IconArrowRight size={14} aria-hidden />
+            </Link>
+          </>
+        }
+        testId="report-registrations"
+        left={
+          <>
+            <h3 className="rp-sub">
+              Where the players are
+              <span>
+                {regs.total === regs.approved && regs.total > 0
+                  ? `all ${count(regs.total)} approved`
+                  : `${count(regs.approved)} of ${count(regs.total)} approved`}
+              </span>
+            </h3>
+            <Split
+              label="Players by where they are"
+              parts={[
+                {
+                  key: "pool",
+                  value: regs.auctionPool,
+                  label: "in the auction pool",
+                  tone: "gold",
+                },
+                {
+                  key: "signed",
+                  value: regs.preSigned,
+                  label: "pre-signed — captains & icons",
+                  tone: "purple",
+                },
+                { key: "review", value: regs.submitted, label: "waiting for review", tone: "blue" },
+                { key: "waitlist", value: regs.waitlisted, label: "waitlisted", tone: "amber" },
+              ]}
+              testId="report-status-bars"
             />
-          ) : (
-            <Bars
-              label={money ? "Spend by team" : "Squad size by team"}
-              testId="report-team-bars"
-              bars={report.teams.map((team) =>
-                team.spend !== undefined
-                  ? {
-                      key: team.teamId,
-                      label: team.name,
-                      value: cardAmount(report.auctionUnit, team.spend),
-                      // Against the PURSE when there is one, so the bar is how
-                      // much of it went — the old second card's whole job.
-                      share:
-                        team.purse !== undefined && team.purse > 0
-                          ? Math.min(1, team.spend / team.purse)
-                          : team.spend / spendMax,
-                      color: team.color,
-                      note:
-                        team.purse !== undefined
-                          ? `· ${String(pctOf(team.spend, team.purse))}% · ${unitMoney.compactFloor(Math.max(0, team.purse - team.spend))} left · ${count(team.squad)} players`
-                          : `· ${count(team.squad)} players`,
-                    }
-                  : {
-                      key: team.teamId,
-                      label: team.name,
-                      value: `${count(team.squad)} players`,
-                      share: team.squad / squadMax,
-                      color: team.color,
-                    },
-              )}
-            />
-          )}
-        </SectionCard>
-
-        {money ? (
-          <SectionCard
-            icon={<IconStar />}
-            title="Top buys"
-            description="The five dearest players of the night"
-            {...((report.topBuys ?? []).length > 0
-              ? { action: <CsvLink slug={season.slug} table="buys" label="top buys" /> }
-              : {})}
-            data-testid="report-top-buys"
-          >
-            {(report.topBuys ?? []).length === 0 ? (
-              <EmptyState size="compact" icon={<IconGavel />} title="Nobody has been sold yet" />
+            {regs.rejected + regs.withdrawn > 0 ? (
+              <p className="rp-zero">
+                {count(regs.rejected)} declined · {count(regs.withdrawn)} withdrawn
+              </p>
             ) : (
-              <ol className="rp-buys">
-                {(report.topBuys ?? []).map((buy, index) => (
-                  <li key={buy.registrationId} className="rp-buy">
-                    <span className="rp-rank">{index + 1}</span>
-                    <PlayerImage
-                      name={buy.playerName ?? "Player"}
-                      seed={buy.registrationId}
-                      src={buy.photoUrl}
-                      size="sm"
-                      shape="round"
-                      decorative
-                    />
-                    <span className="rp-buy-text">
-                      <span className="rp-buy-name">{buy.playerName ?? "Unnamed player"}</span>
-                      <span className="rp-buy-sub">
-                        {[buy.role, buy.teamName].filter((part) => part !== null).join(" · ")}
-                      </span>
-                    </span>
-                    <span className="rp-buy-price">
-                      {cardAmount(report.auctionUnit, buy.price)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <p className="rp-zero">Nobody declined or withdrawn.</p>
             )}
-          </SectionCard>
-        ) : feesInUse ? (
-          <SectionCard
-            icon={<IconGavel />}
-            title="Sold and unsold"
-            description="How the auction pool went"
-            data-testid="report-lots"
-          >
-            <LotBars sold={auction.sold} unsold={auction.unsold} remaining={auction.remaining} />
-          </SectionCard>
-        ) : null}
-      </CardGrid>
+          </>
+        }
+        right={
+          <div data-testid="report-fees" className="rp-col">
+            <h3 className="rp-sub">
+              Fees
+              {feesInUse && fees.collectedPaise !== undefined && fees.duePaise !== undefined ? (
+                <span>
+                  {/* rupees-always: registration fees are real money in every season */}
+                  {exactINR(fees.collectedPaise)} collected · {exactINR(fees.duePaise)} still due
+                </span>
+              ) : null}
+            </h3>
+            {feesInUse ? (
+              <Bars label="Fees by state" testId="report-fee-bars" bars={feeBars} />
+            ) : (
+              <>
+                <p className="rp-lead">No fee was set for this season.</p>
+                <p className="rp-quiet">
+                  Registration was free, so there is nothing to collect. Set a fee on the season and
+                  who has paid shows here.
+                </p>
+              </>
+            )}
+          </div>
+        }
+      />
 
-      {money && feesInUse ? (
-        <SectionCard
-          icon={<IconGavel />}
-          title="Sold and unsold"
-          description="How the auction pool went"
-          data-testid="report-lots"
-        >
-          <LotBars sold={auction.sold} unsold={auction.unsold} remaining={auction.remaining} />
-        </SectionCard>
+      <Chapter
+        id="rp-auction"
+        n={2}
+        title="Auction"
+        stage={stateOf("auction")}
+        summary={
+          auction.status === null
+            ? "No auction yet — the purse and rules create it."
+            : [
+                `${count(auction.sold)} of ${count(lotsAll)} sold`,
+                auction.moneyMoved !== undefined
+                  ? `${cardAmount(report.auctionUnit, auction.moneyMoved)} spent`
+                  : null,
+                auction.pursePct !== undefined && auction.pursePct !== null
+                  ? `${String(auction.pursePct)}% of all purses`
+                  : null,
+              ]
+                .filter((part): part is string => part !== null)
+                .join(" · ")
+        }
+        actions={
+          <>
+            {money && report.teams.length > 0 ? (
+              <CsvLink slug={season.slug} table="teams" label="team spend" text="Team spend" />
+            ) : null}
+            {money && (report.topBuys ?? []).length > 0 ? (
+              <CsvLink slug={season.slug} table="buys" label="top buys" text="Top buys" />
+            ) : null}
+            <Link href={`/seasons/${season.slug}/auction`} className="rp-door">
+              {auction.status === null ? "Auction setup" : "Results & replay"}{" "}
+              <IconArrowRight size={14} aria-hidden />
+            </Link>
+          </>
+        }
+        testId="report-lots"
+        left={
+          auction.status === null ? (
+            <>
+              <h3 className="rp-sub">How the pool went</h3>
+              <p className="rp-quiet">
+                Nothing yet. Once the purse and rules are set and the auction runs, how the pool
+                went and what each team spent show here.
+                {report.teams.length > 0
+                  ? ` ${count(report.teams.length)} teams are ready to bid.`
+                  : ""}
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="rp-sub">
+                How the pool went
+                <span>
+                  {count(lotsAll)} lots
+                  {avgSale !== null ? ` · avg ${unitMoney.compact(avgSale)} a sale` : ""}
+                </span>
+              </h3>
+              <Split
+                label="Lots by outcome"
+                parts={[
+                  { key: "sold", value: auction.sold, label: "sold", tone: "green" },
+                  { key: "unsold", value: auction.unsold, label: "unsold", tone: "neutral" },
+                  {
+                    key: "remaining",
+                    value: auction.remaining,
+                    label: "still to go",
+                    tone: "gold",
+                  },
+                ]}
+                testId="report-lot-bars"
+              />
+              <div className="rp-rule" />
+              <div data-testid="report-teams" className="rp-col">
+                <h3 className="rp-sub">
+                  {money ? "Purse used" : "Squads"}
+                  <span>
+                    {report.teams.length === 0
+                      ? "no teams yet"
+                      : money && report.teams[0]?.purse !== undefined
+                        ? `of ${unitMoney.exact(report.teams[0].purse)} each`
+                        : "players signed to each team"}
+                  </span>
+                </h3>
+                {report.teams.length === 0 ? null : (
+                  <Bars
+                    label={money ? "Spend by team" : "Squad size by team"}
+                    testId="report-team-bars"
+                    bars={report.teams.map((team) =>
+                      team.spend !== undefined
+                        ? {
+                            key: team.teamId,
+                            label: team.name,
+                            value: cardAmount(report.auctionUnit, team.spend),
+                            share:
+                              team.purse !== undefined && team.purse > 0
+                                ? Math.min(1, team.spend / team.purse)
+                                : team.spend / spendMax,
+                            color: team.color,
+                            ...(team.purse !== undefined
+                              ? { note: `${String(pctOf(team.spend, team.purse))}%` }
+                              : {}),
+                          }
+                        : {
+                            key: team.teamId,
+                            label: team.name,
+                            value: `${count(team.squad)} players`,
+                            share: team.squad / squadMax,
+                            color: team.color,
+                          },
+                    )}
+                  />
+                )}
+              </div>
+            </>
+          )
+        }
+        right={
+          money && auction.status !== null ? (
+            <div data-testid="report-top-buys" className="rp-col">
+              <h3 className="rp-sub">Top buys</h3>
+              {(report.topBuys ?? []).length === 0 ? (
+                <p className="rp-quiet">Nobody has been sold yet.</p>
+              ) : (
+                <ol className="rp-buys">
+                  {(report.topBuys ?? []).map((buy, index) => (
+                    <li key={buy.registrationId} className="rp-buy">
+                      <span className="rp-rank">{index + 1}</span>
+                      <PlayerImage
+                        name={buy.playerName ?? "Player"}
+                        seed={buy.registrationId}
+                        src={buy.photoUrl}
+                        size="sm"
+                        shape="round"
+                        decorative
+                      />
+                      <span className="rp-buy-text">
+                        <span className="rp-buy-name">{buy.playerName ?? "Unnamed player"}</span>
+                        <span className="rp-buy-sub">
+                          {[buy.role, buy.teamName].filter((part) => part !== null).join(" · ")}
+                        </span>
+                      </span>
+                      <span className="rp-buy-price">
+                        {cardAmount(report.auctionUnit, buy.price)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          ) : null
+        }
+      />
+
+      {play !== null ? (
+        <Chapter
+          id="rp-season"
+          n={3}
+          title="Season"
+          stage={stateOf("season")}
+          summary={
+            matchesAll === 0
+              ? "No fixtures published yet."
+              : [
+                  `${count(play.played)} of ${count(matchesAll)} matches played`,
+                  play.live > 0 ? `${count(play.live)} live` : null,
+                  leader !== undefined && leader.played > 0
+                    ? `${leader.name} lead on ${count(leader.points)} pts`
+                    : null,
+                ]
+                  .filter((part): part is string => part !== null)
+                  .join(" · ")
+          }
+          actions={
+            <>
+              <Link href={`/seasons/${season.slug}/fixtures`} className="rp-door">
+                Schedule <IconArrowRight size={14} aria-hidden />
+              </Link>
+              {play.table !== null ? (
+                <Link href={`/seasons/${season.slug}/standings`} className="rp-door">
+                  Table <IconArrowRight size={14} aria-hidden />
+                </Link>
+              ) : null}
+            </>
+          }
+          testId="report-season"
+          left={
+            play.table === null || play.played === 0 ? (
+              play.table !== null ? (
+                <>
+                  <h3 className="rp-sub">The table</h3>
+                  <p className="rp-quiet">
+                    It fills in after the first result — {count(play.table.length)} teams, all level
+                    on 0.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="rp-sub">The standings</h3>
+                  <p className="rp-quiet">
+                    This season places squads match by match — the full standings are on the Table
+                    tab.
+                  </p>
+                </>
+              )
+            ) : (
+              <>
+                <h3 className="rp-sub">
+                  The table
+                  <span>
+                    {play.played === 0
+                      ? "before the first result"
+                      : `after ${count(play.played)} of ${count(matchesAll)} matches`}
+                  </span>
+                </h3>
+                <table className="rp-table" data-testid="report-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">
+                        <VisuallyHidden>Position</VisuallyHidden>
+                      </th>
+                      <th scope="col">
+                        <VisuallyHidden>Team</VisuallyHidden>
+                      </th>
+                      <th scope="col">
+                        <abbr title="Played">P</abbr>
+                      </th>
+                      <th scope="col">
+                        <abbr title="Won">W</abbr>
+                      </th>
+                      <th scope="col">
+                        <abbr title="Lost">L</abbr>
+                      </th>
+                      <th scope="col">Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {play.table.map((row, index) => (
+                      <tr key={row.teamId}>
+                        <td className="rp-table-pos">{index + 1}</td>
+                        <th scope="row">
+                          <span
+                            className="rp-dot"
+                            style={
+                              row.color === null
+                                ? undefined
+                                : ({ "--rp-fill": row.color } as CSSProperties)
+                            }
+                            aria-hidden
+                          />
+                          {row.name}
+                        </th>
+                        <td>{row.played}</td>
+                        <td>{row.won}</td>
+                        <td>{row.lost}</td>
+                        <td className="rp-table-pts">{row.points}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )
+          }
+          right={
+            <>
+              <h3 className="rp-sub">
+                Matches
+                {matchesAll > 0 ? (
+                  <span>
+                    {count(play.played)} played · {count(play.live)} live · {count(play.toCome)} to
+                    come
+                  </span>
+                ) : null}
+              </h3>
+              {matchesAll === 0 ? (
+                <p className="rp-quiet">Matches show up here once the schedule is published.</p>
+              ) : (
+                <>
+                  <Split
+                    label="Matches by state"
+                    parts={[
+                      { key: "played", value: play.played, label: "played", tone: "green" },
+                      { key: "live", value: play.live, label: "live", tone: "gold" },
+                      { key: "next", value: play.toCome, label: "to come", tone: "neutral" },
+                    ]}
+                    legend={false}
+                    testId="report-match-bars"
+                  />
+                  <ul className="rp-matches">
+                    {play.liveMatches.map((match) => (
+                      <li key={match.fixtureId} data-live="">
+                        <span className="rp-match-when">Live</span>
+                        <span>{resultSentence(match).rest}</span>
+                      </li>
+                    ))}
+                    {play.recent.map((match) => {
+                      const said = resultSentence(match);
+                      return (
+                        <li key={match.fixtureId}>
+                          <span className="rp-match-when">
+                            {match.kickoffAt === null ? "—" : shortDate(match.kickoffAt)}
+                          </span>
+                          <span>
+                            {said.lead !== null ? <strong>{said.lead}</strong> : null}
+                            {said.rest}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )}
+            </>
+          }
+        />
       ) : null}
 
       <p className="rp-foot">
-        <IconCheckCircle size={16} aria-hidden /> Figures are read live from the season&rsquo;s own
-        desks — the same numbers its Registrations, Teams and Auction tabs show.
+        <IconCheckCircle size={16} aria-hidden /> Read live from the season&rsquo;s own desks — the
+        same numbers its Players, Teams, Auction and Schedule tabs show.
       </p>
     </main>
   );
 }
 
-function LotBars({ sold, unsold, remaining }: { sold: number; unsold: number; remaining: number }) {
-  const all = Math.max(sold + unsold + remaining, 1);
+/** "26 Sep" from a wall-clock kickoff. */
+function shortDate(kickoffAt: string): string {
+  const day = kickoffAt.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? formatDate(day).replace(/ \d{4}$/, "") : day;
+}
+
+/** One stage of the season as a card: its header, then one or two columns. */
+function Chapter({
+  id,
+  n,
+  title,
+  stage,
+  summary,
+  actions,
+  left,
+  right,
+  testId,
+}: {
+  id: string;
+  n: number;
+  title: string;
+  stage: { state: string; tone: string } | undefined;
+  summary: string;
+  actions: ReactNode;
+  left: ReactNode;
+  right: ReactNode;
+  testId: string;
+}) {
   return (
-    <Bars
-      label="Lots by outcome"
-      testId="report-lot-bars"
-      bars={[
-        { key: "sold", label: "Sold", value: count(sold), share: sold / all, tone: "green" },
-        {
-          key: "unsold",
-          label: "Unsold",
-          value: count(unsold),
-          share: unsold / all,
-          tone: "neutral",
-        },
-        // "Still to go 0" after the night is a bar about nothing.
-        ...(remaining > 0
-          ? [
-              {
-                key: "remaining",
-                label: "Still to go",
-                value: count(remaining),
-                share: remaining / all,
-                tone: "neutral" as const,
-              },
-            ]
-          : []),
-      ]}
-    />
+    <section id={id} className="rp-chapter" aria-labelledby={`${id}-title`} data-testid={testId}>
+      <header className="rp-chapter-head">
+        <span className="rp-chapter-n" data-tone={stage?.tone} aria-hidden>
+          {n}
+        </span>
+        <span className="rp-chapter-id">
+          <span className="rp-chapter-line">
+            <h2 id={`${id}-title`}>{title}</h2>
+            {stage !== undefined ? (
+              <span className="rp-chapter-state" data-tone={stage.tone}>
+                {stage.state}
+              </span>
+            ) : null}
+          </span>
+          <span className="rp-chapter-summary">{summary}</span>
+        </span>
+        <span className="rp-chapter-actions">{actions}</span>
+      </header>
+      <div className="rp-chapter-body" data-single={right === null ? "" : undefined}>
+        <div className="rp-col">{left}</div>
+        {right === null ? null : <div className="rp-col">{right}</div>}
+      </div>
+    </section>
+  );
+}
+
+interface SplitPart {
+  key: string;
+  value: number;
+  label: string;
+  tone: "gold" | "green" | "neutral" | "purple" | "blue" | "amber";
+}
+
+/** One bar split by share, and its legend; empty parts drop out of both. */
+function Split({
+  parts,
+  label,
+  testId,
+  legend = true,
+}: {
+  parts: readonly SplitPart[];
+  label: string;
+  testId: string;
+  legend?: boolean;
+}) {
+  const shown = parts.filter((part) => part.value > 0);
+  return (
+    <div className="rp-split" data-testid={testId}>
+      <span className="rp-split-bar" aria-hidden>
+        {shown.map((part) => (
+          <i key={part.key} data-tone={part.tone} style={{ flexGrow: part.value }} />
+        ))}
+      </span>
+      {legend ? (
+        <ul className="rp-legend" aria-label={label}>
+          {shown.map((part) => (
+            <li key={part.key} data-tone={part.tone}>
+              <b>{count(part.value)}</b> {part.label}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <VisuallyHidden>
+          {shown.map((part) => `${count(part.value)} ${part.label}`).join(", ")}
+        </VisuallyHidden>
+      )}
+    </div>
   );
 }
