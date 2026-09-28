@@ -162,6 +162,8 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
       "server/competition/appointments.ts": "queues only — delivery is the gated drain",
       "server/competition/lineup-announce.ts": "queues only — delivery is the gated drain",
       "server/competition/squad-sheets.ts": "queues only — delivery is the gated drain",
+      "server/orgs/organizer-notify.ts": "queues only — delivery is the gated drain",
+      "server/competition/registration-digest.ts": "queues only — delivery is the gated drain",
     },
   },
   {

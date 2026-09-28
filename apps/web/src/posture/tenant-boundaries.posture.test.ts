@@ -43,6 +43,13 @@ vi.mock("next/cache", () => ({
   revalidatePath: () => undefined,
   revalidateTag: () => undefined,
 }));
+// Notices a server action sends after its response (`after`) need a request
+// scope a test does not have. They are best effort by design and have their
+// own suites (registration-notify.regression.test.ts); here they are skipped.
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: () => undefined,
+}));
 
 const { competitionsView, submitRegistrationAction, withdrawMyRegistrationAction } =
   await import("../server/competition/actions");
