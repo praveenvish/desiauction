@@ -106,7 +106,11 @@ describe("auction doors by role", () => {
 });
 
 describe("merging per-club player slices", () => {
-  const row = (id: string, createdAt: number): PlayerIndexRow => ({
+  const row = (
+    id: string,
+    soldPrice: number | null,
+    teamName: string | null = null,
+  ): PlayerIndexRow => ({
     registrationId: id,
     number: id,
     name: id,
@@ -115,34 +119,50 @@ describe("merging per-club player slices", () => {
     seasonName: "S",
     role: null,
     status: "approved",
-    teamName: null,
+    teamName: soldPrice !== null ? "Kings" : teamName,
     teamColor: null,
     feeStatus: "pending",
     squadRoute: null,
     auctionDone: false,
-    createdAt,
+    soldPrice,
+    auctionUnit: "points",
+    createdAt: 0,
   });
   const slice = (rows: PlayerIndexRow[], approved: number): PlayersSlice => ({
     rows,
     total: rows.length,
-    stats: { total: rows.length, approved, sold: 0, preSigned: 0 },
+    stats: {
+      total: rows.length,
+      approved,
+      sold: 0,
+      preSigned: 0,
+      unsold: 0,
+      toReview: 0,
+      spent: 0,
+    },
   });
 
-  it("interleaves newest-first, pages the merged list and sums the counts", () => {
-    const merged = mergePlayerSlices(
-      [slice([row("A3", 30), row("A1", 10)], 1), slice([row("B2", 20)], 1)],
-      1,
-      2,
-    );
+  it("interleaves dearest-first, pages the merged list and sums the counts", () => {
+    const slices = [slice([row("A3", 30), row("A1", 10)], 1), slice([row("B2", 20)], 1)];
+    const merged = mergePlayerSlices(slices, 1, 2);
     expect(merged.rows.map((entry) => entry.registrationId)).toEqual(["A3", "B2"]);
     expect(merged.total).toBe(3);
     expect(merged.stats.approved).toBe(2);
-    const second = mergePlayerSlices(
-      [slice([row("A3", 30), row("A1", 10)], 1), slice([row("B2", 20)], 1)],
-      2,
-      2,
+    expect(mergePlayerSlices(slices, 2, 2).rows.map((entry) => entry.registrationId)).toEqual([
+      "A1",
+    ]);
+  });
+
+  it("puts the pre-signed after the bought and before everyone else, then by name", () => {
+    const merged = mergePlayerSlices(
+      [
+        slice([row("Zed", null), row("Cap", null, "Kings")], 0),
+        slice([row("Amy", null), row("Buy", 5)], 0),
+      ],
+      1,
+      10,
     );
-    expect(second.rows.map((entry) => entry.registrationId)).toEqual(["A1"]);
+    expect(merged.rows.map((entry) => entry.registrationId)).toEqual(["Buy", "Cap", "Amy", "Zed"]);
   });
 });
 

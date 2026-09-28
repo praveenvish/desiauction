@@ -202,7 +202,7 @@ function nextDestination(
   };
 }
 
-const STEP_LABELS = ["Setup", "Teams", "Registration", "Auction", "Fixtures", "Settlement"];
+const STEP_LABELS = ["Setup", "Teams", "Registration", "Auction", "Matches", "Settlement"];
 
 /** A points season (0091) has no Settlement rung — nothing is ever owed. */
 function stepLabels(view: SeasonOverviewView): readonly string[] {
@@ -222,7 +222,10 @@ function clearedRungs(view: SeasonOverviewView): boolean[] {
     view.teamCount > 0,
     status === "registration_closed",
     view.auctionStatus === "completed" || view.auctionStatus === "reconciled",
-    view.fixtureCount > 0,
+    // MATCHES is done when they have been played, not when a schedule exists:
+    // "Fixtures ✓" on a season three matches into seven read as over (census
+    // 2026-09-28). The rung fills as they are played (see the journey label).
+    view.fixtureCount > 0 && view.fixturesOpen === 0,
     ...(view.competition.auctionUnit === "points"
       ? []
       : [view.settlement !== null && view.settlement.discharged]),
@@ -406,8 +409,14 @@ export function OverviewPanel({
   now,
   finale,
   mineTeamIds = [],
+  yours,
+  liveMatches = 0,
 }: {
   view: SeasonOverviewView;
+  /** The owner's own team this season, drawn by the page (owners only). */
+  yours?: ReactNode;
+  /** Matches being played right now. */
+  liveMatches?: number;
   slug: string;
   /** Name the champion, once every match is done (champion-card.tsx), drawn by the page. */
   finale?: ReactNode;
@@ -566,21 +575,35 @@ export function OverviewPanel({
     : auctionDone
       ? { tone: "green" as KitTone, icon: <IconCheckCircle /> }
       : (STATUS_PILL[status] ?? { tone: "neutral" as KitTone, icon: <IconCalendar /> });
+  // Once a match has been played (or is being played) the season is ON — the
+  // pill said "auction done" three matches in (census 2026-09-28).
+  const matchesPlayed = view.fixtureCount - view.fixturesOpen;
+  const seasonOn = auctionDone && view.fixtureCount > 0 && (matchesPlayed > 0 || liveMatches > 0);
   const statusText = finished
     ? "completed"
-    : auctionDone
-      ? "auction done"
-      : status.replace(/_/g, " ");
+    : seasonOn
+      ? "season on"
+      : auctionDone
+        ? "auction done"
+        : status.replace(/_/g, " ");
+  // A team owner after the auction: the pool figures and the pool-by-role card
+  // were the organizer's working view, stale for the owner; their own team
+  // stands in their place.
+  const ownerView = mineTeamIds.length > 0 && !view.viewer.canManage && auctionDone;
 
   const journey: JourneyStep[] = steps.map((label, index) => {
     const state = cleared[index] === true ? "done" : index === activeIndex ? "current" : "upcoming";
     const href = stepHref(index, slug, view);
+    const counted =
+      index === 4 && state === "current" && view.fixtureCount > 0
+        ? `${label} · ${String(matchesPlayed)} of ${String(view.fixtureCount)}`
+        : label;
     return {
       key: label,
       // The mark is decorative, so the state is said in words as well.
       label: (
         <>
-          {label}
+          {counted}
           <VisuallyHidden>
             {state === "done" ? " — done" : state === "current" ? " — in progress" : " — to do"}
           </VisuallyHidden>
@@ -742,6 +765,11 @@ export function OverviewPanel({
                   Auction live
                 </Pill>
               ) : null}
+              {liveMatches > 0 ? (
+                <Pill tone="red" dot testId="matches-live">
+                  Match day · {liveMatches} live
+                </Pill>
+              ) : null}
             </span>
           }
           // The season's name is the page's one <h1>: the shell's page head
@@ -864,206 +892,216 @@ export function OverviewPanel({
         ) : null}
       </div>
 
-      {/* The figures, one strip (they were four tiles the height of a card).
+      {ownerView ? yours : null}
+
+      {ownerView ? null : (
+        <>
+          {/* The figures, one strip (they were four tiles the height of a card).
           Before an auction there is no purse and no lot, so those two wait. */}
-      <ul className="ov-figures" data-testid="season-figures">
-        <Figure
-          value={view.approvedPlayers}
-          label={view.approvedPlayers === 1 ? "approved player" : "approved players"}
-          {...(approvedHint !== undefined ? { hint: approvedHint } : {})}
-          href={view.viewer.canReview ? `/seasons/${slug}/registrations` : undefined}
-          testId="overview-approved"
-        />
-        {view.auctionStatus === null && view.pendingPlayers > 0 ? (
-          <Figure
-            value={view.pendingPlayers}
-            label="waiting for your review"
-            tone="warm"
-            href={`/seasons/${slug}/registrations`}
-            testId="pending-tile"
-          />
-        ) : null}
-        <Figure
-          value={view.teamCount}
-          label={view.teamCount === 1 ? "team" : "teams"}
-          href={`/seasons/${slug}/teams`}
-          testId="overview-teams"
-        />
-        {view.auctionStatus !== null && view.purseCommitted !== undefined ? (
-          <Figure
-            value={points ? money.exact(view.purseCommitted) : money.compact(view.purseCommitted)}
-            label="purse committed"
-            {...(view.pursePct !== undefined && view.pursePct !== null
-              ? { hint: `${shareLabel(view.purseCommitted, view.pursePct)} of the total purse` }
-              : {})}
-            testId="overview-purse"
-          />
-        ) : null}
-        {view.auctionStatus !== null ? (
-          <Figure
-            value={`${String(view.lotsSold)}/${String(view.lotsTotal)}`}
-            label="lots sold"
-            hint={`${String(lotsPct)}% of the pool`}
-            testId="overview-lots"
-          />
-        ) : null}
-      </ul>
+          <ul className="ov-figures" data-testid="season-figures">
+            <Figure
+              value={view.approvedPlayers}
+              label={view.approvedPlayers === 1 ? "approved player" : "approved players"}
+              {...(approvedHint !== undefined ? { hint: approvedHint } : {})}
+              href={view.viewer.canReview ? `/seasons/${slug}/registrations` : undefined}
+              testId="overview-approved"
+            />
+            {view.auctionStatus === null && view.pendingPlayers > 0 ? (
+              <Figure
+                value={view.pendingPlayers}
+                label="waiting for your review"
+                tone="warm"
+                href={`/seasons/${slug}/registrations`}
+                testId="pending-tile"
+              />
+            ) : null}
+            <Figure
+              value={view.teamCount}
+              label={view.teamCount === 1 ? "team" : "teams"}
+              href={`/seasons/${slug}/teams`}
+              testId="overview-teams"
+            />
+            {view.auctionStatus !== null && view.purseCommitted !== undefined ? (
+              <Figure
+                value={
+                  points ? money.exact(view.purseCommitted) : money.compact(view.purseCommitted)
+                }
+                label="purse committed"
+                {...(view.pursePct !== undefined && view.pursePct !== null
+                  ? { hint: `${shareLabel(view.purseCommitted, view.pursePct)} of the total purse` }
+                  : {})}
+                testId="overview-purse"
+              />
+            ) : null}
+            {view.auctionStatus !== null ? (
+              <Figure
+                value={`${String(view.lotsSold)}/${String(view.lotsTotal)}`}
+                label="lots sold"
+                hint={`${String(lotsPct)}% of the pool`}
+                testId="overview-lots"
+              />
+            ) : null}
+          </ul>
+        </>
+      )}
 
       {now}
 
-      <div className="ov-grid">
-        <CardGrid>
-          <SectionCard
-            title="Teams"
-            data-testid="team-spend-card"
-            action={
-              <Link className="ov-card-link" href={`/seasons/${slug}/teams`}>
-                All teams
-                <IconArrowRight size={16} />
-              </Link>
-            }
-          >
-            {view.topTeams.length === 0 ? (
-              <EmptyState
-                size="compact"
-                icon={<IconUsers />}
-                title="No teams yet"
-                description="The auction issues one paddle per team, so this is the first thing to build."
-                {...(view.viewer.canManage
-                  ? {
-                      action: (
-                        <Link
-                          href={`/seasons/${slug}/teams`}
-                          className={buttonClassName({ variant: "secondary", size: "sm" })}
-                          data-testid="empty-add-teams"
-                        >
-                          Add teams
-                        </Link>
-                      ),
-                    }
-                  : {})}
-              />
-            ) : (
-              <ul className="ov-rows">
-                {view.topTeams.slice(0, 5).map((team) => {
-                  const spent = team.spend !== undefined && view.lotsSold > 0;
-                  return (
-                    <li key={team.teamId} className="ov-team">
-                      {/* The same crest every other tab draws — its logo, or two
+      {ownerView ? null : (
+        <div className="ov-grid">
+          <CardGrid>
+            <SectionCard
+              title="Teams"
+              data-testid="team-spend-card"
+              action={
+                <Link className="ov-card-link" href={`/seasons/${slug}/teams`}>
+                  All teams
+                  <IconArrowRight size={16} />
+                </Link>
+              }
+            >
+              {view.topTeams.length === 0 ? (
+                <EmptyState
+                  size="compact"
+                  icon={<IconUsers />}
+                  title="No teams yet"
+                  description="The auction issues one paddle per team, so this is the first thing to build."
+                  {...(view.viewer.canManage
+                    ? {
+                        action: (
+                          <Link
+                            href={`/seasons/${slug}/teams`}
+                            className={buttonClassName({ variant: "secondary", size: "sm" })}
+                            data-testid="empty-add-teams"
+                          >
+                            Add teams
+                          </Link>
+                        ),
+                      }
+                    : {})}
+                />
+              ) : (
+                <ul className="ov-rows">
+                  {view.topTeams.slice(0, 5).map((team) => {
+                    const spent = team.spend !== undefined && view.lotsSold > 0;
+                    return (
+                      <li key={team.teamId} className="ov-team">
+                        {/* The same crest every other tab draws — its logo, or two
                           initials — rather than a one-letter tile of its own. */}
-                      <span className="ov-team-tile" aria-hidden>
-                        <TeamCrest
-                          name={team.name}
-                          short={team.shortName}
-                          color={team.color}
-                          logoUrl={team.logoUrl}
-                        />
-                      </span>
-                      <span className="ov-team-name">
-                        {team.name}
-                        {mineTeamIds.includes(team.teamId) ? (
-                          <span className="ov-team-yours">Your team</span>
-                        ) : null}
-                      </span>
-                      <span className="ov-team-figs">
-                        {team.squadMax !== undefined && team.squadMax !== null ? (
-                          <span>
-                            <VisuallyHidden>Squad </VisuallyHidden>
-                            {team.squad}/{team.squadMax}
-                          </span>
-                        ) : (
-                          <span>
-                            {team.squad} {team.squad === 1 ? "player" : "players"}
-                          </span>
-                        )}
-                        {/* Before a hammer has fallen every team has spent ₹0, and
+                        <span className="ov-team-tile" aria-hidden>
+                          <TeamCrest
+                            name={team.name}
+                            short={team.shortName}
+                            color={team.color}
+                            logoUrl={team.logoUrl}
+                          />
+                        </span>
+                        <span className="ov-team-name">
+                          {team.name}
+                          {mineTeamIds.includes(team.teamId) ? (
+                            <span className="ov-team-yours">Your team</span>
+                          ) : null}
+                        </span>
+                        <span className="ov-team-figs">
+                          {team.squadMax !== undefined && team.squadMax !== null ? (
+                            <span>
+                              <VisuallyHidden>Squad </VisuallyHidden>
+                              {team.squad}/{team.squadMax}
+                            </span>
+                          ) : (
+                            <span>
+                              {team.squad} {team.squad === 1 ? "player" : "players"}
+                            </span>
+                          )}
+                          {/* Before a hammer has fallen every team has spent ₹0, and
                           a column of "₹0" is furniture, not a reading. */}
-                        {spent ? <span>{money.exact(team.spend ?? 0)}</span> : null}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </SectionCard>
+                          {spent ? <span>{money.exact(team.spend ?? 0)}</span> : null}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </SectionCard>
 
-          <SectionCard
-            title="Pool by role"
-            data-testid="pool-card"
-            {...(view.viewer.canReview && view.poolByRole.length > 0
-              ? {
-                  action: (
-                    <Link className="ov-card-link" href={`/seasons/${slug}/registrations`}>
-                      View all
-                      <IconArrowRight size={16} />
-                    </Link>
-                  ),
-                }
-              : {})}
-          >
-            {view.poolByRole.length === 0 ? (
-              <EmptyState
-                size="compact"
-                icon={<IconUsers />}
-                title="No approved players yet"
-                description={
-                  status === "registration_open"
-                    ? "Share the registration link — every entry lands in the Registrations tab for you to approve."
-                    : "Players enter through the registration link once you open registration."
-                }
-                {...(view.viewer.canReview &&
-                (status === "registration_open" || view.pendingPlayers > 0)
-                  ? {
-                      action: (
-                        <>
-                          {status === "registration_open" ? (
-                            <ShareRegistration
-                              slug={slug}
-                              open
-                              seasonName={view.competition.name}
-                            />
-                          ) : null}
-                          {view.pendingPlayers > 0 ? (
-                            <Link
-                              href={`/seasons/${slug}/registrations`}
-                              className={buttonClassName({ variant: "secondary", size: "sm" })}
-                              data-testid="empty-review-registrations"
-                            >
-                              Review {view.pendingPlayers} waiting
-                            </Link>
-                          ) : null}
-                        </>
-                      ),
-                    }
-                  : {})}
-              />
-            ) : (
-              <ul className="ov-rows">
-                {view.poolByRole.map((entry) => {
-                  const mark = (entry.role !== null ? ROLE_MARK[entry.role] : undefined) ?? {
-                    ...OTHER_ROLE_MARK,
-                  };
-                  return (
-                    <li key={entry.role ?? "none"} className="ov-role" data-tone={mark.tone}>
-                      <IconTile icon={mark.icon} tone={mark.tone} />
-                      <span className="ov-role-name">{labelOf(entry.role)}</span>
-                      <span className="ov-role-count">{entry.count}</span>
-                      <span className="ov-bar ov-role-bar" aria-hidden>
-                        <span
-                          className="ov-bar-fill"
-                          style={{
-                            width: `${String(percent(entry.count, view.poolByRole[0]?.count ?? 1))}%`,
-                          }}
-                        />
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </SectionCard>
-        </CardGrid>
-      </div>
+            <SectionCard
+              title="Pool by role"
+              data-testid="pool-card"
+              {...(view.viewer.canReview && view.poolByRole.length > 0
+                ? {
+                    action: (
+                      <Link className="ov-card-link" href={`/seasons/${slug}/registrations`}>
+                        View all
+                        <IconArrowRight size={16} />
+                      </Link>
+                    ),
+                  }
+                : {})}
+            >
+              {view.poolByRole.length === 0 ? (
+                <EmptyState
+                  size="compact"
+                  icon={<IconUsers />}
+                  title="No approved players yet"
+                  description={
+                    status === "registration_open"
+                      ? "Share the registration link — every entry lands in the Registrations tab for you to approve."
+                      : "Players enter through the registration link once you open registration."
+                  }
+                  {...(view.viewer.canReview &&
+                  (status === "registration_open" || view.pendingPlayers > 0)
+                    ? {
+                        action: (
+                          <>
+                            {status === "registration_open" ? (
+                              <ShareRegistration
+                                slug={slug}
+                                open
+                                seasonName={view.competition.name}
+                              />
+                            ) : null}
+                            {view.pendingPlayers > 0 ? (
+                              <Link
+                                href={`/seasons/${slug}/registrations`}
+                                className={buttonClassName({ variant: "secondary", size: "sm" })}
+                                data-testid="empty-review-registrations"
+                              >
+                                Review {view.pendingPlayers} waiting
+                              </Link>
+                            ) : null}
+                          </>
+                        ),
+                      }
+                    : {})}
+                />
+              ) : (
+                <ul className="ov-rows">
+                  {view.poolByRole.map((entry) => {
+                    const mark = (entry.role !== null ? ROLE_MARK[entry.role] : undefined) ?? {
+                      ...OTHER_ROLE_MARK,
+                    };
+                    return (
+                      <li key={entry.role ?? "none"} className="ov-role" data-tone={mark.tone}>
+                        <IconTile icon={mark.icon} tone={mark.tone} />
+                        <span className="ov-role-name">{labelOf(entry.role)}</span>
+                        <span className="ov-role-count">{entry.count}</span>
+                        <span className="ov-bar ov-role-bar" aria-hidden>
+                          <span
+                            className="ov-bar-fill"
+                            style={{
+                              width: `${String(percent(entry.count, view.poolByRole[0]?.count ?? 1))}%`,
+                            }}
+                          />
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </SectionCard>
+          </CardGrid>
+        </div>
+      )}
 
       {/* A reader who cannot run the season (a team owner, a member) is not
           told about publishing, copy-links and listing state — that is the
