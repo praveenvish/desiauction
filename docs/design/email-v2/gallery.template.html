@@ -1,0 +1,160 @@
+<title>DesiAuction Email v2</title>
+<style>
+  :root {
+    --bg: #F7F6F2; --panel: #FFFFFF; --sunken: #F0EEE8; --rule: #E7E4DC;
+    --text: #2B2822; --heading: #1A1814; --muted: #58534A;
+    --gold: #F0B43C; --gold-edge: #B57F14; --gold-ink: #865D12; --on-gold: #070A0F;
+    --frame: #D9D5CA;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #070A0F; --panel: #101623; --sunken: #0B1018; --rule: #1F2A3D;
+      --text: #C9D4E8; --heading: #E8EEF9; --muted: #9FB0CC;
+      --gold-ink: #F3D078; --frame: #2C3A52;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #070A0F; --panel: #101623; --sunken: #0B1018; --rule: #1F2A3D;
+    --text: #C9D4E8; --heading: #E8EEF9; --muted: #9FB0CC;
+    --gold-ink: #F3D078; --frame: #2C3A52;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 56px; }
+  header { display: grid; gap: 6px; margin-bottom: 22px; }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold-ink); }
+  h1 { margin: 0; font-size: 28px; line-height: 1.2; color: var(--heading); letter-spacing: -0.4px; text-wrap: balance; }
+  header p { margin: 0; max-width: 68ch; color: var(--muted); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 14px 0; border-block: 1px solid var(--rule); margin-bottom: 22px; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 2; }
+  .group { display: flex; gap: 4px; flex-wrap: wrap; }
+  .group[aria-label] { align-items: center; }
+  .seg { display: inline-flex; background: var(--sunken); border: 1px solid var(--rule); border-radius: 10px; padding: 3px; gap: 2px; }
+  button { font: inherit; cursor: pointer; border: 0; background: transparent; color: var(--muted); padding: 7px 12px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+  button[aria-pressed="true"] { background: var(--gold); color: var(--on-gold); box-shadow: inset 0 0 0 1px var(--gold-edge); }
+  button:focus-visible { outline: 2px solid var(--gold-edge); outline-offset: 2px; }
+  .mails { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .inbox { display: grid; grid-template-columns: 40px 1fr auto; gap: 4px 12px; align-items: start; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 16px; margin-bottom: 22px; max-width: 680px; }
+  .inbox .av { width: 40px; height: 40px; border-radius: 20px; background: #1A1814; color: #F0B43C; display: grid; place-items: center; font-weight: 800; font-size: 14px; grid-row: span 3; }
+  .inbox .from { font-weight: 700; color: var(--heading); }
+  .inbox .time { color: var(--muted); font-size: 13px; }
+  .inbox .subj { grid-column: 2 / 4; font-weight: 600; color: var(--heading); }
+  .inbox .pre { grid-column: 2 / 4; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .inbox-label { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+
+  .frames { display: grid; grid-template-columns: 390px minmax(0, 1fr); gap: 28px; align-items: start; }
+  .frame h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
+  .device { border: 1px solid var(--frame); border-radius: 22px; overflow: hidden; background: var(--sunken); }
+  .phone .device { width: 390px; max-width: 100%; }
+  .desk .scroll { overflow-x: auto; }
+  .desk .device { width: 680px; border-radius: 14px; }
+  iframe { display: block; width: 100%; border: 0; height: 900px; }
+  .notes { margin-top: 36px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .note { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 16px 18px; }
+  .note h3 { margin: 0 0 6px; font-size: 15px; color: var(--heading); }
+  .note p { margin: 0; color: var(--muted); font-size: 14px; }
+  @media (max-width: 1000px) { .frames { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PR0 · for approval</div>
+    <h1>DesiAuction Email v2</h1>
+    <p>The five key emails in the new layout: sign-in code, registration received (new), approved, sold, and the owner's auction reminder (new). Each one is shown the way the inbox lists it, then at phone and desktop width. Switch language and theme above.</p>
+  </header>
+
+  <div class="controls" role="toolbar" aria-label="Preview options">
+    <div class="mails" id="mails" aria-label="Email"></div>
+    <div class="seg" id="lang" aria-label="Language">
+      <button type="button" id="lang-en" data-v="en" aria-pressed="true">English</button>
+      <button type="button" id="lang-hi" data-v="hi" aria-pressed="false">हिन्दी</button>
+    </div>
+    <div class="seg" id="theme" aria-label="Email theme">
+      <button type="button" id="theme-light" data-v="light" aria-pressed="true">Light</button>
+      <button type="button" id="theme-dark" data-v="dark" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+
+  <p class="inbox-label">In the inbox</p>
+  <div class="inbox" aria-live="polite">
+    <div class="av" aria-hidden="true">DA</div>
+    <div class="from">DesiAuction</div>
+    <div class="time">7:42 pm</div>
+    <div class="subj" id="subj"></div>
+    <div class="pre" id="pre"></div>
+  </div>
+
+  <div class="frames">
+    <section class="frame phone">
+      <h2><span>Phone · 390 px</span><span id="kb"></span></h2>
+      <div class="device"><iframe id="f-phone" title="Email at phone width"></iframe></div>
+    </section>
+    <section class="frame desk">
+      <h2><span>Desktop · 680 px</span></h2>
+      <div class="scroll"><div class="device"><iframe id="f-desk" title="Email at desktop width"></iframe></div></div>
+    </section>
+  </div>
+
+  <div class="notes">
+    <div class="note"><h3>Club first</h3><p>Every club email opens with the season and club band, so a player recognises their own tournament before they read anything from us.</p></div>
+    <div class="note"><h3>One progress tracker</h3><p>Registered → Approved → Auction → Team, on every player email. Each one shows where the player is in the season.</p></div>
+    <div class="note"><h3>Code in the subject</h3><p>The lock screen shows the code and Gmail offers "Copy code". Still no links in a code email, and the device and time help people spot a request they didn't make.</p></div>
+    <div class="note"><h3>Auction-night look</h3><p>The sold email uses the Floodlight stage in both themes: gold price, three bidding facts, and a card to share.</p></div>
+    <div class="note"><h3>Works everywhere</h3><p>Built from tables with inline styles. It reads fully with images blocked and without the style block, stays under 60 KB (Gmail clips at 102 KB), and switches to dark mode in Apple Mail and iOS Mail.</p></div>
+    <div class="note"><h3>Hindi done properly</h3><p><code>lang="hi"</code> on the document and a Devanagari-first font list. Every string is written in Hindi, not machine-swapped.</p></div>
+  </div>
+</div>
+
+<script>
+  const MAILS = /*__DATA__*/[];
+  const ids = [...new Set(MAILS.map((m) => m.id))];
+  const state = { id: ids[0], lang: "en", theme: "light" };
+  try { const s = JSON.parse(localStorage.getItem("da-mail-v2") || "{}"); Object.assign(state, s); } catch {}
+  if (!ids.includes(state.id)) state.id = ids[0];
+
+  const mailsEl = document.getElementById("mails");
+  mailsEl.classList.add("seg");
+  for (const id of ids) {
+    const b = document.createElement("button");
+    b.type = "button"; b.id = "mail-" + id; b.dataset.v = id;
+    b.textContent = MAILS.find((m) => m.id === id).title;
+    mailsEl.append(b);
+  }
+
+  function fit(frame) {
+    try {
+      const doc = frame.contentDocument;
+      frame.style.height = Math.max(400, doc.documentElement.scrollHeight) + "px";
+    } catch {}
+  }
+  for (const f of document.querySelectorAll("iframe")) f.addEventListener("load", () => { fit(f); setTimeout(() => fit(f), 150); });
+
+  function render() {
+    const m = MAILS.find((x) => x.id === state.id && x.lang === state.lang);
+    const html = state.theme === "dark" ? m.dark : m.light;
+    document.getElementById("f-phone").srcdoc = html;
+    document.getElementById("f-desk").srcdoc = html;
+    document.getElementById("subj").textContent = m.subject;
+    document.getElementById("pre").textContent = m.preheader;
+    document.getElementById("kb").textContent = m.kb + " KB";
+    for (const [group, key] of [["mails", "id"], ["lang", "lang"], ["theme", "theme"]]) {
+      for (const b of document.getElementById(group).querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === state[key]));
+    }
+    try { localStorage.setItem("da-mail-v2", JSON.stringify(state)); } catch {}
+  }
+  for (const [group, key] of [["mails", "id"], ["lang", "lang"], ["theme", "theme"]]) {
+    document.getElementById(group).addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      state[key] = b.dataset.v; render();
+    });
+  }
+  const hash = location.hash.slice(1);
+  if (ids.includes(hash)) state.id = hash;
+  render();
+</script>
