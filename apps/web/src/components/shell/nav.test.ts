@@ -222,7 +222,7 @@ describe("the admin tab strip agrees with the routes on disk", () => {
   it("finds the admin routes it is meant to be checking", () => {
     // A guard that silently checks nothing is worse than no guard.
     expect(routes.length).toBeGreaterThan(3);
-    expect(routes).toContain("/admin/messaging");
+    expect(routes).toContain("/admin/notifications");
   });
 
   // Every capability, so the catalogue is complete regardless of who holds what.

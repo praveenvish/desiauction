@@ -160,11 +160,67 @@
 }
 
 .ptpl-env {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   max-width: 100%;
-  overflow: hidden;
+  min-width: 0;
   white-space: nowrap;
+}
+
+.ptpl-env code {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ptpl-env-label,
+.ptpl-env-value {
+  flex: none;
+}
+
+.ptpl-env-value {
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The name is copied, never the value; a 24px target inside a meta line. */
+.ptpl-copy {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  margin: -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  vertical-align: middle;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.ptpl-copy:hover {
+  color: var(--text-primary);
+  background: var(--surface-sunken);
+}
+
+.ptpl-copy:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* The words a text says, set apart from the row's facts like a quotation. */
+.ptpl-sms-text {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .ptpl-statuses {

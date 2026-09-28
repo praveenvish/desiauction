@@ -159,6 +159,25 @@ describe("channelHealth", () => {
     });
   });
 
+  it("never calls SMS live when it only reaches the development inbox", () => {
+    const sms = channelHealth(channels(), GROUPS, 30, "dev_inbox").find((c) => c.channel === "sms");
+    expect(sms).toMatchObject({
+      state: "dev_inbox",
+      sent: 4026,
+      line: "Goes to the development inbox — no SMS gateway is set up",
+    });
+    expect(sms && channelShort(sms)).toBe("4,026 written");
+    // Only SMS reads the route; a switch an admin turned off still wins.
+    const email = channelHealth(channels(), GROUPS, 30, "dev_inbox").find(
+      (c) => c.channel === "email",
+    );
+    expect(email?.state).toBe("not_set_up");
+    const off = channelHealth(channels({ sms: "Paused" }), GROUPS, 30, "dev_inbox").find(
+      (c) => c.channel === "sms",
+    );
+    expect(off?.state).toBe("off");
+  });
+
   it("passes an unknown cause through untouched", () => {
     expect(plainCause("Template not approved — paused")).toBe("Template not approved — paused");
   });
@@ -171,6 +190,11 @@ describe("attentionOf", () => {
     expect(attention?.lines).toEqual(["Messages go by SMS and In-app until they are."]);
     expect(attention?.stoppedLead).toBe("1 message is switched off by an admin:");
     expect(attention?.stopped).toEqual([{ key: "demo.booking_reminder", label: "Demo reminder" }]);
+  });
+
+  it("does not count the development inbox as a way messages go", () => {
+    const health = channelHealth(channels(), GROUPS, 30, "dev_inbox");
+    expect(attentionOf(health, GROUPS)?.lines).toEqual(["Messages go by In-app until they are."]);
   });
 
   it("leads with a channel switched off everywhere", () => {
