@@ -1,9 +1,10 @@
-import { auditLog, newId, withTenantDb } from "@desiauction/db";
-import { and, desc, eq, notInArray, sql } from "drizzle-orm";
+import { auditLog, newId, people, withTenantDb } from "@desiauction/db";
+import { and, desc, eq, gt, lt, notInArray, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { dbHandle } from "../db";
 import { hiddenInboxActions } from "../messaging/gate";
+import { UNREAD_CAP } from "../../lib/inbox-cap";
 import { LEDGER_ONLY_ACTIONS, inboxExclusions } from "./inbox-filter";
 
 // Security events ride the append-only audit substrate (IP-2_DESIGN D8) with
@@ -167,18 +168,85 @@ export async function listSecurityEvents(
  * security panel, which reads `listSecurityEvents`, still shows the ledger
  * whole. The preference is read inside the same person boundary as the rows.
  */
-export async function listInboxEvents(personId: string, limit = 10): Promise<SecurityEvent[]> {
+export async function listInboxEvents(
+  personId: string,
+  limit = 10,
+  /** Older than this — the next page of "Show older" (PR16). */
+  before?: Date,
+): Promise<SecurityEvent[]> {
   return withTenantDb(dbHandle, { personId }, async (db) => {
     const hidden = await hiddenInboxActions(db, personId);
     return db
       .select({ action: auditLog.action, at: auditLog.at, meta: auditLog.meta })
       .from(auditLog)
       .where(
-        and(eq(auditLog.scopeId, personId), notInArray(auditLog.action, inboxExclusions(hidden))),
+        and(
+          eq(auditLog.scopeId, personId),
+          notInArray(auditLog.action, inboxExclusions(hidden)),
+          ...(before === undefined ? [] : [lt(auditLog.at, before)]),
+        ),
       )
       .orderBy(desc(auditLog.at))
       .limit(limit);
   });
+}
+
+export interface InboxState {
+  /** The newest notice this person has seen, on any device (0096). */
+  readonly seenAt: Date | null;
+  /** Notices after it, up to UNREAD_CAP + 1 (so the badge can say "9+"). */
+  readonly unread: number;
+}
+
+/**
+ * READ STATE, ON THE SERVER (email programme PR16). The bell's count and the
+ * inbox's "new" dots read one watermark on the person, so a notice read on
+ * the phone is read on the laptop. Filtered exactly as the inbox is, or the
+ * bell would count a notice the inbox refuses to show.
+ */
+export const inboxState = cache(async function inboxState(personId: string): Promise<InboxState> {
+  return withTenantDb(dbHandle, { personId }, async (db) => {
+    const [person] = await db
+      .select({ seenAt: people.inboxSeenAt })
+      .from(people)
+      .where(eq(people.id, personId))
+      .limit(1);
+    const seenAt = person?.seenAt ?? null;
+    const hidden = await hiddenInboxActions(db, personId);
+    const fresh = await db
+      .select({ at: auditLog.at })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.scopeId, personId),
+          notInArray(auditLog.action, inboxExclusions(hidden)),
+          ...(seenAt === null ? [] : [gt(auditLog.at, seenAt)]),
+        ),
+      )
+      .orderBy(desc(auditLog.at))
+      .limit(UNREAD_CAP + 1);
+    return { seenAt, unread: fresh.length };
+  });
+});
+
+/**
+ * Seen up to `upTo` — only ever forward, and never past now: a browser cannot
+ * mark tomorrow's notices read by sending a date from the future.
+ */
+export async function markInboxSeen(
+  personId: string,
+  upTo: Date,
+  now: Date = new Date(),
+): Promise<void> {
+  const at = upTo.getTime() > now.getTime() ? now : upTo;
+  await withTenantDb(dbHandle, { personId }, (db) =>
+    db
+      .update(people)
+      .set({
+        inboxSeenAt: sql`greatest(coalesce(${people.inboxSeenAt}, ${at.toISOString()}::timestamptz), ${at.toISOString()}::timestamptz)`,
+      })
+      .where(eq(people.id, personId)),
+  );
 }
 
 /** How many person-scoped events exist — so a truncated list can admit it. */

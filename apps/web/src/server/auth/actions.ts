@@ -52,6 +52,7 @@ import {
   countSecurityEvents,
   listSecurityEvents,
   logSecurityEvent,
+  markInboxSeen,
   type SecurityEvent,
 } from "./security-events";
 import {
@@ -1283,4 +1284,22 @@ export async function confirmEmailVerificationAction(
   }
   revalidatePath("/account");
   return { step: "idle", done: true, email: result.email };
+}
+
+/**
+ * "I have read my inbox up to here" (email programme PR16) — the newest notice
+ * the person just saw. The watermark lives on the person, so every device
+ * agrees; it only moves forward, and never past now.
+ */
+export async function markInboxSeenAction(upTo: string): Promise<{ ok: boolean }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false };
+  }
+  const at = new Date(upTo);
+  if (Number.isNaN(at.getTime())) {
+    return { ok: false };
+  }
+  await markInboxSeen(session.personId, at);
+  return { ok: true };
 }

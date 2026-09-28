@@ -69,6 +69,12 @@ export const people = pgTable("people", {
    * decides, then English (packages/messaging language.ts).
    */
   language: text("language", { enum: ["en", "hi"] }),
+  /**
+   * The newest inbox notice this person has seen (0096) — the bell's "unread"
+   * is everything after it, on every device. Only ever moves forward. NULL:
+   * never opened /inbox on this build.
+   */
+  inboxSeenAt: ts("inbox_seen_at"),
 });
 
 /**

@@ -666,6 +666,13 @@
       "when": 1791907200000,
       "tag": "0095_competition_auction_starts_at",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1791993600000,
+      "tag": "0096_people_inbox_seen_at",
+      "breakpoints": true
     }
   ]
 }
