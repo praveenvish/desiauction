@@ -98,12 +98,16 @@ export default async function LoginPage({
   // Which door. An explicit `?method=` wins; a code-step link that predates it
   // (`?step=code&to=+91…`) is recognisably a phone one; everything else opens
   // on LOGIN_DEFAULT_METHOD — email until SMS is live.
+  // Email-only sign-in (OTP_PROVIDER=none) has one door: a phone link, old or
+  // hand-typed, opens the email one rather than a form that cannot send.
   const method: LoginMethod =
-    params.method === "email" || params.method === "phone"
-      ? params.method
-      : initialStep === "code" && params.to?.startsWith("+") === true
-        ? "phone"
-        : env.LOGIN_DEFAULT_METHOD;
+    env.OTP_PROVIDER === "none"
+      ? "email"
+      : params.method === "email" || params.method === "phone"
+        ? params.method
+        : initialStep === "code" && params.to?.startsWith("+") === true
+          ? "phone"
+          : env.LOGIN_DEFAULT_METHOD;
   return (
     <main className="login" data-theme="floodlight">
       {/* The floodlit brand panel. The scenery is decorative; the marks are not,

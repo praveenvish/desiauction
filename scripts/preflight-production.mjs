@@ -223,9 +223,18 @@ if (engineFile !== undefined) {
 // would have been REFUSED here — the gate failing the very thing it exists to
 // admit. Whichever is selected, the credentials CHECKED are that provider's.
 const otpProvider = env.OTP_PROVIDER ?? "(unset)";
+// `none` is EMAIL-ONLY SIGN-IN, chosen on purpose (a launch that precedes its
+// text channel): allowed, with a warning, because everyone can still sign in by
+// email. Unset or `dev` stays a blocker — those mean nobody can.
+warn(
+  "OTP_PROVIDER-email-only",
+  otpProvider !== "none",
+  "email-only sign-in — no phone codes",
+  "OTP_PROVIDER=none: players without an email address cannot sign in; set OTP_PROVIDER=whatsapp (or msg91) with credentials once the text channel is approved",
+);
 check(
   "OTP_PROVIDER",
-  otpProvider === "msg91" || otpProvider === "whatsapp",
+  otpProvider === "msg91" || otpProvider === "whatsapp" || otpProvider === "none",
   `OTP_PROVIDER=${otpProvider}`,
   "set OTP_PROVIDER=whatsapp (Meta Cloud API) or msg91 (SMS) — the dev sender is structurally absent in production, so login would be impossible",
 );
@@ -279,7 +288,7 @@ if (otpProvider === "whatsapp") {
     `${String(personalTemplates.length - unapproved.length)}/${String(personalTemplates.length)} personal templates named`,
     `unset in env: ${unapproved.join(", ")} — unless mapped at /admin/notifications/templates (the admin mapping wins; check the grid there), those moments go by email only (docs/messaging/WHATSAPP_TEMPLATES.md)`,
   );
-} else {
+} else if (otpProvider === "msg91") {
   check(
     "MSG91-credentials",
     nonEmpty(env.MSG91_AUTH_KEY) && nonEmpty(env.MSG91_TEMPLATE_ID),

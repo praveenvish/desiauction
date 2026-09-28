@@ -281,7 +281,7 @@ export class WhatsAppCloudOtpSender implements OtpSender {
 }
 
 export interface OtpSenderEnv {
-  OTP_PROVIDER: "dev" | "msg91" | "whatsapp";
+  OTP_PROVIDER: "dev" | "msg91" | "whatsapp" | "none";
   MSG91_AUTH_KEY?: string | undefined;
   MSG91_TEMPLATE_ID?: string | undefined;
   WHATSAPP_PHONE_NUMBER_ID?: string | undefined;
@@ -312,5 +312,21 @@ export function createOtpSenderFromEnv(env: OtpSenderEnv, db: Db): OtpSender {
       templateId: env.MSG91_TEMPLATE_ID ?? "",
     });
   }
+  if (env.OTP_PROVIDER === "none") {
+    return new PhoneCodesDisabledSender();
+  }
   return new DevInboxSender(db);
+}
+
+/**
+ * OTP_PROVIDER=none — email-only sign-in. The login page never opens the phone
+ * door in this mode (login/page.tsx) and the login action answers before it
+ * gets here, so this is the backstop for any other path that asks for a phone
+ * code (a phone-number change): it fails honestly instead of pretending, which
+ * is exactly what `dev` would have done on a production server.
+ */
+export class PhoneCodesDisabledSender implements OtpSender {
+  send(): Promise<void> {
+    return Promise.reject(new OtpSendError("phone codes are disabled (OTP_PROVIDER=none)", false));
+  }
 }
