@@ -202,6 +202,32 @@ export interface AuctionsIndexView {
   };
 }
 
+/**
+ * Every season this person can see, with its auction's facts — for /money's
+ * books (2026-09-28): a points season says where its points went, and a rupee
+ * season the reader holds no money key for says what they CAN see (the
+ * auction's state, its teams) instead of pointing at a desk they can't open.
+ * Amounts ride only where `seesAuctionMoney` allows, as on /auctions.
+ */
+export async function seasonAuctionFacts(): Promise<Map<string, AuctionFacts>> {
+  const personId = await requirePerson("/money");
+  const all = await seasonsWithAccess(personId);
+  const byOrg = groupByOrg(all);
+  const money = new Set(
+    all.filter((season) => season.access.seesAuctionMoney).map((season) => season.id),
+  );
+  const maps = await acrossOrgs(personId, [...byOrg.keys()], (db, orgId) =>
+    auctionFactsIn(
+      db,
+      (byOrg.get(orgId) ?? []).map((season) => season.id),
+      money,
+    ),
+  );
+  const facts = new Map<string, AuctionFacts>();
+  for (const map of maps) for (const [id, value] of map) facts.set(id, value);
+  return facts;
+}
+
 export async function auctionsIndexView(): Promise<AuctionsIndexView> {
   const personId = await requirePerson("/auctions");
   const [all, roles] = await Promise.all([seasonsWithAccess(personId), rolesOf(personId)]);
