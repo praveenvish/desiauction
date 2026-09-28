@@ -8,6 +8,7 @@ import {
   WHATSAPP_LANGUAGES,
   type WhatsAppLanguage,
 } from "../../lib/whatsapp-consent";
+import type { PersonChannelRow } from "../../server/messaging/catalogue";
 import {
   setMessageLanguageAction,
   setNotificationPreferenceAction,
@@ -29,53 +30,83 @@ import {
  * in has been handed a worse outcome than the one they were avoiding — and a
  * switch that silently exempts itself would be the dishonest version of that.
  */
+const CHANNEL_LABEL: Record<PersonChannelRow, string> = {
+  email: "Email",
+  sms: "WhatsApp / SMS",
+  "in-app": "Inbox",
+};
+
+type Key = `${string}:${PersonChannelRow}`;
+
 export function NotificationSwitches({ settings }: { settings: NotificationSettings }) {
   const announce = useAnnouncer();
   const [pending, startTransition] = useTransition();
   const [state, setState] = useState(
-    () => new Map(settings.topics.map((entry) => [entry.topic, entry.allowed])),
+    () =>
+      new Map<Key, boolean>(
+        settings.topics.flatMap((entry) =>
+          entry.channels.map((row) => [`${entry.topic}:${row.channel}`, row.allowed]),
+        ),
+      ),
   );
   const [error, setError] = useState<string | null>(null);
 
-  const toggle = (topic: string, label: string, next: boolean) => {
+  // ONE SWITCH PER CHANNEL (email programme PR17): "stop the emails about the
+  // auction, keep the WhatsApp" is a thing people want, and the gate always
+  // read a row per channel — only this screen could not write one.
+  const toggle = (topic: string, label: string, channel: PersonChannelRow, next: boolean) => {
+    const key: Key = `${topic}:${channel}`;
     // Optimistic, then reconciled. A switch that waits on a round-trip before
     // moving reads as broken on a slow connection, which is most of them here.
-    setState((current) => new Map(current).set(topic, next));
+    setState((current) => new Map(current).set(key, next));
     setError(null);
     startTransition(async () => {
-      const result = await setNotificationPreferenceAction(topic, next);
+      const result = await setNotificationPreferenceAction(topic, next, channel);
       if (result.ok) {
-        announce(next ? `${label} turned on` : `${label} turned off`, "polite");
+        announce(
+          `${label} by ${CHANNEL_LABEL[channel].toLowerCase()} turned ${next ? "on" : "off"}`,
+          "polite",
+        );
         return;
       }
-      setState((current) => new Map(current).set(topic, !next));
+      setState((current) => new Map(current).set(key, !next));
       setError(result.error ?? "That did not save. Try again.");
     });
   };
 
   return (
     <div className="notify-switches" data-testid="notification-switches">
-      {settings.topics.map((entry) => {
-        const on = state.get(entry.topic) ?? entry.allowed;
-        return (
-          <label key={entry.topic} className="notify-switch" htmlFor={`notify-${entry.topic}`}>
-            <input
-              id={`notify-${entry.topic}`}
-              type="checkbox"
-              checked={on}
-              disabled={pending}
-              data-testid={`notify-${entry.topic}`}
-              onChange={(event) => {
-                toggle(entry.topic, entry.label, event.target.checked);
-              }}
-            />
-            <span className="notify-switch-text">
-              <span className="notify-switch-label">{entry.label}</span>
-              <span className="notify-switch-detail">{entry.detail}</span>
-            </span>
-          </label>
-        );
-      })}
+      {settings.topics.map((entry) => (
+        <fieldset key={entry.topic} className="notify-topic" data-testid={`notify-${entry.topic}`}>
+          <legend className="notify-switch-text">
+            <span className="notify-switch-label">{entry.label}</span>
+            <span className="notify-switch-detail">{entry.detail}</span>
+          </legend>
+          <div className="notify-channels">
+            {entry.channels.map((row) => {
+              const key: Key = `${entry.topic}:${row.channel}`;
+              const on = state.get(key) ?? row.allowed;
+              const id = `notify-${entry.topic}-${row.channel}`;
+              return (
+                <label key={row.channel} className="notify-channel" htmlFor={id}>
+                  <input
+                    id={id}
+                    type="checkbox"
+                    checked={on}
+                    disabled={pending}
+                    data-testid={id}
+                    aria-label={`${entry.label} by ${CHANNEL_LABEL[row.channel]}`}
+                    onChange={(event) => {
+                      toggle(entry.topic, entry.label, row.channel, event.target.checked);
+                    }}
+                  />
+                  <span aria-hidden>{CHANNEL_LABEL[row.channel]}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      ))}
       {error !== null ? (
         <p role="alert" className="notify-error">
           {error}

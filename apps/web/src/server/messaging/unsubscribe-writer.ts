@@ -1,7 +1,7 @@
 import type { Db } from "@desiauction/db";
 
 import { db as appDb } from "../db";
-import { PERSON_SWITCH_CHANNELS, type SwitchTopic } from "./catalogue";
+import type { SwitchTopic } from "./catalogue";
 import { setPreference } from "./consent";
 import { personSwitchTopics, platformSwitches } from "./platform-switches";
 
@@ -23,9 +23,10 @@ export async function switchableTopic(
  * (`unsubscribeTokenMatches`) — the link is the only proof there is, since the
  * person is not signed in.
  *
- * The same rows the /account switch writes (email and text together), in one
- * transaction so a half-applied switch cannot exist, with the consent trail
- * saying it came from a mail rather than from account settings.
+ * The EMAIL row only (email programme PR17): an unsubscribe link in an email
+ * stops that topic's email — RFC 8058's meaning, and now that /account has a
+ * switch per channel, texts and the inbox keep their own. The consent trail
+ * says it came from a mail rather than from account settings.
  *
  * On the app pool, as `setNotificationPreferenceAction` writes: a preference
  * is the person's own, not a club's.
@@ -35,7 +36,7 @@ export async function setTopicFromEmailLink(
   db: Db = appDb,
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    for (const channel of PERSON_SWITCH_CHANNELS) {
+    for (const channel of ["email"] as const) {
       await setPreference(tx, {
         personId: input.personId,
         topic: input.topic,

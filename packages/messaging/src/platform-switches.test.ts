@@ -8,6 +8,7 @@ import {
   effectiveOn,
   invalidatePlatformSwitches,
   orgSwitchTopics,
+  personSwitchChannels,
   personSwitchTopics,
   platformSwitches,
   refuseChange,
@@ -142,6 +143,22 @@ describe("the /account and /org switches follow controllability", () => {
     expect(personSwitchTopics(allChannels).map((t) => t.topic)).not.toContain("money");
     expect(orgSwitchTopics(allChannels).map((t) => t.topic)).not.toContain("money");
     expect(personSwitchTopics(allChannels).map((t) => t.topic)).toContain("auction");
+  });
+});
+
+describe("the /account channels per topic (PR17)", () => {
+  it("offers only the channels a topic is sent on", () => {
+    // Feedback asks go by email only; money by email and the inbox; matches
+    // by every channel (lineups are texted).
+    expect(personSwitchChannels(CATALOGUE_DEFAULTS, "feedback")).toEqual(["email"]);
+    expect(personSwitchChannels(CATALOGUE_DEFAULTS, "money")).toEqual(["email", "in-app"]);
+    expect(personSwitchChannels(CATALOGUE_DEFAULTS, "matches")).toEqual(["email", "sms", "in-app"]);
+  });
+
+  it("drops a channel an admin took from the person, and keeps the rest", () => {
+    const money = notificationOf("finance.document.issued");
+    const noInbox = snapshot([row(money.key, "in_app", { personControllable: false })]);
+    expect(personSwitchChannels(noInbox, "money")).toEqual(["email"]);
   });
 });
 
