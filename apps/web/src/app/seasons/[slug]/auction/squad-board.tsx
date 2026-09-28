@@ -335,10 +335,13 @@ export function PoolSummary({
   snapshot,
   resolved,
   preSigned,
+  finished = false,
 }: {
   snapshot: AuctionSnapshot | null;
   resolved: ResolvedLot[];
   preSigned: PreSignedPlayer[];
+  /** The night is over: nothing is "to go", and a pass is simply unsold. */
+  finished?: boolean;
 }) {
   const money = useMoney();
   const sold = resolved.filter((lot) => lot.status === "sold");
@@ -365,15 +368,17 @@ export function PoolSummary({
           </dd>
         </div>
         <div>
-          <dt>Passed</dt>
+          <dt>{finished ? "Unsold" : "Passed"}</dt>
           <dd className="pool-unsold" data-testid="pool-unsold">
             {unsold}
           </dd>
         </div>
-        <div>
-          <dt>To go</dt>
-          <dd data-testid="pool-remaining">{remaining}</dd>
-        </div>
+        {finished ? null : (
+          <div>
+            <dt>To go</dt>
+            <dd data-testid="pool-remaining">{remaining}</dd>
+          </div>
+        )}
         {withdrawn > 0 ? (
           <div>
             <dt>Withdrawn</dt>
