@@ -701,7 +701,9 @@ export async function PlayerHome({
                         {[
                           registration.orgName,
                           roleLabelIn(sportPackFor(registration.sport), registration.role),
-                          registration.number,
+                          // No registration number: it is a receipt to quote to
+                          // the club, and the season's own page (this row's
+                          // door) still carries it while it matters.
                         ]
                           .filter((part) => part !== "")
                           .join(" · ")}

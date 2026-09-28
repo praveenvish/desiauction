@@ -216,7 +216,10 @@ export function RegistrationStatus({
    */
   const soldPrice =
     signed && result.outcome === "sold" && result.priceLabel !== null ? result.priceLabel : null;
-  const facts = [roleLabel, number === null ? null : `Registration ${number}`].filter(
+  // The registration number is the receipt while a registration is in play —
+  // the thing to quote to the club. Once a player is signed it is noise beside
+  // their team, so it moves to the one line that says whom to contact.
+  const facts = [roleLabel, signed || number === null ? null : `Registration ${number}`].filter(
     (part): part is string => part !== null && part !== "",
   );
   // Once the auction has spoken, withdrawing is not a button: a signed player
@@ -322,7 +325,7 @@ export function RegistrationStatus({
             your mobile number.{canWithdraw ? " Withdraw below to take it down." : ""}
           </p>
           <Link className="reg-status-public-url" href={`/c/${slug}/p/${number}`}>
-            /c/{slug}/p/{number}
+            Open your player page
             <IconArrowRight size={14} />
           </Link>
         </div>
@@ -395,7 +398,8 @@ export function RegistrationStatus({
         </div>
       ) : signed ? (
         <p className="reg-status-foot register-hint" data-testid="drop-out-contact">
-          Something wrong? Contact {result.orgName}.
+          Something wrong? Contact {result.orgName}
+          {number === null ? "" : ` and quote registration ${number}`}.
         </p>
       ) : null}
     </Card>
