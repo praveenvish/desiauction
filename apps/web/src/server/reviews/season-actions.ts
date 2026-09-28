@@ -17,6 +17,8 @@ import {
   seasonRef,
   unaskedParticipants,
   mayAskParticipant,
+  askBreakdown,
+  type AskBucket,
   type ReplyResult,
   type SeasonReviews,
 } from "./season";
@@ -64,6 +66,8 @@ export interface SeasonReviewsView {
   /** Manager-only. */
   readonly manage: {
     readonly askable: { readonly players: number; readonly owners: number };
+    /** Everyone who took part, and why each one cannot be asked (if not). */
+    readonly breakdown: { readonly players: AskBucket; readonly owners: AskBucket };
     readonly asked: number;
     readonly reviewed: number;
     readonly awaitingModeration: number;
@@ -101,7 +105,7 @@ export async function seasonReviewsView(slug: string): Promise<SeasonReviewsView
   }
 
   const now = new Date();
-  const [participants, counts, lastAskedAt] = await Promise.all([
+  const [participants, counts, lastAskedAt, breakdown] = await Promise.all([
     unaskedParticipants(season.id, ["player", "owner"]),
     systemDb
       .select({
@@ -118,6 +122,7 @@ export async function seasonReviewsView(slug: string): Promise<SeasonReviewsView
         ),
       ),
     lastOrgAsk(season.id),
+    askBreakdown(season.id, now),
   ]);
   const askable = participants.filter((participant) => mayAskParticipant(participant, now));
   const nextAskAt =
@@ -136,6 +141,7 @@ export async function seasonReviewsView(slug: string): Promise<SeasonReviewsView
         players: askable.filter((participant) => participant.role === "player").length,
         owners: askable.filter((participant) => participant.role === "owner").length,
       },
+      breakdown,
       asked: counts[0]?.asked ?? 0,
       reviewed: counts[0]?.reviewed ?? 0,
       awaitingModeration: counts[0]?.awaiting ?? 0,
