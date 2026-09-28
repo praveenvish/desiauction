@@ -1887,9 +1887,7 @@ function PlayerRow({
           {row.teamName !== null ? (
             <TeamChip color={teamColor}>{row.teamName}</TeamChip>
           ) : (
-            <span className="pd-quiet">
-              {auctionDone && row.status === "approved" ? "Unsold" : "—"}
-            </span>
+            <span className="pd-quiet">—</span>
           )}
         </span>
         {(row.isIcon || row.isCaptain || row.isRetained) && row.teamId === null ? (
@@ -1899,7 +1897,18 @@ function PlayerRow({
       <td className="pd-col-status">
         {/* Approved is the normal state after triage — said quietly. The states
             that need a person keep their colour. */}
-        {row.status === "approved" ? (
+        {/* After the night "Approved" was true of all 43 rows and said nothing
+            (census 11): the column now carries what the auction did — sold,
+            signed before it, or unsold. Before the night it is the triage word. */}
+        {row.status === "approved" && auctionDone ? (
+          <span className="pd-status-quiet" data-testid={`outcome-${row.personId}`}>
+            {row.teamId === null
+              ? "Unsold"
+              : row.isIcon || row.isCaptain || row.isRetained
+                ? "Pre-signed"
+                : "Sold"}
+          </span>
+        ) : row.status === "approved" ? (
           <span className="pd-status-quiet">{STATUS_WORD.approved}</span>
         ) : (
           <span className="pd-status">

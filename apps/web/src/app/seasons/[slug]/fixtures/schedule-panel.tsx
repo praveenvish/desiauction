@@ -424,11 +424,11 @@ export function SchedulePanel({
               Publish schedule
             </Button>
           ) : null}
-          {played > 0 && (needResult > 0 || stats.inProgress === 0) ? (
-            <Pill tone={needResult === 0 ? "green" : "amber"} dot testId="results-outstanding">
-              {needResult === 0
-                ? "All played matches scored"
-                : `${String(needResult)} ${needResult === 1 ? "needs" : "need"} a result`}
+          {/* Only the all-clear: when results are owed, the notice below says
+              so with the matches to open — the pill repeated it (census 11). */}
+          {played > 0 && needResult === 0 && liveNow === 0 ? (
+            <Pill tone="green" dot testId="results-outstanding">
+              All played matches scored
             </Pill>
           ) : null}
         </div>
