@@ -293,6 +293,14 @@
     "apps/web/src/server/messaging/provider-template-writer.ts": {
       "class": "by-design",
       "reason": "Notification Control Center (Phase 3): the scheduled refresh of Meta's WhatsApp template status (/api/jobs/feedback behind FEEDBACK_JOB_SECRET) writes provider_template_status and provider_template_syncs (0088) on the app pool \u2014 platform tables with no org_id and no RLS, holding Meta's verdict on DesiAuction's own templates. There is no tenant to scope to; every other write in this module takes its handles from the caller."
+    },
+    "apps/web/src/server/messaging/email-sends.ts": {
+      "class": "by-design",
+      "reason": "The direct-send ledger (email_sends, 0094): platform-level, no org_id policy, no RLS, like the demo and review tables. Most rows belong to no club (a sign-in code, a demo visitor), so there is no tenant to scope to; the row is written on the app pool, which holds its DML via default privileges (verify-grants APP_WRITES_UNPROTECTED). Holds no words and no address: kind, person, recipient domain, outcome, provider id."
+    },
+    "apps/web/src/server/messaging/unsubscribe-writer.ts": {
+      "class": "by-design",
+      "reason": "One-click unsubscribe (RFC 8058): turns ONE of a person's own /account switches off from a signed mail link, with no session. notification_preferences and consent_records are person-scoped, not a club's \u2014 the same app-pool write setNotificationPreferenceAction makes (messaging/actions.ts). The HMAC link (unsubscribe.ts) is the proof and covers exactly one person and one topic."
     }
   }
 }

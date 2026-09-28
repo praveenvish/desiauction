@@ -780,6 +780,10 @@ a.content-card:focus-visible {
   max-width: 28rem;
   justify-items: start;
 }
+/* The grid's gap is the rhythm; a paragraph's own margin would double it. */
+.unsubscribe-form p {
+  margin: 0;
+}
 
 /* ---- help index, in the public kit (app/help/page.tsx) ---- */
 

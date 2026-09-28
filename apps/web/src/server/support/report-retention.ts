@@ -1,4 +1,5 @@
 import {
+  emailSends,
   emailVerifications,
   messageOutbox,
   otpCodes,
@@ -91,6 +92,7 @@ export const OUTBOX_KEY_RETENTION_MS = 365 * DAY_MS;
 export interface SecurityPurgeResult {
   readonly deliveredMailDeleted: number;
   readonly deliveredMailScrubbed: number;
+  readonly directMailRecordsDeleted: number;
   readonly phoneCodesDeleted: number;
   readonly emailCodesDeleted: number;
   readonly reviewAddressesCleared: number;
@@ -151,6 +153,11 @@ export async function purgeSpentSecurityRecords(
       and(settled, lt(messageOutbox.createdAt, new Date(now.getTime() - OUTBOX_KEY_RETENTION_MS))),
     )
     .returning({ id: messageOutbox.id });
+  // The direct-send ledger (0094) goes with the outbox's keys: a year.
+  const directMail = await db
+    .delete(emailSends)
+    .where(lt(emailSends.createdAt, new Date(now.getTime() - OUTBOX_KEY_RETENTION_MS)))
+    .returning({ id: emailSends.id });
   const reviewAddresses = await db
     .update(reviewReports)
     .set({ reporterIp: null })
@@ -159,6 +166,7 @@ export async function purgeSpentSecurityRecords(
   return {
     deliveredMailDeleted: deliveredMail.length,
     deliveredMailScrubbed: scrubbedMail.length,
+    directMailRecordsDeleted: directMail.length,
     phoneCodesDeleted: phoneCodes.length,
     emailCodesDeleted: emailCodes.length,
     reviewAddressesCleared: reviewAddresses.length,

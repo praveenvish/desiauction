@@ -5,6 +5,7 @@ import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 import { env } from "../../env";
 import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import { providerFetch } from "../messaging/provider-fetch";
+import { providerMessageIdOf } from "../messaging/transactional-mail";
 
 /**
  * Sending a verification code to a mailbox.
@@ -31,13 +32,22 @@ import { providerFetch } from "../messaging/provider-fetch";
  */
 export type CodeMailPurpose = "email_change" | "login" | "signup";
 
+/** What the provider said about a code mail it accepted. */
+export interface CodeMailReceipt {
+  readonly providerMessageId: string | null;
+}
+
 export interface CodeMailer {
+  /**
+   * Resolves with the provider's receipt, or null when nothing was sent (the
+   * dev inbox). Throws `MailSendError` when a real send failed.
+   */
   send(
     email: string,
     code: string,
     purpose: CodeMailPurpose,
     language?: MessageLanguage,
-  ): Promise<void>;
+  ): Promise<CodeMailReceipt | null>;
 }
 
 /**
@@ -68,12 +78,13 @@ export class DevInboxMailer implements CodeMailer {
    * implementations stop being interchangeable.
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async send(email: string, code: string, _purpose: CodeMailPurpose): Promise<void> {
+  async send(email: string, code: string, _purpose: CodeMailPurpose): Promise<null> {
     // `phone` is the inbox's contact column. It holds an address here, which is
     // honest for a development surface whose question is "what did this contact
     // receive" — and is exactly why the production verification codes live in
     // their own table rather than in `otp_codes`.
     await this.db.insert(otpInbox).values({ id: newId(), phone: email, code });
+    return null;
   }
 }
 
@@ -114,7 +125,7 @@ export class HttpMailer implements CodeMailer {
     code: string,
     purpose: CodeMailPurpose,
     language: MessageLanguage = "en",
-  ): Promise<void> {
+  ): Promise<CodeMailReceipt> {
     const transport = this.config.transport ?? defaultTransport;
     const copy = await codeMailCopy(code, purpose, language);
     let response: MailerHttpResponse;
@@ -132,8 +143,10 @@ export class HttpMailer implements CodeMailer {
           // No link, either purpose. A code the person types back proves the
           // same thing a click does, cannot be followed out of a forwarded
           // message, and does not train people to click links in mail about
-          // their account.
+          // their account. The branded part is the same mail laid out
+          // (email-layout.ts, noLinks) — it carries no link either.
           text: copy.text,
+          ...(copy.html === undefined ? {} : { html: copy.html }),
         }),
       });
     } catch (error) {
@@ -153,6 +166,7 @@ export class HttpMailer implements CodeMailer {
         `mail provider rejected send (${String(response.status)}: ${response.body.slice(0, 200)})`,
       );
     }
+    return { providerMessageId: providerMessageIdOf(response.body) };
   }
 }
 
