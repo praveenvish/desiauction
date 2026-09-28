@@ -33,8 +33,10 @@ import {
   playerCareer,
   playerMatches,
   playerUpcomingMatches,
+  teamSeason,
   type CareerMatch,
   type CareerSeason,
+  type TeamSeason,
   type UpcomingMatch,
 } from "../../server/player/career";
 import {
@@ -179,6 +181,26 @@ export default async function MyProfilePage({
   );
 
   if (ownerOnly) {
+    /*
+     * THE TEAM'S SEASON, once it is on (2026-09-29). Three matches in, this
+     * page still said "Auction finished" and gave half its width to the
+     * night's figures. After the night, each team's season is read the way
+     * the owner's home reads it (teamSeason, keyed by the owner's own teams
+     * from rolesOf) and is "on" once the club has published a match for it.
+     */
+    const today = istCalendarDate();
+    const seasons = await Promise.all(
+      owns.map((team) =>
+        team.auctionStatus === "completed" || team.auctionStatus === "reconciled"
+          ? teamSeason(team.teamId, today)
+          : Promise.resolve(null),
+      ),
+    );
+    const seasonsOn = seasons.map((season) =>
+      season !== null && season.upcoming.length + season.results.length > 0 ? season : null,
+    );
+    const lead = owns[0];
+    const leadSeason = seasonsOn[0] ?? null;
     return (
       <main className="me">
         {/* Somebody who owns a team and has never played was greeted as a
@@ -214,7 +236,7 @@ export default async function MyProfilePage({
         />
         <div className="me-layout" data-owner="">
           <div className="me-main">
-            <OwnedTeams teams={owns} />
+            <OwnedTeams teams={owns} seasons={seasonsOn} />
             <p className="me-quiet" data-testid="me-tournaments">
               <IconTrophy size={16} aria-hidden />
               <span>
@@ -224,8 +246,15 @@ export default async function MyProfilePage({
             </p>
             {privacy}
           </div>
-          <aside className="me-side" aria-label="Your auction night">
-            {owns[0] !== undefined ? <OwnerNight team={owns[0]} /> : null}
+          <aside
+            className="me-side"
+            aria-label={leadSeason !== null ? "Your season" : "Your auction night"}
+          >
+            {lead === undefined ? null : leadSeason !== null ? (
+              <OwnerSeason team={lead} season={leadSeason} />
+            ) : (
+              <OwnerNight team={lead} />
+            )}
           </aside>
         </div>
       </main>
@@ -786,12 +815,12 @@ function Form({ results }: { results: FormResult[] }) {
 }
 
 /** The next published fixture, as a ticket. */
-function NextTicket({ match }: { match: UpcomingMatch }) {
+function NextTicket({ match, live = false }: { match: UpcomingMatch; live?: boolean }) {
   return (
     <div className="mp-ticket" data-theme="floodlight" data-testid="me-upcoming">
       <span className="mp-ticket-when">
         <IconCalendar size={14} aria-hidden />
-        Next · {kickoffLabel(match.kickoffAt)}
+        {live ? "Playing now" : "Next"} · {kickoffLabel(match.kickoffAt)}
       </span>
       <span className="mp-ticket-teams">
         <span>
@@ -878,7 +907,14 @@ const OWNED_STATUS: Record<string, { label: string; tone: KitTone }> = {
  * "No tournaments yet" while running a squad in one. Ownership is part of the
  * record, so it is a row here — from the same roles read the rail uses.
  */
-async function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
+async function OwnedTeams({
+  teams,
+  seasons = [],
+}: {
+  teams: OwnedTeam[];
+  /** Each team's season once it is on, index for index; null before. */
+  seasons?: (TeamSeason | null)[];
+}) {
   // The same gated read the owner's home hero uses, so this card shows no
   // figure the plan page would not (null when planning is off: no figures).
   const figures = await Promise.all(
@@ -901,18 +937,34 @@ async function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
       title="Teams I own"
       // The title already says "own": the line under it says what the row holds.
       description={
-        teams.length === 1
-          ? "Its purse, its squad and the way in."
-          : `${String(teams.length)} teams — their purses, squads and the way in.`
+        seasons.some((season) => season !== null)
+          ? teams.length === 1
+            ? "Where it stands and the way in."
+            : `${String(teams.length)} teams — where each stands and the way in.`
+          : teams.length === 1
+            ? "Its purse, its squad and the way in."
+            : `${String(teams.length)} teams — their purses, squads and the way in.`
       }
       data-testid="me-owned"
     >
       <ul className="me-regs">
         {teams.map((team, index) => {
-          const status = OWNED_STATUS[team.auctionStatus] ?? {
-            label: "Auction being set up",
-            tone: "neutral" as KitTone,
-          };
+          const season = seasons[index] ?? null;
+          // Once the season is on, the row says where the team stands — the
+          // purse left stopped mattering when the gavel fell.
+          const status =
+            season !== null
+              ? {
+                  label:
+                    season.place === null
+                      ? "Season on"
+                      : `Season on · ${ordinal(season.place.position)}`,
+                  tone: "green" as KitTone,
+                }
+              : (OWNED_STATUS[team.auctionStatus] ?? {
+                  label: "Auction being set up",
+                  tone: "neutral" as KitTone,
+                });
           const figure = figures[index] ?? null;
           return (
             <li key={`${team.auctionId}:${team.teamId}`}>
@@ -933,7 +985,26 @@ async function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
                     </Pill>
                   </span>
                   <strong className="me-reg-name">{team.teamName}</strong>
-                  {figure !== null ? (
+                  {season !== null ? (
+                    <span className="me-owned-figures" data-testid="me-owned-standing">
+                      <span>
+                        <b>
+                          {season.record.won}–{season.record.lost}
+                        </b>{" "}
+                        won–lost
+                      </span>
+                      {season.place === null ? null : (
+                        <span>
+                          <b>{season.place.points}</b> pts
+                        </span>
+                      )}
+                      {figure === null ? null : (
+                        <span>
+                          <b>{figure.squad}</b> squad
+                        </span>
+                      )}
+                    </span>
+                  ) : figure !== null ? (
                     <span className="me-owned-figures">
                       <span>
                         <b>{figure.purseLeft}</b> purse left
@@ -953,6 +1024,126 @@ async function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
           );
         })}
       </ul>
+    </SectionCard>
+  );
+}
+
+/** "1st", "2nd", "3rd", "11th". */
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${String(n)}${suffix}`;
+}
+
+/**
+ * YOUR SEASON — one owned team's season once it is on: the next match as the
+ * page's ticket, the latest results, the place in the table, and the night
+ * folded to one line with its door. The same pieces the player's Matches card
+ * is built from, so the two halves of /me read alike.
+ */
+async function OwnerSeason({ team, season }: { team: OwnedTeam; season: TeamSeason }) {
+  const [plan, unit] = await Promise.all([
+    planView(team.competitionSlug, team.teamId),
+    seasonUnit(team.competitionSlug),
+  ]);
+  const money = moneyFormat(unit);
+  const bought =
+    plan === null
+      ? []
+      : plan.lots
+          .filter((lot) => lot.status === "sold" && lot.soldToTeamId === team.teamId)
+          .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0));
+  const night =
+    plan === null
+      ? null
+      : [
+          `${money.ledger(plan.rules.pursePerTeam - plan.standing.purseRemaining)} spent`,
+          `${String(bought.length)} bought`,
+          plan.preSignedPlayers.length > 0
+            ? `${String(plan.preSignedPlayers.length)} pre-signed`
+            : null,
+          bought[0] === undefined
+            ? null
+            : `top buy ${bought[0].playerName ?? "a player"} ${money.ledger(bought[0].soldPrice ?? 0)}`,
+        ].filter((part): part is string => part !== null);
+  const next = season.upcoming[0];
+  const results = season.results.slice(0, 3);
+  const base = `/seasons/${team.competitionSlug}`;
+  return (
+    <SectionCard
+      icon={<IconMatch />}
+      title="Your season"
+      description={`${team.teamName} · ${team.competitionName}`}
+      action={
+        <Link href={`${base}/fixtures`} className="me-link">
+          Schedule <IconArrowRight size={14} aria-hidden />
+        </Link>
+      }
+      data-testid="me-owner-season"
+    >
+      {next === undefined ? null : (
+        <NextTicket
+          match={{
+            fixtureId: next.fixtureId,
+            kickoffAt: next.kickoffAt,
+            sport: "",
+            competitionName: team.competitionName,
+            competitionSlug: team.competitionSlug,
+            registrationId: "",
+            teamName: team.teamName,
+            teamColor: null,
+            opponentName: next.opponentName,
+            opponentColor: next.opponentColor,
+            groundName: next.groundName,
+          }}
+          live={next.live}
+        />
+      )}
+      {results.length === 0 ? null : (
+        <ul className="mp-matches">
+          {results.map((match) => (
+            <li key={match.fixtureId}>
+              <span className="mp-match-date">{matchDate(match.kickoffAt)}</span>
+              <span className="mp-match-body">
+                <strong>vs {match.opponentName}</strong>
+                {match.groundName === null ? null : <span>{match.groundName}</span>}
+              </span>
+              {match.result === null ? null : (
+                <span className="mp-result" data-result={match.result}>
+                  <span aria-hidden>{RESULT_LETTER[match.result]}</span>
+                  <VisuallyHidden>{RESULT_WORD[match.result]}</VisuallyHidden>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mp-match-foot" data-testid="me-owner-record">
+        {season.place === null ? null : (
+          <>
+            <strong>
+              {ordinal(season.place.position)} of {season.place.of}
+            </strong>{" "}
+            · {season.place.points} pts ·{" "}
+          </>
+        )}
+        <strong>{formatCount(season.record.played)}</strong> played ·{" "}
+        <strong className="mp-won">{formatCount(season.record.won)} won</strong>
+        {season.upcoming.length > 0 ? ` · ${String(season.upcoming.length)} to come` : ""}
+      </p>
+      {night === null ? null : (
+        <p className="me-owner-night-line" data-testid="me-owner-night">
+          <span>
+            <strong>Auction night</strong> · {night.join(" · ")}
+          </span>
+          <Link
+            href={`${base}/auction/plan?team=${encodeURIComponent(team.teamId)}`}
+            className="me-link"
+          >
+            The night in full <IconArrowRight size={14} aria-hidden />
+          </Link>
+        </p>
+      )}
     </SectionCard>
   );
 }

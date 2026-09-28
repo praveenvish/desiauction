@@ -1203,3 +1203,55 @@
   font-weight: var(--font-weight-regular, 400);
   color: var(--text-muted);
 }
+
+/* ---- The owner's season (2026-09-29) ----
+   Once the season is on, the night folds to one line at the foot of "Your
+   season": its figures as a sentence, and the door to the night in full. */
+.me-owner-night-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-secondary);
+}
+
+.me-owner-night-line strong {
+  color: var(--text-heading);
+}
+
+/* One column (a phone, a narrow laptop): the owner's season follows the team
+   it belongs to, not the privacy note at the end of the main column. The main
+   column's children join the layout's own flow so the side card can sit
+   between them. */
+@media (max-width: 1099px) {
+  .me-layout[data-owner] {
+    display: flex;
+    flex-direction: column;
+    /* Stretch, not the grid's "start": the side card is an inline-size
+       container, which collapses to nothing unless its width is given. */
+    align-items: stretch;
+    gap: var(--space-5);
+  }
+
+  .me-layout[data-owner] > .me-main {
+    display: contents;
+  }
+
+  .me-layout[data-owner] > .me-main > * {
+    order: 2;
+  }
+
+  .me-layout[data-owner] > .me-main > :first-child {
+    order: 0;
+  }
+
+  .me-layout[data-owner] > .me-side {
+    order: 1;
+  }
+}
