@@ -32,8 +32,11 @@ export function nowRows<F extends NowFixture>(
     (a.kickoffAt ?? "9999").localeCompare(b.kickoffAt ?? "9999"),
   );
   const live = byKickoff.filter((row) => row.status === "in_progress");
+  // From the start of TODAY: an unplayed match from this morning is still the
+  // next one, not something to skip (census 2026-09-28).
+  const today = `${now.slice(0, 10)}T00:00`;
   const next = byKickoff
-    .filter((row) => UPCOMING.has(row.status) && (row.kickoffAt ?? "9999") >= now)
+    .filter((row) => UPCOMING.has(row.status) && (row.kickoffAt ?? "9999") >= today)
     .slice(0, 2);
   const last = byKickoff.filter((row) => row.status === "completed" && hasResult(row.id)).slice(-1);
   return [

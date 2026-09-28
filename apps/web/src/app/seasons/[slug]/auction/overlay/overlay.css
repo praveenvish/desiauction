@@ -85,9 +85,12 @@ body:has(.obs-overlay) {
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
 }
+/* A seamless loop: the list is rendered twice, so moving by half its own width
+   lands the second copy exactly where the first began. It used to start with
+   a full track-width of empty padding — a blank bar on screen for seconds
+   every time the overlay loaded and on every loop (census 2026-09-28). */
 .obs-ticker-move {
   display: inline-block;
-  padding-left: 100%;
   animation: obs-ticker 32s linear infinite;
 }
 .obs-ticker-item {
@@ -127,7 +130,7 @@ body:has(.obs-overlay) {
 
 @keyframes obs-ticker {
   to {
-    transform: translateX(-100%);
+    transform: translateX(-50%);
   }
 }
 
