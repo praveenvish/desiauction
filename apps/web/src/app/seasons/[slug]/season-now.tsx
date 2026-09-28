@@ -21,8 +21,11 @@ export function SeasonNow({
   schedule,
   standings,
   now,
+  mine = [],
 }: {
   slug: string;
+  /** The viewer's own teams here — their matches and row are marked "You". */
+  mine?: readonly string[];
   schedule: ScheduleView | null;
   standings: StandingsPageView | null;
   now: string;
@@ -68,7 +71,17 @@ export function SeasonNow({
               const sides =
                 fixture.homeTeamId === null ? `Lobby · ${String(fixture.squadCount)} squads` : null;
               return (
-                <li key={fixture.id} className="ov-now-row" data-state={state}>
+                <li
+                  key={fixture.id}
+                  className="ov-now-row"
+                  data-state={state}
+                  data-mine={
+                    (fixture.homeTeamId !== null && mine.includes(fixture.homeTeamId)) ||
+                    (fixture.awayTeamId !== null && mine.includes(fixture.awayTeamId))
+                      ? "true"
+                      : undefined
+                  }
+                >
                   <span className="ov-now-when">{when}</span>
                   <Link
                     href={`/seasons/${slug}/fixtures?match=${fixture.id}`}
@@ -134,7 +147,7 @@ export function SeasonNow({
               {table.map((row, index) => {
                 const team = teamOf.get(row.teamId);
                 return (
-                  <tr key={row.teamId}>
+                  <tr key={row.teamId} data-mine={mine.includes(row.teamId) ? "true" : undefined}>
                     <td>{index + 1}</td>
                     <th scope="row">
                       <span className="ov-table-team">
@@ -145,6 +158,7 @@ export function SeasonNow({
                           logoUrl={team?.logoUrl ?? null}
                         />
                         {row.teamName}
+                        {mine.includes(row.teamId) ? <span className="ov-now-you">You</span> : null}
                       </span>
                     </th>
                     <td>{row.played}</td>
