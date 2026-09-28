@@ -26,7 +26,16 @@ import {
  * Announcing is ALL-OR-NOTHING by design (`announceAppointments`): the table
  * shows who will hear and who already has, and there is no per-row send.
  */
-export function AppointmentsPanel({ slug, view }: { slug: string; view: AppointmentsPanelView }) {
+export function AppointmentsPanel({
+  slug,
+  view,
+  layout = "card",
+}: {
+  slug: string;
+  view: AppointmentsPanelView;
+  /** "row": one line of the Teams tab's "Tell your players" strip. */
+  layout?: "card" | "row";
+}) {
   const router = useRouter();
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
@@ -53,6 +62,84 @@ export function AppointmentsPanel({ slug, view }: { slug: string; view: Appointm
   };
 
   const people = count === 1 ? "1 person" : `${String(count)} people`;
+  const dialog = (
+    <Dialog
+      open={confirming}
+      onClose={() => {
+        setConfirming(false);
+      }}
+      title="Announce these appointments?"
+      footer={
+        <>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setConfirming(false);
+            }}
+          >
+            Not yet
+          </Button>
+          <Button onClick={() => void announce()} loading={busy} data-testid="appointments-confirm">
+            Announce
+          </Button>
+        </>
+      }
+    >
+      <p className="competitions-hint">
+        {count === 1 ? "This person" : `These ${String(count)} people`} will be told now. A message
+        can&apos;t be taken back — if you change a role later, the new one is announced next time.
+      </p>
+    </Dialog>
+  );
+  if (layout === "row") {
+    const pending = view.rows.filter((row) => !row.told);
+    return (
+      <div className="tm-tell-row" data-testid="appointments-panel">
+        <span className="tm-tell-icon" data-tone={count > 0 ? "gold" : undefined} aria-hidden>
+          <IconMegaphone size={20} />
+        </span>
+        <span className="tm-tell-text">
+          <strong>Announce captains &amp; icons</strong>
+          <span className="tm-tell-sub">
+            {pending.length > 0 ? (
+              <span className="tm-face-stack tm-face-stack--sm" aria-hidden>
+                {pending.slice(0, 4).map((row) => (
+                  <PlayerImage
+                    key={`${row.registrationId}-${row.team}-face`}
+                    name={row.name}
+                    seed={row.registrationId}
+                    src={row.photoUrl}
+                    size="xs"
+                    shape="round"
+                    decorative
+                  />
+                ))}
+              </span>
+            ) : null}
+            <span data-testid={count === 0 ? "appointments-none" : undefined}>
+              {count === 0
+                ? `Everyone named has been told (${String(view.told)}).`
+                : `${String(count)} named, not told yet${view.told > 0 ? ` · ${String(view.told)} told` : ""}`}
+            </span>
+          </span>
+        </span>
+        {count > 0 ? (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setConfirming(true);
+            }}
+            data-testid="appointments-announce"
+          >
+            <IconSend size={16} className="icon-lead" aria-hidden />
+            Announce to {people}
+          </Button>
+        ) : null}
+        {dialog}
+      </div>
+    );
+  }
   return (
     <>
       <SectionCard
@@ -177,38 +264,7 @@ export function AppointmentsPanel({ slug, view }: { slug: string; view: Appointm
           </div>
         ) : null}
       </SectionCard>
-      <Dialog
-        open={confirming}
-        onClose={() => {
-          setConfirming(false);
-        }}
-        title="Announce these appointments?"
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setConfirming(false);
-              }}
-            >
-              Not yet
-            </Button>
-            <Button
-              onClick={() => void announce()}
-              loading={busy}
-              data-testid="appointments-confirm"
-            >
-              Announce
-            </Button>
-          </>
-        }
-      >
-        <p className="competitions-hint">
-          {count === 1 ? "This person" : `These ${String(count)} people`} will be told now. A
-          message can&apos;t be taken back — if you change a role later, the new one is announced
-          next time.
-        </p>
-      </Dialog>
+      {dialog}
     </>
   );
 }

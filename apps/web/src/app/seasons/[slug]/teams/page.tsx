@@ -1,4 +1,4 @@
-import { ToastProvider } from "@desiauction/ui";
+import { IconMegaphone, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
 import { teamsWorkspaceView } from "../../../../server/competition/actions";
@@ -49,24 +49,56 @@ export default async function TeamsPage({
   const ownCard =
     owned === undefined ? undefined : view.teams.find((team) => team.id === owned.teamId);
   const selectedTeam = view.teams.find((team) => team.id === sp.team) ?? null;
-  // Only for whoever may set the roles (team.manage); null otherwise.
-  const appointmentsPanel =
-    appointments !== null && selectedTeam === null ? (
-      <AppointmentsPanel slug={slug} view={appointments} />
-    ) : null;
-  const squadSheetsPanel =
-    squadSheets !== null && selectedTeam === null ? (
-      <SquadSheetsPanel slug={slug} view={squadSheets} />
-    ) : null;
   /*
-   * WHILE SOMEBODY IS STILL WAITING TO BE TOLD, telling them is the page's job:
-   * the two panels move above the team cards. Once everyone has heard they drop
-   * back below, where they are a record rather than a to-do.
+   * TELL YOUR PLAYERS — announcing captains & icons, and sending squad sheets.
+   * Only for whoever may set the roles (team.manage). While somebody is still
+   * waiting to be told, both jobs sit side by side in ONE strip above the team
+   * cards (they were two tall cards that pushed the teams below the fold);
+   * once everyone has heard, the strip becomes one quiet line under the grid.
    */
   const announcePending = appointments !== null && appointments.pending.length > 0;
   const sheetsPending =
     squadSheets !== null && squadSheets.blocked === null && squadSheets.pending > 0;
-  const pendingFirst = announcePending || sheetsPending;
+  const waiting = (announcePending ? 1 : 0) + (sheetsPending ? 1 : 0);
+  const tellStrip =
+    selectedTeam === null && waiting > 0 ? (
+      <section className="tm-tell" aria-labelledby="tm-tell-title" data-testid="tell-players">
+        <header className="tm-tell-head">
+          <h2 id="tm-tell-title">Tell your players</h2>
+          <span>· {waiting === 1 ? "1 thing waiting" : "2 things waiting"}</span>
+        </header>
+        <div className="tm-tell-rows">
+          {appointments !== null ? (
+            <AppointmentsPanel slug={slug} view={appointments} layout="row" />
+          ) : null}
+          {squadSheets !== null ? (
+            <SquadSheetsPanel slug={slug} view={squadSheets} layout="row" />
+          ) : null}
+        </div>
+      </section>
+    ) : null;
+  const toldEver = (appointments?.told ?? 0) > 0 || (squadSheets?.sent ?? 0) > 0;
+  const tellQuiet =
+    selectedTeam === null && waiting === 0 && (appointments !== null || squadSheets !== null) ? (
+      <p className="tm-tell-quiet" data-testid="tell-players-quiet">
+        <IconMegaphone size={16} aria-hidden />
+        <span>
+          <strong>Tell your players</strong> —{" "}
+          {toldEver
+            ? [
+                appointments !== null && appointments.told > 0
+                  ? `everyone named has been told (${String(appointments.told)})`
+                  : null,
+                squadSheets !== null && squadSheets.sent > 0
+                  ? `every squad member has their sheet (${String(squadSheets.sent)})`
+                  : null,
+              ]
+                .filter((part): part is string => part !== null)
+                .join("; ") + ". Anyone named or moved later shows up here."
+            : "announcing captains and sending squad sheets open here once teams have players."}
+        </span>
+      </p>
+    ) : null;
   return (
     <ToastProvider>
       <main className="registrations-dash tm-page">
@@ -84,23 +116,9 @@ export default async function TeamsPage({
             slug={slug}
             selected={selectedTeam}
             {...(ownCard !== undefined ? { ownTeamId: ownCard.id } : {})}
-            {...(pendingFirst
-              ? {
-                  beforeGrid: (
-                    <>
-                      {appointmentsPanel}
-                      {squadSheetsPanel}
-                    </>
-                  ),
-                }
-              : {})}
+            {...(tellStrip !== null ? { beforeGrid: tellStrip } : {})}
           />
-          {pendingFirst ? null : (
-            <>
-              {appointmentsPanel}
-              {squadSheetsPanel}
-            </>
-          )}
+          {tellQuiet}
         </div>
       </main>
     </ToastProvider>
