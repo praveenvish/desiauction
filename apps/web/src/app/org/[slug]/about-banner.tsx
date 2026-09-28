@@ -47,37 +47,31 @@ export function AboutBanner({
     }
   };
 
+  // INLINE, in the club's header line (2026-09-28): it was a dashed banner the
+  // width of the page asking for a description. Written, it reads as the
+  // club's one line; unwritten, an owner sees a quiet link to write it.
   return (
     <>
-      <section
+      <span
         className="od-about"
         data-testid="org-about"
         data-empty={description === null ? "true" : undefined}
       >
-        <div className="od-about-body">
-          <p className="od-about-kicker">About</p>
-          {description !== null ? (
-            <p className="od-about-text">{description}</p>
-          ) : (
-            <p className="od-about-empty">
-              Add a short description so members and the public know what this club runs.
-            </p>
-          )}
-        </div>
+        {description !== null ? <span className="od-about-text">{description}</span> : null}
         {canManage ? (
-          <Button
-            variant={description !== null ? "secondary" : "ghost"}
-            size="sm"
+          <button
+            type="button"
+            className="od-about-edit"
             onClick={() => {
               setDraft(description ?? "");
               setOpen(true);
             }}
             data-testid="edit-about"
           >
-            {description !== null ? "Edit" : "+ Add description"}
-          </Button>
+            {description !== null ? "Edit" : "Add a line about the club"}
+          </button>
         ) : null}
-      </section>
+      </span>
 
       <Dialog
         open={open}
