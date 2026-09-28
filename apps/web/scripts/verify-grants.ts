@@ -212,6 +212,9 @@ const APP_WRITES_UNPROTECTED = [
   "provider_template_mappings",
   "provider_template_status",
   "provider_template_syncs",
+  // The direct-send ledger (0094): every code, security, demo and review mail
+  // records itself on the app pool. Most belong to no club — no tenant, no RLS.
+  "email_sends",
 ];
 
 /**

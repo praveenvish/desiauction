@@ -40,12 +40,55 @@ export interface OutgoingMail {
     readonly contentType: string;
     readonly contentBase64: string;
   };
+  /**
+   * Extra message headers — today only List-Unsubscribe (unsubscribe.ts).
+   * Sent as Resend's `headers` object; a provider that spells it differently
+   * overrides `buildRequest`.
+   */
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 export type MailOutcome = "sent" | "unconfigured" | "breaker-open" | "failed";
 
+/** What became of one send, and the id the provider gave it (a bounce is matched on it). */
+export interface MailReceipt {
+  readonly outcome: MailOutcome;
+  readonly providerMessageId: string | null;
+}
+
 export interface TransactionalMailer {
   send(mail: OutgoingMail): Promise<MailOutcome>;
+  /**
+   * The same send, with the provider's message id. Optional so a test double
+   * stays one line; `deliverMail` falls back to `send` without it.
+   */
+  deliver?(mail: OutgoingMail): Promise<MailReceipt>;
+}
+
+/** Send and keep the provider's id when the mailer can give one. */
+export async function deliverMail(
+  mailer: TransactionalMailer,
+  mail: OutgoingMail,
+): Promise<MailReceipt> {
+  if (mailer.deliver !== undefined) {
+    return mailer.deliver(mail);
+  }
+  return { outcome: await mailer.send(mail), providerMessageId: null };
+}
+
+/**
+ * The id in a provider's answer — Resend's `{ "id": "…" }`, Postmark's
+ * `MessageID`. Null when the body says nothing we recognise: the mail still
+ * went, it just cannot be matched to a later callback.
+ */
+export function providerMessageIdOf(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    const id = parsed["id"] ?? parsed["MessageID"] ?? parsed["messageId"];
+    return typeof id === "string" && id !== "" && id.length <= 200 ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 const BREAKER_THRESHOLD = 3;
@@ -64,6 +107,7 @@ const defaultBuildRequest = (mail: OutgoingMail, from: string, replyTo?: string)
   // Omitted rather than sent empty: a blank reply_to is a header some
   // providers reject and every client renders badly.
   ...(replyTo === undefined ? {} : { reply_to: replyTo }),
+  ...(mail.headers === undefined ? {} : { headers: mail.headers }),
   ...(mail.attachment === undefined
     ? {}
     : {
@@ -100,10 +144,14 @@ export class HttpTransactionalMailer implements TransactionalMailer {
   }
 
   async send(mail: OutgoingMail): Promise<MailOutcome> {
+    return (await this.deliver(mail)).outcome;
+  }
+
+  async deliver(mail: OutgoingMail): Promise<MailReceipt> {
     // One melted provider must not turn a burst of requests into a retry storm
     // — the same reason the finops sender carries a breaker.
     if (this.breaker.isOpen()) {
-      return "breaker-open";
+      return { outcome: "breaker-open", providerMessageId: null };
     }
     const transport = this.config.transport ?? defaultTransport;
     const build = this.config.buildRequest ?? defaultBuildRequest;
@@ -118,13 +166,13 @@ export class HttpTransactionalMailer implements TransactionalMailer {
       });
       if (response.status >= 400) {
         this.breaker.recordFailure();
-        return "failed";
+        return { outcome: "failed", providerMessageId: null };
       }
       this.breaker.recordSuccess();
-      return "sent";
+      return { outcome: "sent", providerMessageId: providerMessageIdOf(response.body) };
     } catch {
       this.breaker.recordFailure();
-      return "failed";
+      return { outcome: "failed", providerMessageId: null };
     }
   }
 }
