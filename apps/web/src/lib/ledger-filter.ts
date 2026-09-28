@@ -10,7 +10,12 @@
  * fold (`buildAuctionLedger`) emits, and it is kept free of any other kind tag.
  * Pure, so the vocabulary it relies on is pinned by a test next door.
  */
-export const LEDGER_FILTERS = ["all", "bids", "results"] as const;
+/*
+ * "players" (2026-09-28) is a fourth reading and the default for a finished
+ * auction: one row per lot, folded from the same rows (ledger-players.ts). It
+ * pages no log rows of its own; as a row test it keeps the results rule.
+ */
+export const LEDGER_FILTERS = ["players", "results", "bids", "all"] as const;
 export type LedgerFilter = (typeof LEDGER_FILTERS)[number];
 
 export function parseLedgerFilter(raw: string | undefined): LedgerFilter | null {
@@ -39,6 +44,7 @@ export function ledgerRowMatches(filter: LedgerFilter, result: string): boolean 
     case "bids":
       return isBid(result);
     case "results":
+    case "players":
       return isResult(result);
   }
 }

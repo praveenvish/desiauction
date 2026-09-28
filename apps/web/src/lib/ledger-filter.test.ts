@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import { ledgerRowMatches, parseLedgerFilter } from "./ledger-filter";
 
 describe("ledger filter", () => {
-  it("reads only the three known filters from the URL", () => {
+  it("reads only the four known readings from the URL", () => {
     expect(parseLedgerFilter("results")).toBe("results");
     expect(parseLedgerFilter("bids")).toBe("bids");
     expect(parseLedgerFilter("all")).toBe("all");
+    expect(parseLedgerFilter("players")).toBe("players");
     expect(parseLedgerFilter(undefined)).toBeNull();
     expect(parseLedgerFilter("nonsense")).toBeNull();
   });

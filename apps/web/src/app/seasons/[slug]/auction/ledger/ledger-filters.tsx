@@ -6,13 +6,15 @@ import type { LedgerFilter } from "../../../../../lib/ledger-filter";
 import { useFilterQuery } from "../../../../../lib/use-filter-query";
 
 const OPTIONS: readonly { value: LedgerFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "bids", label: "Bids" },
+  { value: "players", label: "Players" },
   { value: "results", label: "Results" },
+  { value: "bids", label: "Bids" },
+  { value: "all", label: "Everything" },
 ];
 
 /**
- * All · Bids · Results. The server reads the choice (it pages the filtered
+ * Players · Results · Bids · Everything, each with its count (2026-09-28:
+ * Players, one row per lot, is a finished auction's default). The server reads the choice (it pages the filtered
  * rows), so this writes the URL through `useFilterQuery`, built from the RAW
  * param rather than the resolved default — a finished auction defaults to
  * Results, and choosing "All" there has to be written as `filter=all`, not
@@ -28,7 +30,7 @@ export function LedgerFilters({
   raw: string;
   /** What the server actually filtered by — the raw choice or its default. */
   active: LedgerFilter;
-  /** The row count behind the ACTIVE reading, shown on its segment. */
+  /** The count behind each reading, shown on its segment. */
   counts?: Partial<Record<LedgerFilter, number>>;
 }) {
   const { commit } = useFilterQuery({ filter: raw });
