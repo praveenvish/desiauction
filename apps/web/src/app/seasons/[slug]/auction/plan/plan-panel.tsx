@@ -39,11 +39,14 @@ import {
   groupByPriority,
   outcomeBadge,
   refusalMessage,
+  boughtLots,
+  countLine,
   roleFacts,
   rupeesFromPaise,
   searchPool,
 } from "./plan-model";
 import { NoPlanReport, PlanReportCard } from "./plan-report";
+import { SquadFootnote, SquadHero, SquadList } from "./squad-after";
 import { PlanWhatIf } from "./plan-what-if";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { useMoney } from "../../../../../components/money-unit";
@@ -160,6 +163,7 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     () => roleFacts(view.lots, view.preSignedRoles, view.team.id, roleKeys),
     [view.lots, view.preSignedRoles, view.team.id, roleKeys],
   );
+  const bought = useMemo(() => boughtLots(view.lots, view.team.id), [view.lots, view.team.id]);
   const roleLine = (counts: { role: string; count: number }[]) =>
     counts
       .map(({ role, count }) => `${String(count)} ${labelOf(role)}${count === 1 ? "" : "s"}`)
@@ -287,11 +291,10 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
           </Badge>
         </div>
         <p className="competitions-hint">
-          {view.team.name} · {view.competition.name}. Only you and this team&apos;s other owners can
-          see it.{" "}
-          {view.readOnly
-            ? "The auction is over; this is the plan as it stood."
-            : "Add the players you want. A max is optional."}
+          {/* After the night the hero names the team; the line need not. */}
+          {view.readOnly ? null : `${view.team.name} · ${view.competition.name}. `}
+          Only you and this team&apos;s other owners can see it.{" "}
+          {view.readOnly ? "The auction is over." : "Add the players you want. A max is optional."}
         </p>
         {view.teams.length > 1 ? (
           <nav className="plan-teams" aria-label="Your teams">
@@ -309,7 +312,21 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
         ) : null}
       </header>
 
-      {noPlan ? null : (
+      {view.readOnly ? (
+        <SquadHero
+          team={view.team}
+          competitionName={view.competition.name}
+          squadSize={view.standing.squadSize}
+          squadMax={view.rules.squadMax}
+          bought={bought.length}
+          preSigned={view.preSignedPlayers.length}
+          spent={view.planRules.pursePerTeam - view.standing.purseRemaining}
+          purse={view.planRules.pursePerTeam}
+          purseRemaining={view.standing.purseRemaining}
+          mix={roles.squad}
+          labelOf={labelOf}
+        />
+      ) : (
         <div className="stat-row plan-stats">
           <div className="stat-tile" data-testid="plan-purse">
             <span className="stat-value">{money.ledger(state.budget.purseRemaining)}</span>
@@ -331,20 +348,18 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
 
       {/* Phase 1.5: two counts, stated. Which roles a squad NEEDS stays the owner's
           call — this line never says "you need". */}
-      <p className="plan-roles" data-testid="plan-roles">
-        <span>
-          <span className="plan-roles-label">Squad</span> {roleLine(roles.squad)}
-        </span>
-        {/* After the hammer there is nothing still to come: whoever is left in
-            the pool went unsold, and saying "Still to come" of them invited an
-            owner to wait for players the night had already passed over. */}
-        <span>
-          <span className="plan-roles-label">
-            {view.readOnly ? "Went unsold" : "Still to come"}
-          </span>{" "}
-          {roleLine(roles.remaining)}
-        </span>
-      </p>
+      {view.readOnly ? null : (
+        <p className="plan-roles" data-testid="plan-roles">
+          <span>
+            <span className="plan-roles-label">Squad</span> {roleLine(roles.squad)}
+          </span>
+          {/* Planning only: after the hammer the squad hero and footnote say
+            what went unsold instead (squad-after.tsx). */}
+          <span>
+            <span className="plan-roles-label">Still to come</span> {roleLine(roles.remaining)}
+          </span>
+        </p>
+      )}
 
       {/* "Plan fits your purse" is advice for a night still to be bid; over a
           finished auction it is a verdict on nothing. The report below says
@@ -388,15 +403,13 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
 
       {view.report !== undefined ? (
         noPlan ? (
-          <NoPlanReport
-            report={view.report}
-            lotsByRegistration={lotsByRegistration}
-            labelOf={labelOf}
-            preSigned={view.preSignedPlayers}
-            squadSize={view.standing.squadSize}
-            squadMax={view.rules.squadMax}
-            purseRemaining={view.standing.purseRemaining}
-          />
+          bought.length === 0 && view.preSignedPlayers.length === 0 ? (
+            <NoPlanReport
+              report={view.report}
+              lotsByRegistration={lotsByRegistration}
+              labelOf={labelOf}
+            />
+          ) : null
         ) : (
           <PlanReportCard
             report={view.report}
@@ -404,6 +417,19 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
             labelOf={labelOf}
           />
         )
+      ) : null}
+
+      {view.readOnly && bought.length + view.preSignedPlayers.length > 0 ? (
+        <SquadList
+          preSigned={view.preSignedPlayers}
+          bought={bought}
+          lotMedia={view.lotMedia}
+          labelOf={labelOf}
+          testId={noPlan ? "plan-report" : "plan-squad"}
+        />
+      ) : null}
+      {view.readOnly ? (
+        <SquadFootnote noPlan={noPlan} unsold={countLine(roles.remaining, labelOf)} />
       ) : null}
 
       {view.readOnly ? null : (

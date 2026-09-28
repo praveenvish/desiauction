@@ -222,3 +222,43 @@ export function roleFacts(
       .map(([role, count]) => ({ role, count }));
   return { squad: ordered(squad), remaining: ordered(remaining) };
 }
+
+/* ── After the night: the squad the team signed ────────────────────────── */
+
+/** The lots this team bought, dearest first — the squad list under the hero. */
+export function boughtLots(lots: readonly PlanLotRow[], teamId: string): PlanLotRow[] {
+  return lots
+    .filter((lot) => lot.status === "sold" && lot.soldToTeamId === teamId)
+    .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0) || a.seq - b.seq);
+}
+
+/**
+ * The role mix as bar segments: only roles the squad holds, most first, each
+ * with its share of the squad. The legend reads "6 All-rounders", in the
+ * season's own order when two are tied.
+ */
+export function mixSegments(
+  squad: readonly RoleCount[],
+): { role: string; count: number; share: number }[] {
+  const total = squad.reduce((sum, row) => sum + row.count, 0);
+  if (total === 0) return [];
+  return squad
+    .map((row, index) => ({ ...row, index }))
+    .filter((row) => row.count > 0)
+    .sort((a, b) => b.count - a.count || a.index - b.index)
+    .map(({ role, count }) => ({ role, count, share: count / total }));
+}
+
+/** "3 batters · 2 bowlers" — a count line in running text, lower case. */
+export function countLine(
+  counts: readonly RoleCount[],
+  labelOf: (role: string | null) => string,
+): string {
+  return counts
+    .filter((row) => row.count > 0)
+    .map(
+      ({ role, count }) =>
+        `${String(count)} ${labelOf(role).toLowerCase()}${count === 1 ? "" : "s"}`,
+    )
+    .join(" · ");
+}
