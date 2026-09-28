@@ -1269,3 +1269,12 @@ a.mx-week-step:hover {
     width: auto;
   }
 }
+
+/* On a phone, on match days: once everything is published the publishing strip
+   ("0 Draft — 0 Scheduled — 7 Published · Everything is published.") is
+   noise between the organizer and the owed results (census 11). */
+@media (max-width: 719px) {
+  .mx-pipeline[data-settled="true"] {
+    display: none;
+  }
+}

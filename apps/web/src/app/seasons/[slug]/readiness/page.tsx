@@ -1,6 +1,6 @@
 import { ButtonLink, IconAlert, IconCheck, Pill, type KitTone } from "@desiauction/ui";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { auctionDashboard } from "../../../../server/auction/actions";
 import { competitionView, registrationDashboard } from "../../../../server/competition/actions";
@@ -73,6 +73,14 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
    */
   const auctionStatus = auction?.view?.auction.status ?? null;
   const auctionOver = auctionStatus === "completed" || auctionStatus === "reconciled";
+  /*
+   * AFTER THE NIGHT THERE IS NOTHING TO GET READY FOR (census 11): the page
+   * was one card, "Auction night is behind you", and a blank screen. The
+   * season's overview carries what is next (the matches, results owed).
+   */
+  if (auctionOver) {
+    redirect(base);
+  }
   const auctionLive = auctionStatus === "live" || auctionStatus === "paused";
   const auctionCreated = auction?.view !== null && auction?.view !== undefined;
   const regStats = registrations?.stats;
@@ -83,7 +91,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
    * never counted. Title, button and marks now read from one list.
    */
   const steps =
-    auction === null || auctionOver || auctionLive
+    auction === null || auctionLive
       ? []
       : readinessSteps({ checks, auctionCreated, pending, base });
   /*
@@ -91,8 +99,7 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
    * short, but it must not find out at closing time — so it is said as a
    * sentence with the ways out, and the verdict carries the caveat.
    */
-  const short =
-    auction === null || auctionOver ? null : shortfallSentence(auction.feasibility, pending);
+  const short = auction === null ? null : shortfallSentence(auction.feasibility, pending);
   const runningShort = short !== null;
   const fixtureCount = fixtures?.stats.total ?? 0;
   // The public record, counted the way the Schedule counts it: a match being
@@ -103,35 +110,22 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
   const published = (fixtures?.stats.published ?? 0) + liveMatches + played;
   const conflicts = (fixtures?.conflicts ?? []).length;
 
-  const verdictPill = auctionOver
-    ? { tone: "green" as KitTone, label: "Auction completed" }
-    : auctionLive
-      ? { tone: "green" as KitTone, label: "Auction live" }
-      : auction !== null && steps.length === 0
-        ? {
-            tone: (runningShort ? "amber" : "green") as KitTone,
-            label: runningShort ? "Ready — but running short" : "Ready for auction",
-          }
-        : { tone: "amber" as KitTone, label: "Not ready yet" };
+  const verdictPill = auctionLive
+    ? { tone: "green" as KitTone, label: "Auction live" }
+    : auction !== null && steps.length === 0
+      ? {
+          tone: (runningShort ? "amber" : "green") as KitTone,
+          label: runningShort ? "Ready — but running short" : "Ready for auction",
+        }
+      : { tone: "amber" as KitTone, label: "Not ready yet" };
 
-  const title = auctionOver
-    ? fixtureCount > 0 && published === fixtureCount && conflicts === 0
-      ? "The auction is done — the schedule is out"
-      : "The auction is done — next is the match schedule"
-    : auctionLive
-      ? "The auction is live"
-      : readinessTitle(steps.length);
+  const title = auctionLive ? "The auction is live" : readinessTitle(steps.length);
   const firstStep = steps[0];
-  const primary = auctionOver
-    ? {
-        label: fixtureCount === 0 ? "Build fixtures" : "Open fixtures",
-        href: `${base}/fixtures`,
-      }
-    : auctionLive
-      ? { label: "Open the cockpit", href: `${base}/auction/cockpit` }
-      : firstStep !== undefined
-        ? firstStep.action
-        : { label: "Open auction setup", href: `${base}/auction` };
+  const primary = auctionLive
+    ? { label: "Open the cockpit", href: `${base}/auction/cockpit` }
+    : firstStep !== undefined
+      ? firstStep.action
+      : { label: "Open auction setup", href: `${base}/auction` };
 
   /*
    * ONE CHECKLIST (2026-09-28). Every gate was said three times — a numbered
@@ -229,56 +223,6 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
         />
       </ol>
     );
-
-  if (auctionOver) {
-    const sold = auction?.view?.lotStats.sold ?? 0;
-    const unsold = auction?.view?.lotStats.unsold ?? 0;
-    const facts = [
-      view.competition.name,
-      sold + unsold > 0 ? `${String(sold)} of ${String(sold + unsold)} sold` : null,
-      fixtureCount === 0
-        ? "fixtures come next"
-        : played + liveMatches > 0
-          ? `the season is on — ${String(played)} of ${String(fixtureCount)} matches played${liveMatches > 0 ? `, ${String(liveMatches)} live` : ""}`
-          : `${String(published)} of ${String(fixtureCount)} matches published`,
-    ].filter((part): part is string => part !== null);
-    return (
-      <main className="registrations-dash">
-        <div className="dash-stack">
-          {/* AFTER THE HAMMER THE PAGE STEPS ASIDE: it said "next is the match
-              schedule" on a season three matches in. */}
-          <section
-            className="rd-after"
-            data-testid="readiness-card"
-            aria-labelledby="rd-after-title"
-          >
-            <span className="rd-after-mark" aria-hidden>
-              <IconCheck size={22} />
-            </span>
-            <div className="rd-after-text">
-              <Pill tone="green" dot testId="readiness-verdict">
-                Auction completed
-              </Pill>
-              <h2 id="rd-after-title">Auction night is behind you</h2>
-              <p data-testid="readiness-fixtures">{facts.join(" · ")}</p>
-            </div>
-            <div className="rd-after-go">
-              <ButtonLink
-                href={fixtureCount === 0 ? `${base}/fixtures` : base}
-                size="touch"
-                data-testid="readiness-next"
-              >
-                {fixtureCount === 0 ? "Build fixtures" : "Season overview"}
-              </ButtonLink>
-              <ButtonLink href={`${base}/auction`} variant="secondary" size="touch">
-                Auction results
-              </ButtonLink>
-            </div>
-          </section>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main className="registrations-dash">
