@@ -804,3 +804,252 @@
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- The career strip and the named profile ask, in the hero's footer ---- */
+
+.me-hero-foot {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.me-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--hero-crest-line);
+}
+
+.me-strip > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.me-strip dt {
+  grid-row: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs-size);
+  color: var(--hero-ink-soft);
+}
+
+.me-strip dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xl-size);
+  line-height: 1.2;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--hero-ink);
+}
+
+.me-ask {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--hero-crest-line);
+  border-radius: var(--radius-lg);
+  background: var(--hero-crest-bed);
+  color: var(--hero-ink-soft);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+}
+
+.me-ask > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.me-ask strong {
+  color: var(--hero-ink);
+}
+
+.me-ask:hover {
+  border-color: var(--hero-ink-soft);
+}
+
+.me-ask:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.me-ask-bar {
+  flex: none;
+  width: 72px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--hero-crest-line);
+}
+
+.me-ask-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.me-ask > svg {
+  flex: none;
+  color: var(--hero-ink);
+}
+
+/* ---- Season by season: one row a season, the price loudest ---- */
+
+.me-seasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.me-seasons > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Four columns; the role sits under the team chip — a fifth column beside
+   the chip left the season's name cut short and the chip touching the role. */
+.me-season {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1.5fr) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "year name team end"
+    "year name role end";
+  align-items: center;
+  gap: 2px var(--space-4);
+  min-height: 60px;
+  padding: var(--space-3) var(--space-5);
+  color: inherit;
+  text-decoration: none;
+  font-size: var(--text-sm-size);
+}
+
+.me-season:hover {
+  background: var(--surface-sunken);
+}
+
+.me-season:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.me-season-year {
+  grid-area: year;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.me-season-name {
+  grid-area: name;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.me-season-name strong {
+  overflow-wrap: anywhere;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.me-season-name > span {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.me-season-phone-year {
+  display: none;
+}
+
+.me-season-team {
+  grid-area: team;
+  align-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.me-season-role {
+  grid-area: role;
+  align-self: start;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.me-season-end {
+  grid-area: end;
+  justify-self: end;
+  text-align: right;
+}
+
+.me-season-price {
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+@media (max-width: 719px) {
+  .me-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-4);
+  }
+
+  .me-strip dd {
+    font-size: var(--text-lg-size);
+  }
+
+  .me-ask-bar {
+    display: none;
+  }
+
+  /* A season on a phone: name and price on one line, team and role under. */
+  .me-season {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name end"
+      "team role";
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .me-season-year {
+    display: none;
+  }
+
+  .me-season-phone-year {
+    display: inline;
+  }
+
+  .me-season-name {
+    grid-area: name;
+  }
+
+  .me-season-end {
+    grid-area: end;
+  }
+
+  .me-season-team {
+    grid-area: team;
+  }
+
+  .me-season-role {
+    grid-area: role;
+    align-self: center;
+    justify-self: end;
+  }
+
+  .me-season-team {
+    align-self: center;
+  }
+}
