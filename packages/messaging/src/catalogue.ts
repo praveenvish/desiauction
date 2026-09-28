@@ -46,6 +46,7 @@ export type NotificationAudience =
 export type NotificationTopic =
   | "registration"
   | "auction"
+  | "matches"
   | "money"
   | "feedback"
   | "club"
@@ -177,6 +178,31 @@ const ENTRIES = [
     category: "security",
     topic: "security",
     channels: ["email", "whatsapp"],
+  },
+  {
+    // A passkey signs in with no code at all, so one added by somebody holding
+    // a stolen session is a key they keep (email programme PR14). Removing
+    // the owner's own passkey is the other half of a takeover.
+    key: "security.passkey_changed",
+    label: "Passkey added or removed",
+    description: "Warns the account's verified email the moment a passkey is added or removed.",
+    audience: "account",
+    category: "security",
+    topic: "security",
+    channels: ["email"],
+  },
+  {
+    // The account-deletion request, from filing to its outcome (PR14). A
+    // security notice because a stolen session could file one, and because
+    // the last mail — "deleted" — must reach the address before it is gone.
+    key: "security.account_deletion",
+    label: "Account deletion request",
+    description:
+      "Received, withdrawn, declined (with the reason) or done — told to the account's verified email.",
+    audience: "account",
+    category: "security",
+    topic: "security",
+    channels: ["email"],
   },
   // --- The player's season ----------------------------------------------------
   {
@@ -330,13 +356,63 @@ const ENTRIES = [
     topic: "auction",
     channels: ["email", "in_app"],
   },
+  // --- The season's matches (email programme PR11) ---------------------------
+  // Their own switch ("Match updates"): somebody who has heard enough about the
+  // auction still wants to know their match moved.
+  {
+    // The organizer published fixtures. Held ten minutes and rebuilt on every
+    // publish, so a schedule published in three sittings is one mail with all
+    // of it; a later batch is an update listing the team's matches again.
+    key: "schedule.published",
+    label: "Team schedule published",
+    description:
+      "The team's matches, when the organizer publishes the schedule — to its players and owner.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email"],
+  },
+  {
+    key: "fixture.changed",
+    label: "Match moved or called off",
+    description: "A published match was moved or cancelled — to both teams' players and owners.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email", "in_app"],
+  },
+  {
+    // Built fresh by the sweep when due: the morning of the match, or the
+    // evening before one that starts before 11 am.
+    key: "match.day",
+    label: "Match day",
+    description:
+      "The morning of a match (the evening before an early one): when, where and the lineup — and each organizer's day at a glance.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email"],
+  },
+  {
+    // The organizer names the champion when the matches are done (email
+    // programme PR12) — announced, not derived: a season has no stored end and
+    // its final may have been played off the app. Once per season.
+    key: "season.champion",
+    label: "Season champions",
+    description:
+      "When the organizer names the champion: a celebration for the winning team, the final place for every other team, the final table for organizers.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email", "in_app"],
+  },
   {
     key: "lineup.announced",
     label: "Named in a lineup",
     description: "The player is in the team's lineup for a match.",
     audience: "player",
     category: "transactional",
-    topic: "auction",
+    topic: "matches",
     channels: ["email", ...TEXT, "in_app"],
     inboxKeys: ["fixture.lineup_announced"],
   },
@@ -391,6 +467,59 @@ const ENTRIES = [
     category: "transactional",
     topic: "club",
     channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    // The organizer typed an address beside a club invite link (email
+    // programme PR13). The link is the capability — whoever opens it joins —
+    // so this goes DIRECT, never queued, and no switch applies: the reader
+    // may not have an account yet.
+    key: "club.invite",
+    label: "Club invitation",
+    description:
+      "An organizer emails someone their one-time link to join the club as staff or a member.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    personControllable: false,
+    orgControllable: false,
+  },
+  {
+    // Somebody used a club invite link: the person who sent it, and the
+    // club's owners, hear who now has access — access is a security fact.
+    key: "club.member_joined",
+    label: "Someone joined the club",
+    description:
+      "Tells whoever sent the invite, and the club's owners, who joined and with what access.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
+    orgControllable: false,
+  },
+  {
+    // The season's pass (email programme PR15): an upgrade is a REQUEST a
+    // person answers, so the organizer is told it arrived and, later, the
+    // answer — which moves what the season may hold.
+    key: "plan.requested",
+    label: "Pass request received",
+    description: "Tells the organizer who asked for a bigger season pass that we have it.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    key: "plan.answered",
+    label: "Pass request answered",
+    description:
+      "Granted (with the new limits) or declined — to whoever asked and the club's owners.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
     orgControllable: false,
   },
   {
@@ -549,6 +678,16 @@ const ENTRIES = [
     channels: ["email"],
   },
   {
+    key: "staff.pass_request",
+    label: "New pass request (to us)",
+    description:
+      "A season asked for a bigger pass — to the support mailbox, to answer from the passes desk.",
+    audience: "staff",
+    category: "operational",
+    topic: "staff",
+    channels: ["email"],
+  },
+  {
     key: "staff.review_arrived",
     label: "New review (to us)",
     description: "A first-time review, to the support mailbox for moderation.",
@@ -645,6 +784,10 @@ const TOPIC_COPY: Readonly<Partial<Record<NotificationTopic, { label: string; de
     auction: {
       label: "Auction updates",
       detail: "When an auction you are in is about to start, and how it went.",
+    },
+    matches: {
+      label: "Match updates",
+      detail: "Your team's schedule, a match that moves, lineups and match-day notes.",
     },
     money: {
       label: "Receipts and money",

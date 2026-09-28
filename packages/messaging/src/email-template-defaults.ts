@@ -1255,7 +1255,12 @@ const LINEUP: EmailTemplateSpec = {
   editableFields: LAYOUT_FIELDS,
   languages: ["en", "hi"],
   variants: DEFAULT_VARIANT,
-  actions: [SEASON_ACTION],
+  actions: [
+    {
+      id: "season",
+      description: "The match — or the player's home, when the season is not public.",
+    },
+  ],
   variables: [
     NAME,
     SEASON,
@@ -1288,7 +1293,7 @@ const LINEUP: EmailTemplateSpec = {
           "You're playing for {{teamName}} against {{opponent}} on {{when}}{{placeClause}}. Here's the lineup.",
         ],
         after: ["Good luck!"],
-        actions: { season: SEE_SEASON.en },
+        actions: { season: "See the match" },
         footnote: `You received this because you play for {{teamName}} in {{season}}.`,
       }),
     ),
@@ -1302,10 +1307,917 @@ const LINEUP: EmailTemplateSpec = {
           "आप {{when}}{{placeClause}} {{opponent}} के ख़िलाफ़ {{teamName}} के लिए खेल रहे हैं। यह रही टीम।",
         ],
         after: ["शुभकामनाएँ!"],
-        actions: { season: SEE_SEASON.hi },
+        actions: { season: "मैच देखें" },
         footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं।`,
       }),
     ),
+  },
+};
+
+// --- The season's matches (email programme PR11) ----------------------------------
+
+const MATCH_TITLE = text(
+  "matchTitle",
+  "The match, as its teams (“Cup Kings vs Tigers”) — or a lobby (“Lobby 3 · 12 teams”).",
+  "Cup Kings vs Tigers",
+  "कप किंग्स बनाम टाइगर्स",
+  { computed: true },
+);
+const PLAYS_FOR = {
+  en: "You received this because you're on {{teamName}} in {{season}}.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} की टीम में हैं।",
+};
+const IST_NOTE = {
+  en: "All times are in IST. If a match moves, we'll email you.",
+  hi: "सभी समय IST में हैं। कोई मैच आगे-पीछे हुआ, तो हम आपको ईमेल करेंगे।",
+};
+const SEE_MATCHES = { en: "See all matches", hi: "सारे मैच देखें" };
+const SEE_MATCH = { en: "See the match", hi: "मैच देखें" };
+
+const SCHEDULE_PUBLISHED: EmailTemplateSpec = {
+  kind: "schedule.published",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "first", label: "Schedule out" },
+    { id: "updated", label: "More matches published" },
+  ],
+  actions: [{ id: "matches", description: "The season's Matches screen, filtered to the team." }],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    TEAM,
+    text(
+      "matchCount",
+      "How many matches the team has to come (“5 matches”).",
+      "5 matches",
+      "5 मैच",
+      {
+        computed: true,
+      },
+    ),
+    text(
+      "firstMatch",
+      "The team's next match, in short (“Sun 4 Oct vs Tigers”).",
+      "Sun 4 Oct vs Tigers",
+      "रवि 4 अक्टू॰, टाइगर्स से",
+      { computed: true },
+    ),
+    text(
+      "moreLine",
+      "When the list is long: how many more are on the season page. Empty otherwise.",
+      "…and 3 more on the season page.",
+      "…और 3 मैच सीज़न पेज पर।",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  note: "The list of matches is written by the code. Held ten minutes and rebuilt on every publish, so a schedule published in three sittings is one mail.",
+  defaults: {
+    en: {
+      variants: {
+        first: layout({
+          subject: "Your {{teamName}} schedule: {{matchCount}}",
+          preheader: "First up: {{firstMatch}}.",
+          heading: "Your {{teamName}} schedule is out",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has published the {{season}} schedule. {{teamName}} have {{matchCount}} to play — here they are.",
+          ],
+          after: ["{{moreLine}}", IST_NOTE.en],
+          actions: { matches: SEE_MATCHES.en },
+          footnote: PLAYS_FOR.en,
+        }),
+        updated: layout({
+          subject: "More {{teamName}} matches published",
+          preheader: "Next up: {{firstMatch}}.",
+          heading: "More matches for {{teamName}}",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has published more of the {{season}} schedule. Here are all {{matchCount}} {{teamName}} still have to play.",
+          ],
+          after: ["{{moreLine}}", IST_NOTE.en],
+          actions: { matches: SEE_MATCHES.en },
+          footnote: PLAYS_FOR.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        first: layout({
+          subject: "{{teamName}} का शेड्यूल: {{matchCount}}",
+          preheader: "पहला मैच: {{firstMatch}}।",
+          heading: "{{teamName}} का शेड्यूल आ गया",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{season}} का शेड्यूल जारी कर दिया है। {{teamName}} को {{matchCount}} खेलने हैं — ये रहे।",
+          ],
+          after: ["{{moreLine}}", IST_NOTE.hi],
+          actions: { matches: SEE_MATCHES.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+        updated: layout({
+          subject: "{{teamName}} के और मैच जारी हुए",
+          preheader: "अगला मैच: {{firstMatch}}।",
+          heading: "{{teamName}} के लिए और मैच",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{season}} के और मैच जारी किए हैं। ये रहे {{teamName}} के बाक़ी सभी {{matchCount}}।",
+          ],
+          after: ["{{moreLine}}", IST_NOTE.hi],
+          actions: { matches: SEE_MATCHES.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+      },
+    },
+  },
+};
+
+const FIXTURE_CHANGED: EmailTemplateSpec = {
+  kind: "fixture.changed",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "moved", label: "Match moved" },
+    { id: "cancelled", label: "Match called off" },
+  ],
+  actions: [{ id: "match", description: "The match on the season's Matches screen." }],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    TEAM,
+    MATCH_TITLE,
+    text(
+      "when",
+      "The new time (“Sun 4 Oct, 7:30 pm”).",
+      "Sun 4 Oct, 7:30 pm",
+      "रवि 4 अक्टू॰, 7:30 pm",
+      {
+        computed: true,
+        whenEmpty: "blank",
+      },
+    ),
+    text(
+      "previous",
+      "The time it had (“Sat 3 Oct, 4:00 pm”).",
+      "Sat 3 Oct, 4:00 pm",
+      "शनि 3 अक्टू॰, 4:00 pm",
+      { computed: true },
+    ),
+    text(
+      "reasonLine",
+      "The organizer's reason, when they gave one. Empty otherwise.",
+      "The organizer's note: “Rain forecast for Saturday.”",
+      "आयोजक का नोट: “Rain forecast for Saturday.”",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  note: "Held ten minutes; a newer change to the same match replaces a notice still waiting. The date tile and the old time are written by the code.",
+  defaults: {
+    en: {
+      variants: {
+        moved: layout({
+          subject: "Match moved: {{matchTitle}} is now {{when}}",
+          preheader: "It was {{previous}}. Please update your calendar.",
+          heading: "Your match has moved",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has moved {{matchTitle}}. It was {{previous}} — here's the new time.",
+          ],
+          after: [IST_NOTE.en],
+          actions: { match: SEE_MATCH.en },
+          footnote: PLAYS_FOR.en,
+        }),
+        cancelled: layout({
+          subject: "Called off: {{matchTitle}}, {{previous}}",
+          preheader: "{{orgName}} has called this match off.",
+          heading: "A match has been called off",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has called off {{matchTitle}}, which was set for {{previous}}.",
+          ],
+          after: ["{{reasonLine}}", "If it's rearranged, we'll email you the new date."],
+          actions: { match: SEE_MATCHES.en },
+          footnote: PLAYS_FOR.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        moved: layout({
+          subject: "मैच का समय बदला: {{matchTitle}} अब {{when}}",
+          preheader: "पहले यह {{previous}} था। कृपया अपना कैलेंडर बदल लें।",
+          heading: "आपके मैच का समय बदल गया",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{matchTitle}} का समय बदल दिया है। पहले यह {{previous}} था — नया समय यह है।",
+          ],
+          after: [IST_NOTE.hi],
+          actions: { match: SEE_MATCH.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+        cancelled: layout({
+          subject: "मैच रद्द: {{matchTitle}}, {{previous}}",
+          preheader: "{{orgName}} ने यह मैच रद्द कर दिया है।",
+          heading: "एक मैच रद्द हो गया",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{matchTitle}} रद्द कर दिया है, जो {{previous}} को होना था।",
+          ],
+          after: ["{{reasonLine}}", "अगर यह दोबारा तय हुआ, तो हम आपको नई तारीख़ ईमेल करेंगे।"],
+          actions: { match: SEE_MATCHES.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+      },
+    },
+  },
+};
+
+const MATCH_DAY: EmailTemplateSpec = {
+  kind: "match.day",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "player", label: "Player or owner" },
+    { id: "organizer", label: "Organizer (the day at a glance)" },
+  ],
+  actions: [
+    { id: "open", description: "The match, or the organizer's Matches screen for the day." },
+  ],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    text("teamName", "The reader's team.", "Cup Kings", "कप किंग्स", { whenEmpty: "drop" }),
+    text(
+      "matchTitle",
+      "The match (“Cup Kings vs Tigers”).",
+      "Cup Kings vs Tigers",
+      "कप किंग्स बनाम टाइगर्स",
+      {
+        computed: true,
+        whenEmpty: "drop",
+      },
+    ),
+    text("dayWord", "“today”, or “tomorrow” for a match before 11 am.", "today", "आज", {
+      computed: true,
+    }),
+    text("time", "The kick-off (“7:30 pm”).", "7:30 pm", "7:30 pm", {
+      computed: true,
+      whenEmpty: "drop",
+    }),
+    text(
+      "placeClause",
+      "“ at Malad Ground”, when the match has a ground; otherwise nothing.",
+      " at Malad Ground",
+      ", मलाड ग्राउंड में",
+      { computed: true, whenEmpty: "blank" },
+    ),
+    text("matchCount", "How many matches (“3 matches”).", "3 matches", "3 मैच", { computed: true }),
+    text(
+      "lineupLine",
+      "“You're in the lineup.” — only when the lineup was announced and the reader is in it.",
+      "You're in the lineup — good luck!",
+      "आप प्लेइंग टीम में हैं — शुभकामनाएँ!",
+      { computed: true, whenEmpty: "drop" },
+    ),
+    text(
+      "moreLine",
+      "When the reader's team plays more than once that day. Empty otherwise.",
+      "Cup Kings play twice — both matches are below.",
+      "कप किंग्स के दो मैच हैं — दोनों नीचे हैं।",
+      { computed: true, whenEmpty: "drop" },
+    ),
+    text(
+      "gapLine",
+      "For organizers: lineups still to announce, written by DesiAuction. Empty when every lineup is in.",
+      "2 lineups aren't announced yet — announce them from the Matches screen.",
+      "2 प्लेइंग टीमें अभी घोषित नहीं हुईं — मैच पेज से घोषित करें।",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  note: "Sent by the scheduled sweep: at 7 am IST on the day, or at 6 pm the evening before a match that starts before 11 am. The matchup, the list and the ground's address are written by the code.",
+  defaults: {
+    en: {
+      variants: {
+        player: layout({
+          subject: "Match day: {{matchTitle}}, {{time}} {{dayWord}}",
+          preheader: "{{teamName}} play {{dayWord}}{{placeClause}}. Get there early to warm up.",
+          heading: "Your match is {{dayWord}}",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{teamName}} play {{dayWord}} at {{time}}{{placeClause}}. Get there a little early to warm up.",
+          ],
+          after: [
+            "{{lineupLine}}",
+            "{{moreLine}}",
+            "Times are in IST. Check the match page for any late change.",
+          ],
+          actions: { open: SEE_MATCH.en },
+          footnote: PLAYS_FOR.en,
+        }),
+        organizer: layout({
+          subject: "Match day: {{matchCount}} {{dayWord}} in {{season}}",
+          preheader: "Your day at a glance — grounds, times and lineups.",
+          heading: "Your match day at a glance",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{season}} has {{matchCount}} {{dayWord}}. Here's the day:",
+          ],
+          after: ["{{gapLine}}"],
+          actions: { open: "Open the matches" },
+          footnote: "You received this because you run {{season}} on DesiAuction.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        player: layout({
+          subject: "मैच डे: {{matchTitle}}, {{dayWord}} {{time}}",
+          preheader:
+            "{{teamName}} का मैच {{dayWord}}{{placeClause}}। वॉर्म-अप के लिए जल्दी पहुँचें।",
+          heading: "आपका मैच {{dayWord}} है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{teamName}} का मैच {{dayWord}} {{time}} बजे{{placeClause}} है। वॉर्म-अप के लिए थोड़ा पहले पहुँचें।",
+          ],
+          after: [
+            "{{lineupLine}}",
+            "{{moreLine}}",
+            "समय IST में है। आख़िरी समय के किसी बदलाव के लिए मैच पेज देखें।",
+          ],
+          actions: { open: SEE_MATCH.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+        organizer: layout({
+          subject: "मैच डे: {{season}} में {{dayWord}} {{matchCount}}",
+          preheader: "आपका दिन एक नज़र में — मैदान, समय और प्लेइंग टीमें।",
+          heading: "आपका मैच डे, एक नज़र में",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{season}} में {{dayWord}} {{matchCount}} हैं। पूरा दिन यह रहा:",
+          ],
+          after: ["{{gapLine}}"],
+          actions: { open: "मैच खोलें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+        }),
+      },
+    },
+  },
+};
+
+// --- The season's end (email programme PR12) ------------------------------------
+
+const CHAMPION = text("champion", "The champion team.", "Cup Kings", "कप किंग्स");
+
+const SEASON_CHAMPION: EmailTemplateSpec = {
+  kind: "season.champion",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "champion", label: "The champion team" },
+    { id: "team", label: "Every other team" },
+    { id: "organizer", label: "Organizer (the final table)" },
+  ],
+  actions: [
+    { id: "season", description: "The season's page, or the organizer's season overview." },
+  ],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    text("teamName", "The reader's team.", "Tigers", "टाइगर्स", { whenEmpty: "drop" }),
+    CHAMPION,
+    text(
+      "recordLine",
+      "The champion's season in one line (“7 wins from 8 matches · 14 points”).",
+      "7 wins from 8 matches · 14 points",
+      "8 मैचों में 7 जीत · 14 अंक",
+      { computed: true },
+    ),
+    text("place", "Where the reader's team finished (“3rd of 8”).", "3rd of 8", "8 में से तीसरे", {
+      computed: true,
+      whenEmpty: "drop",
+    }),
+  ],
+  locked: [],
+  note: "Sent once, when the organizer announces the champion from the season overview. The trophy panel and the final table are written by the code.",
+  defaults: {
+    en: {
+      variants: {
+        champion: layout({
+          subject: "Champions! {{champion}} win {{season}}",
+          preheader: "{{recordLine}}. What a season.",
+          heading: "You're the {{season}} champions",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has named {{champion}} the {{season}} champions — {{recordLine}}. Congratulations to you and the whole squad.",
+          ],
+          after: ["Thank you for playing. We hope to see you next season."],
+          actions: { season: "See the final table" },
+          footnote: "You received this because you're on {{champion}} in {{season}}.",
+        }),
+        team: layout({
+          subject: "{{season}} is a wrap — {{champion}} are champions",
+          preheader: "{{teamName}} finished {{place}}. Here's the final table.",
+          heading: "{{season}} is a wrap",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has named {{champion}} the {{season}} champions. {{teamName}} finished {{place}} — here's how the table ended.",
+          ],
+          after: ["Thank you for playing. We hope to see you next season."],
+          actions: { season: "See the final table" },
+          footnote: "You received this because you're on {{teamName}} in {{season}}.",
+        }),
+        organizer: layout({
+          subject: "{{champion}} are your {{season}} champions",
+          preheader: "Every team has been told. Here's the final table.",
+          heading: "{{champion}} are your champions",
+          paragraphs: [
+            "Hi {{name}},",
+            "You've named {{champion}} the {{season}} champions — {{recordLine}}. We've told every player and owner. Here's the final table:",
+          ],
+          after: [
+            "Running it again? Start the next season from this one — your teams, rules and venues come with it.",
+          ],
+          actions: { season: "Open the season" },
+          footnote: "You received this because you run {{season}} on DesiAuction.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        champion: layout({
+          subject: "चैंपियन! {{champion}} ने {{season}} जीता",
+          preheader: "{{recordLine}}। क्या शानदार सीज़न रहा।",
+          heading: "आप {{season}} के चैंपियन हैं",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{champion}} को {{season}} का चैंपियन घोषित किया है — {{recordLine}}। आपको और पूरी टीम को बधाई।",
+          ],
+          after: ["खेलने के लिए धन्यवाद। अगले सीज़न में फिर मिलेंगे।"],
+          actions: { season: "फ़ाइनल टेबल देखें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप {{season}} में {{champion}} की टीम में हैं।",
+        }),
+        team: layout({
+          subject: "{{season}} पूरा हुआ — {{champion}} चैंपियन",
+          preheader: "{{teamName}} {{place}} स्थान पर रहे। यह रही फ़ाइनल टेबल।",
+          heading: "{{season}} पूरा हुआ",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{champion}} को {{season}} का चैंपियन घोषित किया है। {{teamName}} {{place}} स्थान पर रहे — टेबल ऐसे ख़त्म हुई।",
+          ],
+          after: ["खेलने के लिए धन्यवाद। अगले सीज़न में फिर मिलेंगे।"],
+          actions: { season: "फ़ाइनल टेबल देखें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} की टीम में हैं।",
+        }),
+        organizer: layout({
+          subject: "{{champion}} आपके {{season}} चैंपियन हैं",
+          preheader: "हर टीम को बता दिया गया है। यह रही फ़ाइनल टेबल।",
+          heading: "{{champion}} आपके चैंपियन हैं",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "आपने {{champion}} को {{season}} का चैंपियन घोषित किया है — {{recordLine}}। हमने हर खिलाड़ी और मालिक को बता दिया है। यह रही फ़ाइनल टेबल:",
+          ],
+          after: [
+            "फिर से चलाना है? अगला सीज़न इसी से शुरू करें — आपकी टीमें, नियम और मैदान साथ आ जाएँगे।",
+          ],
+          actions: { season: "सीज़न खोलें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+        }),
+      },
+    },
+  },
+};
+
+// --- Passkeys and account deletion (email programme PR14) -----------------------
+
+const SECURITY_PAGE = [
+  { id: "security", description: "The account's sign-in devices and passkeys." },
+] as const;
+
+const PASSKEY_CHANGED: EmailTemplateSpec = {
+  kind: "security.passkey_changed",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "added", label: "Passkey added" },
+    { id: "removed", label: "Passkey removed" },
+  ],
+  actions: SECURITY_PAGE,
+  variables: [
+    text("passkeyName", "The passkey's name (“iPhone 15”).", "iPhone 15", "iPhone 15", {
+      whenEmpty: "blank",
+    }),
+  ],
+  locked: [IF_NOT_YOU],
+  note: "The device and time rows are written by the code, from the request that made the change.",
+  defaults: {
+    en: {
+      variants: {
+        added: layout({
+          subject: "A passkey was added to your DesiAuction account",
+          preheader:
+            "“{{passkeyName}}” can now sign in without a code. If this wasn't you, act now.",
+          heading: "A passkey was added",
+          paragraphs: [
+            "A new passkey, “{{passkeyName}}”, was added to your DesiAuction account. It signs in with a fingerprint, face or screen lock — no code needed.",
+            "If that was you, there's nothing to do.",
+          ],
+          after: [IF_NOT_YOU.text.en],
+          actions: { security: "Review your passkeys" },
+          footnote: "You received this because this is the email on your DesiAuction account.",
+        }),
+        removed: layout({
+          subject: "A passkey was removed from your DesiAuction account",
+          preheader: "“{{passkeyName}}” can no longer sign in. If this wasn't you, act now.",
+          heading: "A passkey was removed",
+          paragraphs: [
+            "The passkey “{{passkeyName}}” was removed from your DesiAuction account and can no longer sign in.",
+            "If that was you, there's nothing to do.",
+          ],
+          after: [IF_NOT_YOU.text.en],
+          actions: { security: "Review your passkeys" },
+          footnote: "You received this because this is the email on your DesiAuction account.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        added: layout({
+          subject: "आपके DesiAuction अकाउंट में एक पासकी जोड़ी गई",
+          preheader:
+            "“{{passkeyName}}” अब बिना कोड के साइन इन कर सकती है। अगर यह आपने नहीं किया, तो तुरंत कदम उठाएँ।",
+          heading: "एक पासकी जोड़ी गई",
+          paragraphs: [
+            "आपके DesiAuction अकाउंट में एक नई पासकी, “{{passkeyName}}”, जोड़ी गई है। यह फ़िंगरप्रिंट, चेहरे या स्क्रीन लॉक से साइन इन करती है — कोड की ज़रूरत नहीं।",
+            "अगर यह आपने किया है, तो कुछ करने की ज़रूरत नहीं है।",
+          ],
+          after: [IF_NOT_YOU.text.hi],
+          actions: { security: "अपनी पासकी देखें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि यह आपके DesiAuction अकाउंट का ईमेल है।",
+        }),
+        removed: layout({
+          subject: "आपके DesiAuction अकाउंट से एक पासकी हटाई गई",
+          preheader:
+            "“{{passkeyName}}” अब साइन इन नहीं कर सकती। अगर यह आपने नहीं किया, तो तुरंत कदम उठाएँ।",
+          heading: "एक पासकी हटाई गई",
+          paragraphs: [
+            "पासकी “{{passkeyName}}” आपके DesiAuction अकाउंट से हटा दी गई है और अब साइन इन नहीं कर सकती।",
+            "अगर यह आपने किया है, तो कुछ करने की ज़रूरत नहीं है।",
+          ],
+          after: [IF_NOT_YOU.text.hi],
+          actions: { security: "अपनी पासकी देखें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि यह आपके DesiAuction अकाउंट का ईमेल है।",
+        }),
+      },
+    },
+  },
+};
+
+const NOT_YOUR_REQUEST: LockedBlock = {
+  id: "not-your-request",
+  field: "after",
+  variants: ["requested"],
+  text: {
+    en: `Didn't ask for this? Withdraw it from your account page and write to ${SUPPORT} straight away — somebody may have reached your account.`,
+    hi: `यह आपने नहीं माँगा? अपने अकाउंट पेज से इसे वापस लें और तुरंत ${SUPPORT} पर लिखें — हो सकता है किसी और ने आपके अकाउंट तक पहुँच बना ली हो।`,
+  },
+  why: "A deletion request filed from a stolen session must be stoppable by the owner.",
+};
+
+const ERASURE_FOOTNOTE = {
+  en: "You received this because this is the email on your DesiAuction account.",
+  hi: "आपको यह इसलिए मिला क्योंकि यह आपके DesiAuction अकाउंट का ईमेल है।",
+};
+
+const ERASURE: EmailTemplateSpec = {
+  kind: "security.account_deletion",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "requested", label: "Request received" },
+    { id: "withdrawn", label: "Request withdrawn" },
+    { id: "declined", label: "Request declined" },
+    { id: "completed", label: "Account deleted" },
+  ],
+  actions: [
+    { id: "account", description: "The account page, where the request can be seen or withdrawn." },
+  ],
+  variables: [
+    NAME,
+    text(
+      "reasonLine",
+      "Why it was declined, in the privacy desk's words. Empty otherwise.",
+      "You're the only owner of Malad Cricket Club — appoint another owner first.",
+      "You're the only owner of Malad Cricket Club — appoint another owner first.",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [NOT_YOUR_REQUEST],
+  note: "The last mail, “deleted”, goes to the address the account had, a moment before it is removed.",
+  defaults: {
+    en: {
+      variants: {
+        requested: layout({
+          subject: "We've received your request to delete your DesiAuction account",
+          preheader: "A person reviews every request. We reply within seven days.",
+          heading: "Your deletion request is in",
+          paragraphs: [
+            "Hi {{name}},",
+            "We've received your request to delete your DesiAuction account. A person on our team reviews every request, and we reply within seven days.",
+            "When it's deleted, your profile, sign-in devices and photo go, and your name, number and email are removed from every club you're in. Your registrations, bids and receipts stay in those clubs' records, without your name.",
+          ],
+          after: [
+            "Changed your mind? Withdraw the request from your account page any time before we act on it.",
+            NOT_YOUR_REQUEST.text.en,
+          ],
+          actions: { account: "See your request" },
+          footnote: ERASURE_FOOTNOTE.en,
+        }),
+        withdrawn: layout({
+          subject: "Your DesiAuction account stays — request withdrawn",
+          preheader: "Nothing has been deleted.",
+          heading: "Your account stays",
+          paragraphs: [
+            "Hi {{name}},",
+            "You withdrew your request to delete your DesiAuction account, so nothing has been deleted. You can ask again any time from your account page.",
+          ],
+          actions: { account: "Open your account" },
+          footnote: ERASURE_FOOTNOTE.en,
+        }),
+        declined: layout({
+          subject: "We couldn't delete your DesiAuction account yet",
+          preheader: "Here's why, and what to do next.",
+          heading: "We couldn't delete your account yet",
+          paragraphs: [
+            "Hi {{name}},",
+            "We looked at your request to delete your DesiAuction account and couldn't go ahead just now.",
+          ],
+          after: [
+            "{{reasonLine}}",
+            `Once that's sorted, you can ask again from your account page. Questions? Write to ${SUPPORT}.`,
+          ],
+          actions: { account: "Open your account" },
+          footnote: ERASURE_FOOTNOTE.en,
+        }),
+        completed: layout({
+          subject: "Your DesiAuction account has been deleted",
+          preheader: "As you asked. This is the last email we'll send to this address.",
+          heading: "Your account has been deleted",
+          paragraphs: [
+            "As you asked, we've deleted your DesiAuction account. Your profile, sign-in devices and photo are gone, and your name, number and email have been removed from every club you were in.",
+            "Your registrations, bids and receipts stay in those clubs' records, without your name.",
+          ],
+          after: [
+            `This is the last email we'll send to this address. If you ever want to come back, you're welcome to sign up again. Questions? Write to ${SUPPORT}.`,
+          ],
+          actions: { account: "Get help" },
+          footnote:
+            "You received this because you asked us to delete the account that used this address.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        requested: layout({
+          subject: "आपका DesiAuction अकाउंट हटाने का अनुरोध हमें मिल गया है",
+          preheader: "हर अनुरोध एक व्यक्ति देखता है। हम सात दिन के अंदर जवाब देंगे।",
+          heading: "आपका अनुरोध मिल गया है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "आपका DesiAuction अकाउंट हटाने का अनुरोध हमें मिल गया है। हमारी टीम का एक व्यक्ति हर अनुरोध देखता है, और हम सात दिन के अंदर जवाब देंगे।",
+            "अकाउंट हटने पर आपकी प्रोफ़ाइल, साइन-इन डिवाइस और फ़ोटो हट जाएँगे, और हर क्लब से आपका नाम, नंबर और ईमेल हटा दिया जाएगा। आपके रजिस्ट्रेशन, बोलियाँ और रसीदें उन क्लबों के रिकॉर्ड में आपके नाम के बिना रहेंगी।",
+          ],
+          after: [
+            "मन बदल गया? हमारे कदम उठाने से पहले कभी भी अपने अकाउंट पेज से अनुरोध वापस लें।",
+            NOT_YOUR_REQUEST.text.hi,
+          ],
+          actions: { account: "अपना अनुरोध देखें" },
+          footnote: ERASURE_FOOTNOTE.hi,
+        }),
+        withdrawn: layout({
+          subject: "आपका DesiAuction अकाउंट बना रहेगा — अनुरोध वापस लिया गया",
+          preheader: "कुछ भी हटाया नहीं गया है।",
+          heading: "आपका अकाउंट बना रहेगा",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "आपने अपना DesiAuction अकाउंट हटाने का अनुरोध वापस ले लिया है, इसलिए कुछ भी हटाया नहीं गया है। आप अपने अकाउंट पेज से कभी भी फिर से अनुरोध कर सकते हैं।",
+          ],
+          actions: { account: "अपना अकाउंट खोलें" },
+          footnote: ERASURE_FOOTNOTE.hi,
+        }),
+        declined: layout({
+          subject: "हम अभी आपका DesiAuction अकाउंट नहीं हटा सके",
+          preheader: "वजह और आगे क्या करें, यहाँ है।",
+          heading: "हम अभी आपका अकाउंट नहीं हटा सके",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "हमने आपका DesiAuction अकाउंट हटाने का अनुरोध देखा, लेकिन अभी आगे नहीं बढ़ सके।",
+          ],
+          after: [
+            "{{reasonLine}}",
+            `यह ठीक होने के बाद आप अपने अकाउंट पेज से फिर से अनुरोध कर सकते हैं। कोई सवाल? ${SUPPORT} पर लिखें।`,
+          ],
+          actions: { account: "अपना अकाउंट खोलें" },
+          footnote: ERASURE_FOOTNOTE.hi,
+        }),
+        completed: layout({
+          subject: "आपका DesiAuction अकाउंट हटा दिया गया है",
+          preheader: "जैसा आपने कहा था। इस पते पर यह हमारा आख़िरी ईमेल है।",
+          heading: "आपका अकाउंट हटा दिया गया है",
+          paragraphs: [
+            "जैसा आपने कहा था, हमने आपका DesiAuction अकाउंट हटा दिया है। आपकी प्रोफ़ाइल, साइन-इन डिवाइस और फ़ोटो हट गए हैं, और हर क्लब से आपका नाम, नंबर और ईमेल हटा दिया गया है।",
+            "आपके रजिस्ट्रेशन, बोलियाँ और रसीदें उन क्लबों के रिकॉर्ड में आपके नाम के बिना रहेंगी।",
+          ],
+          after: [
+            `इस पते पर यह हमारा आख़िरी ईमेल है। कभी लौटना चाहें तो फिर से साइन अप करें, आपका स्वागत है। कोई सवाल? ${SUPPORT} पर लिखें।`,
+          ],
+          actions: { account: "मदद लें" },
+          footnote:
+            "आपको यह इसलिए मिला क्योंकि आपने वह अकाउंट हटाने को कहा था जो इस पते से चलता था।",
+        }),
+      },
+    },
+  },
+};
+
+// --- The season's pass (email programme PR15) -----------------------------------
+
+const PASS_NAME = text(
+  "passName",
+  "The pass asked for or given (“Pro Pass”).",
+  "Pro Pass",
+  "Pro Pass",
+  {
+    computed: true,
+  },
+);
+const CURRENT_PASS = text(
+  "currentPass",
+  "The pass the season is on now (“Free”).",
+  "Free",
+  "Free",
+  {
+    computed: true,
+  },
+);
+const PASS_RUN_FOOTNOTE = {
+  en: "You received this because you run {{season}} on DesiAuction.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+};
+
+const PLAN_REQUESTED: EmailTemplateSpec = {
+  kind: "plan.requested",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "season", description: "The season's overview, where the pass card is." }],
+  variables: [NAME, SEASON, PASS_NAME, CURRENT_PASS],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "We've got your {{passName}} request for {{season}}",
+        preheader: "A person on our team answers every request. We'll email you the answer.",
+        heading: "Your pass request is in",
+        paragraphs: [
+          "Hi {{name}},",
+          "You asked to move {{season}} from {{currentPass}} to {{passName}}. A person on our team answers every request, and we'll email you as soon as it's decided.",
+        ],
+        after: [
+          "Nothing changes until then: the season keeps running on {{currentPass}}, and nothing is charged.",
+        ],
+        actions: { season: "Open the season" },
+        footnote: PASS_RUN_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} के लिए आपका {{passName}} अनुरोध हमें मिल गया है",
+        preheader: "हर अनुरोध हमारी टीम का एक व्यक्ति देखता है। जवाब हम ईमेल करेंगे।",
+        heading: "आपका पास अनुरोध मिल गया है",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "आपने {{season}} को {{currentPass}} से {{passName}} पर ले जाने का अनुरोध किया है। हर अनुरोध हमारी टीम का एक व्यक्ति देखता है, और फ़ैसला होते ही हम आपको ईमेल करेंगे।",
+        ],
+        after: [
+          "तब तक कुछ नहीं बदलेगा: सीज़न {{currentPass}} पर चलता रहेगा, और कोई पैसा नहीं लिया जाएगा।",
+        ],
+        actions: { season: "सीज़न खोलें" },
+        footnote: PASS_RUN_FOOTNOTE.hi,
+      }),
+    ),
+  },
+};
+
+const PLAN_ANSWERED: EmailTemplateSpec = {
+  kind: "plan.answered",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "granted", label: "Granted" },
+    { id: "declined", label: "Declined" },
+  ],
+  actions: [{ id: "season", description: "The season's overview, where the pass card is." }],
+  variables: [
+    NAME,
+    SEASON,
+    PASS_NAME,
+    CURRENT_PASS,
+    text(
+      "noteLine",
+      "The operator's note, when they wrote one. Empty otherwise.",
+      "Our note: “Happy to help — tell us if you need more.”",
+      "हमारा नोट: “Happy to help — tell us if you need more.”",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  note: "The new limits (teams, players) are written by the code from the pass itself.",
+  defaults: {
+    en: {
+      variants: {
+        granted: layout({
+          subject: "{{season}} is now on {{passName}}",
+          preheader: "Your request was granted. Here's what the season can hold now.",
+          heading: "{{season}} is on {{passName}}",
+          paragraphs: [
+            "Hi {{name}},",
+            "Your request was granted: {{season}} has moved from {{currentPass}} to {{passName}}, starting now. Here's what it can hold:",
+          ],
+          after: ["{{noteLine}}"],
+          actions: { season: "Open the season" },
+          footnote: PASS_RUN_FOOTNOTE.en,
+        }),
+        declined: layout({
+          subject: "Your {{passName}} request for {{season}}",
+          preheader: "We couldn't grant it this time. The season stays on {{currentPass}}.",
+          heading: "We couldn't grant this request",
+          paragraphs: [
+            "Hi {{name}},",
+            "We couldn't move {{season}} to {{passName}} this time, so it stays on {{currentPass}}. Everything already in the season stays as it is.",
+          ],
+          after: [
+            "{{noteLine}}",
+            `Want to talk it through? Reply to ${SUPPORT} and a person will get back to you.`,
+          ],
+          actions: { season: "Open the season" },
+          footnote: PASS_RUN_FOOTNOTE.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        granted: layout({
+          subject: "{{season}} अब {{passName}} पर है",
+          preheader: "आपका अनुरोध मंज़ूर हो गया। अब सीज़न में इतना आ सकता है।",
+          heading: "{{season}} {{passName}} पर है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "आपका अनुरोध मंज़ूर हो गया: {{season}} अब {{currentPass}} से {{passName}} पर है, अभी से। अब इसमें इतना आ सकता है:",
+          ],
+          after: ["{{noteLine}}"],
+          actions: { season: "सीज़न खोलें" },
+          footnote: PASS_RUN_FOOTNOTE.hi,
+        }),
+        declined: layout({
+          subject: "{{season}} के लिए आपका {{passName}} अनुरोध",
+          preheader: "इस बार हम इसे मंज़ूर नहीं कर सके। सीज़न {{currentPass}} पर रहेगा।",
+          heading: "हम यह अनुरोध मंज़ूर नहीं कर सके",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "इस बार हम {{season}} को {{passName}} पर नहीं ले जा सके, इसलिए यह {{currentPass}} पर ही रहेगा। सीज़न में जो कुछ है, वह वैसा ही रहेगा।",
+          ],
+          after: [
+            "{{noteLine}}",
+            `इस पर बात करनी है? ${SUPPORT} पर लिखें, हमारी टीम का एक व्यक्ति आपसे संपर्क करेगा।`,
+          ],
+          actions: { season: "सीज़न खोलें" },
+          footnote: PASS_RUN_FOOTNOTE.hi,
+        }),
+      },
+    },
   },
 };
 
@@ -1402,6 +2314,130 @@ const CLUB_WELCOME: EmailTemplateSpec = {
         ],
         actions: { club: "अपना क्लब खोलें" },
         footnote: "आपको यह इसलिए मिला क्योंकि आपने DesiAuction पर {{orgName}} बनाया।",
+      }),
+    ),
+  },
+};
+
+// --- Club invitations (email programme PR13) --------------------------------------
+
+const CLUB_LINK_ONLY_YOURS: LockedBlock = {
+  id: "club-link-only-yours",
+  field: "after",
+  text: {
+    en: "This link is yours alone. Whoever opens it joins the club, so please don't forward it. It works once, for 7 days.",
+    hi: "यह लिंक सिर्फ़ आपके लिए है। जो भी इसे खोलेगा वह क्लब में जुड़ जाएगा, इसलिए इसे आगे न भेजें। यह एक बार, 7 दिन तक चलेगा।",
+  },
+  why: "The invitation link IS the access: the reader must be told not to pass it on.",
+};
+const ROLE_NAME = text(
+  "roleName",
+  "The access the link gives (“staff”, “a member”).",
+  "staff",
+  "स्टाफ़",
+  {
+    computed: true,
+  },
+);
+const ROLE_LINE = text(
+  "roleLine",
+  "What that access lets them do, written by DesiAuction.",
+  "As staff you can run seasons, teams, registrations and matches — not the money or who has access.",
+  "स्टाफ़ के तौर पर आप सीज़न, टीमें, रजिस्ट्रेशन और मैच चला सकते हैं — पैसे या एक्सेस नहीं।",
+  { computed: true },
+);
+
+const CLUB_INVITE: EmailTemplateSpec = {
+  kind: "club.invite",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "accept", description: "The one-time link that joins the club." }],
+  variables: [ORG, INVITER, ROLE_NAME, ROLE_LINE],
+  locked: [CLUB_LINK_ONLY_YOURS],
+  note: "Sent directly, never queued: the link is the access itself.",
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{inviterName}} invited you to join {{orgName}} on DesiAuction",
+        preheader: "Join as {{roleName}} — the link works once, for 7 days.",
+        heading: "Join {{orgName}}",
+        paragraphs: [
+          "Hi,",
+          "{{inviterName}} has invited you to help run {{orgName}} on DesiAuction, as {{roleName}}.",
+          "{{roleLine}}",
+        ],
+        after: [CLUB_LINK_ONLY_YOURS.text.en],
+        actions: { accept: "Join {{orgName}}" },
+        footnote: "You received this because {{inviterName}} entered this address to invite you.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{inviterName}} ने आपको DesiAuction पर {{orgName}} से जुड़ने के लिए बुलाया है",
+        preheader: "{{roleName}} के रूप में जुड़ें — लिंक एक बार, 7 दिन तक चलेगा।",
+        heading: "{{orgName}} से जुड़ें",
+        paragraphs: [
+          "नमस्ते,",
+          "{{inviterName}} ने आपको DesiAuction पर {{orgName}} चलाने में मदद के लिए {{roleName}} के रूप में बुलाया है।",
+          "{{roleLine}}",
+        ],
+        after: [CLUB_LINK_ONLY_YOURS.text.hi],
+        actions: { accept: "{{orgName}} से जुड़ें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि {{inviterName}} ने आपको बुलाने के लिए यह पता डाला।",
+      }),
+    ),
+  },
+};
+
+const CLUB_MEMBER_JOINED: EmailTemplateSpec = {
+  kind: "club.member_joined",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "members", description: "The club's members, where access can be changed." }],
+  variables: [
+    NAME,
+    ORG,
+    text("memberName", "Who joined, as they gave their name.", "Rahul Mehta", "राहुल मेहता"),
+    ROLE_NAME,
+  ],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{memberName}} joined {{orgName}} as {{roleName}}",
+        preheader: "They used an invite link. You can change their access any time.",
+        heading: "{{memberName}} joined {{orgName}}",
+        paragraphs: [
+          "Hi {{name}},",
+          "{{memberName}} used an invite link and joined {{orgName}} as {{roleName}}.",
+        ],
+        after: [
+          "Not someone you expected? Remove them from the members page — their access ends at once.",
+        ],
+        actions: { members: "See the members" },
+        footnote: "You received this because you sent the invite or own {{orgName}}.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{memberName}} {{roleName}} के रूप में {{orgName}} से जुड़े",
+        preheader: "उन्होंने इनवाइट लिंक इस्तेमाल किया। आप कभी भी उनका एक्सेस बदल सकते हैं।",
+        heading: "{{memberName}} {{orgName}} से जुड़े",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{memberName}} ने इनवाइट लिंक से {{orgName}} जॉइन किया है, {{roleName}} के रूप में।",
+        ],
+        after: [
+          "क्या आप इनकी उम्मीद नहीं कर रहे थे? उन्हें मेंबर्स पेज से हटा दें — उनका एक्सेस तुरंत ख़त्म हो जाएगा।",
+        ],
+        actions: { members: "मेंबर्स देखें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि आपने इनवाइट भेजा या आप {{orgName}} के मालिक हैं।",
       }),
     ),
   },
@@ -2125,12 +3161,38 @@ const STAFF_REVIEW = staff(
   ],
 );
 
+const STAFF_PASS = staff(
+  "staff.pass_request",
+  "[Pass] {{season}} asks for {{passName}}",
+  [
+    "{{season}} ({{orgName}}) asks to move from {{currentPass}} to {{passName}}.",
+    "Asked by: {{requesterLine}}",
+    "Their note:\n{{noteText}}",
+    "Answer it: {{deskUrl}}",
+  ],
+  [
+    ["season", "The season.", "Malad Premier League 2026"],
+    ["orgName", "Its club.", "Malad Cricket Club"],
+    ["currentPass", "The pass it is on.", "Free"],
+    ["passName", "The pass it asks for.", "Pro Pass"],
+    [
+      "requesterLine",
+      "Who asked, and their email when we have one.",
+      "Priya Shah · priya@example.com",
+    ],
+    ["noteText", "What they wrote, or that they wrote nothing.", "(nothing written)"],
+    ["deskUrl", "The passes desk.", "https://desiauction.in/admin/passes"],
+  ],
+);
+
 // --- The registry --------------------------------------------------------------------
 
 export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTemplateSpec>> = {
   "auth.email_code": EMAIL_CODE,
   "security.phone_changed": PHONE_CHANGED,
   "security.email_changed": EMAIL_CHANGED,
+  "security.passkey_changed": PASSKEY_CHANGED,
+  "security.account_deletion": ERASURE,
   "registration.received": RECEIVED,
   "registration.approved": decision("registration.approved", {
     en: {
@@ -2229,6 +3291,10 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
     },
   }),
   "club.welcome": CLUB_WELCOME,
+  "club.invite": CLUB_INVITE,
+  "club.member_joined": CLUB_MEMBER_JOINED,
+  "plan.requested": PLAN_REQUESTED,
+  "plan.answered": PLAN_ANSWERED,
   "registration.first": REGISTRATION_FIRST,
   "registration.digest": REGISTRATION_DIGEST,
   "season.held": SEASON_HELD,
@@ -2244,6 +3310,10 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "team.appointed": APPOINTED,
   "team.squad_sheet": SQUAD_SHEET,
   "lineup.announced": LINEUP,
+  "schedule.published": SCHEDULE_PUBLISHED,
+  "fixture.changed": FIXTURE_CHANGED,
+  "match.day": MATCH_DAY,
+  "season.champion": SEASON_CHAMPION,
   "finance.document.issued": FINANCE,
   "review.platform_ask": PLATFORM_ASK,
   "review.season_ask": SEASON_ASK,
@@ -2255,6 +3325,7 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "staff.demo_request": STAFF_DEMO,
   "staff.problem_report": STAFF_REPORT,
   "staff.review_arrived": STAFF_REVIEW,
+  "staff.pass_request": STAFF_PASS,
 };
 
 export function emailTemplateOf(kind: EmailNotificationKind): EmailTemplateSpec {

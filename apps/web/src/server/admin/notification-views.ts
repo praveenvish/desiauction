@@ -191,7 +191,11 @@ const GROUPS: readonly { key: string; label: string; topics: readonly Notificati
   { key: "access", label: "Sign-in and security", topics: ["login", "security"] },
   { key: "registration", label: "Registration", topics: ["registration"] },
   { key: "auction", label: "Auction and team", topics: ["auction"] },
+  { key: "matches", label: "Matches", topics: ["matches"] },
   { key: "money", label: "Money", topics: ["money"] },
+  // The organizer's own club (email programme PR5) — missing until PR11, so
+  // the welcome, the first registration and the 9 am digest had no row.
+  { key: "club", label: "Organizers' club", topics: ["club"] },
   { key: "feedback", label: "Feedback requests", topics: ["feedback"] },
   { key: "outside", label: "Demos and support", topics: ["demo", "support"] },
   { key: "staff", label: "To our own team", topics: ["staff"] },

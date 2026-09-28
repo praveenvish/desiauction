@@ -12,15 +12,20 @@ import {
 } from "@desiauction/core";
 import { organizations, withTenantDb, type Db } from "@desiauction/db";
 import { eq } from "drizzle-orm";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
+import { logger } from "../logger";
 import { can } from "../orgs/authz";
 import { orgsFor } from "../orgs/orgs";
 import { acrossOrgs, asPerson } from "../tenant";
 import { resolveMemberCompetition } from "./resolve";
+import { notifyFixtureChanged, notifySchedulePublished } from "./fixture-notify";
+import { announceChampion, finaleState, type FinaleState } from "./season-finale";
+import { fixtureSnapshot } from "./fixtures";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
   isResultOutcome,
@@ -118,6 +123,26 @@ function inCompetitionOrg<T>(
   fn: (db: Db) => Promise<T>,
 ): Promise<T> {
   return withTenantDb(dbHandle, { personId, orgId: competition.orgId }, fn);
+}
+
+/**
+ * Tell a team about its matches after the response (email programme PR11).
+ * Best effort: the fixture is saved whatever becomes of the notice, and a
+ * failure is logged, never shown to the organizer as their action failing.
+ */
+function afterNotify(
+  personId: string,
+  competition: { id: string; orgId: string },
+  what: string,
+  fn: (db: Db) => Promise<unknown>,
+): void {
+  after(async () => {
+    try {
+      await inCompetitionOrg(personId, competition, fn);
+    } catch (error) {
+      logger().warn({ err: error, competitionId: competition.id }, what);
+    }
+  });
 }
 
 /** Resolve competition + require fixture.manage — every fixture mutation's gate. */
@@ -551,15 +576,50 @@ export async function fixtureLifecycleAction(
     return { ok: false, error: gate.error };
   }
   const { competition, personId } = gate;
-  const result: FixtureMutationResult = await inCompetitionOrg(personId, competition, (db) =>
-    ({
+  const { result, before } = await inCompetitionOrg(personId, competition, async (db) => {
+    // What the match was, for a notice: a published match called off is news.
+    const before = action === "cancel" ? await fixtureSnapshot(db, fixtureId) : null;
+    const result: FixtureMutationResult = await {
       schedule: () => scheduleFixture(db, competition, fixtureId, personId),
       publish: () => publishFixture(db, competition, fixtureId, personId),
       start: () => startFixture(db, competition, fixtureId, personId),
       complete: () => completeFixture(db, competition, fixtureId, personId),
       cancel: () => cancelFixture(db, competition, fixtureId, personId, cancelReason),
-    })[action](),
-  );
+    }[action]();
+    return { result, before };
+  });
+  if (result.ok && action === "publish") {
+    afterNotify(personId, competition, "fixture.schedule_notice_failed", async (db) => {
+      const published = await fixtureSnapshot(db, fixtureId);
+      const teamIds = [published?.homeTeamId, published?.awayTeamId].filter(
+        (id): id is string => typeof id === "string",
+      );
+      // A lobby's squads are found by the notice itself; a duel names its two.
+      return notifySchedulePublished(db, {
+        competitionId: competition.id,
+        ...(teamIds.length > 0 ? { teamIds } : {}),
+      });
+    });
+  }
+  if (
+    result.ok &&
+    action === "cancel" &&
+    before !== null &&
+    before.status === "published" &&
+    before.kickoffAt !== null
+  ) {
+    const previousKickoff = before.kickoffAt;
+    afterNotify(personId, competition, "fixture.change_notice_failed", (db) =>
+      notifyFixtureChanged(db, {
+        competitionId: competition.id,
+        fixtureId,
+        change: "cancelled",
+        previousKickoff,
+        previousGround: before.groundName ?? before.venueName,
+        reason: cancelReason?.trim() || null,
+      }),
+    );
+  }
   return result.ok ? { ok: true } : { ok: false, error: mutationError(result) };
 }
 
@@ -587,9 +647,30 @@ export async function rescheduleFixtureAction(
   if (!gate.ok) {
     return { ok: false, error: gate.error };
   }
-  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
-    rescheduleFixture(db, gate.competition, fixtureId, gate.personId, patch),
-  );
+  const { result, before } = await inCompetitionOrg(gate.personId, gate.competition, async (db) => {
+    const before = await fixtureSnapshot(db, fixtureId);
+    const result = await rescheduleFixture(db, gate.competition, fixtureId, gate.personId, patch);
+    return { result, before };
+  });
+  // Only a PUBLISHED match was ever told to anyone; a scheduled one moving is
+  // the organizer's draft.
+  if (result.ok && before !== null && before.status === "published" && before.kickoffAt !== null) {
+    const previousKickoff = before.kickoffAt;
+    afterNotify(gate.personId, gate.competition, "fixture.change_notice_failed", async (db) => {
+      const now = await fixtureSnapshot(db, fixtureId);
+      if (now === null || (now.kickoffAt === previousKickoff && now.groundId === before.groundId)) {
+        return null;
+      }
+      return notifyFixtureChanged(db, {
+        competitionId: gate.competition.id,
+        fixtureId,
+        change: "moved",
+        previousKickoff,
+        previousGround: before.groundName ?? before.venueName,
+        reason: null,
+      });
+    });
+  }
   return result.ok ? { ok: true } : { ok: false, error: mutationError(result) };
 }
 
@@ -626,6 +707,11 @@ export async function publishAllAction(slug: string): Promise<BulkFixtureResult>
   const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     publishAllScheduled(db, gate.competition, gate.personId),
   );
+  if (result.applied > 0) {
+    afterNotify(gate.personId, gate.competition, "fixture.schedule_notice_failed", (db) =>
+      notifySchedulePublished(db, { competitionId: gate.competition.id }),
+    );
+  }
   return { ok: true, ...result };
 }
 
@@ -1318,4 +1404,49 @@ export async function recordLobbyResultAction(
   revalidatePath(`/seasons/${slug}/fixtures`);
   revalidatePath(`/seasons/${slug}/standings`);
   return { ok: true, amended: result.amended };
+}
+
+/**
+ * The season's end (email programme PR12): the final table and whether a
+ * champion was named — for the people who run the season, and only once every
+ * match is done or a champion is already named. Null otherwise.
+ */
+export async function finaleView(slug: string): Promise<FinaleState | null> {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
+    return null;
+  }
+  const state = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    finaleState(db, gate.competition.id),
+  );
+  return state.matchesDone || state.announced !== null ? state : null;
+}
+
+/** Name the champion and tell every team — once. */
+export async function announceChampionAction(
+  slug: string,
+  teamId: string,
+): Promise<{ ok: boolean; told?: number; error?: string }> {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    announceChampion(db, {
+      competitionId: gate.competition.id,
+      teamId,
+      actorId: gate.personId,
+    }),
+  );
+  if (!result.ok) {
+    const message = {
+      not_done: "Every match has to be played or called off first.",
+      not_a_team: "That team isn't in this season.",
+      already: "The champion has already been announced.",
+      not_found: "Not available.",
+    } as const;
+    return { ok: false, error: message[result.reason] };
+  }
+  revalidatePath(`/seasons/${slug}`);
+  return { ok: true, told: result.told };
 }

@@ -10,6 +10,7 @@ import {
   registrations,
   type Db,
 } from "@desiauction/db";
+import type { Tier } from "@desiauction/core";
 import { messageLanguagesOf } from "@desiauction/messaging/language";
 import { and, count, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
@@ -26,6 +27,10 @@ import {
 } from "../messaging/organizer-mail";
 import { drainOutbox, enqueueMail, type QueuedMail } from "../messaging/outbox";
 import { ownersReadyMail } from "../messaging/owner-mail";
+import { memberJoinedMail } from "../messaging/club-mail";
+import { passAnsweredMail, passRequestedMail, staffPassRequestMail } from "../messaging/plan-mail";
+import { sendNotificationMail } from "../messaging/notify";
+import { SUPPORT_EMAIL } from "../messaging/email-layout";
 import type { NotificationKind } from "../messaging/catalogue";
 import type { TransactionalMailer } from "../messaging/transactional-mail";
 import { holdersOf } from "./orgs";
@@ -338,4 +343,186 @@ export async function notifyOwnerJoined(
     }
   }
   return { ready: true };
+}
+
+/**
+ * SOMEBODY USED A CLUB INVITE LINK (email programme PR13). Whoever minted the
+ * link, and the club's owners, hear who now has access and what kind — by
+ * email and in the inbox — because a link that reached the wrong person is
+ * only ever noticed this way. Once per invitation (keyed by the invite).
+ */
+export async function notifyMemberJoined(
+  db: Db,
+  input: {
+    inviteId: string;
+    orgId: string;
+    orgName: string;
+    orgSlug: string;
+    memberId: string;
+    invitedBy: string;
+    capabilitySet: string;
+  },
+  channels: OrganizerNoticeChannels = {},
+): Promise<number> {
+  const owners = await holdersOf(db, input.orgId, "org:owner");
+  // Never the new member themselves — an owner invite makes them an owner.
+  const told = [...new Set([input.invitedBy, ...owners])].filter((id) => id !== input.memberId);
+  if (told.length === 0) {
+    return 0;
+  }
+  const memberName = (await namesOf(db, [input.memberId])).get(input.memberId) ?? "Someone";
+  const mails = await forEachOrganizer(
+    db,
+    told,
+    {
+      orgId: input.orgId,
+      kind: "club.member_joined",
+      key: (personId) => `club.member_joined:${input.inviteId}:${personId}`,
+    },
+    (name, language) =>
+      memberJoinedMail(
+        {
+          name,
+          orgName: input.orgName,
+          orgSlug: input.orgSlug,
+          memberName,
+          capabilitySet: input.capabilitySet,
+        },
+        language,
+      ),
+  );
+  const fresh = await deliver(mails, channels);
+  if (fresh.length > 0) {
+    for (const personId of told) {
+      try {
+        await logSecurityEvent(personId, "club.member_joined", { member: memberName });
+      } catch (error) {
+        logger().warn({ err: error }, "organizer_inbox.write_failed");
+      }
+    }
+  }
+  return fresh.length;
+}
+
+/**
+ * A SEASON ASKED FOR A BIGGER PASS (email programme PR15). The organizer who
+ * asked hears we have it — nothing changes and nothing is charged until a
+ * person answers — and the support mailbox hears there is one to answer,
+ * because until now a request sat on /admin/passes until somebody looked.
+ */
+export async function notifyPassRequested(
+  db: Db,
+  input: {
+    competitionId: string;
+    requestId: string;
+    requestedBy: string;
+    fromTier: Tier;
+    requestedTier: Tier;
+    note: string | null;
+  },
+  channels: OrganizerNoticeChannels = {},
+): Promise<void> {
+  const season = await seasonOf(db, input.competitionId);
+  if (season === null) {
+    return;
+  }
+  const mails = await forEachOrganizer(
+    db,
+    [input.requestedBy],
+    {
+      orgId: season.orgId,
+      kind: "plan.requested",
+      key: (personId) => `plan.requested:${input.requestId}:${personId}`,
+    },
+    (name, language) =>
+      passRequestedMail(
+        { ...season, name, fromTier: input.fromTier, requestedTier: input.requestedTier },
+        language,
+      ),
+  );
+  await deliver(mails, channels);
+  const [requester] = await db
+    .select({ name: people.name, email: people.email })
+    .from(people)
+    .where(eq(people.id, input.requestedBy))
+    .limit(1);
+  try {
+    await sendNotificationMail(
+      db,
+      { kind: "staff.pass_request", to: SUPPORT_EMAIL },
+      await staffPassRequestMail({
+        season: season.season,
+        orgName: season.orgName,
+        fromTier: input.fromTier,
+        requestedTier: input.requestedTier,
+        requesterName: requester?.name?.trim() || "An organizer",
+        requesterEmail: requester?.email ?? null,
+        note: input.note,
+      }),
+      channels.mailer,
+    );
+  } catch (error) {
+    logger().warn({ err: error }, "staff.pass_request_failed");
+  }
+}
+
+/**
+ * A PASS REQUEST WAS ANSWERED. Whoever asked, and the club's owners, hear it —
+ * granted with what the season can hold now, or declined with the note — by
+ * email and in the inbox. Once per request.
+ */
+export async function notifyPassAnswered(
+  db: Db,
+  input: {
+    competitionId: string;
+    requestId: string;
+    requestedBy: string;
+    outcome: "granted" | "declined";
+    fromTier: Tier;
+    passTier: Tier;
+    note: string | null;
+  },
+  channels: OrganizerNoticeChannels = {},
+): Promise<number> {
+  const season = await seasonOf(db, input.competitionId);
+  if (season === null) {
+    return 0;
+  }
+  const owners = await holdersOf(db, season.orgId, "org:owner");
+  const told = [...new Set([input.requestedBy, ...owners])];
+  const mails = await forEachOrganizer(
+    db,
+    told,
+    {
+      orgId: season.orgId,
+      kind: "plan.answered",
+      key: (personId) => `plan.answered:${input.requestId}:${personId}`,
+    },
+    (name, language) =>
+      passAnsweredMail(
+        {
+          ...season,
+          name,
+          outcome: input.outcome,
+          fromTier: input.fromTier,
+          passTier: input.passTier,
+          note: input.note,
+        },
+        language,
+      ),
+  );
+  const fresh = await deliver(mails, channels);
+  if (fresh.length > 0) {
+    for (const personId of told) {
+      try {
+        await logSecurityEvent(personId, "plan.answered", {
+          competitionId: input.competitionId,
+          outcome: input.outcome,
+        });
+      } catch (error) {
+        logger().warn({ err: error }, "organizer_inbox.write_failed");
+      }
+    }
+  }
+  return fresh.length;
 }

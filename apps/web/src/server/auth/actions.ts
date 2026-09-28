@@ -8,6 +8,7 @@ import type {
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -31,6 +32,7 @@ import { maskEmail, notifyEmailChanged, notifyPhoneChangedByEmail } from "./emai
 import { MailSendError } from "./email-sender";
 import { sendSignInCodeMail } from "../messaging/notify";
 import { currentRequestContext, type RequestContext } from "../messaging/request-context";
+import { notifyPasskeyChanged } from "./account-notices";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
 import { logger } from "../logger";
@@ -566,6 +568,19 @@ export async function finishPasskeyEnrollmentAction(
   }
   try {
     const result = await finishEnrollment(db, session.personId, challenge, response, named);
+    if (result.ok) {
+      // Warn the account's email (PR14): a passkey signs in with no code, so
+      // one added from a stolen session is a key the thief keeps.
+      const context = await currentRequestContext();
+      after(() =>
+        notifyPasskeyChanged(db, {
+          personId: session.personId,
+          change: "added",
+          passkeyName: named.slice(0, 60),
+          context,
+        }).then(() => undefined),
+      );
+    }
     return result.ok ? { ok: true } : { ok: false, error: "That passkey couldn't be verified." };
   } catch {
     return { ok: false, error: "We couldn't save that passkey. Try again." };
@@ -653,10 +668,23 @@ export async function removePasskeyAction(passkeyId: string): Promise<ActionResu
   if (!signedInRecently(session)) {
     return { ok: false, error: SIGN_IN_AGAIN };
   }
+  let removed: string | null;
   try {
-    await removePasskey(db, session.personId, passkeyId);
+    removed = await removePasskey(db, session.personId, passkeyId);
   } catch {
     return { ok: false, error: "We couldn't remove that passkey. Try again." };
+  }
+  if (removed !== null) {
+    const context = await currentRequestContext();
+    const passkeyName = removed;
+    after(() =>
+      notifyPasskeyChanged(db, {
+        personId: session.personId,
+        change: "removed",
+        passkeyName,
+        context,
+      }).then(() => undefined),
+    );
   }
   return { ok: true };
 }

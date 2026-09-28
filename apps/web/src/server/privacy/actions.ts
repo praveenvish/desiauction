@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
+import { notifyAccountDeletion } from "../auth/account-notices";
 import { currentSession } from "../auth/actions";
 import { logSecurityEvent } from "../auth/security-events";
 import { logger } from "../logger";
@@ -55,6 +57,14 @@ export async function requestErasureAction(
       // The request is the fact; the ledger line is a courtesy to the person.
       logger().error({ err: error }, "privacy.erasure_request_ledger_failed");
     }
+    // By email too (PR14): a request filed from a stolen session has to reach
+    // the owner, who can withdraw it before the desk acts.
+    const personId = session.personId;
+    after(() =>
+      asPerson(personId, (db) => notifyAccountDeletion(db, { personId, stage: "requested" })).then(
+        () => undefined,
+      ),
+    );
   }
   revalidatePath("/account");
   return { filed: true };
@@ -72,6 +82,12 @@ export async function withdrawErasureAction(): Promise<{ ok: boolean }> {
     } catch (error) {
       logger().error({ err: error }, "privacy.erasure_withdraw_ledger_failed");
     }
+    const personId = session.personId;
+    after(() =>
+      asPerson(personId, (db) => notifyAccountDeletion(db, { personId, stage: "withdrawn" })).then(
+        () => undefined,
+      ),
+    );
     revalidatePath("/account");
   }
   return { ok: withdrawn };
