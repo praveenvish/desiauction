@@ -1,21 +1,5 @@
-import {
-  ButtonLink,
-  IconAlert,
-  IconCalendar,
-  IconCheck,
-  IconClose,
-  IconFlag,
-  IconTile,
-  IconLayers,
-  IconPin,
-  IconUser,
-  IconUsers,
-  Pill,
-  SectionCard,
-  type KitTone,
-} from "@desiauction/ui";
+import { ButtonLink, IconAlert, IconCheck, Pill, type KitTone } from "@desiauction/ui";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 
 import { auctionDashboard } from "../../../../server/auction/actions";
@@ -62,15 +46,6 @@ const STATUS_WORDS: Record<string, string> = {
  */
 function checkDetail(check: { id: string; detail: string }, status: string): string {
   return check.id === "intake_closed" ? (STATUS_WORDS[status] ?? check.detail) : check.detail;
-}
-
-/**
- * Whether a check's detail adds anything to its label. "Registration is still
- * open — close it to lock the pool" was followed by "Registration is open".
- */
-function detailAdds(check: { id: string; label: string; pass: boolean }, detail: string): boolean {
-  if (check.id === "intake_closed" && !check.pass) return false;
-  return !check.label.toLowerCase().startsWith(detail.toLowerCase());
 }
 
 export default async function ReadinessPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -120,7 +95,12 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
     auction === null || auctionOver ? null : shortfallSentence(auction.feasibility, pending);
   const runningShort = short !== null;
   const fixtureCount = fixtures?.stats.total ?? 0;
-  const published = fixtures?.stats.published ?? 0;
+  // The public record, counted the way the Schedule counts it: a match being
+  // played or already played was published first. "3 of 7 published" on a
+  // season with 3 played and 1 live read as a schedule not yet out.
+  const played = fixtures?.stats.completed ?? 0;
+  const liveMatches = fixtures?.stats.inProgress ?? 0;
+  const published = (fixtures?.stats.published ?? 0) + liveMatches + played;
   const conflicts = (fixtures?.conflicts ?? []).length;
 
   const verdictPill = auctionOver
@@ -153,260 +133,202 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
         ? firstStep.action
         : { label: "Open auction setup", href: `${base}/auction` };
 
+  /*
+   * ONE CHECKLIST (2026-09-28). Every gate was said three times — a numbered
+   * step, a check row and an "area" card ("Close registration" was step 1, a
+   * button and a failed check). Now each gate is one row: its state, its facts
+   * in a line, and its one action. The first gate still to clear is "next".
+   */
+  const firstBlocked =
+    checks.find((check) => !check.pass)?.id ?? (auctionCreated ? null : "auction_created");
+  const stepByKey = new Map(steps.map((step) => [step.key, step]));
+  const factOf = (id: string): string => {
+    switch (id) {
+      case "intake_closed":
+        return regStats === undefined
+          ? checkDetail({ id, detail: "" }, view.competition.status)
+          : `${String(regStats.approved)} approved${pending > 0 ? ` · ${String(pending)} still waiting` : ""}${
+              stepByKey.get(id)?.detail !== undefined &&
+              stepByKey.get(id)?.detail !== null &&
+              pending > 0
+                ? " — approve or decline them, then close. The pool locks when you do."
+                : view.competition.status === "registration_closed"
+                  ? " · the pool is locked"
+                  : ""
+            }`;
+      case "teams_present":
+        return `${String(view.teams.length)} team${view.teams.length === 1 ? "" : "s"} · ${
+          view.teams.length >= 2
+            ? "each gets an owner and a paddle on the night"
+            : "at least two are needed"
+        }`;
+      case "pool_present":
+        return `${String(auction?.feasibility.poolSize ?? 0)} players in the pool`;
+      default:
+        return "";
+    }
+  };
+  const TITLE: Record<string, string> = {
+    intake_closed: "Close registration",
+    teams_present: "Teams",
+    pool_present: "Players in the pool",
+  };
+  const rowState = (pass: boolean, id: string): RowState =>
+    pass ? "pass" : id === firstBlocked ? "next" : "later";
   const checkRows =
     auction === null ? null : (
-      <ul className="rd-checks">
-        {checks.map((check) => (
-          <CheckRow
-            key={check.id}
-            testId={`check-${check.id}`}
-            state={check.pass ? "pass" : "block"}
-            title={check.label}
-            detail={
-              detailAdds(check, checkDetail(check, view.competition.status))
-                ? checkDetail(check, view.competition.status)
-                : null
-            }
-            {...(!check.pass && !auctionOver ? { fix: fixOf(check.id, base) } : {})}
-          />
-        ))}
-        {auctionOver ? null : (
-          <CheckRow
-            testId="check-squads_fillable"
-            state={auction.feasibility.ok ? "pass" : "warn"}
-            title="Pool against squads"
-            detail={
-              auction.feasibility.ok
-                ? auction.feasibility.headline
-                : `${String(auction.feasibility.shortfall)} short — ${String(auction.feasibility.poolSize)} players for ${String(auction.feasibility.needed)} squad places`
-            }
-            {...(auction.feasibility.ok
-              ? {}
-              : { fix: { href: `${base}/auction`, label: "Auction setup" } })}
-          />
-        )}
+      <ol className="rd-list" data-testid="readiness-sections">
+        {checks.map((check) => {
+          const step = stepByKey.get(check.id);
+          return (
+            <CheckRow
+              key={check.id}
+              testId={`check-${check.id}`}
+              state={rowState(check.pass, check.id)}
+              title={TITLE[check.id] ?? check.label}
+              detail={factOf(check.id) || checkDetail(check, view.competition.status)}
+              {...(check.pass
+                ? check.id === "teams_present"
+                  ? { fix: { href: `${base}/teams`, label: "Teams" } }
+                  : {}
+                : { fix: step?.action ?? fixOf(check.id, base) })}
+            />
+          );
+        })}
+        <CheckRow
+          testId="check-squads_fillable"
+          state={auction.feasibility.ok ? "pass" : "warn"}
+          title="Pool against squads"
+          detail={
+            auction.feasibility.ok
+              ? auction.feasibility.headline
+              : `${String(auction.feasibility.shortfall)} short — ${String(auction.feasibility.poolSize)} players for ${String(auction.feasibility.needed)} squad places`
+          }
+          {...(short !== null
+            ? {
+                // The row's facts already say the count; the note says only the ways out.
+                note: short.body.slice(short.body.indexOf("). ") + 3),
+                fix: { href: `${base}/auction`, label: "Auction setup" },
+              }
+            : {})}
+        />
         <CheckRow
           testId="check-auction_created"
-          state={auctionCreated ? "pass" : "block"}
-          title="The auction exists"
-          detail={auctionOver ? "Completed" : auctionCreated ? "Created" : "Not created yet"}
+          state={auctionCreated ? "pass" : rowState(false, "auction_created")}
+          title={auctionCreated ? "The auction exists" : "Create the auction"}
+          detail={
+            auctionLive
+              ? "Live now"
+              : auctionCreated
+                ? "Created — invite the owners, then open the room"
+                : "Set the purse and squad size, then invite the owners"
+          }
           {...(auctionCreated
-            ? {}
+            ? { fix: { href: `${base}/auction`, label: "Auction setup" } }
             : { fix: { href: `${base}/auction`, label: "Create the auction" } })}
         />
-      </ul>
+      </ol>
     );
+
+  if (auctionOver) {
+    const sold = auction?.view?.lotStats.sold ?? 0;
+    const unsold = auction?.view?.lotStats.unsold ?? 0;
+    const facts = [
+      view.competition.name,
+      sold + unsold > 0 ? `${String(sold)} of ${String(sold + unsold)} sold` : null,
+      fixtureCount === 0
+        ? "fixtures come next"
+        : played + liveMatches > 0
+          ? `the season is on — ${String(played)} of ${String(fixtureCount)} matches played${liveMatches > 0 ? `, ${String(liveMatches)} live` : ""}`
+          : `${String(published)} of ${String(fixtureCount)} matches published`,
+    ].filter((part): part is string => part !== null);
+    return (
+      <main className="registrations-dash">
+        <div className="dash-stack">
+          {/* AFTER THE HAMMER THE PAGE STEPS ASIDE: it said "next is the match
+              schedule" on a season three matches in. */}
+          <section
+            className="rd-after"
+            data-testid="readiness-card"
+            aria-labelledby="rd-after-title"
+          >
+            <span className="rd-after-mark" aria-hidden>
+              <IconCheck size={22} />
+            </span>
+            <div className="rd-after-text">
+              <Pill tone="green" dot testId="readiness-verdict">
+                Auction completed
+              </Pill>
+              <h2 id="rd-after-title">Auction night is behind you</h2>
+              <p data-testid="readiness-fixtures">{facts.join(" · ")}</p>
+            </div>
+            <div className="rd-after-go">
+              <ButtonLink
+                href={fixtureCount === 0 ? `${base}/fixtures` : base}
+                size="touch"
+                data-testid="readiness-next"
+              >
+                {fixtureCount === 0 ? "Build fixtures" : "Season overview"}
+              </ButtonLink>
+              <ButtonLink href={`${base}/auction`} variant="secondary" size="touch">
+                Auction results
+              </ButtonLink>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
         <section
           className="rd-verdict"
-          data-tone={auctionOver || auctionLive ? "done" : steps.length === 0 ? "ready" : "todo"}
+          data-tone={auctionLive ? "done" : steps.length === 0 ? "ready" : "todo"}
           aria-labelledby="rd-verdict-title"
           data-testid="readiness-card"
         >
           <div className="rd-verdict-head">
-            <Pill tone={verdictPill.tone} dot testId="readiness-verdict">
-              {verdictPill.label}
-            </Pill>
-            <h2 id="rd-verdict-title">{title}</h2>
-            <p>
-              {auctionOver
-                ? `${view.competition.name} · ${String(fixtureCount)} fixture${fixtureCount === 1 ? "" : "s"}, ${String(published)} published${conflicts > 0 ? ` · ${String(conflicts)} conflict${conflicts === 1 ? "" : "s"}` : ""}`
-                : `${view.competition.name} · ${String(auction?.feasibility.poolSize ?? 0)} players in the pool, ${String(view.teams.length)} team${view.teams.length === 1 ? "" : "s"}`}
-            </p>
-          </div>
-          {steps.length > 0 ? (
-            <ol className="rd-steps" data-testid="readiness-steps">
-              {steps.map((step, index) => (
-                <li key={step.key} data-now={index === 0 || undefined}>
-                  <span className="rd-step-n" aria-hidden>
-                    {index + 1}
-                  </span>
-                  <span className="rd-text">
-                    <strong>{step.label}</strong>
-                    {step.detail === null ? null : <span className="st-note">{step.detail}</span>}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-          {short === null ? null : (
-            <p className="rd-short" data-testid="readiness-short">
-              <IconAlert size={18} aria-hidden />
-              <span>
-                <strong>{short.lead}</strong> {short.body}
-              </span>
-            </p>
-          )}
-          <div className="rd-actions">
+            <div className="rd-verdict-text">
+              <Pill tone={verdictPill.tone} dot testId="readiness-verdict">
+                {verdictPill.label}
+              </Pill>
+              <h2 id="rd-verdict-title">{title}</h2>
+              <p>
+                {`${view.competition.name} · ${String(auction?.feasibility.poolSize ?? 0)} players in the pool · ${String(view.teams.length)} team${view.teams.length === 1 ? "" : "s"}`}
+              </p>
+            </div>
             <ButtonLink href={primary.href} size="touch" data-testid="readiness-next">
               {primary.label}
             </ButtonLink>
-            {firstStep !== undefined && firstStep.action.href !== firstStep.href ? (
-              <ButtonLink href={firstStep.href} variant="secondary" size="touch">
-                {firstStep.label}
-              </ButtonLink>
-            ) : null}
-            {auctionOver ? (
-              <ButtonLink href={`${base}/auction`} variant="secondary" size="touch">
-                See the auction results
-              </ButtonLink>
-            ) : primary.href !== `${base}/auction` ? (
-              <ButtonLink href={`${base}/auction`} variant="secondary" size="touch">
-                Auction setup
-              </ButtonLink>
-            ) : null}
           </div>
-        </section>
-
-        <div className="rd-grid" data-over={auctionOver || undefined}>
-          {auctionOver ? null : (
-            <SectionCard
-              icon={<IconFlag />}
-              tone={steps.length > 0 ? "red" : "green"}
-              title="Checks"
-              description="What the platform looks at before it lets the auction open"
-              data-testid="readiness-auction"
-            >
-              {checkRows ?? (
-                <p className="st-note">Sign-in lacks access to this season&apos;s auction view.</p>
-              )}
-            </SectionCard>
+          {checkRows ?? (
+            <p className="st-note">Sign-in lacks access to this season&apos;s auction view.</p>
           )}
-
-          <div className="rd-prep" data-testid="readiness-sections">
-            {auctionOver ? null : (
-              <SectionCard
-                icon={<IconLayers />}
-                tone="gold"
-                title="For auction night"
-                description="The parts the auction needs"
-              >
-                <ul className="rd-areas">
-                  <Area
-                    testId="readiness-registrations"
-                    icon={<IconUser />}
-                    title="Registrations"
-                    figure={
-                      regStats !== undefined
-                        ? `${String(regStats.approved)} of ${String(regStats.total)}`
-                        : "—"
-                    }
-                    detail={
-                      regStats !== undefined
-                        ? `approved · ${pending > 0 ? `${String(pending)} waiting` : "none waiting"}`
-                        : "No access"
-                    }
-                    attention={pending > 0}
-                    href={`${base}/registrations?status=submitted`}
-                    link="Review queue"
-                  />
-                  <Area
-                    testId="readiness-teams"
-                    icon={<IconUsers />}
-                    title="Teams"
-                    figure={`${String(view.teams.length)} team${view.teams.length === 1 ? "" : "s"}`}
-                    detail={
-                      view.teams.length >= 2
-                        ? "each needs an owner before the night"
-                        : "at least two are needed"
-                    }
-                    attention={view.teams.length < 2}
-                    href={`${base}/teams`}
-                    link="Team workspace"
-                  />
-                </ul>
-              </SectionCard>
-            )}
-
-            <SectionCard
-              icon={<IconCalendar />}
-              tone="gold"
-              title={auctionOver ? "Next: the match schedule" : "After the auction"}
-              description={
-                auctionOver
-                  ? "What the season needs now"
-                  : "Not needed yet — for the match schedule"
-              }
-            >
-              <ul className="rd-areas">
-                <Area
-                  testId="readiness-venues"
-                  icon={<IconPin />}
-                  title="Grounds"
-                  figure={activeGrounds === 0 ? "None yet" : `${String(activeGrounds)} active`}
-                  detail={
-                    venues !== null && venues.venues.length > 0
-                      ? `across ${String(venues.venues.length)} venue${venues.venues.length === 1 ? "" : "s"}`
-                      : "add a venue before building fixtures"
-                  }
-                  attention={auctionOver && activeGrounds === 0}
-                  quiet={!auctionOver && activeGrounds === 0}
-                  {...(org !== null ? { href: `/org/${org.slug}/venues`, link: "Venues" } : {})}
-                />
-                <Area
-                  testId="readiness-fixtures"
-                  icon={<IconCalendar />}
-                  title="Fixtures"
-                  figure={
-                    fixtures === null
-                      ? "—"
-                      : fixtureCount === 0
-                        ? "None yet"
-                        : `${String(published)} of ${String(fixtureCount)} published`
-                  }
-                  detail={
-                    fixtures === null
-                      ? "No access"
-                      : fixtureCount === 0
-                        ? "none published — built once teams are final"
-                        : `${String(fixtures.stats.scheduled)} scheduled · ${conflicts === 0 ? "no conflicts" : `${String(conflicts)} conflict${conflicts === 1 ? "" : "s"}`}`
-                  }
-                  attention={conflicts > 0}
-                  quiet={!auctionOver && fixtureCount === 0}
-                  href={`${base}/fixtures`}
-                  link="Fixtures"
-                />
-              </ul>
-            </SectionCard>
-          </div>
-
-          {auctionOver && checkRows !== null ? (
-            // The night passed every check; the list stays one click away.
-            <details className="rd-record" data-testid="readiness-auction">
-              <summary>
-                <span className="rd-mark" aria-hidden>
-                  <IconCheck size={14} />
-                </span>
-                <span>
-                  <strong>Every auction check passed</strong> — registration closed,{" "}
-                  {String(auction?.feasibility.poolSize ?? 0)} left in the pool, {view.teams.length}{" "}
-                  teams, auction completed.
-                </span>
-                <span className="rd-record-show">Show the checks</span>
-              </summary>
-              {checkRows}
-            </details>
-          ) : null}
-        </div>
+        </section>
+        <p className="rd-after-line" data-testid="readiness-fixtures">
+          {fixtureCount > 0
+            ? `Fixtures: ${String(published)} of ${String(fixtureCount)} published${conflicts > 0 ? ` · ${String(conflicts)} conflict${conflicts === 1 ? "" : "s"}` : ""}${activeGrounds > 0 ? ` · ${String(activeGrounds)} ground${activeGrounds === 1 ? "" : "s"}` : ""} — `
+            : "After the auction: grounds and fixtures — "}
+          {org !== null ? <Link href={`/org/${org.slug}/venues`}>Venues</Link> : null}
+          {org !== null ? " · " : null}
+          <Link href={`${base}/fixtures`}>Fixtures</Link>
+        </p>
       </div>
     </main>
   );
 }
 
-type CheckState = "pass" | "block" | "warn";
+type RowState = "pass" | "next" | "later" | "warn";
 
-const CHECK_ICON: Record<CheckState, ReactNode> = {
-  pass: <IconCheck size={14} />,
-  block: <IconClose size={14} />,
-  warn: <IconAlert size={14} />,
-};
-
-const CHECK_WORD: Record<CheckState, string> = {
+// What a screen reader hears. A gate not yet cleared is "Blocked" whether it
+// is the next one or a later one — the auction cannot open past either (and
+// the organizer journey asserts the word).
+const CHECK_WORD: Record<RowState, string> = {
   pass: "Pass: ",
-  block: "Blocked: ",
+  next: "Blocked: ",
+  later: "Blocked: ",
   warn: "Warning: ",
 };
 
@@ -416,18 +338,25 @@ function CheckRow({
   state,
   title,
   detail,
+  note,
   fix,
 }: {
   testId: string;
-  state: CheckState;
+  state: RowState;
   title: string;
   detail: string | null;
+  /** A consequence said under the facts (the shortfall's ways out). */
+  note?: string;
   fix?: { href: string; label: string };
 }) {
   return (
     <li data-pass={state === "pass"} data-state={state} data-testid={testId}>
       <span className="rd-mark" aria-hidden>
-        {CHECK_ICON[state]}
+        {state === "pass" ? (
+          <IconCheck size={14} />
+        ) : state === "warn" ? (
+          <IconAlert size={14} />
+        ) : null}
       </span>
       <span className="rd-text">
         <strong>{title}</strong>
@@ -435,55 +364,11 @@ function CheckRow({
           <span className="st-sr">{CHECK_WORD[state]}</span>
           {detail}
         </span>
+        {note !== undefined ? <span className="rd-note">{note}</span> : null}
       </span>
       {fix !== undefined ? (
         <Link className="st-link" href={fix.href}>
           {fix.label}
-        </Link>
-      ) : (
-        <span />
-      )}
-    </li>
-  );
-}
-
-/** One area: what it is, a figure with its noun, and where to change it. */
-function Area({
-  testId,
-  icon,
-  title,
-  figure,
-  detail,
-  attention = false,
-  quiet = false,
-  href,
-  link,
-}: {
-  testId: string;
-  icon: ReactNode;
-  title: string;
-  figure: string;
-  detail: string;
-  attention?: boolean;
-  quiet?: boolean;
-  href?: string;
-  link?: string;
-}) {
-  return (
-    <li
-      data-testid={testId}
-      data-attention={attention || undefined}
-      data-quiet={quiet || undefined}
-    >
-      <IconTile icon={icon} tone="neutral" size="sm" />
-      <span className="rd-text">
-        <strong>{title}</strong>
-        <span className="st-note">{detail}</span>
-      </span>
-      <span className="rd-state rd-figure">{figure}</span>
-      {href !== undefined && link !== undefined ? (
-        <Link className="st-link" href={href}>
-          {link}
         </Link>
       ) : (
         <span />
