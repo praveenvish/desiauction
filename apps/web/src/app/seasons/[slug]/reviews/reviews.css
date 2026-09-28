@@ -1,29 +1,7 @@
 /* REVIEWS (page.tsx, review-card.tsx, season-reviews-panel.tsx): the ask
    card, the rating summary, and one card per review. Tokens only. */
 
-.rv-ask-line {
-  margin: 0;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.rv-ask-line strong {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
-.rv-ask-note {
-  margin-top: var(--space-3);
-}
-
 /* ---- Summary + list ---- */
-
-.rv-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
 
 .rv-summary {
   display: flex;
@@ -192,18 +170,214 @@
   }
 }
 
-/* The eligibility rules, one click away. */
-.rv-who > summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-accent);
-  cursor: pointer;
+/* ---- Redesign 2026-09-28: the result, then who can be asked and why ---- */
+
+.rv-eyebrow {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.rv-who > summary:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+/* The result band: the average, its stars, how many. */
+.rv-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: clamp(var(--space-4), 3vw, var(--space-6));
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.rv-result .rv-average {
+  font-size: var(--text-3xl-size);
+}
+
+.rv-result-count {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+/* The ask: a title that says the state, each group with its reasons. */
+.rv-ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: clamp(var(--space-4), 3vw, var(--space-6));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.rv-ask[data-state="ready"] {
+  border-color: var(--accent-line);
+}
+
+.rv-ask-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-5);
+}
+
+.rv-ask-text {
+  display: flex;
+  flex: 1 1 22rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.rv-ask-title {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: var(--font-weight-semibold);
+}
+
+.rv-ask-sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.rv-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-groups > li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.rv-group-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-group-head strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+}
+
+.rv-group-head span {
+  color: var(--text-secondary);
+}
+
+.rv-meter {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+
+.rv-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--state-sold);
+}
+
+.rv-group-why {
+  color: var(--warning-strong);
+  font-size: var(--text-xs-size);
+}
+
+.rv-asked {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rv-asked > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+}
+
+.rv-asked dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.rv-asked dd {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-ask-foot {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  line-height: 1.6;
+}
+
+.rv-ask-door {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-accent);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rv-ask-door:hover {
+  text-decoration: underline;
+}
+
+/* No reviews yet: one line, not a second card repeating the ask. */
+.rv-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.rv-empty > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent-line);
+}
+
+.rv-empty strong {
+  color: var(--text-heading);
 }

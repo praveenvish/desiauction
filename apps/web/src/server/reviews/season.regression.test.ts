@@ -34,6 +34,7 @@ import {
   type ValidReview,
 } from "./reviews";
 import {
+  askBreakdown,
   askSeason,
   publicSeasonReviews,
   publishedSeasonReviews,
@@ -311,6 +312,57 @@ describe("FR-1 P4 · who is asked about a season", () => {
     expect(toOwner?.text).toContain("You bid for a team");
     expect(toOwner?.text).toContain('"A team owner"');
     expect(sent.find((mail) => mail.to === emailOf(adult))?.text).toContain("You played in");
+  });
+
+  it("says why each person cannot be asked, and its 'can be asked' is exactly who the ask reaches", async () => {
+    const where = await season();
+    const adult = await person({ dob: "1995-05-05" });
+    const undated = await person();
+    const minor = await person({ dob: "2011-01-01" });
+    const phoneOnly = await person({ email: false, dob: "1990-01-01" });
+    const bidder = await person();
+    const phoneOnlyOwner = await person({ email: false });
+    await player(where, adult);
+    await player(where, undated);
+    await player(where, minor);
+    await player(where, phoneOnly);
+    const auctionId = await auctionFor(where);
+    await owner(where, auctionId, bidder);
+    await owner(where, auctionId, phoneOnlyOwner);
+    // The organizer also holds a paddle: counted, and said to run the season.
+    await owner(where, auctionId, where.organizer);
+
+    const before = await askBreakdown(where.id, NOW);
+    expect(before.players).toEqual({
+      total: 4,
+      askable: 1,
+      runsSeason: 0,
+      alreadyAsked: 0,
+      noEmail: 1,
+      ageRule: 2,
+    });
+    expect(before.owners).toEqual({
+      total: 3,
+      askable: 1,
+      runsSeason: 1,
+      alreadyAsked: 0,
+      noEmail: 1,
+      ageRule: 0,
+    });
+
+    const result = await askSeason(where, {
+      roles: ["player", "owner"],
+      source: "manual_org",
+      requestedBy: where.organizer,
+      now: NOW,
+    });
+    // The breakdown's "can be asked" is the ask's own count.
+    expect(result.asked).toBe(before.players.askable + before.owners.askable);
+
+    const after = await askBreakdown(where.id, NOW);
+    expect(after.players.askable).toBe(0);
+    expect(after.players.alreadyAsked).toBe(1);
+    expect(after.owners.alreadyAsked).toBe(1);
   });
 
   it("never asks the club about its own season, even when an organizer also bid or played", async () => {
