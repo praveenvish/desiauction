@@ -1,6 +1,7 @@
 import {
   EmptyState,
   Pager,
+  Pill,
   SegmentedTabs,
   Toolbar,
   ToolbarCount,
@@ -9,10 +10,12 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { countNoun, formatCount, maskPersonContact } from "../../../server/admin/format";
+import { formatCount, maskPersonContact } from "../../../server/admin/format";
 import type { UserDirectory } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
-import { RelativeTime, TableCount, monogram } from "../admin-ui";
+import { RelativeTime, monogram } from "../admin-ui";
+import { userFacts, userFlags } from "../directory-model";
+import "../directory.css";
 
 const USER_FILTERS: readonly { key: UserDirectory["filter"]; label: string }[] = [
   { key: "all", label: "Everyone" },
@@ -69,6 +72,7 @@ export function UsersPanel({
               items={USER_FILTERS.map((option) => ({
                 key: option.key,
                 label: option.label,
+                count: formatCount(directory.counts[option.key]),
                 active: option.key === directory.filter,
                 href: filterHref(query, option.key),
               }))}
@@ -104,81 +108,75 @@ export function UsersPanel({
                 <thead>
                   <tr>
                     <th scope="col">User</th>
-                    <th scope="col" className="admin-num">
-                      Organizations
-                    </th>
-                    <th scope="col" className="admin-num">
-                      Active grants
+                    <th scope="col">On the platform</th>
+                    <th scope="col" className="admin-dir-flags-head">
+                      Grants
                     </th>
                     <th scope="col">Last activity</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id}>
-                      <td data-label="User" data-cell="title">
-                        <span className="admin-cell-main admin-person">
-                          <span className="admin-monogram" aria-hidden>
-                            {monogram(row.name)}
+                  {rows.map((row) => {
+                    const facts = userFacts(row);
+                    const flags = userFlags(row);
+                    return (
+                      <tr key={row.id}>
+                        <td data-label="User" data-cell="title">
+                          <span className="admin-cell-main admin-person">
+                            <span className="admin-monogram" aria-hidden>
+                              {monogram(row.name)}
+                            </span>
+                            <Link href={`/admin/users/${row.id}`} className="admin-name">
+                              {row.name ?? "Unnamed"}
+                            </Link>
+                            {/* A fifty-row directory of full E.164 mobile numbers
+                                is a bulk export of the platform's contact list:
+                                the last four digits answer "which row is this?",
+                                and the whole number is on the one person's page. */}
+                            <span className="registration-phone admin-meta" data-private>
+                              {maskPersonContact(row)}
+                            </span>
                           </span>
-                          <Link href={`/admin/users/${row.id}`} className="admin-name">
-                            {row.name ?? "Unnamed"}
-                          </Link>
-                          {/* A fifty-row directory of full E.164 mobile numbers
-                              is a bulk export of the platform's contact list,
-                              and `?q=` put the other 1,098 one page away. The
-                              last four digits answer the directory's actual
-                              question — "which row is this?" — and the whole
-                              number is on the one person's page an operator
-                              chose to open. Masked in a screenshot too. */}
-                          <span className="registration-phone admin-meta" data-private>
-                            {maskPersonContact(row)}
+                          {/* The phone row's second line: contact, then what the
+                              person is — it wraps rather than cut mid-word. */}
+                          <span className="da-row-meta">
+                            <span data-private>{maskPersonContact(row)}</span> · {facts}
                           </span>
-                        </span>
-                        {/* The phone row's one line of meta (the counts' columns step
-                            aside there); zeros say nothing, so they are left out. */}
-                        <span className="da-row-meta">
-                          <span data-private>{maskPersonContact(row)}</span>
-                          {[
-                            row.orgs > 0 ? countNoun(row.orgs, "organization") : null,
-                            row.activeGrants > 0
-                              ? countNoun(row.activeGrants, "active grant")
-                              : null,
-                          ]
-                            .filter((part) => part !== null)
-                            .map((part) => ` · ${part}`)
-                            .join("")}
-                        </span>
-                      </td>
-                      <td
-                        data-label="Organizations"
-                        className="admin-count admin-num"
-                        data-zero={row.orgs === 0 || undefined}
-                      >
-                        <TableCount n={row.orgs} />
-                      </td>
-                      <td
-                        data-label="Active grants"
-                        className="admin-count admin-num"
-                        data-zero={row.activeGrants === 0 || undefined}
-                      >
-                        <TableCount n={row.activeGrants} />
-                      </td>
-                      {/* Joined and Last activity were two columns saying the
-                          same "4m ago" for most people. One column: the last
-                          thing they did, and when they joined only when they
-                          have done nothing since. */}
-                      <td data-label="Last activity" className="is-side" data-cell="figure">
-                        {row.lastActivityAt === null ? (
-                          <span className="admin-meta">
-                            Joined <RelativeTime at={row.createdAt} />
-                          </span>
-                        ) : (
-                          <RelativeTime at={row.lastActivityAt} />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        {/* One phrase for what the person IS on the platform —
+                            two numeric columns of dashes never said it. */}
+                        <td data-label="On the platform" className="admin-dir-facts">
+                          {facts}
+                        </td>
+                        <td data-label="Grants" data-cell="status" className="admin-dir-flags">
+                          {flags.length === 0 ? (
+                            <span className="admin-dash" title="No grants">
+                              —<span className="admin-sr-only">No grants</span>
+                            </span>
+                          ) : (
+                            <span className="admin-pills">
+                              {flags.map((flag) => (
+                                <Pill key={flag.label} tone={flag.tone}>
+                                  {flag.label}
+                                </Pill>
+                              ))}
+                            </span>
+                          )}
+                        </td>
+                        {/* The last thing they did; when they joined only when
+                            they have done nothing since. */}
+                        <td data-label="Last activity" className="is-side" data-cell="figure">
+                          {row.lastActivityAt === null ? (
+                            <span className="admin-meta">
+                              Joined <RelativeTime at={row.createdAt} />
+                            </span>
+                          ) : (
+                            <RelativeTime at={row.lastActivityAt} />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -187,7 +185,7 @@ export function UsersPanel({
                 label="More users"
                 total={total}
                 shown={rows.length}
-                noun="users"
+                noun="users · newest first"
                 firstHref={paged ? filterHref(query, directory.filter) : null}
                 nextHref={nextHref}
                 linkComponent={Link}
