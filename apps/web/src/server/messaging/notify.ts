@@ -3,17 +3,21 @@ import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 import { messageLanguageOf } from "@desiauction/messaging/language";
 import { and, eq, isNotNull } from "drizzle-orm";
 
-import { createCodeMailer, type CodeMailPurpose } from "../auth/email-sender";
+import { MailSendError, createCodeMailer, type CodeMailPurpose } from "../auth/email-sender";
 import { logger } from "../logger";
 import type { NotificationKind } from "./catalogue";
 import { notificationGate, type GateDecision } from "./gate";
+import { recordEmailSend } from "./email-sends";
+import type { RequestContext } from "./request-context";
 import type { NotificationMail } from "./notification-email";
 import {
+  deliverMail,
   transactionalMailer,
   type MailOutcome,
   type OutgoingMail,
   type TransactionalMailer,
 } from "./transactional-mail";
+import { unsubscribeHeaders } from "./unsubscribe";
 
 /**
  * THE DIRECT SENDS, GATED.
@@ -24,7 +28,8 @@ import {
  * ask `maySend` first. Eighteen of them did not.
  *
  * So a direct send is now ONE call that names its catalogue entry, asks the
- * gate and only then touches the mailer. The guard test
+ * gate and only then touches the mailer — and leaves a record of what became of
+ * it (email-sends.ts, 0094), withheld or sent. The guard test
  * (notification-guard.test.ts) fails the build if a module outside this one
  * and the outbox reaches for a mailer itself, so the next direct send cannot
  * quietly skip the gate the way these did.
@@ -67,19 +72,32 @@ export async function sendNotificationMail(
     ...(target.orgId === undefined ? {} : { orgId: target.orgId }),
     ...(target.now === undefined ? {} : { now: target.now }),
   });
+  const record = {
+    kind: target.kind,
+    to: target.to,
+    personId: target.personId ?? null,
+    orgId: target.orgId ?? null,
+  };
   if (!decision.send) {
+    await recordEmailSend({ ...record, outcome: "suppressed", reason: decision.reason });
     return { outcome: "suppressed", decision };
   }
-  return {
-    outcome: await mailer.send({
-      to: target.to,
-      subject: mail.subject,
-      text: mail.text,
-      ...(mail.html === undefined ? {} : { html: mail.html }),
-      ...(mail.attachment === undefined ? {} : { attachment: mail.attachment }),
-    }),
-    decision,
-  };
+  // A mail the reader can switch off carries the one-click unsubscribe.
+  const headers = unsubscribeHeaders(target.kind, target.personId);
+  const receipt = await deliverMail(mailer, {
+    to: target.to,
+    subject: mail.subject,
+    text: mail.text,
+    ...(mail.html === undefined ? {} : { html: mail.html }),
+    ...(mail.attachment === undefined ? {} : { attachment: mail.attachment }),
+    ...(headers === undefined ? {} : { headers }),
+  });
+  await recordEmailSend({
+    ...record,
+    outcome: receipt.outcome,
+    providerMessageId: receipt.providerMessageId,
+  });
+  return { outcome: receipt.outcome, decision };
 }
 
 /**
@@ -122,6 +140,8 @@ export async function sendSignInCodeMail(
   purpose: CodeMailPurpose,
   /** Whose account it is, when known (a new address being confirmed). */
   personId?: string,
+  /** Where and when it was asked for (request-context.ts), shown in the mail. */
+  context?: RequestContext,
 ): Promise<void> {
   const decision = await notificationGate(db, {
     kind: "auth.email_code",
@@ -137,5 +157,19 @@ export async function sendSignInCodeMail(
   // account a sign-in address belongs to. A sign-up has no account yet.
   const language =
     purpose === "signup" ? "en" : await languageForMail(db, { personId: personId ?? null, email });
-  await createCodeMailer(db).send(email, code, purpose, language);
+  const record = { kind: "auth.email_code", to: email, personId: personId ?? null };
+  try {
+    const receipt = await createCodeMailer(db).send(email, code, purpose, language, context);
+    // Null is the dev inbox: nothing left the building.
+    await recordEmailSend(
+      receipt === null
+        ? { ...record, outcome: "unconfigured", reason: "dev inbox" }
+        : { ...record, outcome: "sent", providerMessageId: receipt.providerMessageId },
+    );
+  } catch (error) {
+    if (error instanceof MailSendError) {
+      await recordEmailSend({ ...record, outcome: "failed", reason: error.message });
+    }
+    throw error;
+  }
 }

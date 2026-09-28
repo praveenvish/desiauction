@@ -527,6 +527,17 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
       price: "Rs 55,000",
     });
 
+    // And the organizer gets the night in one place (email programme PR9):
+    // players sold, what was spent, the top buys, each team's spend.
+    const [pack] = await db
+      .select({ subject: messageOutboxTable.subject, text: messageOutboxTable.bodyText })
+      .from(messageOutboxTable)
+      .where(
+        and(eq(messageOutboxTable.personId, owner), eq(messageOutboxTable.kind, "auction.results")),
+      );
+    expect(pack?.subject).toMatch(/auction: \d+ players sold, ₹[\d,]+ spent$/);
+    expect(pack?.text).toContain("Kohli Local");
+
     // A half-written sale is never announced: 0030 forbids sold-without-price at
     // the database, so reaching that state means something is wrong, and "sold
     // to undefined" is worse than silence.

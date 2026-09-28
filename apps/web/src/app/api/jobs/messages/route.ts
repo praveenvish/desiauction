@@ -3,7 +3,8 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
-import { withRequestId } from "../../../../server/logger";
+import { sweepAuctionReminders } from "../../../../server/competition/auction-reminders";
+import { logger, withRequestId } from "../../../../server/logger";
 import { drainOutbox } from "../../../../server/messaging/outbox";
 
 /**
@@ -33,8 +34,15 @@ async function handle(request: Request): Promise<NextResponse> {
   if (!secretMatches(request.headers.get("x-feedback-job-secret"), expected)) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
+  // Auction night reminders are built when due (email programme PR8) and
+  // queued here, so the drain right after delivers them on this same run.
+  // A failed sweep must never stop the drain.
+  const reminders = await sweepAuctionReminders().catch((error: unknown) => {
+    logger().error({ err: error }, "auction_reminders.sweep_failed");
+    return "failed" as const;
+  });
   const drained = await drainOutbox({ limit: 200 });
-  return NextResponse.json({ drained });
+  return NextResponse.json({ reminders, drained });
 }
 
 export function POST(request: Request): Promise<NextResponse> {

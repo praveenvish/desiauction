@@ -144,6 +144,34 @@ describe("createSesProvider — the SES v2 SendEmail call", () => {
     });
   });
 
+  it("carries List-Unsubscribe as SES's name/value headers, beside the html part", async () => {
+    const { transport, calls } = recording();
+    await createSesProvider({ ...SES, transport, now: () => AT }).send({
+      to: "a@example.com",
+      subject: "s",
+      text: "t",
+      html: "<p>t</p>",
+      headers: {
+        "List-Unsubscribe": "<https://desiauction.in/api/email/unsubscribe?t=x>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    });
+    expect(calls[0]?.body).toMatchObject({
+      Content: {
+        Simple: {
+          Body: { Html: { Data: "<p>t</p>", Charset: "UTF-8" } },
+          Headers: [
+            {
+              Name: "List-Unsubscribe",
+              Value: "<https://desiauction.in/api/email/unsubscribe?t=x>",
+            },
+            { Name: "List-Unsubscribe-Post", Value: "List-Unsubscribe=One-Click" },
+          ],
+        },
+      },
+    });
+  });
+
   it("lets an unreachable provider throw, for the caller to name", async () => {
     const transport: MailTransport = () => Promise.reject(new TypeError("fetch failed"));
     await expect(

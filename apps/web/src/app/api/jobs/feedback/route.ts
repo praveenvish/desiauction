@@ -3,7 +3,8 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
-import { withRequestId } from "../../../../server/logger";
+import { sweepRegistrationDigests } from "../../../../server/competition/registration-digest";
+import { logger, withRequestId } from "../../../../server/logger";
 import { scheduledTemplateSync } from "../../../../server/messaging/provider-template-writer";
 import { sweepReviewAsks } from "../../../../server/reviews/review-sweep";
 import {
@@ -50,6 +51,13 @@ async function handle(request: Request): Promise<NextResponse> {
   const security = await purgeSpentSecurityRecords();
   const whatsappInbound = await purgeWhatsAppInbound();
   const reviewAsks = await sweepReviewAsks();
+  // The organizers' 9 am digest (email programme PR5). Here because this job
+  // already runs every fifteen minutes; it sends only 9:00–12:00 IST, once a day.
+  // Never allowed to fail the purges and template sync beside it.
+  const registrationDigests = await sweepRegistrationDigests().catch((error: unknown) => {
+    logger().error({ err: error }, "registration_digest.sweep_failed");
+    return "failed" as const;
+  });
   // Meta's template status, refreshed when the snapshot is six hours old
   // (Notification Control Center, Phase 3). Here rather than a door of its
   // own: this job already runs every fifteen minutes, and the refresh never
@@ -60,6 +68,7 @@ async function handle(request: Request): Promise<NextResponse> {
     security,
     whatsappInbound,
     reviewAsks,
+    registrationDigests,
     whatsappTemplates: templates.ok
       ? "skipped" in templates
         ? "fresh"

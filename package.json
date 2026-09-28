@@ -11,6 +11,7 @@
     "setup:local": "node scripts/setup-local.mjs",
     "health": "node scripts/health.mjs",
     "seed:demo": "pnpm --filter @desiauction/web seed:demo",
+    "mail:gallery": "pnpm --filter @desiauction/web mail:gallery",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

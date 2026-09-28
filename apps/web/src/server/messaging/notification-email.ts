@@ -1,5 +1,6 @@
 import type { Db } from "@desiauction/db";
 import type { EmailNotificationKind } from "@desiauction/messaging/catalogue";
+import { financeDocumentMail } from "@desiauction/messaging/email-adapter";
 import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults";
 import {
   fillTemplate,
@@ -19,7 +20,15 @@ import {
 import { env } from "../../env";
 import { db as appDb } from "../db";
 import { logger } from "../logger";
-import { renderEmail } from "./email-layout";
+import {
+  manageEmailsUrl,
+  renderEmail,
+  type EmailBand,
+  type EmailDateLeaf,
+  type EmailStage,
+  type EmailStep,
+} from "./email-layout";
+import { isSelfManagedKind } from "./unsubscribe";
 
 /**
  * EVERY EMAIL'S WORDS COME FROM HERE (Notification Control Center, Phase 2).
@@ -59,16 +68,25 @@ export interface NotificationMail {
  *     point is the click (a review ask).
  *   · whatsappNudge: the personal moments leave room for "Get these on
  *     WhatsApp" (email-layout.ts) — never a security mail or a code.
+ *   · calloutLast: the closing "didn't ask?" / "wasn't you?" line boxed.
  */
 const LAYOUT: Readonly<
   Partial<
     Record<
       EmailNotificationKind,
-      { noLinks?: boolean; actionFirst?: boolean; whatsappNudge?: boolean }
+      { noLinks?: boolean; actionFirst?: boolean; whatsappNudge?: boolean; calloutLast?: boolean }
     >
   >
 > = {
-  "auth.email_code": { noLinks: true },
+  // The last line of a code or a security alert — "didn't ask for this?",
+  // "if it wasn't you" — is the one a worried reader looks for: boxed.
+  "auth.email_code": { noLinks: true, calloutLast: true },
+  "security.email_changed": { calloutLast: true },
+  "security.phone_changed": { calloutLast: true },
+  // "Think this is a mistake?" under a take-down: the way back, boxed.
+  "season.held": { calloutLast: true },
+  // "This link is yours alone" — the one line an invited owner must not miss.
+  "owner.invite": { calloutLast: true },
   "registration.approved": { whatsappNudge: true },
   "registration.waitlisted": { whatsappNudge: true },
   "registration.rejected": { whatsappNudge: true },
@@ -90,6 +108,16 @@ export interface RenderOptions {
   readonly details?: readonly (readonly [string, string])[];
   /** A one-time code, shown large. */
   readonly code?: string;
+  /** The reader's language — the document's `lang` and its fonts. English when omitted. */
+  readonly language?: MessageLanguage;
+  /** The club band — whose season this is. Facts, written by the caller in `language`. */
+  readonly band?: EmailBand;
+  /** Where the player is in the season (player-mail.ts `journey`). */
+  readonly progress?: readonly EmailStep[];
+  /** A date tile — auction night (auction-schedule-mail.ts). */
+  readonly dateLeaf?: EmailDateLeaf;
+  /** The auction-night stage — a sale (player-mail.ts `soldMail`). */
+  readonly stage?: EmailStage;
 }
 
 /**
@@ -122,12 +150,41 @@ export function composeNotificationEmail(
       : { action: { label, url: options.action.url } }),
     ...(layout.actionFirst === true ? { actionFirst: true } : {}),
     ...(options.details === undefined ? {} : { details: options.details }),
+    ...(options.band === undefined ? {} : { band: options.band }),
+    ...(options.progress === undefined ? {} : { progress: options.progress }),
+    ...(options.dateLeaf === undefined ? {} : { dateLeaf: options.dateLeaf }),
+    ...(options.stage === undefined ? {} : { stage: options.stage }),
     ...(filled.after.length === 0 ? {} : { after: filled.after }),
     footnote: filled.footnote,
     ...(layout.noLinks === true ? { noLinks: true } : {}),
     ...(layout.whatsappNudge === true ? { whatsappNudge: true } : {}),
+    ...(options.language === undefined ? {} : { language: options.language }),
+    // "Manage emails" exactly where the one-click unsubscribe header goes: the
+    // reader has an /account switch for this kind (unsubscribe.ts).
+    ...(isSelfManagedKind(spec.kind) ? { manageUrl: manageEmailsUrl() } : {}),
+    ...(layout.calloutLast === true ? { calloutLast: true } : {}),
   });
   return { subject: filled.subject, text: body.text, html: body.html } as NotificationMail;
+}
+
+/**
+ * A finance document's mail as the runner sends it (email programme PR10):
+ * the registry's wording, the document, and the branded part around them —
+ * for the admin preview and the mail gallery, which must show what goes out.
+ */
+export function financeDocumentPreviewMail(
+  fields: TemplateFields,
+  document: string,
+  templateId: string,
+  language: MessageLanguage,
+  orgName: string | null,
+): NotificationMail {
+  return financeDocumentMail(fields, document, {
+    publicBaseUrl: env.PUBLIC_BASE_URL,
+    templateId,
+    language,
+    orgName,
+  }) as NotificationMail;
 }
 
 /** The hosts a link in the wording may name: desiauction.in and PUBLIC_BASE_URL's. */
@@ -174,12 +231,10 @@ export async function renderNotificationEmail(
   db: Db = appDb,
 ): Promise<NotificationMail> {
   const resolved = await wordingFor(kind, language, db);
-  return composeNotificationEmail(
-    resolved.spec,
-    variantOf(resolved, options.variant),
-    variables,
-    options,
-  );
+  return composeNotificationEmail(resolved.spec, variantOf(resolved, options.variant), variables, {
+    ...options,
+    language,
+  });
 }
 
 export function templateSpecOf(kind: EmailNotificationKind): EmailTemplateSpec {

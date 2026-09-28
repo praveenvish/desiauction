@@ -22,7 +22,8 @@ import {
   WHATSAPP_TEMPLATES,
   type PersonalWhatsAppSender,
 } from "./whatsapp";
-import { transactionalMailer, type TransactionalMailer } from "./transactional-mail";
+import { deliverMail, transactionalMailer, type TransactionalMailer } from "./transactional-mail";
+import { unsubscribeHeaders } from "./unsubscribe";
 
 /**
  * THE PERSONAL-MESSAGE QUEUE (0079).
@@ -66,6 +67,11 @@ export interface QueuedMail extends NotificationMail {
   readonly orgId: string | null;
   /** What happened — its catalogue entry (`auction.sold`, `team.appointed`, …). */
   readonly kind: NotificationKind;
+  /**
+   * Not sent before this moment (the drain's `next_attempt_at`). For a notice
+   * that should settle first — a time an organizer may still be correcting.
+   */
+  readonly notBefore?: Date;
   /** One per person per moment; a repeat is ignored. */
   readonly dedupeKey: string;
 }
@@ -143,11 +149,28 @@ export async function enqueueMail(mails: readonly QueuedMail[], db: Db = appDb):
         subject: mail.subject,
         bodyText: mail.text,
         bodyHtml: mail.html ?? "",
+        ...(mail.notBefore === undefined ? {} : { nextAttemptAt: mail.notBefore }),
       })),
     )
     .onConflictDoNothing({ target: messageOutbox.dedupeKey })
     .returning({ dedupeKey: messageOutbox.dedupeKey });
   return inserted.map((row) => row.dedupeKey);
+}
+
+/**
+ * A newer version of a notice replaces the one still waiting: every PENDING
+ * row whose key starts with `prefix` is settled as suppressed, "superseded".
+ * Anything already sent stays sent — a correction goes out as its own mail,
+ * nothing sent is ever unsent. Returns how many were withdrawn.
+ */
+export async function supersedePending(prefix: string, db: Db = appDb): Promise<number> {
+  const withdrawn = await db.execute<{ id: string } & Record<string, unknown>>(sql`
+    update ${messageOutbox}
+    set status = 'suppressed', last_error = 'superseded by a newer notice'
+    where status = 'pending' and dedupe_key like ${`${prefix.replace(/[\\%_]/g, "\\$&")}%`}
+    returning id
+  `);
+  return withdrawn.length;
 }
 
 /**
@@ -452,16 +475,28 @@ export async function drainOutbox(
       hasWhatsAppNudge(row.body_html) &&
       !(await whatsappOptedIn(db, row.person_id)).optedIn;
     const body = applyWhatsAppNudge({ text: row.body_text, html: row.body_html }, nudge);
-    const outcome = await mailer.send({
+    // A mail the reader can switch off carries the one-click unsubscribe
+    // (unsubscribe.ts). Every queued kind today is one of those.
+    const headers = isNotificationKind(row.kind)
+      ? unsubscribeHeaders(row.kind, row.person_id)
+      : undefined;
+    const { outcome, providerMessageId } = await deliverMail(mailer, {
       to: email,
       subject: row.subject,
       text: body.text,
       html: body.html,
+      ...(headers === undefined ? {} : { headers }),
     });
     if (outcome === "sent") {
       await db
         .update(messageOutbox)
-        .set({ status: "sent", sentAt: new Date(), lastError: null })
+        .set({
+          status: "sent",
+          sentAt: new Date(),
+          lastError: null,
+          // What a bounce or delivery callback will be matched on.
+          providerMessageId,
+        })
         .where(eq(messageOutbox.id, row.id));
       sent += 1;
     } else if (outcome === "unconfigured") {

@@ -44,6 +44,11 @@ export interface MailRequest {
   readonly replyTo?: string;
   readonly attachment?: MailAttachment;
   /**
+   * Extra message headers — today only List-Unsubscribe and its one-click
+   * partner (RFC 8058). Resend takes an object; SES a list of name/value pairs.
+   */
+  readonly headers?: Readonly<Record<string, string>>;
+  /**
    * Labels the provider echoes back on delivery events (SES `EmailTags`).
    * Keys and values are reduced to what SES accepts; Resend ignores them.
    */
@@ -112,6 +117,7 @@ export function resendBody(mail: MailRequest, from: string): unknown {
     // Omitted rather than sent empty: a blank reply_to is a header some
     // providers reject and every client renders badly.
     ...(mail.replyTo === undefined ? {} : { reply_to: mail.replyTo }),
+    ...(mail.headers === undefined ? {} : { headers: mail.headers }),
     ...(mail.attachment === undefined
       ? {}
       : {
@@ -222,6 +228,11 @@ export function sesBody(mail: MailRequest, config: SesProviderConfig): unknown {
           Text: utf8(mail.text),
           ...(mail.html === undefined ? {} : { Html: utf8(mail.html) }),
         },
+        ...(mail.headers === undefined
+          ? {}
+          : {
+              Headers: Object.entries(mail.headers).map(([Name, Value]) => ({ Name, Value })),
+            }),
         ...(mail.attachment === undefined
           ? {}
           : {

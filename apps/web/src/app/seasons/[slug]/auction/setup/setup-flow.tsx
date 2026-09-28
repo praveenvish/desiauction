@@ -22,6 +22,7 @@ import {
 import { advanceCompetitionAction } from "../../../../../server/competition/actions";
 import { BroadcastLinks } from "../broadcast-links";
 import { ConnectionCheck } from "../live-experience";
+import { AuctionTimeCard } from "./auction-time-card";
 import { OwnersStep } from "./owners-step";
 import { RulesStep } from "./rules-step";
 import "./setup.css";
@@ -300,6 +301,12 @@ export function AuctionSetupFlow({
           </span>
         </span>
       </header>
+      <AuctionTimeCard
+        slug={slug}
+        startsAt={dashboard.startsAt}
+        canEdit={viewer.canManage}
+        locked={exists && status !== "scheduled"}
+      />
       <div className="as-board">
         <ol className="as-steps da-scroll-strip" aria-label="Setup steps" ref={stripRef}>
           {steps.map((step, index) => (

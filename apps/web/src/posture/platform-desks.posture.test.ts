@@ -29,6 +29,13 @@ vi.mock("next/headers", () => ({
   headers: () => Promise.resolve(new Headers()),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined, revalidateTag: () => undefined }));
+// The organizers' take-down notice goes after the response (`after`), which
+// needs a request scope a test does not have; it has its own suite
+// (organizer-notify.regression.test.ts).
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: () => undefined,
+}));
 
 const { takeDownSeason, liftSeasonHoldAction } = await import("../server/admin/moderation-actions");
 const { answerPassRequest } = await import("../server/admin/pass-actions");

@@ -1,6 +1,10 @@
 import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 
+import { roleLabelIn, sportPackFor } from "@desiauction/core";
+import { sportLabel } from "@desiauction/core/sport-labels";
+
 import { env } from "../../env";
+import type { EmailBand, EmailStep } from "./email-layout";
 import { renderNotificationEmail, type NotificationMail } from "./notification-email";
 import { REASON_HI } from "./whatsapp";
 
@@ -88,6 +92,24 @@ export interface SoldFacts {
   readonly cardUrl: string | null;
 }
 
+/** "3× your base · 7 bids · 3 teams" — the night in one line, under the price. */
+export function soldStageLine(facts: SoldFacts, language: MessageLanguage): string {
+  const hi = language === "hi";
+  const parts: string[] = [];
+  if (facts.multiple !== null && facts.multiple >= 1.5) {
+    const times = String(Math.round(facts.multiple * 10) / 10);
+    parts.push(hi ? `बेस प्राइस का ${times} गुना` : `${times}× your base`);
+  }
+  if (facts.bidCount > 1) {
+    parts.push(hi ? `${String(facts.bidCount)} बोलियाँ` : `${String(facts.bidCount)} bids`);
+  }
+  const teams = new Set(facts.bidders).size;
+  if (teams > 1) {
+    parts.push(hi ? `${String(teams)} टीमें` : `${String(teams)} teams`);
+  }
+  return parts.join(" · ");
+}
+
 /** "Cup Kings, Tigers and Falcons all bid for you — 7 bids …" */
 export function bidStory(facts: SoldFacts, language: MessageLanguage = "en"): string {
   const rivals = facts.bidders.filter((team) => team !== facts.teamName);
@@ -170,6 +192,15 @@ export function soldMail(
       shareLine: facts.cardUrl === null ? "" : SHARE_CARD_LINE[language],
     },
     {
+      // The auction room's own moment: the price large and gold, on the stage.
+      stage: {
+        kicker: "Sold",
+        monogram: monogramOf(facts.name),
+        title: `${facts.name} → ${facts.teamName}`,
+        figure: facts.price,
+        line: soldStageLine(facts, language),
+      },
+      progress: journey(3, language),
       details: facts.squad.map((line) => localLine(line, language)),
       action:
         facts.cardUrl === null
@@ -186,16 +217,19 @@ export function unsoldMail(
     readonly name: string;
     readonly season: string;
     readonly orgName: string;
+    readonly seasonSlug?: string;
+    readonly sport?: string;
   },
   language: MessageLanguage = "en",
 ): Promise<ComposedMail> {
   // Said plainly and kindly. Never by SMS (founder decision): a text that
-  // just says "unsold" lands too hard.
+  // just says "unsold" lands too hard. The club band, and no tracker: a row
+  // of steps they did not take is not a kindness (C-23).
   return renderNotificationEmail(
     "auction.unsold",
     language,
     { name: facts.name, season: facts.season, orgName: facts.orgName },
-    { action: { id: "season", url: seasonUrl() } },
+    { action: { id: "season", url: seasonUrl() }, band: seasonBand(facts) },
   );
 }
 
@@ -438,6 +472,9 @@ export interface OwnerSummaryFacts {
    * asks the owner to share it.
    */
   readonly shareUrl?: string | null;
+  /** The club and sport, for the band at the top (outcome-mail.ts). */
+  readonly orgName?: string;
+  readonly sport?: string;
 }
 
 export function ownerSummaryMail(
@@ -474,8 +511,84 @@ export function ownerSummaryMail(
       // the console's teams page as before.
       action:
         shareUrl === null ? { id: "team", url: facts.teamUrl } : { id: "share", url: shareUrl },
+      ...(facts.orgName === undefined
+        ? {}
+        : {
+            band: seasonBand({
+              season: facts.season,
+              orgName: facts.orgName,
+              ...(facts.sport === undefined ? {} : { sport: facts.sport }),
+            }),
+          }),
     },
   );
+}
+
+// --- The player's season: whose it is, and where they are in it -----------------
+
+/** The season a registration mail is about — the band at the top, and the link. */
+export interface SeasonFacts {
+  readonly season: string;
+  readonly orgName: string;
+  /** The season's slug: the button opens the player's own registration page. */
+  readonly seasonSlug?: string;
+  /** The season's sport key, named in the band ("Malad Cricket Club · Cricket"). */
+  readonly sport?: string;
+}
+
+/** "Malad Cricket Club" → "MC"; one word → its first two letters. */
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** The first `count` letters as a reader sees them — a Hindi conjunct stays whole. */
+function firstLetters(word: string, count: number): string {
+  return Array.from(GRAPHEMES.segment(word), (part) => part.segment)
+    .slice(0, count)
+    .join("");
+}
+
+export function monogramOf(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word !== "");
+  const letters =
+    words.length >= 2
+      ? `${firstLetters(words[0] ?? "", 1)}${firstLetters(words[1] ?? "", 1)}`
+      : firstLetters(words[0] ?? "", 2);
+  return letters.toUpperCase() || "DA";
+}
+
+export function seasonBand(facts: SeasonFacts): EmailBand {
+  const sport = facts.sport === undefined ? null : sportLabel(facts.sport);
+  return {
+    title: facts.season,
+    subtitle: sport === null ? facts.orgName : `${facts.orgName} · ${sport}`,
+    monogram: monogramOf(facts.orgName),
+  };
+}
+
+/** The player's own page for this season, or their home when the season is not known. */
+function registrationUrl(facts: SeasonFacts): string {
+  return facts.seasonSlug === undefined
+    ? seasonUrl()
+    : `${env.PUBLIC_BASE_URL}/seasons/${encodeURIComponent(facts.seasonSlug)}/register`;
+}
+
+const JOURNEY: Readonly<Record<MessageLanguage, readonly [string, string, string, string]>> = {
+  en: ["Registered", "Approved", "Auction", "Team"],
+  hi: ["रजिस्टर", "मंज़ूर", "नीलामी", "टीम"],
+};
+
+/**
+ * WHERE THE PLAYER IS — the same four steps on every player mail, so each
+ * answers "where am I?" before it says anything else. `at` is the step they
+ * are on now; the ones before it are done.
+ */
+export function journey(at: 1 | 2 | 3, language: MessageLanguage): readonly EmailStep[] {
+  return JOURNEY[language].map((label, i) => ({
+    label,
+    state: i < at ? "done" : i === at ? "now" : "next",
+  }));
 }
 
 // --- Registration decisions -----------------------------------------------------
@@ -491,9 +604,8 @@ const DECISION_KIND = {
   restore: "registration.restored",
 } as const;
 
-export interface RegistrationDecisionFacts {
+export interface RegistrationDecisionFacts extends SeasonFacts {
   readonly name: string;
-  readonly season: string;
   readonly decision: RegistrationDecision;
   /** The rejection's reason in the player's words (REASON_TO_PLAYER), for `reject`. */
   readonly reason?: string;
@@ -510,14 +622,88 @@ export function registrationDecisionMail(
   language: MessageLanguage = "en",
 ): Promise<ComposedMail> {
   const reason = facts.reason ?? "no reason was given";
+  /*
+   * The tracker only where the season is still ahead of them. A declined or
+   * withdrawn player is not shown a row of steps they will not take (C-23:
+   * a person's outcome is said plainly, never staged).
+   */
+  const step = STEP_AFTER[facts.decision];
   return renderNotificationEmail(
     DECISION_KIND[facts.decision],
     language,
     {
       name: facts.name,
       season: facts.season,
+      orgName: facts.orgName,
       reason: language === "hi" ? (REASON_HI[reason] ?? reason) : reason,
     },
-    { action: { id: "registration", url: seasonUrl() } },
+    {
+      action: { id: "registration", url: registrationUrl(facts) },
+      band: seasonBand(facts),
+      ...(step === null ? {} : { progress: journey(step, language) }),
+    },
+  );
+}
+
+/** Which step a decision leaves the player on — null: no tracker. */
+const STEP_AFTER: Readonly<Record<RegistrationDecision, 1 | 2 | null>> = {
+  approve: 2,
+  waitlist: 1,
+  restore: 1,
+  reject: null,
+  withdraw: null,
+};
+
+const ROLE_WORD: Readonly<Record<MessageLanguage, string>> = { en: "Role", hi: "भूमिका" };
+
+/**
+ * What the player sent, as the mail's details table: their role, then every
+ * answer the sport asked for, in the pack's own labels. The same pack the form
+ * was built from, so a football player sees "Preferred foot", not cricket.
+ */
+export function submittedDetails(
+  sport: string,
+  role: string,
+  answers: Readonly<Record<string, string>>,
+  language: MessageLanguage,
+): readonly (readonly [string, string])[] {
+  const pack = sportPackFor(sport);
+  const rows: (readonly [string, string])[] = [];
+  const roleLabel = roleLabelIn(pack, role);
+  if (roleLabel !== "") rows.push([ROLE_WORD[language], roleLabel]);
+  for (const attribute of pack.attributes) {
+    const value = answers[attribute.key];
+    if (value === undefined || value === "") continue;
+    const option = attribute.options.find((candidate) => candidate.key === value);
+    rows.push([attribute.label, option?.label ?? value]);
+  }
+  return rows;
+}
+
+export interface RegistrationReceivedFacts extends SeasonFacts {
+  readonly name: string;
+  /** What they sent, as the details table: role and each answer, labelled. */
+  readonly submitted: readonly (readonly [string, string])[];
+}
+
+/**
+ * "We've got your registration" — the first mail a player ever gets from us.
+ * What they sent comes back to them in a table, the tracker shows the next
+ * step (approval), and the button opens their registration page.
+ */
+export function registrationReceivedMail(
+  facts: RegistrationReceivedFacts,
+  language: MessageLanguage = "en",
+): Promise<ComposedMail> {
+  return renderNotificationEmail(
+    "registration.received",
+    language,
+    { name: facts.name, season: facts.season, orgName: facts.orgName },
+    {
+      action: { id: "registration", url: registrationUrl(facts) },
+      band: seasonBand(facts),
+      progress: journey(1, language),
+      ...(facts.submitted.length === 0 ? {} : { details: facts.submitted }),
+    },
   );
 }

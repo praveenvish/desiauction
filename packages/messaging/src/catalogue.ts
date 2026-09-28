@@ -48,6 +48,7 @@ export type NotificationTopic =
   | "auction"
   | "money"
   | "feedback"
+  | "club"
   | "login"
   | "security"
   | "demo"
@@ -179,6 +180,18 @@ const ENTRIES = [
   },
   // --- The player's season ----------------------------------------------------
   {
+    // The first mail a player ever gets from us. Email and inbox only for now:
+    // a WhatsApp template needs Meta's approval first (plan: wave 1 submits it).
+    key: "registration.received",
+    label: "Registration received",
+    description:
+      "The player registered themselves; tells them what they sent and what happens next.",
+    audience: "player",
+    category: "transactional",
+    topic: "registration",
+    channels: ["email", "in_app"],
+  },
+  {
     key: "registration.approved",
     label: "Registration approved",
     description: "An organizer approved the player into the pool.",
@@ -212,7 +225,7 @@ const ENTRIES = [
     audience: "player",
     category: "transactional",
     topic: "registration",
-    channels: ["email", ...TEXT],
+    channels: ["email", ...TEXT, "in_app"],
   },
   {
     key: "registration.restored",
@@ -221,7 +234,56 @@ const ENTRIES = [
     audience: "player",
     category: "transactional",
     topic: "registration",
-    channels: ["email", ...TEXT],
+    channels: ["email", ...TEXT, "in_app"],
+  },
+  {
+    // The organizer set, moved or cleared auction night (0095). Held ten
+    // minutes before it goes, and a newer change replaces a pending one, so an
+    // organizer correcting a typo sends one mail, not three.
+    key: "auction.schedule",
+    label: "Auction time set or changed",
+    description:
+      "Tells the season's owners and pool players when auction night is — and when it moves.",
+    audience: "player",
+    category: "transactional",
+    topic: "auction",
+    channels: ["email"],
+  },
+  {
+    // The organizer typed the owner's address beside the invite link. The link
+    // is the capability, so this goes DIRECT (no queued copy of the body) and
+    // nobody's switch applies: the reader may not even have an account yet.
+    key: "owner.invite",
+    label: "Team owner invitation",
+    description: "An organizer emails a team's owner their one-time invitation link.",
+    audience: "owner",
+    category: "transactional",
+    topic: "auction",
+    channels: ["email"],
+    personControllable: false,
+    orgControllable: false,
+  },
+  {
+    // The day before auction night: owners (their team, their paddle), pool
+    // players (when, and where to watch), organizers (is the room ready?).
+    // Built fresh by the sweep when it is due, so the readiness is true.
+    key: "auction.reminder",
+    label: "Auction tomorrow",
+    description:
+      "24 hours before auction night — to owners, pool players, and organizers with a readiness check.",
+    audience: "player",
+    category: "transactional",
+    topic: "auction",
+    channels: ["email"],
+  },
+  {
+    key: "auction.starting_soon",
+    label: "Auction starts in 30 minutes",
+    description: "Half an hour before auction night, in the inbox of everybody in the room.",
+    audience: "player",
+    category: "transactional",
+    topic: "auction",
+    channels: ["in_app"],
   },
   {
     key: "auction.sold",
@@ -315,6 +377,95 @@ const ENTRIES = [
      * would be offering one that silently does nothing (consent.ts on `db`
      * being part of the contract). The org screen showed exactly that switch.
      */
+    orgControllable: false,
+  },
+  // --- The organizer's club (email programme PR5) -----------------------------
+  // DesiAuction writing to the people who RUN a club. The club's own switch
+  // never applies (orgControllable: false): these are ours, about their club,
+  // not the club's messages to its players.
+  {
+    key: "club.welcome",
+    label: "Club created",
+    description: "Welcomes the organizer who just created a club, with the first steps.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    key: "registration.first",
+    label: "First registration in",
+    description: "Tells a season's organizers its first player has registered.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    key: "registration.digest",
+    label: "Registrations waiting (daily)",
+    description:
+      "At 9 am IST, only on days something is waiting: each season's registrations awaiting review.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    // DesiAuction took a season's public page down. Nobody but a platform admin
+    // can silence it: an organizer must never learn of it from a blank page.
+    key: "season.held",
+    label: "Season taken off public view",
+    description: "DesiAuction made a season's public page private, with the reason.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
+    personControllable: false,
+    orgControllable: false,
+  },
+  {
+    key: "season.released",
+    label: "Season hold lifted",
+    description: "DesiAuction lifted its hold; the organizer may publish the season again.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
+    personControllable: false,
+    orgControllable: false,
+  },
+  {
+    key: "auction.owner_joined",
+    label: "Owner accepted",
+    description: "A team's owner accepted their invitation — in each organizer's inbox.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["in_app"],
+    orgControllable: false,
+  },
+  {
+    key: "auction.owners_ready",
+    label: "All owners are in",
+    description: "Every team in the auction has its owner — once per auction, to the organizers.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
+    orgControllable: false,
+  },
+  {
+    key: "auction.results",
+    label: "Auction results",
+    description: "When the auction completes: players sold, what each team spent, the top buys.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
     orgControllable: false,
   },
   // --- Strangers: a demo requester, a person reporting a problem -------------
@@ -502,6 +653,10 @@ const TOPIC_COPY: Readonly<Partial<Record<NotificationTopic, { label: string; de
     feedback: {
       label: "Feedback requests",
       detail: "When we ask how a season or DesiAuction worked for you.",
+    },
+    club: {
+      label: "Club updates",
+      detail: "For organizers: registrations waiting for your review, and your club's first steps.",
     },
   };
 

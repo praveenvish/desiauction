@@ -117,6 +117,7 @@ describe("the /account and /org switches follow controllability", () => {
       "auction",
       "money",
       "feedback",
+      "club",
     ]);
     expect(orgSwitchTopics(CATALOGUE_DEFAULTS).map((t) => t.topic)).toEqual([
       "registration",

@@ -60,6 +60,20 @@ export type SecurityAction =
   // carried sign-in events only, and its own empty state admitted it. These
   // ride the same person-scoped ledger; no notification store was invented.
   | "registration.approved"
+  // Email programme PR4: the player's own registration, received — and the two
+  // decisions that had an email and a text but no inbox row.
+  | "registration.received"
+  | "registration.withdrawn"
+  | "registration.restored"
+  // Email programme PR5: DesiAuction held (or released) a season's public page —
+  // on each organizer's own ledger, so they never learn it from a blank page.
+  | "season.held"
+  | "season.released"
+  // Email programme PR7: a team's owner accepted, and every team has one.
+  | "auction.owner_joined"
+  | "auction.owners_ready"
+  // Email programme PR8: half an hour before auction night, in everyone's inbox.
+  | "auction.starting_soon"
   | "registration.rejected"
   | "registration.waitlisted"
   // The night itself. Being sold at auction is the moment this whole product

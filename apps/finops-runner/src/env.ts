@@ -60,6 +60,12 @@ const envSchema = z.object({
   EMAIL_API_ENDPOINT: z.url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),
+  /**
+   * The site's address, for the logo and links in a receipt's branded part
+   * (email programme PR10). Production's by default — the runner needs no new
+   * setting to send it; a staging runner points at its own host.
+   */
+  PUBLIC_BASE_URL: z.url().default("https://desiauction.in"),
   // Amazon SES — the same values as web.env (docs/EMAIL_INFRASTRUCTURE.md).
   SES_REGION: z
     .string()
