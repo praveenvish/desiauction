@@ -99,6 +99,19 @@ export default async function MoneyPage() {
     roles.owns.length > 0 &&
     roles.owns.every((team) => unitBySlug.get(team.competitionSlug) === "points");
   const receiptsColumn = teams.length > 0 || roles.owns.length > 0 || clubs.length === 0;
+  /*
+   * NO RUPEES MOVE (2026-09-29). An organizer whose every season plays for
+   * points opened on a heading and one row — a books page with no money on it
+   * and no word on why. Said once, at the top: what this page would hold, why
+   * it holds nothing, and what would change that.
+   */
+  const clubSeasons = view.competitions.filter((season) =>
+    clubs.some((club) => club.orgId === season.orgId),
+  );
+  const allPoints =
+    !receiptsColumn &&
+    clubSeasons.length > 0 &&
+    clubSeasons.every((season) => season.auctionUnit === "points");
 
   return (
     <main
@@ -140,6 +153,7 @@ export default async function MoneyPage() {
           )}
         </div>
       ) : null}
+      {allPoints ? <NoRupees seasons={clubSeasons} /> : null}
       {clubs.length > 0 ? <ClubBooks clubs={clubs} /> : null}
     </main>
   );
@@ -339,6 +353,33 @@ function NothingToPay({ team }: { team: OwnedTeam | undefined }) {
       >
         My team
       </ButtonLink>
+    </section>
+  );
+}
+
+/** Every season in the reader's clubs plays for points: say so once, and what would change it. */
+function NoRupees({ seasons }: { seasons: readonly { name: string; slug: string }[] }) {
+  const first = seasons[0];
+  if (first === undefined) return null;
+  const named =
+    seasons.length === 1 ? `${first.name} plays` : `All ${String(seasons.length)} seasons play`;
+  return (
+    <section className="mm-points" data-testid="money-no-rupees">
+      <span className="mm-points-mark" aria-hidden>
+        <IconWallet size={20} />
+      </span>
+      <div className="mm-points-body">
+        <h2>No rupees move in your clubs yet</h2>
+        <p>
+          {named} for points — no invoices, no receipts, nothing to settle. Money lands here when a
+          season charges a registration fee or runs its auction in rupees.
+        </p>
+      </div>
+      {seasons.length === 1 ? (
+        <ButtonLink href={`/seasons/${first.slug}/money`} size="sm" variant="secondary">
+          Season money
+        </ButtonLink>
+      ) : null}
     </section>
   );
 }
