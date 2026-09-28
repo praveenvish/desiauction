@@ -11,12 +11,13 @@ import {
   teams,
   tournaments,
 } from "@desiauction/db";
-import type { MoneyUnit } from "@desiauction/core";
+import { sportPackFor, type MoneyUnit } from "@desiauction/core";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { systemDb } from "../db";
+import { standingsOf } from "../competition/results";
 
 /**
  * THE PLAYER'S CAREER (PI-1 P5) — the read the data has been waiting for.
@@ -440,4 +441,128 @@ export async function playerUpcomingMatches(
       groundName: row.groundName,
     };
   });
+}
+
+/*
+ * A TEAM'S SEASON, for its owner's home (2026-09-28). After auction night the
+ * owner home stopped moving — purse and top buys while the team was 2–0 with
+ * a match that day. This is the season from the team's side: the next match,
+ * the latest results, the record and the place in the table.
+ *
+ * The same class as the reads above — the system pool, scoped by a subject the
+ * SERVER resolved. `teamId` must come from `rolesOf(session)` (the owner's own
+ * teams), never from a request. Only fixtures the public can see (published,
+ * live, completed), so a draft schedule never shows as fixed.
+ */
+export interface TeamSeasonMatch {
+  fixtureId: string;
+  kickoffAt: string | null;
+  opponentName: string;
+  opponentColor: string | null;
+  groundName: string | null;
+  /** Being played right now. */
+  live: boolean;
+  /** From this team's side; null while it is being played or still to come. */
+  result: "won" | "lost" | "tied" | "no_result" | null;
+}
+
+export interface TeamSeason {
+  /** Published matches still to come (or live), kickoff order. */
+  upcoming: TeamSeasonMatch[];
+  /** Results, newest first. */
+  results: TeamSeasonMatch[];
+  record: { played: number; won: number; lost: number; tied: number };
+  /** Place in the table — null for a lobby-shaped sport or before any team plays. */
+  place: { position: number; of: number; points: number } | null;
+}
+
+export async function teamSeason(teamId: string, today: string): Promise<TeamSeason | null> {
+  const [team] = await systemDb
+    .select({ competitionId: teams.competitionId, sport: competitions.sport })
+    .from(teams)
+    .innerJoin(competitions, eq(competitions.id, teams.competitionId))
+    .where(eq(teams.id, teamId))
+    .limit(1);
+  if (team === undefined) return null;
+  const home = alias(teams, "home_team");
+  const away = alias(teams, "away_team");
+  const rows = await systemDb
+    .select({
+      fixtureId: fixtures.id,
+      kickoffAt: fixtures.kickoffAt,
+      status: fixtures.status,
+      homeTeamId: fixtures.homeTeamId,
+      homeName: home.name,
+      homeColor: home.primaryColor,
+      awayName: away.name,
+      awayColor: away.primaryColor,
+      groundName: grounds.name,
+      outcome: fixtureResults.outcome,
+    })
+    .from(fixtures)
+    .innerJoin(home, eq(home.id, fixtures.homeTeamId))
+    .innerJoin(away, eq(away.id, fixtures.awayTeamId))
+    .leftJoin(grounds, eq(grounds.id, fixtures.groundId))
+    .leftJoin(fixtureResults, eq(fixtureResults.fixtureId, fixtures.id))
+    .where(
+      and(
+        eq(fixtures.competitionId, team.competitionId),
+        or(eq(fixtures.homeTeamId, teamId), eq(fixtures.awayTeamId, teamId)),
+        inArray(fixtures.status, ["published", "in_progress", "completed"]),
+      ),
+    )
+    .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
+    .limit(MATCHES_LIMIT);
+  const matches = rows.map((row) => {
+    const isHome = row.homeTeamId === teamId;
+    const result: TeamSeasonMatch["result"] =
+      row.outcome === null
+        ? null
+        : row.outcome === "tie"
+          ? "tied"
+          : row.outcome === "no_result" || row.outcome === "abandoned"
+            ? "no_result"
+            : (row.outcome === "home_win") === isHome
+              ? "won"
+              : "lost";
+    return {
+      status: row.status,
+      match: {
+        fixtureId: row.fixtureId,
+        kickoffAt: row.kickoffAt,
+        opponentName: isHome ? row.awayName : row.homeName,
+        opponentColor: isHome ? row.awayColor : row.homeColor,
+        groundName: row.groundName,
+        live: row.status === "in_progress",
+        result,
+      },
+    };
+  });
+  const upcoming = matches
+    .filter(
+      ({ status, match }) =>
+        status === "in_progress" ||
+        (status === "published" && (match.kickoffAt === null || match.kickoffAt >= today)),
+    )
+    .map(({ match }) => match);
+  const results = matches
+    .filter(({ status, match }) => status === "completed" && match.result !== null)
+    .map(({ match }) => match)
+    .reverse();
+  const record = { played: results.length, won: 0, lost: 0, tied: 0 };
+  for (const match of results) {
+    if (match.result === "won") record.won += 1;
+    else if (match.result === "lost") record.lost += 1;
+    else if (match.result === "tied") record.tied += 1;
+  }
+  let place: TeamSeason["place"] = null;
+  if (sportPackFor(team.sport).fixtureShape !== "lobby") {
+    const standings = await standingsOf(systemDb, team.competitionId);
+    const index = standings.rows.findIndex((row) => row.teamId === teamId);
+    const row = standings.rows[index];
+    if (row !== undefined && standings.rows.some((entry) => entry.played > 0)) {
+      place = { position: index + 1, of: standings.rows.length, points: row.points };
+    }
+  }
+  return { upcoming, results, record, place };
 }

@@ -165,3 +165,258 @@
     row-gap: var(--space-2);
   }
 }
+
+/* ======================================================================
+   One hero that follows the season (2026-09-28): the stage hero before a
+   team (waiting · pool · auction live), and match day once it is played.
+   The sold moment above stays for the stretch between.
+   ====================================================================== */
+
+.pm-stage,
+.pm-match-hero {
+  --pm-team: var(--accent);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: clamp(var(--space-5), 3vw, var(--space-7, 28px));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
+}
+
+.pm-match-hero {
+  background:
+    radial-gradient(
+      60% 160% at 100% 0%,
+      color-mix(in srgb, var(--pm-team) 32%, transparent),
+      transparent 60%
+    ),
+    var(--surface);
+}
+
+.pm-stage-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4) var(--space-6);
+}
+
+.pm-stage-copy {
+  display: flex;
+  flex: 1 1 22rem;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.pm-stage-title {
+  margin: 0;
+  font-size: var(--text-2xl-size);
+  line-height: 1.2;
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--text-heading);
+}
+
+.pm-stage-line {
+  margin: 0;
+  max-width: 44rem;
+  font-size: var(--text-sm-size);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.pm-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pm-track li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-track li::before {
+  content: "";
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--border-subtle);
+}
+
+.pm-track li[data-state="done"] {
+  color: var(--text-secondary);
+}
+
+.pm-track li[data-state="done"]::before {
+  background: var(--success-base);
+}
+
+.pm-track li[data-state="now"] {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.pm-track li[data-state="now"]::before {
+  background: var(--accent);
+}
+
+/* ---- match day ---- */
+
+.pm-vs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-size: var(--text-3xl-size);
+  line-height: 1.15;
+  font-weight: var(--font-weight-bold, 700);
+  letter-spacing: -0.01em;
+  color: var(--text-heading);
+}
+
+.pm-vs > span:not(.pm-vs-word) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pm-vs i {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 2px var(--border-subtle);
+}
+
+.pm-vs-word {
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-regular, 400);
+  color: var(--text-muted);
+}
+
+.pm-figs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pm-figs > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+}
+
+.pm-figs dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.pm-figs dd {
+  margin: 0;
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-bold, 700);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+/* ---- your matches ---- */
+
+.pm-matches {
+  list-style: none;
+}
+
+.pm-match {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pm-match:first-child {
+  border-top: 0;
+}
+
+.pm-match-when {
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.pm-match-next {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-bold, 700);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.pm-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--text-secondary);
+}
+
+.pm-result[data-result="won"] {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.pm-result[data-result="lost"] {
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+}
+
+@media (max-width: 719px) {
+  .pm-stage-title {
+    font-size: var(--text-xl-size);
+  }
+
+  .pm-vs {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+    font-size: var(--text-2xl-size);
+  }
+
+  .pm-vs-word {
+    font-size: var(--text-sm-size);
+  }
+
+  .pm-stage-main > a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pm-figs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
