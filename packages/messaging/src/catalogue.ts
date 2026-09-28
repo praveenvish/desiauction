@@ -48,6 +48,7 @@ export type NotificationTopic =
   | "auction"
   | "money"
   | "feedback"
+  | "club"
   | "login"
   | "security"
   | "demo"
@@ -329,6 +330,65 @@ const ENTRIES = [
      */
     orgControllable: false,
   },
+  // --- The organizer's club (email programme PR5) -----------------------------
+  // DesiAuction writing to the people who RUN a club. The club's own switch
+  // never applies (orgControllable: false): these are ours, about their club,
+  // not the club's messages to its players.
+  {
+    key: "club.welcome",
+    label: "Club created",
+    description: "Welcomes the organizer who just created a club, with the first steps.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    key: "registration.first",
+    label: "First registration in",
+    description: "Tells a season's organizers its first player has registered.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    key: "registration.digest",
+    label: "Registrations waiting (daily)",
+    description:
+      "At 9 am IST, only on days something is waiting: each season's registrations awaiting review.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    // DesiAuction took a season's public page down. Nobody but a platform admin
+    // can silence it: an organizer must never learn of it from a blank page.
+    key: "season.held",
+    label: "Season taken off public view",
+    description: "DesiAuction made a season's public page private, with the reason.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
+    personControllable: false,
+    orgControllable: false,
+  },
+  {
+    key: "season.released",
+    label: "Season hold lifted",
+    description: "DesiAuction lifted its hold; the organizer may publish the season again.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
+    personControllable: false,
+    orgControllable: false,
+  },
   // --- Strangers: a demo requester, a person reporting a problem -------------
   {
     key: "demo.request_received",
@@ -514,6 +574,10 @@ const TOPIC_COPY: Readonly<Partial<Record<NotificationTopic, { label: string; de
     feedback: {
       label: "Feedback requests",
       detail: "When we ask how a season or DesiAuction worked for you.",
+    },
+    club: {
+      label: "Club updates",
+      detail: "For organizers: registrations waiting for your review, and your club's first steps.",
     },
   };
 

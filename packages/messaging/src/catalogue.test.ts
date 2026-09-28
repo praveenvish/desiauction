@@ -62,12 +62,14 @@ describe("the notification catalogue", () => {
     expect(receipt.channels).toEqual(["email", "in_app"]);
   });
 
-  it("offers a person exactly the four switches /account always had", () => {
+  it("offers a person the four switches /account always had, and organizers' club updates", () => {
     expect(personTopics().map((t) => t.topic)).toEqual([
       "registration",
       "auction",
       "money",
       "feedback",
+      // Email programme PR5: the 9 am digest and the club welcome.
+      "club",
     ]);
   });
 

@@ -236,11 +236,18 @@ function callout(text: string, font: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-notice" style="margin:4px 0 20px;background:${NOTICE};border:1px solid ${NOTICE_EDGE};border-radius:12px;"><tr><td class="da-text" style="padding:14px 16px;font:14px/22px ${font};color:${TEXT};">${body}</td></tr></table>`;
 }
 
+/**
+ * A value this short ("Mon 28 Sep, 7:42 pm IST", "₹1,50,000", "9 waiting · 3
+ * days") stays on one line; the label beside it wraps instead. A long one
+ * ("We call the number you gave us") wraps as prose.
+ */
+const SHORT_VALUE = 24;
+
 function detailsTable(details: readonly (readonly [string, string])[], font: string): string {
   const rows = details
     .map(([label, value], i) => {
       const rule = i === 0 ? "" : `border-top:1px solid ${RULE};`;
-      return `<tr><td class="da-muted da-rule" style="padding:11px 16px 11px 0;${rule}font:14px/20px ${font};color:${MUTED};vertical-align:top;white-space:nowrap;">${escape(label)}</td><td class="da-heading da-rule" align="right" style="padding:11px 0;${rule}font:600 14px/20px ${font};color:${INK};text-align:right;vertical-align:top;font-variant-numeric:tabular-nums;">${escape(value)}</td></tr>`;
+      return `<tr><td class="da-muted da-rule" style="padding:11px 16px 11px 0;${rule}font:14px/20px ${font};color:${MUTED};vertical-align:top;">${escape(label)}</td><td class="da-heading da-rule" align="right" style="padding:11px 0;${rule}font:600 14px/20px ${font};color:${INK};text-align:right;vertical-align:top;font-variant-numeric:tabular-nums;${value.length <= SHORT_VALUE ? "white-space:nowrap;" : ""}">${escape(value)}</td></tr>`;
     })
     .join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-sunken" style="margin:4px 0 24px;background:${SUNKEN};border-radius:12px;"><tr><td style="padding:4px 18px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table></td></tr></table>`;

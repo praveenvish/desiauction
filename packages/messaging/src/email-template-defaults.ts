@@ -908,6 +908,288 @@ const FINANCE: EmailTemplateSpec = {
   },
 };
 
+// --- The organizer's club (email programme PR5) ----------------------------------
+
+const RUN_FOOTNOTE = {
+  en: "You received this because you run {{season}} on DesiAuction.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+};
+const REVIEW_ACTION = { en: "Review registrations", hi: "रजिस्ट्रेशन देखें" };
+const OPEN_SEASON = { en: "Open your season", hi: "अपना सीज़न खोलें" };
+
+/**
+ * "YOUR CLUB IS READY" — to the organizer who just created a club. The three
+ * steps to auction night are a details table the code writes (they name the
+ * product's own screens); the button opens the club.
+ */
+const CLUB_WELCOME: EmailTemplateSpec = {
+  kind: "club.welcome",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "club", description: "The club's own page, where setup continues." }],
+  variables: [NAME, ORG],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{orgName}} is ready on DesiAuction",
+        preheader: "Three steps take you from here to auction night.",
+        heading: "Your club is ready",
+        paragraphs: [
+          "Hi {{name}},",
+          "{{orgName}} is set up on DesiAuction. Three steps take you from here to auction night:",
+        ],
+        after: [
+          `Stuck on anything? Write to ${SUPPORT} and a person will help, or book a 20-minute walkthrough at desiauction.in/schedule-demo.`,
+        ],
+        actions: { club: "Open your club" },
+        footnote: "You received this because you created {{orgName}} on DesiAuction.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{orgName}} DesiAuction पर तैयार है",
+        preheader: "यहाँ से नीलामी की रात तक बस तीन कदम।",
+        heading: "आपका क्लब तैयार है",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{orgName}} DesiAuction पर सेट हो गया है। यहाँ से नीलामी की रात तक बस तीन कदम:",
+        ],
+        after: [
+          `कहीं अटक गए? ${SUPPORT} पर लिखें, हमारी टीम मदद करेगी — या desiauction.in/schedule-demo पर 20 मिनट का डेमो बुक करें।`,
+        ],
+        actions: { club: "अपना क्लब खोलें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि आपने DesiAuction पर {{orgName}} बनाया।",
+      }),
+    ),
+  },
+};
+
+const PLAYER_NAME = text(
+  "playerName",
+  "The player who registered, as they gave their name.",
+  "Rohit Nair",
+  "रोहित नायर",
+);
+
+/** "YOUR FIRST REGISTRATION IS IN" — once per season, to its organizers. */
+const REGISTRATION_FIRST: EmailTemplateSpec = {
+  kind: "registration.first",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "review", description: "The season's registrations awaiting review." }],
+  variables: [NAME, SEASON, PLAYER_NAME],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "First player in: {{playerName}} registered for {{season}}",
+        preheader:
+          "Your season is live. From now on, one summary a morning while registrations wait.",
+        heading: "Your first registration is in",
+        paragraphs: [
+          "Hi {{name}},",
+          "{{playerName}} just registered for {{season}} — your first player. Review them now so they know where they stand.",
+        ],
+        after: [
+          "From here on we'll email you one summary at 9 am on days registrations are waiting, instead of a mail for every player.",
+        ],
+        actions: { review: REVIEW_ACTION.en },
+        footnote: RUN_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "पहला खिलाड़ी आ गया: {{playerName}} ने {{season}} के लिए रजिस्टर किया",
+        preheader:
+          "आपका सीज़न शुरू हो गया। अब से, रजिस्ट्रेशन इंतज़ार में हों तो हर सुबह एक सारांश।",
+        heading: "आपका पहला रजिस्ट्रेशन आ गया",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{playerName}} ने अभी {{season}} के लिए रजिस्टर किया है — आपका पहला खिलाड़ी। अभी देख लें, ताकि उन्हें पता रहे कि वे कहाँ खड़े हैं।",
+        ],
+        after: [
+          "अब से, जिस दिन रजिस्ट्रेशन इंतज़ार में होंगे, हम हर खिलाड़ी के लिए अलग मेल के बजाय सुबह 9 बजे एक सारांश भेजेंगे।",
+        ],
+        actions: { review: REVIEW_ACTION.hi },
+        footnote: RUN_FOOTNOTE.hi,
+      }),
+    ),
+  },
+};
+
+/**
+ * THE 9 AM DIGEST — one mail per organizer per day, only on days something
+ * is waiting, covering every season they review. Each season and its count is
+ * a details table the code writes.
+ */
+const REGISTRATION_DIGEST: EmailTemplateSpec = {
+  kind: "registration.digest",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "review", description: "The registrations awaiting review." }],
+  variables: [
+    NAME,
+    text(
+      "waiting",
+      'How many are waiting, with the noun ("12 registrations", "1 registration").',
+      "12 registrations",
+      "12 रजिस्ट्रेशन",
+      { required: true, computed: true },
+    ),
+  ],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{waiting}} waiting for your review",
+        preheader:
+          "Players are waiting to hear back. Here's where each season stands this morning.",
+        heading: "Registrations waiting for you",
+        paragraphs: [
+          "Hi {{name}},",
+          "Players are waiting to hear back. Here's each season this morning, with how long the oldest has waited:",
+        ],
+        after: ["You get this at 9 am, and only on days something is waiting."],
+        actions: { review: REVIEW_ACTION.en },
+        footnote: "You received this because you review registrations for a club on DesiAuction.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{waiting}} आपकी समीक्षा के इंतज़ार में",
+        preheader: "खिलाड़ी जवाब का इंतज़ार कर रहे हैं। आज सुबह हर सीज़न की स्थिति नीचे है।",
+        heading: "आपके इंतज़ार में रजिस्ट्रेशन",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "खिलाड़ी जवाब का इंतज़ार कर रहे हैं। आज सुबह हर सीज़न की स्थिति, और सबसे पुराना कितने दिन से इंतज़ार में है:",
+        ],
+        after: ["यह मेल सुबह 9 बजे आता है, और सिर्फ़ उन्हीं दिनों जब कुछ इंतज़ार में हो।"],
+        actions: { review: REVIEW_ACTION.hi },
+        footnote:
+          "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर किसी क्लब के रजिस्ट्रेशन देखते हैं।",
+      }),
+    ),
+  },
+};
+
+const CONTEST: LockedBlock = {
+  id: "contest",
+  field: "after",
+  text: {
+    en: `Think this is a mistake? Write to ${SUPPORT} and a person will look at it again.`,
+    hi: `आपको लगता है यह ग़लती है? ${SUPPORT} पर लिखें, हमारी टीम इसे फिर से देखेगी।`,
+  },
+  why: "An organizer whose page we took down must always be told how to contest it.",
+};
+
+/** DesiAuction took a season's public page down — the organizer hears it from us, with why. */
+const SEASON_HELD: EmailTemplateSpec = {
+  kind: "season.held",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "season", description: "The season's own page." }],
+  variables: [
+    NAME,
+    SEASON,
+    text(
+      "reason",
+      "Why the page was taken down, as our moderator wrote it.",
+      "the page used another club's logo",
+      "पेज पर किसी और क्लब का लोगो था",
+      { required: true, computed: true },
+    ),
+  ],
+  locked: [CONTEST],
+  note: "Nobody but a platform admin can stop this mail: an organizer must never learn of a take-down from a blank page.",
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{season}} has been taken off public view",
+        preheader:
+          "Only the public page is hidden. Your season keeps working for you, your players and owners.",
+        heading: "We've hidden your season's public page",
+        paragraphs: [
+          "Hi {{name}},",
+          "DesiAuction has made the public page for {{season}} private. Only the public page is hidden — the season keeps working for you, your players and your team owners.",
+          "The reason: {{reason}}",
+        ],
+        after: [CONTEST.text.en],
+        actions: { season: OPEN_SEASON.en },
+        footnote: RUN_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} को सार्वजनिक पेज से हटा दिया गया है",
+        preheader:
+          "सिर्फ़ सार्वजनिक पेज छिपाया गया है। आपका सीज़न आपके, खिलाड़ियों और मालिकों के लिए चलता रहेगा।",
+        heading: "हमने आपके सीज़न का सार्वजनिक पेज छिपा दिया है",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "DesiAuction ने {{season}} का सार्वजनिक पेज प्राइवेट कर दिया है। सिर्फ़ सार्वजनिक पेज छिपाया गया है — सीज़न आपके, आपके खिलाड़ियों और टीम मालिकों के लिए चलता रहेगा।",
+          "वजह: {{reason}}",
+        ],
+        after: [CONTEST.text.hi],
+        actions: { season: OPEN_SEASON.hi },
+        footnote: RUN_FOOTNOTE.hi,
+      }),
+    ),
+  },
+};
+
+const SEASON_RELEASED: EmailTemplateSpec = {
+  kind: "season.released",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "season", description: "The season's own page, where it is published." }],
+  variables: [NAME, SEASON],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{season}} can go public again",
+        preheader: "We've lifted our hold. It stays private until you publish it.",
+        heading: "Your season's page is back in your hands",
+        paragraphs: [
+          "Hi {{name}},",
+          "We've lifted the hold on {{season}}. It stays private until you publish it again from the season page.",
+        ],
+        actions: { season: OPEN_SEASON.en },
+        footnote: RUN_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} फिर से सार्वजनिक हो सकता है",
+        preheader: "हमने रोक हटा दी है। जब तक आप इसे पब्लिश नहीं करते, यह प्राइवेट रहेगा।",
+        heading: "आपके सीज़न का पेज फिर से आपके हाथ में है",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "हमने {{season}} से रोक हटा दी है। जब तक आप सीज़न पेज से इसे फिर से पब्लिश नहीं करते, यह प्राइवेट रहेगा।",
+        ],
+        actions: { season: OPEN_SEASON.hi },
+        footnote: RUN_FOOTNOTE.hi,
+      }),
+    ),
+  },
+};
+
 // --- Feedback --------------------------------------------------------------------
 
 const ASK_VARIABLES: readonly TemplateVariable[] = [
@@ -1507,6 +1789,11 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
       ],
     },
   }),
+  "club.welcome": CLUB_WELCOME,
+  "registration.first": REGISTRATION_FIRST,
+  "registration.digest": REGISTRATION_DIGEST,
+  "season.held": SEASON_HELD,
+  "season.released": SEASON_RELEASED,
   "auction.sold": SOLD,
   "auction.unsold": UNSOLD,
   "auction.owner_summary": OWNER_SUMMARY,

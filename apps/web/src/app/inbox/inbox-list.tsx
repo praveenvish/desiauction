@@ -110,6 +110,8 @@ const EVENT_ICON: Record<string, { icon: ReactNode; tone: KitTone }> = {
   "registration.received": { icon: <IconInbox />, tone: "blue" },
   "registration.withdrawn": { icon: <IconClose />, tone: "neutral" },
   "registration.restored": { icon: <IconRefresh />, tone: "blue" },
+  "season.held": { icon: <IconAlert />, tone: "amber" },
+  "season.released": { icon: <IconCheckCircle />, tone: "green" },
   "auction.sold": { icon: <IconGavel />, tone: "gold" },
   "auction.unsold": { icon: <IconGavel />, tone: "neutral" },
   "team.appointed": { icon: <IconCrown />, tone: "purple" },

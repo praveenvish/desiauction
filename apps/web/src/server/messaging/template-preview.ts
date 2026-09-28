@@ -5,6 +5,7 @@ import { sampleVariables, type MessageLanguage } from "@desiauction/messaging/em
 import { sportPackFor } from "@desiauction/core";
 
 import { env } from "../../env";
+import { digestDetails, organizerJourney, welcomeFrame } from "./organizer-mail";
 import { journey, seasonBand, submittedDetails } from "./player-mail";
 import { requestDetails } from "./request-context";
 import type { RenderOptions } from "./notification-email";
@@ -96,11 +97,54 @@ const PREVIEW_STEP: Partial<Record<EmailNotificationKind, 1 | 2>> = {
 };
 
 /** The club band and tracker a registration mail carries, with the sample season. */
+const ORGANIZER_KINDS = {
+  "registration.first": true,
+  "registration.digest": true,
+} as const;
+
+/**
+ * What an organizer mail carries, with the samples — built by the same
+ * builders a send uses (organizer-mail.ts), so the preview cannot drift.
+ */
+function organizerFrame(
+  kind: EmailNotificationKind,
+  language: MessageLanguage,
+): Partial<RenderOptions> {
+  const samples = sampleVariables(EMAIL_TEMPLATES[kind], language);
+  const orgName = String(
+    samples["orgName"] ?? (language === "hi" ? "मलाड क्रिकेट क्लब" : "Malad Cricket Club"),
+  );
+  const season = String(samples["season"] ?? "Malad Premier League 2026");
+  const band = seasonBand({ season, orgName, sport: "cricket" });
+  switch (kind) {
+    case "club.welcome":
+      return welcomeFrame(orgName, language);
+    case "registration.first":
+      return { band, progress: organizerJourney(2, language) };
+    case "registration.digest":
+      return {
+        details: digestDetails(
+          [
+            { season, orgName, seasonSlug: "mpl-2026", waiting: 9, oldestDays: 3 },
+            { season: "Under-19 Cup", orgName, seasonSlug: "u19", waiting: 3, oldestDays: 0 },
+          ],
+          language,
+        ),
+      };
+    case "season.held":
+    case "season.released":
+      return { band };
+    default:
+      return {};
+  }
+}
+
 function seasonFrame(
   kind: EmailNotificationKind,
   language: MessageLanguage,
 ): Partial<RenderOptions> {
-  if (!kind.startsWith("registration.")) return {};
+  // The player's registration mails; the organizer's are organizerFrame's.
+  if (!kind.startsWith("registration.") || kind in ORGANIZER_KINDS) return {};
   const step = PREVIEW_STEP[kind];
   // The template's own samples, so the band and the sentences name one season.
   const samples = sampleVariables(EMAIL_TEMPLATES[kind], language);
@@ -131,5 +175,6 @@ export function previewOptions(
     ...(rows === undefined ? {} : { details: rows }),
     ...(kind === "auth.email_code" ? { code: "482913" } : {}),
     ...seasonFrame(kind, language),
+    ...organizerFrame(kind, language),
   };
 }

@@ -39,6 +39,8 @@ const PERSON_EVENT_LABELS = {
   "registration.received": "You registered — the organizer will review it",
   "registration.withdrawn": "Your registration was withdrawn",
   "registration.restored": "Your registration is back under review",
+  "season.held": "DesiAuction hid one of your seasons from public view",
+  "season.released": "DesiAuction lifted its hold on one of your seasons",
   "auth.login.passkey": "Signed in with a passkey",
   "auth.otp.lockout": "Too many wrong codes — sign-in was locked briefly",
   "auth.passkey.enrolled": "Passkey added",

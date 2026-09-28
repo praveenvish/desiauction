@@ -75,6 +75,8 @@ const LAYOUT: Readonly<
   "auth.email_code": { noLinks: true, calloutLast: true },
   "security.email_changed": { calloutLast: true },
   "security.phone_changed": { calloutLast: true },
+  // "Think this is a mistake?" under a take-down: the way back, boxed.
+  "season.held": { calloutLast: true },
   "registration.approved": { whatsappNudge: true },
   "registration.waitlisted": { whatsappNudge: true },
   "registration.rejected": { whatsappNudge: true },

@@ -39,9 +39,14 @@ const MANAGEABLE_TOPICS: ReadonlySet<NotificationTopic> = new Set(
   personTopics().map((entry) => entry.topic),
 );
 
-/** The reader has an /account switch for this kind. */
+/**
+ * The reader has an /account switch for this kind: its topic is one of their
+ * switches AND the kind obeys it. A moderation notice sits under "club" but no
+ * switch stops it, so it must not offer one.
+ */
 export function isSelfManagedKind(kind: NotificationKind): boolean {
-  return MANAGEABLE_TOPICS.has(notificationOf(kind).topic);
+  const entry = notificationOf(kind);
+  return entry.personControllable && MANAGEABLE_TOPICS.has(entry.topic);
 }
 
 export function isSelfManagedTopic(topic: string): topic is NotificationTopic {

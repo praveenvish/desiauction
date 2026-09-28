@@ -132,6 +132,7 @@ import {
   savedMappingFor,
   type SavedMapping,
 } from "./import-mappings";
+import { notifyFirstRegistration } from "../orgs/organizer-notify";
 import { notifyDecision, notifyRegistrationReceived } from "./registration-notify";
 import { seasonOverview, type SeasonOverview } from "./season-overview";
 import { teamsWorkspace, workspaceSightFor, type TeamsWorkspace } from "./team-workspace";
@@ -1399,9 +1400,14 @@ export async function submitRegistrationAction(
   };
   after(async () => {
     try {
-      await inCompetitionOrg(session.personId, competition, (db) =>
-        notifyRegistrationReceived(db, received),
-      );
+      await inCompetitionOrg(session.personId, competition, async (db) => {
+        await notifyRegistrationReceived(db, received);
+        // And the season's organizers, if this is its very first player.
+        await notifyFirstRegistration(db, {
+          competitionId: competition.id,
+          playerPersonId: session.personId,
+        });
+      });
     } catch (error) {
       logger().warn(
         { err: error, competitionId: competition.id },

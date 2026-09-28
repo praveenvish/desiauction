@@ -19,13 +19,16 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { personLabel } from "../../lib/person-label";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
 import { canFinops } from "../financial-operations/authz";
 import { canSettlement } from "../settlement/authz";
+import { logger } from "../logger";
 import { ForbiddenError, can, requireCapability } from "./authz";
+import { notifyClubCreated } from "./organizer-notify";
 import {
   acceptInvite,
   createInvite,
@@ -233,6 +236,22 @@ export async function createOrgAction(
     const org = await withTenantDb(dbHandle, { personId: session.personId, orgId }, (db) =>
       createOrg(db, session.personId, typed, orgId),
     );
+    // "Your club is ready" — after the response, like every notice: the club
+    // exists either way, and a mail provider outage must not say otherwise.
+    after(async () => {
+      try {
+        await withTenantDb(dbHandle, { personId: session.personId, orgId }, (db) =>
+          notifyClubCreated(db, {
+            orgId,
+            orgName: org.name,
+            orgSlug: org.slug,
+            personId: session.personId,
+          }),
+        );
+      } catch (error) {
+        logger().warn({ err: error, orgId }, "club.welcome_notice_failed");
+      }
+    });
     return { created: org.slug };
   } catch {
     /*

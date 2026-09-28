@@ -65,6 +65,10 @@ export type SecurityAction =
   | "registration.received"
   | "registration.withdrawn"
   | "registration.restored"
+  // Email programme PR5: DesiAuction held (or released) a season's public page —
+  // on each organizer's own ledger, so they never learn it from a blank page.
+  | "season.held"
+  | "season.released"
   | "registration.rejected"
   | "registration.waitlisted"
   // The night itself. Being sold at auction is the moment this whole product

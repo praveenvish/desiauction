@@ -301,6 +301,10 @@
     "apps/web/src/server/messaging/unsubscribe-writer.ts": {
       "class": "by-design",
       "reason": "One-click unsubscribe (RFC 8058): turns ONE of a person's own /account switches off from a signed mail link, with no session. notification_preferences and consent_records are person-scoped, not a club's \u2014 the same app-pool write setNotificationPreferenceAction makes (messaging/actions.ts). The HMAC link (unsubscribe.ts) is the proof and covers exactly one person and one topic."
+    },
+    "apps/web/src/server/competition/registration-digest.ts": {
+      "class": "by-design",
+      "reason": "The organizers' 9 am digest (email programme PR5), run by the feedback job with no session: it reads, across every club, which seasons have registrations in 'submitted' and which owners/staff (live grant AND membership) review them \u2014 counts, season names and person ids only, on the system pool, the same shape as reviews/review-sweep.ts. Each digest is then queued on the app pool (message_outbox, keyed by person, no RLS) and the drain applies each person's gate inside their club's scope (outbox.ts mayDeliver). There is no single tenant to scope a cross-club sweep to."
     }
   }
 }
