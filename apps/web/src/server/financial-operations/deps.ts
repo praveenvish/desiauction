@@ -8,6 +8,7 @@ import {
 } from "@desiauction/financial-operations/server";
 
 import type { EmailAdapterConfig } from "@desiauction/messaging/email-adapter";
+import { mailProviderFromEnv } from "@desiauction/messaging/mail-provider";
 import {
   financeDeliveryAdapters,
   resolveOwnerEmail,
@@ -43,12 +44,9 @@ export { resolveOwnerEmail };
  * change without a restart, and a per-request check would invite a deploy where
  * half the requests mail and half write files.
  */
+const emailProvider = mailProviderFromEnv(env);
 const emailConfig: EmailAdapterConfig | null =
-  env.EMAIL_API_ENDPOINT !== undefined &&
-  env.EMAIL_API_KEY !== undefined &&
-  env.EMAIL_FROM !== undefined
-    ? { endpoint: env.EMAIL_API_ENDPOINT, apiKey: env.EMAIL_API_KEY, from: env.EMAIL_FROM }
-    : null;
+  emailProvider === null ? null : { provider: emailProvider };
 
 // PRR P1-4: the shared S3 store when configured, otherwise the filesystem store
 // (finopsDeps falls back to it when `artifacts` is undefined). Built once.

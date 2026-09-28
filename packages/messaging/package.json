@@ -13,6 +13,8 @@
     "./gate": "./src/gate.ts",
     "./in-app-adapter": "./src/in-app-adapter.ts",
     "./language": "./src/language.ts",
+    "./mail-provider": "./src/mail-provider.ts",
+    "./mail-provider-config": "./src/mail-provider-config.ts",
     "./platform-switches": "./src/platform-switches.ts",
     "./provider-fetch": "./src/provider-fetch.ts",
     "./template-store": "./src/template-store.ts",

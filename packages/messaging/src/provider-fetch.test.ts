@@ -30,11 +30,11 @@ afterAll(async () => {
 });
 
 describe("providerFetch — every provider call has a deadline", () => {
-  it("returns the status and body of an answer", async () => {
-    expect(await providerFetch(`${base}/ok`, { method: "GET", headers: {} }, 1_000)).toEqual({
-      status: 200,
-      body: "fine",
-    });
+  it("returns the status, body and headers of an answer", async () => {
+    const answer = await providerFetch(`${base}/ok`, { method: "GET", headers: {} }, 1_000);
+    expect(answer).toMatchObject({ status: 200, body: "fine" });
+    // Lower-cased, as SES's `x-amzn-errortype` is read.
+    expect(answer.headers?.["content-length"]).toBe("4");
   });
 
   it("gives up on a body that never finishes, and says it was the deadline", async () => {

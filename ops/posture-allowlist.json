@@ -18,9 +18,9 @@
     "  before launch."
   ],
   "allow": {
-    "apps/web/src/app/api/webhooks/delivery-status/route.ts": {
+    "apps/web/src/server/messaging/email-events.ts": {
       "class": "by-design",
-      "reason": "FIXED (PA-1R 2.1). The finops write now runs inside withTenantDb on the app role, and the suppression on the app pool. The remaining system-pool use is ONE id\u2192org lookup that opens that boundary \u2014 the dispatch's org is the only thing that can, and reading it is itself org-scoped. Adapter-verified id, single column, no write."
+      "reason": "FIXED (PA-1R 2.1); moved here from the delivery-status route so the SES/SNS route shares it. The finops write runs inside withTenantDb on the app role, and the suppression (deduplicated) on the app pool \u2014 suppressions carries no org_id and no RLS: a bounce is a fact about an address. The remaining system-pool use is ONE id\u2192org lookup that opens that boundary \u2014 the dispatch's org is the only thing that can, and reading it is itself org-scoped. Adapter-verified id, single column, no write."
     },
     "apps/web/src/app/api/webhooks/razorpay/route.ts": {
       "class": "by-design",
