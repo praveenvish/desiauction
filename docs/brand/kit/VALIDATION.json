@@ -425,16 +425,46 @@
    "name": "Tagline not letter-spaced",
    "ok": true,
    "detail": "Devanagari tracking 0 keeps the shirorekha (headline) joined"
+  },
+  {
+   "area": "Social",
+   "name": "social/facebook-cover-1640x624.png",
+   "ok": true,
+   "detail": "1640×624 · logo 79px inside the safe zone (mobile crops to the centre) · 271 KB"
+  },
+  {
+   "area": "Social",
+   "name": "social/x-header-1500x500.png",
+   "ok": true,
+   "detail": "1500×500 · logo 71px inside the safe zone (clear of the profile photo and the phone trim) · 227 KB"
+  },
+  {
+   "area": "Social",
+   "name": "social/linkedin-cover-1128x191.png",
+   "ok": true,
+   "detail": "1128×191 · logo 22px inside the safe zone (clear of the company logo) · 86 KB"
+  },
+  {
+   "area": "Social",
+   "name": "social/youtube-banner-2560x1440.png",
+   "ok": true,
+   "detail": "2560×1440 · logo 53px inside the safe zone (inside the 1546 x 423 area every device shows) · 585 KB"
+  },
+  {
+   "area": "Social",
+   "name": "social/avatar-1080.png",
+   "ok": true,
+   "detail": "1080×1080 · glyph reaches 70.2% of the circle crop (limit 80%)"
   }
  ],
  "files": [
   [
    "README.txt",
-   607
+   725
   ],
   [
    "VALIDATION.json",
-   7098
+   13881
   ],
   [
    "favicon/apple-touch-icon.png",
@@ -474,7 +504,7 @@
   ],
   [
    "index.html",
-   144775
+   187693
   ],
   [
    "logo/da-glyph-gold.svg",
@@ -707,6 +737,26 @@
   [
    "print/lockup-light-cmyk.pdf",
    4467
+  ],
+  [
+   "social/avatar-1080.png",
+   23317
+  ],
+  [
+   "social/facebook-cover-1640x624.png",
+   277336
+  ],
+  [
+   "social/linkedin-cover-1128x191.png",
+   88098
+  ],
+  [
+   "social/x-header-1500x500.png",
+   232551
+  ],
+  [
+   "social/youtube-banner-2560x1440.png",
+   599423
   ],
   [
    "sound/da-sting.m4a",

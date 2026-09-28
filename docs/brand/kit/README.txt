@@ -7,5 +7,6 @@ favicon/  favicon.ico, iOS and Android icons, site.webmanifest, head-snippet.htm
 motion/   the strike: MP4 (square, 9:16, 16:9), transparent WebM, GIF, and a live HTML version
 sound/    the sting (WAV, M4A) and the live-room SOLD cue for reference
 print/    CMYK PDF + EPS, spot-colour PDF, one-colour files, and brand-print-spec.pdf for printers
+social/   profile picture and covers: Facebook 1640x624, X 1500x500, LinkedIn 1128x191, YouTube 2560x1440
 
-71/71 automated checks pass (VALIDATION.json).
+76/76 automated checks pass (VALIDATION.json).
