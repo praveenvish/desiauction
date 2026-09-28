@@ -1,0 +1,9 @@
+/* ---- The live board's own rules (kept out of admin.css: sibling redesigns
+   append there and conflict) ---- */
+
+/* A quiet room on a phone is two lines: the lots move into the meta line. */
+@media (max-width: 1023px) {
+  .live-quiet-row .live-quiet-facts {
+    display: none;
+  }
+}
