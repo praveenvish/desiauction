@@ -27,10 +27,10 @@ import {
   type ScheduleView,
 } from "../../../../server/competition/fixture-actions";
 import type { FixtureTimelineEntry } from "../../../../server/competition/fixtures";
-import { FixtureStatusPill } from "../_tabs/fixture-status";
+import { FixtureStatusPill, awaitsResult } from "../_tabs/fixture-status";
 import { TeamCrest } from "../_tabs/team-crest";
 import { LineupSideEditor } from "../lineups/lineup-side-editor";
-import { DuelResultForm, LobbyResultForm } from "./result-form";
+import { DuelResultForm, LobbyResultForm, type NextOwed } from "./result-form";
 import { isLobby, primaryScore, resultSentence, type ModelResult } from "./schedule-model";
 
 /**
@@ -172,6 +172,8 @@ export function MatchPanel({
   grounds,
   canManage,
   closeHref,
+  nextOwed = null,
+  today,
 }: {
   slug: string;
   selected: Selected;
@@ -180,6 +182,9 @@ export function MatchPanel({
   grounds: Grounds;
   canManage: boolean;
   closeHref: string;
+  /** The next match owed a result — opened after this one's result is saved. */
+  nextOwed?: NextOwed | null;
+  today: string;
 }) {
   const terms = useSportTerms();
   const router = useRouter();
@@ -197,7 +202,13 @@ export function MatchPanel({
   const title = lobby
     ? `Lobby · ${String(fixture.squadCount)} squads`
     : `${fixture.homeTeamName ?? "TBA"} v ${fixture.awayTeamName ?? "TBA"}`;
-  const step = canManage ? NEXT_STEP[fixture.status as keyof typeof NEXT_STEP] : undefined;
+  const baseStep = canManage ? NEXT_STEP[fixture.status as keyof typeof NEXT_STEP] : undefined;
+  // Its day has passed and nobody started it: what is owed is the score, and
+  // starting is how the score form opens.
+  const step =
+    baseStep !== undefined && baseStep.action === "start" && awaitsResult(fixture, today)
+      ? { action: "start" as const, label: "Enter the score" }
+      : baseStep;
   const movable = fixture.status === "scheduled" || fixture.status === "published";
   const cancellable = fixture.status !== "completed" && fixture.status !== "cancelled";
   const played = fixture.status === "in_progress" || fixture.status === "completed";
@@ -246,7 +257,7 @@ export function MatchPanel({
       closeHref={closeHref}
       eyebrow={
         <>
-          <FixtureStatusPill status={fixture.status} />
+          <FixtureStatusPill status={fixture.status} overdue={awaitsResult(fixture, today)} />
           <span className="st-mono">{fixture.number}</span>
         </>
       }
@@ -388,6 +399,7 @@ export function MatchPanel({
                   slug={slug}
                   fixture={fixture}
                   scoreFields={scoreFields}
+                  next={nextOwed}
                 />
               ) : (
                 <DuelResultForm
@@ -396,6 +408,7 @@ export function MatchPanel({
                   fixture={fixture}
                   result={result}
                   scoreFields={scoreFields}
+                  next={nextOwed}
                 />
               )}
             </section>
