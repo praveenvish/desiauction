@@ -216,6 +216,16 @@ const envSchema = z.object({
    */
   SES_FEEDBACK_ADDRESS: z.email().optional(),
   /**
+   * The SNS topic SES publishes bounce/complaint/delivery events to. Unset
+   * CLOSES /api/webhooks/ses (404) — the sibling webhooks' rule. Only messages
+   * from exactly this topic are acted on, because any AWS account can get a
+   * validly signed SNS message from a topic of its own.
+   */
+  SES_SNS_TOPIC_ARN: z
+    .string()
+    .regex(/^arn:aws:sns:[a-z]{2}(-[a-z]+)+-\d:\d{12}:[A-Za-z0-9_-]{1,256}$/, "an SNS topic ARN")
+    .optional(),
+  /**
    * "Get photos from Google Drive" (Google Picker + drive.file). All three are
    * PUBLIC by design — they sit in the page, and the key is locked to our
    * origins and the Picker API in Google Cloud — so they are served to the

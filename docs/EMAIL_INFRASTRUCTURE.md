@@ -5,8 +5,10 @@ demo bookings) is sent through **Amazon SES** in **Mumbai (`ap-south-1`)**.
 Business mailboxes stay on **Zoho Mail**, untouched. Resend is kept configured
 as the rollback until SES has run cleanly for a few weeks.
 
-Status (2026-09-28): code merged behind `EMAIL_PROVIDER`; AWS account, SES
-identity, DNS and production access are in progress — see "Setup checklist".
+Status (2026-09-28): AWS account `561965250144` (Paid plan, SES à la carte),
+identity `mail.desiauction.in` created with DKIM + MAIL FROM, DNS published,
+config set / SNS topic / IAM user / budget created. Remaining: access key,
+sandbox tests, site live, production access — see "Setup checklist".
 
 ## Architecture
 
@@ -15,9 +17,12 @@ Hostinger VPS (web + finops-runner)
    │  HTTPS, SigV4-signed, SES v2 SendEmail
    ▼
 Amazon SES ap-south-1 (shared IPs) ──► recipients' inboxes
-   │  bounces/complaints
+   │  bounces / complaints / deliveries
    ├─► account suppression list (automatic, free)
-   └─► email report to bounces@desiauction.in (Zoho alias)
+   ├─► email report to bounces@desiauction.in (Zoho alias)
+   └─► SNS topic ─HTTPS─► /api/webhooks/ses (signature + topic checked)
+                              ├─► app `suppressions` table
+                              └─► finops: receipt dispatch delivered / failed
 
 Zoho Mail (desiauction.in root) ── business mailboxes, UNCHANGED
 ```
@@ -29,8 +34,8 @@ Zoho Mail (desiauction.in root) ── business mailboxes, UNCHANGED
 - **No AWS SDK.** SES is called over its JSON API with a hand-rolled SigV4
   signer (`packages/messaging/src/sigv4.ts`, proved against AWS's published
   test vectors), the same approach the repo already uses for S3.
-- **No other AWS services.** No EC2, S3, Route 53, Lambda, SQS or dedicated IP.
-  SNS is an optional later step (see "Bounce and complaint handling").
+- **One other AWS service: SNS**, only to carry SES events to the app (free at
+  this volume). No EC2, S3, Route 53, Lambda, SQS or dedicated IP.
 
 ### Code map
 
@@ -43,7 +48,11 @@ Zoho Mail (desiauction.in root) ── business mailboxes, UNCHANGED
 | `apps/web/src/server/messaging/transactional-mail.ts` | Everything else the web sends, incl. the outbox drain (`HttpTransactionalMailer`) |
 | `packages/messaging/src/email-adapter.ts` | Receipts, invoices, corrections (finops `DeliveryPort`) |
 | `apps/finops-runner/src/delivery.ts` | The runner's wiring of the finops adapter |
-| `apps/web/scripts/mail-test.ts` | Send ONE test email through the configured provider |
+| `apps/web/src/app/api/webhooks/ses/route.ts` | SNS → SES events endpoint (thin) |
+| `apps/web/src/server/messaging/sns.ts` | SNS signature verification (AWS's documented check, `node:crypto`) |
+| `apps/web/src/server/messaging/ses-webhook.ts` | What each SES event means: suppress, report to finops, ignore |
+| `apps/web/src/server/messaging/email-events.ts` | The database half, shared with `/api/webhooks/delivery-status` |
+| `apps/web/scripts/mail-test.ts` | Send test email — bare, or every real template design — or write HTML previews |
 
 Every sender keeps its own breaker, outcomes and retry rules; only the request
 format moved into the provider. SES errors are classified there:
@@ -66,6 +75,7 @@ Names only — values live in `.env.local` (dev) and `web.env` + `runner.env`
 | `SES_SECRET_ACCESS_KEY` | web, runner | same |
 | `SES_CONFIGURATION_SET` | web, runner | `desiauction-transactional` |
 | `SES_FEEDBACK_ADDRESS` | web, runner | `bounces@desiauction.in` (verified in SES) |
+| `SES_SNS_TOPIC_ARN` | web | `arn:aws:sns:ap-south-1:561965250144:desiauction-ses-events` — unset closes `/api/webhooks/ses` (404) |
 | `EMAIL_API_ENDPOINT` / `EMAIL_API_KEY` | web, runner | Resend — keep until cleanup |
 
 A production process **refuses to boot** without a configured mailer, and a
@@ -85,6 +95,9 @@ All in `ap-south-1`. Only sending costs money.
 | SES email identity | `bounces@desiauction.in` (feedback address) | free |
 | Configuration set | `desiauction-transactional` | free |
 | Account suppression list | BOUNCE + COMPLAINT | free |
+| SNS topic | `desiauction-ses-events` (standard) | first 1M publishes + 100k HTTPS deliveries/month free |
+| SNS subscription | HTTPS → `https://desiauction.in/api/webhooks/ses`, raw delivery OFF (after the site is live) | free |
+| Config-set event destination | `ses-events` → the topic; Hard bounces, Complaints, Deliveries | free |
 | IAM user | `desiauction-mailer`, no console access, one inline policy | free |
 | Budget | `monthly-5-usd`, email alert at 80% | free |
 
@@ -99,9 +112,9 @@ All in `ap-south-1`. Only sending costs money.
       "Effect": "Allow",
       "Action": "ses:SendEmail",
       "Resource": [
-        "arn:aws:ses:ap-south-1:<ACCOUNT_ID>:identity/mail.desiauction.in",
-        "arn:aws:ses:ap-south-1:<ACCOUNT_ID>:identity/bounces@desiauction.in",
-        "arn:aws:ses:ap-south-1:<ACCOUNT_ID>:configuration-set/desiauction-transactional"
+        "arn:aws:ses:ap-south-1:561965250144:identity/mail.desiauction.in",
+        "arn:aws:ses:ap-south-1:561965250144:identity/bounces@desiauction.in",
+        "arn:aws:ses:ap-south-1:561965250144:configuration-set/desiauction-transactional"
       ],
       "Condition": {
         "StringEquals": { "ses:FromAddress": "no-reply@mail.desiauction.in" }
@@ -125,14 +138,14 @@ Hostinger's Name field appends the domain — enter the part before
 
 | Type | Name | Value |
 |---|---|---|
-| CNAME | `<token1>._domainkey.mail` | `<token1>.dkim.amazonses.com` |
-| CNAME | `<token2>._domainkey.mail` | `<token2>.dkim.amazonses.com` |
-| CNAME | `<token3>._domainkey.mail` | `<token3>.dkim.amazonses.com` |
+| CNAME | `lgwx7ikjosf5mwl5nre3qy5uioc4byin._domainkey.mail` | `lgwx7ikjosf5mwl5nre3qy5uioc4byin.dkim.amazonses.com` |
+| CNAME | `7hmmiygebgoshfoe3oadjjaamddizyyi._domainkey.mail` | `7hmmiygebgoshfoe3oadjjaamddizyyi.dkim.amazonses.com` |
+| CNAME | `w4rliyz3b6fcz4nja6n4zumrdos7xg2e._domainkey.mail` | `w4rliyz3b6fcz4nja6n4zumrdos7xg2e.dkim.amazonses.com` |
 | MX | `bounce.mail` | `feedback-smtp.ap-south-1.amazonses.com` (priority 10) |
 | TXT | `bounce.mail` | `v=spf1 include:amazonses.com ~all` |
 
-Tokens are shown in SES → Identities → `mail.desiauction.in` → DKIM; record
-the real values here once published.
+Published 2026-09-28 (TTL 3600) and confirmed on `ns1.dns-parking.com`. Also
+present and untouched: Hostinger Reach's `reach-a/reach-b._domainkey` CNAMEs.
 
 ### Preserved — never edit or delete
 
@@ -164,7 +177,7 @@ is instant.
 Check from anywhere (authoritative, no cache):
 
 ```bash
-dig +short CNAME <token1>._domainkey.mail.desiauction.in @ns1.dns-parking.com
+dig +short CNAME lgwx7ikjosf5mwl5nre3qy5uioc4byin._domainkey.mail.desiauction.in @ns1.dns-parking.com
 dig +short MX bounce.mail.desiauction.in @ns1.dns-parking.com
 dig +short TXT bounce.mail.desiauction.in @ns1.dns-parking.com
 ```
@@ -205,27 +218,41 @@ month).
 
 ## Bounce and complaint handling
 
-**Now (no extra AWS service):**
+Three layers, cheapest first:
 
-1. SES account-level suppression list (BOUNCE + COMPLAINT): SES stops sending
-   to an address that hard-bounced or complained.
-2. Reports are emailed to `SES_FEEDBACK_ADDRESS` (`bounces@desiauction.in`,
+1. **SES account-level suppression list** (BOUNCE + COMPLAINT): SES itself
+   stops sending to an address that hard-bounced or complained.
+2. **Email reports** to `SES_FEEDBACK_ADDRESS` (`bounces@desiauction.in`,
    Zoho) for a human to see.
-3. The app's own gate already sends notifications only to addresses the person
-   verified with a code, which keeps bounce rates low.
+3. **SES events → SNS → `/api/webhooks/ses`** into the app:
+
+| SES event | App action |
+|---|---|
+| Bounce, `Permanent` | address added to `suppressions` (reason `bounce`); a receipt's dispatch → failed |
+| Bounce, `Transient` / `Undetermined` | nothing — a full mailbox is not a reason to stop |
+| Complaint | address added to `suppressions` (reason `complaint`); a receipt's dispatch → failed |
+| Delivery | a receipt's dispatch → delivered (the adapter tags each receipt `dispatch=<id>`) |
+| Send, Open, Click, DeliveryDelay, Reject | ignored |
+
+The route verifies AWS's SNS signature (certificate only from
+`sns.<region>.amazonaws.com`) **and** that the message came from
+`SES_SNS_TOPIC_ARN` — any AWS account can get a valid signature on a topic of
+its own, so the ARN check is not optional. It confirms the SNS subscription
+automatically (only for our topic, only via an SNS URL). Forged or foreign
+messages get 403; a database failure gets 503 so SNS redelivers. Suppressions
+are deduplicated and the finops ingest is idempotent, so redelivery is safe.
+The app's notification gate already skips suppressed addresses.
+
+Cost at 150k emails/month with all three event types: ~150k SNS HTTPS
+deliveries, 100k free, the rest $0.60/million — about **$0.03/month**.
 
 AWS's review thresholds: bounce rate 5% (pause at 10%), complaint rate 0.1%
 (pause at 0.5%). Watch SES → Reputation metrics weekly. Gmail does not report
 complaints to SES; Google Postmaster Tools covers that gap (optional, free).
 
-**Later (optional, ~$0 at this volume):** an SNS topic on the configuration
-set, delivering Bounce/Complaint/Delivery events to a new
-`/api/webhooks/ses` route that verifies the SNS signature, writes the app's
-`suppressions` table and confirms finops dispatches (each receipt is already
-tagged `dispatch=<id>`). The existing `/api/webhooks/delivery-status` never
-worked with Resend either (it expects a shared-secret header Resend cannot send,
-and top-level fields Resend nests under `data`), so this is new capability, not
-a regression.
+`/api/webhooks/delivery-status` (the generic shared-secret callback) never
+worked with Resend — it expects a header Resend cannot send and top-level
+fields Resend nests under `data` — and is kept for providers that fit it.
 
 ## Known limitation
 
@@ -245,6 +272,8 @@ preferable to a missing one.
 | 5 | Publish the 5 DNS records in Hostinger | Founder / Claude |
 | 6 | Zoho alias `bounces@desiauction.in`; verify it in SES | Founder |
 | 7 | Configuration set `desiauction-transactional`; suppression list BOUNCE+COMPLAINT | Claude |
+| 7b | SNS topic `desiauction-ses-events`; config-set event destination (Bounce, Complaint, Delivery) → topic | Claude |
+| 7c | After the site is live: HTTPS subscription → `/api/webhooks/ses` with `SES_SNS_TOPIC_ARN` set (auto-confirms) | Claude |
 | 8 | IAM user `desiauction-mailer` + inline policy + access key → `.env.local` | Founder (key is shown once) |
 | 9 | Sandbox tests (below) | Claude + founder |
 | 10 | Site live; request production access | Founder submits |
@@ -260,7 +289,14 @@ Zoho, a Gmail and an Outlook address in SES → Identities).
 pnpm --filter web mail:test --to=you@gmail.com --kind=plain
 pnpm --filter web mail:test --to=you@gmail.com --kind=html
 pnpm --filter web mail:test --to=you@outlook.com --kind=ics
+# every real design (default wording, sample values), one at a time
+pnpm --filter web mail:test --to=you@gmail.com --template=all --language=en
+pnpm --filter web mail:test --to=you@gmail.com --template=all --language=hi
+# no sending: all 65 designs × languages × versions as HTML files
+pnpm --filter web mail:test --preview=/tmp/mail-preview
 ```
+
+`--template=all` is ~20 messages per language — inside the sandbox's 200/day.
 
 Then through the app, with `EMAIL_PROVIDER=ses` locally: email sign-in code,
 sign-up code, a registration notification (outbox), the demo booking (`.ics`),
