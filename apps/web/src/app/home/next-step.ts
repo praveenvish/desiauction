@@ -124,7 +124,7 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
       title: first.label,
       why:
         input.attention.length > 1
-          ? `${String(input.attention.length - 1)} more thing${input.attention.length === 2 ? " is" : "s are"} waiting below — this one is first.`
+          ? `Start here — ${String(input.attention.length - 1)} more thing${input.attention.length === 2 ? " is" : "s are"} waiting below.`
           : "Nothing else is waiting on you.",
       cta: { label: first.verb ?? attentionVerb(first.href), href: first.href },
       tone: "action",

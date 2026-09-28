@@ -626,7 +626,7 @@ export default async function ReportsPage({
                   <span>
                     {[
                       `${count(play.played)} played`,
-                      `${count(play.live)} live`,
+                      play.live > 0 ? `${count(play.live)} live` : null,
                       play.awaiting > 0 ? `${count(play.awaiting)} awaiting a result` : null,
                       `${count(play.toCome)} to come`,
                     ]

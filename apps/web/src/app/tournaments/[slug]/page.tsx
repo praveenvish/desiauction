@@ -474,7 +474,9 @@ function SoFar({ slug, view, today }: { slug: string; view: SeasonSoFarView; tod
   const results = play.recent.slice(0, 2);
   // Owed results lead (census 9: the list showed two results and nothing of
   // the three matches whose day passed unscored).
-  const due = play.awaitingMatches.slice(-2);
+  // Every owed match, up to three — "3 matches need a result" sat over a list
+  // that showed two (census 10).
+  const due = play.awaitingMatches.slice(0, 3);
   const upcoming = play.upcoming.slice(0, Math.max(1, 4 - results.length - due.length));
   return (
     <div className="tx-sofar" data-testid="tournament-so-far">

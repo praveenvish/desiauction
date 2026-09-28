@@ -88,6 +88,8 @@ export interface HomeTopCompetition {
   canSeeMoney: boolean;
   /** The season's auction has been run (completed or reconciled) — the badge's next word. */
   auctionDone: boolean;
+  /** Matches on the books — after the night the badge follows the season, not the auction. */
+  fixtures: number;
   teams: number;
   registrations: number;
   collectedPaise: number;
@@ -774,6 +776,7 @@ export async function homeDashboard(): Promise<HomeDashboardData> {
       settlement: caseStatusBy.get(competition.id) ?? null,
       canSeeMoney: settleable.has(competition.orgId),
       auctionDone: auctionDoneFor.has(competition.id),
+      fixtures: fixturesBy.get(competition.id) ?? 0,
       teams: teamsBy.get(competition.id) ?? 0,
       registrations: registrationsBy.get(competition.id) ?? 0,
       collectedPaise: collectedBy.get(competition.id) ?? 0,

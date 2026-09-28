@@ -90,7 +90,9 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
               dot
               testId="standings-completeness"
             >
-              {standings.recorded} of {standings.playable} results in
+              {standings.awaiting > 0
+                ? `${String(standings.recorded)} results in · ${String(standings.awaiting)} owed`
+                : `${String(standings.recorded)} of ${String(standings.playable)} results in`}
             </Pill>
           }
           flush={standings.rows.length > 0}
