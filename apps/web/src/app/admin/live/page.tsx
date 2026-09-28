@@ -5,6 +5,7 @@ import { adminLiveBoard } from "../../../server/admin/live-watch";
 import { LiveBoard } from "./live-board";
 import "../../seasons/seasons.css";
 import "../admin.css";
+import "./live.css";
 import { AdminPageHead } from "../admin-ui";
 
 export const metadata = { title: "Live · Platform admin · DesiAuction" };
