@@ -51,12 +51,13 @@
   color: var(--text-on-dark);
 }
 
-.rd-checks > li[data-pass="false"] .rd-mark {
+/* One mark per state, told apart by shape as well as colour. */
+.rd-checks > li[data-state="block"] .rd-mark {
   background: var(--danger-subtle);
   color: var(--danger-strong);
 }
 
-.rd-checks > li[data-pass="false"][data-soft="true"] .rd-mark {
+.rd-checks > li[data-state="warn"] .rd-mark {
   background: var(--warning-subtle);
   color: var(--warning-strong);
 }
@@ -143,5 +144,207 @@
 
   .rd-actions > * {
     flex: 1 1 100%;
+  }
+}
+
+/* ---- The verdict: the answer to "can I start?", the steps, the one button ---- */
+
+.rd-verdict {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background: var(--accent-subtle);
+}
+
+.rd-verdict[data-tone="done"],
+.rd-verdict[data-tone="ready"] {
+  border-color: var(--success-base);
+  background: var(--success-subtle);
+}
+
+.rd-verdict-head {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+}
+
+.rd-verdict-head h2 {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-2xl-size);
+  line-height: 1.2;
+  color: var(--text-heading);
+}
+
+.rd-verdict-head p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.rd-steps {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rd-steps > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.rd-step-n {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.rd-steps > li[data-now] .rd-step-n {
+  background: var(--accent);
+  color: var(--text-heading);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+.rd-steps .rd-text {
+  padding-top: 3px;
+}
+
+.rd-steps .rd-text strong {
+  font-size: var(--text-md-size);
+}
+
+.rd-short {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  font-size: var(--text-sm-size);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.rd-short > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--warning-strong);
+}
+
+.rd-short strong {
+  color: var(--text-heading);
+}
+
+/* ---- Checks beside the preparation, the record folded after the night ---- */
+
+.rd-grid {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .rd-grid:not([data-over]) {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+}
+
+.rd-prep {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.rd-figure {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.rd-areas > li[data-quiet] .rd-figure {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-muted);
+}
+
+.rd-areas > li[data-attention] .rd-figure {
+  color: var(--warning-strong);
+}
+
+.rd-areas > li {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.rd-record {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.rd-record > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.rd-record > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rd-record > summary > span:nth-child(2) {
+  flex: 1 1 auto;
+}
+
+.rd-record > summary strong {
+  color: var(--text-heading);
+}
+
+.rd-record > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xl);
+}
+
+.rd-record-show {
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+.rd-record[open] .rd-record-show {
+  visibility: hidden;
+}
+
+.rd-record > .rd-checks {
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+@media (max-width: 719px) {
+  .rd-verdict {
+    padding: var(--space-4);
+  }
+
+  .rd-verdict-head h2 {
+    font-size: var(--text-xl-size);
+  }
+
+  .rd-record-show {
+    display: none;
   }
 }
