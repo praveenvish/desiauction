@@ -456,15 +456,45 @@ warn(
 // The door that works without DLT. With EMAIL_PROVIDER=auto and no mailer the
 // web tier used to fall back to the dev inbox silently; env.ts now refuses to
 // boot, and this says so before the deploy rather than at it.
+//
+// Mirrors packages/messaging/src/mail-provider-config.ts (this file is plain
+// JS and cannot import it): ses needs SES_*, resend/http need EMAIL_API_*,
+// auto takes whichever is complete (Resend first), dev is never a mailer.
+function mailerOf(e) {
+  const has = (name) => Boolean(e[name]);
+  const resend = has("EMAIL_API_ENDPOINT") && has("EMAIL_API_KEY") && has("EMAIL_FROM");
+  const ses =
+    has("SES_REGION") &&
+    has("SES_ACCESS_KEY_ID") &&
+    has("SES_SECRET_ACCESS_KEY") &&
+    has("EMAIL_FROM");
+  switch (e.EMAIL_PROVIDER ?? "auto") {
+    case "dev":
+      return null;
+    case "ses":
+      return ses ? "ses" : null;
+    case "resend":
+    case "http":
+      return resend ? "resend" : null;
+    default:
+      return resend ? "resend" : ses ? "ses" : null;
+  }
+}
+const webMailer = mailerOf(env);
 check(
   "EMAIL_MAILER",
-  env.EMAIL_PROVIDER !== "dev" &&
-    Boolean(env.EMAIL_API_ENDPOINT) &&
-    Boolean(env.EMAIL_API_KEY) &&
-    Boolean(env.EMAIL_FROM),
+  webMailer !== null,
   "email sign-in codes and receipts need a real mailer",
-  "set EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM (and leave EMAIL_PROVIDER unset or http)",
+  "set EMAIL_PROVIDER=ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM (or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM)",
 );
+if (webMailer === "ses") {
+  check(
+    "EMAIL_SES_FEEDBACK",
+    Boolean(env.SES_FEEDBACK_ADDRESS),
+    "SES bounce and complaint reports reach a mailbox a person reads",
+    "set SES_FEEDBACK_ADDRESS to the verified Zoho alias (bounces@desiauction.in)",
+  );
+}
 
 // --- Receipt delivery (the runner) -------------------------------------------
 // The runner drains `dispatch.send`, so it is the process that actually emails
@@ -473,21 +503,22 @@ check(
 // boot without them. With split files, say so here — and hold it to the SAME
 // provider as the web tier, whose callback route confirms what the runner sent.
 if (runnerFile !== undefined) {
+  const runnerMailer = mailerOf(runnerEnv);
   check(
     "EMAIL_MAILER-runner",
-    runnerEnv.EMAIL_PROVIDER !== "dev" &&
-      Boolean(runnerEnv.EMAIL_API_ENDPOINT) &&
-      Boolean(runnerEnv.EMAIL_API_KEY) &&
-      Boolean(runnerEnv.EMAIL_FROM),
+    runnerMailer !== null,
     "the runner emails every financial document — without a mailer it writes them to its own disk",
-    "set EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM in runner.env (the same values as web.env)",
+    "set the same EMAIL_PROVIDER, EMAIL_FROM and SES_* (or EMAIL_API_*) in runner.env as in web.env",
   );
   check(
     "EMAIL_MAILER-runner-matches-web",
-    runnerEnv.EMAIL_API_ENDPOINT === env.EMAIL_API_ENDPOINT &&
-      runnerEnv.EMAIL_FROM === env.EMAIL_FROM,
+    runnerMailer === webMailer &&
+      runnerEnv.EMAIL_FROM === env.EMAIL_FROM &&
+      (webMailer === "ses"
+        ? runnerEnv.SES_REGION === env.SES_REGION
+        : runnerEnv.EMAIL_API_ENDPOINT === env.EMAIL_API_ENDPOINT),
     "the runner and the web tier send through the same provider and From address",
-    "copy EMAIL_API_ENDPOINT and EMAIL_FROM from web.env into runner.env",
+    "copy EMAIL_PROVIDER, EMAIL_FROM and SES_REGION (or EMAIL_API_ENDPOINT) from web.env into runner.env",
   );
 }
 

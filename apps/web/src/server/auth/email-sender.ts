@@ -1,6 +1,12 @@
 import { newId, otpInbox, type Db } from "@desiauction/db";
 
 import type { MessageLanguage } from "@desiauction/messaging/email-templates";
+import {
+  createResendProvider,
+  mailProviderFromEnv,
+  type MailProvider,
+  type MailProviderResult,
+} from "@desiauction/messaging/mail-provider";
 
 import { env } from "../../env";
 import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
@@ -96,18 +102,29 @@ export class MailSendError extends Error {
 
 /**
  * The real one, over the provider's HTTP API — no new dependency, the same
- * decision `email-adapter.ts` documents at length. The request body is the
- * intersection of every provider on the table.
+ * decision `email-adapter.ts` documents at length. Which provider (SES or
+ * Resend) and its request format live in mail-provider.ts; Resend settings are
+ * still accepted here directly, which is how the tests spell it.
  */
 export class HttpMailer implements CodeMailer {
+  private readonly provider: MailProvider;
+
   constructor(
-    private readonly config: {
-      endpoint: string;
-      apiKey: string;
-      from: string;
-      transport?: MailTransport;
-    },
-  ) {}
+    config:
+      | { readonly provider: MailProvider }
+      | { endpoint: string; apiKey: string; from: string; transport?: MailTransport },
+  ) {
+    this.provider =
+      "provider" in config
+        ? config.provider
+        : createResendProvider({
+            endpoint: config.endpoint,
+            apiKey: config.apiKey,
+            from: config.from,
+            // Deadline-bound (provider-fetch.ts) unless a test stands in.
+            transport: config.transport ?? providerFetch,
+          });
+  }
 
   async send(
     email: string,
@@ -115,26 +132,17 @@ export class HttpMailer implements CodeMailer {
     purpose: CodeMailPurpose,
     language: MessageLanguage = "en",
   ): Promise<void> {
-    const transport = this.config.transport ?? defaultTransport;
     const copy = await codeMailCopy(code, purpose, language);
-    let response: MailerHttpResponse;
+    let result: MailProviderResult;
     try {
-      response = await transport(this.config.endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          from: this.config.from,
-          to: [email],
-          subject: copy.subject,
-          // No link, either purpose. A code the person types back proves the
-          // same thing a click does, cannot be followed out of a forwarded
-          // message, and does not train people to click links in mail about
-          // their account.
-          text: copy.text,
-        }),
+      result = await this.provider.send({
+        to: email,
+        subject: copy.subject,
+        // No link, either purpose. A code the person types back proves the
+        // same thing a click does, cannot be followed out of a forwarded
+        // message, and does not train people to click links in mail about
+        // their account.
+        text: copy.text,
       });
     } catch (error) {
       // The CAUSE is the diagnosis. "unreachable" alone hid a corporate TLS
@@ -146,24 +154,21 @@ export class HttpMailer implements CodeMailer {
           : "unknown";
       throw new MailSendError(`mail provider unreachable (${cause})`);
     }
-    if (response.status >= 400) {
-      // The provider's own reason — "domain not verified", "restricted key" —
-      // is short and names no recipient. Bounded all the same.
+    if (!result.ok) {
+      // The provider's own reason — "domain not verified", "restricted key",
+      // SES's `MessageRejected: …` — short, recipient-free and bounded.
       throw new MailSendError(
-        `mail provider rejected send (${String(response.status)}: ${response.body.slice(0, 200)})`,
+        `mail provider rejected send (${String(result.status)}: ${result.detail})`,
       );
     }
   }
 }
 
-// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
-// outbox's claim lease, or two drains deliver the same message.
-const defaultTransport: MailTransport = providerFetch;
-
 /**
- * One construction point. The real mailer is selected only when all three
- * settings are present; otherwise codes land in the dev inbox, VISIBLY, rather
- * than being half-sent by a partly-configured provider.
+ * One construction point. The real mailer is selected only when the provider
+ * `EMAIL_PROVIDER` names is fully configured (mail-provider.ts); otherwise
+ * codes land in the dev inbox, VISIBLY, rather than being half-sent by a
+ * partly-configured provider.
  */
 export function createCodeMailer(db: Db): CodeMailer {
   // Explicit beats inferred. `dev` forces the inbox even when real credentials
@@ -173,14 +178,13 @@ export function createCodeMailer(db: Db): CodeMailer {
   if (env.EMAIL_PROVIDER === "dev") {
     return new DevInboxMailer(db);
   }
-  const endpoint = env.EMAIL_API_ENDPOINT;
-  const apiKey = env.EMAIL_API_KEY;
-  const from = env.EMAIL_FROM;
-  if (endpoint === undefined || apiKey === undefined || from === undefined) {
-    if (env.EMAIL_PROVIDER === "http") {
-      throw new MailSendError("EMAIL_PROVIDER=http without endpoint, key and from address");
+  const provider = mailProviderFromEnv(env);
+  if (provider === null) {
+    // Named a provider and left it half set up: say so, never fall back.
+    if (env.EMAIL_PROVIDER !== "auto") {
+      throw new MailSendError(`EMAIL_PROVIDER=${env.EMAIL_PROVIDER} is not fully configured`);
     }
     return new DevInboxMailer(db);
   }
-  return new HttpMailer({ endpoint, apiKey, from });
+  return new HttpMailer({ provider });
 }

@@ -1,5 +1,11 @@
 # Email Setup (2026-08-30)
 
+> **2026-09-28: app mail is moving from Resend to Amazon SES.** The mailbox
+> half below (Zoho) is unchanged. For the sending half — SES setup, DNS added,
+> IAM, costs, testing and rollback — read
+> [`docs/EMAIL_INFRASTRUCTURE.md`](../EMAIL_INFRASTRUCTURE.md), which
+> supersedes the "Sending (Resend)" and "App configuration" sections here.
+
 Two systems that are deliberately NOT the same system, on two domains that are
 deliberately NOT the same domain.
 

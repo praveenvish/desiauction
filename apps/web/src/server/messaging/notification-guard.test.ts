@@ -181,6 +181,33 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
       "packages/messaging/src/finance-delivery.ts": "gate-owning (resolveOwnerEmail)",
     },
   },
+  /*
+   * THE WIRE (mail-provider.ts). A provider sends to whoever it is handed, so
+   * only the senders above may hold one — each asks the gate, or is the
+   * sign-in code path that must never be switched off.
+   */
+  {
+    token: "mailProviderFromEnv(",
+    allowed: {
+      "packages/messaging/src/mail-provider.ts": "defines it",
+      "server/auth/email-sender.ts": "factory",
+      "server/messaging/transactional-mail.ts": "factory",
+      "server/financial-operations/deps.ts": "finops deps — the adapter asks the gate",
+      "apps/finops-runner/src/delivery.ts": "the runner's finops deps",
+    },
+  },
+  {
+    token: "createSesProvider(",
+    allowed: { "packages/messaging/src/mail-provider.ts": "defines it; built by the factory" },
+  },
+  {
+    token: "createResendProvider(",
+    allowed: {
+      "packages/messaging/src/mail-provider.ts": "defines it; built by the factory",
+      "packages/messaging/src/email-adapter.ts": "Resend settings given directly (tests)",
+      "server/auth/email-sender.ts": "Resend settings given directly (tests)",
+    },
+  },
   {
     token: "createPersonInAppAdapter(",
     allowed: {

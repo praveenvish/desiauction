@@ -1,6 +1,7 @@
-import { EmailBreaker, type EmailTransport } from "./email-adapter";
+import { mailProviderFromEnv, type MailProvider } from "@desiauction/messaging/mail-provider";
+
+import { EmailBreaker } from "./email-adapter";
 import { env } from "../../env";
-import { providerFetch } from "./provider-fetch";
 
 /**
  * ONE-OFF TRANSACTIONAL MAIL — a receipt for something the person just did.
@@ -30,11 +31,7 @@ export interface OutgoingMail {
   readonly text: string;
   /** The branded HTML part (email-layout.ts). Plain text alone is still valid mail. */
   readonly html?: string;
-  /**
-   * Optional file, in the shape Postmark/Resend/Brevo all accept. Providers
-   * that want a different key override `buildRequest`, which is the same escape
-   * hatch `email-adapter.ts` documents.
-   */
+  /** Optional file; each provider puts it where its API wants (mail-provider.ts). */
   readonly attachment?: {
     readonly filename: string;
     readonly contentType: string;
@@ -51,40 +48,11 @@ export interface TransactionalMailer {
 const BREAKER_THRESHOLD = 3;
 const BREAKER_COOLDOWN_MS = 60 * 1000;
 
-// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
-// outbox's claim lease, or two drains deliver the same message.
-const defaultTransport: EmailTransport = providerFetch;
-
-const defaultBuildRequest = (mail: OutgoingMail, from: string, replyTo?: string): unknown => ({
-  from,
-  to: [mail.to],
-  subject: mail.subject,
-  text: mail.text,
-  ...(mail.html === undefined ? {} : { html: mail.html }),
-  // Omitted rather than sent empty: a blank reply_to is a header some
-  // providers reject and every client renders badly.
-  ...(replyTo === undefined ? {} : { reply_to: replyTo }),
-  ...(mail.attachment === undefined
-    ? {}
-    : {
-        attachments: [
-          {
-            filename: mail.attachment.filename,
-            content: mail.attachment.contentBase64,
-            contentType: mail.attachment.contentType,
-          },
-        ],
-      }),
-});
-
 export interface HttpMailerConfig {
-  readonly endpoint: string;
-  readonly apiKey: string;
-  readonly from: string;
+  /** SES or Resend (mail-provider.ts) — the request format lives there. */
+  readonly provider: MailProvider;
   /** Reply-To. Absent means replies bounce off the no-reply From address. */
   readonly replyTo?: string;
-  readonly transport?: EmailTransport;
-  readonly buildRequest?: (mail: OutgoingMail, from: string, replyTo?: string) => unknown;
   readonly now?: () => number;
 }
 
@@ -105,18 +73,13 @@ export class HttpTransactionalMailer implements TransactionalMailer {
     if (this.breaker.isOpen()) {
       return "breaker-open";
     }
-    const transport = this.config.transport ?? defaultTransport;
-    const build = this.config.buildRequest ?? defaultBuildRequest;
     try {
-      const response = await transport(this.config.endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify(build(mail, this.config.from, this.config.replyTo)),
+      const result = await this.config.provider.send({
+        ...mail,
+        // Spread rather than passed as undefined: exactOptionalPropertyTypes.
+        ...(this.config.replyTo === undefined ? {} : { replyTo: this.config.replyTo }),
       });
-      if (response.status >= 400) {
+      if (!result.ok) {
         this.breaker.recordFailure();
         return "failed";
       }
@@ -142,28 +105,25 @@ export class UnconfiguredMailer implements TransactionalMailer {
 let cached: TransactionalMailer | null = null;
 
 /**
- * ONE construction point, and the real mailer is selected only when all three
- * settings are present — the rule `createCodeMailer` and `finopsDeps` both
- * follow. A half-configured provider that silently drops mail is worse than one
- * that says out loud it is not there.
+ * ONE construction point, and the real mailer is selected only when the
+ * provider `EMAIL_PROVIDER` names is fully configured (mail-provider.ts) — the
+ * rule `createCodeMailer` and `finopsDeps` both follow. A half-configured
+ * provider that silently drops mail is worse than one that says out loud it is
+ * not there.
  */
 export function transactionalMailer(): TransactionalMailer {
   if (cached !== null) {
     return cached;
   }
-  const endpoint = env.EMAIL_API_ENDPOINT;
-  const apiKey = env.EMAIL_API_KEY;
-  const from = env.EMAIL_FROM;
-  // Not part of the three-way check below: a missing Reply-To degrades the
-  // mail, it does not make the provider unconfigured.
+  const provider = mailProviderFromEnv(env);
+  // Not part of "configured": a missing Reply-To degrades the mail, it does
+  // not make the provider unconfigured.
   const replyTo = env.EMAIL_REPLY_TO;
   cached =
-    endpoint === undefined || apiKey === undefined || from === undefined
+    provider === null
       ? new UnconfiguredMailer()
       : new HttpTransactionalMailer({
-          endpoint,
-          apiKey,
-          from,
+          provider,
           // Spread rather than passed as undefined: the repo runs
           // exactOptionalPropertyTypes, so absent and undefined differ.
           ...(replyTo === undefined ? {} : { replyTo }),
