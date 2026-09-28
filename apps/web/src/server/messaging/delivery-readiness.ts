@@ -1,3 +1,5 @@
+import { mailerConfigured } from "@desiauction/messaging/mail-provider-config";
+
 import type { NotificationChannel, ResolvedNotification } from "./catalogue";
 import {
   NO_MAPPINGS,
@@ -96,11 +98,13 @@ function cause(
     case "in_app":
       return null;
     case "email": {
-      if (set("EMAIL_API_ENDPOINT") && set("EMAIL_API_KEY") && set("EMAIL_FROM")) return null;
+      if (mailerConfigured(env)) return null;
       // A sign-in code falls back to the dev inbox when no provider is set up
       // (`EMAIL_PROVIDER=auto|dev`, email-sender.ts) — a real destination
-      // locally, and one env.ts refuses on a production server.
-      if (entry.category === "login" && env["EMAIL_PROVIDER"] !== "http") return null;
+      // locally, and one env.ts refuses on a production server. A NAMED
+      // provider left half set up throws instead, so it is not ready.
+      const named = env["EMAIL_PROVIDER"] ?? "auto";
+      if (entry.category === "login" && (named === "auto" || named === "dev")) return null;
       return "Email provider not set up";
     }
     case "whatsapp": {

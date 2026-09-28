@@ -652,6 +652,20 @@
       "when": 1791734400000,
       "tag": "0093_competition_import_sheet",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1791820800000,
+      "tag": "0094_email_sends",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1791907200000,
+      "tag": "0095_competition_auction_starts_at",
+      "breakpoints": true
     }
   ]
 }

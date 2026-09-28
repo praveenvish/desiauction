@@ -11,6 +11,7 @@ import {
   bidStory,
   ownerSummaryMail,
   registrationDecisionMail,
+  registrationReceivedMail,
   rolesTitle,
   smsRolePhrase,
   soldMail,
@@ -50,10 +51,13 @@ describe("the sale", () => {
     );
   });
 
-  it("names the team and the price in the subject, and the multiple of base in the body", async () => {
+  it("names the team and the price in the subject, and the night on the stage", async () => {
     const mail = await soldMail(sale);
     expect(mail.subject).toBe("Congratulations — Cup Kings bought you for ₹75,000");
-    expect(mail.text).toContain("3 times your base");
+    // Email v2 (PR9): the auction-night stage carries the price and the story.
+    expect(mail.text).toContain("Sold: Arjun → Cup Kings — ₹75,000");
+    expect(mail.text).toContain("3× your base · 7 bids · 3 teams");
+    expect(mail.html).toContain('class="da-stage"');
     expect(mail.text).toContain("most expensive buy of the night");
     expect(mail.text).toContain("Vikram Patel");
     expect(mail.html).toContain("Share your player card");
@@ -287,10 +291,17 @@ describe("the lineup", () => {
 });
 
 describe("the registration decisions, by email", () => {
+  const facts = {
+    name: "Arjun",
+    season: "Malad Premier League 2026",
+    orgName: "Malad Cricket Club",
+    seasonSlug: "malad-premier-league-2026-x7k2",
+    sport: "cricket",
+  };
+
   it("says the decision in the subject — most people read nothing else", async () => {
-    const facts = { name: "Arjun", season: "Malad Premier League 2026" };
     expect((await registrationDecisionMail({ ...facts, decision: "approve" })).subject).toBe(
-      "You're approved for Malad Premier League 2026",
+      "You're in — Malad Premier League 2026",
     );
     expect((await registrationDecisionMail({ ...facts, decision: "waitlist" })).subject).toContain(
       "waitlist",
@@ -302,7 +313,47 @@ describe("the registration decisions, by email", () => {
     });
     expect(rejected.subject).toContain("wasn't approved");
     expect(rejected.text).toContain("The reason given: the season is full.");
-    expect(rejected.text).toContain('Switch off "Registration decisions"');
+    // Switched off from "Manage emails", which every registration mail carries.
+    expect(rejected.text).toContain("Manage emails: ");
+  });
+
+  it("opens with the club and season, and links the player's own season page", async () => {
+    const mail = await registrationDecisionMail({ ...facts, decision: "approve" });
+    expect(mail.text.split("\n")[0]).toBe(
+      "Malad Premier League 2026 · Malad Cricket Club · Cricket",
+    );
+    expect(mail.text).toContain("/seasons/malad-premier-league-2026-x7k2/register");
+    expect(mail.html).toContain(">MC</div>");
+  });
+
+  it("shows where they are — and no tracker for a decline or a withdrawal", async () => {
+    const approved = await registrationDecisionMail({ ...facts, decision: "approve" });
+    expect(approved.text).toContain("✓ Registered → ✓ Approved → ● Auction → ○ Team");
+    const waitlisted = await registrationDecisionMail({ ...facts, decision: "waitlist" });
+    expect(waitlisted.text).toContain("✓ Registered → ● Approved");
+    for (const decision of ["reject", "withdraw"] as const) {
+      expect((await registrationDecisionMail({ ...facts, decision })).text).not.toContain("→");
+    }
+  });
+});
+
+describe("we've got your registration", () => {
+  it("gives back what they sent, and what happens next", async () => {
+    const mail = await registrationReceivedMail({
+      name: "Arjun",
+      season: "Malad Premier League 2026",
+      orgName: "Malad Cricket Club",
+      seasonSlug: "mpl-2026",
+      sport: "cricket",
+      submitted: [
+        ["Role", "All-rounder"],
+        ["Batting", "Right-hand"],
+      ],
+    });
+    expect(mail.subject).toBe("You're registered for Malad Premier League 2026");
+    expect(mail.text).toContain("✓ Registered → ● Approved → ○ Auction → ○ Team");
+    expect(mail.text).toContain("  Role: All-rounder");
+    expect(mail.text).toContain("Malad Cricket Club reviews every player");
   });
 });
 
@@ -333,7 +384,12 @@ describe("THE WHATSAPP NUDGE — decided at send time", () => {
         where: null,
         lineup: [],
       }),
-      await registrationDecisionMail({ name: "Arjun", season: "MPL 2026", decision: "approve" }),
+      await registrationDecisionMail({
+        name: "Arjun",
+        season: "MPL 2026",
+        orgName: "Malad CC",
+        decision: "approve",
+      }),
     ].map(parts);
   });
 

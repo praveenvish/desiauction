@@ -4,18 +4,20 @@ import {
   fixtureLineups,
   fixtureResults,
   fixtures,
+  grounds,
   lots,
   organizations,
   registrations,
   teams,
   tournaments,
 } from "@desiauction/db";
-import type { MoneyUnit } from "@desiauction/core";
+import { sportPackFor, type MoneyUnit } from "@desiauction/core";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { systemDb } from "../db";
+import { standingsOf } from "../competition/results";
 
 /**
  * THE PLAYER'S CAREER (PI-1 P5) — the read the data has been waiting for.
@@ -31,7 +33,7 @@ import { systemDb } from "../db";
  * verdict and the price). Nothing here can drift from the record because
  * nothing here IS a record.
  *
- * Prices are the PERSON'S OWN — this module serves the self view (/me/cricket).
+ * Prices are the PERSON'S OWN — this module serves the self view (/me).
  * The public career section renders only what the public player page already
  * shows, through its own gated reader in competition/public.ts.
  */
@@ -47,6 +49,10 @@ export interface CareerSeason {
   orgName: string;
   /** Competition start date (ISO) — the career's ordering key. */
   startsOn: string | null;
+  /** Competition end date (ISO) — past it, a season is over for its player. */
+  endsOn: string | null;
+  /** The season's auction, if one was set up (never an abandoned one). */
+  auctionStatus: string | null;
   role: string | null;
   status: string;
   teamName: string | null;
@@ -79,7 +85,7 @@ export interface PlayerCareer {
   };
 }
 
-/** Seasons per page on /me/cricket — plenty for a local career, honest beyond it. */
+/** Seasons per page on /me — plenty for a local career, honest beyond it. */
 export const CAREER_PAGE_SIZE = 50;
 
 export async function playerCareer(personId: string, sport?: string): Promise<PlayerCareer> {
@@ -90,6 +96,8 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
       competitionSlug: competitions.slug,
       sport: competitions.sport,
       startsOn: competitions.startsOn,
+      endsOn: competitions.endsOn,
+      auctionStatus: auctions.status,
       tournamentName: tournaments.name,
       orgName: organizations.name,
       role: registrations.role,
@@ -141,6 +149,8 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
     tournamentName: row.tournamentName,
     orgName: row.orgName,
     startsOn: row.startsOn,
+    endsOn: row.endsOn,
+    auctionStatus: row.auctionStatus,
     role: row.role,
     status: row.status,
     teamName: row.teamName,
@@ -239,6 +249,8 @@ export async function personSeasonsInOrg(
  */
 export interface CareerMatch {
   fixtureId: string;
+  /** The season this match belongs to, from this person's side. */
+  registrationId: string;
   kickoffAt: string | null;
   sport: string;
   competitionName: string;
@@ -323,6 +335,7 @@ export async function playerMatches(personId: string): Promise<CareerMatch[]> {
               : "lost";
     return {
       fixtureId: row.fixtureId,
+      registrationId: row.registrationId,
       kickoffAt: row.kickoffAt,
       sport: row.sport,
       competitionName: row.competitionName,
@@ -353,9 +366,14 @@ export interface UpcomingMatch {
   sport: string;
   competitionName: string;
   competitionSlug: string;
+  /** The season this fixture belongs to, from this person's side. */
+  registrationId: string;
   teamName: string;
   teamColor: string | null;
   opponentName: string;
+  opponentColor: string | null;
+  /** Where it is played, when the club named a ground. */
+  groundName: string | null;
 }
 
 export const UPCOMING_LIMIT = 5;
@@ -373,7 +391,9 @@ export async function playerUpcomingMatches(
       sport: competitions.sport,
       competitionName: competitions.name,
       competitionSlug: competitions.slug,
+      registrationId: registrations.id,
       teamId: registrations.teamId,
+      groundName: grounds.name,
       homeTeamId: fixtures.homeTeamId,
       homeName: home.name,
       homeColor: home.primaryColor,
@@ -394,6 +414,7 @@ export async function playerUpcomingMatches(
     )
     .innerJoin(home, eq(home.id, fixtures.homeTeamId))
     .innerJoin(away, eq(away.id, fixtures.awayTeamId))
+    .leftJoin(grounds, eq(grounds.id, fixtures.groundId))
     .where(
       and(
         eq(registrations.personId, personId),
@@ -412,9 +433,136 @@ export async function playerUpcomingMatches(
       sport: row.sport,
       competitionName: row.competitionName,
       competitionSlug: row.competitionSlug,
+      registrationId: row.registrationId,
       teamName: isHome ? row.homeName : row.awayName,
       teamColor: isHome ? row.homeColor : row.awayColor,
       opponentName: isHome ? row.awayName : row.homeName,
+      opponentColor: isHome ? row.awayColor : row.homeColor,
+      groundName: row.groundName,
     };
   });
+}
+
+/*
+ * A TEAM'S SEASON, for its owner's home (2026-09-28). After auction night the
+ * owner home stopped moving — purse and top buys while the team was 2–0 with
+ * a match that day. This is the season from the team's side: the next match,
+ * the latest results, the record and the place in the table.
+ *
+ * The same class as the reads above — the system pool, scoped by a subject the
+ * SERVER resolved. `teamId` must come from `rolesOf(session)` (the owner's own
+ * teams), never from a request. Only fixtures the public can see (published,
+ * live, completed), so a draft schedule never shows as fixed.
+ */
+export interface TeamSeasonMatch {
+  fixtureId: string;
+  kickoffAt: string | null;
+  opponentName: string;
+  opponentColor: string | null;
+  groundName: string | null;
+  /** Being played right now. */
+  live: boolean;
+  /** From this team's side; null while it is being played or still to come. */
+  result: "won" | "lost" | "tied" | "no_result" | null;
+}
+
+export interface TeamSeason {
+  /** Published matches still to come (or live), kickoff order. */
+  upcoming: TeamSeasonMatch[];
+  /** Results, newest first. */
+  results: TeamSeasonMatch[];
+  record: { played: number; won: number; lost: number; tied: number };
+  /** Place in the table — null for a lobby-shaped sport or before any team plays. */
+  place: { position: number; of: number; points: number } | null;
+}
+
+export async function teamSeason(teamId: string, today: string): Promise<TeamSeason | null> {
+  const [team] = await systemDb
+    .select({ competitionId: teams.competitionId, sport: competitions.sport })
+    .from(teams)
+    .innerJoin(competitions, eq(competitions.id, teams.competitionId))
+    .where(eq(teams.id, teamId))
+    .limit(1);
+  if (team === undefined) return null;
+  const home = alias(teams, "home_team");
+  const away = alias(teams, "away_team");
+  const rows = await systemDb
+    .select({
+      fixtureId: fixtures.id,
+      kickoffAt: fixtures.kickoffAt,
+      status: fixtures.status,
+      homeTeamId: fixtures.homeTeamId,
+      homeName: home.name,
+      homeColor: home.primaryColor,
+      awayName: away.name,
+      awayColor: away.primaryColor,
+      groundName: grounds.name,
+      outcome: fixtureResults.outcome,
+    })
+    .from(fixtures)
+    .innerJoin(home, eq(home.id, fixtures.homeTeamId))
+    .innerJoin(away, eq(away.id, fixtures.awayTeamId))
+    .leftJoin(grounds, eq(grounds.id, fixtures.groundId))
+    .leftJoin(fixtureResults, eq(fixtureResults.fixtureId, fixtures.id))
+    .where(
+      and(
+        eq(fixtures.competitionId, team.competitionId),
+        or(eq(fixtures.homeTeamId, teamId), eq(fixtures.awayTeamId, teamId)),
+        inArray(fixtures.status, ["published", "in_progress", "completed"]),
+      ),
+    )
+    .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
+    .limit(MATCHES_LIMIT);
+  const matches = rows.map((row) => {
+    const isHome = row.homeTeamId === teamId;
+    const result: TeamSeasonMatch["result"] =
+      row.outcome === null
+        ? null
+        : row.outcome === "tie"
+          ? "tied"
+          : row.outcome === "no_result" || row.outcome === "abandoned"
+            ? "no_result"
+            : (row.outcome === "home_win") === isHome
+              ? "won"
+              : "lost";
+    return {
+      status: row.status,
+      match: {
+        fixtureId: row.fixtureId,
+        kickoffAt: row.kickoffAt,
+        opponentName: isHome ? row.awayName : row.homeName,
+        opponentColor: isHome ? row.awayColor : row.homeColor,
+        groundName: row.groundName,
+        live: row.status === "in_progress",
+        result,
+      },
+    };
+  });
+  const upcoming = matches
+    .filter(
+      ({ status, match }) =>
+        status === "in_progress" ||
+        (status === "published" && (match.kickoffAt === null || match.kickoffAt >= today)),
+    )
+    .map(({ match }) => match);
+  const results = matches
+    .filter(({ status, match }) => status === "completed" && match.result !== null)
+    .map(({ match }) => match)
+    .reverse();
+  const record = { played: results.length, won: 0, lost: 0, tied: 0 };
+  for (const match of results) {
+    if (match.result === "won") record.won += 1;
+    else if (match.result === "lost") record.lost += 1;
+    else if (match.result === "tied") record.tied += 1;
+  }
+  let place: TeamSeason["place"] = null;
+  if (sportPackFor(team.sport).fixtureShape !== "lobby") {
+    const standings = await standingsOf(systemDb, team.competitionId);
+    const index = standings.rows.findIndex((row) => row.teamId === teamId);
+    const row = standings.rows[index];
+    if (row !== undefined && standings.rows.some((entry) => entry.played > 0)) {
+      place = { position: index + 1, of: standings.rows.length, points: row.points };
+    }
+  }
+  return { upcoming, results, record, place };
 }

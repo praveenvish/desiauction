@@ -143,34 +143,43 @@ const EMAIL_CODE: EmailTemplateSpec = {
   defaults: {
     en: {
       variants: {
+        // The code LEADS the subject: the lock screen shows it, and Gmail
+        // offers "Copy code" — the person never has to open the mail at all.
         login: layout({
-          subject: "Your DesiAuction sign-in code",
-          preheader: "Your sign-in code is {{code}}. It expires in 15 minutes.",
+          subject: "{{code}} is your DesiAuction sign-in code",
+          preheader: "It works for 15 minutes. DesiAuction will never ask you for it.",
           heading: "Your sign-in code",
-          paragraphs: ["Your DesiAuction sign-in code is:"],
+          paragraphs: ["Enter this code on the DesiAuction sign-in page to continue."],
           after: [
             CODE_EXPIRY.login.en,
-            "If you did not try to sign in, someone entered your address on our sign-in page. Your account is safe as long as you do not share this code.",
+            // Not "ignore this" (that is advice for spam): somebody knows their
+            // address, and the account is safe only while the code stays theirs.
+            "Did not try to sign in? Someone entered your address on our sign-in page. Your account is safe as long as you do not share this code, and DesiAuction will never call or message you to ask for it.",
           ],
-          footnote: "You received this because this address was entered on our sign-in page.",
+          footnote:
+            "You received this because this address was entered on the DesiAuction sign-in page.",
         }),
         signup: layout({
-          subject: "Your DesiAuction sign-up code",
-          preheader: "Your sign-up code is {{code}}. It expires in 15 minutes.",
+          subject: "{{code}} is your DesiAuction sign-up code",
+          preheader: "Enter it to finish creating your account. It works for 15 minutes.",
           heading: "Welcome to DesiAuction",
-          paragraphs: ["Your sign-up code is:"],
+          paragraphs: ["Enter this code to finish creating your account."],
           after: [
             CODE_EXPIRY.signup.en,
-            "If you did not ask for this, ignore this message — nothing is created until the code is used.",
+            "Didn't ask for this? You can ignore this email. Nothing is created until the code is entered.",
           ],
-          footnote: "You received this because this address was entered on our sign-up page.",
+          footnote:
+            "You received this because this address was entered on the DesiAuction sign-up page.",
         }),
         email_change: layout({
-          subject: "Confirm your email for DesiAuction",
-          preheader: "Your confirmation code is {{code}}.",
+          subject: "{{code}} is your code to confirm this email",
+          preheader: "Enter it on your DesiAuction account page. It works for 15 minutes.",
           heading: "Confirm your email",
-          paragraphs: ["Your DesiAuction confirmation code is {{code}}."],
-          after: [CODE_EXPIRY.email_change.en, "If you did not ask for this, ignore this message."],
+          paragraphs: ["Use this code to add this address to your DesiAuction account."],
+          after: [
+            CODE_EXPIRY.email_change.en,
+            "Didn't ask for this? You can ignore this email. The address is only added when the code is entered.",
+          ],
           footnote: "You received this because this address was added to a DesiAuction account.",
         }),
       },
@@ -178,33 +187,36 @@ const EMAIL_CODE: EmailTemplateSpec = {
     hi: {
       variants: {
         login: layout({
-          subject: "आपका DesiAuction साइन-इन कोड",
-          preheader: "आपका साइन-इन कोड {{code}} है। यह 15 मिनट में खत्म हो जाएगा।",
+          subject: "{{code}} आपका DesiAuction साइन-इन कोड है",
+          preheader: "यह 15 मिनट तक चलेगा। DesiAuction कभी भी आपसे यह कोड नहीं माँगेगा।",
           heading: "आपका साइन-इन कोड",
-          paragraphs: ["आपका DesiAuction साइन-इन कोड है:"],
+          paragraphs: ["आगे बढ़ने के लिए यह कोड DesiAuction के साइन-इन पेज पर डालें।"],
           after: [
             CODE_EXPIRY.login.hi,
-            "अगर आपने साइन-इन की कोशिश नहीं की, तो किसी ने हमारे साइन-इन पेज पर आपका पता डाला है। जब तक आप यह कोड किसी को नहीं बताते, आपका अकाउंट सुरक्षित है।",
+            "आपने साइन-इन की कोशिश नहीं की? किसी ने हमारे साइन-इन पेज पर आपका पता डाला है। जब तक आप यह कोड किसी को नहीं बताते, आपका अकाउंट सुरक्षित है, और DesiAuction कभी फ़ोन या मैसेज करके यह कोड नहीं माँगेगा।",
           ],
-          footnote: "आपको यह इसलिए मिला क्योंकि हमारे साइन-इन पेज पर यह पता डाला गया था।",
+          footnote: "आपको यह इसलिए मिला क्योंकि DesiAuction के साइन-इन पेज पर यह पता डाला गया था।",
         }),
         signup: layout({
-          subject: "आपका DesiAuction साइन-अप कोड",
-          preheader: "आपका साइन-अप कोड {{code}} है। यह 15 मिनट में खत्म हो जाएगा।",
+          subject: "{{code}} आपका DesiAuction साइन-अप कोड है",
+          preheader: "अकाउंट बनाने के लिए इसे डालें। यह 15 मिनट तक चलेगा।",
           heading: "DesiAuction में आपका स्वागत है",
-          paragraphs: ["आपका साइन-अप कोड है:"],
+          paragraphs: ["अपना अकाउंट बनाने के लिए यह कोड डालें।"],
           after: [
             CODE_EXPIRY.signup.hi,
-            "अगर आपने यह नहीं माँगा, तो इस मेल को अनदेखा करें — कोड डाले बिना कुछ नहीं बनेगा।",
+            "आपने यह नहीं माँगा? इस ईमेल को अनदेखा करें। कोड डाले बिना कुछ नहीं बनेगा।",
           ],
-          footnote: "आपको यह इसलिए मिला क्योंकि हमारे साइन-अप पेज पर यह पता डाला गया था।",
+          footnote: "आपको यह इसलिए मिला क्योंकि DesiAuction के साइन-अप पेज पर यह पता डाला गया था।",
         }),
         email_change: layout({
-          subject: "DesiAuction के लिए अपना ईमेल पक्का करें",
-          preheader: "आपका पुष्टि कोड {{code}} है।",
+          subject: "{{code}} — अपना ईमेल पक्का करने का कोड",
+          preheader: "इसे अपने DesiAuction अकाउंट पेज पर डालें। यह 15 मिनट तक चलेगा।",
           heading: "अपना ईमेल पक्का करें",
-          paragraphs: ["आपका DesiAuction पुष्टि कोड {{code}} है।"],
-          after: [CODE_EXPIRY.email_change.hi, "अगर आपने यह नहीं माँगा, तो इस मेल को अनदेखा करें।"],
+          paragraphs: ["इस पते को अपने DesiAuction अकाउंट में जोड़ने के लिए यह कोड इस्तेमाल करें।"],
+          after: [
+            CODE_EXPIRY.email_change.hi,
+            "आपने यह नहीं माँगा? इस ईमेल को अनदेखा करें। कोड डाले बिना यह पता नहीं जुड़ेगा।",
+          ],
           footnote: "आपको यह इसलिए मिला क्योंकि यह पता एक DesiAuction अकाउंट में जोड़ा गया था।",
         }),
       },
@@ -240,11 +252,11 @@ const PHONE_CHANGED: EmailTemplateSpec = {
     en: one(
       layout({
         subject: "Your DesiAuction mobile number was changed",
-        preheader: "This account's mobile number now ends {{last4}}.",
+        preheader: "It now ends in {{last4}}. If this wasn't you, write to us right away.",
         heading: "Your mobile number was changed",
         paragraphs: [
-          "The mobile number on your DesiAuction account was changed to one ending {{last4}}. Sign-in codes and texts go there from now on, and every other device was signed out.",
-          "If that was you, there is nothing to do.",
+          "The mobile number on your DesiAuction account now ends in {{last4}}. Sign-in codes and texts go there from now on, and every other device was signed out.",
+          "If that was you, there's nothing to do.",
         ],
         after: [IF_NOT_YOU.text.en],
         actions: { help: "Get help" },
@@ -255,7 +267,7 @@ const PHONE_CHANGED: EmailTemplateSpec = {
     hi: one(
       layout({
         subject: "आपका DesiAuction मोबाइल नंबर बदल दिया गया है",
-        preheader: "इस अकाउंट का मोबाइल नंबर अब {{last4}} पर खत्म होता है।",
+        preheader: "अब यह {{last4}} पर खत्म होता है। अगर यह आपने नहीं किया, तो तुरंत हमें लिखें।",
         heading: "आपका मोबाइल नंबर बदल दिया गया है",
         paragraphs: [
           "आपके DesiAuction अकाउंट का मोबाइल नंबर बदलकर {{last4}} पर खत्म होने वाला नंबर कर दिया गया है। अब साइन-इन कोड और मैसेज उसी नंबर पर जाएँगे, और बाकी सभी डिवाइस से साइन आउट कर दिया गया है।",
@@ -292,11 +304,12 @@ const EMAIL_CHANGED: EmailTemplateSpec = {
     en: one(
       layout({
         subject: "Your DesiAuction sign-in email was changed",
-        preheader: "This account now signs in with {{maskedEmail}}.",
+        preheader:
+          "It now signs in with {{maskedEmail}}. If this wasn't you, write to us right away.",
         heading: "Your sign-in email was changed",
         paragraphs: [
           "The DesiAuction account that used this address now signs in with {{maskedEmail}}. Codes and account mail go there from now on, and every other device was signed out.",
-          "If that was you, there is nothing to do.",
+          "If that was you, there's nothing to do.",
         ],
         after: [IF_NOT_YOU.text.en],
         actions: { help: "Get help" },
@@ -307,7 +320,8 @@ const EMAIL_CHANGED: EmailTemplateSpec = {
     hi: one(
       layout({
         subject: "आपका DesiAuction साइन-इन ईमेल बदल दिया गया है",
-        preheader: "यह अकाउंट अब {{maskedEmail}} से साइन इन होता है।",
+        preheader:
+          "अब यह {{maskedEmail}} से साइन इन होता है। अगर यह आपने नहीं किया, तो तुरंत हमें लिखें।",
         heading: "आपका साइन-इन ईमेल बदल दिया गया है",
         paragraphs: [
           "जो DesiAuction अकाउंट इस पते से चलता था, वह अब {{maskedEmail}} से साइन इन होता है। अब कोड और अकाउंट के मेल वहीं जाएँगे, और बाकी सभी डिवाइस से साइन आउट कर दिया गया है।",
@@ -324,9 +338,12 @@ const EMAIL_CHANGED: EmailTemplateSpec = {
 
 // --- Registration decisions ------------------------------------------------------
 
+// "Manage emails" in the footer (email v2) is where these are switched off, so
+// the footnote says only why — and no longer names an English switch inside a
+// Hindi mail.
 const REGISTRATION_FOOTNOTE = {
-  en: 'You received this because you registered for {{season}}. Switch off "Registration decisions" in your account to stop these.',
-  hi: 'आपको यह इसलिए मिला क्योंकि आपने {{season}} के लिए रजिस्टर किया था। ये मेल बंद करने के लिए अपने अकाउंट में "Registration decisions" बंद करें।',
+  en: "You received this because you registered for {{season}}.",
+  hi: "आपको यह इसलिए मिला क्योंकि आपने {{season}} के लिए रजिस्टर किया था।",
 };
 
 const REGISTRATION_ACTION = { en: "See your registration", hi: "अपना रजिस्ट्रेशन देखें" };
@@ -356,22 +373,520 @@ function decision(
     editableFields: LAYOUT_FIELDS,
     languages: ["en", "hi"],
     variants: DEFAULT_VARIANT,
-    actions: [{ id: "registration", description: "The player's home, where the registration is." }],
-    variables: [NAME, SEASON, ...extra],
+    actions: [
+      { id: "registration", description: "The player's registration page for this season." },
+    ],
+    variables: [NAME, SEASON, ORG, ...extra],
     locked: [],
     defaults: { en: build("en"), hi: build("hi") },
   };
 }
 
-// --- The season ------------------------------------------------------------------
-
-const AUCTION_FOOTNOTE_SWITCH = {
-  en: 'Switch off "Auction updates" in your account to stop these.',
-  hi: 'ये मेल बंद करने के लिए अपने अकाउंट में "Auction updates" बंद करें।',
+/**
+ * "WE'VE GOT YOUR REGISTRATION" — the first mail a player ever gets from us
+ * (email programme PR4). Sent only when the player registered THEMSELVES: an
+ * organizer adding a player, or an import, is not the player's moment.
+ * What they sent is a details table the code writes (role and every answer the
+ * sport asked for); the club band and the tracker are the code's too.
+ */
+const RECEIVED: EmailTemplateSpec = {
+  kind: "registration.received",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "registration", description: "The player's registration page for this season." }],
+  variables: [NAME, SEASON, ORG],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "You're registered for {{season}}",
+        preheader: "{{orgName}} reviews every registration. Here's what you sent them.",
+        heading: "We've got your registration",
+        paragraphs: [
+          "Hi {{name}},",
+          "Thanks for registering for {{season}}. {{orgName}} reviews every player before auction day, and we'll email you as soon as they decide.",
+        ],
+        after: [
+          "Spotted a mistake? Ask {{orgName}} to correct it — organizers can edit any registration.",
+        ],
+        actions: { registration: REGISTRATION_ACTION.en },
+        footnote: REGISTRATION_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} के लिए आपका रजिस्ट्रेशन हो गया",
+        preheader: "{{orgName}} हर रजिस्ट्रेशन देखता है। आपने जो भेजा, वह नीचे है।",
+        heading: "आपका रजिस्ट्रेशन हमें मिल गया",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{season}} के लिए रजिस्टर करने का धन्यवाद। {{orgName}} नीलामी से पहले हर खिलाड़ी को देखता है — फ़ैसला होते ही हम आपको ईमेल करेंगे।",
+        ],
+        after: [
+          "कुछ ग़लत दिखा? {{orgName}} से ठीक करने को कहें — आयोजक किसी भी रजिस्ट्रेशन को बदल सकते हैं।",
+        ],
+        actions: { registration: REGISTRATION_ACTION.hi },
+        footnote: REGISTRATION_FOOTNOTE.hi,
+      }),
+    ),
+  },
 };
+
+// --- The season ------------------------------------------------------------------
 
 const SEASON_ACTION = { id: "season", description: "The player's home, with the season on it." };
 const SEE_SEASON = { en: "See your season", hi: "अपना सीज़न देखें" };
+
+// --- Auction night: set, moved, cleared (email programme PR6) ------------------
+
+const AUCTION_WHEN = text(
+  "when",
+  'When auction night starts, in IST ("Sat 4 Oct, 8:00 pm IST").',
+  "Sun 4 Oct, 8:00 pm IST",
+  "रवि, 4 अक्टू॰, 8:00 pm IST",
+  { computed: true, whenEmpty: "drop" },
+);
+const PREVIOUS = text(
+  "previous",
+  "The time it was before — only when it moved.",
+  "Sat 3 Oct, 7:00 pm IST",
+  "शनि, 3 अक्टू॰, 7:00 pm IST",
+  { computed: true, whenEmpty: "drop" },
+);
+const OWNER_TEAM = text(
+  "teamName",
+  "The team an OWNER bids for — empty for a player, and the owner line is left out.",
+  "Cup Kings",
+  "कप किंग्स",
+  { whenEmpty: "drop" },
+);
+// The preview shows the OWNER's mail (teamName filled, this off): a real send
+// carries one line or the other, never both.
+const IF_PLAYER = flag("ifPlayer", "On for a pool player: shows the player's line.", false);
+
+const SCHEDULE_FOOTNOTE = {
+  en: "You received this because you're in the {{season}} auction.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में हैं।",
+};
+const OWNER_LINE = {
+  en: "You're bidding for {{teamName}}. Open your owner room a few minutes early on the night, so your paddle is ready for the first player.",
+  hi: "आप {{teamName}} के लिए बोली लगा रहे हैं। उस रात अपना ओनर रूम कुछ मिनट पहले खोल लें, ताकि पहले खिलाड़ी के आते ही आपका पैडल तैयार हो।",
+};
+const PLAYER_LINE = {
+  en: "{{ifPlayer}}You're in the player pool. Watch it live on DesiAuction and see which team buys you.",
+  hi: "{{ifPlayer}}आप खिलाड़ियों की सूची में हैं। DesiAuction पर लाइव देखें कि कौन-सी टीम आपको ख़रीदती है।",
+};
+
+const AUCTION_SCHEDULE: EmailTemplateSpec = {
+  kind: "auction.schedule",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "set", label: "Time set" },
+    { id: "moved", label: "Time changed" },
+    { id: "cleared", label: "Time taken off" },
+  ],
+  actions: [
+    { id: "season", description: "The owner's auction room, or the player's season page." },
+  ],
+  variables: [NAME, SEASON, ORG, AUCTION_WHEN, PREVIOUS, OWNER_TEAM, IF_PLAYER],
+  locked: [],
+  note: "Held ten minutes before it goes; a newer change replaces a notice still waiting, so a corrected typo sends one mail.",
+  defaults: {
+    en: {
+      variants: {
+        set: layout({
+          subject: "{{season}} auction: {{when}}",
+          preheader: "Save the date — {{orgName}} has set auction night.",
+          heading: "Auction night is set",
+          paragraphs: ["Hi {{name}},", "{{orgName}} has set the {{season}} auction for {{when}}."],
+          after: [OWNER_LINE.en, PLAYER_LINE.en],
+          actions: { season: "See the season" },
+          footnote: SCHEDULE_FOOTNOTE.en,
+        }),
+        moved: layout({
+          subject: "New time: the {{season}} auction is now {{when}}",
+          preheader: "It was {{previous}}. Please update your calendar.",
+          heading: "The auction has moved",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has moved the {{season}} auction. It was {{previous}}; it's now {{when}}.",
+          ],
+          after: [OWNER_LINE.en, PLAYER_LINE.en],
+          actions: { season: "See the season" },
+          footnote: SCHEDULE_FOOTNOTE.en,
+        }),
+        cleared: layout({
+          subject: "{{season}} auction: new time to follow",
+          preheader: "{{orgName}} will share the new time soon.",
+          heading: "The auction time is off for now",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has taken the time off the {{season}} auction for now. We'll email you as soon as a new time is set.",
+          ],
+          actions: { season: "See the season" },
+          footnote: SCHEDULE_FOOTNOTE.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        set: layout({
+          subject: "{{season}} की नीलामी: {{when}}",
+          preheader: "तारीख़ नोट कर लें — {{orgName}} ने नीलामी की रात तय कर दी है।",
+          heading: "नीलामी की रात तय हो गई",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{season}} की नीलामी {{when}} के लिए तय की है।",
+          ],
+          after: [OWNER_LINE.hi, PLAYER_LINE.hi],
+          actions: { season: "सीज़न देखें" },
+          footnote: SCHEDULE_FOOTNOTE.hi,
+        }),
+        moved: layout({
+          subject: "नया समय: {{season}} की नीलामी अब {{when}}",
+          preheader: "पहले यह {{previous}} थी। कृपया अपना कैलेंडर बदल लें।",
+          heading: "नीलामी का समय बदल गया",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{season}} की नीलामी का समय बदल दिया है। पहले यह {{previous}} थी; अब {{when}} है।",
+          ],
+          after: [OWNER_LINE.hi, PLAYER_LINE.hi],
+          actions: { season: "सीज़न देखें" },
+          footnote: SCHEDULE_FOOTNOTE.hi,
+        }),
+        cleared: layout({
+          subject: "{{season}} की नीलामी: नया समय जल्द",
+          preheader: "{{orgName}} जल्द ही नया समय बताएगा।",
+          heading: "नीलामी का समय अभी तय नहीं है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने अभी के लिए {{season}} की नीलामी का समय हटा दिया है। नया समय तय होते ही हम आपको ईमेल करेंगे।",
+          ],
+          actions: { season: "सीज़न देखें" },
+          footnote: SCHEDULE_FOOTNOTE.hi,
+        }),
+      },
+    },
+  },
+};
+
+// --- Team owners: the invitation, and "every team has its owner" (PR7) ----------
+
+const INVITER = text(
+  "inviterName",
+  "The organizer who sent the invitation.",
+  "Priya Shah",
+  "प्रिया शाह",
+);
+const LINK_ONLY_YOURS: LockedBlock = {
+  id: "link-only-yours",
+  field: "after",
+  text: {
+    en: "This link is yours alone. Whoever opens it becomes the owner, so please don't forward it. It works once, for 7 days.",
+    hi: "यह लिंक सिर्फ़ आपके लिए है। जो भी इसे खोलेगा वही मालिक बन जाएगा, इसलिए इसे आगे न भेजें। यह एक बार, 7 दिन तक चलेगा।",
+  },
+  why: "The invitation link IS the ownership: the reader must be told not to pass it on.",
+};
+
+const OWNER_INVITE: EmailTemplateSpec = {
+  kind: "owner.invite",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "accept", description: "The one-time invitation link." }],
+  variables: [SEASON, ORG, TEAM, INVITER],
+  locked: [LINK_ONLY_YOURS],
+  note: "Sent direct, never queued: the link in it is the ownership, and no copy of it is kept.",
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{orgName}} invites you to own {{teamName}}",
+        preheader: "Accept to bid for {{teamName}} in the {{season}} auction.",
+        heading: "You're invited to own {{teamName}}",
+        paragraphs: [
+          "Hello,",
+          "{{inviterName}} from {{orgName}} has invited you to be the owner of {{teamName}} in {{season}}. As owner, you bid for players on auction night and build the squad, from your own phone.",
+        ],
+        after: [LINK_ONLY_YOURS.text.en],
+        actions: { accept: "Accept the invitation" },
+        footnote:
+          "You received this because {{orgName}} entered this address to invite a team owner.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{orgName}} ने आपको {{teamName}} का मालिक बनने के लिए बुलाया है",
+        preheader: "{{season}} की नीलामी में {{teamName}} के लिए बोली लगाने को स्वीकार करें।",
+        heading: "आपको {{teamName}} का मालिक बनने का न्योता है",
+        paragraphs: [
+          "नमस्ते,",
+          "{{orgName}} से {{inviterName}} ने आपको {{season}} में {{teamName}} का मालिक बनने के लिए बुलाया है। मालिक के तौर पर आप नीलामी की रात अपने फ़ोन से खिलाड़ियों पर बोली लगाते हैं और टीम बनाते हैं।",
+        ],
+        after: [LINK_ONLY_YOURS.text.hi],
+        actions: { accept: "न्योता स्वीकार करें" },
+        footnote:
+          "आपको यह इसलिए मिला क्योंकि {{orgName}} ने टीम मालिक को बुलाने के लिए यह पता डाला।",
+      }),
+    ),
+  },
+};
+
+const OWNERS_READY: EmailTemplateSpec = {
+  kind: "auction.owners_ready",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "room", description: "The season's auction setup and room." }],
+  variables: [
+    NAME,
+    SEASON,
+    text("teamCount", "How many teams — all of them now owned.", "3", "3", { computed: true }),
+    flag("ifNoTime", "On when auction night has no time yet: shows the nudge to set one.", false),
+  ],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "All {{teamCount}} owners are in for {{season}}",
+        preheader: "Every team has its owner. Auction night can go ahead.",
+        heading: "Every team has its owner",
+        paragraphs: [
+          "Hi {{name}},",
+          "All {{teamCount}} teams in {{season}} now have an owner. Here's who is bidding for whom:",
+        ],
+        after: [
+          "{{ifNoTime}}Auction night doesn't have a time yet. Set it on the auction page, and every owner and player gets it by email.",
+          "Next: grant each owner their paddle, so they can claim it in the live room.",
+        ],
+        actions: { room: "Open the auction" },
+        footnote: "You received this because you run {{season}} on DesiAuction.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} के सभी {{teamCount}} मालिक जुड़ गए",
+        preheader: "हर टीम का मालिक तय हो गया। नीलामी की रात आगे बढ़ सकती है।",
+        heading: "हर टीम का मालिक तय हो गया",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{season}} की सभी {{teamCount}} टीमों का अब एक मालिक है। कौन किसके लिए बोली लगा रहा है:",
+        ],
+        after: [
+          "{{ifNoTime}}नीलामी की रात का अभी कोई समय तय नहीं है। इसे नीलामी पेज पर तय करें, और हर मालिक और खिलाड़ी को ईमेल से मिल जाएगा।",
+          "आगे: हर मालिक को उसका पैडल दें, ताकि वे लाइव रूम में उसे ले सकें।",
+        ],
+        actions: { room: "नीलामी खोलें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+      }),
+    ),
+  },
+};
+
+// --- The day before auction night (email programme PR8) ------------------------
+
+const REMINDER_FOOTNOTE = {
+  en: "You received this because you're in the {{season}} auction.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में हैं।",
+};
+
+const AUCTION_REMINDER: EmailTemplateSpec = {
+  kind: "auction.reminder",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "owner", label: "Team owner" },
+    { id: "player", label: "Pool player" },
+    { id: "organizer", label: "Organizer (readiness)" },
+  ],
+  actions: [
+    { id: "open", description: "The owner's room, the live broadcast, or the auction setup." },
+  ],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    text(
+      "when",
+      'When it starts, in IST ("Sun 4 Oct, 8:00 pm IST").',
+      "Sun 4 Oct, 8:00 pm IST",
+      "रवि, 4 अक्टू॰, 8:00 pm IST",
+      { computed: true },
+    ),
+    text("teamName", "The owner's team.", "Cup Kings", "कप किंग्स", { whenEmpty: "drop" }),
+    text(
+      "gapLine",
+      'For organizers: what is still missing, written by DesiAuction ("2 owners haven\'t joined yet"). Empty when the room is ready.',
+      "2 owners haven't joined yet — resend their links from the auction page.",
+      "2 मालिक अभी जुड़े नहीं हैं — नीलामी पेज से उन्हें लिंक दोबारा भेजें।",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  defaults: {
+    en: {
+      variants: {
+        owner: layout({
+          subject: "Tomorrow: the {{season}} auction, {{when}}",
+          preheader: "You're bidding for {{teamName}}. Open your owner room a few minutes early.",
+          heading: "Your auction is tomorrow",
+          paragraphs: [
+            "Hi {{name}},",
+            "The {{season}} auction starts {{when}}. You're bidding for {{teamName}} — open your owner room a few minutes early so your paddle is ready for the first player.",
+          ],
+          after: [
+            "It works on a phone or a laptop. Keep your phone charged and on Wi-Fi if you can.",
+          ],
+          actions: { open: "Open your owner room" },
+          footnote: REMINDER_FOOTNOTE.en,
+        }),
+        player: layout({
+          subject: "Tomorrow: the {{season}} auction, {{when}}",
+          preheader: "You're in the pool. Watch live and see which team buys you.",
+          heading: "Your auction is tomorrow",
+          paragraphs: [
+            "Hi {{name}},",
+            "The {{season}} auction starts {{when}}, and you're in the player pool. Watch it live and see which team buys you — we'll email you the moment it happens.",
+          ],
+          actions: { open: "Watch it live" },
+          footnote: REMINDER_FOOTNOTE.en,
+        }),
+        organizer: layout({
+          subject: "Tomorrow: is the {{season}} auction ready?",
+          preheader: "Auction night is {{when}}. Here's where the room stands.",
+          heading: "Auction night is tomorrow",
+          paragraphs: [
+            "Hi {{name}},",
+            "The {{season}} auction starts {{when}}. Here's where the room stands:",
+          ],
+          after: ["{{gapLine}}"],
+          actions: { open: "Open the auction" },
+          footnote: "You received this because you run {{season}} on DesiAuction.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        owner: layout({
+          subject: "कल: {{season}} की नीलामी, {{when}}",
+          preheader: "आप {{teamName}} के लिए बोली लगा रहे हैं। अपना ओनर रूम कुछ मिनट पहले खोल लें।",
+          heading: "आपकी नीलामी कल है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{season}} की नीलामी {{when}} शुरू होगी। आप {{teamName}} के लिए बोली लगा रहे हैं — अपना ओनर रूम कुछ मिनट पहले खोल लें, ताकि पहले खिलाड़ी के आते ही आपका पैडल तैयार हो।",
+          ],
+          after: ["फ़ोन या लैपटॉप, दोनों पर चलता है। हो सके तो फ़ोन चार्ज रखें और Wi-Fi पर रहें।"],
+          actions: { open: "अपना ओनर रूम खोलें" },
+          footnote: REMINDER_FOOTNOTE.hi,
+        }),
+        player: layout({
+          subject: "कल: {{season}} की नीलामी, {{when}}",
+          preheader: "आप खिलाड़ियों की सूची में हैं। लाइव देखें कि कौन-सी टीम आपको ख़रीदती है।",
+          heading: "आपकी नीलामी कल है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{season}} की नीलामी {{when}} शुरू होगी, और आप खिलाड़ियों की सूची में हैं। लाइव देखें कि कौन-सी टीम आपको ख़रीदती है — ऐसा होते ही हम आपको ईमेल करेंगे।",
+          ],
+          actions: { open: "लाइव देखें" },
+          footnote: REMINDER_FOOTNOTE.hi,
+        }),
+        organizer: layout({
+          subject: "कल: क्या {{season}} की नीलामी तैयार है?",
+          preheader: "नीलामी की रात {{when}} है। रूम की स्थिति नीचे है।",
+          heading: "नीलामी की रात कल है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{season}} की नीलामी {{when}} शुरू होगी। रूम की स्थिति:",
+          ],
+          after: ["{{gapLine}}"],
+          actions: { open: "नीलामी खोलें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+        }),
+      },
+    },
+  },
+};
+
+// --- The organizer's results pack (email programme PR9) --------------------------
+
+const AUCTION_RESULTS: EmailTemplateSpec = {
+  kind: "auction.results",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "results", description: "The season's auction page, with every lot and team." }],
+  variables: [
+    NAME,
+    SEASON,
+    text("soldCount", "Players sold.", "38", "38", { computed: true, required: true }),
+    text("poolCount", "Players who went under the hammer.", "43", "43", { computed: true }),
+    text("spent", "What every team spent together.", "₹12,40,000", "₹12,40,000", {
+      computed: true,
+    }),
+    {
+      name: "topBuys",
+      description: "The night's top buys, one line each — a paragraph on its own.",
+      type: "list",
+      computed: true,
+      sample: {
+        en: ["Arjun Sharma — Cup Kings, ₹75,000", "Rohit Nair — Tigers, ₹60,000"],
+        hi: ["अर्जुन शर्मा — कप किंग्स, ₹75,000", "रोहित नायर — टाइगर्स, ₹60,000"],
+      },
+    },
+  ],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{season}} auction: {{soldCount}} players sold, {{spent}} spent",
+        preheader: "Every team, what it spent, and the night's top buys.",
+        heading: "The auction is done",
+        paragraphs: [
+          "Hi {{name}},",
+          "{{soldCount}} of {{poolCount}} players were sold in the {{season}} auction, for {{spent}} in all. The night's top buys:",
+          "{{topBuys}}",
+          "Here's what each team spent:",
+        ],
+        after: [
+          "Every player has been told by email where they went, and every owner has their squad. Next: fixtures.",
+        ],
+        actions: { results: "See the full results" },
+        footnote: "You received this because you run {{season}} on DesiAuction.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} की नीलामी: {{soldCount}} खिलाड़ी बिके, {{spent}} ख़र्च",
+        preheader: "हर टीम, उसका ख़र्च, और रात की सबसे बड़ी ख़रीदें।",
+        heading: "नीलामी पूरी हो गई",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{season}} की नीलामी में {{poolCount}} में से {{soldCount}} खिलाड़ी बिके, कुल {{spent}} में। रात की सबसे बड़ी ख़रीदें:",
+          "{{topBuys}}",
+          "हर टीम ने कितना ख़र्च किया:",
+        ],
+        after: [
+          "हर खिलाड़ी को ईमेल से बता दिया गया है कि वे किस टीम में गए, और हर मालिक को उसकी टीम मिल गई है। आगे: मैच।",
+        ],
+        actions: { results: "पूरे नतीजे देखें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+      }),
+    ),
+  },
+};
 
 const SOLD: EmailTemplateSpec = {
   kind: "auction.sold",
@@ -431,11 +946,9 @@ const SOLD: EmailTemplateSpec = {
       layout({
         subject: "Congratulations — {{teamName}} bought you for {{price}}",
         preheader: "{{teamName}} bought you in the {{season}} auction.",
-        heading: "You're a {{teamName}} player",
+        heading: "Congratulations, {{name}}",
         paragraphs: [
-          "Congratulations, {{name}}!",
-          "{{teamName}} bought you for {{price}} in the {{season}} auction{{multipleNote}}.",
-          "{{bidStory}}",
+          "You're a {{teamName}} player. {{bidStory}}",
           "{{highlight}}.",
           "{{shareLine}}",
         ],
@@ -443,18 +956,16 @@ const SOLD: EmailTemplateSpec = {
           "That is your squad so far at {{teamName}}. Your organizer, {{orgName}}, will share fixtures next.",
         ],
         actions: { card: "Share your player card", season: SEE_SEASON.en },
-        footnote: `You received this because you played in the {{season}} auction. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because you played in the {{season}} auction.`,
       }),
     ),
     hi: one(
       layout({
         subject: "बधाई हो — {{teamName}} ने आपको {{price}} में खरीदा",
         preheader: "{{season}} की नीलामी में {{teamName}} ने आपको खरीदा।",
-        heading: "अब आप {{teamName}} के खिलाड़ी हैं",
+        heading: "बधाई हो, {{name}}",
         paragraphs: [
-          "बधाई हो, {{name}}!",
-          "{{season}} की नीलामी में {{teamName}} ने आपको {{price}} में खरीदा{{multipleNote}}।",
-          "{{bidStory}}",
+          "अब आप {{teamName}} के खिलाड़ी हैं। {{bidStory}}",
           "{{highlight}}।",
           "{{shareLine}}",
         ],
@@ -462,7 +973,7 @@ const SOLD: EmailTemplateSpec = {
           "यह {{teamName}} में अब तक की आपकी टीम है। आपके आयोजक, {{orgName}}, आगे मैचों की जानकारी देंगे।",
         ],
         actions: { card: "अपना प्लेयर कार्ड शेयर करें", season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में थे। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में थे।`,
       }),
     ),
   },
@@ -491,7 +1002,7 @@ const UNSOLD: EmailTemplateSpec = {
           "You're still registered with {{orgName}}, and organizers often bring players in as replacements during the season.",
         ],
         actions: { season: SEE_SEASON.en },
-        footnote: `You received this because you registered for {{season}}. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because you registered for {{season}}.`,
       }),
     ),
     hi: one(
@@ -505,7 +1016,7 @@ const UNSOLD: EmailTemplateSpec = {
           "आप अभी भी {{orgName}} के साथ रजिस्टर्ड हैं, और सीज़न के दौरान आयोजक अक्सर खिलाड़ियों को रिप्लेसमेंट के तौर पर बुलाते हैं।",
         ],
         actions: { season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि आपने {{season}} के लिए रजिस्टर किया था। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि आपने {{season}} के लिए रजिस्टर किया था।`,
       }),
     ),
   },
@@ -644,7 +1155,7 @@ const APPOINTED: EmailTemplateSpec = {
           "{{ifSignedDirect}}You join {{teamName}} directly, without going through the auction.",
         ],
         actions: { season: SEE_SEASON.en },
-        footnote: `You received this because {{orgName}} named you in {{season}}. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because {{orgName}} named you in {{season}}.`,
       }),
     ),
     hi: one(
@@ -659,7 +1170,7 @@ const APPOINTED: EmailTemplateSpec = {
           "{{ifSignedDirect}}आप नीलामी में जाए बिना सीधे {{teamName}} में शामिल हो रहे हैं।",
         ],
         actions: { season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि {{orgName}} ने {{season}} में आपको यह भूमिका दी। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि {{orgName}} ने {{season}} में आपको यह भूमिका दी।`,
       }),
     ),
   },
@@ -713,7 +1224,7 @@ const SQUAD_SHEET: EmailTemplateSpec = {
           "Your first match: {{firstMatch}}.",
         ],
         actions: { season: SEE_SEASON.en },
-        footnote: `You received this because you play for {{teamName}} in {{season}}. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because you play for {{teamName}} in {{season}}.`,
       }),
     ),
     hi: one(
@@ -731,7 +1242,7 @@ const SQUAD_SHEET: EmailTemplateSpec = {
           "आपका पहला मैच: {{firstMatch}}।",
         ],
         actions: { season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं।`,
       }),
     ),
   },
@@ -778,7 +1289,7 @@ const LINEUP: EmailTemplateSpec = {
         ],
         after: ["Good luck!"],
         actions: { season: SEE_SEASON.en },
-        footnote: `You received this because you play for {{teamName}} in {{season}}. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because you play for {{teamName}} in {{season}}.`,
       }),
     ),
     hi: one(
@@ -792,7 +1303,7 @@ const LINEUP: EmailTemplateSpec = {
         ],
         after: ["शुभकामनाएँ!"],
         actions: { season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं।`,
       }),
     ),
   },
@@ -833,6 +1344,288 @@ const FINANCE: EmailTemplateSpec = {
         other: plain("DesiAuction से एक दस्तावेज़", []),
       },
     },
+  },
+};
+
+// --- The organizer's club (email programme PR5) ----------------------------------
+
+const RUN_FOOTNOTE = {
+  en: "You received this because you run {{season}} on DesiAuction.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+};
+const REVIEW_ACTION = { en: "Review registrations", hi: "रजिस्ट्रेशन देखें" };
+const OPEN_SEASON = { en: "Open your season", hi: "अपना सीज़न खोलें" };
+
+/**
+ * "YOUR CLUB IS READY" — to the organizer who just created a club. The three
+ * steps to auction night are a details table the code writes (they name the
+ * product's own screens); the button opens the club.
+ */
+const CLUB_WELCOME: EmailTemplateSpec = {
+  kind: "club.welcome",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "club", description: "The club's own page, where setup continues." }],
+  variables: [NAME, ORG],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{orgName}} is ready on DesiAuction",
+        preheader: "Three steps take you from here to auction night.",
+        heading: "Your club is ready",
+        paragraphs: [
+          "Hi {{name}},",
+          "{{orgName}} is set up on DesiAuction. Three steps take you from here to auction night:",
+        ],
+        after: [
+          `Stuck on anything? Write to ${SUPPORT} and a person will help, or book a 20-minute walkthrough at desiauction.in/schedule-demo.`,
+        ],
+        actions: { club: "Open your club" },
+        footnote: "You received this because you created {{orgName}} on DesiAuction.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{orgName}} DesiAuction पर तैयार है",
+        preheader: "यहाँ से नीलामी की रात तक बस तीन कदम।",
+        heading: "आपका क्लब तैयार है",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{orgName}} DesiAuction पर सेट हो गया है। यहाँ से नीलामी की रात तक बस तीन कदम:",
+        ],
+        after: [
+          `कहीं अटक गए? ${SUPPORT} पर लिखें, हमारी टीम मदद करेगी — या desiauction.in/schedule-demo पर 20 मिनट का डेमो बुक करें।`,
+        ],
+        actions: { club: "अपना क्लब खोलें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि आपने DesiAuction पर {{orgName}} बनाया।",
+      }),
+    ),
+  },
+};
+
+const PLAYER_NAME = text(
+  "playerName",
+  "The player who registered, as they gave their name.",
+  "Rohit Nair",
+  "रोहित नायर",
+);
+
+/** "YOUR FIRST REGISTRATION IS IN" — once per season, to its organizers. */
+const REGISTRATION_FIRST: EmailTemplateSpec = {
+  kind: "registration.first",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "review", description: "The season's registrations awaiting review." }],
+  variables: [NAME, SEASON, PLAYER_NAME],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "First player in: {{playerName}} registered for {{season}}",
+        preheader:
+          "Your season is live. From now on, one summary a morning while registrations wait.",
+        heading: "Your first registration is in",
+        paragraphs: [
+          "Hi {{name}},",
+          "{{playerName}} just registered for {{season}} — your first player. Review them now so they know where they stand.",
+        ],
+        after: [
+          "From here on we'll email you one summary at 9 am on days registrations are waiting, instead of a mail for every player.",
+        ],
+        actions: { review: REVIEW_ACTION.en },
+        footnote: RUN_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "पहला खिलाड़ी आ गया: {{playerName}} ने {{season}} के लिए रजिस्टर किया",
+        preheader:
+          "आपका सीज़न शुरू हो गया। अब से, रजिस्ट्रेशन इंतज़ार में हों तो हर सुबह एक सारांश।",
+        heading: "आपका पहला रजिस्ट्रेशन आ गया",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{playerName}} ने अभी {{season}} के लिए रजिस्टर किया है — आपका पहला खिलाड़ी। अभी देख लें, ताकि उन्हें पता रहे कि वे कहाँ खड़े हैं।",
+        ],
+        after: [
+          "अब से, जिस दिन रजिस्ट्रेशन इंतज़ार में होंगे, हम हर खिलाड़ी के लिए अलग मेल के बजाय सुबह 9 बजे एक सारांश भेजेंगे।",
+        ],
+        actions: { review: REVIEW_ACTION.hi },
+        footnote: RUN_FOOTNOTE.hi,
+      }),
+    ),
+  },
+};
+
+/**
+ * THE 9 AM DIGEST — one mail per organizer per day, only on days something
+ * is waiting, covering every season they review. Each season and its count is
+ * a details table the code writes.
+ */
+const REGISTRATION_DIGEST: EmailTemplateSpec = {
+  kind: "registration.digest",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "review", description: "The registrations awaiting review." }],
+  variables: [
+    NAME,
+    text(
+      "waiting",
+      'How many are waiting, with the noun ("12 registrations", "1 registration").',
+      "12 registrations",
+      "12 रजिस्ट्रेशन",
+      { required: true, computed: true },
+    ),
+  ],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{waiting}} waiting for your review",
+        preheader:
+          "Players are waiting to hear back. Here's where each season stands this morning.",
+        heading: "Registrations waiting for you",
+        paragraphs: [
+          "Hi {{name}},",
+          "Players are waiting to hear back. Here's each season this morning, with how long the oldest has waited:",
+        ],
+        after: ["You get this at 9 am, and only on days something is waiting."],
+        actions: { review: REVIEW_ACTION.en },
+        footnote: "You received this because you review registrations for a club on DesiAuction.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{waiting}} आपकी समीक्षा के इंतज़ार में",
+        preheader: "खिलाड़ी जवाब का इंतज़ार कर रहे हैं। आज सुबह हर सीज़न की स्थिति नीचे है।",
+        heading: "आपके इंतज़ार में रजिस्ट्रेशन",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "खिलाड़ी जवाब का इंतज़ार कर रहे हैं। आज सुबह हर सीज़न की स्थिति, और सबसे पुराना कितने दिन से इंतज़ार में है:",
+        ],
+        after: ["यह मेल सुबह 9 बजे आता है, और सिर्फ़ उन्हीं दिनों जब कुछ इंतज़ार में हो।"],
+        actions: { review: REVIEW_ACTION.hi },
+        footnote:
+          "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर किसी क्लब के रजिस्ट्रेशन देखते हैं।",
+      }),
+    ),
+  },
+};
+
+const CONTEST: LockedBlock = {
+  id: "contest",
+  field: "after",
+  text: {
+    en: `Think this is a mistake? Write to ${SUPPORT} and a person will look at it again.`,
+    hi: `आपको लगता है यह ग़लती है? ${SUPPORT} पर लिखें, हमारी टीम इसे फिर से देखेगी।`,
+  },
+  why: "An organizer whose page we took down must always be told how to contest it.",
+};
+
+/** DesiAuction took a season's public page down — the organizer hears it from us, with why. */
+const SEASON_HELD: EmailTemplateSpec = {
+  kind: "season.held",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "season", description: "The season's own page." }],
+  variables: [
+    NAME,
+    SEASON,
+    text(
+      "reason",
+      "Why the page was taken down, as our moderator wrote it.",
+      "the page used another club's logo",
+      "पेज पर किसी और क्लब का लोगो था",
+      { required: true, computed: true },
+    ),
+  ],
+  locked: [CONTEST],
+  note: "Nobody but a platform admin can stop this mail: an organizer must never learn of a take-down from a blank page.",
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{season}} has been taken off public view",
+        preheader:
+          "Only the public page is hidden. Your season keeps working for you, your players and owners.",
+        heading: "We've hidden your season's public page",
+        paragraphs: [
+          "Hi {{name}},",
+          "DesiAuction has made the public page for {{season}} private. Only the public page is hidden — the season keeps working for you, your players and your team owners.",
+          "The reason: {{reason}}",
+        ],
+        after: [CONTEST.text.en],
+        actions: { season: OPEN_SEASON.en },
+        footnote: RUN_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} को सार्वजनिक पेज से हटा दिया गया है",
+        preheader:
+          "सिर्फ़ सार्वजनिक पेज छिपाया गया है। आपका सीज़न आपके, खिलाड़ियों और मालिकों के लिए चलता रहेगा।",
+        heading: "हमने आपके सीज़न का सार्वजनिक पेज छिपा दिया है",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "DesiAuction ने {{season}} का सार्वजनिक पेज प्राइवेट कर दिया है। सिर्फ़ सार्वजनिक पेज छिपाया गया है — सीज़न आपके, आपके खिलाड़ियों और टीम मालिकों के लिए चलता रहेगा।",
+          "वजह: {{reason}}",
+        ],
+        after: [CONTEST.text.hi],
+        actions: { season: OPEN_SEASON.hi },
+        footnote: RUN_FOOTNOTE.hi,
+      }),
+    ),
+  },
+};
+
+const SEASON_RELEASED: EmailTemplateSpec = {
+  kind: "season.released",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "season", description: "The season's own page, where it is published." }],
+  variables: [NAME, SEASON],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{season}} can go public again",
+        preheader: "We've lifted our hold. It stays private until you publish it.",
+        heading: "Your season's page is back in your hands",
+        paragraphs: [
+          "Hi {{name}},",
+          "We've lifted the hold on {{season}}. It stays private until you publish it again from the season page.",
+        ],
+        actions: { season: OPEN_SEASON.en },
+        footnote: RUN_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} फिर से सार्वजनिक हो सकता है",
+        preheader: "हमने रोक हटा दी है। जब तक आप इसे पब्लिश नहीं करते, यह प्राइवेट रहेगा।",
+        heading: "आपके सीज़न का पेज फिर से आपके हाथ में है",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "हमने {{season}} से रोक हटा दी है। जब तक आप सीज़न पेज से इसे फिर से पब्लिश नहीं करते, यह प्राइवेट रहेगा।",
+        ],
+        actions: { season: OPEN_SEASON.hi },
+        footnote: RUN_FOOTNOTE.hi,
+      }),
+    ),
   },
 };
 
@@ -1338,19 +2131,20 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "auth.email_code": EMAIL_CODE,
   "security.phone_changed": PHONE_CHANGED,
   "security.email_changed": EMAIL_CHANGED,
+  "registration.received": RECEIVED,
   "registration.approved": decision("registration.approved", {
     en: {
-      subject: "You're approved for {{season}}",
-      heading: "You're in",
+      subject: "You're in — {{season}}",
+      heading: "You're in the auction pool",
       lines: [
-        "Your registration for {{season}} is approved. You're in the player pool for auction day.",
+        "{{orgName}} approved your registration for {{season}}. You're in the player pool for auction day, and we'll email you the moment a team buys you.",
       ],
     },
     hi: {
-      subject: "{{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर हो गया",
-      heading: "आप शामिल हैं",
+      subject: "आप चुन लिए गए — {{season}}",
+      heading: "आप नीलामी की सूची में हैं",
       lines: [
-        "{{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर हो गया है। नीलामी के दिन आप खिलाड़ियों की सूची में हैं।",
+        "{{orgName}} ने {{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर कर दिया है। नीलामी के दिन आप खिलाड़ियों की सूची में हैं, और कोई टीम आपको ख़रीदते ही हम आपको ईमेल करेंगे।",
       ],
     },
   }),
@@ -1359,14 +2153,14 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
       subject: "You're on the waitlist for {{season}}",
       heading: "You're on the waitlist",
       lines: [
-        "Your registration for {{season}} is on the waitlist. The organizer moves players up if a place opens, and we'll tell you if that happens.",
+        "{{orgName}} has put your registration for {{season}} on the waitlist. If a place opens they move players up, and we'll email you if that happens.",
       ],
     },
     hi: {
       subject: "{{season}} के लिए आप वेटलिस्ट पर हैं",
       heading: "आप वेटलिस्ट पर हैं",
       lines: [
-        "{{season}} के लिए आपका रजिस्ट्रेशन वेटलिस्ट पर है। जगह खाली होने पर आयोजक खिलाड़ियों को आगे बढ़ाते हैं, और ऐसा होने पर हम आपको बताएँगे।",
+        "{{orgName}} ने {{season}} के लिए आपका रजिस्ट्रेशन वेटलिस्ट पर रखा है। जगह खाली होने पर वे खिलाड़ियों को आगे बढ़ाते हैं, और ऐसा होने पर हम आपको ईमेल करेंगे।",
       ],
     },
   }),
@@ -1377,16 +2171,18 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
         subject: "Your registration for {{season}} wasn't approved",
         heading: "Your registration wasn't approved",
         lines: [
-          "Your registration for {{season}} was not approved.",
+          "{{orgName}} didn't approve your registration for {{season}}.",
           "The reason given: {{reason}}.",
+          "Your details stay on your account, so registering for another season takes a minute.",
         ],
       },
       hi: {
         subject: "{{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर नहीं हुआ",
         heading: "आपका रजिस्ट्रेशन मंज़ूर नहीं हुआ",
         lines: [
-          "{{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर नहीं किया गया।",
+          "{{orgName}} ने {{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर नहीं किया।",
           "बताई गई वजह: {{reason}}।",
+          "आपकी जानकारी आपके अकाउंट में बनी रहती है, इसलिए किसी और सीज़न के लिए रजिस्टर करने में बस एक मिनट लगेगा।",
         ],
       },
     },
@@ -1421,17 +2217,27 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
       subject: "Your registration for {{season}} is back under review",
       heading: "Back under review",
       lines: [
-        "Your registration for {{season}} is back under review. We'll tell you what the organizer decides.",
+        "Your registration for {{season}} is back under review. We'll email you as soon as {{orgName}} decides.",
       ],
     },
     hi: {
       subject: "{{season}} के लिए आपका रजिस्ट्रेशन फिर से जाँच में है",
       heading: "फिर से जाँच में",
       lines: [
-        "{{season}} के लिए आपका रजिस्ट्रेशन फिर से जाँच में है। आयोजक जो भी फ़ैसला करेंगे, हम आपको बताएँगे।",
+        "{{season}} के लिए आपका रजिस्ट्रेशन फिर से जाँच में है। {{orgName}} के फ़ैसला करते ही हम आपको ईमेल करेंगे।",
       ],
     },
   }),
+  "club.welcome": CLUB_WELCOME,
+  "registration.first": REGISTRATION_FIRST,
+  "registration.digest": REGISTRATION_DIGEST,
+  "season.held": SEASON_HELD,
+  "season.released": SEASON_RELEASED,
+  "auction.schedule": AUCTION_SCHEDULE,
+  "owner.invite": OWNER_INVITE,
+  "auction.owners_ready": OWNERS_READY,
+  "auction.reminder": AUCTION_REMINDER,
+  "auction.results": AUCTION_RESULTS,
   "auction.sold": SOLD,
   "auction.unsold": UNSOLD,
   "auction.owner_summary": OWNER_SUMMARY,

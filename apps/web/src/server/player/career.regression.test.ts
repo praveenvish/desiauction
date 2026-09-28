@@ -18,7 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { myRegistrations } from "../competition/public";
-import { personSeasonsInOrg, playerCareer, playerUpcomingMatches } from "./career";
+import { personSeasonsInOrg, playerCareer, playerUpcomingMatches, teamSeason } from "./career";
 
 /**
  * The career projection, against a real database (PI-1 P5).
@@ -302,6 +302,18 @@ describe("playerCareer (PI-1)", () => {
       competitionName: "CPL 1",
     });
     expect(await playerUpcomingMatches(newId(), "2026-01-01")).toEqual([]);
+  });
+
+  it("reads a team's season for its owner — public, upcoming, from the team's side", async () => {
+    const season = await teamSeason(teamId, "2026-01-01");
+    // The 2099 published match is to come; the 2020 one is past, the draft is
+    // the organizer's working copy, and the completed one has no result yet.
+    expect(season?.upcoming.map((match) => match.fixtureId)).toEqual([fixtureIds[0]]);
+    expect(season?.upcoming[0]).toMatchObject({ opponentName: "Career Rivals", live: false });
+    expect(season?.results).toEqual([]);
+    expect(season?.record).toEqual({ played: 0, won: 0, lost: 0, tied: 0 });
+    expect(season?.place).toBeNull();
+    expect(await teamSeason(newId(), "2026-01-01")).toBeNull();
   });
 
   it("carries the team colour on a season for its chip", async () => {

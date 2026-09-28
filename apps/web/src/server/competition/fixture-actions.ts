@@ -34,6 +34,7 @@ import {
   type StandingsView,
 } from "./results";
 import { teamsOf, type CompetitionSummary, type TeamSummary } from "./competitions";
+import { seasonPlayIn, type SeasonPlay } from "./season-play";
 import {
   cancelFixture,
   completeFixture,
@@ -1057,6 +1058,34 @@ export async function standingsView(slug: string): Promise<StandingsPageView | n
       next: Object.fromEntries(nextOf(timeline, nowWallClock())),
       viewer: { canManage },
     };
+  });
+}
+
+/**
+ * A SEASON SO FAR, for the tournament page's edition card: the table and the
+ * matches (live, next, latest results) from the one `seasonPlayIn` read the
+ * public page and Reports use, plus each team's form. Member-gated like the
+ * table; only published matches, so a draft fixture never reads as "next".
+ */
+export interface SeasonSoFarView {
+  readonly play: SeasonPlay;
+  readonly form: Record<string, FormLetter[]>;
+}
+
+export async function seasonSoFarView(slug: string): Promise<SeasonSoFarView | null> {
+  const session = await requireSession();
+  const competition = await resolveMemberCompetition(session.personId, slug);
+  if (competition === null) {
+    return null;
+  }
+  return inCompetitionOrg(session.personId, competition, async (db) => {
+    const [play, timeline, resultMap] = await Promise.all([
+      seasonPlayIn(db, competition),
+      competitionTimeline(db, competition.id, PUBLIC_FIXTURE_STATUSES),
+      resultsOf(db, competition.id),
+    ]);
+    const outcomes = new Map([...resultMap.entries()].map(([id, row]) => [id, row.outcome]));
+    return { play, form: Object.fromEntries(formOf(timeline, outcomes)) };
   });
 }
 

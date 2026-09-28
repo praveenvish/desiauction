@@ -162,6 +162,11 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
       "server/competition/appointments.ts": "queues only — delivery is the gated drain",
       "server/competition/lineup-announce.ts": "queues only — delivery is the gated drain",
       "server/competition/squad-sheets.ts": "queues only — delivery is the gated drain",
+      "server/orgs/organizer-notify.ts": "queues only — delivery is the gated drain",
+      "server/competition/registration-digest.ts": "queues only — delivery is the gated drain",
+      "server/competition/auction-reminders.ts": "queues only — delivery is the gated drain",
+      "server/competition/auction-schedule-notify.ts":
+        "queues only, held ten minutes — delivery is the gated drain",
     },
   },
   {
@@ -179,6 +184,33 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
     allowed: {
       "packages/messaging/src/email-adapter.ts": "defines it",
       "packages/messaging/src/finance-delivery.ts": "gate-owning (resolveOwnerEmail)",
+    },
+  },
+  /*
+   * THE WIRE (mail-provider.ts). A provider sends to whoever it is handed, so
+   * only the senders above may hold one — each asks the gate, or is the
+   * sign-in code path that must never be switched off.
+   */
+  {
+    token: "mailProviderFromEnv(",
+    allowed: {
+      "packages/messaging/src/mail-provider.ts": "defines it",
+      "server/auth/email-sender.ts": "factory",
+      "server/messaging/transactional-mail.ts": "factory",
+      "server/financial-operations/deps.ts": "finops deps — the adapter asks the gate",
+      "apps/finops-runner/src/delivery.ts": "the runner's finops deps",
+    },
+  },
+  {
+    token: "createSesProvider(",
+    allowed: { "packages/messaging/src/mail-provider.ts": "defines it; built by the factory" },
+  },
+  {
+    token: "createResendProvider(",
+    allowed: {
+      "packages/messaging/src/mail-provider.ts": "defines it; built by the factory",
+      "packages/messaging/src/email-adapter.ts": "Resend settings given directly (tests)",
+      "server/auth/email-sender.ts": "Resend settings given directly (tests)",
     },
   },
   {
@@ -255,8 +287,12 @@ const WORDING_TOKENS: readonly { token: string; allowed: Readonly<Record<string,
   {
     token: "renderEmail(",
     allowed: {
-      "server/messaging/email-layout.ts": "defines the layout",
+      "packages/messaging/src/email-layout.ts":
+        "defines the layout (shared with the finops runner)",
+      "server/messaging/email-layout.ts": "binds the layout to this site's address",
       "server/messaging/notification-email.ts": "the one renderer — wording from the registry",
+      "packages/messaging/src/email-adapter.ts":
+        "lays a finance document out around its registry wording; the text part stays the document",
     },
   },
   {

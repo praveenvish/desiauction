@@ -240,6 +240,7 @@ export async function recordConsent(
       | "sms_start"
       | "whatsapp_stop"
       | "whatsapp_start"
+      | "email_unsubscribe"
       | "import"
       | "support"
       | "login";
@@ -333,6 +334,12 @@ export async function setPreference(
     topic: string;
     channel: "sms" | "email" | "in-app";
     allowed: boolean;
+    /**
+     * Where the change was made. The /account switch by default; a mail's
+     * one-click unsubscribe (and its undo) says so, so the consent trail shows
+     * how the person actually turned it off.
+     */
+    via?: { source: "account" | "email_unsubscribe"; evidence: Record<string, unknown> };
   },
 ): Promise<void> {
   await db
@@ -356,8 +363,8 @@ export async function setPreference(
     personId: input.personId,
     purpose: `${input.channel}.${input.topic}`,
     granted: input.allowed,
-    source: "account",
-    evidence: { via: "account notification settings" },
+    source: input.via?.source ?? "account",
+    evidence: input.via?.evidence ?? { via: "account notification settings" },
   });
 }
 

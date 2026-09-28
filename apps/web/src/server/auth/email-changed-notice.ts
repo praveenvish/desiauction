@@ -4,6 +4,7 @@ import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 import { env } from "../../env";
 import { languageForMail, sendNotificationMail } from "../messaging/notify";
 import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
+import { requestDetails, type RequestContext } from "../messaging/request-context";
 import type { TransactionalMailer } from "../messaging/transactional-mail";
 
 /**
@@ -41,6 +42,7 @@ export function maskEmail(email: string): string {
 export function emailChangedCopy(
   newEmail: string,
   language: MessageLanguage = "en",
+  context?: RequestContext,
 ): Promise<NotificationMail> {
   // The "if it wasn't you" line is LOCKED in the template: an admin can reword
   // the rest, never remove the one sentence that tells the owner what to do.
@@ -48,7 +50,10 @@ export function emailChangedCopy(
     "security.email_changed",
     language,
     { maskedEmail: maskEmail(newEmail) },
-    { action: { id: "help", url: `${env.PUBLIC_BASE_URL}/support` } },
+    {
+      action: { id: "help", url: `${env.PUBLIC_BASE_URL}/support` },
+      ...(context === undefined ? {} : { details: requestDetails(context, "change", language) }),
+    },
   );
 }
 
@@ -68,6 +73,8 @@ export async function notifyEmailChanged(
   mailer?: TransactionalMailer,
   /** Whose account moved — the warning is written in their language. */
   personId?: string,
+  /** Where and when the change was made, shown so the owner can tell if it was them. */
+  context?: RequestContext,
 ): Promise<"sent" | "skipped" | "refused" | "failed"> {
   if (previousEmail === null || previousEmail === newEmail) {
     return "skipped";
@@ -76,7 +83,7 @@ export async function notifyEmailChanged(
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "security.email_changed", to: previousEmail },
-    await emailChangedCopy(newEmail, language),
+    await emailChangedCopy(newEmail, language, context),
     mailer,
   );
   return outcome === "suppressed" ? "refused" : outcome === "sent" ? "sent" : "failed";
@@ -94,12 +101,16 @@ export async function notifyEmailChanged(
 export function phoneChangedCopy(
   last4: string,
   language: MessageLanguage = "en",
+  context?: RequestContext,
 ): Promise<NotificationMail> {
   return renderNotificationEmail(
     "security.phone_changed",
     language,
     { last4 },
-    { action: { id: "help", url: `${env.PUBLIC_BASE_URL}/support` } },
+    {
+      action: { id: "help", url: `${env.PUBLIC_BASE_URL}/support` },
+      ...(context === undefined ? {} : { details: requestDetails(context, "change", language) }),
+    },
   );
 }
 
@@ -110,6 +121,7 @@ export async function notifyPhoneChangedByEmail(
   newPhone: string,
   mailer?: TransactionalMailer,
   personId?: string,
+  context?: RequestContext,
 ): Promise<"sent" | "skipped" | "refused" | "failed"> {
   if (email === null) {
     return "skipped";
@@ -118,7 +130,7 @@ export async function notifyPhoneChangedByEmail(
   const { outcome } = await sendNotificationMail(
     db,
     { kind: "security.phone_changed", to: email },
-    await phoneChangedCopy(newPhone.slice(-4), language),
+    await phoneChangedCopy(newPhone.slice(-4), language, context),
     mailer,
   );
   return outcome === "suppressed" ? "refused" : outcome === "sent" ? "sent" : "failed";

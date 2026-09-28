@@ -27,7 +27,7 @@ describe("the menu says when it changes", () => {
     expect(roleChangeFor(["owner"], "")?.item).toBe("My team");
     expect(roleChangeFor(["auctioneer"], "")?.item).toBe("Auction nights");
     expect(roleChangeFor(["organizer"], "")?.item).toBe("Tournaments");
-    expect(roleChangeFor(["player"], "")?.item).toBe("My sports");
+    expect(roleChangeFor(["player"], "")?.item).toBe("My profile");
   });
 
   it("collapses several at once to the most urgent — two sentences is a worse menu", () => {
@@ -53,6 +53,6 @@ describe("the menu says when it changes", () => {
 
   it("holding nothing has a signature, so the next role is announced", () => {
     expect(signatureOf([])).toBe("");
-    expect(roleChangeFor(["player"], "")?.item).toBe("My sports");
+    expect(roleChangeFor(["player"], "")?.item).toBe("My profile");
   });
 });

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { systemDb } from "../db";
 import { logger } from "../logger";
@@ -11,6 +12,7 @@ import {
   liftSeasonHold,
   type HoldOutcome,
 } from "../moderation/season-hold";
+import { notifySeasonHold } from "../orgs/organizer-notify";
 import { inOrg } from "../tenant";
 import { platformModerationGate } from "./authz";
 import { platformSeasonBySlug } from "./season-lookup";
@@ -66,6 +68,16 @@ export async function takeDownSeason(slug: string, reason: string): Promise<Mode
     return { ok: false, error: REFUSALS[outcome.reason] };
   }
   logger().info({ slug, operator: operator.personId }, "moderation.season_held");
+  // The organizers hear it from us, with the reason — by email and in their inbox.
+  after(async () => {
+    try {
+      await inOrg(operator.personId, season.orgId, (db) =>
+        notifySeasonHold(db, { competitionId: season.id, held: true, reason: reason.trim() }),
+      );
+    } catch (error) {
+      logger().warn({ err: error, slug }, "moderation.hold_notice_failed");
+    }
+  });
   revalidatePublicSurfaces(outcome.slug);
   return {
     ok: true,
@@ -95,6 +107,15 @@ export async function liftSeasonHoldAction(slug: string, note: string): Promise<
     return { ok: false, error: REFUSALS[outcome.reason] };
   }
   logger().info({ slug, operator: operator.personId }, "moderation.season_hold_lifted");
+  after(async () => {
+    try {
+      await inOrg(operator.personId, season.orgId, (db) =>
+        notifySeasonHold(db, { competitionId: season.id, held: false }),
+      );
+    } catch (error) {
+      logger().warn({ err: error, slug }, "moderation.release_notice_failed");
+    }
+  });
   revalidatePath("/admin/moderation");
   return {
     ok: true,

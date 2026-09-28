@@ -26,6 +26,8 @@ export interface AuctionFacts {
   teams: number;
   /** Paise across every sold lot. ABSENT without money sight. */
   moneyMoved?: number;
+  /** The dearest hammer price of the night, paise; null before any sale. ABSENT without money sight. */
+  topPrice?: number | null;
 }
 
 const EMPTY: Omit<AuctionFacts, "teams"> = {
@@ -94,6 +96,9 @@ export async function auctionFactsIn(
             unsold: sql<number>`count(*) filter (where ${lots.status} = 'unsold')::int`,
             total: sql<number>`count(*) filter (where not (${lots.status} = 'withdrawn' and ${preSignedSql}))::int`,
             spend: sql<number>`coalesce(sum(${lots.soldPrice}) filter (where ${lots.status} = 'sold'), 0)::double precision`,
+            top: sql<
+              number | null
+            >`max(${lots.soldPrice}) filter (where ${lots.status} = 'sold')::double precision`,
           })
           .from(lots)
           .innerJoin(registrations, eq(registrations.id, lots.registrationId))
@@ -124,7 +129,12 @@ export async function auctionFactsIn(
             lotsTotal: lotFacts?.total ?? 0,
             lotsUnsold: lotFacts?.unsold ?? 0,
           }),
-      ...(money.has(id) ? { moneyMoved: auction === undefined ? 0 : (lotFacts?.spend ?? 0) } : {}),
+      ...(money.has(id)
+        ? {
+            moneyMoved: auction === undefined ? 0 : (lotFacts?.spend ?? 0),
+            topPrice: lotFacts?.top ?? null,
+          }
+        : {}),
     };
     out.set(id, facts);
   }

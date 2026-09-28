@@ -125,7 +125,7 @@ export default async function PlayersPage({
                 </NavButton>
                 {view.plays ? (
                   <NavButton href="/me" variant="secondary" size="touch">
-                    <IconStar size={18} aria-hidden /> My sports
+                    <IconStar size={18} aria-hidden /> My profile
                   </NavButton>
                 ) : null}
               </>

@@ -1,6 +1,6 @@
 "use server";
 
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import {
   auctionOwnerInvites,
@@ -15,19 +15,31 @@ import {
 } from "@desiauction/db";
 import type { MoneyUnit } from "@desiauction/core";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { after } from "next/server";
 
 import { personLabel } from "../../lib/person-label";
 
 import { currentSession } from "../auth/actions";
-import { systemDb } from "../db";
+import { normalizeEmail } from "../auth/email-address";
+import { maskEmail } from "../auth/email-changed-notice";
+import { env } from "../../env";
+import { db as appDb, systemDb } from "../db";
+import { logger } from "../logger";
+import { languageForMail, sendNotificationMail } from "../messaging/notify";
+import { ownerInviteMail } from "../messaging/owner-mail";
+import { hashInviteToken, inviteTokenFrom, liveInviteByToken } from "./owner-invite-lookup";
+import { notifyOwnerJoined } from "../orgs/organizer-notify";
+import { inOrg } from "../tenant";
 import { isSeasonAuctioneer, lockSeasonAppointments } from "./auctioneers";
 import { sendEngineCommand } from "./engine-client";
 import { liveGate } from "./live-actions";
 import { rulesOf } from "./live-summary";
 
 // The owner invitation workflow (M-IP4-3). Tokens follow the IP-2 invite
-// discipline: one-time, expiring, stored only as hashes, and the platform
-// sends nothing — the organizer forwards the link. PRP-1 §1: the token
+// discipline: one-time, expiring, stored only as hashes. The organizer
+// forwards the link — by copy, WhatsApp, or (email programme PR7, founder
+// decision 2026-09-28) an email we send for them to an address they type,
+// direct and never queued, so no copy of the link is kept. PRP-1 §1: the token
 // lookups are the documented pre-tenant reads (the token is the capability)
 // and run on the system pool, exactly like org invites. The auction-side state
 // (invite row + OwnerInvited/OwnerAccepted events) mutates ONLY through
@@ -36,9 +48,7 @@ import { rulesOf } from "./live-summary";
 
 const OWNER_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
+const hashToken = hashInviteToken;
 
 export type InviteOwnerActionResult =
   { ok: true; joinPath: string; teamId: string } | { ok: false; error: string };
@@ -91,6 +101,84 @@ export async function inviteOwnerAction(
  * worse state than the one this closes. Removing an owner who has accepted is a
  * different operation on a different object.
  */
+export type EmailOwnerInviteResult = { ok: true; sentTo: string } | { ok: false; error: string };
+
+/**
+ * EMAIL THE INVITATION (email programme PR7) — beside Copy link and WhatsApp,
+ * for an organizer who has the owner's address.
+ *
+ * The server keeps only the link's HASH, so the link comes back from the
+ * browser that minted it; it is honoured only if it is a live, unaccepted
+ * invitation on THIS season's auction. Sent DIRECT, never through the queue:
+ * the link is the ownership, and the queue keeps a copy of every body it
+ * sends. The ledger (email_sends) records that it went, without the words.
+ */
+export async function emailOwnerInviteAction(
+  slug: string,
+  joinUrl: string,
+  address: string,
+): Promise<EmailOwnerInviteResult> {
+  const gate = await liveGate(slug);
+  if (gate === null || !gate.canConduct || !gate.canManage) {
+    return { ok: false, error: "Only the club's owners can invite team owners." };
+  }
+  const to = normalizeEmail(address);
+  if (to === null) {
+    return { ok: false, error: "Enter the owner's email address." };
+  }
+  const token = inviteTokenFrom(joinUrl);
+  if (token === null) {
+    return { ok: false, error: "Create the invite link first." };
+  }
+  const invite = await liveInviteByToken(systemDb, gate.auction.id, token);
+  if (invite === null) {
+    return {
+      ok: false,
+      error: "That link has been used, withdrawn or has expired. Create a new one.",
+    };
+  }
+  const [inviter] = await systemDb
+    .select({ name: people.name })
+    .from(people)
+    .where(eq(people.id, gate.personId))
+    .limit(1);
+  const language = await languageForMail(appDb, { email: to });
+  const mail = await ownerInviteMail(
+    {
+      season: invite.season.trim(),
+      orgName: invite.orgName.trim(),
+      seasonSlug: invite.seasonSlug,
+      sport: invite.sport,
+      teamName: invite.teamName,
+      inviterName: inviter?.name?.trim() || invite.orgName.trim(),
+      acceptUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/owner-join/${token}`,
+      auctionAt: invite.auctionAt,
+    },
+    language,
+  );
+  const { outcome } = await sendNotificationMail(appDb, { kind: "owner.invite", to }, mail);
+  if (outcome !== "sent") {
+    return {
+      ok: false,
+      error:
+        outcome === "unconfigured"
+          ? "Email isn't set up here yet — copy the link or send it on WhatsApp."
+          : "We couldn't send that email just now — copy the link or send it on WhatsApp.",
+    };
+  }
+  // The address itself is not kept: the domain says enough for the timeline.
+  await systemDb.insert(auditLog).values({
+    id: newId(),
+    actor: gate.personId,
+    action: "auction.owner_invite_emailed",
+    scopeType: "org",
+    scopeId: gate.auction.orgId,
+    subject: invite.id,
+    meta: { teamId: invite.teamId, domain: to.slice(to.lastIndexOf("@") + 1) },
+  });
+  return { ok: true, sentTo: maskEmail(to) };
+}
+
 export async function revokeOwnerInviteAction(
   slug: string,
   inviteId: string,
@@ -428,6 +516,18 @@ export async function acceptOwnerJoin(token: string): Promise<AcceptOwnerJoinRes
     scopeType: "org",
     scopeId: row.orgId,
     subject: row.id,
+  });
+  // The organizers hear it (inbox), and — when this completes the set — get
+  // "every team has its owner" (email programme PR7). After the response: the
+  // acceptance stands whatever the mail does.
+  after(async () => {
+    try {
+      await inOrg(session.personId, row.orgId, (db) =>
+        notifyOwnerJoined(db, { auctionId: row.auctionId, teamName: row.teamName }),
+      );
+    } catch (error) {
+      logger().warn({ err: error, auctionId: row.auctionId }, "auction.owner_joined_notice_failed");
+    }
   });
   return { ok: true, competitionSlug: row.competitionSlug, teamName: row.teamName };
 }

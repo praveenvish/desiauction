@@ -4,6 +4,7 @@ import {
   auditLog,
   consentRecords,
   emailVerifications,
+  emailSends,
   messageOutbox,
   erasureRequests,
   grants,
@@ -316,6 +317,9 @@ export async function executeErasure(input: {
     // Queued personal mail carries a name and a price (0079): nothing of it is
     // kept, sent or not.
     await tx.delete(messageOutbox).where(eq(messageOutbox.personId, personId));
+    // The direct-send ledger (0094) keeps no words, but "this person was sent
+    // these mails" is still theirs: the rows go too.
+    await tx.delete(emailSends).where(eq(emailSends.personId, personId));
     if (before?.phone !== null && before?.phone !== undefined) {
       await tx.delete(otpCodes).where(eq(otpCodes.phone, before.phone));
       await tx.delete(otpInbox).where(eq(otpInbox.phone, before.phone));

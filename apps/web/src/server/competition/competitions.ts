@@ -550,6 +550,73 @@ export async function updateCompetitionDetails(
   return { ok: true, competition: { ...competition, ...next } };
 }
 
+// --- When is auction night? (0095) ----------------------------------------------
+
+/** The season's auction time, or null when none is set. */
+export async function auctionStartOf(db: Db, competitionId: string): Promise<Date | null> {
+  const [row] = await db
+    .select({ at: competitions.auctionStartsAt })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  return row?.at ?? null;
+}
+
+export type AuctionStartResult =
+  | { ok: true; previous: Date | null; next: Date | null; changed: boolean }
+  | { ok: false; reason: "in_past" | "auction_started" };
+
+/**
+ * Set, move or clear the time auction night starts.
+ *
+ * Refused in the past (a time nobody can attend is a typo) and once the
+ * auction has opened — after that the room itself is the truth, and a notice
+ * saying "the auction has moved" would be about a night already under way.
+ * Audited like every change to the season, with the old and new moments.
+ */
+export async function setAuctionStart(
+  db: Db,
+  competition: CompetitionSummary,
+  personId: string,
+  next: Date | null,
+  now: Date = new Date(),
+): Promise<AuctionStartResult> {
+  if (next !== null && next.getTime() <= now.getTime()) {
+    return { ok: false, reason: "in_past" };
+  }
+  const [auction] = await db
+    .select({ status: auctions.status })
+    .from(auctions)
+    .where(and(eq(auctions.competitionId, competition.id), sql`${auctions.status} <> 'abandoned'`))
+    .limit(1);
+  if (auction !== undefined && auction.status !== "scheduled") {
+    return { ok: false, reason: "auction_started" };
+  }
+  const previous = await auctionStartOf(db, competition.id);
+  if ((previous?.getTime() ?? null) === (next?.getTime() ?? null)) {
+    return { ok: true, previous, next, changed: false };
+  }
+  await db
+    .update(competitions)
+    .set({ auctionStartsAt: next })
+    .where(eq(competitions.id, competition.id));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: personId,
+    action:
+      previous === null
+        ? "competition.auction_time_set"
+        : next === null
+          ? "competition.auction_time_cleared"
+          : "competition.auction_time_changed",
+    scopeType: "org",
+    scopeId: competition.orgId,
+    subject: competition.id,
+    meta: { from: previous?.toISOString() ?? null, to: next?.toISOString() ?? null },
+  });
+  return { ok: true, previous, next, changed: true };
+}
+
 /**
  * Publish / unpublish the public page. Audited, because putting a season on the
  * public internet — or taking it back down — is exactly the class of act the

@@ -40,8 +40,9 @@ Copy from the production template and split by service:
   `TRUSTED_PROXY_COUNT=1` (Caddy is in front; without it the per-client socket cap keys on
   Caddy's address and becomes ONE cap of 50 sockets for every live room together),
   `SENTRY_DSN` — the engine refuses to boot in production without either of the last two
-- `runner.env` — `DATABASE_URL` (runner role), `FINOPS_*`, `SENTRY_DSN`, and
-  `EMAIL_API_ENDPOINT`/`EMAIL_API_KEY`/`EMAIL_FROM` (the same values as `web.env`):
+- `runner.env` — `DATABASE_URL` (runner role), `FINOPS_*`, `SENTRY_DSN`, and the
+  mail settings — `EMAIL_PROVIDER`, `EMAIL_FROM` and `SES_*` (or `EMAIL_API_*` for
+  Resend), the same values as `web.env` (docs/EMAIL_INFRASTRUCTURE.md):
   the runner emails every receipt, invoice and correction, and refuses to boot in
   production without a mailer
 - `db.env` — `POSTGRES_PASSWORD`, `POSTGRES_DB`

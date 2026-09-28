@@ -1,8 +1,9 @@
 import type { Db } from "@desiauction/db";
 import type { EmailAdapterConfig, EmailTransport } from "@desiauction/messaging/email-adapter";
 import { financeDeliveryAdapters } from "@desiauction/messaging/finance-delivery";
+import { mailProviderFromEnv } from "@desiauction/messaging/mail-provider";
 
-import { mailConfigured, type Env } from "./env";
+import type { Env } from "./env";
 import { logger } from "./logger";
 
 /**
@@ -30,17 +31,16 @@ import { logger } from "./logger";
  * tables 0083–0085 revoked. Should any read be refused, the adapter throws,
  * the job retries and then dead-letters: an honest failure, never "delivered".
  */
-export function mailConfigFor(env: Env): EmailAdapterConfig | null {
-  if (env.EMAIL_PROVIDER === "dev" || !mailConfigured(env)) {
-    // The file outbox stays. Production cannot reach this line: env.ts refuses
-    // to boot a serving runner without a configured mailer.
-    return null;
-  }
-  return {
-    endpoint: env.EMAIL_API_ENDPOINT ?? "",
-    apiKey: env.EMAIL_API_KEY ?? "",
-    from: env.EMAIL_FROM ?? "",
-  };
+export function mailConfigFor(
+  env: Env,
+  /** Tests stand in for the provider; nothing else should. */
+  transport?: EmailTransport,
+): EmailAdapterConfig | null {
+  // The file outbox stays when nothing is selected (`dev`, or not configured).
+  // Production cannot reach that: env.ts refuses to boot a serving runner
+  // without a configured mailer.
+  const provider = mailProviderFromEnv(env, transport === undefined ? {} : { transport });
+  return provider === null ? null : { provider };
 }
 
 export function runnerDelivery(
@@ -49,20 +49,18 @@ export function runnerDelivery(
   /** Tests stand in for the provider; nothing else should. */
   transport?: EmailTransport,
 ): ReturnType<typeof financeDeliveryAdapters> {
-  const mail = mailConfigFor(env);
-  return financeDeliveryAdapters(
-    db,
-    mail === null || transport === undefined ? mail : { ...mail, transport },
-    {
-      // A receipt's subject and opening lines are admin-editable wording
-      // (notification_templates, 0087 — this role keeps SELECT on it). One that
-      // no longer validates goes out in the default, and is said here.
-      onTemplateProblem: (problem) => {
-        logger.error(
-          { kind: problem.kind, language: problem.language, reason: problem.reason },
-          "notification_template.fallback",
-        );
-      },
+  return financeDeliveryAdapters(db, mailConfigFor(env, transport), {
+    // The receipt's branded HTML part lays out around the document itself
+    // (packages/messaging email-layout.ts); the text part is unchanged.
+    publicBaseUrl: env.PUBLIC_BASE_URL,
+    // A receipt's subject and opening lines are admin-editable wording
+    // (notification_templates, 0087 — this role keeps SELECT on it). One that
+    // no longer validates goes out in the default, and is said here.
+    onTemplateProblem: (problem) => {
+      logger.error(
+        { kind: problem.kind, language: problem.language, reason: problem.reason },
+        "notification_template.fallback",
+      );
     },
-  );
+  });
 }

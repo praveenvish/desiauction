@@ -267,3 +267,12 @@ export function reportRows(
     ),
   };
 }
+
+// The season chapter moved to server/competition/season-play.ts — the public
+// season page reads it too, and a public read should not reach into console code.
+export {
+  seasonPlayIn,
+  type SeasonMatchLine,
+  type SeasonPlay,
+  type SeasonTableRow,
+} from "../competition/season-play";

@@ -58,7 +58,13 @@ import {
 import { DevInboxSender } from "../auth/otp-sender";
 import { createOrg } from "../orgs/orgs";
 import { advanceCompetition, createCompetition, resolveCompetition } from "./competitions";
-import { DevInboxSmsSender, notifyDecision } from "./registration-notify";
+import type { OutgoingMail } from "../messaging/transactional-mail";
+import {
+  DevInboxSmsSender,
+  notifyDecision,
+  notifyRegistrationReceived,
+  submittedDetails,
+} from "./registration-notify";
 import { purgeOrg } from "../test-support/purge-org";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
@@ -381,5 +387,82 @@ describe("WHATSAPP FIRST — a decision reaches the player where they asked for 
       .where(and(eq(messageOutbox.personId, person), eq(messageOutbox.channel, "sms")));
     expect(text?.status).toBe("suppressed");
     expect(text?.lastError).toBe("no_text_channel: not opted in to WhatsApp");
+  });
+});
+
+describe("we've got your registration (email programme PR4)", () => {
+  it("names the role and every answer in the sport's own words", () => {
+    expect(
+      submittedDetails(
+        "cricket",
+        "all_rounder",
+        { batting_style: "right_hand", bowling_style: "right_arm_medium" },
+        "en",
+      ),
+    ).toEqual([
+      ["Role", "All-rounder"],
+      ["Batting style", "Right Hand Batsman"],
+      ["Bowling style", "Right Arm Medium"],
+    ]);
+    expect(submittedDetails("cricket", "batter", {}, "hi")).toEqual([["भूमिका", "Batter"]]);
+  });
+
+  it("emails the player what they sent, with the club band and tracker, and writes their inbox row", async () => {
+    const reader = newId();
+    await db.insert(people).values({
+      id: reader,
+      phone: `+9187${RUN}9`,
+      name: "Keen Player",
+      email: `keen-${RUN}@example.test`,
+      emailVerifiedAt: new Date(),
+    });
+    seeded.push(reader);
+    const sent: OutgoingMail[] = [];
+    await notifyRegistrationReceived(
+      db,
+      {
+        orgId: org.id,
+        competitionId: season,
+        competitionName: LONGEST_NAME,
+        seasonSlug,
+        sport: "cricket",
+        registrationId: newId(),
+        personId: reader,
+        role: "all_rounder",
+        answers: { batting_style: "left_hand" },
+      },
+      {
+        ...channels(),
+        mailer: {
+          send: () => Promise.resolve("sent" as const),
+          deliver: (mail) => {
+            sent.push(mail);
+            return Promise.resolve({ outcome: "sent" as const, providerMessageId: null });
+          },
+        },
+      },
+    );
+    expect(sent).toHaveLength(1);
+    const mail = sent[0];
+    expect(mail?.subject).toBe(`You're registered for ${LONGEST_NAME}`);
+    expect(mail?.text).toContain(`${LONGEST_NAME} · Notify Org ${RUN} · Cricket`);
+    expect(mail?.text).toContain("✓ Registered → ● Approved → ○ Auction → ○ Team");
+    expect(mail?.text).toContain("  Role: All-rounder");
+    expect(mail?.text).toContain("  Batting style: Left Hand Batsman");
+    expect(mail?.text).toContain(`/seasons/${seasonSlug}/register`);
+    expect(mail?.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+    const [queued] = await db
+      .select({ status: messageOutbox.status })
+      .from(messageOutbox)
+      .where(
+        and(eq(messageOutbox.personId, reader), eq(messageOutbox.kind, "registration.received")),
+      );
+    expect(queued?.status).toBe("sent");
+    const inbox = await db
+      .select({ action: auditLog.action })
+      .from(auditLog)
+      .where(and(eq(auditLog.scopeId, reader), eq(auditLog.action, "registration.received")));
+    expect(inbox).toHaveLength(1);
+    await db.delete(auditLog).where(eq(auditLog.scopeId, reader));
   });
 });

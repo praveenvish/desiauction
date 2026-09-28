@@ -169,7 +169,8 @@ describe("validation", () => {
   it("refuses to lose a required placeholder — the login code", () => {
     const content = edit(
       CODE,
-      () => ({ preheader: "Your sign-in code is inside." }),
+      // Email v2 carries the code in the subject too; both go.
+      () => ({ subject: "Your sign-in code", preheader: "Your sign-in code is inside." }),
       "en",
       "login",
     );

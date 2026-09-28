@@ -29,7 +29,7 @@ const BREAKPOINTS = [
 const PUBLIC_ROUTES = ["/", "/pricing", "/features", "/help", "/c", "/login"];
 
 /** The console pages an organizer actually works in. */
-const CONSOLE_ROUTES = ["/home", "/tournaments", "/orgs", "/account", "/inbox", "/me/cricket"];
+const CONSOLE_ROUTES = ["/home", "/tournaments", "/orgs", "/account", "/inbox", "/me"];
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   await page.goto("/login");

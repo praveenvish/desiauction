@@ -79,6 +79,24 @@ describe("the runner's production boot refuses the file adapter", () => {
     );
   });
 
+  it("boots on Amazon SES with no Resend settings, and wires the real mailer", () => {
+    const env = parseEnv({
+      ...without("EMAIL_API_ENDPOINT", "EMAIL_API_KEY"),
+      EMAIL_PROVIDER: "ses",
+      SES_REGION: "ap-south-1",
+      SES_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE",
+      SES_SECRET_ACCESS_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    });
+    const config = mailConfigFor(env);
+    expect(config !== null && "provider" in config ? config.provider.name : null).toBe("ses");
+  });
+
+  it("refuses EMAIL_PROVIDER=ses without its settings anywhere", () => {
+    expect(() => parseEnv({ DATABASE_URL: PROD["DATABASE_URL"], EMAIL_PROVIDER: "ses" })).toThrow(
+      /EMAIL_PROVIDER=ses needs/,
+    );
+  });
+
   it("lets the local production rehearsal boot on the outbox, through the named escape", () => {
     const bare = without("EMAIL_API_KEY", "SENTRY_DSN");
     const env = parseEnv({ ...bare, ALLOW_INSECURE_LOCAL_PRODUCTION: "1" });

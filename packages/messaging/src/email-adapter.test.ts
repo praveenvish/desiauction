@@ -6,6 +6,7 @@ import {
   type EmailResolver,
   type EmailTransport,
 } from "./email-adapter";
+import { createSesProvider } from "./mail-provider";
 
 const request = {
   dispatchId: "01DISPATCH",
@@ -272,5 +273,60 @@ describe("provider idempotency (PA-1 §16)", () => {
     );
     await port.send(request);
     expect(Object.keys(seen[0] ?? {})).not.toContain("idempotency-key");
+  });
+});
+
+describe("http email adapter over Amazon SES (EMAIL_PROVIDER=ses)", () => {
+  const sesAdapter = (answer: {
+    status: number;
+    body: string;
+    headers?: Record<string, string>;
+  }) => {
+    const sent: unknown[] = [];
+    const port = createHttpEmailAdapter(
+      {
+        provider: createSesProvider({
+          region: "ap-south-1",
+          accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+          secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+          from: "no-reply@mail.desiauction.in",
+          transport: (_url, init) => {
+            sent.push(JSON.parse(init.body));
+            return Promise.resolve(answer);
+          },
+        }),
+      },
+      resolves,
+    );
+    return { port, sent };
+  };
+
+  it("tags the message with its dispatch, so a bounce event can find it", async () => {
+    const { port, sent } = sesAdapter({ status: 200, body: '{"MessageId":"m"}' });
+    const result = await port.send(request);
+    expect(result).toEqual({ ok: true, providerRef: "email:01DISPATCH" });
+    expect(sent[0]).toMatchObject({ EmailTags: [{ Name: "dispatch", Value: "01DISPATCH" }] });
+  });
+
+  it("retries a throttled or paused send rather than dead-lettering the receipt", async () => {
+    const { port } = sesAdapter({
+      status: 400,
+      body: '{"message":"Maximum sending rate exceeded."}',
+      headers: { "x-amzn-errortype": "LimitExceededException" },
+    });
+    expect(await port.send(request)).toEqual({
+      ok: false,
+      code: "provider_rejected_400",
+      retryable: true,
+    });
+  });
+
+  it("does not retry a message SES rejected for its content", async () => {
+    const { port } = sesAdapter({
+      status: 400,
+      body: '{"message":"Illegal address"}',
+      headers: { "x-amzn-errortype": "MessageRejected" },
+    });
+    expect(await port.send(request)).toMatchObject({ ok: false, retryable: false });
   });
 });

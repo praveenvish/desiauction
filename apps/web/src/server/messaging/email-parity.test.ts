@@ -19,7 +19,7 @@ import { REVIEW_LINK_TTL_MS, type ValidReview } from "../reviews/reviews";
 import * as support from "../support/problem-report-mail";
 import { CATEGORY_WORDS } from "../support/problem-report-mail";
 import type { ValidProblemReport } from "../support/problem-reports";
-import { SUPPORT_EMAIL, renderEmail } from "./email-layout";
+import { SUPPORT_EMAIL, manageEmailsUrl, renderEmail } from "./email-layout";
 import * as player from "./player-mail";
 import type {
   AppointedRole,
@@ -51,6 +51,10 @@ import type {
 
 type ComposedMail = { subject: string; text: string; html: string };
 const PUBLIC = env.PUBLIC_BASE_URL;
+// Changed on purpose (email v2, 2026-09-28): a mail the reader can switch off
+// carries "Manage emails" in its footer, so the frozen copies of those kinds
+// pass the same link. The wording is untouched.
+const MANAGE = manageEmailsUrl();
 
 // ---------------------------------------------------------------------------
 // The renderers as they were (frozen).
@@ -72,20 +76,40 @@ function bidStory(facts: SoldFacts): string {
   return `${all} all bid for you — ${String(facts.bidCount)} bids in all, from ${facts.basePrice} to ${facts.price}. ${facts.teamName} won.`;
 }
 
+// Changed on purpose (email v2 PR9, 2026-09-28): the sale opens on the
+// auction-night stage — the price large, "3× your base · 7 bids · 3 teams"
+// under it — so the paragraphs no longer repeat the price; the tracker shows
+// Team; and the footnote drops the switch name ("Manage emails" is the switch).
 function soldMail(facts: SoldFacts): ComposedMail {
-  const multiple =
-    facts.multiple !== null && facts.multiple >= 1.5
-      ? ` — ${facts.multiple >= 2 ? `${String(Math.round(facts.multiple * 10) / 10)} times` : "well above"} your base`
-      : "";
+  const line = [
+    ...(facts.multiple !== null && facts.multiple >= 1.5
+      ? [`${String(Math.round(facts.multiple * 10) / 10)}× your base`]
+      : []),
+    ...(facts.bidCount > 1 ? [`${String(facts.bidCount)} bids`] : []),
+    ...(new Set(facts.bidders).size > 1 ? [`${String(new Set(facts.bidders).size)} teams`] : []),
+  ].join(" · ");
+  const words = facts.name.trim().split(/\s+/);
+  const monogram = (
+    words.length >= 2
+      ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`
+      : (words[0] ?? "").slice(0, 2)
+  ).toUpperCase();
   return {
     subject: `Congratulations — ${facts.teamName} bought you for ${facts.price}`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${facts.teamName} bought you in the ${facts.season} auction.`,
-      heading: `You're a ${facts.teamName} player`,
+      heading: `Congratulations, ${facts.name}`,
+      stage: {
+        kicker: "Sold",
+        monogram,
+        title: `${facts.name} → ${facts.teamName}`,
+        figure: facts.price,
+        line,
+      },
+      progress: steps(3),
       paragraphs: [
-        `Congratulations, ${facts.name}!`,
-        `${facts.teamName} bought you for ${facts.price} in the ${facts.season} auction${multiple}.`,
-        bidStory(facts),
+        `You're a ${facts.teamName} player. ${bidStory(facts)}`,
         ...(facts.highlight === null ? [] : [`${facts.highlight}.`]),
         // Changed on purpose (share nudges, 2026-09-24): a public card is
         // offered to SHARE on the night it was bought, not only to look at.
@@ -103,7 +127,7 @@ function soldMail(facts: SoldFacts): ComposedMail {
         facts.cardUrl === null
           ? { label: "See your season", url: `${PUBLIC}/home` }
           : { label: "Share your player card", url: facts.cardUrl },
-      footnote: `You received this because you played in the ${facts.season} auction. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because you played in the ${facts.season} auction.`,
       whatsappNudge: true,
     }),
   };
@@ -119,6 +143,14 @@ function unsoldMail(facts: {
     // just says "unsold" lands too hard.
     subject: `Your ${facts.season} auction`,
     ...renderEmail({
+      // Changed on purpose (PR9): the club band opens a "not picked" mail too.
+      band: {
+        title: facts.season,
+        subtitle: facts.orgName,
+        monogram:
+          `${facts.orgName.trim().split(/\s+/)[0]?.[0] ?? ""}${facts.orgName.trim().split(/\s+/)[1]?.[0] ?? ""}`.toUpperCase(),
+      },
+      manageUrl: MANAGE,
       preheader: "You weren't picked this time — you're still registered.",
       heading: "Not this time",
       paragraphs: [
@@ -127,7 +159,7 @@ function unsoldMail(facts: {
         `You're still registered with ${facts.orgName}, and organizers often bring players in as replacements during the season.`,
       ],
       action: { label: "See your season", url: `${PUBLIC}/home` },
-      footnote: `You received this because you registered for ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because you registered for ${facts.season}.`,
     }),
   };
 }
@@ -171,6 +203,7 @@ function appointmentMail(facts: AppointmentFacts): ComposedMail {
   return {
     subject: `You're the ${title} of ${facts.teamName}`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${facts.orgName} named you ${title} of ${facts.teamName} for ${facts.season}.`,
       heading: `You're the ${title} of ${facts.teamName}`,
       paragraphs: [
@@ -182,7 +215,7 @@ function appointmentMail(facts: AppointmentFacts): ComposedMail {
           : []),
       ],
       action: { label: "See your season", url: `${PUBLIC}/home` },
-      footnote: `You received this because ${facts.orgName} named you in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because ${facts.orgName} named you in ${facts.season}.`,
       whatsappNudge: true,
     }),
   };
@@ -193,6 +226,7 @@ function squadSheetMail(facts: SquadSheetFacts): ComposedMail {
   return {
     subject: `Meet your ${facts.teamName} squad`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${String(count)} players${facts.coach === null ? "" : `, coached by ${facts.coach}`} — the ${facts.teamName} squad for ${facts.season}.`,
       heading: `Meet your ${facts.teamName} squad`,
       paragraphs: [
@@ -209,7 +243,7 @@ function squadSheetMail(facts: SquadSheetFacts): ComposedMail {
           : `Your first match: ${facts.firstMatch}.`,
       ],
       action: { label: "See your season", url: `${PUBLIC}/home` },
-      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}.`,
     }),
   };
 }
@@ -219,6 +253,7 @@ function lineupMail(facts: LineupFacts): ComposedMail {
   return {
     subject: `You're in the ${facts.teamName} lineup vs ${facts.opponent}`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${facts.when}${place} — ${facts.season}.`,
       heading: `You're in the ${facts.teamName} lineup`,
       paragraphs: [
@@ -228,7 +263,7 @@ function lineupMail(facts: LineupFacts): ComposedMail {
       details: facts.lineup.map((line) => [line.name, line.note] as const),
       after: ["Good luck!"],
       action: { label: "See your season", url: `${PUBLIC}/home` },
-      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}.`,
       whatsappNudge: true,
     }),
   };
@@ -239,6 +274,7 @@ function ownerSummaryMail(facts: OwnerSummaryFacts): ComposedMail {
   return {
     subject: `${facts.teamName}: your squad from the ${facts.season} auction`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${String(facts.squadSize)} players · ${facts.spent} spent · ${facts.purseLeft} left.`,
       heading: `Your ${facts.teamName} squad`,
       paragraphs: [
@@ -273,33 +309,48 @@ function ownerSummaryMail(facts: OwnerSummaryFacts): ComposedMail {
   };
 }
 
+// Changed on purpose (email v2 PR4, 2026-09-28): the club is named, the band
+// and the season tracker open the mail, and the button opens the player's own
+// registration page. The tracker is left off a decline and a withdrawal.
+const STEPS = ["Registered", "Approved", "Auction", "Team"] as const;
+function steps(at: number) {
+  return STEPS.map((label, i) => ({
+    label,
+    state: i < at ? ("done" as const) : i === at ? ("now" as const) : ("next" as const),
+  }));
+}
+
 function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMail {
-  const { season } = facts;
+  const { season, orgName } = facts;
   const copy: Record<
     RegistrationDecision,
-    { subject: string; heading: string; lines: readonly string[] }
+    { subject: string; heading: string; lines: readonly string[]; at: number | null }
   > = {
     approve: {
-      subject: `You're approved for ${season}`,
-      heading: "You're in",
+      subject: `You're in — ${season}`,
+      heading: "You're in the auction pool",
       lines: [
-        `Your registration for ${season} is approved. You're in the player pool for auction day.`,
+        `${orgName} approved your registration for ${season}. You're in the player pool for auction day, and we'll email you the moment a team buys you.`,
       ],
+      at: 2,
     },
     waitlist: {
       subject: `You're on the waitlist for ${season}`,
       heading: "You're on the waitlist",
       lines: [
-        `Your registration for ${season} is on the waitlist. The organizer moves players up if a place opens, and we'll tell you if that happens.`,
+        `${orgName} has put your registration for ${season} on the waitlist. If a place opens they move players up, and we'll email you if that happens.`,
       ],
+      at: 1,
     },
     reject: {
       subject: `Your registration for ${season} wasn't approved`,
       heading: "Your registration wasn't approved",
       lines: [
-        `Your registration for ${season} was not approved.`,
+        `${orgName} didn't approve your registration for ${season}.`,
         `The reason given: ${facts.reason ?? "no reason was given"}.`,
+        "Your details stay on your account, so registering for another season takes a minute.",
       ],
+      at: null,
     },
     withdraw: {
       subject: `Your registration for ${season} was withdrawn`,
@@ -307,84 +358,103 @@ function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMai
       lines: [
         `Your registration for ${season} was withdrawn. You can register again while registration is open.`,
       ],
+      at: null,
     },
     restore: {
       subject: `Your registration for ${season} is back under review`,
       heading: "Back under review",
       lines: [
-        `Your registration for ${season} is back under review. We'll tell you what the organizer decides.`,
+        `Your registration for ${season} is back under review. We'll email you as soon as ${orgName} decides.`,
       ],
+      at: 1,
     },
   };
   const chosen = copy[facts.decision];
+  const words = orgName.trim().split(/\s+/);
   return {
     subject: chosen.subject,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: chosen.lines[0] ?? chosen.heading,
       heading: chosen.heading,
       paragraphs: [`Hi ${facts.name},`, ...chosen.lines],
-      action: { label: "See your registration", url: `${PUBLIC}/home` },
-      footnote: `You received this because you registered for ${season}. Switch off "Registration decisions" in your account to stop these.`,
+      action: {
+        label: "See your registration",
+        url:
+          facts.seasonSlug === undefined
+            ? `${PUBLIC}/home`
+            : `${PUBLIC}/seasons/${facts.seasonSlug}/register`,
+      },
+      band: {
+        title: season,
+        subtitle: facts.sport === undefined ? orgName : `${orgName} · Cricket`,
+        monogram: `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`.toUpperCase(),
+      },
+      ...(chosen.at === null ? {} : { progress: steps(chosen.at) }),
+      footnote: `You received this because you registered for ${season}.`,
       whatsappNudge: true,
     }),
   };
 }
 
+// Changed on purpose (email v2 PR3, 2026-09-28): the code leads every
+// subject, the opening line says what to do with it, and the closing line —
+// "did not try to sign in?", "if it wasn't you" — is boxed (calloutLast). The
+// locked lines (expiry, if-not-you) are word for word what they were.
 function codeMailCopy(
   code: string,
   purpose: CodeMailPurpose,
 ): { subject: string; text: string; html: string } {
   if (purpose === "signup") {
-    /*
-     * A DIFFERENT PERSON IS READING THIS. "Sign-in code" to somebody who has no
-     * account reads as a mistake or a breach, and the closing sentence of the
-     * login copy — "your account is safe" — is about an account that does not
-     * exist. Both halves have to change together.
-     */
     return {
-      subject: "Your DesiAuction sign-up code",
+      subject: `${code} is your DesiAuction sign-up code`,
       ...renderEmail({
-        preheader: `Your sign-up code is ${code}. It expires in 15 minutes.`,
+        preheader: "Enter it to finish creating your account. It works for 15 minutes.",
         heading: "Welcome to DesiAuction",
-        paragraphs: ["Your sign-up code is:"],
+        paragraphs: ["Enter this code to finish creating your account."],
         code,
         after: [
           "It expires in 15 minutes. Entering it creates your account on this address.",
-          "If you did not ask for this, ignore this message — nothing is created until the code is used.",
+          "Didn't ask for this? You can ignore this email. Nothing is created until the code is entered.",
         ],
-        footnote: "You received this because this address was entered on our sign-up page.",
+        calloutLast: true,
+        footnote:
+          "You received this because this address was entered on the DesiAuction sign-up page.",
         noLinks: true,
       }),
     };
   }
   if (purpose === "login") {
     return {
-      subject: "Your DesiAuction sign-in code",
+      subject: `${code} is your DesiAuction sign-in code`,
       ...renderEmail({
-        preheader: `Your sign-in code is ${code}. It expires in 15 minutes.`,
+        preheader: "It works for 15 minutes. DesiAuction will never ask you for it.",
         heading: "Your sign-in code",
-        paragraphs: ["Your DesiAuction sign-in code is:"],
+        paragraphs: ["Enter this code on the DesiAuction sign-in page to continue."],
         code,
         after: [
           "It expires in 15 minutes.",
-          "If you did not try to sign in, someone entered your address on our sign-in page. Your account is safe as long as you do not share this code.",
+          "Did not try to sign in? Someone entered your address on our sign-in page. Your account is safe as long as you do not share this code, and DesiAuction will never call or message you to ask for it.",
         ],
-        footnote: "You received this because this address was entered on our sign-in page.",
+        calloutLast: true,
+        footnote:
+          "You received this because this address was entered on the DesiAuction sign-in page.",
         noLinks: true,
       }),
     };
   }
   return {
-    subject: "Confirm your email for DesiAuction",
+    subject: `${code} is your code to confirm this email`,
     ...renderEmail({
-      preheader: `Your confirmation code is ${code}.`,
+      preheader: "Enter it on your DesiAuction account page. It works for 15 minutes.",
       heading: "Confirm your email",
-      paragraphs: [`Your DesiAuction confirmation code is ${code}.`],
+      paragraphs: ["Use this code to add this address to your DesiAuction account."],
       code,
       after: [
         "Enter it on your account page to confirm this address. It expires in 15 minutes.",
-        "If you did not ask for this, ignore this message.",
+        "Didn't ask for this? You can ignore this email. The address is only added when the code is entered.",
       ],
+      calloutLast: true,
       footnote: "You received this because this address was added to a DesiAuction account.",
       noLinks: true,
     }),
@@ -408,15 +478,16 @@ function emailChangedCopy(newEmail: string): {
   return {
     subject: "Your DesiAuction sign-in email was changed",
     ...renderEmail({
-      preheader: `This account now signs in with ${masked}.`,
+      preheader: `It now signs in with ${masked}. If this wasn't you, write to us right away.`,
       heading: "Your sign-in email was changed",
       paragraphs: [
         `The DesiAuction account that used this address now signs in with ${masked}. Codes and account mail go there from now on, and every other device was signed out.`,
-        "If that was you, there is nothing to do.",
+        "If that was you, there's nothing to do.",
       ],
       after: [
         `If it wasn't you, somebody may have reached your account. Write to ${SUPPORT_EMAIL} straight away from this address and we will help you get it back.`,
       ],
+      calloutLast: true,
       action: { label: "Get help", url: `${PUBLIC}/support` },
       footnote:
         "You received this because this address was the sign-in email on a DesiAuction account until a moment ago.",
@@ -432,15 +503,16 @@ function phoneChangedCopy(last4: string): {
   return {
     subject: "Your DesiAuction mobile number was changed",
     ...renderEmail({
-      preheader: `This account's mobile number now ends ${last4}.`,
+      preheader: `It now ends in ${last4}. If this wasn't you, write to us right away.`,
       heading: "Your mobile number was changed",
       paragraphs: [
-        `The mobile number on your DesiAuction account was changed to one ending ${last4}. Sign-in codes and texts go there from now on, and every other device was signed out.`,
-        "If that was you, there is nothing to do.",
+        `The mobile number on your DesiAuction account now ends in ${last4}. Sign-in codes and texts go there from now on, and every other device was signed out.`,
+        "If that was you, there's nothing to do.",
       ],
       after: [
         `If it wasn't you, somebody may have reached your account. Write to ${SUPPORT_EMAIL} straight away from this address and we will help you get it back.`,
       ],
+      calloutLast: true,
       action: { label: "Get help", url: `${PUBLIC}/support` },
       footnote:
         "You received this because this is the verified email on a DesiAuction account whose mobile number just changed.",
@@ -600,6 +672,7 @@ function reviewAskMail(
   return {
     subject: "How has DesiAuction worked for you?",
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: "Two minutes on what worked and what got in your way.",
       heading: "How has DesiAuction worked for you?",
       paragraphs: [name === null ? "Hi," : `Hi ${name},`, OPENING[audience].join(" ")],
@@ -650,6 +723,7 @@ function seasonAskMail(input: {
   return {
     subject: `How was ${season}?`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `Two minutes on ${season} — for the players and owners deciding on next season.`,
       heading: `How was ${season}?`,
       paragraphs: [
@@ -905,11 +979,28 @@ describe("the player's season renders exactly as before", () => {
 
   const decisions: RegistrationDecisionFacts[] = (
     ["approve", "waitlist", "reject", "withdraw", "restore"] as RegistrationDecision[]
-  ).map((decision) => ({ name: "Arjun", season: "MPL 2026", decision }));
+  ).map((decision) => ({
+    name: "Arjun",
+    season: "MPL 2026",
+    orgName: "Malad Cricket Club",
+    seasonSlug: "mpl-2026-x7k2",
+    sport: "cricket",
+    decision,
+  }));
   it.each(
     [
       ...decisions,
-      { name: "Arjun", season: "MPL 2026", decision: "reject", reason: "the season is full" },
+      // No season known (an old caller): the band names the club alone, the link is /home.
+      { name: "Arjun", season: "MPL 2026", orgName: "Malad CC", decision: "approve" },
+      {
+        name: "Arjun",
+        season: "MPL 2026",
+        orgName: "Malad Cricket Club",
+        seasonSlug: "mpl-2026-x7k2",
+        sport: "cricket",
+        decision: "reject",
+        reason: "the season is full",
+      },
     ].map((facts) => [facts.decision, facts as RegistrationDecisionFacts] as const),
   )("registration: %s", async (_d, facts) => {
     same(await player.registrationDecisionMail(facts), registrationDecisionMail(facts));

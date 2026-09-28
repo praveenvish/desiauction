@@ -665,8 +665,7 @@ const SURFACE_SUBTITLES: [string, string][] = [
   ["/players", "Every player across the seasons you run — search, filter, open their sheet."],
   ["/auctions", "Every auction night you run, conduct, bid in or can watch."],
   ["/reports", "Registrations and the auction, season by season, for every season you run."],
-  ["/me", "Every tournament, match and sport you've played — in one place."],
-  ["/me/cricket", "Every season you've played, in one place."],
+  ["/me", "You as a player — every sport, season, match and club."],
 ];
 
 export interface IdentityCrumb {
@@ -822,7 +821,7 @@ export function pageIdentity(pathname: string, ctx: IdentityContext): PageIdenti
 export function careerTitle(pathname: string): string | null {
   // The all-sports hub (launch polish, Phase 3).
   if (pathname === "/me") {
-    return "My sports";
+    return "My profile";
   }
   const match = /^\/me\/([^/?#]+)/.exec(pathname);
   if (match === null) {
@@ -1308,7 +1307,13 @@ export function navigationFor(input: { roles: NavRoles | null; pathname: string 
       ? { key: "money", label: "Money", shortLabel: "Money", href: "/money", icon: "money" }
       : null,
     roles.plays
-      ? { key: "sports", label: "My sports", shortLabel: "My sports", href: "/me", icon: "sports" }
+      ? {
+          key: "sports",
+          label: "My profile",
+          shortLabel: "My profile",
+          href: "/me",
+          icon: "sports",
+        }
       : null,
     /*
      * An organizer already has three doors into competitions; the public

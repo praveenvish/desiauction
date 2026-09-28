@@ -25,7 +25,7 @@ import {
 } from "../competition/competitions";
 import { auctionFactsIn } from "./auctions-index";
 import { playersIn, type PlayerSeasonRef } from "./players-index";
-import { seasonReportIn } from "./reports";
+import { seasonPlayIn, seasonReportIn } from "./reports";
 
 const handle: DbHandle = createDb(env.DATABASE_URL);
 const db = handle.db;
@@ -195,13 +195,15 @@ describe("/auctions — progress, and money moved only with sight", () => {
       lotsTotal: 2,
       teams: 2,
       moneyMoved: 2_500_000,
+      topPrice: 2_500_000,
     });
   });
 
-  it("without sight the key is ABSENT, not zero", async () => {
+  it("without sight the keys are ABSENT, not zero", async () => {
     const facts = (await auctionFactsIn(db, [season.id], new Set())).get(season.id);
     expect(facts).toBeDefined();
     expect(Object.keys(facts ?? {})).not.toContain("moneyMoved");
+    expect(Object.keys(facts ?? {})).not.toContain("topPrice");
   });
 });
 
@@ -239,5 +241,16 @@ describe("/reports — one season, gated before the read", () => {
     ]) {
       expect(wire, `money key "${key}" reached a reader without sight`).not.toContain(`"${key}"`);
     }
+  });
+});
+
+describe("/reports — the season chapter", () => {
+  it("reads a season with no fixtures as nothing played, with every team level in the table", async () => {
+    const play = await seasonPlayIn(db, season);
+    expect(play).toMatchObject({ shape: "duel", played: 0, live: 0, toCome: 0 });
+    expect(play.liveMatches).toEqual([]);
+    expect(play.recent).toEqual([]);
+    expect(play.table?.map((row) => row.name).sort()).toContain("Index Tigers");
+    expect(play.table?.every((row) => row.points === 0 && row.played === 0)).toBe(true);
   });
 });
