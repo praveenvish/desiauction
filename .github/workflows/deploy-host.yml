@@ -251,10 +251,13 @@ jobs:
 
             docker compose pull
 
-            # 3. Forward-only migrations, then the grant manifest against the
-            #    real roles (a new table must not reach production unreadable).
+            # 3. Forward-only migrations, then the four runtime roles and their
+            #    grants (idempotent; the first deploy creates them), then the
+            #    grant manifest against the real roles (a new table must not
+            #    reach production unreadable).
             STAGE=migrate
             ops migrator migrate
+            ops migrator roles
             ops migrator grants
 
             # 4. Swap. Engine first: it hands its single-writer lease back on

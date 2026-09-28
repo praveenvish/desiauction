@@ -43,6 +43,17 @@ a hand edit on the host is overwritten by the next release, so make it here.
 
 ## The env files the host needs
 
+`init-env.sh` creates all of them ON THE HOST, generating every internal secret
+there (database roles, object storage, engine and job secrets, the backup
+cipher) and never overwriting a file that exists:
+
+```bash
+sudo bash init-env.sh production desiauction.in
+```
+
+What only a person can supply is left commented out under a `FOUNDER` marker,
+and the script ends by listing it. The split, for reference:
+
 Copy from the production template and split by service:
 
 - `web.env` — the full web environment (see `preflight:production`)
@@ -350,7 +361,10 @@ the stack files, then over SSH on the host:
    (blocking for production, advisory for staging)
 2. `migrator live-window` — the C-22 freeze; `deploy_anyway` passes
    `DEPLOY_ANYWAY=1` explicitly, and the rooms are still named in the log
-3. `docker compose pull`, `migrator migrate`, `migrator grants`
+3. `docker compose pull`, `migrator migrate`, `migrator roles` (the four
+   runtime roles and their grants from `ops/db/create-app-role.sql`, passwords
+   read from the service env files — idempotent, so the first deploy onto an
+   empty database creates them), `migrator grants`
 4. engine swapped, its `/readyz` polled (180 s); then everything else, web's
    `/readyz` polled; runner and scheduler must be running
 5. `site.caddy` rendered into `/srv/platform/sites/<stack>.caddy`, the edge
