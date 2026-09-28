@@ -2058,6 +2058,169 @@ const ERASURE: EmailTemplateSpec = {
   },
 };
 
+// --- The season's pass (email programme PR15) -----------------------------------
+
+const PASS_NAME = text(
+  "passName",
+  "The pass asked for or given (“Pro Pass”).",
+  "Pro Pass",
+  "Pro Pass",
+  {
+    computed: true,
+  },
+);
+const CURRENT_PASS = text(
+  "currentPass",
+  "The pass the season is on now (“Free”).",
+  "Free",
+  "Free",
+  {
+    computed: true,
+  },
+);
+const PASS_RUN_FOOTNOTE = {
+  en: "You received this because you run {{season}} on DesiAuction.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+};
+
+const PLAN_REQUESTED: EmailTemplateSpec = {
+  kind: "plan.requested",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "season", description: "The season's overview, where the pass card is." }],
+  variables: [NAME, SEASON, PASS_NAME, CURRENT_PASS],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "We've got your {{passName}} request for {{season}}",
+        preheader: "A person on our team answers every request. We'll email you the answer.",
+        heading: "Your pass request is in",
+        paragraphs: [
+          "Hi {{name}},",
+          "You asked to move {{season}} from {{currentPass}} to {{passName}}. A person on our team answers every request, and we'll email you as soon as it's decided.",
+        ],
+        after: [
+          "Nothing changes until then: the season keeps running on {{currentPass}}, and nothing is charged.",
+        ],
+        actions: { season: "Open the season" },
+        footnote: PASS_RUN_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} के लिए आपका {{passName}} अनुरोध हमें मिल गया है",
+        preheader: "हर अनुरोध हमारी टीम का एक व्यक्ति देखता है। जवाब हम ईमेल करेंगे।",
+        heading: "आपका पास अनुरोध मिल गया है",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "आपने {{season}} को {{currentPass}} से {{passName}} पर ले जाने का अनुरोध किया है। हर अनुरोध हमारी टीम का एक व्यक्ति देखता है, और फ़ैसला होते ही हम आपको ईमेल करेंगे।",
+        ],
+        after: [
+          "तब तक कुछ नहीं बदलेगा: सीज़न {{currentPass}} पर चलता रहेगा, और कोई पैसा नहीं लिया जाएगा।",
+        ],
+        actions: { season: "सीज़न खोलें" },
+        footnote: PASS_RUN_FOOTNOTE.hi,
+      }),
+    ),
+  },
+};
+
+const PLAN_ANSWERED: EmailTemplateSpec = {
+  kind: "plan.answered",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "granted", label: "Granted" },
+    { id: "declined", label: "Declined" },
+  ],
+  actions: [{ id: "season", description: "The season's overview, where the pass card is." }],
+  variables: [
+    NAME,
+    SEASON,
+    PASS_NAME,
+    CURRENT_PASS,
+    text(
+      "noteLine",
+      "The operator's note, when they wrote one. Empty otherwise.",
+      "Our note: “Happy to help — tell us if you need more.”",
+      "हमारा नोट: “Happy to help — tell us if you need more.”",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  note: "The new limits (teams, players) are written by the code from the pass itself.",
+  defaults: {
+    en: {
+      variants: {
+        granted: layout({
+          subject: "{{season}} is now on {{passName}}",
+          preheader: "Your request was granted. Here's what the season can hold now.",
+          heading: "{{season}} is on {{passName}}",
+          paragraphs: [
+            "Hi {{name}},",
+            "Your request was granted: {{season}} has moved from {{currentPass}} to {{passName}}, starting now. Here's what it can hold:",
+          ],
+          after: ["{{noteLine}}"],
+          actions: { season: "Open the season" },
+          footnote: PASS_RUN_FOOTNOTE.en,
+        }),
+        declined: layout({
+          subject: "Your {{passName}} request for {{season}}",
+          preheader: "We couldn't grant it this time. The season stays on {{currentPass}}.",
+          heading: "We couldn't grant this request",
+          paragraphs: [
+            "Hi {{name}},",
+            "We couldn't move {{season}} to {{passName}} this time, so it stays on {{currentPass}}. Everything already in the season stays as it is.",
+          ],
+          after: [
+            "{{noteLine}}",
+            `Want to talk it through? Reply to ${SUPPORT} and a person will get back to you.`,
+          ],
+          actions: { season: "Open the season" },
+          footnote: PASS_RUN_FOOTNOTE.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        granted: layout({
+          subject: "{{season}} अब {{passName}} पर है",
+          preheader: "आपका अनुरोध मंज़ूर हो गया। अब सीज़न में इतना आ सकता है।",
+          heading: "{{season}} {{passName}} पर है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "आपका अनुरोध मंज़ूर हो गया: {{season}} अब {{currentPass}} से {{passName}} पर है, अभी से। अब इसमें इतना आ सकता है:",
+          ],
+          after: ["{{noteLine}}"],
+          actions: { season: "सीज़न खोलें" },
+          footnote: PASS_RUN_FOOTNOTE.hi,
+        }),
+        declined: layout({
+          subject: "{{season}} के लिए आपका {{passName}} अनुरोध",
+          preheader: "इस बार हम इसे मंज़ूर नहीं कर सके। सीज़न {{currentPass}} पर रहेगा।",
+          heading: "हम यह अनुरोध मंज़ूर नहीं कर सके",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "इस बार हम {{season}} को {{passName}} पर नहीं ले जा सके, इसलिए यह {{currentPass}} पर ही रहेगा। सीज़न में जो कुछ है, वह वैसा ही रहेगा।",
+          ],
+          after: [
+            "{{noteLine}}",
+            `इस पर बात करनी है? ${SUPPORT} पर लिखें, हमारी टीम का एक व्यक्ति आपसे संपर्क करेगा।`,
+          ],
+          actions: { season: "सीज़न खोलें" },
+          footnote: PASS_RUN_FOOTNOTE.hi,
+        }),
+      },
+    },
+  },
+};
+
 // --- Money -----------------------------------------------------------------------
 
 const FINANCE: EmailTemplateSpec = {
@@ -2998,6 +3161,30 @@ const STAFF_REVIEW = staff(
   ],
 );
 
+const STAFF_PASS = staff(
+  "staff.pass_request",
+  "[Pass] {{season}} asks for {{passName}}",
+  [
+    "{{season}} ({{orgName}}) asks to move from {{currentPass}} to {{passName}}.",
+    "Asked by: {{requesterLine}}",
+    "Their note:\n{{noteText}}",
+    "Answer it: {{deskUrl}}",
+  ],
+  [
+    ["season", "The season.", "Malad Premier League 2026"],
+    ["orgName", "Its club.", "Malad Cricket Club"],
+    ["currentPass", "The pass it is on.", "Free"],
+    ["passName", "The pass it asks for.", "Pro Pass"],
+    [
+      "requesterLine",
+      "Who asked, and their email when we have one.",
+      "Priya Shah · priya@example.com",
+    ],
+    ["noteText", "What they wrote, or that they wrote nothing.", "(nothing written)"],
+    ["deskUrl", "The passes desk.", "https://desiauction.in/admin/passes"],
+  ],
+);
+
 // --- The registry --------------------------------------------------------------------
 
 export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTemplateSpec>> = {
@@ -3106,6 +3293,8 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "club.welcome": CLUB_WELCOME,
   "club.invite": CLUB_INVITE,
   "club.member_joined": CLUB_MEMBER_JOINED,
+  "plan.requested": PLAN_REQUESTED,
+  "plan.answered": PLAN_ANSWERED,
   "registration.first": REGISTRATION_FIRST,
   "registration.digest": REGISTRATION_DIGEST,
   "season.held": SEASON_HELD,
@@ -3136,6 +3325,7 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "staff.demo_request": STAFF_DEMO,
   "staff.problem_report": STAFF_REPORT,
   "staff.review_arrived": STAFF_REVIEW,
+  "staff.pass_request": STAFF_PASS,
 };
 
 export function emailTemplateOf(kind: EmailNotificationKind): EmailTemplateSpec {

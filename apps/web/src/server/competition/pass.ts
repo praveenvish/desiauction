@@ -12,9 +12,12 @@ import {
 } from "@desiauction/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle, systemDb } from "../db";
+import { logger } from "../logger";
+import { notifyPassRequested } from "../orgs/organizer-notify";
 import { canCompetition } from "./authz";
 import { resolveCompetition } from "./competitions";
 
@@ -248,6 +251,26 @@ export async function requestPassUpgrade(
         }
         throw error;
       }
+      // "We've got it" to the organizer, and a notice to the support mailbox
+      // (PR15) — after the response; the request stands either way.
+      const personId = session.personId;
+      const orgId = competition.orgId;
+      after(async () => {
+        try {
+          await withTenantDb(dbHandle, { personId, orgId }, (tx) =>
+            notifyPassRequested(tx, {
+              competitionId: competition.id,
+              requestId: id,
+              requestedBy: personId,
+              fromTier,
+              requestedTier,
+              note: note.trim() === "" ? null : note.trim().slice(0, 1000),
+            }),
+          );
+        } catch (error) {
+          logger().warn({ err: error }, "plan.request_notice_failed");
+        }
+      });
       revalidatePath(`/seasons/${slug}`);
       return { ok: true };
     },

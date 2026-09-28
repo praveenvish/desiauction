@@ -499,6 +499,30 @@ const ENTRIES = [
     orgControllable: false,
   },
   {
+    // The season's pass (email programme PR15): an upgrade is a REQUEST a
+    // person answers, so the organizer is told it arrived and, later, the
+    // answer — which moves what the season may hold.
+    key: "plan.requested",
+    label: "Pass request received",
+    description: "Tells the organizer who asked for a bigger season pass that we have it.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
+  {
+    key: "plan.answered",
+    label: "Pass request answered",
+    description:
+      "Granted (with the new limits) or declined — to whoever asked and the club's owners.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
+    orgControllable: false,
+  },
+  {
     key: "registration.first",
     label: "First registration in",
     description: "Tells a season's organizers its first player has registered.",
@@ -648,6 +672,16 @@ const ENTRIES = [
     key: "staff.problem_report",
     label: "New problem report (to us)",
     description: "A reported problem, with its screenshot, to the support mailbox.",
+    audience: "staff",
+    category: "operational",
+    topic: "staff",
+    channels: ["email"],
+  },
+  {
+    key: "staff.pass_request",
+    label: "New pass request (to us)",
+    description:
+      "A season asked for a bigger pass — to the support mailbox, to answer from the passes desk.",
     audience: "staff",
     category: "operational",
     topic: "staff",

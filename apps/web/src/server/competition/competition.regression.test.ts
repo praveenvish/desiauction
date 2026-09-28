@@ -380,12 +380,15 @@ describe("TIER LIMITS — the ceiling the pricing page has always described", ()
       outcome: "granted",
       actorId: owner,
     });
-    expect(granted).toEqual({
+    expect(granted).toMatchObject({
       ok: true,
       slug: competition.slug,
       fromTier: "free",
       toTier: "pro",
       outcome: "granted",
+      // PR15: and which request, who asked and for what — for telling them.
+      competitionId: competition.id,
+      requestedTier: "pro",
     });
 
     // The ceiling moved with it — this is the whole point of the round trip.

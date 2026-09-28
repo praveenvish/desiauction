@@ -64,6 +64,7 @@ const PERSON_EVENT_LABELS = {
   "fixture.changed": "One of your team's matches moved or was called off",
   "season.champion": "Your season is over — the champions are named",
   "club.member_joined": "Someone joined your club with an invite link",
+  "plan.answered": "Your season's pass request was answered",
   "profile.name.updated": "Name updated",
   // The first name is not an update — see `profile.name.set`.
   "profile.name.set": "Name added to your profile",

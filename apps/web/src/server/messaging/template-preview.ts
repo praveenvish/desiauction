@@ -17,6 +17,7 @@ import {
   type MatchFacts,
 } from "./fixture-mail";
 import { clubBand } from "./club-mail";
+import { passLimits } from "./plan-mail";
 import { finaleTable, recordWords, type FinaleRow } from "./finale-mail";
 import { digestDetails, organizerJourney, welcomeFrame } from "./organizer-mail";
 import { journey, seasonBand, submittedDetails } from "./player-mail";
@@ -465,6 +466,18 @@ export function previewOptions(
     ...resultsFrame(kind, language),
     ...matchesFrame(kind, variant, language),
     ...finaleFrame(kind, variant, language),
+    ...(kind === "plan.requested" || kind === "plan.answered"
+      ? {
+          band: seasonBand({
+            season: String(sampleVariables(EMAIL_TEMPLATES[kind], language)["season"] ?? ""),
+            orgName: language === "hi" ? "मलाड क्रिकेट क्लब" : "Malad Cricket Club",
+            sport: "cricket",
+          }),
+          ...(kind === "plan.answered" && variant === "granted"
+            ? { details: passLimits("pro", language) }
+            : {}),
+        }
+      : {}),
     ...(kind === "club.invite" || kind === "club.member_joined"
       ? {
           band: clubBand(

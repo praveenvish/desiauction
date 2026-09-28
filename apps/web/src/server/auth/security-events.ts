@@ -95,6 +95,8 @@ export type SecurityAction =
   | "season.champion"
   // Email programme PR13: someone used a club invite link (to its sender and owners).
   | "club.member_joined"
+  // Email programme PR15: a season's pass request was granted or declined.
+  | "plan.answered"
   // The person asked for their account to be erased, or took the request back.
   // On their own ledger because it is the one request that ends the account;
   // the DECISION is on the request itself, which /account reads.
