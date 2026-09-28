@@ -68,7 +68,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
           description={
             standings.playable === 0
               ? "No match has been played yet — the table fills as results come in."
-              : `Built from ${String(standings.recorded)} recorded result${standings.recorded === 1 ? "" : "s"}, on every read.`
+              : `From ${String(standings.recorded)} recorded result${standings.recorded === 1 ? "" : "s"} — it updates the moment a score is entered.`
           }
           action={
             /* Said whenever it is not the whole story. A table built from three
@@ -93,7 +93,9 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             />
           ) : (
             <>
-              <div className="st-table-wrap">
+              {/* It scrolls sideways on a phone, so a keyboard must be able to
+                  reach it (axe: scrollable-region-focusable). */}
+              <div className="st-table-wrap" tabIndex={0} role="region" aria-label="League table">
                 <table className="st-table sd-table" data-testid="standings-table">
                   <caption>
                     The table, best first: played, won, lost, tied, no result, points

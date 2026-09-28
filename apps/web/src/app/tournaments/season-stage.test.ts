@@ -73,6 +73,13 @@ describe("nextStep", () => {
     expect(
       nextStep(season({ ...on, counts: { auctionDone: true, matches: 6, live: 1 } }), today),
     ).toMatchObject({ label: "Enter score", why: "1 match is being played now", urgent: true });
+    // A result owed from an earlier day outranks a match being played (census 8).
+    expect(
+      nextStep(
+        season({ ...on, counts: { auctionDone: true, matches: 7, live: 1, due: 3 } }),
+        today,
+      ),
+    ).toMatchObject({ label: "Enter results", why: "3 matches need a result", urgent: true });
     expect(
       nextStep(season({ ...on, counts: { auctionDone: true, matches: 6, played: 3 } }), today),
     ).toMatchObject({ label: "Schedule", why: "3 of 6 matches played", urgent: false });

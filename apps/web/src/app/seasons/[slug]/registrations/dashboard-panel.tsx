@@ -138,7 +138,12 @@ function poolHint(stats: RegistrationStats): string {
   }
   return terms.length === 0
     ? "Approved players who go to the block"
-    : `${String(stats.approved)} approved − ${terms.join(" − ")}`;
+    : // In words: "43 approved − 3 icons − 3 captains" read as dashes (census 8).
+      `${String(stats.approved)} approved, less ${
+        terms.length === 1
+          ? (terms[0] ?? "")
+          : `${terms.slice(0, -1).join(", ")} and ${terms.at(-1) ?? ""}`
+      }`;
 }
 
 interface Filters {

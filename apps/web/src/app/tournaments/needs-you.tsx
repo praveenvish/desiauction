@@ -145,7 +145,11 @@ function ComingUp({ fixtures }: { fixtures: readonly OrganizerFixture[] }) {
   const today = istCalendarDate();
   return (
     <aside className="tx-coming" aria-labelledby="tx-coming-title">
-      <h3 id="tx-coming-title">Coming up</h3>
+      {/* The list keeps matches whose day passed with no result (they lead,
+          oldest first), so it is not only "coming up" then. */}
+      <h3 id="tx-coming-title">
+        {fixtures.some((fixture) => awaitsResult(fixture, today)) ? "Matches" : "Coming up"}
+      </h3>
       <ul>
         {fixtures.map((fixture) => {
           const tile = fixture.kickoffAt === null ? null : dayTile(fixture.kickoffAt);

@@ -672,8 +672,8 @@ export default async function ReportsPage({
       ) : null}
 
       <p className="rp-foot">
-        <IconCheckCircle size={16} aria-hidden /> Read live from the season&rsquo;s own desks — the
-        same numbers its Players, Teams, Auction and Schedule tabs show.
+        <IconCheckCircle size={16} aria-hidden /> Live — the same numbers the season&rsquo;s
+        Players, Teams, Auction and Schedule tabs show.
       </p>
     </main>
   );

@@ -29,6 +29,7 @@ export interface StageInput {
     readonly auctionDone?: boolean | undefined;
     readonly approved?: number | undefined;
     readonly live?: number | undefined;
+    readonly due?: number | undefined;
     readonly played?: number | undefined;
   };
 }
@@ -62,7 +63,8 @@ export function seasonStage(season: StageInput, today: string): StageKey {
       season.auctionUnit === "points" &&
       season.endsOn !== null &&
       season.endsOn < today &&
-      (season.counts.live ?? 0) === 0;
+      (season.counts.live ?? 0) === 0 &&
+      (season.counts.due ?? 0) === 0;
     return over ? "finished" : "season";
   }
   if (season.status === "registration_closed") {
@@ -89,6 +91,7 @@ export function nextStep(season: StageInput, today: string): NextStep | null {
   const base = `/seasons/${season.slug}`;
   const { counts } = season;
   const live = counts.live ?? 0;
+  const due = counts.due ?? 0;
   const played = counts.played ?? 0;
   switch (seasonStage(season, today)) {
     case "setup":
@@ -123,6 +126,16 @@ export function nextStep(season: StageInput, today: string): NextStep | null {
         urgent: true,
       };
     case "season":
+      // A result owed from an earlier day outranks a match being played: the
+      // one being played will want its score soon; this one already does.
+      if (due > 0) {
+        return {
+          label: "Enter results",
+          href: `${base}/fixtures`,
+          why: `${formatCount(due)} ${due === 1 ? "match needs" : "matches need"} a result`,
+          urgent: true,
+        };
+      }
       if (live > 0) {
         return {
           label: "Enter score",
@@ -170,7 +183,7 @@ export function needsYou<T extends StageInput & { startsOn: string | null }>(
 ): T[] {
   const weight = (season: T): number => {
     const step = nextStep(season, today);
-    if ((season.counts.live ?? 0) > 0) return 0;
+    if ((season.counts.live ?? 0) > 0 || (season.counts.due ?? 0) > 0) return 0;
     if (step?.urgent === true) return 1;
     return 2;
   };
