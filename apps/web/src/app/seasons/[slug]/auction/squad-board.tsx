@@ -186,6 +186,7 @@ export function SquadBoard({
   showPurse = true,
   note = null,
   collapsible = false,
+  mineTeamId = null,
 }: {
   /** The season's roles, so a football night is not named in cricket. */
   roles: readonly { key: string; label: string }[];
@@ -205,10 +206,18 @@ export function SquadBoard({
    * so a search in the page still finds a player.
    */
   collapsible?: boolean;
+  /**
+   * The viewer's own team (2026-09-28): listed first, open, and called "Your
+   * squad". An owner opening a finished room had to find and unfold their own
+   * team among the others to see who they bought.
+   */
+  mineTeamId?: string | null;
 }) {
   const money = useMoney();
   const labelOf = useMemo(() => roleLabeller(roles), [roles]);
-  const squads = squadsOf(teams, preSigned, resolved, lotMedia);
+  const squads = squadsOf(teams, preSigned, resolved, lotMedia).sort(
+    (a, b) => Number(b.team.id === mineTeamId) - Number(a.team.id === mineTeamId),
+  );
   const purseByTeam = new Map(
     (snapshot?.paddles ?? []).map((paddle) => [paddle.teamId, paddle.purseRemaining]),
   );
@@ -251,7 +260,12 @@ export function SquadBoard({
             <>
               <PurseTeamCrest team={team} fallback={team.name} />
               <span className="squad-team-words">
-                <span className="squad-team-name">{team.name}</span>
+                <span className="squad-team-name">
+                  {team.name}
+                  {team.id === mineTeamId ? (
+                    <span className="squad-team-mine"> · yours</span>
+                  ) : null}
+                </span>
                 {purseLine}
               </span>
               <span className="squad-team-count">
@@ -308,7 +322,13 @@ export function SquadBoard({
               </ul>
             );
           return collapsible ? (
-            <details key={team.id} className="squad-team" data-testid={`squad-${team.id}`}>
+            <details
+              key={team.id}
+              className="squad-team"
+              data-testid={`squad-${team.id}`}
+              data-mine={team.id === mineTeamId || undefined}
+              open={team.id === mineTeamId || undefined}
+            >
               <summary className="squad-team-head">
                 {head}
                 <IconChevronDown size={16} className="squad-team-caret" aria-hidden />
