@@ -680,9 +680,16 @@ export interface OrgDirectory {
   readonly query: string;
   /** The id to pass as `?after=` for the next page, or null at the end. */
   readonly nextCursor: string | null;
+  /**
+   * How many organizations each filter holds under the current search — the
+   * chips say "Cases not yet closed · 5" instead of making an operator click
+   * to find out whether it is 0 or 400.
+   */
+  readonly counts: Readonly<Record<OrgFilter, number>>;
 }
 
 const ORG_PAGE = 50;
+const ORG_FILTERS: readonly OrgFilter[] = ["all", "finance", "settling", "quiet"];
 
 /**
  * The filter, as SQL.
@@ -763,11 +770,19 @@ export async function organizationDirectory(
       clauses.push(match);
     }
   }
+  const searchClauses = [...clauses];
   const filterClause = orgFilterClause(filter);
   if (filterClause !== undefined) {
     clauses.push(filterClause);
   }
   const where = clauses.length === 0 ? undefined : and(...clauses);
+  /** The search with one filter applied — one count per chip. */
+  const whereFor = (f: OrgFilter): SQL | undefined => {
+    const parts = [...searchClauses];
+    const clause = orgFilterClause(f);
+    if (clause !== undefined) parts.push(clause);
+    return parts.length === 0 ? undefined : and(...parts);
+  };
   const cursor = await orgCursor(db, options.after);
   const pageWhere =
     cursor === undefined ? where : where === undefined ? cursor : and(where, cursor);
@@ -808,13 +823,20 @@ export async function organizationDirectory(
     .orderBy(desc(organizations.createdAt), desc(organizations.id))
     .limit(ORG_PAGE + 1);
 
-  const [matching, everything] = await Promise.all([
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(organizations)
-      .where(where),
+  const [facetRows, everything] = await Promise.all([
+    Promise.all(
+      ORG_FILTERS.map((f) =>
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(organizations)
+          .where(whereFor(f)),
+      ),
+    ),
     db.select({ n: sql<number>`count(*)::int` }).from(organizations),
   ]);
+  const counts = Object.fromEntries(
+    ORG_FILTERS.map((f, index) => [f, facetRows[index]?.[0]?.n ?? 0]),
+  ) as Record<OrgFilter, number>;
   const more = rows.length > ORG_PAGE;
   const page = more ? rows.slice(0, ORG_PAGE) : rows;
   return {
@@ -822,11 +844,12 @@ export async function organizationDirectory(
       ...row,
       lastActivityAt: row.lastActivityAt === null ? null : new Date(row.lastActivityAt),
     })),
-    total: matching[0]?.n ?? 0,
+    total: counts[filter],
     platformTotal: everything[0]?.n ?? 0,
     filter,
     query,
     nextCursor: more ? (page[page.length - 1]?.id ?? null) : null,
+    counts,
   };
 }
 
@@ -974,6 +997,8 @@ export interface UserDirectoryRow {
   readonly createdAt: Date;
   readonly orgs: number;
   readonly activeGrants: number;
+  /** Seasons they entered as a player — the row says "Player · 2 seasons". */
+  readonly seasons: number;
   readonly lastActivityAt: Date | null;
 }
 
@@ -989,9 +1014,12 @@ export interface UserDirectory {
   readonly query: string;
   readonly filter: UserDirectoryFilter;
   readonly nextCursor: string | null;
+  /** How many people each facet holds under the current search. */
+  readonly counts: Readonly<Record<UserDirectoryFilter, number>>;
 }
 
 const USER_PAGE = 50;
+const USER_FILTERS: readonly UserDirectoryFilter[] = ["all", "players", "profiled"];
 
 async function userCursor(db: Db, after: string | undefined): Promise<SQL | undefined> {
   if (after === undefined || after === "") {
@@ -1041,13 +1069,17 @@ export async function userDirectory(
         );
   // PI-1 P6: profile-aware facets. EXISTS subqueries, so the directory stays
   // one indexed pass (registrations_person_idx / player_profiles_person_uq).
-  const facet =
-    filter === "players"
+  const facetOf = (f: UserDirectoryFilter): SQL | undefined =>
+    f === "players"
       ? sql`exists (select 1 from registrations r where r.person_id = ${people.id})`
-      : filter === "profiled"
+      : f === "profiled"
         ? sql`exists (select 1 from player_profiles pp where pp.person_id = ${people.id})`
         : undefined;
-  const where = search === undefined ? facet : facet === undefined ? search : and(search, facet);
+  const whereFor = (f: UserDirectoryFilter): SQL | undefined => {
+    const facet = facetOf(f);
+    return search === undefined ? facet : facet === undefined ? search : and(search, facet);
+  };
+  const where = whereFor(filter);
   const cursor = await userCursor(db, after);
   const pageWhere =
     cursor === undefined ? where : where === undefined ? cursor : and(where, cursor);
@@ -1060,6 +1092,7 @@ export async function userDirectory(
       createdAt: people.createdAt,
       orgs: sql<number>`(select count(*)::int from org_members m where m.person_id = people.id)`,
       activeGrants: sql<number>`(select count(*)::int from grants g where g.person_id = people.id and g.revoked_at is null)`,
+      seasons: sql<number>`(select count(distinct r.competition_id)::int from registrations r where r.person_id = people.id)`,
       lastActivityAt: sql<
         string | null
       >`(select max(al.at) from audit_log al where al.actor = people.id)`,
@@ -1068,13 +1101,20 @@ export async function userDirectory(
     .where(pageWhere)
     .orderBy(desc(people.createdAt), desc(people.id))
     .limit(USER_PAGE + 1);
-  const [matching, everything] = await Promise.all([
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(people)
-      .where(where),
+  const [facetRows, everything] = await Promise.all([
+    Promise.all(
+      USER_FILTERS.map((f) =>
+        db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(people)
+          .where(whereFor(f)),
+      ),
+    ),
     db.select({ n: sql<number>`count(*)::int` }).from(people),
   ]);
+  const counts = Object.fromEntries(
+    USER_FILTERS.map((f, index) => [f, facetRows[index]?.[0]?.n ?? 0]),
+  ) as Record<UserDirectoryFilter, number>;
   const more = rows.length > USER_PAGE;
   const page = more ? rows.slice(0, USER_PAGE) : rows;
   return {
@@ -1082,11 +1122,12 @@ export async function userDirectory(
       ...row,
       lastActivityAt: row.lastActivityAt === null ? null : new Date(row.lastActivityAt),
     })),
-    total: matching[0]?.n ?? 0,
+    total: counts[filter],
     platformTotal: everything[0]?.n ?? 0,
     query: term,
     filter,
     nextCursor: more ? (page[page.length - 1]?.id ?? null) : null,
+    counts,
   };
 }
 

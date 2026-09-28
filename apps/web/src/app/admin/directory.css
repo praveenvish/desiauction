@@ -1,0 +1,43 @@
+/* ---- The admin directories (orgs, users): kept out of admin.css, where
+   sibling redesigns append and conflict ---- */
+
+.admin-dir-facts {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.admin-dir-flags,
+.admin-dir-flags-head {
+  text-align: right;
+}
+
+.admin-dir-flags .admin-pills {
+  justify-content: flex-end;
+}
+
+/* A phone row says the facts in full: they wrap rather than cut mid-word
+   ("+91 ······ 8264 · 1 organization · 1 a…"). */
+@media (max-width: 719px) {
+  [data-testid="admin-org-table"] .da-row-meta,
+  [data-testid="admin-user-table"] .da-row-meta {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  [data-testid="admin-org-table"] [data-cell="title"] > .da-row-meta,
+  [data-testid="admin-user-table"] [data-cell="title"] > .da-row-meta {
+    white-space: normal;
+  }
+
+  [data-testid="admin-org-table"] [data-cell="status"],
+  [data-testid="admin-user-table"] [data-cell="status"] {
+    align-self: end;
+  }
+
+  /* No flag says nothing on a phone. */
+  [data-testid="admin-org-table"] [data-cell="status"]:has(.admin-dash),
+  [data-testid="admin-user-table"] [data-cell="status"]:has(.admin-dash) {
+    display: none;
+  }
+}

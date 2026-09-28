@@ -10,10 +10,12 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import { countNoun, formatCount } from "../../../server/admin/format";
+import { formatCount } from "../../../server/admin/format";
 import type { OrgDirectory, OrgFilter } from "../../../server/admin/views";
 import { AdminFilterForm } from "../admin-filter-form";
-import { RelativeTime, TableCount } from "../admin-ui";
+import { RelativeTime } from "../admin-ui";
+import { orgFacts, orgFlags } from "../directory-model";
+import "../directory.css";
 
 /**
  * PX-9 §2 — the organization directory.
@@ -71,6 +73,8 @@ export function OrgsPanel({
               items={FILTER_LABELS.map((option) => ({
                 key: option.key,
                 label: option.label,
+                // Each chip says how many it holds under the current search.
+                count: formatCount(directory.counts[option.key]),
                 active: option.key === filter,
                 href: filterHref(query, option.key),
               }))}
@@ -111,117 +115,71 @@ export function OrgsPanel({
                 <thead>
                   <tr>
                     <th scope="col">Organization</th>
-                    <th scope="col" className="admin-num">
-                      Seasons
+                    <th scope="col">On the platform</th>
+                    <th scope="col" className="admin-dir-flags-head">
+                      Needs a look
                     </th>
-                    <th scope="col" className="admin-num">
-                      Members
-                    </th>
-                    <th scope="col" className="admin-num">
-                      Auctions
-                    </th>
-                    <th scope="col">Cases</th>
-                    <th scope="col">Finance</th>
                     <th scope="col">Last activity</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id}>
-                      {/* On a phone each row is a card and the header strip is
-                          hidden; `data-label` names every figure in its place,
-                          so Seasons, Members and Cases never read as three
-                          unlabelled numbers. */}
-                      <td data-label="Organization" data-cell="title">
-                        <span className="admin-cell-main is-inline">
-                          <Link href={`/admin/orgs/${row.slug}`} className="admin-name">
-                            {row.name}
-                          </Link>
-                          <span className="admin-id admin-slug">{row.slug}</span>
-                          {row.matchedSeason !== null ? (
-                            <span className="admin-match" data-testid="admin-org-matched-season">
-                              Matched: {row.matchedSeason}
+                  {rows.map((row) => {
+                    const facts = orgFacts(row);
+                    const flags = orgFlags(row);
+                    return (
+                      <tr key={row.id}>
+                        {/* Five numeric columns read "—" on almost every row: a
+                            grid of dashes the one open case hid in. The row now
+                            says what the club has done in one phrase, and
+                            carries only the flags an operator acts on. */}
+                        <td data-label="Organization" data-cell="title">
+                          <span className="admin-cell-main is-inline">
+                            <Link href={`/admin/orgs/${row.slug}`} className="admin-name">
+                              {row.name}
+                            </Link>
+                            <span className="admin-id admin-slug">{row.slug}</span>
+                            {row.matchedSeason !== null ? (
+                              <span className="admin-match" data-testid="admin-org-matched-season">
+                                Matched: {row.matchedSeason}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="da-row-meta">{facts}</span>
+                        </td>
+                        <td data-label="On the platform" className="admin-dir-facts">
+                          {facts}
+                        </td>
+                        <td
+                          data-label="Needs a look"
+                          data-cell="status"
+                          className="admin-dir-flags"
+                        >
+                          {flags.length === 0 ? (
+                            <span className="admin-dash" title="Nothing to look at">
+                              —<span className="admin-sr-only">Nothing to look at</span>
                             </span>
-                          ) : null}
-                        </span>
-                        <span className="da-row-meta">
-                          {[
-                            row.competitions > 0 ? countNoun(row.competitions, "season") : null,
-                            row.members > 0 ? countNoun(row.members, "member") : null,
-                            row.openCases > 0 ? `${formatCount(row.openCases)} open` : null,
-                            row.financeDeclared ? "finance declared" : null,
-                          ]
-                            .filter((part) => part !== null)
-                            .join(" · ") || "No seasons yet"}
-                        </span>
-                      </td>
-                      <td
-                        data-label="Seasons"
-                        className="admin-count admin-num"
-                        data-zero={row.competitions === 0 || undefined}
-                      >
-                        <TableCount n={row.competitions} />
-                      </td>
-                      <td
-                        data-label="Members"
-                        className="admin-count admin-num"
-                        data-zero={row.members === 0 || undefined}
-                      >
-                        <TableCount n={row.members} />
-                      </td>
-                      <td
-                        data-label="Auctions"
-                        className="admin-count admin-num"
-                        data-zero={row.auctions === 0 || undefined}
-                      >
-                        <TableCount n={row.auctions} />
-                      </td>
-                      <td data-label="Cases" data-empty={row.cases === 0 || undefined}>
-                        {/* `settled` is counted as unfinished — it can still be
-                            closed — but it is not "open", and an amber pill on
-                            a case that settled correctly reads as a problem
-                            that is not there. */}
-                        <span className="admin-pills">
-                          {/* One figure, not "1" beside "● 1 open": the total
-                              only when it says more than its parts. */}
-                          {row.cases === 0 ? (
-                            <TableCount n={0} />
-                          ) : row.cases > row.openCases + row.settledCases ? (
-                            <span className="admin-count">{formatCount(row.cases)}</span>
-                          ) : null}
-                          {row.openCases > 0 ? (
-                            <Pill tone="amber" dot>
-                              {row.openCases} open
-                            </Pill>
-                          ) : null}
-                          {row.settledCases > 0 ? (
-                            <Pill tone="neutral">{row.settledCases} settled</Pill>
-                          ) : null}
-                        </span>
-                      </td>
-                      <td data-label="Finance" data-empty={!row.financeDeclared || undefined}>
-                        {/* "Not declared" 49 times down a column drowned the one
-                            org that had. The dash is named for assistive tech. */}
-                        {row.financeDeclared ? (
-                          <span className="admin-state" data-tone="green">
-                            <span className="admin-state-dot" aria-hidden />
-                            Declared
-                          </span>
-                        ) : (
-                          <span className="admin-dash" title="Not declared">
-                            —<span className="admin-sr-only">Not declared</span>
-                          </span>
-                        )}
-                      </td>
-                      <td data-label="Last activity" className="is-side" data-cell="figure">
-                        {row.lastActivityAt === null ? (
-                          <span className="admin-meta">Never</span>
-                        ) : (
-                          <RelativeTime at={row.lastActivityAt} />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          ) : (
+                            <span className="admin-pills">
+                              {flags.map((flag) => (
+                                <Pill key={flag.label} tone={flag.tone}>
+                                  {flag.label}
+                                </Pill>
+                              ))}
+                            </span>
+                          )}
+                        </td>
+                        <td data-label="Last activity" className="is-side" data-cell="figure">
+                          {row.lastActivityAt === null ? (
+                            <span className="admin-meta">
+                              Joined <RelativeTime at={row.createdAt} />
+                            </span>
+                          ) : (
+                            <RelativeTime at={row.lastActivityAt} />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -233,7 +191,7 @@ export function OrgsPanel({
                 label="More organizations"
                 total={total}
                 shown={rows.length}
-                noun="organizations"
+                noun="organizations · newest first"
                 firstHref={paged ? filterHref(query, filter) : null}
                 nextHref={nextHref}
                 linkComponent={Link}
