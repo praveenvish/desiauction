@@ -51,10 +51,13 @@ describe("the sale", () => {
     );
   });
 
-  it("names the team and the price in the subject, and the multiple of base in the body", async () => {
+  it("names the team and the price in the subject, and the night on the stage", async () => {
     const mail = await soldMail(sale);
     expect(mail.subject).toBe("Congratulations — Cup Kings bought you for ₹75,000");
-    expect(mail.text).toContain("3 times your base");
+    // Email v2 (PR9): the auction-night stage carries the price and the story.
+    expect(mail.text).toContain("Sold: Arjun → Cup Kings — ₹75,000");
+    expect(mail.text).toContain("3× your base · 7 bids · 3 teams");
+    expect(mail.html).toContain('class="da-stage"');
     expect(mail.text).toContain("most expensive buy of the night");
     expect(mail.text).toContain("Vikram Patel");
     expect(mail.html).toContain("Share your player card");

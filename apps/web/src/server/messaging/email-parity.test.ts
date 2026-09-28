@@ -76,21 +76,40 @@ function bidStory(facts: SoldFacts): string {
   return `${all} all bid for you — ${String(facts.bidCount)} bids in all, from ${facts.basePrice} to ${facts.price}. ${facts.teamName} won.`;
 }
 
+// Changed on purpose (email v2 PR9, 2026-09-28): the sale opens on the
+// auction-night stage — the price large, "3× your base · 7 bids · 3 teams"
+// under it — so the paragraphs no longer repeat the price; the tracker shows
+// Team; and the footnote drops the switch name ("Manage emails" is the switch).
 function soldMail(facts: SoldFacts): ComposedMail {
-  const multiple =
-    facts.multiple !== null && facts.multiple >= 1.5
-      ? ` — ${facts.multiple >= 2 ? `${String(Math.round(facts.multiple * 10) / 10)} times` : "well above"} your base`
-      : "";
+  const line = [
+    ...(facts.multiple !== null && facts.multiple >= 1.5
+      ? [`${String(Math.round(facts.multiple * 10) / 10)}× your base`]
+      : []),
+    ...(facts.bidCount > 1 ? [`${String(facts.bidCount)} bids`] : []),
+    ...(new Set(facts.bidders).size > 1 ? [`${String(new Set(facts.bidders).size)} teams`] : []),
+  ].join(" · ");
+  const words = facts.name.trim().split(/\s+/);
+  const monogram = (
+    words.length >= 2
+      ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`
+      : (words[0] ?? "").slice(0, 2)
+  ).toUpperCase();
   return {
     subject: `Congratulations — ${facts.teamName} bought you for ${facts.price}`,
     ...renderEmail({
       manageUrl: MANAGE,
       preheader: `${facts.teamName} bought you in the ${facts.season} auction.`,
-      heading: `You're a ${facts.teamName} player`,
+      heading: `Congratulations, ${facts.name}`,
+      stage: {
+        kicker: "Sold",
+        monogram,
+        title: `${facts.name} → ${facts.teamName}`,
+        figure: facts.price,
+        line,
+      },
+      progress: steps(3),
       paragraphs: [
-        `Congratulations, ${facts.name}!`,
-        `${facts.teamName} bought you for ${facts.price} in the ${facts.season} auction${multiple}.`,
-        bidStory(facts),
+        `You're a ${facts.teamName} player. ${bidStory(facts)}`,
         ...(facts.highlight === null ? [] : [`${facts.highlight}.`]),
         // Changed on purpose (share nudges, 2026-09-24): a public card is
         // offered to SHARE on the night it was bought, not only to look at.
@@ -108,7 +127,7 @@ function soldMail(facts: SoldFacts): ComposedMail {
         facts.cardUrl === null
           ? { label: "See your season", url: `${PUBLIC}/home` }
           : { label: "Share your player card", url: facts.cardUrl },
-      footnote: `You received this because you played in the ${facts.season} auction. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because you played in the ${facts.season} auction.`,
       whatsappNudge: true,
     }),
   };
@@ -124,6 +143,13 @@ function unsoldMail(facts: {
     // just says "unsold" lands too hard.
     subject: `Your ${facts.season} auction`,
     ...renderEmail({
+      // Changed on purpose (PR9): the club band opens a "not picked" mail too.
+      band: {
+        title: facts.season,
+        subtitle: facts.orgName,
+        monogram:
+          `${facts.orgName.trim().split(/\s+/)[0]?.[0] ?? ""}${facts.orgName.trim().split(/\s+/)[1]?.[0] ?? ""}`.toUpperCase(),
+      },
       manageUrl: MANAGE,
       preheader: "You weren't picked this time — you're still registered.",
       heading: "Not this time",
@@ -133,7 +159,7 @@ function unsoldMail(facts: {
         `You're still registered with ${facts.orgName}, and organizers often bring players in as replacements during the season.`,
       ],
       action: { label: "See your season", url: `${PUBLIC}/home` },
-      footnote: `You received this because you registered for ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because you registered for ${facts.season}.`,
     }),
   };
 }
@@ -189,7 +215,7 @@ function appointmentMail(facts: AppointmentFacts): ComposedMail {
           : []),
       ],
       action: { label: "See your season", url: `${PUBLIC}/home` },
-      footnote: `You received this because ${facts.orgName} named you in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because ${facts.orgName} named you in ${facts.season}.`,
       whatsappNudge: true,
     }),
   };
@@ -217,7 +243,7 @@ function squadSheetMail(facts: SquadSheetFacts): ComposedMail {
           : `Your first match: ${facts.firstMatch}.`,
       ],
       action: { label: "See your season", url: `${PUBLIC}/home` },
-      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}.`,
     }),
   };
 }
@@ -237,7 +263,7 @@ function lineupMail(facts: LineupFacts): ComposedMail {
       details: facts.lineup.map((line) => [line.name, line.note] as const),
       after: ["Good luck!"],
       action: { label: "See your season", url: `${PUBLIC}/home` },
-      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}. Switch off "Auction updates" in your account to stop these.`,
+      footnote: `You received this because you play for ${facts.teamName} in ${facts.season}.`,
       whatsappNudge: true,
     }),
   };

@@ -36,6 +36,7 @@ const MANAGEABLE = new Set([
   // "Club updates" (PR5) — but never a moderation notice: no switch stops those.
   "club.welcome",
   "auction.owners_ready",
+  "auction.results",
   "registration.first",
   "registration.digest",
   "registration.received",

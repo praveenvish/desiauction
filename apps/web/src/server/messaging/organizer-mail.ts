@@ -25,8 +25,11 @@ const JOURNEY: Readonly<Record<MessageLanguage, readonly [string, string, string
   hi: ["क्लब", "सीज़न", "खिलाड़ी", "नीलामी"],
 };
 
-/** The organizer's four steps to auction night; `at` is the one they are on. */
-export function organizerJourney(at: 1 | 2 | 3, language: MessageLanguage): readonly EmailStep[] {
+/** The organizer's four steps to auction night; `at` is the one they are on (4: all done). */
+export function organizerJourney(
+  at: 1 | 2 | 3 | 4,
+  language: MessageLanguage,
+): readonly EmailStep[] {
   return JOURNEY[language].map((label, i) => ({
     label,
     state: i < at ? "done" : i === at ? "now" : "next",
@@ -196,5 +199,57 @@ export function seasonReleasedMail(
     language,
     { name: facts.name, season: facts.season },
     { action: { id: "season", url: seasonUrl(facts.seasonSlug) }, band: seasonBand(facts) },
+  );
+}
+
+// --- The results pack -------------------------------------------------------------
+
+export interface TeamSpend {
+  readonly team: string;
+  readonly spent: string;
+  readonly players: number;
+}
+
+const PLAYERS_WORD: Readonly<Record<MessageLanguage, (n: number) => string>> = {
+  en: (n) => `${String(n)} ${n === 1 ? "player" : "players"}`,
+  hi: (n) => `${String(n)} खिलाड़ी`,
+};
+
+/**
+ * "THE AUCTION IS DONE" — to the organizers when the auction completes: how
+ * many were sold for how much, the top buys, and each team's spend. What the
+ * room already showed, gathered in one place (outcome-mail.ts).
+ */
+export function auctionResultsMail(
+  facts: SeasonFacts & {
+    name: string;
+    seasonSlug: string;
+    sold: number;
+    pool: number;
+    spent: string;
+    topBuys: readonly string[];
+    teams: readonly TeamSpend[];
+  },
+  language: MessageLanguage,
+): Promise<NotificationMail> {
+  return renderNotificationEmail(
+    "auction.results",
+    language,
+    {
+      name: facts.name,
+      season: facts.season,
+      soldCount: String(facts.sold),
+      poolCount: String(facts.pool),
+      spent: facts.spent,
+      topBuys: facts.topBuys,
+    },
+    {
+      action: { id: "results", url: `${seasonUrl(facts.seasonSlug)}/auction` },
+      band: seasonBand(facts),
+      progress: organizerJourney(4, language),
+      details: facts.teams.map(
+        (team) => [team.team, `${team.spent} · ${PLAYERS_WORD[language](team.players)}`] as const,
+      ),
+    },
   );
 }

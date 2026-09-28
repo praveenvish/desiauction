@@ -20,7 +20,9 @@ import { env } from "../../env";
 import { shownName } from "../competition/shown-name";
 import type { QueuedMail, QueuedSms } from "../messaging/outbox";
 import { smsFit, smsPrice, smsSeasonName } from "../messaging/templates";
+import { auctionResultsMail } from "../messaging/organizer-mail";
 import { ownerSummaryMail, soldMail, unsoldMail, type SquadLine } from "../messaging/player-mail";
+import { organizersOf } from "../orgs/organizer-notify";
 
 /**
  * THE FACTS BEHIND A FINISHED AUCTION'S EMAILS.
@@ -64,6 +66,7 @@ export async function auctionOutcomeMessages(
     .select({
       season: competitions.name,
       slug: competitions.slug,
+      sport: competitions.sport,
       visibility: competitions.visibility,
       orgId: competitions.orgId,
       orgName: organizations.name,
@@ -240,7 +243,16 @@ export async function auctionOutcomeMessages(
         orgId: context.orgId,
         kind: "auction.unsold",
         dedupeKey: `auction.unsold:${input.auctionId}:${sale.registrationId}`,
-        ...(await unsoldMail({ name, season: context.season, orgName: context.orgName }, language)),
+        ...(await unsoldMail(
+          {
+            name,
+            season: context.season,
+            orgName: context.orgName,
+            seasonSlug: context.slug,
+            sport: context.sport,
+          },
+          language,
+        )),
       });
     }
   }
@@ -295,8 +307,65 @@ export async function auctionOutcomeMessages(
             context.visibility === "public"
               ? `${env.PUBLIC_BASE_URL}/c/${context.slug}/t/${slugifyName(owner.teamName)}?ref=email`
               : null,
+          orgName: context.orgName,
+          sport: context.sport,
         },
         ownerLanguages.get(owner.personId) ?? "en",
+      )),
+    });
+  }
+  // The organizers get the night in one place (email programme PR9): how many
+  // were sold for how much, the top buys, and each team's spend.
+  const sold = sales.filter(
+    (sale) => sale.status === "sold" && sale.teamName !== null && sale.soldPrice !== null,
+  );
+  const topBuys = [...sold]
+    .sort((a, b) => (b.soldPrice ?? 0) - (a.soldPrice ?? 0))
+    .slice(0, 3)
+    .map(
+      (sale) =>
+        `${sale.personName?.trim() || "A player"} — ${sale.teamName ?? ""}, ${amount(sale.soldPrice ?? 0)}`,
+    );
+  const byTeam = new Map<string, { spent: number; players: number }>();
+  for (const sale of sold) {
+    const team = byTeam.get(sale.teamName ?? "") ?? { spent: 0, players: 0 };
+    team.spent += sale.soldPrice ?? 0;
+    team.players += 1;
+    byTeam.set(sale.teamName ?? "", team);
+  }
+  const teamSpends = [...byTeam.entries()]
+    .sort((a, b) => b[1].spent - a[1].spent)
+    .map(([team, value]) => ({ team, spent: amount(value.spent), players: value.players }));
+  const organizers = await organizersOf(db, context.orgId);
+  const [organizerLanguages, organizerNames] = await Promise.all([
+    messageLanguagesOf(db, organizers),
+    organizers.length === 0
+      ? Promise.resolve([])
+      : db
+          .select({ id: people.id, name: people.name })
+          .from(people)
+          .where(inArray(people.id, organizers)),
+  ]);
+  for (const personId of organizers) {
+    mails.push({
+      personId,
+      orgId: context.orgId,
+      kind: "auction.results",
+      dedupeKey: `auction.results:${input.auctionId}:${personId}`,
+      ...(await auctionResultsMail(
+        {
+          name: organizerNames.find((row) => row.id === personId)?.name?.trim() || "there",
+          season: context.season,
+          orgName: context.orgName,
+          seasonSlug: context.slug,
+          sport: context.sport,
+          sold: sold.length,
+          pool: sales.length,
+          spent: amount(sold.reduce((sum, sale) => sum + (sale.soldPrice ?? 0), 0)),
+          topBuys,
+          teams: teamSpends,
+        },
+        organizerLanguages.get(personId) ?? "en",
       )),
     });
   }

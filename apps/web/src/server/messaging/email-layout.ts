@@ -50,6 +50,23 @@ export interface EmailStep {
   readonly state: "done" | "now" | "next";
 }
 
+/**
+ * The auction-night stage: a Floodlight panel at the top of the card, dark in
+ * BOTH themes — the room's own look — for the moment a player is sold.
+ */
+export interface EmailStage {
+  /** "SOLD" */
+  readonly kicker: string;
+  /** Initials in the ring — a player photo is a signed, expiring URL, never mailed. */
+  readonly monogram: string;
+  /** "Arjun → Cup Kings" */
+  readonly title: string;
+  /** "₹75,000" — the one number, large and gold. */
+  readonly figure: string;
+  /** "3× your base · 7 bids · 3 teams" */
+  readonly line: string;
+}
+
 /** A calendar leaf: the date is the whole point of a reminder or a time change. */
 export interface EmailDateLeaf {
   /** "OCT" / "अक्टू॰" */
@@ -88,6 +105,8 @@ export interface EmailContent {
    * security alert. The words stay the template's; only the setting is code.
    */
   readonly calloutLast?: boolean;
+  /** The auction-night stage at the top of the card (a sale). Replaces the club band. */
+  readonly stage?: EmailStage;
   /** A date tile after the opening paragraphs — auction night, a changed time. */
   readonly dateLeaf?: EmailDateLeaf;
   /** The club band at the top of the card (club and season mail). */
@@ -202,6 +221,17 @@ function button(action: { label: string; url: string }, font: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="da-btn-wrap" style="margin:8px 0 24px;"><tr><td align="center" style="background:${GOLD};border:1px solid ${GOLD_EDGE};border-radius:10px;"><a class="da-btn" href="${escape(action.url)}" style="display:inline-block;padding:14px 28px;font:700 16px/20px ${font};color:${ON_GOLD};text-decoration:none;border-radius:10px;">${escape(action.label)}</a></td></tr></table>`;
 }
 
+// The stage's own palette: the Floodlight room, whatever the reader's theme.
+const STAGE_BG = "#0B1018"; // ink-900
+const STAGE_PANEL = "#101623"; // ink-850
+const STAGE_TEXT = "#C9D4E8"; // ink-200
+const STAGE_HEADING = "#F6F9FF"; // ink-50
+const STAGE_GOLD = "#F3D078"; // gold-300
+
+function stageRow(stage: EmailStage, font: string): string {
+  return `<tr><td class="da-stage" align="center" style="background:${STAGE_BG};border-radius:16px 16px 0 0;border-bottom:2px solid ${GOLD};padding:30px 32px 26px;"><div style="font:800 12px/16px ${FONT};letter-spacing:3px;color:${STAGE_GOLD};text-transform:uppercase;">${escape(stage.kicker)}</div><div style="width:80px;height:80px;border-radius:40px;border:2px solid ${GOLD};background:${STAGE_PANEL};margin:16px auto 14px;font:700 28px/80px ${FONT};color:${STAGE_HEADING};text-align:center;">${escape(stage.monogram)}</div><div style="font:700 21px/28px ${font};color:${STAGE_HEADING};">${escape(stage.title)}</div><div style="font:800 42px/50px ${FONT};color:${STAGE_GOLD};letter-spacing:-1px;font-variant-numeric:tabular-nums;margin-top:6px;">${escape(stage.figure)}</div>${stage.line === "" ? "" : `<div style="font:14px/20px ${font};color:${STAGE_TEXT};margin-top:6px;">${escape(stage.line)}</div>`}</td></tr>`;
+}
+
 /**
  * The club band: a crest (the club's initials — there is no logo to show) and
  * the season with its club and sport. Players know their tournament, not us.
@@ -284,6 +314,7 @@ body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
 @media (max-width: 520px) {
   .da-outer { padding:20px 12px 28px !important; }
   .da-body { padding:26px 22px 8px !important; }
+  .da-stage { padding-left:22px !important; padding-right:22px !important; }
   .da-band { padding-left:22px !important; padding-right:22px !important; }
   .da-btn-wrap { width:100% !important; }
   .da-btn { display:block !important; }
@@ -375,7 +406,7 @@ ${STYLE}
 </td></tr>
 <tr><td>
 <table role="article" aria-roledescription="email" aria-label="${escape(content.heading)}" lang="${language}" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-card" style="background:${CARD};border:1px solid ${RULE};border-radius:16px;">
-${content.band === undefined ? "" : bandRow(content.band, font)}
+${content.stage !== undefined ? stageRow(content.stage, font) : content.band === undefined ? "" : bandRow(content.band, font)}
 <tr><td class="da-body" style="padding:32px 36px 12px;">
 <h1 class="da-heading" style="margin:0 0 16px;font:700 24px/32px ${font};color:${INK};letter-spacing:-0.3px;">${escape(content.heading)}</h1>
 ${content.progress === undefined || content.progress.length === 0 ? "" : progressRow(content.progress, font)}
@@ -396,7 +427,16 @@ ${body}
   const actionLine =
     content.action === undefined ? [] : [`${content.action.label}: ${content.action.url}`, ""];
   const text = [
-    ...(content.band === undefined ? [] : [`${content.band.title} · ${content.band.subtitle}`, ""]),
+    ...(content.stage === undefined
+      ? []
+      : [
+          `${content.stage.kicker}: ${content.stage.title} — ${content.stage.figure}`,
+          ...(content.stage.line === "" ? [] : [content.stage.line]),
+          "",
+        ]),
+    ...(content.stage !== undefined || content.band === undefined
+      ? []
+      : [`${content.band.title} · ${content.band.subtitle}`, ""]),
     content.heading,
     "",
     ...(content.progress === undefined || content.progress.length === 0

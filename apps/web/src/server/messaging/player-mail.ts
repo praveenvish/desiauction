@@ -92,6 +92,24 @@ export interface SoldFacts {
   readonly cardUrl: string | null;
 }
 
+/** "3× your base · 7 bids · 3 teams" — the night in one line, under the price. */
+export function soldStageLine(facts: SoldFacts, language: MessageLanguage): string {
+  const hi = language === "hi";
+  const parts: string[] = [];
+  if (facts.multiple !== null && facts.multiple >= 1.5) {
+    const times = String(Math.round(facts.multiple * 10) / 10);
+    parts.push(hi ? `बेस प्राइस का ${times} गुना` : `${times}× your base`);
+  }
+  if (facts.bidCount > 1) {
+    parts.push(hi ? `${String(facts.bidCount)} बोलियाँ` : `${String(facts.bidCount)} bids`);
+  }
+  const teams = new Set(facts.bidders).size;
+  if (teams > 1) {
+    parts.push(hi ? `${String(teams)} टीमें` : `${String(teams)} teams`);
+  }
+  return parts.join(" · ");
+}
+
 /** "Cup Kings, Tigers and Falcons all bid for you — 7 bids …" */
 export function bidStory(facts: SoldFacts, language: MessageLanguage = "en"): string {
   const rivals = facts.bidders.filter((team) => team !== facts.teamName);
@@ -174,6 +192,15 @@ export function soldMail(
       shareLine: facts.cardUrl === null ? "" : SHARE_CARD_LINE[language],
     },
     {
+      // The auction room's own moment: the price large and gold, on the stage.
+      stage: {
+        kicker: "Sold",
+        monogram: monogramOf(facts.name),
+        title: `${facts.name} → ${facts.teamName}`,
+        figure: facts.price,
+        line: soldStageLine(facts, language),
+      },
+      progress: journey(3, language),
       details: facts.squad.map((line) => localLine(line, language)),
       action:
         facts.cardUrl === null
@@ -190,16 +217,19 @@ export function unsoldMail(
     readonly name: string;
     readonly season: string;
     readonly orgName: string;
+    readonly seasonSlug?: string;
+    readonly sport?: string;
   },
   language: MessageLanguage = "en",
 ): Promise<ComposedMail> {
   // Said plainly and kindly. Never by SMS (founder decision): a text that
-  // just says "unsold" lands too hard.
+  // just says "unsold" lands too hard. The club band, and no tracker: a row
+  // of steps they did not take is not a kindness (C-23).
   return renderNotificationEmail(
     "auction.unsold",
     language,
     { name: facts.name, season: facts.season, orgName: facts.orgName },
-    { action: { id: "season", url: seasonUrl() } },
+    { action: { id: "season", url: seasonUrl() }, band: seasonBand(facts) },
   );
 }
 
@@ -442,6 +472,9 @@ export interface OwnerSummaryFacts {
    * asks the owner to share it.
    */
   readonly shareUrl?: string | null;
+  /** The club and sport, for the band at the top (outcome-mail.ts). */
+  readonly orgName?: string;
+  readonly sport?: string;
 }
 
 export function ownerSummaryMail(
@@ -478,6 +511,15 @@ export function ownerSummaryMail(
       // the console's teams page as before.
       action:
         shareUrl === null ? { id: "team", url: facts.teamUrl } : { id: "share", url: shareUrl },
+      ...(facts.orgName === undefined
+        ? {}
+        : {
+            band: seasonBand({
+              season: facts.season,
+              orgName: facts.orgName,
+              ...(facts.sport === undefined ? {} : { sport: facts.sport }),
+            }),
+          }),
     },
   );
 }

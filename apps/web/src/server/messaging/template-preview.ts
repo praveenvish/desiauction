@@ -210,6 +210,52 @@ function reminderFrame(variant: string, language: MessageLanguage): Partial<Rend
   };
 }
 
+/** The auction's results, with the samples: the sale's stage, the bands, the organizer's pack. */
+function resultsFrame(
+  kind: EmailNotificationKind,
+  language: MessageLanguage,
+): Partial<RenderOptions> {
+  const samples = sampleVariables(EMAIL_TEMPLATES[kind], language);
+  const band = seasonBand({
+    season: String(samples["season"] ?? ""),
+    orgName: String(
+      samples["orgName"] ?? (language === "hi" ? "मलाड क्रिकेट क्लब" : "Malad Cricket Club"),
+    ),
+    sport: "cricket",
+  });
+  switch (kind) {
+    case "auction.sold":
+      return {
+        stage: {
+          kicker: "Sold",
+          monogram: "AS",
+          title: `${String(samples["name"] ?? "")} → ${String(samples["teamName"] ?? "")}`,
+          figure: String(samples["price"] ?? ""),
+          line:
+            language === "hi"
+              ? "बेस प्राइस का 3 गुना · 7 बोलियाँ · 3 टीमें"
+              : "3× your base · 7 bids · 3 teams",
+        },
+        progress: journey(3, language),
+      };
+    case "auction.unsold":
+    case "auction.owner_summary":
+      return { band };
+    case "auction.results":
+      return {
+        band,
+        progress: organizerJourney(4, language),
+        details: [
+          ["Cup Kings", language === "hi" ? "₹2,10,000 · 9 खिलाड़ी" : "₹2,10,000 · 9 players"],
+          ["Tigers", language === "hi" ? "₹1,90,000 · 8 खिलाड़ी" : "₹1,90,000 · 8 players"],
+          ["Falcons", language === "hi" ? "₹1,75,000 · 8 खिलाड़ी" : "₹1,75,000 · 8 players"],
+        ],
+      };
+    default:
+      return {};
+  }
+}
+
 function seasonFrame(
   kind: EmailNotificationKind,
   language: MessageLanguage,
@@ -250,5 +296,6 @@ export function previewOptions(
     ...(kind === "auction.schedule" ? scheduleFrame(variant, language) : {}),
     ...ownerFrame(kind, language),
     ...(kind === "auction.reminder" ? reminderFrame(variant, language) : {}),
+    ...resultsFrame(kind, language),
   };
 }

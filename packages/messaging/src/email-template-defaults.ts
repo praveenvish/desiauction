@@ -437,11 +437,6 @@ const RECEIVED: EmailTemplateSpec = {
 
 // --- The season ------------------------------------------------------------------
 
-const AUCTION_FOOTNOTE_SWITCH = {
-  en: 'Switch off "Auction updates" in your account to stop these.',
-  hi: 'ये मेल बंद करने के लिए अपने अकाउंट में "Auction updates" बंद करें।',
-};
-
 const SEASON_ACTION = { id: "season", description: "The player's home, with the season on it." };
 const SEE_SEASON = { en: "See your season", hi: "अपना सीज़न देखें" };
 
@@ -823,6 +818,76 @@ const AUCTION_REMINDER: EmailTemplateSpec = {
   },
 };
 
+// --- The organizer's results pack (email programme PR9) --------------------------
+
+const AUCTION_RESULTS: EmailTemplateSpec = {
+  kind: "auction.results",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "results", description: "The season's auction page, with every lot and team." }],
+  variables: [
+    NAME,
+    SEASON,
+    text("soldCount", "Players sold.", "38", "38", { computed: true, required: true }),
+    text("poolCount", "Players who went under the hammer.", "43", "43", { computed: true }),
+    text("spent", "What every team spent together.", "₹12,40,000", "₹12,40,000", {
+      computed: true,
+    }),
+    {
+      name: "topBuys",
+      description: "The night's top buys, one line each — a paragraph on its own.",
+      type: "list",
+      computed: true,
+      sample: {
+        en: ["Arjun Sharma — Cup Kings, ₹75,000", "Rohit Nair — Tigers, ₹60,000"],
+        hi: ["अर्जुन शर्मा — कप किंग्स, ₹75,000", "रोहित नायर — टाइगर्स, ₹60,000"],
+      },
+    },
+  ],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{season}} auction: {{soldCount}} players sold, {{spent}} spent",
+        preheader: "Every team, what it spent, and the night's top buys.",
+        heading: "The auction is done",
+        paragraphs: [
+          "Hi {{name}},",
+          "{{soldCount}} of {{poolCount}} players were sold in the {{season}} auction, for {{spent}} in all. The night's top buys:",
+          "{{topBuys}}",
+          "Here's what each team spent:",
+        ],
+        after: [
+          "Every player has been told by email where they went, and every owner has their squad. Next: fixtures.",
+        ],
+        actions: { results: "See the full results" },
+        footnote: "You received this because you run {{season}} on DesiAuction.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} की नीलामी: {{soldCount}} खिलाड़ी बिके, {{spent}} ख़र्च",
+        preheader: "हर टीम, उसका ख़र्च, और रात की सबसे बड़ी ख़रीदें।",
+        heading: "नीलामी पूरी हो गई",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{season}} की नीलामी में {{poolCount}} में से {{soldCount}} खिलाड़ी बिके, कुल {{spent}} में। रात की सबसे बड़ी ख़रीदें:",
+          "{{topBuys}}",
+          "हर टीम ने कितना ख़र्च किया:",
+        ],
+        after: [
+          "हर खिलाड़ी को ईमेल से बता दिया गया है कि वे किस टीम में गए, और हर मालिक को उसकी टीम मिल गई है। आगे: मैच।",
+        ],
+        actions: { results: "पूरे नतीजे देखें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+      }),
+    ),
+  },
+};
+
 const SOLD: EmailTemplateSpec = {
   kind: "auction.sold",
   format: "layout",
@@ -881,11 +946,9 @@ const SOLD: EmailTemplateSpec = {
       layout({
         subject: "Congratulations — {{teamName}} bought you for {{price}}",
         preheader: "{{teamName}} bought you in the {{season}} auction.",
-        heading: "You're a {{teamName}} player",
+        heading: "Congratulations, {{name}}",
         paragraphs: [
-          "Congratulations, {{name}}!",
-          "{{teamName}} bought you for {{price}} in the {{season}} auction{{multipleNote}}.",
-          "{{bidStory}}",
+          "You're a {{teamName}} player. {{bidStory}}",
           "{{highlight}}.",
           "{{shareLine}}",
         ],
@@ -893,18 +956,16 @@ const SOLD: EmailTemplateSpec = {
           "That is your squad so far at {{teamName}}. Your organizer, {{orgName}}, will share fixtures next.",
         ],
         actions: { card: "Share your player card", season: SEE_SEASON.en },
-        footnote: `You received this because you played in the {{season}} auction. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because you played in the {{season}} auction.`,
       }),
     ),
     hi: one(
       layout({
         subject: "बधाई हो — {{teamName}} ने आपको {{price}} में खरीदा",
         preheader: "{{season}} की नीलामी में {{teamName}} ने आपको खरीदा।",
-        heading: "अब आप {{teamName}} के खिलाड़ी हैं",
+        heading: "बधाई हो, {{name}}",
         paragraphs: [
-          "बधाई हो, {{name}}!",
-          "{{season}} की नीलामी में {{teamName}} ने आपको {{price}} में खरीदा{{multipleNote}}।",
-          "{{bidStory}}",
+          "अब आप {{teamName}} के खिलाड़ी हैं। {{bidStory}}",
           "{{highlight}}।",
           "{{shareLine}}",
         ],
@@ -912,7 +973,7 @@ const SOLD: EmailTemplateSpec = {
           "यह {{teamName}} में अब तक की आपकी टीम है। आपके आयोजक, {{orgName}}, आगे मैचों की जानकारी देंगे।",
         ],
         actions: { card: "अपना प्लेयर कार्ड शेयर करें", season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में थे। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में थे।`,
       }),
     ),
   },
@@ -941,7 +1002,7 @@ const UNSOLD: EmailTemplateSpec = {
           "You're still registered with {{orgName}}, and organizers often bring players in as replacements during the season.",
         ],
         actions: { season: SEE_SEASON.en },
-        footnote: `You received this because you registered for {{season}}. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because you registered for {{season}}.`,
       }),
     ),
     hi: one(
@@ -955,7 +1016,7 @@ const UNSOLD: EmailTemplateSpec = {
           "आप अभी भी {{orgName}} के साथ रजिस्टर्ड हैं, और सीज़न के दौरान आयोजक अक्सर खिलाड़ियों को रिप्लेसमेंट के तौर पर बुलाते हैं।",
         ],
         actions: { season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि आपने {{season}} के लिए रजिस्टर किया था। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि आपने {{season}} के लिए रजिस्टर किया था।`,
       }),
     ),
   },
@@ -1094,7 +1155,7 @@ const APPOINTED: EmailTemplateSpec = {
           "{{ifSignedDirect}}You join {{teamName}} directly, without going through the auction.",
         ],
         actions: { season: SEE_SEASON.en },
-        footnote: `You received this because {{orgName}} named you in {{season}}. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because {{orgName}} named you in {{season}}.`,
       }),
     ),
     hi: one(
@@ -1109,7 +1170,7 @@ const APPOINTED: EmailTemplateSpec = {
           "{{ifSignedDirect}}आप नीलामी में जाए बिना सीधे {{teamName}} में शामिल हो रहे हैं।",
         ],
         actions: { season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि {{orgName}} ने {{season}} में आपको यह भूमिका दी। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि {{orgName}} ने {{season}} में आपको यह भूमिका दी।`,
       }),
     ),
   },
@@ -1163,7 +1224,7 @@ const SQUAD_SHEET: EmailTemplateSpec = {
           "Your first match: {{firstMatch}}.",
         ],
         actions: { season: SEE_SEASON.en },
-        footnote: `You received this because you play for {{teamName}} in {{season}}. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because you play for {{teamName}} in {{season}}.`,
       }),
     ),
     hi: one(
@@ -1181,7 +1242,7 @@ const SQUAD_SHEET: EmailTemplateSpec = {
           "आपका पहला मैच: {{firstMatch}}।",
         ],
         actions: { season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं।`,
       }),
     ),
   },
@@ -1228,7 +1289,7 @@ const LINEUP: EmailTemplateSpec = {
         ],
         after: ["Good luck!"],
         actions: { season: SEE_SEASON.en },
-        footnote: `You received this because you play for {{teamName}} in {{season}}. ${AUCTION_FOOTNOTE_SWITCH.en}`,
+        footnote: `You received this because you play for {{teamName}} in {{season}}.`,
       }),
     ),
     hi: one(
@@ -1242,7 +1303,7 @@ const LINEUP: EmailTemplateSpec = {
         ],
         after: ["शुभकामनाएँ!"],
         actions: { season: SEE_SEASON.hi },
-        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं। ${AUCTION_FOOTNOTE_SWITCH.hi}`,
+        footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं।`,
       }),
     ),
   },
@@ -2176,6 +2237,7 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "owner.invite": OWNER_INVITE,
   "auction.owners_ready": OWNERS_READY,
   "auction.reminder": AUCTION_REMINDER,
+  "auction.results": AUCTION_RESULTS,
   "auction.sold": SOLD,
   "auction.unsold": UNSOLD,
   "auction.owner_summary": OWNER_SUMMARY,

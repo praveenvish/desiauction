@@ -458,6 +458,16 @@ const ENTRIES = [
     channels: ["email", "in_app"],
     orgControllable: false,
   },
+  {
+    key: "auction.results",
+    label: "Auction results",
+    description: "When the auction completes: players sold, what each team spent, the top buys.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    orgControllable: false,
+  },
   // --- Strangers: a demo requester, a person reporting a problem -------------
   {
     key: "demo.request_received",

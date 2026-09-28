@@ -24,6 +24,7 @@ import {
   renderEmail,
   type EmailBand,
   type EmailDateLeaf,
+  type EmailStage,
   type EmailStep,
 } from "./email-layout";
 import { isSelfManagedKind } from "./unsubscribe";
@@ -114,6 +115,8 @@ export interface RenderOptions {
   readonly progress?: readonly EmailStep[];
   /** A date tile — auction night (auction-schedule-mail.ts). */
   readonly dateLeaf?: EmailDateLeaf;
+  /** The auction-night stage — a sale (player-mail.ts `soldMail`). */
+  readonly stage?: EmailStage;
 }
 
 /**
@@ -149,6 +152,7 @@ export function composeNotificationEmail(
     ...(options.band === undefined ? {} : { band: options.band }),
     ...(options.progress === undefined ? {} : { progress: options.progress }),
     ...(options.dateLeaf === undefined ? {} : { dateLeaf: options.dateLeaf }),
+    ...(options.stage === undefined ? {} : { stage: options.stage }),
     ...(filled.after.length === 0 ? {} : { after: filled.after }),
     footnote: filled.footnote,
     ...(layout.noLinks === true ? { noLinks: true } : {}),
