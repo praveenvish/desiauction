@@ -484,3 +484,234 @@
 .plan-panel .competition-title-row {
   justify-content: flex-start;
 }
+
+/* ---- After the night: the squad hero, the roster, the footnote ---- */
+
+.plan-hero {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.plan-hero-id {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* The team's own colour where it has one; the season's gold where not. */
+.plan-hero-crest {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: var(--plan-team, var(--accent));
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.14);
+  color: #fff;
+  font-size: var(--text-lg-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 0.35);
+}
+
+.plan-hero-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-hero-title h2 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xl-size);
+  color: var(--text-heading);
+}
+
+.plan-hero-title > span {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.plan-hero-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.plan-hero-figures > div {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-hero-figures dt {
+  grid-row: 2;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.plan-hero-figures dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-2xl-size);
+  line-height: 1.2;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.plan-hero-figures dd span {
+  color: var(--text-muted);
+}
+
+/* The sub-line wraps rather than clip ("10 bought + 2 p…" on a phone). */
+.plan-hero-figures dd.plan-hero-sub {
+  grid-row: 3;
+  overflow: visible;
+  white-space: normal;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-muted);
+}
+
+.plan-mix {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.plan-mix-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+}
+
+.plan-mix-bar > span,
+.plan-mix-key {
+  background: var(--accent);
+}
+
+.plan-mix [data-slot="1"] {
+  background: var(--info-base);
+}
+
+.plan-mix [data-slot="2"] {
+  background: var(--violet-base);
+}
+
+.plan-mix [data-slot="3"] {
+  background: var(--success-base);
+}
+
+.plan-mix [data-slot="4"] {
+  background: var(--text-muted);
+}
+
+.plan-mix [data-slot="5"] {
+  background: var(--border-strong);
+}
+
+.plan-mix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.plan-mix-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plan-mix-legend strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.plan-mix-key {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.plan-roster-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.plan-roster-head h2 {
+  margin: 0;
+}
+
+.plan-roster-head span {
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+/* The list fills the card: two columns wherever two fit. */
+.plan-roster-list {
+  display: grid;
+  column-gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 900px) {
+  .plan-roster-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.plan-foot {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0 var(--space-1);
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+@media (max-width: 519px) {
+  .plan-hero {
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .plan-hero-crest {
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+  }
+
+  .plan-hero-figures {
+    gap: var(--space-3);
+  }
+
+  .plan-hero-figures dd {
+    font-size: var(--text-lg-size);
+  }
+}
