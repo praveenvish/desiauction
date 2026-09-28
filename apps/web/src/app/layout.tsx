@@ -19,7 +19,7 @@ import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
 import { platformDoorCapabilities } from "../server/admin/actions";
 import { currentSession, logoutAction } from "../server/auth/actions";
-import { latestSecurityEventAt } from "../server/auth/security-events";
+import { inboxState } from "../server/auth/security-events";
 import { competitionsView } from "../server/competition/actions";
 import { myOrgs } from "../server/orgs/actions";
 import { rolesOf } from "../server/roles/roles";
@@ -130,7 +130,7 @@ export default async function RootLayout({
     competitionsView_: null as Awaited<ReturnType<typeof competitionsView>> | null,
     settlementOrgs: new Set<string>(),
     financeOrgs: new Set<string>(),
-    latestEventAt: null as string | null,
+    unreadCount: 0,
     platform: [] as Awaited<ReturnType<typeof platformDoorCapabilities>>,
     roles: null as Awaited<ReturnType<typeof rolesOf>> | null,
     registered: [] as Awaited<ReturnType<typeof myRegistrations>>,
@@ -139,13 +139,13 @@ export default async function RootLayout({
   if (session !== null) {
     const personId = session.personId;
     try {
-      const [orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, platform, lens] =
+      const [orgs, competitionsView_, settlementOrgs, financeOrgs, unreadCount, platform, lens] =
         await Promise.all([
           myOrgs(),
           competitionsView(),
           settlementOrgIds().then((ids) => new Set(ids)),
           finopsOrgIds().then((ids) => new Set(ids)),
-          latestSecurityEventAt(personId).then((at) => at?.toISOString() ?? null),
+          inboxState(personId).then((state) => state.unread),
           platformDoorCapabilities(),
           rolesOf(personId).then(async (roles) => ({
             roles,
@@ -157,7 +157,7 @@ export default async function RootLayout({
         competitionsView_,
         settlementOrgs,
         financeOrgs,
-        latestEventAt,
+        unreadCount,
         platform,
         roles: lens.roles,
         registered: lens.registered,
@@ -168,7 +168,7 @@ export default async function RootLayout({
       session = null;
     }
   }
-  const { orgs, competitionsView_, settlementOrgs, financeOrgs, latestEventAt, platform, roles } =
+  const { orgs, competitionsView_, settlementOrgs, financeOrgs, unreadCount, platform, roles } =
     shell;
   /*
    * WHAT THE MENU OFFERS THIS PERSON (RN-1). Facts in, menu out — `nav.ts`
@@ -310,7 +310,7 @@ export default async function RootLayout({
               competitions={competitions}
               serverAction={action}
               navRoles={navRoles}
-              latestEventAt={latestEventAt}
+              unreadCount={unreadCount}
               logout={logoutAction}
             >
               {children}

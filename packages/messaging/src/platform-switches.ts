@@ -2,11 +2,15 @@ import { notificationChannels, notificationSwitches, type Db } from "@desiauctio
 
 import {
   NOTIFICATIONS,
+  PERSON_CHANNEL_ROWS,
   isNotificationKind,
   notificationOf,
   orgTopics,
   personTopics,
+  rowChannelOf,
   type NotificationChannel,
+  type NotificationTopic,
+  type PersonChannelRow,
   type ResolvedNotification,
   type SwitchTopic,
 } from "./catalogue";
@@ -155,6 +159,27 @@ export function personSwitchTopics(snapshot: PlatformSwitches): SwitchTopic[] {
       (entry) => entry.topic === topic.topic && personControllableSomewhere(snapshot, entry),
     ),
   );
+}
+
+/**
+ * The switch ROWS a person has for one topic, as the platform leaves them
+ * (email programme PR17): a channel appears while some kind in the topic is
+ * sent on it and is still the person's to switch on that channel.
+ */
+export function personSwitchChannels(
+  snapshot: PlatformSwitches,
+  topic: NotificationTopic,
+): PersonChannelRow[] {
+  const rows = new Set<PersonChannelRow>();
+  for (const entry of NOTIFICATIONS) {
+    if (entry.topic !== topic) continue;
+    for (const channel of entry.channels) {
+      if (effectiveOn(snapshot, entry, channel).personControllable) {
+        rows.add(rowChannelOf(channel));
+      }
+    }
+  }
+  return PERSON_CHANNEL_ROWS.filter((row) => rows.has(row));
 }
 
 /** The /org switches, likewise. */

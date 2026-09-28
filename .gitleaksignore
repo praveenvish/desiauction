@@ -4,3 +4,9 @@
 # Picker API and our own origins. The sample now carries placeholders; this
 # entry only stops the scanner re-flagging the historical commit.
 876ee9cb64d5120668f24ddbea23b0ef46be05f0:.env.example:gcp-api-key:88
+
+# The RFC 8291 Appendix A test vector in the web push test (email programme
+# PR18): the example browser auth secret published in the RFC itself, used to
+# prove our encryption matches the standard byte for byte. Public by design —
+# not a credential of ours.
+b723d33622d7ed4db27d69121f341d7fae3e2ff5:packages/messaging/src/web-push.test.ts:generic-api-key:56

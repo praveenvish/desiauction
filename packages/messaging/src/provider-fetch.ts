@@ -34,7 +34,12 @@ export interface ProviderResponse {
  */
 export async function providerFetch(
   url: string,
-  init: { method: string; headers: Record<string, string>; body?: string },
+  /** A binary body is a web push (web-push.ts): encrypted bytes, never text. */
+  init: {
+    method: string;
+    headers: Record<string, string>;
+    body?: string | Uint8Array<ArrayBuffer>;
+  },
   /** Tests shorten it; nothing else should. */
   timeoutMs: number = PROVIDER_TIMEOUT_MS,
 ): Promise<ProviderResponse> {
