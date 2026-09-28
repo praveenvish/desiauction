@@ -376,15 +376,8 @@ const ADMIN_SECTIONS: readonly Omit<AdminSection, "dividerBefore">[] = [
     capability: "platform.admin",
     group: "commercial",
   },
-  {
-    key: "messaging",
-    label: "Messaging",
-    href: "/admin/messaging",
-    capability: "platform.admin",
-    group: "commercial",
-  },
-  // Switches every message the platform sends — so its own door, beside the
-  // read-only messaging view rather than inside it.
+  // Switches every message the platform sends; its tabs hold the templates,
+  // delivery and suppressions the old read-only Messaging page repeated.
   {
     key: "notifications",
     label: "Notifications",
@@ -431,7 +424,7 @@ const ADMIN_INLINE_MAX = 7;
 const ADMIN_MENU_GROUPS: readonly { label: string; keys: readonly string[] }[] = [
   { label: "Trust & safety", keys: ["moderation", "erasure", "reports"] },
   { label: "Growth", keys: ["passes", "demos", "reviews", "newsletter"] },
-  { label: "Comms", keys: ["messaging", "notifications"] },
+  { label: "Comms", keys: ["notifications"] },
 ];
 
 export interface AdminNavLayout {
@@ -488,9 +481,6 @@ export function activeAdminTab(pathname: string): string {
   }
   if (pathname.startsWith("/admin/health")) {
     return "health";
-  }
-  if (pathname.startsWith("/admin/messaging")) {
-    return "messaging";
   }
   if (pathname.startsWith("/admin/notifications")) {
     return "notifications";
@@ -561,7 +551,6 @@ const SECTION_LABELS: [RegExp, string][] = [
   // title "Platform admin" directly beneath a breadcrumb reading "Platform
   // admin", since `pageIdentity` falls back to the surface name when a section
   // has no label.
-  [/^\/admin\/messaging$/, "Messaging"],
   [/^\/admin\/notifications\/suppressions$/, "Suppressions"],
   [/^\/admin\/notifications\/analytics$/, "Delivery analytics"],
   [/^\/admin\/notifications\/[^/]+\/email$/, "Email wording"],

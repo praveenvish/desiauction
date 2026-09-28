@@ -222,10 +222,13 @@ export function OverviewPanel({
                 Platform health
                 <IconArrowRight size={16} aria-hidden />
               </Link>
-              {/* Whether the deployment holds the registered DLT ids it needs is
-                  a health fact like any other — without an id a message shape
-                  does not send at all. */}
-              <Link href="/admin/messaging" className="adm-link" data-testid="admin-messaging-link">
+              {/* Whether each message can go out on each channel — gateways,
+                  registered templates, approvals — is Notifications' to say. */}
+              <Link
+                href="/admin/notifications"
+                className="adm-link"
+                data-testid="admin-messaging-link"
+              >
                 Messaging
                 <IconArrowRight size={16} aria-hidden />
               </Link>

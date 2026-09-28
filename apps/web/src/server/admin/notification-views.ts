@@ -11,7 +11,12 @@ import {
   type NotificationChannel,
   type NotificationTopic,
 } from "../messaging/catalogue";
-import { notConfiguredCause, type TemplateReadiness } from "../messaging/delivery-readiness";
+import {
+  notConfiguredCause,
+  smsRoute,
+  type SmsRoute,
+  type TemplateReadiness,
+} from "../messaging/delivery-readiness";
 import {
   loadProviderTemplateMappings,
   NO_MAPPINGS,
@@ -177,6 +182,8 @@ export interface NotificationCenter {
   readonly groups: readonly GridGroup[];
   readonly recent: readonly RecentChange[];
   readonly windowDays: number;
+  /** Where a text goes on this server — the SMS card says it, not "Live". */
+  readonly smsRoute: SmsRoute;
 }
 
 /** The grid's sections, in the catalogue's order. */
@@ -434,6 +441,7 @@ export async function notificationControlCenter(
     }),
     recent,
     windowDays: WINDOW_DAYS,
+    smsRoute: smsRoute(envRecord),
   };
 }
 

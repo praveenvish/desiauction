@@ -7,6 +7,7 @@ import type {
   GridRow,
   RecentChange,
 } from "../../../server/admin/notification-views";
+import type { SmsRoute } from "../../../server/messaging/delivery-readiness";
 import { formatCount } from "../../../lib/plural";
 
 /**
@@ -18,7 +19,11 @@ import { formatCount } from "../../../lib/plural";
 
 /* ── The channel strip ─────────────────────────────────────────────────── */
 
-export type ChannelHealthState = "live" | "not_set_up" | "off";
+/**
+ * `dev_inbox`: SMS with no gateway, written to the development inbox. It sends
+ * — the grid's cells are ready — but reaches nobody, so it is never "Live".
+ */
+export type ChannelHealthState = "live" | "dev_inbox" | "not_set_up" | "off";
 
 export interface ChannelHealth {
   readonly channel: ChannelSwitchView["channel"];
@@ -89,6 +94,8 @@ export function channelHealth(
   channels: readonly ChannelSwitchView[],
   groups: readonly GridGroup[],
   windowDays: number,
+  /** Where a text goes on this server; only SMS reads it. */
+  smsRoute: SmsRoute = "gateway",
 ): ChannelHealth[] {
   return channels.map((channel) => {
     const cells = cellsOn(groups, channel.channel);
@@ -121,6 +128,14 @@ export function channelHealth(
         blocked: blockedCells.length,
       };
     }
+    if (channel.channel === "sms" && smsRoute === "dev_inbox") {
+      return {
+        ...base,
+        state: "dev_inbox",
+        line: "Goes to the development inbox — no SMS gateway is set up",
+        blocked: blockedCells.length,
+      };
+    }
     return {
       ...base,
       state: "live",
@@ -140,6 +155,10 @@ export function channelHealth(
 export function channelShort(health: ChannelHealth): string {
   if (health.state === "off") return "Switched off";
   if (health.state === "not_set_up") return `${formatCount(health.blocked)} waiting`;
+  // The pill already says "Dev inbox"; the phrase is what went there.
+  if (health.state === "dev_inbox") {
+    return health.sent > 0 ? `${formatCount(health.sent)} written` : "Nothing written";
+  }
   if (health.failed > 0) return `${formatCount(health.failed)} failed`;
   if (health.sent > 0) return `${formatCount(health.sent)} sent`;
   return "Nothing sent";

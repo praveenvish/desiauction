@@ -95,6 +95,7 @@ describe("an SMS template, the counts and the Clear item", () => {
     kind: "k",
     label: "K",
     mapped: mapped({ handle, source: handle === null ? "unset" : "env" }),
+    text: "DesiAuction: {code}",
   });
 
   it("is Mapped with an id, Not set without", () => {

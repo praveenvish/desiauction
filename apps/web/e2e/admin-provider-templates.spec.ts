@@ -82,7 +82,7 @@ test("an admin maps a WhatsApp template, the grid follows, and clearing goes bac
   await expect(page.getByTestId("tpl-refresh")).toHaveCount(0);
   // The sign-in template is shown, read-only.
   await expect(page.getByTestId("tpl-otp")).toContainText("Read-only");
-  // SMS is dormant in the harness, and says so — in the one set-up banner.
+  // SMS has no gateway in the harness (dev inbox), and says so — in the one set-up banner.
   await expect(page.getByTestId("tpl-sms")).toBeVisible();
   await expect(page.getByTestId("tpl-sms-dormant")).toBeVisible();
 

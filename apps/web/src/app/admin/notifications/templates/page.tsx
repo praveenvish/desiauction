@@ -1,3 +1,4 @@
+import type { SmsRoute } from "../../../../server/messaging/delivery-readiness";
 import { EmptyState, IconInfo, IconLock, Notice, Pill, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -13,6 +14,7 @@ import {
 } from "../../../../server/admin/provider-template-views";
 import { RecentFold, RelativeTime } from "../../admin-ui";
 import {
+  CopyEnvName,
   MapTemplate,
   RefreshFromMeta,
   RevertTemplate,
@@ -108,14 +110,34 @@ const SOURCE: Record<MappedView["source"], { label: string }> = {
 
 /* ── What is not set up, said once ─────────────────────────────────────── */
 
-const SETUP_LINE: Record<SetupLine["key"], ReactNode> = {
+/** The SMS line is drawn only when there is no gateway; this says which kind. */
+function smsRouteOff(view: ProviderTemplatesView): Exclude<SmsRoute, "gateway"> {
+  return view.smsRoute === "dev_inbox" ? "dev_inbox" : "none";
+}
+
+/** Where a text goes when there is no gateway, in the page's words. */
+const SMS_LINE: Record<Exclude<SmsRoute, "gateway">, ReactNode> = {
+  dev_inbox: (
+    <>
+      SMS goes to the development inbox on this server — no gateway is set up. DLT IDs mapped here
+      take effect once <code>MSG91_AUTH_KEY</code> is.
+    </>
+  ),
+  none: (
+    <>
+      SMS is not set up on this server (no <code>MSG91_AUTH_KEY</code>): no text goes out, whatever
+      is mapped here.
+    </>
+  ),
+};
+
+const SETUP_LINE: Record<Exclude<SetupLine["key"], "sms">, ReactNode> = {
   whatsapp: (
     <>
       WhatsApp is not set up on this server (no phone number ID or token): nothing goes on WhatsApp
       yet, whatever is mapped here.
     </>
   ),
-  sms: <>SMS is dormant — DLT is not configured (no MSG91 key). IDs mapped here wait for it.</>,
   sync: (
     <>
       Status sync is off: set <code>WHATSAPP_BUSINESS_ACCOUNT_ID</code> to read Meta&rsquo;s
@@ -138,7 +160,7 @@ function SetupBanner({ view }: { view: ProviderTemplatesView }) {
       <ul className="ptpl-setup">
         {lines.map((line) => (
           <li key={line.key} data-testid={line.testId}>
-            {SETUP_LINE[line.key]}
+            {line.key === "sms" ? SMS_LINE[smsRouteOff(view)] : SETUP_LINE[line.key]}
           </li>
         ))}
       </ul>
@@ -225,17 +247,15 @@ function Mapped({ mapped, testId }: { mapped: MappedView; testId: string }) {
           {mapped.note === null ? null : ` · ${mapped.note}`}
         </span>
       ) : null}
-      <span
-        className="ptpl-meta ptpl-env"
-        title={`Server setting ${mapped.envVar}: ${mapped.envValue ?? "unset"}`}
-      >
-        <span className="admin-sr-only">Server setting </span>
-        <code>{mapped.envVar}</code>
-        {mapped.envValue === null ? (
-          <span className="admin-sr-only">: unset</span>
-        ) : (
-          <span>: {mapped.envValue}</span>
-        )}
+      {/* Only the name gives way on a narrow row; the copy button and the
+          value (or "not set") always show. */}
+      <span className="ptpl-meta ptpl-env">
+        <span className="ptpl-env-label">Server setting</span>
+        <code title={mapped.envVar}>{mapped.envVar}</code>
+        <CopyEnvName name={mapped.envVar} />
+        <span className="ptpl-env-value">
+          {mapped.envValue === null ? "not set" : mapped.envValue}
+        </span>
       </span>
     </span>
   );
@@ -409,6 +429,10 @@ function SmsKindRow({ row }: { row: SmsRow }) {
       <span className="ptpl-what">
         <Mapped mapped={row.mapped} testId={`tpl-sms-id-${row.kind}`} />
       </span>
+      {/* The words DLT registered — what the ID in this row stands for. */}
+      <p className="ptpl-note-line ptpl-sms-text" data-testid={`tpl-sms-text-${row.kind}`}>
+        {row.text}
+      </p>
       <span className="ptpl-actions">
         <MapTemplate
           kind={row.kind}
