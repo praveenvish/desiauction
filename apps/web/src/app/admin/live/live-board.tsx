@@ -10,7 +10,9 @@ import {
   IconChevronDown,
   IconClock,
   IconGavel,
+  IconShieldCheck,
   IconUsers,
+  Notice,
   Pill,
   SectionCard,
   StatCard,
@@ -26,11 +28,14 @@ import type { LiveAuctionRow } from "../../../server/admin/live-views";
 import { KpiValue } from "../admin-ui";
 import { LiveFreshness } from "../live-freshness";
 import { STUCK_LABEL, engineTrouble, roomBadge } from "../room-state";
+import { biddingNow, engineHealth, goneQuiet, nothingBiddingLine } from "./live-model";
 import { ageLabel, istWhen, usePolled } from "../use-polled";
 
 const REFRESH_MS = 10_000;
 /** "Never closed" is a backlog, not a feed: the longest-silent tail folds away. */
 const STALE_SHOWN = 10;
+/** Rooms gone quiet: the most recent few, the rest behind "Show all". */
+const QUIET_SHOWN = 10;
 /** The last day's closes: the newest few, the rest behind "Show all". */
 const ENDED_SHOWN = 5;
 
@@ -51,7 +56,12 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
       sum + (room.state === "loaded" || room.state === "idle" ? room.connectedClients : 0),
     0,
   );
-  const troubled = data.running.filter((row) => engineTrouble(data.engine[row.auctionId]) !== null);
+  const bidding = biddingNow(data.running);
+  const quiet = goneQuiet(data.running);
+  const health = engineHealth(data.running, data.engine, (room) => engineTrouble(room) !== null);
+  // With the engine down everywhere, that is ONE fact: the notice says it and
+  // the rows stop repeating it twenty times.
+  const engineDown = health.kind === "down";
 
   return (
     <>
@@ -67,9 +77,9 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
       <StatGrid testId="live-summary">
         <StatCard
           icon={<IconGavel />}
-          concept="auction"
-          value={<KpiValue n={data.running.length} />}
-          label="Auctions running"
+          concept={bidding.length > 0 ? "auction" : "neutral"}
+          value={<KpiValue n={bidding.length} />}
+          label="Bidding now"
         />
         <StatCard
           icon={<IconBolt />}
@@ -83,33 +93,41 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
           value={<KpiValue n={connected} />}
           label="People connected"
         />
-        <StatCard
-          icon={<IconAlert />}
-          concept={troubled.length > 0 ? "alert" : "neutral"}
-          value={<KpiValue n={troubled.length} />}
-          label="Rooms with engine trouble"
-        />
+        <EngineTile health={health} />
       </StatGrid>
+
+      {engineDown ? (
+        <Notice
+          tone="danger"
+          icon={<IconAlert size={20} />}
+          title="The engine isn't answering"
+          testId="live-engine-down"
+        >
+          None of the {health.asked} open {health.asked === 1 ? "room" : "rooms"} it was asked about
+          replied, so nobody can bid anywhere until it is back. The rooms themselves are intact in
+          the database. <Link href="/admin/health">Check system health</Link>
+        </Notice>
+      ) : null}
 
       <SectionCard
         icon={<IconBroadcast />}
-        tone={data.running.length > 0 ? "green" : "neutral"}
-        title="Running now"
+        tone={bidding.length > 0 ? "green" : "neutral"}
+        title="Bidding now"
         description={
-          data.running.length === 0
-            ? "Busiest first"
-            : `${String(data.running.length)} room${data.running.length === 1 ? "" : "s"}, busiest first`
+          bidding.length === 0
+            ? "Rooms with a bid, sale or pause in the last 15 minutes"
+            : `${String(bidding.length)} room${bidding.length === 1 ? "" : "s"}, busiest first`
         }
         flush
         data-testid="live-running"
       >
-        {data.running.length === 0 ? (
+        {bidding.length === 0 ? (
           <div className="admin-card-empty">
             <EmptyState
               size="compact"
               headingLevel={3}
-              title="No auction is running"
-              description={`When an organizer opens one, it appears here within ${String(REFRESH_MS / 1000)} seconds.`}
+              title="Nothing is bidding right now"
+              description={nothingBiddingLine(quiet.length, REFRESH_MS / 1000)}
             />
           </div>
         ) : (
@@ -125,17 +143,53 @@ export function LiveBoard({ initial }: { initial: LiveBoardView }) {
               </span>
               <span />
             </li>
-            {data.running.map((row) => (
+            {bidding.map((row) => (
               <RoomRow
                 key={row.auctionId}
                 row={row}
                 engine={data.engine[row.auctionId]}
+                engineDown={engineDown}
                 nowMs={data.generatedAtMs}
               />
             ))}
           </ul>
         )}
       </SectionCard>
+
+      {quiet.length > 0 ? (
+        // Open and not closed, but nothing for over fifteen minutes: usually a
+        // rehearsal, or a night someone forgot to close. Not the night's feed.
+        <details className="admin-fold" data-testid="live-quiet">
+          <summary>
+            <span className="admin-fold-icon" aria-hidden>
+              <IconClock size={16} />
+            </span>
+            <span className="admin-fold-title">
+              <strong>Open, gone quiet · {String(quiet.length)}</strong>
+              <span className="admin-meta">
+                Opened and not closed, with nothing for over 15 minutes — usually a rehearsal, or a
+                night someone forgot to close.
+              </span>
+            </span>
+            <IconChevronDown size={16} className="admin-fold-caret" />
+          </summary>
+          <ul className="admin-rows">
+            {quiet.slice(0, QUIET_SHOWN).map((row) => (
+              <QuietRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
+            ))}
+          </ul>
+          {quiet.length > QUIET_SHOWN ? (
+            <details className="admin-more">
+              <summary>Show all {String(quiet.length)}</summary>
+              <ul className="admin-rows">
+                {quiet.slice(QUIET_SHOWN).map((row) => (
+                  <QuietRow key={row.auctionId} row={row} nowMs={data.generatedAtMs} />
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </details>
+      ) : null}
 
       {data.stale.length > 0 ? (
         // A backlog, not a feed: one warning line, opened on demand.
@@ -233,6 +287,63 @@ function EndedRow({ row, nowMs }: { row: LiveBoardView["ended"][number]; nowMs: 
   );
 }
 
+/** The fourth tile: the engine as one fact — down, answering, or not asked. */
+function EngineTile({ health }: { health: ReturnType<typeof engineHealth> }) {
+  if (health.kind === "down") {
+    return (
+      <StatCard
+        icon={<IconAlert />}
+        concept="alert"
+        value="Down"
+        label="Engine"
+        testId="live-engine"
+      />
+    );
+  }
+  if (health.kind === "answering" && health.troubled > 0) {
+    return (
+      <StatCard
+        icon={<IconAlert />}
+        concept="alert"
+        value={<KpiValue n={health.troubled} />}
+        label={health.troubled === 1 ? "Room with engine trouble" : "Rooms with engine trouble"}
+        testId="live-engine"
+      />
+    );
+  }
+  return (
+    <StatCard
+      icon={<IconShieldCheck />}
+      concept="neutral"
+      value={health.kind === "answering" ? "Answering" : <span className="admin-zero">—</span>}
+      label={health.kind === "answering" ? "Engine" : "Engine · no room open"}
+      testId="live-engine"
+    />
+  );
+}
+
+function QuietRow({ row, nowMs }: { row: LiveAuctionRow; nowMs: number }) {
+  const sold = `${String(row.lots.sold)} of ${String(row.lots.total)} sold${
+    row.moneyMoved === 0 ? "" : ` · ${moneyFormat(row.auctionUnit).compact(row.moneyMoved)}`
+  }`;
+  return (
+    <li className="live-quiet-row" data-testid={`live-quiet-${row.auctionId}`}>
+      <span className="admin-live-name">
+        <Link href={`/admin/auctions/${row.auctionId}`}>{row.seasonName}</Link>
+        <span className="admin-meta">
+          {row.orgName} · {row.status === "paused" ? "paused, " : ""}
+          {row.lastEventAtMs === null
+            ? "never opened"
+            : `last activity ${ageLabel(nowMs - row.lastEventAtMs)} ago`}
+          {/* A phone has no right-hand column: the lots join this line. */}
+          <span className="admin-room-phone"> · {sold}</span>
+        </span>
+      </span>
+      <span className="admin-meta admin-num-line live-quiet-facts">{sold}</span>
+    </li>
+  );
+}
+
 function StaleRow({ row, nowMs }: { row: LiveAuctionRow; nowMs: number }) {
   return (
     <li>
@@ -252,13 +363,13 @@ function StaleRow({ row, nowMs }: { row: LiveAuctionRow; nowMs: number }) {
   );
 }
 
-function engineLine(room: EngineRoom | undefined): string {
-  if (room === undefined || room.state === "not_checked") {
-    // Each refresh asks the engine about the busiest rooms only.
-    return "Not checked (busiest 20 only)";
-  }
+function engineLine(room: EngineRoom | undefined, engineDown: boolean): string {
+  // Each refresh asks the engine about the busiest rooms only; a room it did
+  // not ask, or one it cannot answer while the notice above says it is down,
+  // has nothing more to say here.
+  if (room === undefined || room.state === "not_checked") return "—";
   if (room.state === "unreachable") {
-    return "Engine not answering";
+    return engineDown ? "—" : "Engine not answering";
   }
   if (room.state === "idle") {
     return room.connectedClients === 0
@@ -271,13 +382,16 @@ function engineLine(room: EngineRoom | undefined): string {
 function RoomRow({
   row,
   engine,
+  engineDown,
   nowMs,
 }: {
   row: LiveAuctionRow;
   engine: EngineRoom | undefined;
+  engineDown: boolean;
   nowMs: number;
 }) {
-  const trouble = engineTrouble(engine);
+  // A room's own trouble stays on its row; "the engine is down" is said once.
+  const trouble = engineDown ? null : engineTrouble(engine);
   const badge = roomBadge(row.state, trouble);
   const pct = (n: number) => (row.lots.total > 0 ? (n / row.lots.total) * 100 : 0);
   return (
@@ -305,7 +419,9 @@ function RoomRow({
         </span>
         {/* "Quiet" on every row said nothing. The pill appears only when the
             room is doing something worth a glance; the dot always carries it. */}
-        {badge.dotState === "quiet" ? (
+        {/* With the engine down nothing can bid, so a green "Bidding" beside
+            the notice would contradict it: the dot alone carries the state. */}
+        {badge.dotState === "quiet" || engineDown ? (
           <span className="admin-sr-only">{badge.label}</span>
         ) : (
           // With trouble, a phone says it once — on the Room line below.
@@ -389,7 +505,16 @@ function RoomRow({
               </span>
             </dd>
           ) : (
-            <dd className="admin-meta">{engineLine(engine)}</dd>
+            <dd
+              className="admin-meta"
+              title={
+                engine === undefined || engine.state === "not_checked"
+                  ? "Not asked this refresh — the engine is asked about the busiest rooms only"
+                  : undefined
+              }
+            >
+              {engineLine(engine, engineDown)}
+            </dd>
           )}
         </div>
       </dl>
