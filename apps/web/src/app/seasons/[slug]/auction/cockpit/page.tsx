@@ -33,18 +33,9 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
               where leaving belongs on the surface you leave last. */}
             <h1 className="auction-sr-only">{view.auctionName} — cockpit</h1>
             <CockpitPanel slug={slug} view={view} />
-            {finished ? (
-              /* After the night the record card above is the door to the ledger
-                 and the replay, and the engine has nothing to show. */
-              <nav className="live-exits" aria-label="Other auction views">
-                <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
-                  Public recap
-                </ButtonLink>
-                <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
-                  Auction page
-                </ButtonLink>
-              </nav>
-            ) : (
+            {/* After the night the closing card carries every door (the auction
+                page, ledger, replay, recap); the row below is the live room's. */}
+            {finished ? null : (
               <nav className="live-exits" aria-label="Auction records and other views">
                 <span className="live-exits-label" aria-hidden>
                   Records &amp; other views

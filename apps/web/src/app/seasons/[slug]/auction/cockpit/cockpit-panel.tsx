@@ -10,11 +10,13 @@ import {
   useToast,
   Dialog,
   Field,
+  IconArrowRight,
   IconClock,
+  IconEye,
   IconList,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { resolveKeyDown, resolveKeyUp } from "../../../../../components/auction/cockpit-keys";
 import { deskActionOf } from "../../../../../components/auction/desk-action";
@@ -51,6 +53,7 @@ import { useAuctionSocket } from "../use-auction-socket";
 import { useCeremonySound } from "../use-ceremony-sound";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { useMoney } from "../../../../../components/money-unit";
+import { formatCount } from "../../../../../lib/plural";
 
 // THE AUCTION COCKPIT (M-IP4-3). The organizer's control room: open, pause,
 // resume, open ANY queued lot (order control = skip/bring-forward, doc 41),
@@ -379,6 +382,17 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     (best, row) => (best === null || (row.soldPrice ?? 0) > (best.soldPrice ?? 0) ? row : best),
     null,
   );
+  const finishedUnsold = feed.resolved.filter((row) => row.status === "unsold").length;
+  // Withdrawn lots never went under the hammer, so they are not in "of N".
+  const finishedLots = finishedSold.length + finishedUnsold;
+  const spentBy = new Map<string, number>();
+  for (const row of finishedSold) {
+    if (row.teamId !== null) {
+      spentBy.set(row.teamId, (spentBy.get(row.teamId) ?? 0) + (row.soldPrice ?? 0));
+    }
+  }
+  const teamName = (teamId: string | null): string | null =>
+    view.teams.find((team) => team.id === teamId)?.name ?? null;
   // Reconciled with the socket so it moves on the same frame as the queue —
   // see needs-resolution.ts for the double listing this used to show.
   const needsResolution = useMemo(
@@ -574,44 +588,109 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               teams={view.teams}
             />
           )}
-          <Card data-testid="conduct-card">
-            <h2>The record</h2>
-            <div className="cockpit-record">
-              <p className="competitions-hint" data-testid="cockpit-finished">
-                This auction is {status}. Nothing here can be opened, undone or recovered — the
-                ledger and the replay are the record now.
-              </p>
-              {/* The night in one line — only with the engine away: with it,
-                  the completion stage above and the pool card already say the
-                  count, the spend and the top buy. */}
-              {overOffline ? (
-                <p className="cockpit-record-line" data-testid="cockpit-record-line">
-                  <strong>{finishedSold.length}</strong> sold ·{" "}
-                  <strong>{feed.resolved.filter((row) => row.status === "unsold").length}</strong>{" "}
-                  unsold · <strong>{money.ledger(finishedSpend)}</strong> spent
-                  {finishedTop !== null ? (
-                    <>
-                      {" "}
-                      · top buy <strong>
-                        {finishedTop.playerName ?? finishedTop.lotNumber}
-                      </strong>{" "}
-                      {money.ledger(finishedTop.soldPrice ?? 0)}
-                    </>
-                  ) : null}
-                </p>
+          {/* THE NIGHT, CLOSED IN ONE CARD (2026-09-28). The finished cockpit
+              was a second auction page — a record card, the unsold list, pool
+              tiles that repeated the line above them and a squads grid — and
+              never said where to go next. The next jobs (posters, squad
+              sheets, captains) are on the auction page, so that is the door. */}
+          <section
+            className="night-over"
+            data-testid="conduct-card"
+            aria-labelledby="night-over-title"
+          >
+            <p className="night-over-kicker">
+              {status === "abandoned" ? "The auction was abandoned" : "The night is over"}
+            </p>
+            <h2 id="night-over-title" className="night-over-count">
+              {formatCount(finishedSold.length)} of {formatCount(finishedLots)} sold
+            </h2>
+            {finishedLots > 0 ? (
+              <span className="night-over-bar" aria-hidden>
+                <span
+                  style={{
+                    width: `${String(Math.round((finishedSold.length / finishedLots) * 100))}%`,
+                  }}
+                />
+              </span>
+            ) : null}
+            <p className="night-over-line" data-testid="cockpit-record-line">
+              {formatCount(finishedUnsold)} unsold · <strong>{money.ledger(finishedSpend)}</strong>{" "}
+              spent
+              {finishedTop !== null ? (
+                <>
+                  {" "}
+                  · top buy <strong>{finishedTop.playerName ?? finishedTop.lotNumber}</strong>{" "}
+                  {money.ledger(finishedTop.soldPrice ?? 0)}
+                  {teamName(finishedTop.teamId) !== null
+                    ? ` to ${teamName(finishedTop.teamId) ?? ""}`
+                    : ""}
+                </>
               ) : null}
-              <div className="cockpit-actions">
-                <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
-                  <IconList size={16} />
-                  Open the ledger
-                </ButtonLink>
-                <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="ghost">
-                  <IconClock size={16} />
-                  Watch the replay
-                </ButtonLink>
-              </div>
+            </p>
+            {view.teams.length > 0 ? (
+              <ul className="night-over-teams" aria-label="Squads">
+                {view.teams.map((team) => (
+                  <li key={team.id}>
+                    <span
+                      className="night-over-crest"
+                      style={
+                        team.primaryColor === null
+                          ? undefined
+                          : ({ "--team-color": team.primaryColor } as CSSProperties)
+                      }
+                      aria-hidden
+                    >
+                      {team.shortName ??
+                        team.name
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((word) => word.charAt(0))
+                          .join("")
+                          .toUpperCase()}
+                    </span>
+                    <span className="night-over-team">
+                      <strong>{team.name}</strong>
+                      <span>
+                        {formatCount(squadSizes[team.id] ?? 0)} of{" "}
+                        {formatCount(view.rules.squadMax)} ·{" "}
+                        {money.ledger(spentBy.get(team.id) ?? 0)} spent
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="night-over-note" data-testid="cockpit-finished">
+              Nothing here can be opened, undone or recovered — the ledger and the replay are the
+              record now.
+            </p>
+            <div className="night-over-doors">
+              <ButtonLink href={`/seasons/${slug}/auction`} variant="primary">
+                Go to the auction page
+                <IconArrowRight size={16} aria-hidden />
+              </ButtonLink>
+              <ButtonLink href={`/seasons/${slug}/auction/ledger`} variant="secondary">
+                <IconList size={16} aria-hidden />
+                Open the ledger
+              </ButtonLink>
+              <ButtonLink href={`/seasons/${slug}/auction/replay`} variant="ghost">
+                <IconClock size={16} aria-hidden />
+                Watch the replay
+              </ButtonLink>
+              <ButtonLink
+                href={`/seasons/${slug}/auction/spectate`}
+                variant="ghost"
+                className="night-over-recap"
+              >
+                <IconEye size={16} aria-hidden />
+                Public recap
+              </ButtonLink>
             </div>
-          </Card>
+            <p className="night-over-note">
+              What&apos;s next — result posters, squad sheets, telling the captains — is on the
+              auction page.
+            </p>
+          </section>
         </div>
       ) : (
         <ConductorDesk
@@ -635,21 +714,20 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         />
       )}
 
-      <div className="cockpit-grid cockpit-lower">
-        <div className="cockpit-col">
-          {finished && queue.length === 0 && needsResolution.length === 0 ? null : (
+      {/* After the night the lower grid and the squads were the auction
+          page again; the closing card above carries the doors to all of it. */}
+      {finished ? null : (
+        <div className="cockpit-grid cockpit-lower">
+          <div className="cockpit-col">
             <section data-testid="queue-card" className="room-card" aria-label="Lot queue">
-              {/* A finished night has no queue: the card keeps only its list of
-                  who went unsold. */}
-              {finished && queue.length === 0 ? null : (
-                <div className="room-card-head">
-                  <h2>Lot queue</h2>
-                  <span className="room-muted">
-                    {queue.length === 0 ? "empty" : `${String(queue.length)} to go`}
-                  </span>
-                </div>
-              )}
-              {finished && queue.length === 0 ? null : queue.length === 0 ? (
+              <div className="room-card-head">
+                <h2>Lot queue</h2>
+                <span className="room-muted">
+                  {queue.length === 0 ? "empty" : `${String(queue.length)} to go`}
+                </span>
+              </div>
+
+              {queue.length === 0 ? (
                 <p className="room-muted" data-testid="queue-empty">
                   No queued lots.
                 </p>
@@ -710,27 +788,14 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
               )}
               {needsResolution.length > 0 ? (
                 <>
-                  {/* A finished auction resolves nothing. The block used to
-                    keep its live-night heading, two paragraphs on freezing and
-                    withdrawing, and a disabled Requeue on every row — seven
-                    dead buttons under a card that said nothing can be undone.
-                    What is left is a plain list of who went unsold. */}
-                  {finished ? (
-                    <h2 data-testid="resolve-finished-heading">
-                      {needsResolution.every((entry) => entry.status === "unsold")
-                        ? "Unsold"
-                        : "Not sold"}{" "}
-                      ({needsResolution.length})
-                    </h2>
-                  ) : (
-                    <>
-                      <h2>Needs resolution</h2>
-                      <p className="competitions-hint" data-testid="frozen-lot-hint">
-                        A frozen lot has a clock that is stopped, not running — including one you
-                        have just undone. Requeue it and it goes back to the top of the queue for
-                        you to open deliberately.
-                      </p>
-                      {/* The second way out, and until now there was no first one for
+                  <>
+                    <h2>Needs resolution</h2>
+                    <p className="competitions-hint" data-testid="frozen-lot-hint">
+                      A frozen lot has a clock that is stopped, not running — including one you have
+                      just undone. Requeue it and it goes back to the top of the queue for you to
+                      open deliberately.
+                    </p>
+                    {/* The second way out, and until now there was no first one for
                         half these lots. Requeue is refused when the auction's unsold
                         policy is "final", or when the lot has used its rounds — and
                         Requeue was the only button here. A frozen lot with a
@@ -738,15 +803,15 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                         money on it) nor requeued, and a frozen lot blocks completing
                         the auction, so the night could not end without making the
                         sale the conductor froze the lot to avoid. */}
-                      <p className="competitions-hint" data-testid="frozen-lot-withdraw-hint">
-                        If Requeue is refused — this auction is set to one round, or the lot has
-                        used them — <strong>Withdraw</strong> takes the player out of the auction
-                        for good and voids any bid standing on the lot. It cannot be undone, and it
-                        is the only way to close an auction that has a frozen lot on it.
-                      </p>
-                    </>
-                  )}
-                  {!finished && unsoldToRequeue(needsResolution).length > 1 ? (
+                    <p className="competitions-hint" data-testid="frozen-lot-withdraw-hint">
+                      If Requeue is refused — this auction is set to one round, or the lot has used
+                      them — <strong>Withdraw</strong> takes the player out of the auction for good
+                      and voids any bid standing on the lot. It cannot be undone, and it is the only
+                      way to close an auction that has a frozen lot on it.
+                    </p>
+                  </>
+
+                  {unsoldToRequeue(needsResolution).length > 1 ? (
                     <div className="cockpit-actions">
                       <Button
                         variant="secondary"
@@ -764,7 +829,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                     </div>
                   ) : null}
                   <LotQueueList
-                    label={finished ? "Lots not sold" : "Lots that need resolving"}
+                    label="Lots that need resolving"
                     tone="attention"
                     roles={view.roles}
                     lotMedia={view.lotMedia}
@@ -777,86 +842,59 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                       role: entry.role,
                       detail: entry.status,
                       testId: `resolve-${entry.lotNumber}`,
-                      ...(finished
-                        ? {}
-                        : {
-                            actions: (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() =>
-                                    void send(
-                                      `requeue-${entry.id}`,
-                                      "RequeueLot",
-                                      { lotId: entry.id },
-                                      `${entry.lotNumber} requeued`,
-                                    )
-                                  }
-                                  loading={pending === `requeue-${entry.id}`}
-                                  /* `finished` for the same reason "Invite owner"
-                                 carries it: the control was offered on a
-                                 completed auction, directly under a banner
-                                 saying nothing here can be opened or undone, and
-                                 clicking it did NOTHING AT ALL. The engine
-                                 refuses the command — the record is safe — but
-                                 the refusal never reached the screen, so the
-                                 conductor's only evidence was a button that did
-                                 not respond. */
-                                  disabled={stale || finished}
-                                  data-testid={`requeue-${entry.lotNumber}`}
-                                >
-                                  Requeue
-                                </Button>
-                                {entry.status === "frozen" ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() =>
-                                      void send(
-                                        `withdraw-${entry.id}`,
-                                        "WithdrawLot",
-                                        { lotId: entry.id },
-                                        `${entry.lotNumber} withdrawn`,
-                                      )
-                                    }
-                                    loading={pending === `withdraw-${entry.id}`}
-                                    disabled={stale || finished}
-                                    data-testid={`withdraw-frozen-${entry.lotNumber}`}
-                                  >
-                                    Withdraw
-                                  </Button>
-                                ) : null}
-                              </>
-                            ),
-                          }),
+                      actions: (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() =>
+                              void send(
+                                `requeue-${entry.id}`,
+                                "RequeueLot",
+                                { lotId: entry.id },
+                                `${entry.lotNumber} requeued`,
+                              )
+                            }
+                            loading={pending === `requeue-${entry.id}`}
+                            disabled={stale}
+                            data-testid={`requeue-${entry.lotNumber}`}
+                          >
+                            Requeue
+                          </Button>
+                          {entry.status === "frozen" ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                void send(
+                                  `withdraw-${entry.id}`,
+                                  "WithdrawLot",
+                                  { lotId: entry.id },
+                                  `${entry.lotNumber} withdrawn`,
+                                )
+                              }
+                              loading={pending === `withdraw-${entry.id}`}
+                              disabled={stale}
+                              data-testid={`withdraw-frozen-${entry.lotNumber}`}
+                            >
+                              Withdraw
+                            </Button>
+                          ) : null}
+                        </>
+                      ),
                     }))}
                   />
                 </>
               ) : null}
             </section>
-          )}
-        </div>
+          </div>
 
-        <div className="cockpit-col">
-          {/* No progress bar here: the room's header says "n of N done" and
+          <div className="cockpit-col">
+            {/* No progress bar here: the room's header says "n of N done" and
               the queue card says how many are to go (stage 3). */}
-          {/* One panel at a time on the right: purses while the room is live,
+            {/* One panel at a time on the right: purses while the room is live,
               owners while it is being set up, and the two broadcast screens
               (DA-20 — their only door) a tab away instead of above both. */}
-          {finished ? (
-            /* After the night the owners are invited and the screens are dark:
-               the column is the pool, final. */
-            <div className="cockpit-tab">
-              {overOffline ? null : <PurseBoard snapshot={snapshot} teams={view.teams} />}
-              <PoolSummary
-                snapshot={snapshot}
-                resolved={feed.resolved}
-                preSigned={view.preSigned}
-                finished
-              />
-            </div>
-          ) : (
             <HashTabs
               label="Room panels"
               defaultId={status === "scheduled" ? "owners" : "purses"}
@@ -1109,20 +1147,22 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                 },
               ]}
             />
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <SquadBoard
-        roles={view.roles}
-        teams={view.teams}
-        lotMedia={view.lotMedia}
-        preSigned={view.preSigned}
-        resolved={feed.resolved}
-        snapshot={snapshot}
-        squadMax={view.rules.squadMax}
-        collapsible
-      />
+      {finished ? null : (
+        <SquadBoard
+          roles={view.roles}
+          teams={view.teams}
+          lotMedia={view.lotMedia}
+          preSigned={view.preSigned}
+          resolved={feed.resolved}
+          snapshot={snapshot}
+          squadMax={view.rules.squadMax}
+          collapsible
+        />
+      )}
 
       {/* UNDO's confirmation — it names what is about to be reversed. */}
       <Dialog
