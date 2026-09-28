@@ -8,7 +8,7 @@ import { insertCareerFixture, insertWomensSeason, personIdByPhone } from "./play
  * PI-1: the player-identity journeys, end to end in a real browser.
  *
  *  1. The cricket profile — saved on /account, counted by the 8-item
- *     checklist, framing /me/cricket.
+ *     checklist, framing My profile (/me).
  *  2. The career — a settled season (DB fixture) renders with its verdict and
  *     its price, axe-clean in the shell it actually ships in.
  *  3. The gendered category — a declared mismatch is refused with the real
@@ -87,22 +87,24 @@ test("the cricket profile saves, counts, and frames the career page", async ({ p
   // role now reaches the checklist from the cricket panel, which is the point.
   await expect(page.getByTestId("profile-completion")).toContainText("Profile 4 of 8");
 
+  // The old per-sport address still lands on My profile, filtered.
   await page.goto("/me/cricket");
-  await expect(page.getByTestId("career-header")).toContainText("Asha Player");
-  await expect(page.getByTestId("career-header")).toContainText("All-rounder");
+  await expect(page).toHaveURL(/\/me\?sport=cricket$/);
+  await expect(page.getByTestId("me-hero")).toContainText("Asha Player");
+  await expect(page.getByTestId("me-hero")).toContainText("All-rounder");
   await expect(page.getByText("No seasons yet")).toBeVisible();
 
   const scan = await new AxeBuilder({ page }).analyze();
   expect(scan.violations).toEqual([]);
 });
 
-test("a settled season renders on /me/cricket with its verdict and price", async ({ page }) => {
+test("a settled season renders on My profile with its verdict and price", async ({ page }) => {
   test.setTimeout(120_000);
   const personId = await personIdByPhone(PLAYER_PHONE);
   const fixture = await insertCareerFixture(personId, STAMP);
 
   await otpLogin(page, PLAYER);
-  await page.goto("/me/cricket");
+  await page.goto("/me?sport=cricket");
   await expect(page.getByTestId("career-seasons")).toContainText(fixture.competitionName);
   await expect(page.getByTestId("career-seasons")).toContainText(
     `Sold · ${fixture.soldPriceLabel}`,
@@ -116,7 +118,7 @@ test("a settled season renders on /me/cricket with its verdict and price", async
   const career = page.getByTestId("home-career-link");
   await expect(career).toBeVisible();
   await expect(career).toHaveText("My cricket");
-  await expect(career).toHaveAttribute("href", "/me/cricket");
+  await expect(career).toHaveAttribute("href", "/me?sport=cricket");
 });
 
 test("a gendered category refuses a declared mismatch, and the profile fix opens it", async ({

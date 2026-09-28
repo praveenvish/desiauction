@@ -172,7 +172,7 @@ export default async function AccountPage({
     !playsHere &&
     (roles.owns.length > 0 || roles.organizes.length > 0 || roles.conducts.length > 0);
   const recordLink = playsHere
-    ? { href: "/me", label: "My sports" }
+    ? { href: "/me", label: "My profile" }
     : roles.owns.length > 0
       ? { href: "/me", label: "My teams" }
       : null;

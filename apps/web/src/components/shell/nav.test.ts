@@ -294,8 +294,8 @@ describe("careerTitle", () => {
   });
 
   it("titles the all-sports hub", () => {
-    // /me used to be a 404 with no index; it is the "My sports" hub now.
-    expect(careerTitle("/me")).toBe("My sports");
+    // /me used to be a 404 with no index; it is the "My profile" page now.
+    expect(careerTitle("/me")).toBe("My profile");
   });
 
   it("ignores paths that are not a career page", () => {

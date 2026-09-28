@@ -1,13 +1,11 @@
-import { Pill, RosterMark, TeamChip, type KitTone } from "@desiauction/ui";
+import type { KitTone } from "@desiauction/ui";
 import type { MoneyUnit } from "@desiauction/core";
-import Link from "next/link";
 
 import type { CareerSeason } from "../../server/player/career";
 
 /**
- * One season of a player's career, as a card: the sport and year, where it
- * stands (one pill), the competition and club, and the team in its own colour.
- * Shared by /me and /me/[sport] so the two tell a season the same way.
+ * Where a season stands for its player, in one phrase — shared by My profile
+ * (/me) and /home so the two tell a season the same way.
  */
 
 const ENTRY: Record<string, { label: string; tone: KitTone }> = {
@@ -43,108 +41,4 @@ export function verdictOf(
   if (outcome.kind === "captain")
     return { label: "Captain · picked before the auction", tone: "purple" };
   return { label: "Retained", tone: "purple" };
-}
-
-export function RegistrationCard({
-  season,
-  eyebrow,
-  subline,
-  money,
-}: {
-  season: CareerSeason;
-  /** The small line above the name — "Cricket · 2026". */
-  eyebrow: string;
-  /** Under the name — the club, and whatever else the page adds. */
-  subline: string;
-  /** Formats a sold price in its season's unit — rupees or points (0091). */
-  money: (paise: number, unit: MoneyUnit) => string;
-}) {
-  const verdict = verdictOf(season, money);
-  return (
-    <Link href={`/seasons/${season.competitionSlug}/register`} className="me-reg da-lift">
-      <span className="me-reg-top">
-        <span className="me-reg-when">{eyebrow}</span>
-        <Pill tone={verdict.tone} dot>
-          {verdict.label}
-        </Pill>
-      </span>
-      <strong className="me-reg-name">
-        {season.tournamentName !== null && season.tournamentName !== season.competitionName
-          ? `${season.tournamentName} · ${season.competitionName}`
-          : season.competitionName}
-      </strong>
-      <span className="me-reg-org">{subline}</span>
-      <span className="me-reg-foot">
-        {season.teamName !== null ? (
-          <TeamChip color={season.teamColor}>{season.teamName}</TeamChip>
-        ) : (
-          <span className="me-reg-noteam">No team yet</span>
-        )}
-        {season.isCaptain && season.auction?.kind !== "captain" ? (
-          <RosterMark kind="captain" />
-        ) : season.isViceCaptain ? (
-          <RosterMark kind="vice-captain" />
-        ) : null}
-      </span>
-    </Link>
-  );
-}
-
-/**
- * One season as a ROW of the career (My sports): year, the season and club,
- * the team in its own colour, the role, and where it ended — a sold price is
- * the row's loudest figure. The card above stays for /home, where a season is
- * one of a few things on the page; here the seasons ARE the page.
- */
-export function SeasonRow({
-  season,
-  year,
-  roleLabel,
-  money,
-}: {
-  season: CareerSeason;
-  year: string;
-  roleLabel: string;
-  money: (paise: number, unit: MoneyUnit) => string;
-}) {
-  const outcome = season.auction;
-  const verdict = verdictOf(season, money);
-  return (
-    <Link href={`/seasons/${season.competitionSlug}/register`} className="me-season">
-      <span className="me-season-year">{year}</span>
-      <span className="me-season-name">
-        <strong>
-          {season.tournamentName !== null && season.tournamentName !== season.competitionName
-            ? `${season.tournamentName} · ${season.competitionName}`
-            : season.competitionName}
-        </strong>
-        <span>
-          {season.orgName}
-          <span className="me-season-phone-year"> · {year}</span>
-        </span>
-      </span>
-      <span className="me-season-team">
-        {season.teamName !== null ? (
-          <TeamChip color={season.teamColor}>{season.teamName}</TeamChip>
-        ) : (
-          <span className="me-reg-noteam">No team yet</span>
-        )}
-        {season.isCaptain && outcome?.kind !== "captain" ? (
-          <RosterMark kind="captain" />
-        ) : season.isViceCaptain ? (
-          <RosterMark kind="vice-captain" />
-        ) : null}
-      </span>
-      <span className="me-season-role">{roleLabel === "" ? "—" : roleLabel}</span>
-      <span className="me-season-end">
-        {outcome?.kind === "sold" ? (
-          <span className="me-season-price">{money(outcome.soldPrice, season.auctionUnit)}</span>
-        ) : (
-          <Pill tone={verdict.tone} dot>
-            {verdict.label}
-          </Pill>
-        )}
-      </span>
-    </Link>
-  );
 }
