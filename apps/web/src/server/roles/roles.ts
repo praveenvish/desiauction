@@ -2,7 +2,9 @@ import {
   auctionOwnerInvites,
   auctions,
   competitions,
+  lots,
   paddleGrants,
+  paddles,
   playerProfiles,
   registrations,
   teams,
@@ -66,6 +68,8 @@ export interface PersonRoles {
 }
 
 export interface ConductedSeason {
+  /** Resolved from the person's own conduct grant — the key `conductSetup` takes. */
+  competitionId: string;
   competitionSlug: string;
   competitionName: string;
   /** The season's auction, if one has been created (null before that). */
@@ -82,6 +86,7 @@ async function conductedSeasons(competitionIds: string[]): Promise<ConductedSeas
   if (competitionIds.length === 0) return [];
   const rows = await systemDb
     .select({
+      competitionId: competitions.id,
       competitionSlug: competitions.slug,
       competitionName: competitions.name,
       auctionStatus: auctions.status,
@@ -95,6 +100,60 @@ async function conductedSeasons(competitionIds: string[]): Promise<ConductedSeas
     )
     .where(inArray(competitions.id, competitionIds));
   return rows;
+}
+
+/**
+ * THE ORGANIZER'S SETUP, COUNTED — for the auctioneer's queue (2026-09-29).
+ *
+ * The auctioneer's home listed "Before the cockpit opens, the organizer adds
+ * the teams, the pool, the paddles" as fixed text: it never ticked, so it
+ * could not say whether the night was a week of work away or one paddle.
+ * These are counts only — no names, no money, no roster — the same partition
+ * as the rest of this person's surface (they hold `auction.conduct` alone).
+ *
+ * `competitionId` must come from `rolesOf(...).conducts` (the person's own
+ * conduct grant), never from a request.
+ */
+export interface ConductSetup {
+  teams: number;
+  auctionBuilt: boolean;
+  /** Lots on the auction, withdrawn ones aside. */
+  lots: number;
+  /** Paddles issued and not released. */
+  paddles: number;
+}
+
+export async function conductSetup(competitionId: string): Promise<ConductSetup> {
+  const [[teamRow], [auction]] = await Promise.all([
+    systemDb
+      .select({ count: sql<number>`count(*)::int` })
+      .from(teams)
+      .where(eq(teams.competitionId, competitionId)),
+    systemDb
+      .select({ id: auctions.id })
+      .from(auctions)
+      .where(and(eq(auctions.competitionId, competitionId), ne(auctions.status, "abandoned")))
+      .limit(1),
+  ]);
+  if (auction === undefined) {
+    return { teams: teamRow?.count ?? 0, auctionBuilt: false, lots: 0, paddles: 0 };
+  }
+  const [[lotRow], [paddleRow]] = await Promise.all([
+    systemDb
+      .select({ count: sql<number>`count(*)::int` })
+      .from(lots)
+      .where(and(eq(lots.auctionId, auction.id), ne(lots.status, "withdrawn"))),
+    systemDb
+      .select({ count: sql<number>`count(*)::int` })
+      .from(paddles)
+      .where(and(eq(paddles.auctionId, auction.id), isNull(paddles.releasedAt))),
+  ]);
+  return {
+    teams: teamRow?.count ?? 0,
+    auctionBuilt: true,
+    lots: lotRow?.count ?? 0,
+    paddles: paddleRow?.count ?? 0,
+  };
 }
 
 async function ownedTeams(personId: string): Promise<OwnedTeam[]> {

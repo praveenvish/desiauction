@@ -10,10 +10,11 @@ import {
   ListRow,
   Pill,
   SectionCard,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import Link from "next/link";
 
-import type { ConductedSeason } from "../../server/roles/roles";
+import { conductSetup, type ConductedSeason } from "../../server/roles/roles";
 import { monogram, type Tone } from "./home-parts";
 import "./home-duo.css";
 import { formatDate, formatShortDate, istCalendarDate } from "../../lib/format-date";
@@ -166,7 +167,9 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
                 <Row key={season.competitionSlug} season={season} />
               ))}
             </ul>
-            {queue[0] !== undefined && queue[0].auctionStatus === null ? <SetupSteps /> : null}
+            {queue[0] !== undefined && queue[0].auctionStatus === null ? (
+              <SetupSteps season={queue[0]} />
+            ) : null}
           </SectionCard>
           <NightKit season={queue[0] ?? null} />
         </div>
@@ -192,19 +195,69 @@ export function AuctioneerHome({ seasons }: { seasons: ConductedSeason[] }) {
 }
 
 /**
- * WHAT HAS TO HAPPEN FIRST (round 5). A queue row that said "Not set up yet"
- * and nothing more left the auctioneer guessing what "set up" means and how
- * far off it is. These are the three things the organizer builds before the
- * cockpit opens — said as the organizer's list, not the auctioneer's chores.
+ * WHAT HAS TO HAPPEN FIRST (round 5), COUNTED (2026-09-29). The three things
+ * the organizer builds before the cockpit opens used to be fixed text that
+ * never ticked — it could not tell the auctioneer whether the night was a week
+ * of work away or one paddle. Each step now reads the organizer's setup
+ * (counts only; see `conductSetup`) and says where it stands. Still said as
+ * the organizer's list, not the auctioneer's chores.
  */
-function SetupSteps() {
+export async function SetupSteps({ season }: { season: ConductedSeason }) {
+  const setup = await conductSetup(season.competitionId);
+  const steps = [
+    {
+      label: "The teams and their owners",
+      done: setup.teams > 0,
+      fact:
+        setup.teams > 0 ? `${String(setup.teams)} ${setup.teams === 1 ? "team" : "teams"}` : null,
+    },
+    {
+      label: "The auction — its purse and rules",
+      done: setup.auctionBuilt,
+      fact: null,
+    },
+    {
+      label: "The pool of players, as lots",
+      done: setup.lots > 0,
+      fact: setup.lots > 0 ? `${String(setup.lots)} ${setup.lots === 1 ? "lot" : "lots"}` : null,
+    },
+    {
+      label: "A paddle for each team",
+      done: setup.teams > 0 && setup.paddles >= setup.teams,
+      fact:
+        setup.auctionBuilt && setup.teams > 0
+          ? `${String(Math.min(setup.paddles, setup.teams))} of ${String(setup.teams)}`
+          : null,
+    },
+  ];
+  const done = steps.filter((step) => step.done).length;
+  const current = steps.findIndex((step) => !step.done);
   return (
-    <div className="home-setup">
-      <p className="home-setup-title">Before the cockpit opens, the organizer adds</p>
-      <ol className="home-setup-list">
-        <li>The teams and their owners</li>
-        <li>The pool of players, as lots</li>
-        <li>A paddle for each team</li>
+    <div className="home-setup" data-testid="home-conduct-setup">
+      <p className="home-setup-title">
+        Before the cockpit opens, the organizer adds
+        <span className="home-setup-count">
+          {String(done)} of {String(steps.length)} done
+        </span>
+      </p>
+      <ol className="home-setup-list home-setup-list--counted">
+        {steps.map((step, index) => (
+          <li
+            key={step.label}
+            data-state={step.done ? "done" : index === current ? "current" : "todo"}
+          >
+            <span className="home-setup-mark" aria-hidden>
+              {step.done ? <IconCheckCircle size={16} /> : String(index + 1)}
+            </span>
+            <span className="home-setup-label">
+              {step.label}
+              <VisuallyHidden>
+                {step.done ? " — done" : index === current ? " — next" : " — to do"}
+              </VisuallyHidden>
+            </span>
+            {step.fact !== null ? <span className="home-setup-fact">{step.fact}</span> : null}
+          </li>
+        ))}
       </ol>
     </div>
   );
