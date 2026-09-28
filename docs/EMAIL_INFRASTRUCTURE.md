@@ -6,9 +6,20 @@ Business mailboxes stay on **Zoho Mail**, untouched. Resend is kept configured
 as the rollback until SES has run cleanly for a few weeks.
 
 Status (2026-09-28): AWS account `561965250144` (Paid plan, SES à la carte),
-identity `mail.desiauction.in` created with DKIM + MAIL FROM, DNS published,
-config set / SNS topic / IAM user / budget created. Remaining: access key,
-sandbox tests, site live, production access — see "Setup checklist".
+identity `mail.desiauction.in` verified (DKIM + MAIL FROM), DNS published,
+config set / SNS topic / IAM user / budget created, access key in `.env.local`.
+**Proven live in the sandbox:** all 47 designs (25 en + 22 hi) plus plain, HTML
+and `.ics` accepted by SES; a real send to Gmail arrived in the **inbox**
+(marked Important) with `mailed-by: bounce.mail.desiauction.in`,
+`signed-by: mail.desiauction.in` — SPF and DKIM aligned, so DMARC passes — over
+TLS, Reply-To `support@`. Remaining: site live → production access → SNS
+subscription → cutover — see "Setup checklist".
+
+**Sandbox-only IAM policy to delete at production access:**
+`ses-sandbox-test-recipients-TEMP` on `desiauction-mailer`. In the sandbox SES
+authorises the send against each *recipient's* identity too, so verified test
+recipients need their own statement; once production access is granted they do
+not, and the policy must go.
 
 ## Architecture
 
@@ -336,7 +347,11 @@ at 100/day — upgrade Resend Pro ($20/month) if the rollback must last.
 
 ## Cleanup (only after 2–4 clean weeks on SES)
 
-Safe to remove then, with confirmation:
+At production access (immediately): delete the IAM inline policy
+`ses-sandbox-test-recipients-TEMP` and the test identity
+`praveenvishnoi28@gmail.com`.
+
+Safe to remove after the clean weeks, with confirmation:
 
 - Hostinger DNS: `resend._domainkey.mail` TXT, `send.mail` records,
   `rsend.mail` CNAME.
