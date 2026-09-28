@@ -163,9 +163,16 @@ export async function renamePasskey(
   await logSecurityEvent(personId, "auth.passkey.renamed");
 }
 
-export async function removePasskey(db: Db, personId: string, passkeyId: string): Promise<void> {
-  await db
+/** Remove one of the person's passkeys; its name, for the warning — null when there was none. */
+export async function removePasskey(
+  db: Db,
+  personId: string,
+  passkeyId: string,
+): Promise<string | null> {
+  const removed = await db
     .delete(passkeyCredentials)
-    .where(and(eq(passkeyCredentials.id, passkeyId), eq(passkeyCredentials.personId, personId)));
+    .where(and(eq(passkeyCredentials.id, passkeyId), eq(passkeyCredentials.personId, personId)))
+    .returning({ name: passkeyCredentials.name });
   await logSecurityEvent(personId, "auth.passkey.removed");
+  return removed[0]?.name ?? null;
 }

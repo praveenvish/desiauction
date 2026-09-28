@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { avatarColor } from "../../../components/avatar-color";
 import {
   createInviteAction,
+  emailClubInviteAction,
   issueGrantAction,
   removeMemberAction,
   revokeGrantAction,
@@ -411,6 +412,7 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
                 {copied ? "Copied" : "Copy link"}
               </Button>
             </div>
+            <EmailInviteForm key={inviteUrl} slug={slug} link={inviteUrl} />
           </div>
         ) : null}
       </Dialog>
@@ -571,5 +573,67 @@ function MemberRowView({
         ) : null}
       </span>
     </div>
+  );
+}
+
+/**
+ * "Or email it to them" (email programme PR13) — beside Copy, for an organizer
+ * who has the address. Sent at once, directly; the address is not kept.
+ */
+function EmailInviteForm({ slug, link }: { slug: string; link: string }) {
+  const toast = useToast();
+  const [address, setAddress] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  if (sentTo !== null) {
+    return (
+      <p className="od-invite-note" role="status" data-testid="club-invite-emailed">
+        Invitation emailed to {sentTo}.
+      </p>
+    );
+  }
+  return (
+    <form
+      className="od-invite-email"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setBusy(true);
+        setError(null);
+        void emailClubInviteAction(slug, link, address).then((result) => {
+          setBusy(false);
+          if (result.ok) {
+            setSentTo(result.sentTo);
+            toast({ title: `Invitation emailed to ${result.sentTo}.`, tone: "success" });
+          } else {
+            setError(result.error);
+          }
+        });
+      }}
+    >
+      <Field
+        label="Or email it to them"
+        name="club-invite-email"
+        type="email"
+        autoComplete="off"
+        placeholder="name@example.com"
+        value={address}
+        onChange={(event) => {
+          setAddress(event.target.value);
+        }}
+        {...(error === null ? {} : { error })}
+      />
+      <Button
+        type="submit"
+        size="touch"
+        variant="secondary"
+        loading={busy}
+        disabled={address.trim() === ""}
+        data-testid="email-club-invite"
+      >
+        Email the invite
+      </Button>
+    </form>
   );
 }

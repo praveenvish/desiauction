@@ -4,7 +4,7 @@ import { roleLabelIn, sportPackFor } from "@desiauction/core";
 import { sportLabel } from "@desiauction/core/sport-labels";
 
 import { env } from "../../env";
-import type { EmailBand, EmailStep } from "./email-layout";
+import type { EmailBand, EmailMatchup, EmailStep } from "./email-layout";
 import { renderNotificationEmail, type NotificationMail } from "./notification-email";
 import { REASON_HI } from "./whatsapp";
 
@@ -426,6 +426,13 @@ export interface LineupFacts {
   readonly where: string | null;
   /** The whole lineup, the reader marked "(you)". */
   readonly lineup: readonly SquadLine[];
+  /** The two crests at the top (fixture-mail.ts `lineupMatchup`); the club band without it. */
+  readonly matchup?: EmailMatchup;
+  /** The season's club and sport, for the band when there is no matchup. */
+  readonly orgName?: string;
+  readonly sport?: string;
+  /** The match itself; the player's home when not given. */
+  readonly url?: string;
 }
 
 /** "You're in the Cup Kings lineup vs Tigers" — sent on the organizer's Announce. */
@@ -448,7 +455,18 @@ export function lineupMail(
     },
     {
       details: facts.lineup.map((line) => localLine(line, language)),
-      action: { id: "season", url: seasonUrl() },
+      action: { id: "season", url: facts.url ?? seasonUrl() },
+      ...(facts.matchup !== undefined
+        ? { matchup: facts.matchup }
+        : facts.orgName === undefined
+          ? {}
+          : {
+              band: seasonBand({
+                season: facts.season,
+                orgName: facts.orgName,
+                ...(facts.sport === undefined ? {} : { sport: facts.sport }),
+              }),
+            }),
     },
   );
 }

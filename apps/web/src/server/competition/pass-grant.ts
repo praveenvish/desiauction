@@ -42,7 +42,18 @@ class RaceLost extends Error {
 }
 
 export type GrantPassResult =
-  | { ok: true; slug: string; fromTier: Tier; toTier: Tier; outcome: GrantOutcome }
+  | {
+      ok: true;
+      slug: string;
+      fromTier: Tier;
+      toTier: Tier;
+      outcome: GrantOutcome;
+      /** For telling the organizer (PR15): which request, who asked, for what. */
+      competitionId: string;
+      requestId: string;
+      requestedBy: string;
+      requestedTier: string;
+    }
   | {
       ok: false;
       reason: "no_open_request" | "unknown_season" | "invalid_tier";
@@ -83,6 +94,7 @@ export async function resolvePassRequest(
     .select({
       id: passUpgradeRequests.id,
       requestedTier: passUpgradeRequests.requestedTier,
+      requestedBy: passUpgradeRequests.requestedBy,
     })
     .from(passUpgradeRequests)
     .where(
@@ -149,7 +161,17 @@ export async function resolvePassRequest(
     throw error;
   }
 
-  return { ok: true, slug: input.slug, fromTier, toTier, outcome: input.outcome };
+  return {
+    ok: true,
+    slug: input.slug,
+    fromTier,
+    toTier,
+    outcome: input.outcome,
+    competitionId: season.id,
+    requestId: request.id,
+    requestedBy: request.requestedBy,
+    requestedTier: request.requestedTier,
+  };
 }
 
 /** One line an operator can paste into a reply to the organizer. */

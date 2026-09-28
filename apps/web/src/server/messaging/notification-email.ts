@@ -25,6 +25,8 @@ import {
   renderEmail,
   type EmailBand,
   type EmailDateLeaf,
+  type EmailFixture,
+  type EmailMatchup,
   type EmailStage,
   type EmailStep,
 } from "./email-layout";
@@ -83,10 +85,16 @@ const LAYOUT: Readonly<
   "auth.email_code": { noLinks: true, calloutLast: true },
   "security.email_changed": { calloutLast: true },
   "security.phone_changed": { calloutLast: true },
+  "security.passkey_changed": { calloutLast: true },
+  // "Didn't ask for this?" under a deletion request; the next step under the rest.
+  "security.account_deletion": { calloutLast: true },
   // "Think this is a mistake?" under a take-down: the way back, boxed.
   "season.held": { calloutLast: true },
   // "This link is yours alone" — the one line an invited owner must not miss.
   "owner.invite": { calloutLast: true },
+  "club.invite": { calloutLast: true },
+  // "Not someone you expected?" — the way to take access back, boxed.
+  "club.member_joined": { calloutLast: true },
   "registration.approved": { whatsappNudge: true },
   "registration.waitlisted": { whatsappNudge: true },
   "registration.rejected": { whatsappNudge: true },
@@ -118,6 +126,10 @@ export interface RenderOptions {
   readonly dateLeaf?: EmailDateLeaf;
   /** The auction-night stage — a sale (player-mail.ts `soldMail`). */
   readonly stage?: EmailStage;
+  /** A list of matches — a team's schedule, a busy match day (fixture-mail.ts). */
+  readonly fixtures?: readonly EmailFixture[];
+  /** The match at the top of the card — match day, a lineup (fixture-mail.ts). */
+  readonly matchup?: EmailMatchup;
 }
 
 /**
@@ -154,6 +166,8 @@ export function composeNotificationEmail(
     ...(options.progress === undefined ? {} : { progress: options.progress }),
     ...(options.dateLeaf === undefined ? {} : { dateLeaf: options.dateLeaf }),
     ...(options.stage === undefined ? {} : { stage: options.stage }),
+    ...(options.fixtures === undefined ? {} : { fixtures: options.fixtures }),
+    ...(options.matchup === undefined ? {} : { matchup: options.matchup }),
     ...(filled.after.length === 0 ? {} : { after: filled.after }),
     footnote: filled.footnote,
     ...(layout.noLinks === true ? { noLinks: true } : {}),

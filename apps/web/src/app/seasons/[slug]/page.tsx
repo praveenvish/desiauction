@@ -6,8 +6,13 @@ import { requireOnboarded } from "../../../server/auth/onboarding-gate";
 import { rolesOf } from "../../../server/roles/roles";
 import { seasonOverviewView } from "../../../server/competition/actions";
 import { seasonPass } from "../../../server/competition/pass";
-import { scheduleView, standingsView } from "../../../server/competition/fixture-actions";
+import {
+  finaleView,
+  scheduleView,
+  standingsView,
+} from "../../../server/competition/fixture-actions";
 import { nowWallClock } from "../../../server/competition/fixtures";
+import { ChampionCard } from "./champion-card";
 import { SeasonNow } from "./season-now";
 import { YourTeam } from "./your-team";
 import { teamSeason } from "../../../server/player/career";
@@ -59,6 +64,12 @@ export default async function CompetitionHomePage({
       : null,
   ]);
   const liveMatches = schedule?.rows.filter((row) => row.status === "in_progress").length ?? 0;
+  // Name the champion (PR12): for the people who run the season, once every
+  // match is done — or to show who was named.
+  const finale =
+    view.viewer.canManage && view.fixtureCount > 0 && view.fixturesOpen === 0
+      ? await finaleView(slug)
+      : null;
   return (
     <ToastProvider>
       <CreatedToast />
@@ -91,6 +102,7 @@ export default async function CompetitionHomePage({
                   ),
                 }
               : {})}
+            {...(finale === null ? {} : { finale: <ChampionCard slug={slug} state={finale} /> })}
             now={
               view.fixtureCount > 0 ? (
                 <SeasonNow

@@ -1,9 +1,13 @@
 "use server";
 
+import { isTier } from "@desiauction/core";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { systemDb } from "../db";
 import { resolvePassRequest, type GrantOutcome } from "../competition/pass-grant";
+import { logger } from "../logger";
+import { notifyPassAnswered } from "../orgs/organizer-notify";
 import { inOrg } from "../tenant";
 import { platformBillingGate } from "./authz";
 import { platformSeasonBySlug } from "./season-lookup";
@@ -84,6 +88,27 @@ export async function answerPassRequest(
   if (!result.ok) {
     return { ok: false, error: result.detail };
   }
+  // Tell whoever asked, and the club's owners (PR15) — after the response,
+  // best effort: the answer stands whatever becomes of the mail.
+  const answered = result;
+  const passTier = answered.outcome === "granted" ? answered.toTier : answered.requestedTier;
+  after(async () => {
+    try {
+      await inOrg(operator.personId, season.orgId, (db) =>
+        notifyPassAnswered(db, {
+          competitionId: answered.competitionId,
+          requestId: answered.requestId,
+          requestedBy: answered.requestedBy,
+          outcome: answered.outcome,
+          fromTier: answered.fromTier,
+          passTier: isTier(passTier) ? passTier : answered.toTier,
+          note: note.trim() === "" ? null : note.trim().slice(0, 500),
+        }),
+      );
+    } catch (error) {
+      logger().warn({ err: error }, "plan.answer_notice_failed");
+    }
+  });
   revalidatePath("/admin/passes");
   return {
     ok: true,

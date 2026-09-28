@@ -6,7 +6,19 @@ import { sportPackFor } from "@desiauction/core";
 
 import { env } from "../../env";
 import { readinessRows } from "./auction-reminder-mail";
-import { auctionDateLeaf } from "./auction-schedule-mail";
+import { auctionDateLeaf, leafDate } from "./auction-schedule-mail";
+import {
+  fixtureLine,
+  lineupMatchup,
+  matchupOf,
+  matchTitle,
+  whenAndWhere,
+  wallInstant,
+  type MatchFacts,
+} from "./fixture-mail";
+import { clubBand } from "./club-mail";
+import { passLimits } from "./plan-mail";
+import { finaleTable, recordWords, type FinaleRow } from "./finale-mail";
 import { digestDetails, organizerJourney, welcomeFrame } from "./organizer-mail";
 import { journey, seasonBand, submittedDetails } from "./player-mail";
 import { requestDetails } from "./request-context";
@@ -81,6 +93,7 @@ function details(
     case "auth.email_code":
       return requestDetails(SAMPLE_REQUEST, "code", language);
     case "security.email_changed":
+    case "security.passkey_changed":
     case "security.phone_changed":
       return requestDetails(SAMPLE_REQUEST, "change", language);
     case "registration.received":
@@ -139,6 +152,160 @@ function organizerFrame(
     default:
       return {};
   }
+}
+
+/** A team's sample schedule — the preview's and the gallery's (fixture-mail.ts). */
+export const SAMPLE_MATCHES: readonly MatchFacts[] = [
+  {
+    id: "sample-1",
+    kickoffAt: "2026-10-04T19:30",
+    ground: "Malad Ground",
+    home: { id: "cup-kings", name: "Cup Kings", color: "#1E6FD9" },
+    away: { id: "tigers", name: "Tigers", color: "#E8772E" },
+    squadCount: 0,
+  },
+  {
+    id: "sample-2",
+    kickoffAt: "2026-10-11T16:00",
+    ground: "Goregaon Sports Club",
+    home: { id: "falcons", name: "Falcons", color: "#2E9E6B" },
+    away: { id: "cup-kings", name: "Cup Kings", color: "#1E6FD9" },
+    squadCount: 0,
+  },
+  {
+    id: "sample-3",
+    kickoffAt: "2026-10-18T07:30",
+    ground: "Malad Ground",
+    home: { id: "cup-kings", name: "Cup Kings", color: "#1E6FD9" },
+    away: { id: "royals", name: "Royals", color: null },
+    squadCount: 0,
+  },
+];
+export const SAMPLE_TEAM_ID = "cup-kings";
+
+/** The season's matches (PR11): the schedule's list, a change's tile, match day's crests. */
+function matchesFrame(
+  kind: EmailNotificationKind,
+  variant: string,
+  language: MessageLanguage,
+): Partial<RenderOptions> {
+  if (
+    kind !== "schedule.published" &&
+    kind !== "fixture.changed" &&
+    kind !== "match.day" &&
+    kind !== "lineup.announced"
+  ) {
+    return {};
+  }
+  const samples = sampleVariables(EMAIL_TEMPLATES[kind], language);
+  const band = seasonBand({
+    season: String(samples["season"] ?? ""),
+    orgName: String(
+      samples["orgName"] ?? (language === "hi" ? "मलाड क्रिकेट क्लब" : "Malad Cricket Club"),
+    ),
+    sport: "cricket",
+  });
+  const [first] = SAMPLE_MATCHES;
+  if (first === undefined) return {};
+  const hi = language === "hi";
+  switch (kind) {
+    case "schedule.published":
+      return {
+        band,
+        fixtures: SAMPLE_MATCHES.map((match) => fixtureLine(match, SAMPLE_TEAM_ID, language)),
+      };
+    case "fixture.changed":
+      return variant === "cancelled"
+        ? { band, details: [[hi ? "तय था" : "Was set for", String(samples["previous"] ?? "")]] }
+        : {
+            band,
+            dateLeaf: {
+              ...leafDate(wallInstant(first.kickoffAt), language),
+              title: matchTitle(first, language),
+              detail: whenAndWhere(first),
+            },
+            details: [[hi ? "पहले" : "Was", String(samples["previous"] ?? "")]],
+          };
+    case "match.day":
+      return variant === "organizer"
+        ? {
+            band,
+            fixtures: SAMPLE_MATCHES.slice(0, 2).map((match, i) =>
+              fixtureLine(
+                match,
+                null,
+                language,
+                i === 0 ? (hi ? "टीमें घोषित" : "Lineups in") : hi ? "1/2 टीमें" : "1/2 lineups",
+              ),
+            ),
+          }
+        : {
+            ...(() => {
+              const matchup = matchupOf(
+                first,
+                SAMPLE_TEAM_ID,
+                hi ? "मैच डे" : "Match day",
+                language,
+              );
+              return matchup === undefined ? { band } : { matchup };
+            })(),
+            details: [
+              [hi ? "शुरुआत" : "Kick-off", "7:30 pm IST"],
+              [hi ? "मैदान" : "Ground", "Malad Ground"],
+              [hi ? "पता" : "Address", "Link Road, Malad West, Mumbai"],
+            ],
+          };
+    case "lineup.announced": {
+      const matchup = lineupMatchup(first, SAMPLE_TEAM_ID, language);
+      return matchup === undefined ? { band } : { matchup };
+    }
+  }
+}
+
+/** A season's sample final table (finale-mail.ts). */
+const SAMPLE_TABLE: readonly FinaleRow[] = [
+  { teamId: "cup-kings", teamName: "Cup Kings", played: 8, won: 7, points: 14 },
+  { teamId: "falcons", teamName: "Falcons", played: 8, won: 5, points: 10 },
+  { teamId: "tigers", teamName: "Tigers", played: 8, won: 4, points: 8 },
+  { teamId: "royals", teamName: "Royals", played: 8, won: 2, points: 4 },
+  { teamId: "strikers", teamName: "Strikers", played: 8, won: 2, points: 4 },
+];
+
+/** The champion's trophy, or the final table (finale-mail.ts). */
+function finaleFrame(
+  kind: EmailNotificationKind,
+  variant: string,
+  language: MessageLanguage,
+): Partial<RenderOptions> {
+  if (kind !== "season.champion") return {};
+  const samples = sampleVariables(EMAIL_TEMPLATES[kind], language);
+  const season = String(samples["season"] ?? "");
+  const role = variant === "champion" || variant === "organizer" ? variant : "team";
+  const details = finaleTable(
+    {
+      table: SAMPLE_TABLE,
+      championId: "cup-kings",
+      teamId: role === "organizer" ? null : role === "champion" ? "cup-kings" : "tigers",
+      role,
+    },
+    language,
+  );
+  const [first] = SAMPLE_TABLE;
+  return role === "champion" && first !== undefined
+    ? {
+        stage: {
+          kicker: season,
+          monogram: "CK",
+          title: first.teamName,
+          figure: language === "hi" ? "चैंपियन" : "Champions",
+          line: recordWords(first, language),
+        },
+        details,
+      }
+    : {
+        band: seasonBand({ season, orgName: String(samples["orgName"] ?? ""), sport: "cricket" }),
+        details,
+      };
 }
 
 /** Auction night's band and date tile, with the sample season (auction-schedule-mail.ts). */
@@ -297,5 +464,27 @@ export function previewOptions(
     ...ownerFrame(kind, language),
     ...(kind === "auction.reminder" ? reminderFrame(variant, language) : {}),
     ...resultsFrame(kind, language),
+    ...matchesFrame(kind, variant, language),
+    ...finaleFrame(kind, variant, language),
+    ...(kind === "plan.requested" || kind === "plan.answered"
+      ? {
+          band: seasonBand({
+            season: String(sampleVariables(EMAIL_TEMPLATES[kind], language)["season"] ?? ""),
+            orgName: language === "hi" ? "मलाड क्रिकेट क्लब" : "Malad Cricket Club",
+            sport: "cricket",
+          }),
+          ...(kind === "plan.answered" && variant === "granted"
+            ? { details: passLimits("pro", language) }
+            : {}),
+        }
+      : {}),
+    ...(kind === "club.invite" || kind === "club.member_joined"
+      ? {
+          band: clubBand(
+            String(sampleVariables(EMAIL_TEMPLATES[kind], language)["orgName"] ?? ""),
+            language,
+          ),
+        }
+      : {}),
   };
 }
