@@ -190,7 +190,7 @@ export default async function ReportsPage({
     1,
   );
   const play = view.play;
-  const matchesAll = play === null ? 0 : play.played + play.live + play.toCome;
+  const matchesAll = play === null ? 0 : play.played + play.live + play.toCome + play.awaiting;
 
   const stages = [
     {
@@ -520,6 +520,7 @@ export default async function ReportsPage({
               : [
                   `${count(play.played)} of ${count(matchesAll)} matches played`,
                   play.live > 0 ? `${count(play.live)} live` : null,
+                  play.awaiting > 0 ? `${count(play.awaiting)} awaiting a result` : null,
                   leader !== undefined && leader.played > 0
                     ? `${leader.name} lead on ${count(leader.points)} pts`
                     : null,
@@ -623,8 +624,14 @@ export default async function ReportsPage({
                 Matches
                 {matchesAll > 0 ? (
                   <span>
-                    {count(play.played)} played · {count(play.live)} live · {count(play.toCome)} to
-                    come
+                    {[
+                      `${count(play.played)} played`,
+                      `${count(play.live)} live`,
+                      play.awaiting > 0 ? `${count(play.awaiting)} awaiting a result` : null,
+                      `${count(play.toCome)} to come`,
+                    ]
+                      .filter((part): part is string => part !== null)
+                      .join(" · ")}
                   </span>
                 ) : null}
               </h3>
@@ -637,6 +644,12 @@ export default async function ReportsPage({
                     parts={[
                       { key: "played", value: play.played, label: "played", tone: "green" },
                       { key: "live", value: play.live, label: "live", tone: "gold" },
+                      {
+                        key: "due",
+                        value: play.awaiting,
+                        label: "awaiting a result",
+                        tone: "amber",
+                      },
                       { key: "next", value: play.toCome, label: "to come", tone: "neutral" },
                     ]}
                     legend={false}

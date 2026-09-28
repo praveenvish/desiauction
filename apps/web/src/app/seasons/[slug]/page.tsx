@@ -16,6 +16,7 @@ import { ChampionCard } from "./champion-card";
 import { SeasonNow } from "./season-now";
 import { YourTeam } from "./your-team";
 import { teamSeason } from "../../../server/player/career";
+import { awaitsResult } from "./_tabs/fixture-status";
 import { istCalendarDate } from "../../../lib/format-date";
 import { CreatedToast } from "./created-toast";
 import { OverviewPanel } from "./overview-panel";
@@ -63,7 +64,11 @@ export default async function CompetitionHomePage({
       ? teamSeason(ownTeam.teamId, today)
       : null,
   ]);
-  const liveMatches = schedule?.rows.filter((row) => row.status === "in_progress").length ?? 0;
+  // Live is today's: a match left open from an earlier day awaits a result.
+  const liveMatches =
+    schedule?.rows.filter((row) => row.status === "in_progress" && !awaitsResult(row, today))
+      .length ?? 0;
+  const dueMatches = schedule?.rows.filter((row) => awaitsResult(row, today)).length ?? 0;
   // Name the champion (PR12): for the people who run the season, once every
   // match is done — or to show who was named.
   const finale =
@@ -85,6 +90,7 @@ export default async function CompetitionHomePage({
             slug={slug}
             mineTeamIds={mineTeamIds}
             liveMatches={liveMatches}
+            dueMatches={dueMatches}
             {...(ownTeam !== undefined
               ? {
                   yours: (

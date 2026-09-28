@@ -153,9 +153,9 @@ export default async function PublicCompetitionPage({
    * played the page is about the season — the table and the matches lead.
    */
   const play = view.play;
-  const matchesAll = play.played + play.live + play.toCome;
-  const finished = play.played > 0 && play.live === 0 && play.toCome === 0;
-  const seasonOn = !finished && play.played + play.live > 0;
+  const matchesAll = play.played + play.live + play.toCome + play.awaiting;
+  const finished = play.played > 0 && play.live === 0 && play.toCome === 0 && play.awaiting === 0;
+  const seasonOn = !finished && play.played + play.live + play.awaiting > 0;
   const seasonPhase = seasonOn || finished;
   // Once the season card lists the next matches, the full schedule below is
   // only worth its section when it holds more than the card already shows.
@@ -465,6 +465,7 @@ export default async function PublicCompetitionPage({
                   <span>
                     {play.played} played
                     {play.live > 0 ? ` · ${String(play.live)} live` : ""}
+                    {play.awaiting > 0 ? ` · ${String(play.awaiting)} awaiting a result` : ""}
                     {play.toCome > 0 ? ` · ${String(play.toCome)} to come` : ""}
                   </span>
                 </h3>
@@ -485,6 +486,24 @@ export default async function PublicCompetitionPage({
                         <span className="public-match-meta">
                           {match.groundName ?? "Being played now"}
                         </span>
+                      </span>
+                    </li>
+                  ))}
+                  {/* Played days with no result yet: said, not dropped (census 9). */}
+                  {play.awaitingMatches.map((match) => (
+                    <li key={match.fixtureId} data-state="due">
+                      <span className="public-match-when">{dayWord(match.kickoffAt, today)}</span>
+                      <span className="public-match-body">
+                        <span>
+                          <strong>{match.homeName ?? "Lobby"}</strong>
+                          {match.awayName !== null ? (
+                            <>
+                              {" "}
+                              vs <strong>{match.awayName}</strong>
+                            </>
+                          ) : null}
+                        </span>
+                        <span className="public-match-meta">Result to come</span>
                       </span>
                     </li>
                   ))}

@@ -52,7 +52,18 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             from (RN-1), so this is how an organizer reaches them. */}
         <div className="st-head">
           <ScheduleViews slug={slug} active="table" />
-          {standings.live > 0 ? (
+          {standings.awaiting > 0 ? (
+            <p className="st-head-lede" data-testid="standings-awaiting">
+              <strong>
+                {standings.awaiting} match{standings.awaiting === 1 ? "" : "es"}{" "}
+                {standings.awaiting === 1 ? "needs" : "need"} a result
+              </strong>{" "}
+              —{" "}
+              {standings.awaiting === 1
+                ? "its day has passed; the table counts it once the score is in."
+                : "their days have passed; the table counts them once the scores are in."}
+            </p>
+          ) : standings.live > 0 ? (
             <p className="st-head-lede">
               <span className="sd-live">
                 {standings.live} match{standings.live === 1 ? "" : "es"} playing now
@@ -250,6 +261,13 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                               return <span className="st-muted">—</span>;
                             }
                             const opponent = next.opponent !== null ? ` v ${next.opponent}` : "";
+                            if (next.due === true) {
+                              return (
+                                <span className="sd-next" data-due="true">
+                                  Result due{opponent}
+                                </span>
+                              );
+                            }
                             if (next.live) {
                               return (
                                 <span className="sd-next" data-live="true">
