@@ -223,4 +223,22 @@
   .sd-table .sd-next {
     white-space: normal;
   }
+
+  /* THE TABLE FITS THE PHONE (census 2026-09-28). With Next and five form
+     marks it scrolled sideways: the form ran off the edge and Next was a
+     screen away. On a phone the row keeps the last three results, a little
+     smaller, and Next goes — each team's page and the overview say it. */
+  .sd-table .sd-next-col {
+    display: none;
+  }
+
+  .sd-form-mark {
+    width: 19px;
+    height: 19px;
+    font-size: 10px;
+  }
+
+  .sd-form-mark:not(:nth-last-child(-n + 3)) {
+    display: none;
+  }
 }

@@ -69,9 +69,17 @@ export function formOf(
   return form;
 }
 
-/** Each team's match being played now, else its next dated one still to come. */
+/**
+ * Each team's match being played now, else its next dated one still to come.
+ *
+ * "Still to come" counts from the START of today, not this minute: a match
+ * on today at 9:30 that has not been played is still the team's next, not
+ * something to skip past to next week (census 2026-09-28 — the Table said
+ * "Sun, 4 Oct" for a team playing that morning).
+ */
 export function nextOf(fixtures: readonly FormFixture[], now: string): Map<string, TeamNext> {
   const next = new Map<string, TeamNext>();
+  const today = `${now.slice(0, 10)}T00:00`;
   const ordered = [...fixtures].sort((a, b) =>
     (a.kickoffAt ?? "9999").localeCompare(b.kickoffAt ?? "9999"),
   );
@@ -101,7 +109,7 @@ export function nextOf(fixtures: readonly FormFixture[], now: string): Map<strin
     if (
       (fixture.status === "published" || fixture.status === "scheduled") &&
       fixture.kickoffAt !== null &&
-      fixture.kickoffAt >= now
+      fixture.kickoffAt >= today
     ) {
       consider(fixture, false);
     }

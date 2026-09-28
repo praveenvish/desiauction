@@ -83,4 +83,15 @@ describe("nextOf", () => {
       live: false,
     });
   });
+
+  it("keeps an unplayed match from earlier today as the next, not next week's", () => {
+    // Census 2026-09-28: at 18:00 a team playing at 9:30 that morning (not
+    // yet played) was shown "Sun, 4 Oct" — this minute was the cut-off.
+    const fixtures = [
+      fixture("morning", "mm", "tt", "2026-09-28T09:30", "published"),
+      fixture("nextweek", "mm", "pp", "2026-10-04T15:00", "published"),
+      fixture("yesterday", "mm", "pp", "2026-09-27T09:30", "published"),
+    ];
+    expect(nextOf(fixtures, "2026-09-28T18:00").get("mm")?.fixtureId).toBe("morning");
+  });
 });

@@ -21,6 +21,14 @@ describe("nowRows", () => {
     f("h", "2026-09-26T08:00", "draft"),
   ];
 
+  it("keeps this morning's unplayed match among the next ones in the evening", () => {
+    const out = nowRows(rows, "2026-09-28T18:00", () => true);
+    expect(out.filter((row) => row.state === "next").map((row) => row.fixture.id)).toEqual([
+      "d",
+      "e",
+    ]);
+  });
+
   it("lists what is live, the next two, then the latest result", () => {
     const out = nowRows(rows, "2026-09-27T15:00", () => true);
     expect(out.map((row) => [row.fixture.id, row.state])).toEqual([
