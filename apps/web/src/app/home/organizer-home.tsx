@@ -40,6 +40,7 @@ import { auctionDashboard } from "../../server/auction/actions";
 import { competitionsView, seasonOverviewView } from "../../server/competition/actions";
 import { competitionAllows } from "../../server/competition/authz";
 import { appointmentsPanelView } from "../../server/competition/appointment-actions";
+import { awaitsResult } from "../seasons/[slug]/_tabs/fixture-status";
 import { organizerScheduleView } from "../../server/competition/fixture-actions";
 import { homeDashboard } from "../../server/home/dashboard";
 import { grantsOfPerson } from "../../server/request-cache";
@@ -56,7 +57,7 @@ import { HomeShortcuts } from "./home-shortcuts";
 import type { NextStep } from "./next-step";
 import { NextStepBanner } from "./next-step-banner";
 import "./home.css";
-import { dateTile } from "../../lib/format-date";
+import { dateTile, istCalendarDate } from "../../lib/format-date";
 import { formatCount } from "../../lib/plural";
 
 /**
@@ -338,7 +339,35 @@ export async function OrganizerHome({
       Promise.all(scanned.map((competition) => attentionFor(competition, dash, held))),
     ),
   ]);
-  const attention = scannedRows.flat().filter((row): row is AttentionRow => row !== null);
+  /*
+   * RESULTS OWED LEAD (census 8). A season three matches in, with one left
+   * open two days and two never started, told its organizer "Announce
+   * captains & icons — nothing else is waiting on you". A match whose day has
+   * passed with no result is the most overdue thing a season has.
+   */
+  const today = istCalendarDate();
+  const owed = new Map<string, { name: string; slug: string; count: number }>();
+  for (const fixture of schedule) {
+    if (!awaitsResult(fixture, today)) continue;
+    if (!managedSeasons.some((season) => season.slug === fixture.competitionSlug)) continue;
+    const held = owed.get(fixture.competitionSlug) ?? {
+      name: fixture.competitionName,
+      slug: fixture.competitionSlug,
+      count: 0,
+    };
+    held.count += 1;
+    owed.set(fixture.competitionSlug, held);
+  }
+  const attention = [
+    ...[...owed.values()].map((season): AttentionRow => ({
+      key: `results-${season.slug}`,
+      label: `${String(season.count)} ${season.count === 1 ? "match needs" : "matches need"} a result`,
+      detail: season.name,
+      href: `/seasons/${season.slug}/fixtures`,
+      verb: "Enter results",
+    })),
+    ...scannedRows.flat().filter((row): row is AttentionRow => row !== null),
+  ];
   const unscanned = view.competitions.length - scanned.length;
 
   const seasonNeedingTeams =
@@ -1184,6 +1213,14 @@ export async function OrganizerHome({
                           </strong>
                           <span>{fixture.competitionName}</span>
                         </span>
+                        {/* Its day passed with no result: owed, not upcoming. */}
+                        {awaitsResult(fixture, today) ? (
+                          <Pill tone="amber">Result due</Pill>
+                        ) : fixture.status === "in_progress" ? (
+                          <Pill tone="red" dot>
+                            Live
+                          </Pill>
+                        ) : null}
                       </Link>
                     </li>
                   );

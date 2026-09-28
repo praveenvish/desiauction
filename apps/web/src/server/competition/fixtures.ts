@@ -10,7 +10,7 @@ import {
   type Db,
 } from "@desiauction/db";
 import { alias } from "drizzle-orm/pg-core";
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { containsPattern } from "../../lib/like-pattern";
 
 // FIXTURE SNAPSHOTS (M-IP3-3, CTO addition 2). The immutable projection every
@@ -606,8 +606,14 @@ export async function organizerSchedule(
       // the strip compared kickoff with this minute, so a match on today at
       // 9:30 vanished at 9:31 and a live match (kicked off earlier) never
       // showed at all (census 2026-09-28).
+      // …and every published match whose day passed unplayed: it awaits a
+      // result, and dropping it hid the one thing the organizer owed (census 8).
       or(
         eq(fixtures.status, "in_progress"),
+        and(
+          eq(fixtures.status, "published"),
+          lt(fixtures.kickoffAt, `${fromKickoff.slice(0, 10)}T00:00`),
+        ),
         and(
           gte(fixtures.kickoffAt, `${fromKickoff.slice(0, 10)}T00:00`),
           sql`${fixtures.status} not in ('cancelled', 'completed')`,

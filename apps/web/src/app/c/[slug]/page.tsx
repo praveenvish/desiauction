@@ -159,9 +159,17 @@ export default async function PublicCompetitionPage({
   const seasonPhase = seasonOn || finished;
   // Once the season card lists the next matches, the full schedule below is
   // only worth its section when it holds more than the card already shows.
+  // Under "Matches to come", only matches still to come: a published match
+  // whose day has passed unplayed is not one (census 8 — Mon 28 Sep was
+  // listed on the 29th).
+  const scheduleRows = seasonPhase
+    ? view.fixtures.filter(
+        (fixture) => fixture.kickoffAt === null || fixture.kickoffAt.slice(0, 10) >= today,
+      )
+    : view.fixtures;
   const scheduleShown = seasonPhase
-    ? view.fixtures.length > play.upcoming.length
-    : view.fixtures.length > 0;
+    ? scheduleRows.length > play.upcoming.length
+    : scheduleRows.length > 0;
   /**
    * THE COUNTS, SAID ONCE.
    *
@@ -639,7 +647,7 @@ export default async function PublicCompetitionPage({
             title={seasonPhase ? "Matches to come" : "Published schedule"}
           >
             <ul className="public-fixture-list" data-testid="public-schedule">
-              {view.fixtures.map((fixture) => (
+              {scheduleRows.map((fixture) => (
                 <li key={fixture.number} className="public-fixture">
                   <span className="public-fixture-teams">
                     {/* A lobby has no home and no away, so "vs" is not a

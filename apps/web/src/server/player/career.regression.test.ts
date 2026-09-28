@@ -306,9 +306,11 @@ describe("playerCareer (PI-1)", () => {
 
   it("reads a team's season for its owner — public, upcoming, from the team's side", async () => {
     const season = await teamSeason(teamId, "2026-01-01");
-    // The 2099 published match is to come; the 2020 one is past, the draft is
-    // the organizer's working copy, and the completed one has no result yet.
+    // The 2099 published match is to come; the 2020 one is past with no result,
+    // so it awaits one (it used to vanish); the draft is the organizer's
+    // working copy, and the completed one has no result yet.
     expect(season?.upcoming.map((match) => match.fixtureId)).toEqual([fixtureIds[0]]);
+    expect(season?.awaiting.map((match) => match.fixtureId)).toEqual([fixtureIds[1]]);
     expect(season?.upcoming[0]).toMatchObject({ opponentName: "Career Rivals", live: false });
     expect(season?.results).toEqual([]);
     expect(season?.record).toEqual({ played: 0, won: 0, lost: 0, tied: 0 });

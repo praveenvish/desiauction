@@ -1688,3 +1688,12 @@
     flex: 1 1 0;
   }
 }
+
+/* A past match with no result yet: listed, not dropped (2026-09-29). */
+.reg-season-due {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
