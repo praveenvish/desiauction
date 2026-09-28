@@ -12,6 +12,7 @@ import {
   SectionCard,
   TeamChip,
   type KitTone,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties } from "react";
@@ -28,12 +29,20 @@ import {
   type PublicTeam,
   type PublicTopBuy,
 } from "../../server/competition/public";
-import { playerUpcomingMatches, type UpcomingMatch } from "../../server/player/career";
+import {
+  playerCareer,
+  playerMatches,
+  playerUpcomingMatches,
+  type CareerMatch,
+  type UpcomingMatch,
+} from "../../server/player/career";
 import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/profile";
+import { STAGE_STEPS, matchRecord } from "../me/me-model";
 import { verdictOf } from "../me/registration-card";
+import { currentSeason, heroKind, type CurrentSeason, type HeroKind } from "./player-home-model";
 import "./home-duo.css";
 import "./player-home.css";
-import { dateTile, istCalendarDate } from "../../lib/format-date";
+import { dateTile, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
 
 /**
  * THE PLAYER'S HOME.
@@ -141,12 +150,262 @@ function SoldMoment({ registration }: { registration: MyRegistration }) {
   );
 }
 
-/** "2026-10-04 09:30" (local wall-clock text) → { day: "4", month: "Oct" }. */
-function dateBlock(kickoffAt: string | null): { day: string; month: string } | null {
-  if (kickoffAt === null) return null;
+/** "Mon 28" from the fixture's local wall-clock text. */
+function dayLabel(kickoffAt: string | null): string {
+  if (kickoffAt === null) return "TBA";
   const day = kickoffAt.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
-  return dateTile(day);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return "TBA";
+  const tile = dateTile(day);
+  return `${tile.day} ${tile.month}`;
+}
+
+/** "9:30 am", or null when the kickoff has no time. */
+function timeLabel(kickoffAt: string | null): string | null {
+  if (kickoffAt === null || kickoffAt.length <= 10) return null;
+  return formatWallTime(kickoffAt.replace(" ", "T").slice(0, 16));
+}
+
+const RESULT_WORD = { won: "Won", lost: "Lost", tied: "Tied", no_result: "No result" } as const;
+
+function ResultMark({ result }: { result: CareerMatch["result"] }) {
+  if (result === null) return <span className="pm-match-next">Live</span>;
+  return (
+    <span className="pm-result" data-result={result}>
+      <span aria-hidden>
+        {result === "won" ? "W" : result === "lost" ? "L" : result === "tied" ? "T" : "–"}
+      </span>
+      <VisuallyHidden>{RESULT_WORD[result]}</VisuallyHidden>
+    </span>
+  );
+}
+
+/** The four steps a player's season goes through, the current one lit. */
+function StageTrack({ at }: { at: number }) {
+  return (
+    <ol
+      className="pm-track"
+      aria-label={`Step ${String(at + 1)} of ${String(STAGE_STEPS.length)}: ${STAGE_STEPS[at] ?? ""}`}
+    >
+      {STAGE_STEPS.map((step, index) => (
+        <li
+          key={step}
+          data-state={index < at ? "done" : index === at ? "now" : "todo"}
+          aria-current={index === at ? "step" : undefined}
+        >
+          {step}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * BEFORE A TEAM: where this person's season stands — waiting, in the pool,
+ * the auction live — on the same four steps My profile draws.
+ */
+function StageHero({
+  registration,
+  kind,
+  at,
+}: {
+  registration: MyRegistration;
+  kind: HeroKind;
+  at: number;
+}) {
+  const role =
+    registration.role === null
+      ? null
+      : roleLabelIn(sportPackFor(registration.sport), registration.role);
+  const base = `/seasons/${registration.competitionSlug}`;
+  const copy =
+    kind === "waiting"
+      ? {
+          title: "Your registration is with the organizer",
+          line: `${role !== null ? `Registered as ${role === "" ? "a player" : aOrAn(role)}. ` : ""}You'll get a message the moment they approve it — then you're in the auction pool.`,
+          door: { label: "Your registration", href: `${base}/register`, primary: false },
+        }
+      : kind === "waitlisted"
+        ? {
+            title: "You're on the waitlist",
+            line: "If a place opens, the organizer can move you into the pool — we'll message you.",
+            door: { label: "Your registration", href: `${base}/register`, primary: false },
+          }
+        : kind === "auction_live"
+          ? {
+              title: "The auction is live — you're in the pool",
+              line: "Owners are bidding now. We'll message you the moment a team buys you.",
+              door: {
+                label: "Watch the auction live",
+                href: `${base}/auction/spectate`,
+                primary: true,
+              },
+            }
+          : kind === "pool"
+            ? {
+                title: "You're in the auction pool",
+                line: "Owners bid for you on auction night — we'll message you the moment a team buys you.",
+                door: registration.posterReady
+                  ? { label: "Share your card", href: `${base}/posters`, primary: false }
+                  : { label: "Your registration", href: `${base}/register`, primary: false },
+              }
+            : {
+                title: `You're in the ${registration.teamName ?? ""} squad`,
+                line: "Your matches show here the moment the club publishes the schedule.",
+                door: { label: "Your season", href: `${base}/register`, primary: false },
+              };
+  return (
+    <section
+      className="pm-stage"
+      data-theme="floodlight"
+      data-testid="home-stage-hero"
+      data-kind={kind}
+      aria-labelledby="pm-stage-title"
+    >
+      <p className="pm-moment-kicker">
+        {registration.competitionName} · {registration.orgName}
+      </p>
+      <div className="pm-stage-main">
+        <div className="pm-stage-copy">
+          <h2 id="pm-stage-title" className="pm-stage-title">
+            {copy.title}
+          </h2>
+          <p className="pm-stage-line">{copy.line}</p>
+        </div>
+        <ButtonLink
+          href={copy.door.href}
+          size="lg"
+          variant={copy.door.primary ? "primary" : "secondary"}
+        >
+          {copy.door.label}
+          <IconArrowRight size={16} />
+        </ButtonLink>
+      </div>
+      <StageTrack at={at} />
+    </section>
+  );
+}
+
+function aOrAn(word: string): string {
+  return /^[aeiou]/i.test(word) ? `an ${word}` : `a ${word}`;
+}
+
+/**
+ * THE SEASON IS ON: the next match leads, and the season so far in four
+ * figures — all from this person's own reads.
+ */
+function MatchHero({
+  registration,
+  next,
+  record,
+  toCome,
+  squad,
+}: {
+  registration: MyRegistration;
+  next: UpcomingMatch | undefined;
+  record: { played: number; won: number; lost: number };
+  toCome: number;
+  squad: number | null;
+}) {
+  const base = `/seasons/${registration.competitionSlug}`;
+  const price =
+    registration.auction?.kind === "sold"
+      ? moneyFormat(registration.auctionUnit).ledger(registration.auction.soldPrice)
+      : null;
+  const day = next?.kickoffAt?.slice(0, 10) ?? null;
+  const today = istCalendarDate();
+  const when =
+    next === undefined
+      ? null
+      : day === null || !/^\d{4}-\d{2}-\d{2}$/.test(day)
+        ? "Date to be announced"
+        : [formatDayDate(day), timeLabel(next.kickoffAt), next.groundName]
+            .filter((part): part is string => part !== null && part !== "")
+            .join(" · ");
+  const soon =
+    day === null
+      ? "Next match"
+      : day === today
+        ? "Next match · today"
+        : day === tomorrowOf(today)
+          ? "Next match · tomorrow"
+          : "Next match";
+  return (
+    <section
+      className="pm-match-hero"
+      data-theme="floodlight"
+      data-testid="home-match-hero"
+      aria-labelledby="pm-match-title"
+      style={
+        registration.teamColor === null
+          ? undefined
+          : ({ "--pm-team": registration.teamColor } as CSSProperties)
+      }
+    >
+      <p className="pm-moment-kicker">
+        {next !== undefined ? soon : "Season on"} · {registration.competitionName}
+      </p>
+      <div className="pm-stage-main">
+        <div className="pm-stage-copy">
+          {next !== undefined ? (
+            <h2 id="pm-match-title" className="pm-vs">
+              <span>
+                <i style={{ background: next.teamColor ?? "currentColor" }} aria-hidden />
+                {next.teamName}
+              </span>
+              <span className="pm-vs-word">vs</span>
+              <span>
+                <i style={{ background: next.opponentColor ?? "currentColor" }} aria-hidden />
+                {next.opponentName}
+              </span>
+            </h2>
+          ) : (
+            <h2 id="pm-match-title" className="pm-vs">
+              {registration.teamName}
+            </h2>
+          )}
+          <p className="pm-stage-line">
+            {when ?? "No more matches on the schedule yet — the club publishes them."}
+          </p>
+        </div>
+        {registration.posterReady ? (
+          <ButtonLink href={`${base}/posters`} size="lg" variant="secondary">
+            Share your card
+            <IconArrowRight size={16} />
+          </ButtonLink>
+        ) : null}
+      </div>
+      <dl className="pm-figs">
+        <div>
+          <dt>won – lost</dt>
+          <dd>
+            {record.won} – {record.lost}
+          </dd>
+        </div>
+        <div>
+          <dt>matches to come</dt>
+          <dd>{toCome}</dd>
+        </div>
+        {price !== null ? (
+          <div>
+            <dt>your price</dt>
+            <dd>{price}</dd>
+          </div>
+        ) : null}
+        {squad !== null ? (
+          <div>
+            <dt>in the squad</dt>
+            <dd>{squad}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </section>
+  );
+}
+
+function tomorrowOf(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
 }
 
 /**
@@ -159,18 +418,26 @@ function SoldDuo({
   registration,
   team,
   upcoming,
+  matches,
   topBuys,
 }: {
   registration: MyRegistration;
   team: PublicTeam | null;
   upcoming: UpcomingMatch[];
+  matches: CareerMatch[];
   topBuys: PublicTopBuy[];
 }) {
   const money = moneyFormat(registration.auctionUnit);
-  const next = upcoming.find((match) => match.competitionSlug === registration.competitionSlug);
-  const when = next === undefined ? null : dateBlock(next.kickoffAt);
+  const mine = upcoming.filter((match) => match.registrationId === registration.registrationId);
+  const next = mine[0];
+  const results = matches.filter(
+    (match) => match.registrationId === registration.registrationId && match.result !== null,
+  );
+  const record = matchRecord(results);
   const seasonHref = `/c/${registration.competitionSlug}`;
-  if (team === null && next === undefined && topBuys.length === 0) return null;
+  if (team === null && next === undefined && results.length === 0 && topBuys.length === 0) {
+    return null;
+  }
   return (
     <div className="hd-duo" data-testid="home-player-duo">
       {team !== null ? (
@@ -186,46 +453,49 @@ function SoldDuo({
         />
       ) : null}
 
-      {next !== undefined ? (
-        <section className="hd-card" aria-labelledby="hd-next-title">
+      {next !== undefined || results.length > 0 ? (
+        <section className="hd-card" aria-labelledby="hd-next-title" data-testid="home-matches">
           <div className="hd-head">
             <h2 id="hd-next-title" className="hd-title">
               <IconCalendar size={20} />
-              Next match
+              Your matches
+              {record.played > 0 ? (
+                <span className="hd-title-sub">
+                  · {record.played} played · {record.won} won
+                </span>
+              ) : null}
             </h2>
             <Link className="hd-link" href="/me">
               All matches
               <IconArrowRight size={16} />
             </Link>
           </div>
-          <div className="hd-match">
-            <span className="hd-date" aria-hidden={when === null}>
-              {when === null ? (
-                <IconCalendar size={24} />
-              ) : (
-                <>
-                  <b>{when.day}</b>
-                  <small>{when.month}</small>
-                </>
-              )}
-            </span>
-            <span className="hd-vs">
-              <strong>
-                {next.teamName} vs {next.opponentName}
-              </strong>
-              <span className="hd-meta">
-                {next.kickoffAt === null ? "Date to be announced" : next.kickoffAt.slice(11, 16)}
-                {" · "}
-                {next.competitionName}
-              </span>
-            </span>
-          </div>
-          {upcoming.length > 1 ? (
-            <p className="hd-foot">
-              Then <strong>{String(upcoming.length - 1)} more</strong> published{" "}
-              {upcoming.length === 2 ? "match" : "matches"} on your calendar.
-            </p>
-          ) : null}
+          <ol className="hd-rows pm-matches">
+            {mine.slice(0, 2).map((match) => (
+              <li key={match.fixtureId} className="pm-match">
+                <span className="pm-match-when">{dayLabel(match.kickoffAt)}</span>
+                <span className="hd-who">
+                  <span className="hd-name">vs {match.opponentName}</span>
+                  <span className="hd-meta">
+                    {[timeLabel(match.kickoffAt), match.groundName]
+                      .filter((part): part is string => part !== null && part !== "")
+                      .join(" · ")}
+                  </span>
+                </span>
+                <span className="pm-match-next">Next</span>
+              </li>
+            ))}
+            {results.slice(0, mine.length > 0 ? 2 : 4).map((match) => (
+              <li key={match.fixtureId} className="pm-match">
+                <span className="pm-match-when">{dayLabel(match.kickoffAt)}</span>
+                <span className="hd-who">
+                  <span className="hd-name">vs {match.opponentName}</span>
+                  <span className="hd-meta">{match.competitionName}</span>
+                </span>
+                <ResultMark result={match.result} />
+              </li>
+            ))}
+          </ol>
         </section>
       ) : topBuys.length > 0 ? (
         <section className="hd-card" aria-labelledby="hd-top-title">
@@ -289,10 +559,15 @@ export async function PlayerHome({
   /** False for somebody who already runs a club — see the last section. */
   offerOrganizing: boolean;
 }) {
-  const [registrations, hasProfile, completeness] = await Promise.all([
+  // Today in IST — fixture kickoffs and season dates are local wall-clock text.
+  const today = istCalendarDate();
+  const [registrations, hasProfile, completeness, career, matches, upcoming] = await Promise.all([
     myRegistrations(personId),
     hasPlayerProfile(personId),
     profileCompletenessFor(personId),
+    playerCareer(personId),
+    playerMatches(personId),
+    playerUpcomingMatches(personId, today),
   ]);
 
   // Nudge only somebody the platform can SEE is a player (an entry or a
@@ -307,32 +582,72 @@ export async function PlayerHome({
    * footballer to an empty cricket career and told them that was their record.
    */
   const pack = sportPackFor(registrations[registrations.length - 1]?.sport ?? null);
-  // The most recent sale leads the page (the list is oldest-first).
-  const moment =
-    [...registrations]
-      .reverse()
-      .find((entry) => entry.auction?.kind === "sold" && entry.teamName !== null) ?? null;
-  // Today in IST — fixture kickoffs are local wall-clock text (as /me reads it).
-  const today = istCalendarDate();
-  const [team, upcoming, topBuys] =
+
+  /*
+   * ONE HERO THAT FOLLOWS THE SEASON (2026-09-28). The sale used to lead the
+   * page for ever — three matches in, with the next one tomorrow, the loudest
+   * thing on it was still the price. Now the newest live season decides:
+   * waiting, in the pool, the auction live, sold (until the first match is
+   * played), then match day.
+   */
+  const current: CurrentSeason | null = currentSeason(career.seasons, today);
+  const lead =
+    current === null
+      ? undefined
+      : registrations.find((entry) => entry.registrationId === current.season.registrationId);
+  const played =
+    lead === undefined
+      ? 0
+      : matches.filter(
+          (match) => match.registrationId === lead.registrationId && match.result !== null,
+        ).length;
+  const leadUpcoming =
+    lead === undefined
+      ? []
+      : upcoming.filter((match) => match.registrationId === lead.registrationId);
+  const kind =
+    current === null || lead === undefined
+      ? null
+      : heroKind(current, { played, upcoming: leadUpcoming.length });
+  const moment = kind === "sold" || kind === "match" || kind === "squad" ? (lead ?? null) : null;
+  const [team, topBuys] =
     moment === null || moment.teamName === null
-      ? [null, [], []]
+      ? [null, []]
       : await Promise.all([
           publicTeam(moment.competitionSlug, teamSlugOf(moment.teamName)),
-          playerUpcomingMatches(personId, today),
           publicTopBuys(moment.competitionSlug, 3),
         ]);
+  const record = matchRecord(
+    lead === undefined
+      ? []
+      : matches.filter((match) => match.registrationId === lead.registrationId),
+  );
 
   return (
     <>
-      {moment !== null ? (
-        // The premium hero carries the sale and nothing else: the profile
-        // nudge under its rule diluted it (review r2, r3) — it follows the
-        // duo below as its own quiet line.
-        <SoldMoment registration={moment} />
+      {lead !== undefined && current !== null && kind !== null ? (
+        kind === "sold" ? (
+          <SoldMoment registration={lead} />
+        ) : kind === "match" ? (
+          <MatchHero
+            registration={lead}
+            next={leadUpcoming[0]}
+            record={record}
+            toCome={leadUpcoming.length}
+            squad={team === null ? null : team.members.length}
+          />
+        ) : (
+          <StageHero registration={lead} kind={kind} at={current.stage.at} />
+        )
       ) : null}
       {moment !== null ? (
-        <SoldDuo registration={moment} team={team} upcoming={upcoming} topBuys={topBuys} />
+        <SoldDuo
+          registration={moment}
+          team={team}
+          upcoming={upcoming}
+          matches={matches}
+          topBuys={topBuys}
+        />
       ) : null}
       {showNudge ? (
         <p className="pm-nudge" data-testid="home-profile-nudge">
@@ -383,9 +698,13 @@ export async function PlayerHome({
                     <span className="home-row-text">
                       <strong>{registration.competitionName}</strong>
                       <span>
-                        {registration.orgName} ·{" "}
-                        {roleLabelIn(sportPackFor(registration.sport), registration.role)} ·{" "}
-                        {registration.number}
+                        {[
+                          registration.orgName,
+                          roleLabelIn(sportPackFor(registration.sport), registration.role),
+                          registration.number,
+                        ]
+                          .filter((part) => part !== "")
+                          .join(" · ")}
                       </span>
                       {registration.teamName !== null && !verdict.namesTeam ? (
                         <span>
@@ -403,11 +722,11 @@ export async function PlayerHome({
                     nested in it, and offered only where a verdict exists. */}
                   {/* An unsold player gets no share card (the share-card rule);
                       the route still draws the verdict, home doesn't offer it. */}
-                  {/* …and the season in the sold moment above already offers its
-                      card, so its row does not offer it twice. */}
+                  {/* …and the season in the hero above already offers its card,
+                      so its row does not offer it twice. */}
                   {registration.posterReady &&
                   registration.auction?.kind !== "unsold" &&
-                  registration.registrationId !== moment?.registrationId ? (
+                  registration.registrationId !== lead?.registrationId ? (
                     <Link
                       href={`/seasons/${registration.competitionSlug}/posters`}
                       className="home-own-poster"
