@@ -1,7 +1,9 @@
 import { messageOutbox, type Db } from "@desiauction/db";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
+import { env } from "../../env";
 import { systemDb } from "../db";
+import { smsRoute, type SmsRoute } from "../messaging/delivery-readiness";
 import { isNotificationKind, notificationOf } from "../messaging/catalogue";
 import { platformAdminGate } from "./authz";
 import {
@@ -289,9 +291,20 @@ export async function deliveryAnalytics(
  * the counts are across every club and the outbox is org-scoped for everyone
  * else.
  */
+/** The page's read: the analytics, and where a text goes on this server. */
+export interface AdminDeliveryView extends DeliveryAnalytics {
+  /** "Sent" on SMS means the development inbox when no gateway is set up. */
+  readonly smsRoute: SmsRoute;
+}
+
 export async function adminDeliveryAnalytics(
   windowDays: AnalyticsWindow,
-): Promise<DeliveryAnalytics | null> {
+): Promise<AdminDeliveryView | null> {
   if ((await platformAdminGate()) === null) return null;
-  return deliveryAnalytics(systemDb, windowDays);
+  return {
+    ...(await deliveryAnalytics(systemDb, windowDays)),
+    // The parsed env, widened: every field is a string or undefined, and
+    // smsRoute only asks whether names are set.
+    smsRoute: smsRoute(env as unknown as Record<string, string | undefined>),
+  };
 }

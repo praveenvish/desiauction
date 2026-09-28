@@ -19,13 +19,21 @@ import {
   type ReasonRow,
 } from "../../../../server/admin/delivery-analytics-views";
 import { TrendChart } from "./trend-chart";
-import { headlineFigures, totalsOf } from "./analytics-model";
-import { AdminPageHead, humanAction, KpiValue, TableCount } from "../../admin-ui";
+import {
+  cellWords,
+  channelSentence,
+  headlineFigures,
+  kindMatrix,
+  leadFinding,
+  totalsOf,
+} from "./analytics-model";
+import { AdminPageHead, humanAction, KpiValue } from "../../admin-ui";
 import { formatCount } from "../../../../server/admin/format";
 import { NotifySubnav } from "../notify-subnav";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 import "../notifications.css";
+import "./analytics.css";
 
 export const metadata = {
   title: "Delivery analytics · Notifications · Platform admin · DesiAuction",
@@ -50,6 +58,8 @@ const CHANNEL_LABEL: Record<AnalyticsChannel, string> = {
   sms: "SMS",
 };
 
+const ANALYTICS_CHANNEL_ORDER: readonly AnalyticsChannel[] = ["email", "whatsapp", "sms"];
+
 const CHANNEL_ICON: Record<AnalyticsChannel, ReactNode> = {
   email: <IconMail />,
   whatsapp: <IconWhatsApp />,
@@ -58,7 +68,7 @@ const CHANNEL_ICON: Record<AnalyticsChannel, ReactNode> = {
 
 const STATUS_LABEL: Record<ReasonRow["status"], { label: string; tone: "red" | "amber" }> = {
   failed: { label: "Failed", tone: "red" },
-  suppressed: { label: "Suppressed", tone: "amber" },
+  suppressed: { label: "Held back", tone: "amber" },
   undelivered: { label: "Not delivered", tone: "red" },
 };
 
@@ -76,7 +86,12 @@ export default async function AdminDeliveryAnalyticsPage({
     notFound();
   }
   const anything = view.channels.some((c) => c.sent + c.failed + c.suppressed + c.pending > 0);
-  const figures = headlineFigures(totalsOf(view.channels), windowDays);
+  const totals = totalsOf(view.channels);
+  const figures = headlineFigures(totals, windowDays);
+  const finding = leadFinding(totals, view.reasons, humanAction, (c) =>
+    c in CHANNEL_LABEL ? CHANNEL_LABEL[c as AnalyticsChannel] : c,
+  );
+  const messages = kindMatrix(view.kinds);
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
@@ -101,13 +116,21 @@ export default async function AdminDeliveryAnalyticsPage({
           Sign-in codes, receipts and security emails are not counted. Days are India time.
         </p>
 
-        {/* The headline: one strip of four figures, each with the one fact
-            that reads it. The channel rows under it break it down. */}
+        {/* THE FINDING LEADS. "5,942 of 11,266 never went — every one for No
+            verified email" was a small side card beside the chart; it is the
+            first thing the page says now, over the four figures. */}
         <section
           className="msg-card dla-headline"
           aria-label="In total"
           data-testid="analytics-headline"
+          data-tone={finding?.tone}
         >
+          {finding === null ? null : (
+            <div className="dla-finding" data-testid="analytics-finding">
+              <h2>{finding.title}</h2>
+              <p>{finding.body}</p>
+            </div>
+          )}
           <dl className="dla-figs">
             {figures.map((figure) => (
               <div key={figure.key} className="dla-fig" data-alarm={figure.alarm || undefined}>
@@ -135,6 +158,7 @@ export default async function AdminDeliveryAnalyticsPage({
           <div className="dla-figures">
             {view.channels.map((c) => {
               const settled = c.sent + c.failed;
+              const quiet = c.sent + c.failed + c.suppressed + c.pending === 0;
               return (
                 <section
                   key={c.channel}
@@ -146,20 +170,43 @@ export default async function AdminDeliveryAnalyticsPage({
                     <IconTile icon={CHANNEL_ICON[c.channel]} tone="neutral" size="sm" />
                     {CHANNEL_LABEL[c.channel]}
                   </h3>
-                  <dl>
-                    <dt>Sent</dt>
-                    <dd data-testid={`analytics-${c.channel}-sent`} data-zero={zero(c.sent)}>
+                  {/* The channel in one sentence; the figures stay under it,
+                      folded, for the one who needs the rate. A quiet channel
+                      was a grid of 0 · 0 · 0 · — · — · —. */}
+                  <p className="dla-channel-line" data-quiet={quiet || undefined}>
+                    {channelSentence(
+                      c,
+                      CHANNEL_LABEL[c.channel],
+                      windowDays,
+                      c.channel === "sms" && view.smsRoute === "dev_inbox",
+                    )}
+                  </p>
+                  {c.channel === "sms" && view.smsRoute === "dev_inbox" && !quiet ? (
+                    <p className="dla-channel-note">No SMS gateway is set up on this server.</p>
+                  ) : null}
+                  <dl data-quiet={quiet || undefined}>
+                    <dt className="dla-sr">Sent</dt>
+                    <dd
+                      className="dla-sr"
+                      data-testid={`analytics-${c.channel}-sent`}
+                      data-zero={zero(c.sent)}
+                    >
                       {formatCount(c.sent)}
                     </dd>
-                    <dt>Suppressed</dt>
+                    <dt className="dla-sr">Held back</dt>
                     <dd
+                      className="dla-sr"
                       data-testid={`analytics-${c.channel}-suppressed`}
                       data-zero={zero(c.suppressed)}
                     >
                       {formatCount(c.suppressed)}
                     </dd>
-                    <dt>Failed</dt>
-                    <dd data-testid={`analytics-${c.channel}-failed`} data-zero={zero(c.failed)}>
+                    <dt className="dla-sr">Failed</dt>
+                    <dd
+                      className="dla-sr"
+                      data-testid={`analytics-${c.channel}-failed`}
+                      data-zero={zero(c.failed)}
+                    >
                       {formatCount(c.failed)}
                     </dd>
                     {c.pending > 0 ? (
@@ -247,8 +294,8 @@ export default async function AdminDeliveryAnalyticsPage({
           data-testid="analytics-kinds"
         >
           <header className="msg-group-head">
-            <h2 id="dla-kinds-title">By kind</h2>
-            <span>Each message on each channel, busiest first</span>
+            <h2 id="dla-kinds-title">By message</h2>
+            <span>Busiest first · one row a message, a column a channel</span>
           </header>
           {!anything ? (
             <div className="dla-empty">
@@ -261,47 +308,45 @@ export default async function AdminDeliveryAnalyticsPage({
             </div>
           ) : (
             <div className="admin-table-wrap">
-              <table className="admin-table dla-table">
+              <table className="admin-table dla-table dla-matrix">
                 <thead>
                   <tr>
-                    <th scope="col">Kind</th>
-                    <th scope="col">Channel</th>
-                    <th scope="col" className="admin-num">
-                      Sent
-                    </th>
-                    <th scope="col" className="admin-num">
-                      Suppressed
-                    </th>
-                    <th scope="col" className="admin-num">
-                      Failed
-                    </th>
-                    <th scope="col" className="admin-num">
-                      Failure rate
-                    </th>
+                    <th scope="col">Message</th>
+                    {ANALYTICS_CHANNEL_ORDER.map((c) => (
+                      <th scope="col" key={c}>
+                        {CHANNEL_LABEL[c]}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {view.kinds.map((k) => (
-                    <tr
-                      key={`${k.kind}|${k.channel}`}
-                      data-testid={`analytics-kind-${k.kind}-${k.channel}`}
-                    >
-                      <td data-label="Kind">
-                        <span className="admin-name">{k.label}</span>
+                  {messages.map((m) => (
+                    <tr key={m.kind} data-testid={`analytics-kind-${m.kind}`}>
+                      <td data-label="Message">
+                        <span className="admin-name">{m.label}</span>
                       </td>
-                      <td data-label="Channel">{CHANNEL_LABEL[k.channel]}</td>
-                      <td data-label="Sent" className="admin-num">
-                        <TableCount n={k.sent} />
-                      </td>
-                      <td data-label="Suppressed" className="admin-num">
-                        <TableCount n={k.suppressed} />
-                      </td>
-                      <td data-label="Failed" className="admin-num">
-                        <TableCount n={k.failed} />
-                      </td>
-                      <td data-label="Failure rate" className="admin-num">
-                        {rate(k.failed, k.sent + k.failed)}
-                      </td>
+                      {ANALYTICS_CHANNEL_ORDER.map((c) => {
+                        const cell = m.cells[c];
+                        const words = cellWords(cell);
+                        return (
+                          <td
+                            key={c}
+                            data-label={CHANNEL_LABEL[c]}
+                            data-testid={`analytics-kind-${m.kind}-${c}`}
+                            data-held={cell !== undefined && cell.suppressed > 0 ? "" : undefined}
+                            data-failed={cell !== undefined && cell.failed > 0 ? "" : undefined}
+                            // A phone row leaves a channel with nothing out of its line.
+                            data-empty={words === null || undefined}
+                            className="dla-matrix-cell"
+                          >
+                            {words ?? (
+                              <span className="admin-dash">
+                                —<span className="admin-sr-only">Nothing</span>
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
