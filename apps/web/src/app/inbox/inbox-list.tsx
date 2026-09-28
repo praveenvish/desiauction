@@ -27,9 +27,11 @@ import {
   type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { inboxSeenKey, labelForEvent } from "../../lib/inbox-events";
+import { markInboxSeenAction } from "../../server/auth/actions";
 import { useHydrated } from "../../lib/use-hydrated";
 import {
   formatDate,
@@ -154,32 +156,56 @@ function dayLabel(key: string, now: number | null): string {
 }
 
 /**
- * Unread contract: rows newer than the device's last visit render with the
- * unread dot for THIS render, then the visit timestamp advances. Read-state is
- * presentation-only (localStorage) — no notification storage exists yet — but
- * the key is namespaced by personId, so one account's reading position can
- * never mark another account's notices as read on a shared handset.
+ * Unread contract (PR16): read state is the SERVER's — the person's own
+ * watermark (people.inbox_seen_at), so a notice read on the phone is read on
+ * the laptop. Rows newer than it render with the dot for THIS visit; opening
+ * the list moves the watermark to the newest row and refreshes the layout, so
+ * the bell clears on the way out. The first visit on this build seeds from the
+ * old device watermark, so nobody's whole history turns "new" at once.
  */
-export function InboxList({ personId, events }: { personId: string; events: InboxEvent[] }) {
+export function InboxList({
+  personId,
+  events,
+  seenBefore: serverSeen,
+  olderHref = null,
+}: {
+  personId: string;
+  events: InboxEvent[];
+  /** The server watermark before this visit (ISO), null when never set. */
+  seenBefore: string | null;
+  /** "Show older" — the next page, when there is one. */
+  olderHref?: string | null;
+}) {
+  const router = useRouter();
   const [seenBefore, setSeenBefore] = useState<string | null>(null);
   const hydrated = useHydrated();
   // Rendered on the client only: a server-rendered "3 hours ago" is stale by
   // the time it reaches the browser and mismatches on hydration.
   const [now, setNow] = useState<number | null>(null);
-  // Capture the pre-visit watermark exactly once per mount — StrictMode's
-  // double-invoked effect must not read back the value it just wrote.
+  // The baseline is captured once per mount: marking the list seen refreshes
+  // the page, and the refreshed watermark must not wipe this visit's dots.
   const captured = useRef<{ seen: string | null } | null>(null);
 
   useEffect(() => {
-    const key = inboxSeenKey(personId);
-    captured.current ??= { seen: window.localStorage.getItem(key) };
+    if (captured.current === null) {
+      let legacy: string | null = null;
+      try {
+        legacy = window.localStorage.getItem(inboxSeenKey(personId));
+        window.localStorage.removeItem(inboxSeenKey(personId));
+      } catch {
+        // Storage unreadable: the server watermark alone decides.
+      }
+      captured.current = { seen: serverSeen ?? legacy };
+      const latest = events[0]?.at;
+      if (latest !== undefined && (serverSeen === null || latest > serverSeen)) {
+        void markInboxSeenAction(latest).then(() => {
+          router.refresh();
+        });
+      }
+    }
     setSeenBefore(captured.current.seen);
     setNow(Date.now());
-    const latest = events[0]?.at;
-    if (latest !== undefined) {
-      window.localStorage.setItem(key, latest);
-    }
-  }, [events, personId]);
+  }, [events, personId, serverSeen, router]);
 
   // Consecutive notices on the same IST day share a heading.
   const groups: { key: string; events: InboxEvent[] }[] = [];
@@ -254,11 +280,20 @@ export function InboxList({ personId, events }: { personId: string; events: Inbo
           </ol>
         </div>
       ))}
-      {/* The end of the list says so, instead of stopping at blank space. */}
-      <p className="inbox-end" data-testid="inbox-end">
-        <IconCheckCircle size={18} aria-hidden />
-        You&apos;re up to date.
-      </p>
+      {/* The end of the list says so, instead of stopping at blank space —
+          or offers the page before it (PR16). */}
+      {olderHref !== null ? (
+        <p className="inbox-end" data-testid="inbox-older">
+          <Link href={olderHref} className="inbox-older-link">
+            Show older notices
+          </Link>
+        </p>
+      ) : (
+        <p className="inbox-end" data-testid="inbox-end">
+          <IconCheckCircle size={18} aria-hidden />
+          You&apos;re up to date.
+        </p>
+      )}
     </div>
   );
 }

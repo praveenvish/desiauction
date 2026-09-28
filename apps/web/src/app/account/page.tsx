@@ -21,7 +21,7 @@ import {
   currentSession,
   logoutAction,
 } from "../../server/auth/actions";
-import { notificationSettings } from "../../server/messaging/actions";
+import { notificationSettings, pushPublicKey } from "../../server/messaging/actions";
 import {
   ownPhotoUrl,
   playerProfileFor,
@@ -36,6 +36,7 @@ import { AccountHero } from "./account-hero";
 import {
   MessageLanguageChoice,
   NotificationSwitches,
+  PushDeviceSwitch,
   WhatsAppSwitch,
 } from "./notification-switches";
 import { PersonProfilePanel } from "./person-profile-panel";
@@ -92,6 +93,7 @@ export default async function AccountPage({
     photoUrl,
     entries,
     roles,
+    pushKey,
   ] = await Promise.all([
     accountSecurity(),
     notificationSettings(),
@@ -117,6 +119,8 @@ export default async function AccountPage({
     // The clubs they run and the teams they own — identity facts for the
     // hero (cached; the shell reads it too).
     rolesOf(session.personId),
+    // Web push's public key, or null when it is not configured here (PR18).
+    pushPublicKey(),
   ]);
   const sportForms = SPORTS.map((pack) => {
     const held = sportProfiles.find((profile) => profile.sport === pack.key);
@@ -318,11 +322,13 @@ export default async function AccountPage({
           />
         )}
         {settings === null ? null : <MessageLanguageChoice language={settings.language} />}
+        {pushKey === null ? null : <PushDeviceSwitch publicKey={pushKey} />}
         <p className="acct-fineprint">
-          The big moments — a team buys you, you are named captain, you are in a lineup — always
-          land in <Link href="/inbox">your notifications</Link> too. We never sell your number or
-          use it for marketing. Reply <strong>STOP</strong> to any text to stop them all,{" "}
-          <strong>START</strong> to turn them back on.
+          The big moments — a team buys you, you are named captain, you are in a lineup — land in{" "}
+          <Link href="/inbox">your notifications</Link> too, unless you switch Inbox off for that
+          topic above. We never sell your number or use it for marketing. Reply{" "}
+          <strong>STOP</strong> to any text to stop them all, <strong>START</strong> to turn them
+          back on.
         </p>
       </SectionCard>
     ),

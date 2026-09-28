@@ -26,7 +26,7 @@ export const config = {
       // Pages and server actions. Not static assets, not images, not the API
       // routes (webhooks and jobs set their own ids and render no scripts).
       source:
-        "/((?!_next/static|_next/image|api/|favicon.ico|icon.png|apple-icon.png|brand/|marketing/|_media/).*)",
+        "/((?!_next/static|_next/image|api/|favicon.ico|icon.png|apple-icon.png|sw.js|brand/|marketing/|_media/).*)",
       // A router prefetch renders nothing a nonce could protect.
       missing: [
         { type: "header", key: "next-router-prefetch" },

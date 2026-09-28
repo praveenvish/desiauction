@@ -19,7 +19,8 @@
     "./platform-switches": "./src/platform-switches.ts",
     "./provider-fetch": "./src/provider-fetch.ts",
     "./template-store": "./src/template-store.ts",
-    "./verified-email": "./src/verified-email.ts"
+    "./verified-email": "./src/verified-email.ts",
+    "./web-push": "./src/web-push.ts"
   },
   "scripts": {
     "lint": "eslint src --max-warnings 0",

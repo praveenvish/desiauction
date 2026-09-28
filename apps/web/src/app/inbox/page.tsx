@@ -17,7 +17,7 @@ import { redirect } from "next/navigation";
 import { detailOf } from "../../lib/inbox-events";
 import { currentSession } from "../../server/auth/actions";
 import { systemDb } from "../../server/db";
-import { listInboxEvents } from "../../server/auth/security-events";
+import { inboxState, listInboxEvents } from "../../server/auth/security-events";
 import { rolesOf } from "../../server/roles/roles";
 import { InboxList } from "./inbox-list";
 import "./inbox.css";
@@ -78,17 +78,31 @@ function competitionIdOf(meta: unknown): string | null {
 
 // PX-3: notifications over EXISTING events (the person-scoped security ledger).
 // No notification storage was invented: rows come from audit_log via
-// listInboxEvents (the ledger minus what the person switched off); read-state is device-local (same contract as pins), now
-// keyed per account so it cannot cross people on a shared handset.
-export default async function InboxPage() {
+// listInboxEvents (the ledger minus what the person switched off). Read state
+// is the person's own watermark on the server (PR16), the same on every device.
+export default async function InboxPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const session = await currentSession();
   if (session === null) {
     redirect("/login?next=/inbox");
   }
-  const [events, roles] = await Promise.all([
-    listInboxEvents(session.personId, WINDOW),
+  // "Show older": the page before this timestamp. Anything unparseable is page 1.
+  const beforeRaw = (await searchParams)["before"];
+  const beforeAt = beforeRaw === undefined ? null : new Date(beforeRaw);
+  const before = beforeAt !== null && !Number.isNaN(beforeAt.getTime()) ? beforeAt : undefined;
+  const [events, roles, state] = await Promise.all([
+    listInboxEvents(session.personId, WINDOW, before),
     rolesOf(session.personId),
+    inboxState(session.personId),
   ]);
+  const oldest = events[events.length - 1];
+  const olderHref =
+    events.length === WINDOW && oldest !== undefined
+      ? `/inbox?before=${encodeURIComponent(oldest.at.toISOString())}`
+      : null;
   const organizerOnly = roles.organizes.length > 0 && !roles.plays;
   /*
    * The rail says what lands for THIS person (round 4): an owner and an
@@ -134,6 +148,8 @@ export default async function InboxPage() {
           ) : (
             <InboxList
               personId={session.personId}
+              seenBefore={state.seenAt?.toISOString() ?? null}
+              olderHref={olderHref}
               events={events.map((event) => {
                 const competitionId = competitionIdOf(event.meta);
                 const competition = competitionId === null ? undefined : named.get(competitionId);

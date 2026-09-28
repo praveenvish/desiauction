@@ -25,15 +25,24 @@
   position: relative;
 }
 
-.shell-bell-dot {
+/* The unread COUNT (PR16): gold fill, ink text — never white on gold. */
+.shell-bell-count {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 8px;
-  height: 8px;
+  top: 2px;
+  right: 1px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  box-sizing: border-box;
   border-radius: var(--radius-full);
   background: var(--accent);
-  border: 1px solid var(--surface-raised);
+  color: var(--text-on-accent);
+  border: 1.5px solid var(--surface-raised);
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .shell-avatar {

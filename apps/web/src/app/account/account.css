@@ -462,6 +462,84 @@ a.acct-check-row:hover {
   margin: 0;
 }
 
+/* One row per topic, one chip per channel (PR17). */
+.acct .notify-topic {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: var(--space-3) 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  min-width: 0;
+}
+
+.acct .notify-topic legend {
+  float: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.acct .notify-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.acct .notify-channel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* The box itself is the whole chip: invisible, full-size, still focusable. */
+.acct .notify-channel input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.acct .notify-channel:has(input:checked) {
+  border-color: var(--accent-line);
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+}
+
+.acct .notify-channel:has(input:checked)::before {
+  content: "✓";
+  margin-right: 6px;
+  color: var(--accent-ink);
+  font-weight: var(--font-weight-semibold);
+}
+
+.acct .notify-channel:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.acct .notify-channel:has(input:disabled) {
+  opacity: 0.6;
+}
+
 .acct .notify-switch {
   flex-direction: row-reverse;
   justify-content: space-between;
