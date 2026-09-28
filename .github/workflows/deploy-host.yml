@@ -178,6 +178,9 @@ jobs:
       # so a later manual `docker compose up -d` cannot half-apply it.
       - name: Gate, migrate and swap on the host
         uses: appleboy/ssh-action@v1
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -188,6 +191,13 @@ jobs:
           # `ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub | cut -d' ' -f2`
           fingerprint: ${{ secrets.DEPLOY_HOST_FINGERPRINT }}
           command_timeout: 45m
+          # THE HOST PULLS WITH THIS RUN'S OWN TOKEN. GHCR creates container
+          # packages PRIVATE by default (a public repo does not change that), and
+          # the host holds no registry credential — a first deploy was denied at
+          # its first pull. The job's GITHUB_TOKEN can read these packages and
+          # expires with the run, so nothing long-lived is left on the box; the
+          # script logs out again on success and on failure.
+          envs: GHCR_USER,GHCR_TOKEN
           # bash, not sh: the ERR trap (and -E, so it fires inside functions)
           # is what prints the rollback instructions on a failed swap.
           script: |
@@ -213,7 +223,9 @@ jobs:
             docker inspect edge-caddy >/dev/null 2>&1 \
               || { echo "edge-caddy is not running — apply ops/platform first (ops/platform/README.md)"; exit 1; }
 
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
             on_failure() {
+              docker logout ghcr.io >/dev/null 2>&1 || true
               echo ""
               echo "DEPLOY FAILED during: ${STAGE}"
               case "$STAGE" in
@@ -342,5 +354,6 @@ jobs:
             rm -f "${SITE}.prev"
 
             docker image prune -f
+            docker logout ghcr.io >/dev/null
             trap - ERR
             echo "deployed ${NEW_TAG} (previous: ${PREV_TAG})"
