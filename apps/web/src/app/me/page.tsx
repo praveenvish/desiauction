@@ -1,4 +1,4 @@
-import { SPORTS, sportPackFor } from "@desiauction/core";
+import { SPORTS, roleLabelIn, sportPackFor } from "@desiauction/core";
 import {
   EmptyState,
   HeroBanner,
@@ -16,8 +16,6 @@ import {
   Pill,
   PlayerImage,
   SectionCard,
-  StatCard,
-  StatGrid,
   TeamChip,
 } from "@desiauction/ui";
 import Link from "next/link";
@@ -37,7 +35,8 @@ import {
 } from "../../server/player/career";
 import { ownPhotoUrl, playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
 import { rolesOf, type OwnedTeam } from "../../server/roles/roles";
-import { RegistrationCard } from "./registration-card";
+import { anyLineupRecorded, matchRecord, profileAsk } from "./me-model";
+import { SeasonRow } from "./registration-card";
 import "./me.css";
 import { formatDate, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
 import { formatCount } from "../../lib/plural";
@@ -134,14 +133,15 @@ export default async function MySportsPage({
   /** Owns a team and has never entered as a player. */
   const ownerOnly = career.seasons.length === 0 && owns.length > 0;
   const shownMatches = matches.filter((match) => filter === undefined || match.sport === filter);
+  const shownRecord = matchRecord(shownMatches);
+  /** "Not recorded" on every row said nothing until a club records a lineup. */
+  const showYou = anyLineupRecorded(shownMatches);
   const shownUpcoming = upcomingMatches.filter(
     (match) => filter === undefined || match.sport === filter,
   );
-  const matchesPlayed = matches.filter((match) => match.played === "played").length;
-  const wins = matches.filter(
-    (match) => match.played === "played" && match.result === "won",
-  ).length;
   const auctioned = career.seasons.filter((season) => season.auction !== null).length;
+  const record = matchRecord(matches.filter((match) => match.played !== "bench"));
+  const ask = profileAsk(completeness.missing);
 
   const bySport = sports.map((pack) => ({
     key: pack.key,
@@ -226,68 +226,79 @@ export default async function MySportsPage({
               : [<>Your playing record starts with your first registration.</>]),
         ]}
         actions={
-          <Link href="/account" className="sh-ghost">
-            {/* A player-profile count means nothing to an owner who does not
-                play (their /account asks for no playing role). */}
-            {ownerOnly
-              ? "Account settings"
-              : completeness.done < completeness.total
-                ? `Profile ${String(completeness.done)} of ${String(completeness.total)} — finish it`
-                : "Edit profile"}
-            <IconArrowRight size={14} />
-          </Link>
+          // An unfinished profile is asked for in the footer, by name; the
+          // corner keeps the plain door. A player-profile count means nothing
+          // to an owner who does not play (their /account asks for no role).
+          ask === null || ownerOnly ? (
+            <Link href="/account" className="sh-ghost">
+              {ownerOnly ? "Account settings" : "Edit profile"}
+              <IconArrowRight size={14} />
+            </Link>
+          ) : undefined
         }
         sideAlign="start"
+        footer={
+          career.totals.seasons === 0 &&
+          record.played === 0 &&
+          (ask === null || ownerOnly) ? undefined : (
+            <div className="me-hero-foot">
+              {/* THE CAREER STRIP. The page opened on three tiles each saying
+                  "1"; the record is four figures in the hero, and reads the
+                  same at one season as at forty. */}
+              {career.totals.seasons === 0 && record.played === 0 ? null : (
+                <dl className="me-strip" data-testid="me-figures">
+                  <div>
+                    <dt>
+                      {career.totals.seasons === 1 ? "Season" : "Seasons"}
+                      {sports.length > 1 ? ` · ${String(sports.length)} sports` : ""}
+                    </dt>
+                    <dd>{formatCount(career.totals.seasons)}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      {record.played === 1 ? "Match" : "Matches"}
+                      {record.played > 0 ? ` · ${String(record.won)} won` : ""}
+                    </dt>
+                    <dd>{formatCount(record.played)}</dd>
+                  </div>
+                  <div>
+                    <dt>{career.totals.teams === 1 ? "Team" : "Teams"}</dt>
+                    <dd>{formatCount(career.totals.teams)}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      {career.totals.highestPrice === null
+                        ? "Auctions"
+                        : `Top price · sold ${career.totals.soldCount === 1 ? "once" : `${String(career.totals.soldCount)}×`}`}
+                    </dt>
+                    <dd>
+                      {career.totals.highestPrice === null
+                        ? formatCount(auctioned)
+                        : moneyFormat(career.totals.highestUnit).compact(
+                            career.totals.highestPrice,
+                          )}
+                    </dd>
+                  </div>
+                </dl>
+              )}
+              {ask === null || ownerOnly ? null : (
+                <Link href="/account" className="me-ask" data-testid="me-profile-ask">
+                  <span>
+                    <strong>
+                      Profile {completeness.done} of {completeness.total}.
+                    </strong>{" "}
+                    {ask} — every registration form starts filled in.
+                  </span>
+                  <span className="me-ask-bar" aria-hidden>
+                    <i style={{ width: `${String(Math.round(completeness.score * 100))}%` }} />
+                  </span>
+                  <IconArrowRight size={16} aria-hidden />
+                </Link>
+              )}
+            </div>
+          )
+        }
       />
-
-      {/* No tiles of zeros for somebody who has not played yet — the hero
-          already says the record starts with the first tournament. */}
-      {career.totals.seasons === 0 && matchesPlayed === 0 ? null : (
-        <StatGrid testId="me-figures">
-          <StatCard
-            icon={<IconTrophy />}
-            tone="gold"
-            value={formatCount(career.totals.seasons)}
-            label={career.totals.seasons === 1 ? "Season" : "Seasons"}
-            hint={
-              sports.length > 0
-                ? `${String(sports.length)} ${sports.length === 1 ? "sport" : "sports"}`
-                : "None entered yet"
-            }
-          />
-          {/* A "0 Matches played" tile advertised nothing (round 2): the
-              matches line below already says when they arrive. */}
-          {matchesPlayed > 0 ? (
-            <StatCard
-              icon={<IconMatch />}
-              tone="gold"
-              value={formatCount(matchesPlayed)}
-              label="Matches played"
-              hint={`${String(wins)} won`}
-            />
-          ) : null}
-          <StatCard
-            icon={<IconUsers />}
-            tone="gold"
-            value={formatCount(career.totals.teams)}
-            label={career.totals.teams === 1 ? "Team" : "Teams"}
-            hint="Across every club"
-          />
-          <StatCard
-            icon={<IconGavel />}
-            tone="gold"
-            value={formatCount(auctioned)}
-            label={auctioned === 1 ? "Auction" : "Auctions"}
-            hint={
-              career.totals.highestPrice === null
-                ? career.totals.soldCount > 0
-                  ? `Sold ${String(career.totals.soldCount)}×`
-                  : "No sale yet"
-                : `Sold ${String(career.totals.soldCount)}× · top ${moneyFormat(career.totals.highestUnit).compact(career.totals.highestPrice)}`
-            }
-          />
-        </StatGrid>
-      )}
 
       {upcoming !== undefined ? (
         <Notice
@@ -349,12 +360,13 @@ export default async function MySportsPage({
           ) : (
             <SectionCard
               icon={<IconTrophy />}
-              title="My registrations"
+              title="Season by season"
               description={
                 seasons.length === 0
                   ? "Every season you enter shows up here, with where it stands."
                   : `${String(seasons.length)} ${seasons.length === 1 ? "season" : "seasons"} · newest first`
               }
+              flush={seasons.length > 0}
               action={
                 <Link href="/c" className="me-link">
                   Find a tournament <IconArrowRight size={14} aria-hidden />
@@ -370,20 +382,21 @@ export default async function MySportsPage({
                   description="Find a tournament from the link above and your entries line up here."
                 />
               ) : (
-                <ul className="me-regs">
-                  {seasons.map((season) => {
-                    const pack = sportPackFor(season.sport);
-                    return (
-                      <li key={season.registrationId}>
-                        <RegistrationCard
-                          season={season}
-                          eyebrow={`${pack.label} · ${seasonYear(season.startsOn)}`}
-                          subline={season.orgName}
-                          money={(amount, unit) => moneyFormat(unit).compact(amount)}
-                        />
-                      </li>
-                    );
-                  })}
+                <ul className="me-seasons">
+                  {seasons.map((season) => (
+                    <li key={season.registrationId}>
+                      <SeasonRow
+                        season={season}
+                        year={seasonYear(season.startsOn)}
+                        roleLabel={
+                          season.role === null
+                            ? ""
+                            : roleLabelIn(sportPackFor(season.sport), season.role)
+                        }
+                        money={(amount, unit) => moneyFormat(unit).ledger(amount)}
+                      />
+                    </li>
+                  ))}
                 </ul>
               )}
             </SectionCard>
@@ -402,9 +415,9 @@ export default async function MySportsPage({
               tone="gold"
               title="Matches"
               description={
-                shownMatches.length === 0
-                  ? "Matches and your team's published fixtures appear here once they exist."
-                  : `${String(shownMatches.length)} played or in progress`
+                shownRecord.played === 0
+                  ? `${String(shownMatches.length)} in progress`
+                  : `${String(shownRecord.won)} won · ${String(shownRecord.lost)} lost${shownRecord.tied > 0 ? ` · ${String(shownRecord.tied)} tied` : ""}`
               }
               flush={shownMatches.length > 0}
               data-testid="me-matches"
@@ -417,7 +430,7 @@ export default async function MySportsPage({
                         <th scope="col">Date</th>
                         <th scope="col">Match</th>
                         <th scope="col">Result</th>
-                        <th scope="col">You</th>
+                        {showYou ? <th scope="col">You</th> : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -445,9 +458,11 @@ export default async function MySportsPage({
                               </Pill>
                             )}
                           </td>
-                          <td className={`me-played me-played--${match.played}`} data-label="You">
-                            {PLAYED_LABEL[match.played]}
-                          </td>
+                          {showYou ? (
+                            <td className={`me-played me-played--${match.played}`} data-label="You">
+                              {PLAYED_LABEL[match.played]}
+                            </td>
+                          ) : null}
                         </tr>
                       ))}
                     </tbody>
