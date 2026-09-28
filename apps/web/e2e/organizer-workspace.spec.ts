@@ -229,6 +229,10 @@ test("founder demo: org → competition → approve → team roster → venue �
   // record (it is the state that used to become an unclosable auction).
   await page.getByTestId("accept-short-squads").check();
   await page.getByTestId("create-auction").click();
+  // Wait for the auction to exist before leaving: readiness now counts "the
+  // auction exists" as a step like every gate, and navigating away mid-action
+  // could abandon the create (every other spec waits the same way).
+  await expect(page.getByTestId("auction-status")).toHaveText("scheduled", { timeout: 20_000 });
   await page.goto(`${competitionUrl}/readiness`);
   // "Ready — but running short", not a plain "Ready for auction": this journey
   // deliberately accepted a squad shortfall six lines above, and the verdict

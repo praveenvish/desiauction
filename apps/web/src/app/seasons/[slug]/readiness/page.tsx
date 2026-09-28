@@ -1,7 +1,9 @@
 import {
   ButtonLink,
+  IconAlert,
   IconCalendar,
   IconCheck,
+  IconClose,
   IconFlag,
   IconTile,
   IconLayers,
@@ -23,6 +25,7 @@ import { myOrgs } from "../../../../server/orgs/actions";
 import "../../seasons.css";
 import "../_tabs/tabs.css";
 import "./readiness.css";
+import { readinessSteps, readinessTitle, shortfallSentence } from "./readiness-model";
 
 export const metadata = { title: "Readiness · DesiAuction" };
 
@@ -61,6 +64,15 @@ function checkDetail(check: { id: string; detail: string }, status: string): str
   return check.id === "intake_closed" ? (STATUS_WORDS[status] ?? check.detail) : check.detail;
 }
 
+/**
+ * Whether a check's detail adds anything to its label. "Registration is still
+ * open — close it to lock the pool" was followed by "Registration is open".
+ */
+function detailAdds(check: { id: string; label: string; pass: boolean }, detail: string): boolean {
+  if (check.id === "intake_closed" && !check.pass) return false;
+  return !check.label.toLowerCase().startsWith(detail.toLowerCase());
+}
+
 export default async function ReadinessPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const view = await competitionView(slug);
@@ -80,314 +92,395 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
     0;
   const base = `/seasons/${slug}`;
   const checks = auction?.ready.checks ?? [];
-  const blockers = checks.filter((check) => !check.pass).length;
-  /**
-   * THE VERDICT MUST NOT CONTRADICT THE ROW UNDER IT.
-   *
-   * Squad feasibility is deliberately NOT a blocker (see the note on its row
-   * below: a league may knowingly run short, but must not find out at closing
-   * time). That decision is right and is unchanged here. What was wrong was the
-   * PRESENTATION: with no blockers the header showed a plain green "Ready for
-   * auction" while the card immediately beneath it read "Short — 2 players
-   * cannot fill 4 squads of at least 2". On the one screen whose entire job is
-   * to answer "can I start?", the summary and the detail disagreed and nothing
-   * reconciled them. The verdict now carries the caveat it was hiding.
-   */
   /*
    * AFTER THE HAMMER THIS PAGE IS A RECORD, NOT A CHECKLIST. It used to keep
-   * asking "can I start?" of an auction that had already run: a green "Ready
-   * for auction", a gold "Open auction setup", and a pool-vs-squads row that
-   * compared what was LEFT of the pool with squads that were already full —
-   * "7 players for 3 squads of at least 12 (0 needed) — 7 to spare".
+   * asking "can I start?" of an auction that had already run.
    */
   const auctionStatus = auction?.view?.auction.status ?? null;
   const auctionOver = auctionStatus === "completed" || auctionStatus === "reconciled";
-  const runningShort = auction !== null && !auction.feasibility.ok && !auctionOver;
-  const firstBlocked = auctionOver ? undefined : checks.find((check) => !check.pass);
+  const auctionLive = auctionStatus === "live" || auctionStatus === "paused";
+  const auctionCreated = auction?.view !== null && auction?.view !== undefined;
+  const regStats = registrations?.stats;
+  const pending = regStats?.submitted ?? 0;
+  /*
+   * THE STEPS ARE THE COUNT. The corner pill said "1 blocker" while the list
+   * under it drew two red marks — "the auction exists" was drawn blocked and
+   * never counted. Title, button and marks now read from one list.
+   */
+  const steps =
+    auction === null || auctionOver || auctionLive
+      ? []
+      : readinessSteps({ checks, auctionCreated, pending, base });
+  /*
+   * Squad feasibility is deliberately NOT a step: a league may knowingly run
+   * short, but it must not find out at closing time — so it is said as a
+   * sentence with the ways out, and the verdict carries the caveat.
+   */
+  const short =
+    auction === null || auctionOver ? null : shortfallSentence(auction.feasibility, pending);
+  const runningShort = short !== null;
+  const fixtureCount = fixtures?.stats.total ?? 0;
+  const published = fixtures?.stats.published ?? 0;
+  const conflicts = (fixtures?.conflicts ?? []).length;
+
+  const verdictPill = auctionOver
+    ? { tone: "green" as KitTone, label: "Auction completed" }
+    : auctionLive
+      ? { tone: "green" as KitTone, label: "Auction live" }
+      : auction !== null && steps.length === 0
+        ? {
+            tone: (runningShort ? "amber" : "green") as KitTone,
+            label: runningShort ? "Ready — but running short" : "Ready for auction",
+          }
+        : { tone: "amber" as KitTone, label: "Not ready yet" };
+
+  const title = auctionOver
+    ? fixtureCount > 0 && published === fixtureCount && conflicts === 0
+      ? "The auction is done — the schedule is out"
+      : "The auction is done — next is the match schedule"
+    : auctionLive
+      ? "The auction is live"
+      : readinessTitle(steps.length);
+  const firstStep = steps[0];
+  const primary = auctionOver
+    ? {
+        label: fixtureCount === 0 ? "Build fixtures" : "Open fixtures",
+        href: `${base}/fixtures`,
+      }
+    : auctionLive
+      ? { label: "Open the cockpit", href: `${base}/auction/cockpit` }
+      : firstStep !== undefined
+        ? firstStep.action
+        : { label: "Open auction setup", href: `${base}/auction` };
+
+  const checkRows =
+    auction === null ? null : (
+      <ul className="rd-checks">
+        {checks.map((check) => (
+          <CheckRow
+            key={check.id}
+            testId={`check-${check.id}`}
+            state={check.pass ? "pass" : "block"}
+            title={check.label}
+            detail={
+              detailAdds(check, checkDetail(check, view.competition.status))
+                ? checkDetail(check, view.competition.status)
+                : null
+            }
+            {...(!check.pass && !auctionOver ? { fix: fixOf(check.id, base) } : {})}
+          />
+        ))}
+        {auctionOver ? null : (
+          <CheckRow
+            testId="check-squads_fillable"
+            state={auction.feasibility.ok ? "pass" : "warn"}
+            title="Pool against squads"
+            detail={
+              auction.feasibility.ok
+                ? auction.feasibility.headline
+                : `${String(auction.feasibility.shortfall)} short — ${String(auction.feasibility.poolSize)} players for ${String(auction.feasibility.needed)} squad places`
+            }
+            {...(auction.feasibility.ok
+              ? {}
+              : { fix: { href: `${base}/auction`, label: "Auction setup" } })}
+          />
+        )}
+        <CheckRow
+          testId="check-auction_created"
+          state={auctionCreated ? "pass" : "block"}
+          title="The auction exists"
+          detail={auctionOver ? "Completed" : auctionCreated ? "Created" : "Not created yet"}
+          {...(auctionCreated
+            ? {}
+            : { fix: { href: `${base}/auction`, label: "Create the auction" } })}
+        />
+      </ul>
+    );
 
   return (
     <main className="registrations-dash">
       <div className="dash-stack">
-        <div className="st-head">
-          <p className="st-head-lede">Every row links to the screen that changes it.</p>
-          {auctionOver ? (
-            <Pill tone="green" dot testId="readiness-verdict">
-              Auction completed
-            </Pill>
-          ) : auction !== null && blockers === 0 ? (
-            <Pill tone={runningShort ? "amber" : "green"} dot testId="readiness-verdict">
-              {runningShort ? "Ready — but running short" : "Ready for auction"}
-            </Pill>
-          ) : (
-            <Pill tone="amber" dot testId="readiness-verdict">
-              {blockers > 0
-                ? `${String(blockers)} blocker${blockers === 1 ? "" : "s"}`
-                : "In preparation"}
-            </Pill>
-          )}
-        </div>
-
-        <SectionCard
-          icon={<IconFlag />}
-          tone={blockers > 0 ? "red" : "green"}
-          title="Auction gates"
-          description={
-            auction === null
-              ? undefined
-              : blockers > 0
-                ? `${String(blockers)} of ${String(checks.length)} still blocked`
-                : "Every gate passes"
-          }
-          data-testid="readiness-auction"
+        <section
+          className="rd-verdict"
+          data-tone={auctionOver || auctionLive ? "done" : steps.length === 0 ? "ready" : "todo"}
+          aria-labelledby="rd-verdict-title"
+          data-testid="readiness-card"
         >
-          {auction === null ? (
-            <p className="st-note">Sign-in lacks access to this season&apos;s auction view.</p>
-          ) : (
-            <ul className="rd-checks">
-              {checks.map((check) => (
-                <li key={check.id} data-pass={check.pass} data-testid={`check-${check.id}`}>
-                  <span className="rd-mark" aria-hidden>
-                    <IconCheck size={14} />
+          <div className="rd-verdict-head">
+            <Pill tone={verdictPill.tone} dot testId="readiness-verdict">
+              {verdictPill.label}
+            </Pill>
+            <h2 id="rd-verdict-title">{title}</h2>
+            <p>
+              {auctionOver
+                ? `${view.competition.name} · ${String(fixtureCount)} fixture${fixtureCount === 1 ? "" : "s"}, ${String(published)} published${conflicts > 0 ? ` · ${String(conflicts)} conflict${conflicts === 1 ? "" : "s"}` : ""}`
+                : `${view.competition.name} · ${String(auction?.feasibility.poolSize ?? 0)} players in the pool, ${String(view.teams.length)} team${view.teams.length === 1 ? "" : "s"}`}
+            </p>
+          </div>
+          {steps.length > 0 ? (
+            <ol className="rd-steps" data-testid="readiness-steps">
+              {steps.map((step, index) => (
+                <li key={step.key} data-now={index === 0 || undefined}>
+                  <span className="rd-step-n" aria-hidden>
+                    {index + 1}
                   </span>
                   <span className="rd-text">
-                    <strong>{check.label}</strong>
-                    {/* The detail only when it adds something: "Registration is
-                        closed — the pool is locked" used to be followed by
-                        "Registration is closed". The pass/blocked word stays for
-                        screen readers; the green check says it to the eye. */}
-                    <span className="st-note">
-                      <span className="st-sr">{check.pass ? "Pass: " : "Blocked: "}</span>
-                      {check.label
-                        .toLowerCase()
-                        .startsWith(checkDetail(check, view.competition.status).toLowerCase())
-                        ? null
-                        : checkDetail(check, view.competition.status)}
-                    </span>
+                    <strong>{step.label}</strong>
+                    {step.detail === null ? null : <span className="st-note">{step.detail}</span>}
                   </span>
-                  {/* A blocked gate names where it is cleared — the page's own
-                      promise, which the three gates were the only rows to break. */}
-                  {!check.pass && !auctionOver ? (
-                    <Link className="st-link" href={fixOf(check.id, base).href}>
-                      {fixOf(check.id, base).label}
-                    </Link>
-                  ) : (
-                    <span />
-                  )}
                 </li>
               ))}
-              {/* The sum that decides whether the night can end normally.
-                  Deliberately not counted as a blocker: a league may knowingly
-                  run short, but it must not find out at closing time. Absent
-                  once the night is over — there is nothing left to fit. */}
-              {auctionOver ? null : (
-                <li
-                  data-pass={auction.feasibility.ok}
-                  data-soft="true"
-                  data-testid="check-squads_fillable"
-                >
-                  <span className="rd-mark" aria-hidden>
-                    <IconCheck size={14} />
-                  </span>
-                  <span className="rd-text">
-                    <strong>Pool against squads</strong>
-                    <span className="st-note">{auction.feasibility.headline}</span>
-                  </span>
-                  <Pill tone={auction.feasibility.ok ? "green" : "amber"}>
-                    {auction.feasibility.ok ? "Fits" : "Short"}
-                  </Pill>
-                </li>
+            </ol>
+          ) : null}
+          {short === null ? null : (
+            <p className="rd-short" data-testid="readiness-short">
+              <IconAlert size={18} aria-hidden />
+              <span>
+                <strong>{short.lead}</strong> {short.body}
+              </span>
+            </p>
+          )}
+          <div className="rd-actions">
+            <ButtonLink href={primary.href} size="touch" data-testid="readiness-next">
+              {primary.label}
+            </ButtonLink>
+            {firstStep !== undefined && firstStep.action.href !== firstStep.href ? (
+              <ButtonLink href={firstStep.href} variant="secondary" size="touch">
+                {firstStep.label}
+              </ButtonLink>
+            ) : null}
+            {auctionOver ? (
+              <ButtonLink href={`${base}/auction`} variant="secondary" size="touch">
+                See the auction results
+              </ButtonLink>
+            ) : primary.href !== `${base}/auction` ? (
+              <ButtonLink href={`${base}/auction`} variant="secondary" size="touch">
+                Auction setup
+              </ButtonLink>
+            ) : null}
+          </div>
+        </section>
+
+        <div className="rd-grid" data-over={auctionOver || undefined}>
+          {auctionOver ? null : (
+            <SectionCard
+              icon={<IconFlag />}
+              tone={steps.length > 0 ? "red" : "green"}
+              title="Checks"
+              description="What the platform looks at before it lets the auction open"
+              data-testid="readiness-auction"
+            >
+              {checkRows ?? (
+                <p className="st-note">Sign-in lacks access to this season&apos;s auction view.</p>
               )}
-              <li data-pass={auction.view !== null}>
+            </SectionCard>
+          )}
+
+          <div className="rd-prep" data-testid="readiness-sections">
+            {auctionOver ? null : (
+              <SectionCard
+                icon={<IconLayers />}
+                tone="gold"
+                title="For auction night"
+                description="The parts the auction needs"
+              >
+                <ul className="rd-areas">
+                  <Area
+                    testId="readiness-registrations"
+                    icon={<IconUser />}
+                    title="Registrations"
+                    figure={
+                      regStats !== undefined
+                        ? `${String(regStats.approved)} of ${String(regStats.total)}`
+                        : "—"
+                    }
+                    detail={
+                      regStats !== undefined
+                        ? `approved · ${pending > 0 ? `${String(pending)} waiting` : "none waiting"}`
+                        : "No access"
+                    }
+                    attention={pending > 0}
+                    href={`${base}/registrations?status=submitted`}
+                    link="Review queue"
+                  />
+                  <Area
+                    testId="readiness-teams"
+                    icon={<IconUsers />}
+                    title="Teams"
+                    figure={`${String(view.teams.length)} team${view.teams.length === 1 ? "" : "s"}`}
+                    detail={
+                      view.teams.length >= 2
+                        ? "each needs an owner before the night"
+                        : "at least two are needed"
+                    }
+                    attention={view.teams.length < 2}
+                    href={`${base}/teams`}
+                    link="Team workspace"
+                  />
+                </ul>
+              </SectionCard>
+            )}
+
+            <SectionCard
+              icon={<IconCalendar />}
+              tone="gold"
+              title={auctionOver ? "Next: the match schedule" : "After the auction"}
+              description={
+                auctionOver
+                  ? "What the season needs now"
+                  : "Not needed yet — for the match schedule"
+              }
+            >
+              <ul className="rd-areas">
+                <Area
+                  testId="readiness-venues"
+                  icon={<IconPin />}
+                  title="Grounds"
+                  figure={activeGrounds === 0 ? "None yet" : `${String(activeGrounds)} active`}
+                  detail={
+                    venues !== null && venues.venues.length > 0
+                      ? `across ${String(venues.venues.length)} venue${venues.venues.length === 1 ? "" : "s"}`
+                      : "add a venue before building fixtures"
+                  }
+                  attention={auctionOver && activeGrounds === 0}
+                  quiet={!auctionOver && activeGrounds === 0}
+                  {...(org !== null ? { href: `/org/${org.slug}/venues`, link: "Venues" } : {})}
+                />
+                <Area
+                  testId="readiness-fixtures"
+                  icon={<IconCalendar />}
+                  title="Fixtures"
+                  figure={
+                    fixtures === null
+                      ? "—"
+                      : fixtureCount === 0
+                        ? "None yet"
+                        : `${String(published)} of ${String(fixtureCount)} published`
+                  }
+                  detail={
+                    fixtures === null
+                      ? "No access"
+                      : fixtureCount === 0
+                        ? "none published — built once teams are final"
+                        : `${String(fixtures.stats.scheduled)} scheduled · ${conflicts === 0 ? "no conflicts" : `${String(conflicts)} conflict${conflicts === 1 ? "" : "s"}`}`
+                  }
+                  attention={conflicts > 0}
+                  quiet={!auctionOver && fixtureCount === 0}
+                  href={`${base}/fixtures`}
+                  link="Fixtures"
+                />
+              </ul>
+            </SectionCard>
+          </div>
+
+          {auctionOver && checkRows !== null ? (
+            // The night passed every check; the list stays one click away.
+            <details className="rd-record" data-testid="readiness-auction">
+              <summary>
                 <span className="rd-mark" aria-hidden>
                   <IconCheck size={14} />
                 </span>
-                <span className="rd-text">
-                  <strong>Auction</strong>
-                  <span className="st-note">
-                    {auctionOver
-                      ? "Completed"
-                      : auction.view !== null
-                        ? "Created"
-                        : "Not created yet"}
-                  </span>
+                <span>
+                  <strong>Every auction check passed</strong> — registration closed,{" "}
+                  {String(auction?.feasibility.poolSize ?? 0)} left in the pool, {view.teams.length}{" "}
+                  teams, auction completed.
                 </span>
-                <Link className="st-link" href={`${base}/auction`}>
-                  {auctionOver ? "See results" : "Open auction setup"}
-                </Link>
-              </li>
-            </ul>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          icon={<IconLayers />}
-          tone="gold"
-          title="Preparation"
-          description="Where each part of the season stands"
-          data-testid="readiness-sections"
-        >
-          <ul className="rd-areas">
-            <Area
-              testId="readiness-lifecycle"
-              icon={<IconFlag />}
-              tone="gold"
-              title="Season lifecycle"
-              detail="Where the season is in its steps"
-              pill={
-                auctionOver
-                  ? "Auction done"
-                  : (() => {
-                      const words = view.competition.status.replace(/_/g, " ");
-                      return words.charAt(0).toUpperCase() + words.slice(1);
-                    })()
-              }
-              pillTone="blue"
-              href={base}
-              link="Manage on Overview"
-            />
-            <Area
-              testId="readiness-registrations"
-              icon={<IconUser />}
-              tone="gold"
-              title="Registrations"
-              detail={
-                registrations?.stats !== undefined
-                  ? `${String(registrations.stats.approved)} approved of ${String(registrations.stats.total)}`
-                  : "No access"
-              }
-              pill={
-                registrations?.stats !== undefined
-                  ? `${String(registrations.stats.submitted)} pending`
-                  : "—"
-              }
-              pillTone={
-                registrations?.stats !== undefined && registrations.stats.submitted > 0
-                  ? "amber"
-                  : "neutral"
-              }
-              href={`${base}/registrations?status=submitted`}
-              link="Review queue"
-            />
-            <Area
-              testId="readiness-teams"
-              icon={<IconUsers />}
-              tone="gold"
-              title="Teams"
-              detail={view.teams.length >= 2 ? "Enough to hold an auction" : "At least two needed"}
-              pill={String(view.teams.length)}
-              pillTone={view.teams.length >= 2 ? "green" : "amber"}
-              href={`${base}/teams`}
-              link="Open team workspace"
-            />
-            <Area
-              testId="readiness-venues"
-              icon={<IconPin />}
-              tone="gold"
-              title="Grounds"
-              detail={
-                venues !== null
-                  ? `Across ${String(venues.venues.length)} venue${venues.venues.length === 1 ? "" : "s"}`
-                  : "Venues of the organization"
-              }
-              pill={`${String(activeGrounds)} active`}
-              pillTone={activeGrounds > 0 ? "green" : "amber"}
-              {...(org !== null ? { href: `/org/${org.slug}/venues`, link: "Manage venues" } : {})}
-            />
-            <Area
-              testId="readiness-fixtures"
-              icon={<IconCalendar />}
-              tone="gold"
-              title="Fixtures"
-              detail={
-                fixtures !== null
-                  ? `${String(fixtures.stats.total)} total, ${String(fixtures.stats.scheduled)} scheduled`
-                  : "No access"
-              }
-              pill={
-                fixtures !== null
-                  ? (fixtures.conflicts ?? []).length > 0
-                    ? `${String((fixtures.conflicts ?? []).length)} conflict${(fixtures.conflicts ?? []).length === 1 ? "" : "s"}`
-                    : `${String(fixtures.stats.published)} published`
-                  : "—"
-              }
-              pillTone={
-                fixtures !== null && (fixtures.conflicts ?? []).length > 0
-                  ? "red"
-                  : fixtures !== null && fixtures.stats.published > 0
-                    ? "green"
-                    : "amber"
-              }
-              href={`${base}/fixtures`}
-              link="Open fixtures"
-            />
-          </ul>
-        </SectionCard>
-
-        {auctionOver ? null : (
-          <div className="rd-actions">
-            {/* ONE next step. While a gate is blocked, creating the auction is not
-              it — the first blocker's fix is, so that is the ink button and the
-              auction is the secondary one. */}
-            {firstBlocked !== undefined ? (
-              <ButtonLink
-                href={fixOf(firstBlocked.id, base).href}
-                size="touch"
-                data-testid="readiness-next"
-              >
-                {fixOf(firstBlocked.id, base).label}
-              </ButtonLink>
-            ) : null}
-            <ButtonLink
-              href={`${base}/auction`}
-              size="touch"
-              {...(firstBlocked !== undefined ? { variant: "secondary" as const } : {})}
-            >
-              {auction !== null && auction.view !== null
-                ? "Open auction setup"
-                : "Create the auction"}
-            </ButtonLink>
-            <ButtonLink href={base} variant="secondary" size="touch">
-              Back to overview
-            </ButtonLink>
-          </div>
-        )}
+                <span className="rd-record-show">Show the checks</span>
+              </summary>
+              {checkRows}
+            </details>
+          ) : null}
+        </div>
       </div>
     </main>
   );
 }
 
-/** One area of preparation: what it is, where it stands, where to change it. */
+type CheckState = "pass" | "block" | "warn";
+
+const CHECK_ICON: Record<CheckState, ReactNode> = {
+  pass: <IconCheck size={14} />,
+  block: <IconClose size={14} />,
+  warn: <IconAlert size={14} />,
+};
+
+const CHECK_WORD: Record<CheckState, string> = {
+  pass: "Pass: ",
+  block: "Blocked: ",
+  warn: "Warning: ",
+};
+
+/** One check: a mark whose shape says the state, the words, and its fix. */
+function CheckRow({
+  testId,
+  state,
+  title,
+  detail,
+  fix,
+}: {
+  testId: string;
+  state: CheckState;
+  title: string;
+  detail: string | null;
+  fix?: { href: string; label: string };
+}) {
+  return (
+    <li data-pass={state === "pass"} data-state={state} data-testid={testId}>
+      <span className="rd-mark" aria-hidden>
+        {CHECK_ICON[state]}
+      </span>
+      <span className="rd-text">
+        <strong>{title}</strong>
+        <span className="st-note">
+          <span className="st-sr">{CHECK_WORD[state]}</span>
+          {detail}
+        </span>
+      </span>
+      {fix !== undefined ? (
+        <Link className="st-link" href={fix.href}>
+          {fix.label}
+        </Link>
+      ) : (
+        <span />
+      )}
+    </li>
+  );
+}
+
+/** One area: what it is, a figure with its noun, and where to change it. */
 function Area({
   testId,
   icon,
-  tone,
   title,
+  figure,
   detail,
-  pill,
-  pillTone,
+  attention = false,
+  quiet = false,
   href,
   link,
 }: {
   testId: string;
   icon: ReactNode;
-  tone: KitTone;
   title: string;
+  figure: string;
   detail: string;
-  pill: string;
-  pillTone: KitTone;
+  attention?: boolean;
+  quiet?: boolean;
   href?: string;
   link?: string;
 }) {
   return (
-    <li data-testid={testId}>
-      <IconTile icon={icon} tone={tone} size="sm" />
+    <li
+      data-testid={testId}
+      data-attention={attention || undefined}
+      data-quiet={quiet || undefined}
+    >
+      <IconTile icon={icon} tone="neutral" size="sm" />
       <span className="rd-text">
         <strong>{title}</strong>
         <span className="st-note">{detail}</span>
       </span>
-      <span className="rd-state">
-        <Pill tone={pillTone}>{pill}</Pill>
-      </span>
+      <span className="rd-state rd-figure">{figure}</span>
       {href !== undefined && link !== undefined ? (
         <Link className="st-link" href={href}>
           {link}
