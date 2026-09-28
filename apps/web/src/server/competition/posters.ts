@@ -1460,23 +1460,32 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
       if (gated.grant.organizer && teamRows.length > 0) {
         kinds.push("season");
       }
+      const namesSeen = new Map<string, number>();
+      for (const row of playerRows) {
+        const label = row.name ?? "Unnamed";
+        namesSeen.set(label, (namesSeen.get(label) ?? 0) + 1);
+      }
       return {
         competitionName: gated.competition.name,
         showBranding: gated.showBranding,
         kinds,
         scope: gated.grant.organizer ? ("season" as const) : ("mine" as const),
-        players: playerRows.map((row) => ({
-          id: row.registrationId,
-          label: row.name ?? "Unnamed",
-          sublabel:
-            row.teamName !== null && row.soldPrice !== null
-              ? `#${row.number} · ${row.teamName}`
-              : `#${row.number} · not sold`,
-        })),
+        players: playerRows.map((row) => {
+          const label = row.name ?? "Unnamed";
+          const verdict =
+            row.teamName !== null && row.soldPrice !== null ? row.teamName : "not sold";
+          // The registration code means nothing in a picker — it only tells
+          // two players of the same name apart, so only they carry it.
+          return {
+            id: row.registrationId,
+            label,
+            sublabel: (namesSeen.get(label) ?? 0) > 1 ? `#${row.number} · ${verdict}` : verdict,
+          };
+        }),
         teams: teamRows.map((row) => ({
           id: row.id,
           label: row.name,
-          sublabel: row.shortName ?? "Squad poster",
+          sublabel: row.shortName ?? "",
         })),
       };
     },

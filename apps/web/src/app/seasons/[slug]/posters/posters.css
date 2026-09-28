@@ -175,13 +175,13 @@
 .ps-tabs {
   display: inline-flex;
   gap: 2px;
-  margin-bottom: var(--space-3);
   padding: 2px;
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
 }
 
 .ps-tab {
+  min-block-size: 32px;
   padding: var(--space-1) var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
@@ -223,4 +223,76 @@
    sprite is on its way it reads as a resting card, not a broken one. */
 .poster-preview-image[data-state="loading"] {
   opacity: 0.55;
+}
+
+/* --- Phone order (posters redesign) ----------------------------------------
+   Below the two-column breakpoint the preview card comes first, and the
+   Poster/Animated switch and the download move into one bar under the poster;
+   the header copies are the laptop's. */
+
+.ps-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.ps-phone-bar {
+  display: none;
+}
+
+@media (max-width: 1023.98px) {
+  .ps-preview-card {
+    order: -1;
+  }
+
+  .ps-head-actions {
+    display: none;
+  }
+
+  .ps-phone-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .ps-phone-bar .ps-tab {
+    min-block-size: 40px;
+  }
+
+  .ps-download-phone {
+    flex: 1 1 auto;
+  }
+
+  .ps-layout .poster-preview {
+    padding: var(--space-3);
+  }
+
+  /* The poster takes what the screen has left once the top bar, the season
+     tabs, the card's name line, this bar and the bottom nav are counted
+     (~345px), so Download is on the first screen of an iPhone 13 in Safari. */
+  .ps-layout .poster-preview-image {
+    max-block-size: max(240px, calc(100svh - 345px));
+  }
+}
+
+/* On a phone the six looks are one row that scrolls sideways — a 3×2 grid of
+   tiles pushed the rest of the form a screen further down. */
+@media (max-width: 639.98px) {
+  .ps-swatches {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 92px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    margin-inline-end: calc(-1 * var(--space-4));
+    padding-block-end: var(--space-1);
+    padding-inline-end: var(--space-4);
+  }
+
+  .ps-swatch {
+    scroll-snap-align: start;
+  }
 }

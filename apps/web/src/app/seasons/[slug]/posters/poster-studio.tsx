@@ -15,7 +15,6 @@ import {
   ButtonLink,
   Field,
   IconDownload,
-  IconImage,
   IconPencil,
   IconSend,
   Notice,
@@ -153,16 +152,25 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
   const downloadHref = previewSrc === null ? null : `${previewSrc}&download=1`;
   const motionSrc = previewSrc === null ? null : `${previewSrc}&motion=1`;
 
+  // The preview is headed by what it IS — the player, the squad, the sheet —
+  // not by the word "Preview" over a picture that already says so.
+  const subjectName = needsSubject
+    ? (subjects.find((subject) => subject.id === subjectId)?.label ?? KIND_LABEL[kind].label)
+    : kind === "top"
+      ? `Top ${String(count)}`
+      : view.competitionName;
+  const { width, height } = POSTER_SIZES[size];
+  const previewLine = [
+    ...(needsSubject || kind === "top" ? [KIND_LABEL[kind].label] : []),
+    THEME_LABEL[theme].name,
+    `${String(width)} × ${String(height)}`,
+  ].join(" · ");
+
   return (
     <div className="ps-layout">
       <SectionCard
         icon={<IconPencil />}
         title={view.scope === "mine" ? "Style it" : "Design a poster"}
-        description={`${
-          view.scope === "mine"
-            ? "Your card, ready to post."
-            : "A card for a player, a squad, or the whole season."
-        } ${view.competitionName}.`}
       >
         <div className="ps-controls">
           {kinds.length < 2 ? null : (
@@ -201,7 +209,9 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
             >
               {subjects.map((subject) => (
                 <option key={subject.id} value={subject.id}>
-                  {subject.label} · {subject.sublabel}
+                  {subject.sublabel === ""
+                    ? subject.label
+                    : `${subject.label} · ${subject.sublabel}`}
                 </option>
               ))}
             </Select>
@@ -341,21 +351,34 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
         ) : null}
       </SectionCard>
 
+      {/*
+        On a phone this card comes FIRST (posters.css): the poster is the thing
+        you came for, and below the form it started a thousand pixels down —
+        every template tap happened out of sight of its result.
+      */}
       <SectionCard
-        icon={<IconImage />}
-        tone="purple"
-        title="Preview"
-        description={SIZE_LABEL[size].hint}
+        className="ps-preview-card"
+        title={previewSrc === null ? "Preview" : subjectName}
+        description={previewLine}
         action={
-          downloadHref !== null ? (
-            /* A plain anchor, not next/link: the href is our own image route and
-               `download` must reach the DOM for the browser to save rather than
-               navigate. */
-            <ButtonLink href={downloadHref} download size="sm" data-testid="poster-download">
-              <IconDownload size={16} aria-hidden />
-              Download PNG
-            </ButtonLink>
-          ) : undefined
+          previewSrc === null || downloadHref === null ? undefined : (
+            <div className="ps-head-actions">
+              <PreviewTabs tab={tab} onTab={setTab} />
+              {/* A plain anchor, not next/link: the href is our own image route
+                  and `download` must reach the DOM for the browser to save
+                  rather than navigate. On a phone the full-width one under the
+                  poster takes over (posters.css). */}
+              <ButtonLink
+                href={downloadHref}
+                download
+                className="ps-download-wide"
+                data-testid="poster-download"
+              >
+                <IconDownload size={16} aria-hidden />
+                Download PNG
+              </ButtonLink>
+            </div>
+          )
         }
       >
         {previewSrc === null || motionSrc === null ? (
@@ -368,23 +391,6 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
           </p>
         ) : (
           <>
-            <div className="ps-tabs" role="group" aria-label="Preview mode">
-              {(["still", "motion"] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className="ps-tab"
-                  data-active={value === tab ? "true" : undefined}
-                  aria-pressed={value === tab}
-                  onClick={() => {
-                    setTab(value);
-                  }}
-                  data-testid={`poster-tab-${value}`}
-                >
-                  {value === "still" ? "Poster" : "Animated"}
-                </button>
-              ))}
-            </div>
             {tab === "still" ? (
               <div className="poster-preview" data-poster-size={size}>
                 {/* A plain <img>, like the board's crest: the poster is rendered
@@ -404,10 +410,59 @@ export function PosterStudio({ slug, view }: { slug: string; view: PosterPicker 
               // effect on the way past.
               <MotionPanel key={motionSrc} src={motionSrc} size={size} />
             )}
+            {/* The phone's bar under the poster: the switch and the download
+                within thumb reach, where the header's copy would sit above the
+                fold's top edge. */}
+            <div className="ps-phone-bar">
+              <PreviewTabs tab={tab} onTab={setTab} testIdSuffix="-phone" />
+              {downloadHref === null ? null : (
+                <ButtonLink
+                  href={downloadHref}
+                  download
+                  size="touch"
+                  className="ps-download-phone"
+                  data-testid="poster-download-phone"
+                >
+                  <IconDownload size={18} aria-hidden />
+                  Download PNG
+                </ButtonLink>
+              )}
+            </div>
             <ShareRow previewSrc={previewSrc} />
           </>
         )}
       </SectionCard>
+    </div>
+  );
+}
+
+/** Poster or Animated — drawn in the card header on a laptop, under the poster on a phone. */
+function PreviewTabs({
+  tab,
+  onTab,
+  testIdSuffix = "",
+}: {
+  tab: Tab;
+  onTab: (next: Tab) => void;
+  testIdSuffix?: string;
+}) {
+  return (
+    <div className="ps-tabs" role="group" aria-label="Preview mode">
+      {(["still", "motion"] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          className="ps-tab"
+          data-active={value === tab ? "true" : undefined}
+          aria-pressed={value === tab}
+          onClick={() => {
+            onTab(value);
+          }}
+          data-testid={`poster-tab-${value}${testIdSuffix}`}
+        >
+          {value === "still" ? "Poster" : "Animated"}
+        </button>
+      ))}
     </div>
   );
 }
