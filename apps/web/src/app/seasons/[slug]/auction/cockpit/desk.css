@@ -776,3 +776,134 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+
+/* THE NIGHT IS OVER — the finished cockpit's one card. */
+.night-over {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 62rem;
+  margin: var(--space-4) auto 0;
+  box-sizing: border-box;
+  padding: var(--space-8, 2.5rem) var(--space-8, 2.5rem);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl, 18px);
+  background: var(--surface-raised);
+}
+
+.night-over-kicker {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.night-over h2.night-over-count {
+  margin: 0;
+  font-size: clamp(2.25rem, 5vw, 3.25rem);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.night-over-bar {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+}
+
+.night-over-bar > span {
+  background: var(--live);
+}
+
+.night-over-line {
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  color: var(--text-secondary);
+}
+
+.night-over-line strong {
+  color: var(--text-heading);
+}
+
+.night-over-teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.night-over-teams li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.night-over-crest {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--team-color, var(--surface-raised));
+  color: #fff;
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.night-over-team {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.night-over-team strong {
+  font-size: var(--text-sm-size);
+  color: var(--text-heading);
+}
+
+.night-over-note {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-muted);
+}
+
+.night-over-doors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+@media (max-width: 719px) {
+  .night-over {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .night-over-doors {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .night-over-recap {
+    display: none;
+  }
+}

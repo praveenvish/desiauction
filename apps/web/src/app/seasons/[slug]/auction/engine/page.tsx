@@ -1,5 +1,5 @@
 import { ToastProvider } from "@desiauction/ui";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { cockpitView } from "../../../../../server/auction/conduct-actions";
 import { EnginePanel } from "./engine-panel";
@@ -13,6 +13,12 @@ export default async function EnginePage({ params }: { params: Promise<{ slug: s
   const view = await cockpitView(slug);
   if (view === null) {
     notFound();
+  }
+  // After the night the engine has no job — nothing runs, nothing can be
+  // recovered — and the page was one sentence over four figures the auction
+  // page already shows. It sends you there (census 2026-09-28).
+  if (["completed", "reconciled", "abandoned"].includes(view.view.auction.status)) {
+    redirect(`/seasons/${slug}/auction`);
   }
   return (
     <ToastProvider>
