@@ -12,7 +12,7 @@ import {
   tournaments,
 } from "@desiauction/db";
 import { sportPackFor, type MoneyUnit } from "@desiauction/core";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
@@ -382,6 +382,39 @@ export async function playerUpcomingMatches(
   personId: string,
   today: string,
 ): Promise<UpcomingMatch[]> {
+  return playerOpenMatches(
+    personId,
+    and(
+      eq(fixtures.status, "published"),
+      or(isNull(fixtures.kickoffAt), gte(fixtures.kickoffAt, today)),
+    ),
+  );
+}
+
+/**
+ * This person's matches whose day passed with no result — published and
+ * never started, or started and left open (census 9: player home listed the
+ * next match and the results, and the two owed in between vanished). Oldest
+ * first; same subject rules as `playerUpcomingMatches`.
+ */
+export async function playerAwaitingMatches(
+  personId: string,
+  today: string,
+): Promise<UpcomingMatch[]> {
+  return playerOpenMatches(
+    personId,
+    and(
+      inArray(fixtures.status, ["published", "in_progress"]),
+      isNotNull(fixtures.kickoffAt),
+      lt(fixtures.kickoffAt, `${today.slice(0, 10)}T00:00`),
+    ),
+  );
+}
+
+async function playerOpenMatches(
+  personId: string,
+  when: ReturnType<typeof and>,
+): Promise<UpcomingMatch[]> {
   const home = alias(teams, "home_team");
   const away = alias(teams, "away_team");
   const rows = await systemDb
@@ -415,14 +448,7 @@ export async function playerUpcomingMatches(
     .innerJoin(home, eq(home.id, fixtures.homeTeamId))
     .innerJoin(away, eq(away.id, fixtures.awayTeamId))
     .leftJoin(grounds, eq(grounds.id, fixtures.groundId))
-    .where(
-      and(
-        eq(registrations.personId, personId),
-        isNotNull(registrations.teamId),
-        eq(fixtures.status, "published"),
-        or(isNull(fixtures.kickoffAt), gte(fixtures.kickoffAt, today)),
-      ),
-    )
+    .where(and(eq(registrations.personId, personId), isNotNull(registrations.teamId), when))
     .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
     .limit(UPCOMING_LIMIT);
   return rows.map((row) => {

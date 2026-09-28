@@ -372,6 +372,12 @@
   color: var(--text-accent);
 }
 
+/* A past match with no result yet: owed, not next (census 9). */
+.pm-match-next[data-state="due"] {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .pm-result {
   display: inline-flex;
   align-items: center;

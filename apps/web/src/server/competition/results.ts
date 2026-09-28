@@ -8,6 +8,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
+import { istCalendarDate } from "../../lib/format-date";
 import {
   buildStandings,
   scoreWithinBounds,
@@ -471,6 +472,12 @@ export interface StandingsView {
    * outstanding.
    */
   readonly live: number;
+  /**
+   * Matches whose day passed with no result — never started, or left open
+   * (census 9: the table said "1 match playing now" of a match open two days,
+   * and "3 of 3 results in" with three owed). Counted in `playable`.
+   */
+  readonly awaiting: number;
 }
 
 /**
@@ -480,7 +487,12 @@ export interface StandingsView {
  * A league table built from three of twenty results is not wrong, but presenting
  * it without saying so invites somebody to read it as the season's standing.
  */
-export async function standingsOf(db: Db, competitionId: string): Promise<StandingsView> {
+export async function standingsOf(
+  db: Db,
+  competitionId: string,
+  today: string = istCalendarDate(),
+): Promise<StandingsView> {
+  const todayStart = `${today.slice(0, 10)}T00:00`;
   const [seasonRow] = await db
     .select({ sport: competitions.sport })
     .from(competitions)
@@ -508,17 +520,21 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
         status: fixtures.status,
         homeTeamId: fixtures.homeTeamId,
         awayTeamId: fixtures.awayTeamId,
+        kickoffAt: fixtures.kickoffAt,
       })
       .from(fixtures)
       .where(
         and(
           eq(fixtures.competitionId, competitionId),
-          inArray(fixtures.status, ["in_progress", "completed"]),
+          inArray(fixtures.status, ["published", "in_progress", "completed"]),
         ),
       ),
   ]);
 
-  const sides = new Map(playedFixtures.map((row) => [row.id, row]));
+  // Published rows ride along only to count what is owed (below); the table
+  // itself is folded from played matches alone, as before.
+  const played = playedFixtures.filter((row) => row.status !== "published");
+  const sides = new Map(played.map((row) => [row.id, row]));
   const inputs: AnyResultInput[] = [];
   /** The fixtures that put something into the table. */
   const counted = new Set<string>();
@@ -532,7 +548,7 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
    * have actually been PLACED: a scheduled-but-unrecorded lobby would otherwise
    * award every squad the points for finishing nowhere.
    */
-  const lobbyIds = playedFixtures.filter((row) => row.homeTeamId === null).map((row) => row.id);
+  const lobbyIds = played.filter((row) => row.homeTeamId === null).map((row) => row.id);
   if (lobbyIds.length > 0) {
     const participants = await db
       .select({
@@ -600,15 +616,24 @@ export async function standingsOf(db: Db, competitionId: string): Promise<Standi
     standingsRulesOf(pack),
   ).map((row) => ({ ...row, teamName: names.get(row.teamId) ?? row.teamId }));
 
-  // A match in progress is owed a result only once it has one or has finished.
-  const live = playedFixtures.filter(
-    (row) => row.status === "in_progress" && !counted.has(row.id),
-  ).length;
+  // A match in progress TODAY is owed a result only once it has one or has
+  // finished. One whose day has passed with nothing recorded — left open, or
+  // never started — is owed now.
+  const pastDay = (row: { kickoffAt: string | null }) =>
+    row.kickoffAt !== null && row.kickoffAt < todayStart;
+  const open = playedFixtures.filter((row) => row.status !== "completed" && !counted.has(row.id));
+  const live = open.filter((row) => row.status === "in_progress" && !pastDay(row)).length;
+  const awaiting = open.filter(pastDay).length;
+  const completed = playedFixtures.filter((row) => row.status !== "published").length;
   return {
     rows,
     sport: pack,
     recorded: inputs.length,
-    playable: playedFixtures.length - live,
+    // Completed and in-progress matches, today's live ones aside, plus the
+    // published ones whose day passed unplayed.
+    playable:
+      completed - live + open.filter((row) => row.status === "published" && pastDay(row)).length,
     live,
+    awaiting,
   };
 }

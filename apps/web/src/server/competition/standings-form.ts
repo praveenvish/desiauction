@@ -22,6 +22,8 @@ export interface TeamNext {
   readonly opponent: string | null;
   readonly kickoffAt: string | null;
   readonly live: boolean;
+  /** Its day passed with no result — the team's next job is that score (census 9). */
+  readonly due?: boolean;
 }
 
 const FORM_LENGTH = 5;
@@ -83,7 +85,7 @@ export function nextOf(fixtures: readonly FormFixture[], now: string): Map<strin
   const ordered = [...fixtures].sort((a, b) =>
     (a.kickoffAt ?? "9999").localeCompare(b.kickoffAt ?? "9999"),
   );
-  const consider = (fixture: FormFixture, live: boolean) => {
+  const consider = (fixture: FormFixture, live: boolean, due = false) => {
     const sides: [string | null, string | null][] = [
       [fixture.homeTeamId, fixture.awayTeamName],
       [fixture.awayTeamId, fixture.homeTeamName],
@@ -97,12 +99,21 @@ export function nextOf(fixtures: readonly FormFixture[], now: string): Map<strin
         opponent: fixture.homeTeamId === null ? null : opponent,
         kickoffAt: fixture.kickoffAt,
         live,
+        ...(due ? { due } : {}),
       });
     }
   };
+  const pastDay = (fixture: FormFixture) => fixture.kickoffAt !== null && fixture.kickoffAt < today;
+  // Being played today first; then a match whose day passed with no result —
+  // left open, or never started — which is owed before anything to come.
   for (const fixture of ordered) {
-    if (fixture.status === "in_progress") {
+    if (fixture.status === "in_progress" && !pastDay(fixture)) {
       consider(fixture, true);
+    }
+  }
+  for (const fixture of ordered) {
+    if ((fixture.status === "in_progress" || fixture.status === "published") && pastDay(fixture)) {
+      consider(fixture, false, true);
     }
   }
   for (const fixture of ordered) {
