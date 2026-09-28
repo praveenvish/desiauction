@@ -21,11 +21,26 @@ import { defaultContent, sampleVariables } from "@desiauction/messaging/email-te
 
 import { env } from "../src/env.js";
 import { forceDarkEmail } from "../src/server/messaging/email-layout.js";
-import { composeNotificationEmail } from "../src/server/messaging/notification-email.js";
+import {
+  composeNotificationEmail,
+  financeDocumentPreviewMail,
+} from "../src/server/messaging/notification-email.js";
+import { FINANCE_TEMPLATE_FOR_VARIANT } from "../src/server/messaging/template-writer.js";
 import { previewOptions } from "../src/server/messaging/template-preview.js";
 import { PAGE } from "./mail-gallery-page.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+/** A receipt as the club's books issue it — the document is reproduced, never reworded. */
+const SAMPLE_RECEIPT = [
+  "RECEIPT RCT/2026-27/000042",
+  "Malad Cricket Club · Malad Premier League 2026",
+  "Date: 04 Oct 2026",
+  "Received from: Cup Kings (owner: Rahul Mehta)",
+  "For: Team entry fee",
+  "Amount: ₹25,000.00",
+  "Mode: UPI · ref 4273 9910 2231",
+].join("\n");
 const OUT = join(here, "..", ".mail-gallery");
 const SHOTS = process.argv.includes("--shots");
 
@@ -60,12 +75,23 @@ for (const spec of Object.values(EMAIL_TEMPLATES)) {
     for (const variant of spec.variants) {
       const fields = content.variants[variant.id];
       if (fields === undefined) continue;
-      const mail = composeNotificationEmail(
-        spec,
-        fields,
-        sampleVariables(spec, lang),
-        previewOptions(spec.kind, variant.id, lang),
-      );
+      // A finance document is laid out around the document itself, as the
+      // runner sends it (email programme PR10).
+      const mail =
+        spec.kind === "finance.document.issued"
+          ? financeDocumentPreviewMail(
+              fields,
+              SAMPLE_RECEIPT,
+              FINANCE_TEMPLATE_FOR_VARIANT[variant.id] ?? "document.issued",
+              lang,
+              "Malad Cricket Club",
+            )
+          : composeNotificationEmail(
+              spec,
+              fields,
+              sampleVariables(spec, lang),
+              previewOptions(spec.kind, variant.id, lang),
+            );
       const plain = mail.html === undefined;
       const html =
         mail.html ??

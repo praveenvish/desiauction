@@ -260,8 +260,12 @@ const WORDING_TOKENS: readonly { token: string; allowed: Readonly<Record<string,
   {
     token: "renderEmail(",
     allowed: {
-      "server/messaging/email-layout.ts": "defines the layout",
+      "packages/messaging/src/email-layout.ts":
+        "defines the layout (shared with the finops runner)",
+      "server/messaging/email-layout.ts": "binds the layout to this site's address",
       "server/messaging/notification-email.ts": "the one renderer — wording from the registry",
+      "packages/messaging/src/email-adapter.ts":
+        "lays a finance document out around its registry wording; the text part stays the document",
     },
   },
   {

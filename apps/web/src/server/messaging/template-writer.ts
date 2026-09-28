@@ -12,13 +12,17 @@ import {
   type TemplateFields,
   type TemplateIssue,
 } from "@desiauction/messaging/email-templates";
-import { financeDocumentMail } from "@desiauction/messaging/email-adapter";
 import { invalidateTemplates } from "@desiauction/messaging/template-store";
 import { verifiedEmailOf } from "@desiauction/messaging/verified-email";
 import { and, count, desc, eq, gte, max, sql } from "drizzle-orm";
 
 import { PLATFORM_SCOPE_ID, PLATFORM_SCOPE_TYPE } from "../admin/capabilities";
-import { composeNotificationEmail, ownHosts, type NotificationMail } from "./notification-email";
+import {
+  composeNotificationEmail,
+  financeDocumentPreviewMail,
+  ownHosts,
+  type NotificationMail,
+} from "./notification-email";
 import { previewOptions } from "./template-preview";
 import { transactionalMailer, type TransactionalMailer } from "./transactional-mail";
 
@@ -458,15 +462,24 @@ const SAMPLE_DOCUMENT = [
   "(The document itself is the club's, reproduced exactly — it is not editable.)",
 ].join("\n");
 
+/** A document type for each finance variant, so the preview shows its own heading. */
+export const FINANCE_TEMPLATE_FOR_VARIANT: Readonly<Record<string, string>> = {
+  receipt: "receipt.issued",
+  invoice: "invoice.issued",
+  correction: "correction.issued",
+};
+
 /** The wording with the samples, laid out as the mail would be. */
 function previewMail(t: Target, variant: string, fields: TemplateFields): NotificationMail {
   if (t.kind === "finance.document.issued") {
-    // The one kind whose body is not wording: the document goes last, whole.
-    const mail = financeDocumentMail(fields, SAMPLE_DOCUMENT);
-    return composeNotificationEmail(
-      t.spec,
-      { ...fields, subject: mail.subject, paragraphs: [mail.text] },
-      {},
+    // The one kind whose body is not wording: the document goes last, whole —
+    // in the branded part as the runner sends it (email programme PR10).
+    return financeDocumentPreviewMail(
+      fields,
+      SAMPLE_DOCUMENT,
+      FINANCE_TEMPLATE_FOR_VARIANT[variant] ?? "document.issued",
+      t.language,
+      "Malad Cricket Club",
     );
   }
   return composeNotificationEmail(

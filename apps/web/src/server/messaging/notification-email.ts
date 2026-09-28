@@ -1,5 +1,6 @@
 import type { Db } from "@desiauction/db";
 import type { EmailNotificationKind } from "@desiauction/messaging/catalogue";
+import { financeDocumentMail } from "@desiauction/messaging/email-adapter";
 import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults";
 import {
   fillTemplate,
@@ -164,6 +165,26 @@ export function composeNotificationEmail(
     ...(layout.calloutLast === true ? { calloutLast: true } : {}),
   });
   return { subject: filled.subject, text: body.text, html: body.html } as NotificationMail;
+}
+
+/**
+ * A finance document's mail as the runner sends it (email programme PR10):
+ * the registry's wording, the document, and the branded part around them —
+ * for the admin preview and the mail gallery, which must show what goes out.
+ */
+export function financeDocumentPreviewMail(
+  fields: TemplateFields,
+  document: string,
+  templateId: string,
+  language: MessageLanguage,
+  orgName: string | null,
+): NotificationMail {
+  return financeDocumentMail(fields, document, {
+    publicBaseUrl: env.PUBLIC_BASE_URL,
+    templateId,
+    language,
+    orgName,
+  }) as NotificationMail;
 }
 
 /** The hosts a link in the wording may name: desiauction.in and PUBLIC_BASE_URL's. */

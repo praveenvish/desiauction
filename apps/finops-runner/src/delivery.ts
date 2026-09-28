@@ -54,6 +54,9 @@ export function runnerDelivery(
     db,
     mail === null || transport === undefined ? mail : { ...mail, transport },
     {
+      // The receipt's branded HTML part lays out around the document itself
+      // (packages/messaging email-layout.ts); the text part is unchanged.
+      publicBaseUrl: env.PUBLIC_BASE_URL,
       // A receipt's subject and opening lines are admin-editable wording
       // (notification_templates, 0087 — this role keeps SELECT on it). One that
       // no longer validates goes out in the default, and is said here.

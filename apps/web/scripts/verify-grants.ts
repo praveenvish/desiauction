@@ -80,6 +80,8 @@ const RUNNER_DELIVERY_READS = [
   "notification_channels",
   // A receipt's subject and opening line are admin-editable wording (0087).
   "notification_templates",
+  // The receipt's branded part names the club that issued it (email programme PR10).
+  "organizations",
 ];
 
 /**

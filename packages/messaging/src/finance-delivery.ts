@@ -1,4 +1,5 @@
-import type { Db } from "@desiauction/db";
+import { organizations, type Db } from "@desiauction/db";
+import { eq } from "drizzle-orm";
 import type { DeliveryPort, DispatchChannel } from "@desiauction/financial-operations";
 
 import {
@@ -106,19 +107,40 @@ export interface FinanceMailOptions {
 export function composeFinanceMail(db: Db, options: FinanceMailOptions = {}) {
   const ownHosts = ownHostsFor(options.publicBaseUrl);
   return async (
-    request: { readonly templateId: string; readonly body: string },
+    request: { readonly templateId: string; readonly body: string; readonly orgId?: string },
     recipient: { readonly personId: string | null },
-  ): Promise<{ subject: string; text: string }> => {
+  ): Promise<{ subject: string; text: string; html?: string }> => {
     const language =
       recipient.personId === null ? "en" : await messageLanguageOf(db, recipient.personId);
     const resolved = await resolveTemplate(db, "finance.document.issued", language, {
       ownHosts,
       ...(options.onTemplateProblem === undefined ? {} : { onProblem: options.onTemplateProblem }),
     });
-    return financeDocumentMail(
-      variantOf(resolved, financeVariantFor(request.templateId)),
-      request.body,
-    );
+    const fields = variantOf(resolved, financeVariantFor(request.templateId));
+    if (options.publicBaseUrl === undefined) {
+      return financeDocumentMail(fields, request.body);
+    }
+    // The branded part names the club that issued it (email programme PR10).
+    // Best effort: a club that cannot be read costs the band, never the receipt.
+    let orgName: string | null = null;
+    if (request.orgId !== undefined) {
+      try {
+        const [org] = await db
+          .select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, request.orgId))
+          .limit(1);
+        orgName = org?.name ?? null;
+      } catch {
+        orgName = null;
+      }
+    }
+    return financeDocumentMail(fields, request.body, {
+      publicBaseUrl: options.publicBaseUrl,
+      templateId: request.templateId,
+      language,
+      orgName,
+    });
   };
 }
 
