@@ -179,6 +179,18 @@ const ENTRIES = [
   },
   // --- The player's season ----------------------------------------------------
   {
+    // The first mail a player ever gets from us. Email and inbox only for now:
+    // a WhatsApp template needs Meta's approval first (plan: wave 1 submits it).
+    key: "registration.received",
+    label: "Registration received",
+    description:
+      "The player registered themselves; tells them what they sent and what happens next.",
+    audience: "player",
+    category: "transactional",
+    topic: "registration",
+    channels: ["email", "in_app"],
+  },
+  {
     key: "registration.approved",
     label: "Registration approved",
     description: "An organizer approved the player into the pool.",
@@ -212,7 +224,7 @@ const ENTRIES = [
     audience: "player",
     category: "transactional",
     topic: "registration",
-    channels: ["email", ...TEXT],
+    channels: ["email", ...TEXT, "in_app"],
   },
   {
     key: "registration.restored",
@@ -221,7 +233,7 @@ const ENTRIES = [
     audience: "player",
     category: "transactional",
     topic: "registration",
-    channels: ["email", ...TEXT],
+    channels: ["email", ...TEXT, "in_app"],
   },
   {
     key: "auction.sold",

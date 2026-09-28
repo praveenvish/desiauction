@@ -34,6 +34,22 @@ export const SUPPORT_EMAIL = "support@desiauction.in";
 
 export type EmailLanguage = "en" | "hi";
 
+/** Whose mail this is: the season and club, shown above everything we say. */
+export interface EmailBand {
+  /** "Malad Premier League 2026" */
+  readonly title: string;
+  /** "Malad Cricket Club · Cricket" */
+  readonly subtitle: string;
+  /** Two letters for the crest ("MC") — clubs have no logo yet. */
+  readonly monogram: string;
+}
+
+/** One step of the player's season: done, where they are now, or still ahead. */
+export interface EmailStep {
+  readonly label: string;
+  readonly state: "done" | "now" | "next";
+}
+
 export interface EmailContent {
   /** Hidden preview line most inboxes show beside the subject. */
   readonly preheader: string;
@@ -58,6 +74,10 @@ export interface EmailContent {
    * security alert. The words stay the template's; only the setting is code.
    */
   readonly calloutLast?: boolean;
+  /** The club band at the top of the card (club and season mail). */
+  readonly band?: EmailBand;
+  /** The season tracker under the heading — Registered → Approved → Auction → Team. */
+  readonly progress?: readonly EmailStep[];
   /** Why this person received this mail. */
   readonly footnote: string;
   /**
@@ -131,6 +151,8 @@ export const FOOTER_WORDS: Readonly<Record<EmailLanguage, { manage: string; help
   hi: { manage: "ईमेल सेटिंग", help: "मदद" },
 };
 
+const RULE_STRONG = "#D9D5CA"; // chalk-300 — a step still ahead
+
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
 
 function escape(value: string): string {
@@ -162,6 +184,41 @@ function codeBlock(code: string): string {
 
 function button(action: { label: string; url: string }, font: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="da-btn-wrap" style="margin:8px 0 24px;"><tr><td align="center" style="background:${GOLD};border:1px solid ${GOLD_EDGE};border-radius:10px;"><a class="da-btn" href="${escape(action.url)}" style="display:inline-block;padding:14px 28px;font:700 16px/20px ${font};color:${ON_GOLD};text-decoration:none;border-radius:10px;">${escape(action.label)}</a></td></tr></table>`;
+}
+
+/**
+ * The club band: a crest (the club's initials — there is no logo to show) and
+ * the season with its club and sport. Players know their tournament, not us.
+ */
+function bandRow(band: EmailBand, font: string): string {
+  return `<tr><td class="da-band da-sunken da-rule" style="padding:14px 36px;background:${SUNKEN};border-bottom:1px solid ${RULE};border-radius:16px 16px 0 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr><td width="36" style="vertical-align:middle;"><div class="da-crest" style="width:36px;height:36px;border-radius:18px;background:${INK};color:${GOLD};font:700 13px/36px ${FONT};text-align:center;letter-spacing:0.5px;">${escape(band.monogram)}</div></td><td style="vertical-align:middle;padding-left:12px;"><div class="da-heading" style="font:700 15px/20px ${font};color:${INK};">${escape(band.title)}</div><div class="da-muted" style="font:13px/18px ${font};color:${MUTED};">${escape(band.subtitle)}</div></td></tr></table></td></tr>`;
+}
+
+/** Four dots and their names: where the player is in the season, at a glance. */
+function progressRow(steps: readonly EmailStep[], font: string): string {
+  const width = `${String(Math.floor(100 / Math.max(steps.length, 1)))}%`;
+  const dot = (state: EmailStep["state"]): string => {
+    if (state === "done") {
+      return `<div style="width:26px;height:26px;border-radius:13px;background:${GOLD};border:1px solid ${GOLD_EDGE};color:${ON_GOLD};font:700 14px/26px ${FONT};text-align:center;margin:0 auto;">&#10003;</div>`;
+    }
+    if (state === "now") {
+      return `<div class="da-now" style="width:22px;height:22px;border-radius:13px;border:2px solid ${INK};background:${CARD};margin:0 auto;"><div class="da-now-dot" style="width:10px;height:10px;border-radius:5px;background:${INK};margin:6px auto 0;"></div></div>`;
+    }
+    return `<div class="da-next" style="width:24px;height:24px;border-radius:13px;border:1px solid ${RULE_STRONG};background:${CARD};margin:0 auto;"></div>`;
+  };
+  const cells = steps
+    .map((step) => {
+      const now = step.state === "now";
+      return `<td width="${width}" align="center" style="vertical-align:top;padding:0 2px;">${dot(step.state)}<div class="${now ? "da-heading" : "da-muted"}" style="margin-top:8px;font:${now ? "700" : "500"} 12px/16px ${font};color:${now ? INK : MUTED};">${escape(step.label)}</div></td>`;
+    })
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:2px 0 24px;"><tr>${cells}</tr></table>`;
+}
+
+/** "✓ Registered → ● Approved → ○ Auction → ○ Team" — the tracker, in plain text. */
+function progressText(steps: readonly EmailStep[]): string {
+  const mark = { done: "✓", now: "●", next: "○" } as const;
+  return steps.map((step) => `${mark[step.state]} ${step.label}`).join(" → ");
 }
 
 /** "Didn't ask for this? You can ignore…" → the question in bold, the rest plain. */
@@ -198,6 +255,7 @@ body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
 @media (max-width: 520px) {
   .da-outer { padding:20px 12px 28px !important; }
   .da-body { padding:26px 22px 8px !important; }
+  .da-band { padding-left:22px !important; padding-right:22px !important; }
   .da-btn-wrap { width:100% !important; }
   .da-btn { display:block !important; }
 }
@@ -212,6 +270,9 @@ body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
   .da-gold-text { color:${DARK.goldText} !important; }
   .da-rule { border-color:${DARK.rule} !important; }
   .da-notice { background:${DARK.notice} !important; border-color:${DARK.noticeEdge} !important; }
+  .da-now, .da-next { background:${DARK.card} !important; border-color:${DARK.heading} !important; }
+  .da-now-dot { background:${DARK.heading} !important; }
+  .da-crest { background:${DARK.heading} !important; color:${DARK.canvas} !important; }
 }
 /*/da:dark*/
 </style>`;
@@ -283,8 +344,10 @@ ${STYLE}
 </td></tr>
 <tr><td>
 <table role="article" aria-roledescription="email" aria-label="${escape(content.heading)}" lang="${language}" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-card" style="background:${CARD};border:1px solid ${RULE};border-radius:16px;">
+${content.band === undefined ? "" : bandRow(content.band, font)}
 <tr><td class="da-body" style="padding:32px 36px 12px;">
 <h1 class="da-heading" style="margin:0 0 16px;font:700 24px/32px ${font};color:${INK};letter-spacing:-0.3px;">${escape(content.heading)}</h1>
+${content.progress === undefined || content.progress.length === 0 ? "" : progressRow(content.progress, font)}
 ${body}
 </td></tr>
 </table>
@@ -302,8 +365,12 @@ ${body}
   const actionLine =
     content.action === undefined ? [] : [`${content.action.label}: ${content.action.url}`, ""];
   const text = [
+    ...(content.band === undefined ? [] : [`${content.band.title} · ${content.band.subtitle}`, ""]),
     content.heading,
     "",
+    ...(content.progress === undefined || content.progress.length === 0
+      ? []
+      : [progressText(content.progress), ""]),
     ...content.paragraphs.flatMap((p) => [p, ""]),
     ...(content.code === undefined ? [] : [`    ${content.code}`, ""]),
     ...(first ? actionLine : []),

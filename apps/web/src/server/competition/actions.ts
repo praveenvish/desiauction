@@ -132,7 +132,7 @@ import {
   savedMappingFor,
   type SavedMapping,
 } from "./import-mappings";
-import { notifyDecision } from "./registration-notify";
+import { notifyDecision, notifyRegistrationReceived } from "./registration-notify";
 import { seasonOverview, type SeasonOverview } from "./season-overview";
 import { teamsWorkspace, workspaceSightFor, type TeamsWorkspace } from "./team-workspace";
 import {
@@ -944,6 +944,8 @@ async function notifyAffected(
       notifyDecision(db, {
         orgId: gate.competition.orgId,
         competitionName: gate.competition.name,
+        seasonSlug: gate.competition.slug,
+        sport: gate.competition.sport,
         registrationIds,
         event: event.type,
         ...(event.type === "reject" ? { reason: event.reason } : {}),
@@ -1379,6 +1381,34 @@ export async function submitRegistrationAction(
    * in. A convenience after the fact — like consent evidence, it must never
    * fail the registration that already committed.
    */
+  /*
+   * "WE'VE GOT YOUR REGISTRATION" — email and inbox, after the response, like
+   * every decision notice. The registration has committed; a mail provider
+   * outage must cost the receipt, never the registration.
+   */
+  const received = {
+    orgId: competition.orgId,
+    competitionId: competition.id,
+    competitionName: competition.name,
+    seasonSlug: slug,
+    sport: competition.sport,
+    registrationId: result.registrationId,
+    personId: session.personId,
+    role,
+    answers: attributeAnswers,
+  };
+  after(async () => {
+    try {
+      await inCompetitionOrg(session.personId, competition, (db) =>
+        notifyRegistrationReceived(db, received),
+      );
+    } catch (error) {
+      logger().warn(
+        { err: error, competitionId: competition.id },
+        "registration.received_notice_failed",
+      );
+    }
+  });
   if (formString(formData, "rememberProfile") === "true") {
     try {
       /*

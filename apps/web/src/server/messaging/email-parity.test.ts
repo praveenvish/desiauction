@@ -283,33 +283,48 @@ function ownerSummaryMail(facts: OwnerSummaryFacts): ComposedMail {
   };
 }
 
+// Changed on purpose (email v2 PR4, 2026-09-28): the club is named, the band
+// and the season tracker open the mail, and the button opens the player's own
+// registration page. The tracker is left off a decline and a withdrawal.
+const STEPS = ["Registered", "Approved", "Auction", "Team"] as const;
+function steps(at: number) {
+  return STEPS.map((label, i) => ({
+    label,
+    state: i < at ? ("done" as const) : i === at ? ("now" as const) : ("next" as const),
+  }));
+}
+
 function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMail {
-  const { season } = facts;
+  const { season, orgName } = facts;
   const copy: Record<
     RegistrationDecision,
-    { subject: string; heading: string; lines: readonly string[] }
+    { subject: string; heading: string; lines: readonly string[]; at: number | null }
   > = {
     approve: {
-      subject: `You're approved for ${season}`,
-      heading: "You're in",
+      subject: `You're in — ${season}`,
+      heading: "You're in the auction pool",
       lines: [
-        `Your registration for ${season} is approved. You're in the player pool for auction day.`,
+        `${orgName} approved your registration for ${season}. You're in the player pool for auction day, and we'll email you the moment a team buys you.`,
       ],
+      at: 2,
     },
     waitlist: {
       subject: `You're on the waitlist for ${season}`,
       heading: "You're on the waitlist",
       lines: [
-        `Your registration for ${season} is on the waitlist. The organizer moves players up if a place opens, and we'll tell you if that happens.`,
+        `${orgName} has put your registration for ${season} on the waitlist. If a place opens they move players up, and we'll email you if that happens.`,
       ],
+      at: 1,
     },
     reject: {
       subject: `Your registration for ${season} wasn't approved`,
       heading: "Your registration wasn't approved",
       lines: [
-        `Your registration for ${season} was not approved.`,
+        `${orgName} didn't approve your registration for ${season}.`,
         `The reason given: ${facts.reason ?? "no reason was given"}.`,
+        "Your details stay on your account, so registering for another season takes a minute.",
       ],
+      at: null,
     },
     withdraw: {
       subject: `Your registration for ${season} was withdrawn`,
@@ -317,16 +332,19 @@ function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMai
       lines: [
         `Your registration for ${season} was withdrawn. You can register again while registration is open.`,
       ],
+      at: null,
     },
     restore: {
       subject: `Your registration for ${season} is back under review`,
       heading: "Back under review",
       lines: [
-        `Your registration for ${season} is back under review. We'll tell you what the organizer decides.`,
+        `Your registration for ${season} is back under review. We'll email you as soon as ${orgName} decides.`,
       ],
+      at: 1,
     },
   };
   const chosen = copy[facts.decision];
+  const words = orgName.trim().split(/\s+/);
   return {
     subject: chosen.subject,
     ...renderEmail({
@@ -334,8 +352,20 @@ function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMai
       preheader: chosen.lines[0] ?? chosen.heading,
       heading: chosen.heading,
       paragraphs: [`Hi ${facts.name},`, ...chosen.lines],
-      action: { label: "See your registration", url: `${PUBLIC}/home` },
-      footnote: `You received this because you registered for ${season}. Switch off "Registration decisions" in your account to stop these.`,
+      action: {
+        label: "See your registration",
+        url:
+          facts.seasonSlug === undefined
+            ? `${PUBLIC}/home`
+            : `${PUBLIC}/seasons/${facts.seasonSlug}/register`,
+      },
+      band: {
+        title: season,
+        subtitle: facts.sport === undefined ? orgName : `${orgName} · Cricket`,
+        monogram: `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`.toUpperCase(),
+      },
+      ...(chosen.at === null ? {} : { progress: steps(chosen.at) }),
+      footnote: `You received this because you registered for ${season}.`,
       whatsappNudge: true,
     }),
   };
@@ -923,11 +953,28 @@ describe("the player's season renders exactly as before", () => {
 
   const decisions: RegistrationDecisionFacts[] = (
     ["approve", "waitlist", "reject", "withdraw", "restore"] as RegistrationDecision[]
-  ).map((decision) => ({ name: "Arjun", season: "MPL 2026", decision }));
+  ).map((decision) => ({
+    name: "Arjun",
+    season: "MPL 2026",
+    orgName: "Malad Cricket Club",
+    seasonSlug: "mpl-2026-x7k2",
+    sport: "cricket",
+    decision,
+  }));
   it.each(
     [
       ...decisions,
-      { name: "Arjun", season: "MPL 2026", decision: "reject", reason: "the season is full" },
+      // No season known (an old caller): the band names the club alone, the link is /home.
+      { name: "Arjun", season: "MPL 2026", orgName: "Malad CC", decision: "approve" },
+      {
+        name: "Arjun",
+        season: "MPL 2026",
+        orgName: "Malad Cricket Club",
+        seasonSlug: "mpl-2026-x7k2",
+        sport: "cricket",
+        decision: "reject",
+        reason: "the season is full",
+      },
     ].map((facts) => [facts.decision, facts as RegistrationDecisionFacts] as const),
   )("registration: %s", async (_d, facts) => {
     same(await player.registrationDecisionMail(facts), registrationDecisionMail(facts));

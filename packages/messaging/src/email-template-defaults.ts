@@ -338,9 +338,12 @@ const EMAIL_CHANGED: EmailTemplateSpec = {
 
 // --- Registration decisions ------------------------------------------------------
 
+// "Manage emails" in the footer (email v2) is where these are switched off, so
+// the footnote says only why — and no longer names an English switch inside a
+// Hindi mail.
 const REGISTRATION_FOOTNOTE = {
-  en: 'You received this because you registered for {{season}}. Switch off "Registration decisions" in your account to stop these.',
-  hi: 'आपको यह इसलिए मिला क्योंकि आपने {{season}} के लिए रजिस्टर किया था। ये मेल बंद करने के लिए अपने अकाउंट में "Registration decisions" बंद करें।',
+  en: "You received this because you registered for {{season}}.",
+  hi: "आपको यह इसलिए मिला क्योंकि आपने {{season}} के लिए रजिस्टर किया था।",
 };
 
 const REGISTRATION_ACTION = { en: "See your registration", hi: "अपना रजिस्ट्रेशन देखें" };
@@ -370,12 +373,67 @@ function decision(
     editableFields: LAYOUT_FIELDS,
     languages: ["en", "hi"],
     variants: DEFAULT_VARIANT,
-    actions: [{ id: "registration", description: "The player's home, where the registration is." }],
-    variables: [NAME, SEASON, ...extra],
+    actions: [
+      { id: "registration", description: "The player's registration page for this season." },
+    ],
+    variables: [NAME, SEASON, ORG, ...extra],
     locked: [],
     defaults: { en: build("en"), hi: build("hi") },
   };
 }
+
+/**
+ * "WE'VE GOT YOUR REGISTRATION" — the first mail a player ever gets from us
+ * (email programme PR4). Sent only when the player registered THEMSELVES: an
+ * organizer adding a player, or an import, is not the player's moment.
+ * What they sent is a details table the code writes (role and every answer the
+ * sport asked for); the club band and the tracker are the code's too.
+ */
+const RECEIVED: EmailTemplateSpec = {
+  kind: "registration.received",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "registration", description: "The player's registration page for this season." }],
+  variables: [NAME, SEASON, ORG],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "You're registered for {{season}}",
+        preheader: "{{orgName}} reviews every registration. Here's what you sent them.",
+        heading: "We've got your registration",
+        paragraphs: [
+          "Hi {{name}},",
+          "Thanks for registering for {{season}}. {{orgName}} reviews every player before auction day, and we'll email you as soon as they decide.",
+        ],
+        after: [
+          "Spotted a mistake? Ask {{orgName}} to correct it — organizers can edit any registration.",
+        ],
+        actions: { registration: REGISTRATION_ACTION.en },
+        footnote: REGISTRATION_FOOTNOTE.en,
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} के लिए आपका रजिस्ट्रेशन हो गया",
+        preheader: "{{orgName}} हर रजिस्ट्रेशन देखता है। आपने जो भेजा, वह नीचे है।",
+        heading: "आपका रजिस्ट्रेशन हमें मिल गया",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{season}} के लिए रजिस्टर करने का धन्यवाद। {{orgName}} नीलामी से पहले हर खिलाड़ी को देखता है — फ़ैसला होते ही हम आपको ईमेल करेंगे।",
+        ],
+        after: [
+          "कुछ ग़लत दिखा? {{orgName}} से ठीक करने को कहें — आयोजक किसी भी रजिस्ट्रेशन को बदल सकते हैं।",
+        ],
+        actions: { registration: REGISTRATION_ACTION.hi },
+        footnote: REGISTRATION_FOOTNOTE.hi,
+      }),
+    ),
+  },
+};
 
 // --- The season ------------------------------------------------------------------
 
@@ -1352,19 +1410,20 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "auth.email_code": EMAIL_CODE,
   "security.phone_changed": PHONE_CHANGED,
   "security.email_changed": EMAIL_CHANGED,
+  "registration.received": RECEIVED,
   "registration.approved": decision("registration.approved", {
     en: {
-      subject: "You're approved for {{season}}",
-      heading: "You're in",
+      subject: "You're in — {{season}}",
+      heading: "You're in the auction pool",
       lines: [
-        "Your registration for {{season}} is approved. You're in the player pool for auction day.",
+        "{{orgName}} approved your registration for {{season}}. You're in the player pool for auction day, and we'll email you the moment a team buys you.",
       ],
     },
     hi: {
-      subject: "{{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर हो गया",
-      heading: "आप शामिल हैं",
+      subject: "आप चुन लिए गए — {{season}}",
+      heading: "आप नीलामी की सूची में हैं",
       lines: [
-        "{{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर हो गया है। नीलामी के दिन आप खिलाड़ियों की सूची में हैं।",
+        "{{orgName}} ने {{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर कर दिया है। नीलामी के दिन आप खिलाड़ियों की सूची में हैं, और कोई टीम आपको ख़रीदते ही हम आपको ईमेल करेंगे।",
       ],
     },
   }),
@@ -1373,14 +1432,14 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
       subject: "You're on the waitlist for {{season}}",
       heading: "You're on the waitlist",
       lines: [
-        "Your registration for {{season}} is on the waitlist. The organizer moves players up if a place opens, and we'll tell you if that happens.",
+        "{{orgName}} has put your registration for {{season}} on the waitlist. If a place opens they move players up, and we'll email you if that happens.",
       ],
     },
     hi: {
       subject: "{{season}} के लिए आप वेटलिस्ट पर हैं",
       heading: "आप वेटलिस्ट पर हैं",
       lines: [
-        "{{season}} के लिए आपका रजिस्ट्रेशन वेटलिस्ट पर है। जगह खाली होने पर आयोजक खिलाड़ियों को आगे बढ़ाते हैं, और ऐसा होने पर हम आपको बताएँगे।",
+        "{{orgName}} ने {{season}} के लिए आपका रजिस्ट्रेशन वेटलिस्ट पर रखा है। जगह खाली होने पर वे खिलाड़ियों को आगे बढ़ाते हैं, और ऐसा होने पर हम आपको ईमेल करेंगे।",
       ],
     },
   }),
@@ -1391,16 +1450,18 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
         subject: "Your registration for {{season}} wasn't approved",
         heading: "Your registration wasn't approved",
         lines: [
-          "Your registration for {{season}} was not approved.",
+          "{{orgName}} didn't approve your registration for {{season}}.",
           "The reason given: {{reason}}.",
+          "Your details stay on your account, so registering for another season takes a minute.",
         ],
       },
       hi: {
         subject: "{{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर नहीं हुआ",
         heading: "आपका रजिस्ट्रेशन मंज़ूर नहीं हुआ",
         lines: [
-          "{{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर नहीं किया गया।",
+          "{{orgName}} ने {{season}} के लिए आपका रजिस्ट्रेशन मंज़ूर नहीं किया।",
           "बताई गई वजह: {{reason}}।",
+          "आपकी जानकारी आपके अकाउंट में बनी रहती है, इसलिए किसी और सीज़न के लिए रजिस्टर करने में बस एक मिनट लगेगा।",
         ],
       },
     },
@@ -1435,14 +1496,14 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
       subject: "Your registration for {{season}} is back under review",
       heading: "Back under review",
       lines: [
-        "Your registration for {{season}} is back under review. We'll tell you what the organizer decides.",
+        "Your registration for {{season}} is back under review. We'll email you as soon as {{orgName}} decides.",
       ],
     },
     hi: {
       subject: "{{season}} के लिए आपका रजिस्ट्रेशन फिर से जाँच में है",
       heading: "फिर से जाँच में",
       lines: [
-        "{{season}} के लिए आपका रजिस्ट्रेशन फिर से जाँच में है। आयोजक जो भी फ़ैसला करेंगे, हम आपको बताएँगे।",
+        "{{season}} के लिए आपका रजिस्ट्रेशन फिर से जाँच में है। {{orgName}} के फ़ैसला करते ही हम आपको ईमेल करेंगे।",
       ],
     },
   }),

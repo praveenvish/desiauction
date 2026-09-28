@@ -31,6 +31,7 @@ const OWN = new URL(env.PUBLIC_BASE_URL).origin;
 
 /** The kinds a reader can switch off on /account (notification-email.ts). */
 const MANAGEABLE = new Set([
+  "registration.received",
   "registration.approved",
   "registration.waitlisted",
   "registration.rejected",

@@ -60,6 +60,11 @@ export type SecurityAction =
   // carried sign-in events only, and its own empty state admitted it. These
   // ride the same person-scoped ledger; no notification store was invented.
   | "registration.approved"
+  // Email programme PR4: the player's own registration, received — and the two
+  // decisions that had an email and a text but no inbox row.
+  | "registration.received"
+  | "registration.withdrawn"
+  | "registration.restored"
   | "registration.rejected"
   | "registration.waitlisted"
   // The night itself. Being sold at auction is the moment this whole product

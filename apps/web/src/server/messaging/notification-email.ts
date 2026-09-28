@@ -19,7 +19,7 @@ import {
 import { env } from "../../env";
 import { db as appDb } from "../db";
 import { logger } from "../logger";
-import { manageEmailsUrl, renderEmail } from "./email-layout";
+import { manageEmailsUrl, renderEmail, type EmailBand, type EmailStep } from "./email-layout";
 import { isSelfManagedKind } from "./unsubscribe";
 
 /**
@@ -98,6 +98,10 @@ export interface RenderOptions {
   readonly code?: string;
   /** The reader's language — the document's `lang` and its fonts. English when omitted. */
   readonly language?: MessageLanguage;
+  /** The club band — whose season this is. Facts, written by the caller in `language`. */
+  readonly band?: EmailBand;
+  /** Where the player is in the season (player-mail.ts `journey`). */
+  readonly progress?: readonly EmailStep[];
 }
 
 /**
@@ -130,6 +134,8 @@ export function composeNotificationEmail(
       : { action: { label, url: options.action.url } }),
     ...(layout.actionFirst === true ? { actionFirst: true } : {}),
     ...(options.details === undefined ? {} : { details: options.details }),
+    ...(options.band === undefined ? {} : { band: options.band }),
+    ...(options.progress === undefined ? {} : { progress: options.progress }),
     ...(filled.after.length === 0 ? {} : { after: filled.after }),
     footnote: filled.footnote,
     ...(layout.noLinks === true ? { noLinks: true } : {}),

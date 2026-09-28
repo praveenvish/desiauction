@@ -1,8 +1,11 @@
 import type { EmailNotificationKind } from "@desiauction/messaging/catalogue";
 import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults";
-import type { MessageLanguage } from "@desiauction/messaging/email-templates";
+import { sampleVariables, type MessageLanguage } from "@desiauction/messaging/email-templates";
+
+import { sportPackFor } from "@desiauction/core";
 
 import { env } from "../../env";
+import { journey, seasonBand, submittedDetails } from "./player-mail";
 import { requestDetails } from "./request-context";
 import type { RenderOptions } from "./notification-email";
 
@@ -12,6 +15,21 @@ import type { RenderOptions } from "./notification-email";
  * sample code, and a sample details table in the reader's language. The
  * wording is the editor's; these only make the preview look like the mail.
  */
+
+/**
+ * What a sample player "sent": the cricket pack's first role and the first
+ * option of each question, read from the pack — a sport's words live there only.
+ */
+const CRICKET = sportPackFor("cricket");
+const SAMPLE_ANSWERS = Object.fromEntries(
+  CRICKET.attributes.map((attribute) => [attribute.key, attribute.options[0]?.key ?? ""]),
+);
+const SAMPLE_ROLE = CRICKET.roles.values[0]?.key ?? "";
+const SAMPLE_SUBMITTED: Readonly<Record<MessageLanguage, readonly (readonly [string, string])[]>> =
+  {
+    en: submittedDetails("cricket", SAMPLE_ROLE, SAMPLE_ANSWERS, "en"),
+    hi: submittedDetails("cricket", SAMPLE_ROLE, SAMPLE_ANSWERS, "hi"),
+  };
 
 const SAMPLE_REQUEST = { device: "Chrome on macOS", at: new Date("2026-09-28T14:12:00Z") };
 
@@ -62,9 +80,38 @@ function details(
     case "security.email_changed":
     case "security.phone_changed":
       return requestDetails(SAMPLE_REQUEST, "change", language);
+    case "registration.received":
+      return SAMPLE_SUBMITTED[language];
     default:
       return undefined;
   }
+}
+
+/** Where each player mail leaves the player in the season (player-mail.ts). */
+const PREVIEW_STEP: Partial<Record<EmailNotificationKind, 1 | 2>> = {
+  "registration.received": 1,
+  "registration.waitlisted": 1,
+  "registration.restored": 1,
+  "registration.approved": 2,
+};
+
+/** The club band and tracker a registration mail carries, with the sample season. */
+function seasonFrame(
+  kind: EmailNotificationKind,
+  language: MessageLanguage,
+): Partial<RenderOptions> {
+  if (!kind.startsWith("registration.")) return {};
+  const step = PREVIEW_STEP[kind];
+  // The template's own samples, so the band and the sentences name one season.
+  const samples = sampleVariables(EMAIL_TEMPLATES[kind], language);
+  return {
+    band: seasonBand({
+      season: String(samples["season"] ?? ""),
+      orgName: String(samples["orgName"] ?? ""),
+      sport: "cricket",
+    }),
+    ...(step === undefined ? {} : { progress: journey(step, language) }),
+  };
 }
 
 export function previewOptions(
@@ -83,5 +130,6 @@ export function previewOptions(
       : { action: { id: action.id, url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/home` } }),
     ...(rows === undefined ? {} : { details: rows }),
     ...(kind === "auth.email_code" ? { code: "482913" } : {}),
+    ...seasonFrame(kind, language),
   };
 }
