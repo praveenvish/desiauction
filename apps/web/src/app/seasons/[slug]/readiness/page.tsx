@@ -322,10 +322,13 @@ export default async function ReadinessPage({ params }: { params: Promise<{ slug
 
 type RowState = "pass" | "next" | "later" | "warn";
 
+// What a screen reader hears. A gate not yet cleared is "Blocked" whether it
+// is the next one or a later one — the auction cannot open past either (and
+// the organizer journey asserts the word).
 const CHECK_WORD: Record<RowState, string> = {
   pass: "Pass: ",
-  next: "Next: ",
-  later: "To do: ",
+  next: "Blocked: ",
+  later: "Blocked: ",
   warn: "Warning: ",
 };
 
