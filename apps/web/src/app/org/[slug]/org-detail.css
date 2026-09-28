@@ -67,13 +67,6 @@
   white-space: nowrap;
 }
 
-.od-hero-slug {
-  font-family: var(--font-mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
 .od-hero-actions {
   flex: none;
   display: flex;
@@ -88,65 +81,41 @@
   gap: var(--space-4);
 }
 
-/* --- about banner --------------------------------------------------------- */
-/* The gold left border is the design's marker for "the club's own words".
-   Uses the identity accent so it reads as the org speaking, not the platform. */
-.od-about {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--accent-line);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
+/* --- about: the club's one line, in the header (2026-09-28) --------------- */
+.od-hero-meta {
+  flex-wrap: wrap;
 }
 
-.od-about-body {
+.od-about {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
   min-width: 0;
 }
 
-/* No description yet: one quiet line with its ghost action, not a band. */
-.od-about[data-empty="true"] {
-  align-items: center;
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  border-left-width: 1px;
-  border-style: dashed;
-  background: transparent;
-}
-
-.od-about[data-empty="true"] .od-about-body {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--space-2);
-}
-
-.od-about[data-empty="true"] .od-about-kicker {
-  margin: 0;
-}
-
-.od-about-kicker {
-  margin: 0 0 var(--space-1);
-  font-size: var(--text-xs-size);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: var(--font-weight-semibold);
-}
-
 .od-about-text {
-  margin: 0;
-  max-width: 72ch;
   color: var(--text-secondary);
-  line-height: 1.55;
 }
 
-.od-about-empty {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm-size);
+.od-about-edit {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  cursor: pointer;
+}
+
+.od-about-edit:hover {
+  text-decoration: underline;
+}
+
+.od-about-edit:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .od-about-field {
@@ -1271,5 +1240,139 @@
 
   .od-hero-figures {
     gap: 2px var(--space-3);
+  }
+}
+
+/* ---- The club's own page (2026-09-28): seasons as rows, then the club ---- */
+
+.od-label {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.od-section-head h2.od-label {
+  font-size: var(--text-xs-size);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.od-season-row > .od-season-text {
+  color: inherit;
+  text-decoration: none;
+}
+
+.od-season-row > .od-season-text:hover strong {
+  text-decoration: underline;
+}
+
+.od-season-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.od-season-row > a:last-child {
+  flex: none;
+}
+
+.od-club {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.od-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  color: inherit;
+  text-decoration: none;
+}
+
+.od-tile:hover {
+  border-color: var(--border-strong);
+}
+
+.od-tile:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.od-tile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--accent-ink);
+}
+
+.od-tile-head strong {
+  flex: 1 1 auto;
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+}
+
+.od-tile-head > svg:last-child {
+  color: var(--text-muted);
+}
+
+.od-tile-fact {
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.od-tile-sub {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 719px) {
+  .od-season-row {
+    flex-wrap: wrap;
+  }
+
+  .od-season-row > a:last-child {
+    flex: 1 1 100%;
+  }
+
+  /* Two by two on a phone: the four facts are the point; one per screen
+     width made the club four cards tall. */
+  .od-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .od-tile {
+    padding: var(--space-3);
+  }
+
+  .od-tile-fact {
+    font-size: var(--text-lg-size);
+  }
+}
+
+@media (max-width: 420px) {
+  .od-tile-sub {
+    display: none;
   }
 }
