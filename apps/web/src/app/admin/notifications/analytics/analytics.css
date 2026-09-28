@@ -1,0 +1,95 @@
+/* ---- Delivery analytics: the finding, channel sentences, the message matrix
+   (kept out of notifications.css, where sibling redesigns append) ---- */
+
+.dla-finding {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+}
+
+.dla-finding h2 {
+  margin: 0;
+  font-size: var(--text-xl-size);
+  line-height: 1.25;
+  color: var(--text-heading);
+}
+
+.dla-finding p {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-primary);
+}
+
+.dla-headline[data-tone="warn"] {
+  border-color: var(--warning-base);
+  background: var(--warning-subtle);
+}
+
+.dla-headline[data-tone="warn"] .dla-figs {
+  margin: 0 var(--space-3) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.dla-channel-line {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.dla-channel-line[data-quiet] {
+  color: var(--text-muted);
+}
+
+.dla-channel-note {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* A channel with no traffic keeps its figures for assistive tech and the
+   specs; the eye gets the sentence, not a grid of zeros. */
+.dla-channel dl[data-quiet] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.dla-matrix-cell {
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.dla-matrix-cell[data-held] {
+  color: var(--warning-strong);
+}
+
+.dla-matrix-cell[data-failed] {
+  color: var(--danger-strong);
+}
+
+@media (max-width: 719px) {
+  .dla-finding {
+    padding: var(--space-4) var(--space-4) var(--space-2);
+  }
+
+  .dla-finding h2 {
+    font-size: var(--text-lg-size);
+  }
+}
+
+/* The sentence above says sent · held back · failed; the list keeps them for
+   assistive tech and shows only what the sentence does not (the rates). */
+.dla-channel .dla-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
