@@ -4,6 +4,7 @@
 // status sync stores a snapshot (over a fake transport) and is rate limited;
 // a submission records what Meta answered; the database refuses what the code
 // refuses; and nobody but a platform admin gets through the door.
+import { NOTIFICATIONS } from "@desiauction/messaging/catalogue";
 import {
   auditLog,
   consentRecords,
@@ -213,6 +214,14 @@ describe("a mapping reaches the real WhatsApp send", () => {
     expect(row?.mapped).toMatchObject({ handle: "da_team_v1", source: "admin" });
     expect(view.recent.length).toBeGreaterThanOrEqual(3);
     expect(view.recent[0]).toMatchObject({ revertable: true });
+  });
+
+  it("the grid has a row for every kind in the catalogue", async () => {
+    // A topic with no group had no rows: "club" (PR5) and "matches" (PR11)
+    // were both missing from the admin screen before this was checked.
+    const center = await notificationControlCenter(db, envRecord);
+    const keys = center.groups.flatMap((g) => g.rows).map((r) => r.key);
+    expect([...keys].sort()).toEqual(NOTIFICATIONS.map((entry) => entry.key).sort());
   });
 
   it("the grid cell names the mapped template and its source", async () => {

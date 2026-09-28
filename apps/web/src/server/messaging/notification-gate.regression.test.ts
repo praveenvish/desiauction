@@ -294,6 +294,7 @@ describe("gap 3 — the club's switch shows what it stops, and stops what it sho
     expect(Object.keys(shown), "only switches some send obeys").toEqual([
       "registration",
       "auction",
+      "matches",
       "money",
     ]);
   });

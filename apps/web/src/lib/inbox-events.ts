@@ -61,6 +61,10 @@ const PERSON_EVENT_LABELS = {
   "team.appointed": "Your team named you to a role",
   "team.squad_sheet": "Your squad is set",
   "fixture.lineup_announced": "You're in the lineup",
+  "fixture.changed": "One of your team's matches moved or was called off",
+  "season.champion": "Your season is over — the champions are named",
+  "club.member_joined": "Someone joined your club with an invite link",
+  "plan.answered": "Your season's pass request was answered",
   "profile.name.updated": "Name updated",
   // The first name is not an update — see `profile.name.set`.
   "profile.name.set": "Name added to your profile",
@@ -150,9 +154,11 @@ export function clearInboxWatermarks(): void {
  * security rows too, whose meta holds request-shaped facts (addresses, agents)
  * that belong in an audit trail and not on a page; rendering the column
  * wholesale would put them there the first time a new event type was added.
- * Only these two keys are ever shown, in this order, and only as plain text.
+ * Only these keys are ever shown, in this order, and only as plain text.
  */
-const DETAIL_KEYS = ["team", "price"] as const;
+// "member": who joined a club with an invite link (PR13) — a name the club's
+// owners already see on the members page.
+const DETAIL_KEYS = ["team", "price", "member"] as const;
 
 export function detailOf(meta: unknown): string | null {
   if (typeof meta !== "object" || meta === null) {

@@ -117,7 +117,16 @@ describe("AUTHZ REGRESSION — tenancy + capability contract", () => {
     // `orgName` joined the result so acceptance can finally CONFIRM itself:
     // the redirect used to be silent, and an unnamed account was bounced
     // straight on to /onboarding with nothing saying the invite had worked.
-    expect(first).toEqual({ ok: true, orgSlug: orgX.slug, orgName: orgX.name });
+    // PR13: and who sent it, with what access — for "someone joined".
+    expect(first).toEqual({
+      ok: true,
+      inviteId: expect.any(String) as string,
+      orgId: orgX.id,
+      orgSlug: orgX.slug,
+      orgName: orgX.name,
+      invitedBy: owner,
+      capabilitySet: "org:staff",
+    });
     const replay = await acceptInvite(db, staff, invite.token);
     expect(replay).toEqual({ ok: false });
     expect(await previewInvite(db, invite.token)).toBeNull();

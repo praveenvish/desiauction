@@ -1,4 +1,13 @@
-import { declineRequest, openRequests, recentDecisions, type DecidedRow } from "./requests";
+import { after } from "next/server";
+
+import { deletionContactOf, notifyAccountDeletion } from "../auth/account-notices";
+import {
+  declineRequest,
+  openRequests,
+  recentDecisions,
+  requesterOf,
+  type DecidedRow,
+} from "./requests";
 import { erasurePreflight, executeErasure, REFUSAL_TEXT, type ErasureRefusal } from "./erasure";
 import { asPerson } from "../tenant";
 
@@ -51,7 +60,18 @@ export async function eraseForRequest(
   requestId: string,
   note: string | null,
 ): Promise<DeskResult> {
+  // The address the "deleted" mail goes to, read BEFORE it is erased (PR14).
+  const personId = await asPerson(operatorId, (db) => requesterOf(db, requestId));
+  const contact =
+    personId === null ? null : await asPerson(operatorId, (db) => deletionContactOf(db, personId));
   const result = await executeErasure({ operatorId, requestId, note });
+  if (result.ok && personId !== null && contact !== null) {
+    after(() =>
+      asPerson(operatorId, (db) =>
+        notifyAccountDeletion(db, { personId, stage: "completed", contact }),
+      ).then(() => undefined),
+    );
+  }
   if (result.ok) {
     return {
       ok: true,
@@ -78,6 +98,16 @@ export async function declineForRequest(
   const declined = await asPerson(operatorId, (db) =>
     declineRequest(db, { requestId, operatorId, note }),
   );
+  if (declined) {
+    const personId = await asPerson(operatorId, (db) => requesterOf(db, requestId));
+    if (personId !== null) {
+      after(() =>
+        asPerson(operatorId, (db) =>
+          notifyAccountDeletion(db, { personId, stage: "declined", reason: note }),
+        ).then(() => undefined),
+      );
+    }
+  }
   return declined
     ? { ok: true, message: "Request declined. The person sees your reason on their account." }
     : { ok: false, error: "That request has already been decided." };

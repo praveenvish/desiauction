@@ -115,6 +115,7 @@ describe("the /account and /org switches follow controllability", () => {
     expect(personSwitchTopics(CATALOGUE_DEFAULTS).map((t) => t.topic)).toEqual([
       "registration",
       "auction",
+      "matches",
       "money",
       "feedback",
       "club",
@@ -122,6 +123,7 @@ describe("the /account and /org switches follow controllability", () => {
     expect(orgSwitchTopics(CATALOGUE_DEFAULTS).map((t) => t.topic)).toEqual([
       "registration",
       "auction",
+      "matches",
       "money",
     ]);
   });

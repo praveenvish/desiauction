@@ -262,7 +262,8 @@ function lineupMail(facts: LineupFacts): ComposedMail {
       ],
       details: facts.lineup.map((line) => [line.name, line.note] as const),
       after: ["Good luck!"],
-      action: { label: "See your season", url: `${PUBLIC}/home` },
+      // PR11: the button opens the match (its URL is the caller's; home by default).
+      action: { label: "See the match", url: `${PUBLIC}/home` },
       footnote: `You received this because you play for ${facts.teamName} in ${facts.season}.`,
       whatsappNudge: true,
     }),

@@ -174,9 +174,13 @@ describe("hiddenInboxActions — the in-app gate at read time", () => {
   it("hides every in-app kind on a switched-off topic, by its inbox name", async () => {
     const hidden = await hiddenInboxActions(fakeDb(["auction"]), PERSON);
     expect(hidden).toContain("auction.sold");
-    expect(hidden).toContain("fixture.lineup_announced");
-    expect(hidden).not.toContain("lineup.announced");
     expect(hidden).not.toContain("registration.approved");
+    // A lineup is a match update (PR11) — written under its inbox name.
+    const matches = await hiddenInboxActions(fakeDb(["matches"]), PERSON);
+    expect(matches).toContain("fixture.lineup_announced");
+    expect(matches).toContain("fixture.changed");
+    expect(matches).not.toContain("lineup.announced");
+    expect(matches).not.toContain("auction.sold");
   });
 
   it("hides nothing for a person with no in-app switch off", async () => {

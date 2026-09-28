@@ -22,16 +22,23 @@ import { cookies } from "next/headers";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 
+import { env } from "../../env";
 import { currentSession } from "../auth/actions";
+import { normalizeEmail } from "../auth/email-address";
+import { maskEmail } from "../auth/email-changed-notice";
+import { clubInviteMail } from "../messaging/club-mail";
+import { languageForMail, sendNotificationMail } from "../messaging/notify";
 import { dbHandle, systemDb } from "../db";
 import { canFinops } from "../financial-operations/authz";
 import { canSettlement } from "../settlement/authz";
 import { logger } from "../logger";
 import { ForbiddenError, can, requireCapability } from "./authz";
-import { notifyClubCreated } from "./organizer-notify";
+import { notifyClubCreated, notifyMemberJoined } from "./organizer-notify";
 import {
   acceptInvite,
+  clubInviteTokenFrom,
   createInvite,
+  liveClubInvite,
   inviteLanding,
   pendingInvitesOf,
   previewInvite,
@@ -527,6 +534,93 @@ export async function createInviteAction(
 }
 
 /**
+ * EMAIL AN INVITE LINK (email programme PR13) — beside Copy, for an organizer
+ * who has the address rather than a WhatsApp chat. Sent DIRECTLY and never
+ * queued: the link is the access, and the queue keeps bodies. The address is
+ * not stored; the audit row keeps its domain.
+ */
+export async function emailClubInviteAction(
+  slug: string,
+  joinUrl: string,
+  address: string,
+): Promise<{ ok: true; sentTo: string } | { ok: false; error: string }> {
+  const session = await requireSession();
+  const org = await resolveTenantScoped(session.personId, slug);
+  if (org === null) {
+    return { ok: false, error: "Not available." };
+  }
+  const to = normalizeEmail(address);
+  if (to === null) {
+    return { ok: false, error: "Enter their email address." };
+  }
+  const token = clubInviteTokenFrom(joinUrl);
+  if (token === null) {
+    return { ok: false, error: "Create the invite link first." };
+  }
+  try {
+    return await withTenantDb(
+      dbHandle,
+      { personId: session.personId, orgId: org.id },
+      async (db) => {
+        await requireCapability(
+          db,
+          session.personId,
+          { scopeType: "org", scopeId: org.id },
+          "org.members.invite",
+        );
+        const invite = await liveClubInvite(db, org.id, token);
+        if (invite === null) {
+          return {
+            ok: false as const,
+            error: "That link has been used, revoked or has expired. Create a new one.",
+          };
+        }
+        const [inviter] = await db
+          .select({ name: people.name })
+          .from(people)
+          .where(eq(people.id, session.personId))
+          .limit(1);
+        const language = await languageForMail(db, { email: to });
+        const mail = await clubInviteMail(
+          {
+            orgName: org.name,
+            inviterName: inviter?.name?.trim() || org.name,
+            capabilitySet: invite.capabilitySet,
+            acceptUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/join/${token}`,
+          },
+          language,
+        );
+        const { outcome } = await sendNotificationMail(db, { kind: "club.invite", to }, mail);
+        if (outcome !== "sent") {
+          return {
+            ok: false as const,
+            error:
+              outcome === "unconfigured"
+                ? "Email isn't set up here yet — copy the link and send it yourself."
+                : "We couldn't send that email just now — copy the link and send it yourself.",
+          };
+        }
+        await db.insert(auditLog).values({
+          id: newId(),
+          actor: session.personId,
+          action: "invite.emailed",
+          scopeType: "org",
+          scopeId: org.id,
+          subject: invite.id,
+          meta: { capabilitySet: invite.capabilitySet, domain: to.slice(to.lastIndexOf("@") + 1) },
+        });
+        return { ok: true as const, sentTo: maskEmail(to) };
+      },
+    );
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return { ok: false, error: "You can't invite members to this organization." };
+    }
+    return { ok: false, error: "We couldn't send that email just now." };
+  }
+}
+
+/**
  * Kill an outstanding invite link. Same capability as minting one — if you may
  * hand out a key you may take an unused one back.
  */
@@ -716,6 +810,26 @@ export async function acceptInviteAction(token: string): Promise<void> {
   // Pre-tenant token path (documented exception): runs on the system pool.
   const result = await acceptInvite(systemDb, session.personId, token);
   if (result.ok) {
+    // Whoever sent the link, and the club's owners, hear who joined (PR13).
+    // After the response and best effort: the membership stands either way.
+    const joined = result;
+    after(async () => {
+      try {
+        await withTenantDb(dbHandle, { personId: session.personId, orgId: joined.orgId }, (db) =>
+          notifyMemberJoined(db, {
+            inviteId: joined.inviteId,
+            orgId: joined.orgId,
+            orgName: joined.orgName,
+            orgSlug: joined.orgSlug,
+            memberId: session.personId,
+            invitedBy: joined.invitedBy,
+            capabilitySet: joined.capabilitySet,
+          }),
+        );
+      } catch (error) {
+        logger().warn({ err: error, orgId: joined.orgId }, "club.member_joined_notice_failed");
+      }
+    });
     // Land on the club WITH a confirmation. Acceptance used to redirect in
     // silence — and an unnamed account was then bounced straight onward to
     // /onboarding, whose heading is written for a founder creating an auction,
