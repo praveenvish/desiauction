@@ -37,7 +37,7 @@ import {
   scheduleAllAction,
   type ScheduleView,
 } from "../../../../server/competition/fixture-actions";
-import { FixtureStatusPill } from "../_tabs/fixture-status";
+import { FixtureStatusPill, awaitsResult } from "../_tabs/fixture-status";
 import { RoundRobinPreview } from "../_tabs/round-robin-preview";
 import { TeamCrest, teamInitials } from "../_tabs/team-crest";
 import { ScheduleViews } from "../sibling-link";
@@ -106,6 +106,12 @@ export function SchedulePanel({
   const lobbySeason = fixtureShape === "lobby";
   const grounds = view.grounds ?? [];
   const outstanding = view.outstanding ?? [];
+  // Being played NOW: a match left open from an earlier day awaits a result.
+  const liveNow = Math.max(
+    0,
+    stats.inProgress -
+      view.rows.filter((row) => row.status === "in_progress" && awaitsResult(row, today)).length,
+  );
   const noun = lobbySeason ? "lobby" : "match";
   const nouns = lobbySeason ? "lobbies" : "matches";
   const total = stats.total - stats.cancelled;
@@ -186,9 +192,7 @@ export function SchedulePanel({
         {total} {total === 1 ? noun : nouns}
       </strong>
       {` · ${String(stats.completed)} played`}
-      {stats.inProgress > 0 ? (
-        <span className="mx-live-word"> · {stats.inProgress} playing now</span>
-      ) : null}
+      {liveNow > 0 ? <span className="mx-live-word"> · {liveNow} playing now</span> : null}
       {next !== null && next.state === "upcoming" && next.fixture.kickoffAt !== null
         ? ` · next ${wallDay(next.fixture.kickoffAt.slice(0, 10)).label}, ${formatWallTime(next.fixture.kickoffAt)}`
         : ""}
@@ -342,6 +346,15 @@ export function SchedulePanel({
 
   /* ---- Publishing: what is still private, and the one step that fixes it ---- */
   const played = stats.inProgress + stats.completed;
+  /*
+   * What still needs a result: played-and-unscored, plus the week's matches
+   * whose day passed with none. "All played matches scored" was green beside
+   * a match left in progress two days (census 8) — it is said only when true.
+   */
+  const needResult = new Set([
+    ...outstanding.map((fixture) => fixture.id),
+    ...view.rows.filter((row) => awaitsResult(row, today)).map((row) => row.id),
+  ]).size;
   const pipeline =
     canManage && !empty ? (
       <section
@@ -403,15 +416,11 @@ export function SchedulePanel({
               Publish schedule
             </Button>
           ) : null}
-          {played > 0 ? (
-            <Pill
-              tone={outstanding.length === 0 ? "green" : "amber"}
-              dot
-              testId="results-outstanding"
-            >
-              {outstanding.length === 0
+          {played > 0 && (needResult > 0 || stats.inProgress === 0) ? (
+            <Pill tone={needResult === 0 ? "green" : "amber"} dot testId="results-outstanding">
+              {needResult === 0
                 ? "All played matches scored"
-                : `${String(outstanding.length)} still to score`}
+                : `${String(needResult)} ${needResult === 1 ? "needs" : "need"} a result`}
             </Pill>
           ) : null}
         </div>
@@ -594,12 +603,15 @@ export function SchedulePanel({
           const dateLine = parts.date;
           const count =
             day.count === 0 ? "—" : `${String(day.count)} ${day.count === 1 ? noun : nouns}`;
+          const liveHere = day.date < today ? 0 : day.live;
           const body = (
             <>
               <span className="mx-day-name">{label}</span>
               <span className="mx-day-date">{dateLine}</span>
-              <span className="mx-day-count" data-live={day.live > 0 ? "true" : undefined}>
-                {day.live > 0 ? `${String(day.live)} live` : count}
+              {/* A past day is never "live": a match left open there awaits a
+                  result (its row says so), it is not being played. */}
+              <span className="mx-day-count" data-live={liveHere > 0 ? "true" : undefined}>
+                {liveHere > 0 ? `${String(liveHere)} live` : count}
               </span>
             </>
           );
@@ -706,7 +718,9 @@ export function SchedulePanel({
           day.date,
           view.mode === "search" || day.date.slice(0, 4) !== today.slice(0, 4),
         ).label;
-        const liveCount = day.rows.filter((row) => row.status === "in_progress").length;
+        // A past day's open match awaits a result; it is not being played.
+        const liveCount =
+          day.date < today ? 0 : day.rows.filter((row) => row.status === "in_progress").length;
         return (
           <section
             key={day.date}
@@ -937,7 +951,7 @@ function MatchRow({
         </span>
       </Link>
       <span className="mx-state">
-        <FixtureStatusPill status={fixture.status} />
+        <FixtureStatusPill status={fixture.status} overdue={awaitsResult(fixture, today)} />
       </span>
       {canManage ? (
         <span className="mx-act">

@@ -467,8 +467,15 @@ export interface TeamSeasonMatch {
 }
 
 export interface TeamSeason {
-  /** Published matches still to come (or live), kickoff order. */
+  /** Published matches still to come (or live today), kickoff order. */
   upcoming: TeamSeasonMatch[];
+  /**
+   * Matches whose day has passed with no result — never started, or started
+   * and left open. They used to fall between "upcoming" (kickoff before
+   * today) and "results" (no result) and vanish: an owner read "1 to come"
+   * with three matches unaccounted for. Kickoff order.
+   */
+  awaiting: TeamSeasonMatch[];
   /** Results, newest first. */
   results: TeamSeasonMatch[];
   record: { played: number; won: number; lost: number; tied: number };
@@ -538,13 +545,15 @@ export async function teamSeason(teamId: string, today: string): Promise<TeamSea
       },
     };
   });
-  const upcoming = matches
-    .filter(
-      ({ status, match }) =>
-        status === "in_progress" ||
-        (status === "published" && (match.kickoffAt === null || match.kickoffAt >= today)),
-    )
-    .map(({ match }) => match);
+  // A match on a day before today with no result is awaiting one, whether it
+  // was never started or started and left open — not "next", and not "live".
+  const pastDay = (kickoffAt: string | null) =>
+    kickoffAt !== null && kickoffAt.slice(0, 10) < today.slice(0, 10);
+  const open = matches.filter(({ status }) => status === "in_progress" || status === "published");
+  const awaiting = open
+    .filter(({ match }) => pastDay(match.kickoffAt))
+    .map(({ match }) => ({ ...match, live: false }));
+  const upcoming = open.filter(({ match }) => !pastDay(match.kickoffAt)).map(({ match }) => match);
   const results = matches
     .filter(({ status, match }) => status === "completed" && match.result !== null)
     .map(({ match }) => match)
@@ -564,5 +573,5 @@ export async function teamSeason(teamId: string, today: string): Promise<TeamSea
       place = { position: index + 1, of: standings.rows.length, points: row.points };
     }
   }
-  return { upcoming, results, record, place };
+  return { upcoming, awaiting, results, record, place };
 }

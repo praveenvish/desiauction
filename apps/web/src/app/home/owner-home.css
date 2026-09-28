@@ -378,6 +378,12 @@
   color: var(--text-accent);
 }
 
+/* A past match with no result: someone owes a score, which is not "next". */
+.ow-match-next[data-state="due"] {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .ow-result {
   display: inline-flex;
   align-items: center;

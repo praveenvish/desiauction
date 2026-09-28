@@ -426,7 +426,7 @@ export default async function RegisterPage({
       auction.outcome !== "passed" &&
       auction.teamName !== null &&
       season !== null &&
-      season.upcoming.length + season.results.length > 0
+      season.upcoming.length + season.awaiting.length + season.results.length > 0
         ? {
             teamName: auction.teamName,
             teamColor: outcome?.teamColor ?? null,
@@ -439,6 +439,7 @@ export default async function RegisterPage({
             results: season.results.slice(0, 3).map(seasonMatch),
             record: { played: season.record.played, won: season.record.won },
             toCome: season.upcoming.length,
+            awaiting: season.awaiting.map(seasonMatch),
           }
         : null;
     return (

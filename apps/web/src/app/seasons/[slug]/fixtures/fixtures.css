@@ -497,6 +497,13 @@ a.mx-day:hover {
   color: var(--accent-ink);
 }
 
+/* On today's gold wash the muted grey fell to 3.8:1 in the floodlight theme;
+   the secondary ink clears 4.5:1 on both themes. */
+.mx-day[data-today="true"] .mx-day-date,
+.mx-day[data-today="true"] .mx-day-count {
+  color: var(--text-secondary);
+}
+
 .mx-day-date,
 .mx-day-count {
   font-size: var(--text-xs-size);

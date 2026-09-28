@@ -44,9 +44,20 @@ describe("nowRows", () => {
     expect(out.at(-1)).toMatchObject({ fixture: { id: "a" }, state: "result" });
   });
 
-  it("never offers a past, unplayed kickoff as next", () => {
+  it("never offers a past, unplayed kickoff as next — it awaits a result", () => {
     const out = nowRows([f("x", "2026-09-20T09:00", "published")], "2026-09-27T15:00", () => true);
-    expect(out).toEqual([]);
+    expect(out.map((row) => [row.fixture.id, row.state])).toEqual([["x", "due"]]);
+  });
+
+  it("a match left in progress past its day awaits a result, not live", () => {
+    const out = nowRows(rows, "2026-09-29T10:00", () => true);
+    expect(out.map((row) => [row.fixture.id, row.state])).toEqual([
+      ["c", "due"],
+      ["d", "due"],
+      ["e", "due"],
+      ["g", "next"],
+      ["b", "result"],
+    ]);
   });
 });
 

@@ -382,7 +382,7 @@ function MatchHero({
           </dd>
         </div>
         <div>
-          <dt>matches to come</dt>
+          <dt>{toCome === 1 ? "match to come" : "matches to come"}</dt>
           <dd>{toCome}</dd>
         </div>
         {price !== null ? (
