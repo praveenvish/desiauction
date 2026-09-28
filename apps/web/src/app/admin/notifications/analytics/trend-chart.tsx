@@ -105,7 +105,7 @@ export function TrendChart({ days, windowDays }: { days: readonly DayRow[]; wind
         </li>
         <li>
           <span className="dla-swatch dla-bar-suppressed" />
-          Suppressed
+          Held back
         </li>
         <li>
           <span className="dla-swatch dla-bar-failed" />
@@ -121,7 +121,7 @@ export function TrendChart({ days, windowDays }: { days: readonly DayRow[]; wind
               <tr>
                 <th scope="col">Day</th>
                 <th scope="col">Sent</th>
-                <th scope="col">Suppressed</th>
+                <th scope="col">Held back</th>
                 <th scope="col">Failed</th>
               </tr>
             </thead>
@@ -134,7 +134,7 @@ export function TrendChart({ days, windowDays }: { days: readonly DayRow[]; wind
                   <td data-label="Sent" className="admin-num">
                     {String(d.sent)}
                   </td>
-                  <td data-label="Suppressed" className="admin-num">
+                  <td data-label="Held back" className="admin-num">
                     {String(d.suppressed)}
                   </td>
                   <td data-label="Failed" className="admin-num">
