@@ -120,6 +120,16 @@ export default {
       // real pages.
       { source: "/competitions", destination: "/tournaments?view=seasons", permanent: true },
       { source: "/competitions/:path*", destination: "/seasons/:path*", permanent: true },
+      // /admin/messaging (2026-09-28) was a second copy of Notifications — its
+      // templates, delivery and suppression cards each had a tab there — and it
+      // told a different story about SMS than the page beside it. Retired; the
+      // address lands on the tab that now holds what only it showed. Temporary
+      // (307): the admin's shape may move again.
+      {
+        source: "/admin/messaging",
+        destination: "/admin/notifications/templates",
+        permanent: false,
+      },
     ]);
   },
 };

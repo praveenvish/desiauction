@@ -22,6 +22,7 @@ import {
   type MappingSource,
   type TextChannel,
 } from "../messaging/provider-templates";
+import { smsRoute, type SmsRoute } from "../messaging/delivery-readiness";
 import { SMS_TEMPLATES } from "../messaging/templates";
 import {
   approvalOf,
@@ -111,6 +112,8 @@ export interface SmsRow {
   readonly kind: string;
   readonly label: string;
   readonly mapped: MappedView;
+  /** The words the text says, `{slot}` markers and all — what DLT registered. */
+  readonly text: string;
 }
 
 export interface TemplateChange {
@@ -127,6 +130,8 @@ export interface ProviderTemplatesView {
   readonly syncEnabled: boolean;
   readonly whatsappConfigured: boolean;
   readonly smsGateway: boolean;
+  /** Where a text goes on this server (delivery-readiness.ts `smsRoute`). */
+  readonly smsRoute: SmsRoute;
   readonly sync: SyncRecord;
   readonly otp: {
     readonly name: string | null;
@@ -318,6 +323,7 @@ export function buildTemplatesView(input: {
     kind: template.key,
     label: labelOf(template.key).label,
     mapped: mappedView(template.key, "sms", mappings, envRecord, names),
+    text: template.body,
   }));
 
   const otpName = envRecord["WHATSAPP_TEMPLATE_NAME"] ?? null;
@@ -325,6 +331,7 @@ export function buildTemplatesView(input: {
     syncEnabled: set("WHATSAPP_BUSINESS_ACCOUNT_ID") && set("WHATSAPP_ACCESS_TOKEN"),
     whatsappConfigured: set("WHATSAPP_PHONE_NUMBER_ID") && set("WHATSAPP_ACCESS_TOKEN"),
     smsGateway: set("MSG91_AUTH_KEY"),
+    smsRoute: smsRoute(envRecord),
     sync: status.sync,
     otp: {
       name: otpName === "" ? null : otpName,

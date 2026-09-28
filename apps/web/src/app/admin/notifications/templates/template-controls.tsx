@@ -5,6 +5,7 @@ import {
   Dialog,
   Field,
   IconAlert,
+  IconCopy,
   IconKebab,
   Notice,
   PopoverMenu,
@@ -504,5 +505,34 @@ export function RevertTemplate({ auditId, summary }: { auditId: string; summary:
     >
       Revert
     </Button>
+  );
+}
+
+/**
+ * Copies a server setting's NAME — never its value — for the operator who has
+ * to set it on the host. The name used to be the row's loudest text; it is a
+ * detail now, one click from the clipboard.
+ */
+export function CopyEnvName({ name }: { name: string }) {
+  const toast = useToast();
+  return (
+    <button
+      type="button"
+      className="ptpl-copy"
+      aria-label={`Copy ${name}`}
+      title={`Copy ${name}`}
+      onClick={() => {
+        void navigator.clipboard.writeText(name).then(
+          () => {
+            toast({ title: `Copied ${name}`, tone: "success" });
+          },
+          () => {
+            toast({ title: "Couldn't copy — select the name instead", tone: "danger" });
+          },
+        );
+      }}
+    >
+      <IconCopy size={14} />
+    </button>
   );
 }

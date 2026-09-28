@@ -62,7 +62,6 @@ const ROUTES = [
   "/admin/users/warmup",
   "/admin/audit",
   "/admin/health",
-  "/admin/messaging",
   "/gallery",
   "/",
 ];

@@ -65,6 +65,7 @@ const CHANNEL_ICON: Readonly<Record<string, ReactNode>> = {
 
 const HEALTH_PILL: Readonly<Record<ChannelHealth["state"], { tone: KitTone; label: string }>> = {
   live: { tone: "green", label: "Live" },
+  dev_inbox: { tone: "neutral", label: "Dev inbox" },
   not_set_up: { tone: "amber", label: "Not set up" },
   off: { tone: "red", label: "Off everywhere" },
 };
@@ -83,6 +84,11 @@ function channelSub(health: ChannelHealth): ReactNode {
   }
   if (health.state === "not_set_up") {
     return `${formatCount(health.blocked)} ${health.blocked === 1 ? "message waits" : "messages wait"} for it`;
+  }
+  if (health.state === "dev_inbox") {
+    return health.sent === 0
+      ? "None written there lately"
+      : `${formatCount(health.sent)} written there`;
   }
   if (health.failed > 0) {
     return <span className="ntc-bad">{formatCount(health.failed)} failed</span>;
@@ -516,7 +522,7 @@ export function NotificationsPanel({
   center: NotificationCenter;
   kind: string | undefined;
 }) {
-  const health = channelHealth(center.channels, center.groups, center.windowDays);
+  const health = channelHealth(center.channels, center.groups, center.windowDays, center.smsRoute);
   const open = findRow(center.groups, kind);
   return (
     <>

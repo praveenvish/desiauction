@@ -18,6 +18,22 @@ function hasSmsTemplate(key: string): boolean {
 }
 
 /**
+ * WHERE A TEXT GOES ON THIS SERVER — the one SMS fact every admin page says.
+ *
+ * Mirrors sms.ts `createPlayerSmsSender`'s precedence, by variable name: the
+ * MSG91 gateway when its key is set, else the dev inbox under
+ * `OTP_PROVIDER=dev` (never on a production server — env.ts refuses it), else
+ * nowhere. Notifications, Templates and the retired Messaging page each used to
+ * derive this on their own and told three different stories about one server.
+ */
+export type SmsRoute = "gateway" | "dev_inbox" | "none";
+
+export function smsRoute(env: Readonly<Record<string, string | undefined>>): SmsRoute {
+  if ((env["MSG91_AUTH_KEY"] ?? "") !== "") return "gateway";
+  return env["OTP_PROVIDER"] === "dev" ? "dev_inbox" : "none";
+}
+
+/**
  * CAN THIS CELL ACTUALLY SEND? — for the admin grid's "Not configured" chip.
  *
  * A switch that is ON for a channel with no provider behind it is not "on" in
