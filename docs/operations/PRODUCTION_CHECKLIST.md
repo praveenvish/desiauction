@@ -72,10 +72,12 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
 - ☐F **An off-box S3 bucket for object storage**, keys in `mirror.env`. ☑ The
   `minio-mirror` sidecar copies the media and finops buckets hourly and refuses
   to run unconfigured.
-- ☐F **`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY`** in the `production`
-  GitHub environment. `backup-production.yml` FAILS nightly until they exist
-  (it used to report green with no backup taken), and `deploy-host.yml` cannot
-  run without them.
+- ☑ **`DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_SSH_KEY` / `DEPLOY_HOST_FINGERPRINT`**
+  in the `production` GitHub environment (2026-09-28). The key is used by CI
+  only, `restrict`ed in the `deploy` user's authorized_keys (no forwarding, no
+  pty, no sudo), and its private half exists only in GitHub. The fingerprint
+  pins the host's SSH identity in both workflows. `backup-production.yml`
+  FAILS nightly until backups exist (it used to report green with none).
 - ☐F **Branch protection on `main`** with the required checks listed in
   [DEPLOYMENT](DEPLOYMENT.md) "Required status checks". Needs a repository admin;
   nothing in the repo can set it.

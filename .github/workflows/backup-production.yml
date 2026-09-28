@@ -51,12 +51,13 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST_FINGERPRINT: ${{ secrets.DEPLOY_HOST_FINGERPRINT }}
         run: |
-          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_HOST_FINGERPRINT" ]; then
             {
               echo "### Backups NOT verified"
               echo ""
-              echo "DEPLOY_HOST, DEPLOY_USER and DEPLOY_SSH_KEY are not all configured for the"
+              echo "DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY and DEPLOY_HOST_FINGERPRINT are not all configured for the"
               echo "\`production\` environment, so nothing could be checked. These are founder-held"
               echo "(PRODUCTION_CHECKLIST §2)."
               echo ""
@@ -72,6 +73,11 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # The host's SSH identity, pinned. Without it the action accepts
+          # whatever answers at DEPLOY_HOST — a hijacked IP would receive the
+          # deploy key's session and every env file the deploy touches.
+          # `ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub | cut -d' ' -f2`
+          fingerprint: ${{ secrets.DEPLOY_HOST_FINGERPRINT }}
           script: |
             set -euo pipefail
             cd /srv/apps/desiauction/production

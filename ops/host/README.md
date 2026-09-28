@@ -39,6 +39,16 @@ Lost the key? hPanel → VPS → **Web console** still works, and a new public k
 can be added in hPanel → VPS → Settings → SSH keys (it lands in root's
 `authorized_keys`; copy it to `/home/ops/.ssh/authorized_keys` from the console).
 
+## CI access
+
+`deploy` has exactly one key: GitHub Actions', written `restrict ssh-ed25519 …`
+(no port/agent forwarding, no pty) — its private half lives only in the
+`production` environment's `DEPLOY_SSH_KEY` secret. Both workflows pin the
+host with `DEPLOY_HOST_FINGERPRINT`. Rotating it: generate a new pair, replace
+the line in `/home/deploy/.ssh/authorized_keys`, update the secret, delete the
+local private key. A rebuilt host has a NEW host key: update the fingerprint
+secret too, or every deploy refuses (correctly).
+
 ## Backups of the machine itself
 
 Hostinger takes a weekly backup (daily is paid) and keeps one manual snapshot

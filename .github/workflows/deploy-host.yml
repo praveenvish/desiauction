@@ -152,11 +152,16 @@ jobs:
       # env files are NOT in git and are never touched. Anything edited by hand
       # on the host under these names is overwritten — change it here instead.
       - name: Ship the stack definition to the host
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # The host's SSH identity, pinned. Without it the action accepts
+          # whatever answers at DEPLOY_HOST — a hijacked IP would receive the
+          # deploy key's session and every env file the deploy touches.
+          # `ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub | cut -d' ' -f2`
+          fingerprint: ${{ secrets.DEPLOY_HOST_FINGERPRINT }}
           source: "ops/deploy/docker-compose.production.yml,ops/deploy/site.caddy,ops/deploy/jobs,ops/deploy/postgresql.conf.d"
           target: /srv/apps/desiauction/${{ inputs.environment }}
           strip_components: 2
@@ -177,6 +182,11 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # The host's SSH identity, pinned. Without it the action accepts
+          # whatever answers at DEPLOY_HOST — a hijacked IP would receive the
+          # deploy key's session and every env file the deploy touches.
+          # `ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub | cut -d' ' -f2`
+          fingerprint: ${{ secrets.DEPLOY_HOST_FINGERPRINT }}
           command_timeout: 45m
           # bash, not sh: the ERR trap (and -E, so it fires inside functions)
           # is what prints the rollback instructions on a failed swap.
