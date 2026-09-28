@@ -18,6 +18,12 @@
 # freely, and a heartbeat rule on it would fire every time. Another project
 # adds its own group below with its own project label.
 #
+# EVERY QUERY IS AN INSTANT QUERY. Each expression already carries its own
+# window (`[26h]`, `[5m]`, …); a RANGE query then reduced with `last` returned
+# the last point that EXISTED — and `absent_over_time` only has points while the
+# line is missing — so a heartbeat alert kept firing for up to an hour after the
+# first BACKUP_OK (seen on the first production boot, 2026-09-29).
+#
 # Every rule's "no data" is OK: a count over a quiet window returns nothing, and
 # `absent_over_time` returns nothing precisely when the heartbeat IS present.
 apiVersion: 1
@@ -55,7 +61,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum(count_over_time({project="platform", service="autoheal"} |= "found to be unhealthy" |= "da-prod-" [10m]))'
           - refId: B
             datasourceUid: __expr__
@@ -88,7 +94,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum(count_over_time({project="platform", service="autoheal"} |= "found to be unhealthy" |= "da-prod-engine" [10m]))'
           - refId: B
             datasourceUid: __expr__
@@ -121,7 +127,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum by (service) (count_over_time({project="da-prod", level="error"}[5m]))'
           - refId: B
             datasourceUid: __expr__
@@ -154,7 +160,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum by (service) (count_over_time({project="da-prod", level="fatal"}[5m]))'
           - refId: B
             datasourceUid: __expr__
@@ -187,7 +193,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum(count_over_time({project="da-prod", service="runner"} |= "finops-runner started" [30m]))'
           - refId: B
             datasourceUid: __expr__
@@ -220,7 +226,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum(count_over_time({project="platform", service="caddy"} |= "handled request" |= "/api/webhooks/" | json | status >= 500 [5m]))'
           - refId: B
             datasourceUid: __expr__
@@ -253,7 +259,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum(count_over_time({project="platform", service="caddy"} |= "handled request" |= "/api/webhooks/" | json | status >= 400 and status < 500 [15m]))'
           - refId: B
             datasourceUid: __expr__
@@ -286,7 +292,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum(count_over_time({project="da-prod", service="pgbackrest"} |~ "BACKUP_FAILED|BACKUP_REFUSED" [1h]))'
           - refId: B
             datasourceUid: __expr__
@@ -319,7 +325,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'absent_over_time({project="da-prod", service="pgbackrest"} |= "BACKUP_OK" [26h])'
           - refId: B
             datasourceUid: __expr__
@@ -352,7 +358,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum(count_over_time({project="da-prod", service="minio-mirror"} |~ "MIRROR_FAILED|MIRROR_REFUSED" [2h]))'
           - refId: B
             datasourceUid: __expr__
@@ -385,7 +391,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'absent_over_time({project="da-prod", service="minio-mirror"} |= "MIRROR_OK" [3h])'
           - refId: B
             datasourceUid: __expr__
@@ -418,7 +424,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'sum(count_over_time({project="da-prod", service="scheduler"} |= "job.failed" [15m]))'
           - refId: B
             datasourceUid: __expr__
@@ -451,7 +457,7 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              queryType: range
+              queryType: instant
               expr: 'absent_over_time({project="da-prod", service="scheduler"} |= "job.ok" [15m])'
           - refId: B
             datasourceUid: __expr__

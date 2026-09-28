@@ -83,6 +83,10 @@ MaxAuthTries 3
 LoginGraceTime 20
 ClientAliveInterval 60
 ClientAliveCountMax 3
+# ONE host key, so the fingerprint CI pins (DEPLOY_HOST_FINGERPRINT) is the one
+# every client is offered. With ECDSA and RSA also present, the deploy's Go SSH
+# client negotiated ECDSA first and refused the pinned ed25519 fingerprint.
+HostKey /etc/ssh/ssh_host_ed25519_key
 AllowUsers root $ADMIN_USER $DEPLOY_USER
 EOF
 if [ "$LOCK_ROOT" = 1 ]; then
@@ -101,7 +105,11 @@ systemctl restart ssh
 log "Firewall"
 ufw default deny incoming
 ufw default allow outgoing
-ufw limit 22/tcp comment ssh
+# `allow`, not `limit`: SSH accepts keys only (no passwords, 3 tries), so the
+# rate limit bought nothing — and it blocked the deploy, whose scp step opens
+# several connections in a burst (6+ per 30s trips `limit`: "i/o timeout").
+ufw delete limit 22/tcp >/dev/null 2>&1 || true
+ufw allow 22/tcp comment ssh
 ufw allow 80/tcp comment http
 ufw allow 443/tcp comment https
 ufw allow 443/udp comment http3

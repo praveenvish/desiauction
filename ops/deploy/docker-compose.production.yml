@@ -438,8 +438,12 @@ services:
         limits: { memory: "256m", cpus: "0.5" }
     restart: unless-stopped
     env_file: [./minio.env, ./mirror.env]
+    # The buckets must EXIST, not just the server: minio-init creates them, and
+    # a mirror started on `minio` healthy alone raced it on the first boot and
+    # failed with "Bucket desiauction-finops does not exist" (2026-09-29).
     depends_on:
       minio: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
