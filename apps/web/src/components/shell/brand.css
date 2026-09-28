@@ -129,3 +129,29 @@
   width: 30px;
   height: 30px;
 }
+
+/* ---- the strike (brand-strike.tsx): the mark's motion logo ---- */
+.da-strike {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* The server sends the mark hidden so the strike starts from nothing, with no
+   flash of the finished mark first. Script flips this to running at once; if
+   it never runs, the mark still appears. */
+.da-strike[data-strike="pending"] {
+  opacity: 0;
+  /* motion-ok: a no-script fallback reveal (an instant step after 1.5s), not an interaction. */
+  animation: da-strike-reveal 0s linear 1.5s forwards;
+}
+@keyframes da-strike-reveal {
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .da-strike[data-strike="pending"] {
+    opacity: 1;
+    animation: none;
+  }
+}

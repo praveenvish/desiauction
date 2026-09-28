@@ -384,7 +384,7 @@ export function BoardPanel({
               with the projector's one control (sound), which used to float over
               this corner on its own. */}
           <div className="board-head-brand">
-            <BrandLockup tone="board" />
+            <BrandLockup tone="board" strike="sound" />
             <SoundToggle className="board-sound" />
           </div>
           {/* Rendered while connecting too, with em dashes for the counts. It is

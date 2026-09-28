@@ -162,9 +162,11 @@ function ComingUp({ fixtures }: { fixtures: readonly OrganizerFixture[] }) {
                   {teams}
                 </Link>
                 <span>
-                  {fixture.kickoffAt !== null
-                    ? formatWallTime(fixture.kickoffAt)
-                    : "Time to be set"}
+                  {fixture.status === "in_progress"
+                    ? "Live now"
+                    : fixture.kickoffAt !== null
+                      ? formatWallTime(fixture.kickoffAt)
+                      : "Time to be set"}
                   {fixture.groundName !== null ? (
                     <>
                       {" · "}

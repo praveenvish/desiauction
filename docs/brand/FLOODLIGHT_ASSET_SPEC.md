@@ -20,7 +20,12 @@ gold-300 #FFD666 | gold-500 #F0B429 | gold-700 #B57F14
 6. Truth wears its status.
 7. Dignity has a visual grammar. No red on a person-outcome.
 
-## The mark — "The Beam" (ratified, docs/07)
+## The mark — the DA monogram (shipped 2026-09-28)
+The Beam described below is superseded. The shipped mark is the DA monogram on a gold tile.
+Use the files and rules in `docs/brand/kit/` (open `index.html`): SVG masters, PNGs,
+favicons, motion, the Hindi lockup, and CMYK print files with `print/brand-print-spec.pdf`.
+
+### Superseded: "The Beam" (docs/07, kept for the record)
 A minimal floodlight beam: a narrow triangle of light descending onto a horizontal
 baseline, forming a subtle "D" counterform in the negative space.
 - MUST work at 16px (favicon) and 40ft (projector)

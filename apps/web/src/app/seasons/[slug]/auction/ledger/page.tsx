@@ -103,6 +103,12 @@ export default async function LedgerPage({
                   ? ` · ${String(players.soldOnReRun)} sold on a second pass`
                   : ""}{" "}
                 · {players.bids.toLocaleString("en-IN")} bids
+                {/* The Bids tab counts every bid event; this line counts the
+                    ones that stood. Said, so the two numbers agree (census:
+                    "289 bids" over a "Bids 297" tab). */}
+                {view.readingCounts.bids > players.bids
+                  ? ` · ${(view.readingCounts.bids - players.bids).toLocaleString("en-IN")} refused or voided`
+                  : ""}
                 {players.openedAtMs !== null
                   ? ` · ${clock(players.openedAtMs) ?? ""}${players.closedAtMs !== null ? `–${clock(players.closedAtMs) ?? ""}` : ""}`
                   : ""}
