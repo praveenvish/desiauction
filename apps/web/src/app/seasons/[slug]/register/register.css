@@ -1379,3 +1379,310 @@
   padding-inline: 0;
   font-size: var(--text-sm-size);
 }
+
+/* ---- The player's season, once it is on (season-on.tsx, 2026-09-29) ----
+   The receipt steps aside for the season: who you play for and where that
+   team stands, the next match, the results — and the price as one figure
+   beside you, not the page's slab. */
+
+.reg-hero-on {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.reg-season {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reg-season-you,
+.reg-season-matches,
+.reg-season-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reg-season-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.reg-season-photo {
+  flex: none;
+  display: block;
+  width: 80px;
+  height: 80px;
+}
+
+.reg-season-who {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.reg-season-name,
+.reg-season-facts {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-season-team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: 700;
+  color: var(--text-heading);
+  overflow-wrap: anywhere;
+}
+
+.reg-season-crest {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.reg-season-price {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  text-align: end;
+}
+
+.reg-season-price-label {
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reg-season-price-figure {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  line-height: 1.1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--accent-ink);
+}
+
+.reg-season-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.reg-season-head h2 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.reg-season-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.reg-season-next {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.reg-season-tile {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 3.25rem;
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.reg-season-tile span:first-child {
+  color: var(--text-accent);
+}
+
+.reg-season-tile strong {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  letter-spacing: 0;
+  color: var(--text-heading);
+}
+
+.reg-season-next-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reg-season-next-kicker {
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-line);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reg-season-next-text strong {
+  font-size: var(--text-lg-size);
+  line-height: var(--text-lg-line);
+  color: var(--text-heading);
+}
+
+.reg-season-next-meta {
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-season-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reg-season-results li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 48px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.reg-season-day {
+  flex: none;
+  width: 3.25rem;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+}
+
+.reg-season-vs {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+}
+
+.reg-season-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs-size);
+  font-weight: 800;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.reg-season-mark[data-result="won"] {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.reg-season-mark[data-result="lost"] {
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+}
+
+.reg-season-summary,
+.reg-season-contact {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-season-public {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.reg-season-public > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.reg-season-public strong {
+  color: var(--text-heading);
+}
+
+.reg-season-public + .reg-season-contact {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+@media (width <= 480px) {
+  .reg-season-photo {
+    width: 64px;
+    height: 64px;
+  }
+
+  /* The photo keeps its place beside the name; the price takes the next row. */
+  .reg-season-who {
+    flex: 1 1 0;
+  }
+
+  .reg-season-price {
+    flex-basis: 100%;
+    text-align: start;
+  }
+
+  .reg-season .reg-status-actions > * {
+    flex: 1 1 0;
+  }
+}
