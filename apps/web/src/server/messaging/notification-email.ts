@@ -1,5 +1,9 @@
 import type { Db } from "@desiauction/db";
-import type { EmailNotificationKind } from "@desiauction/messaging/catalogue";
+import {
+  notificationOf,
+  personTopics,
+  type EmailNotificationKind,
+} from "@desiauction/messaging/catalogue";
 import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults";
 import {
   fillTemplate,
@@ -19,7 +23,7 @@ import {
 import { env } from "../../env";
 import { db as appDb } from "../db";
 import { logger } from "../logger";
-import { renderEmail } from "./email-layout";
+import { manageEmailsUrl, renderEmail } from "./email-layout";
 
 /**
  * EVERY EMAIL'S WORDS COME FROM HERE (Notification Control Center, Phase 2).
@@ -90,6 +94,19 @@ export interface RenderOptions {
   readonly details?: readonly (readonly [string, string])[];
   /** A one-time code, shown large. */
   readonly code?: string;
+  /** The reader's language — the document's `lang` and its fonts. English when omitted. */
+  readonly language?: MessageLanguage;
+}
+
+/**
+ * "Manage emails" goes only on a mail the reader can switch off themselves:
+ * its topic is one of their /account switches. A code, a security alert, a
+ * demo booking (no account) and our staff notices have nothing to manage.
+ */
+const MANAGEABLE_TOPICS: ReadonlySet<string> = new Set(personTopics().map((t) => t.topic));
+
+function manageable(kind: EmailNotificationKind): boolean {
+  return MANAGEABLE_TOPICS.has(notificationOf(kind).topic);
 }
 
 /**
@@ -126,6 +143,8 @@ export function composeNotificationEmail(
     footnote: filled.footnote,
     ...(layout.noLinks === true ? { noLinks: true } : {}),
     ...(layout.whatsappNudge === true ? { whatsappNudge: true } : {}),
+    ...(options.language === undefined ? {} : { language: options.language }),
+    ...(manageable(spec.kind) ? { manageUrl: manageEmailsUrl() } : {}),
   });
   return { subject: filled.subject, text: body.text, html: body.html } as NotificationMail;
 }
@@ -174,12 +193,10 @@ export async function renderNotificationEmail(
   db: Db = appDb,
 ): Promise<NotificationMail> {
   const resolved = await wordingFor(kind, language, db);
-  return composeNotificationEmail(
-    resolved.spec,
-    variantOf(resolved, options.variant),
-    variables,
-    options,
-  );
+  return composeNotificationEmail(resolved.spec, variantOf(resolved, options.variant), variables, {
+    ...options,
+    language,
+  });
 }
 
 export function templateSpecOf(kind: EmailNotificationKind): EmailTemplateSpec {

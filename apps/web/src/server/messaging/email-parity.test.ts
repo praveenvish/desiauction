@@ -19,7 +19,7 @@ import { REVIEW_LINK_TTL_MS, type ValidReview } from "../reviews/reviews";
 import * as support from "../support/problem-report-mail";
 import { CATEGORY_WORDS } from "../support/problem-report-mail";
 import type { ValidProblemReport } from "../support/problem-reports";
-import { SUPPORT_EMAIL, renderEmail } from "./email-layout";
+import { SUPPORT_EMAIL, manageEmailsUrl, renderEmail } from "./email-layout";
 import * as player from "./player-mail";
 import type {
   AppointedRole,
@@ -51,6 +51,10 @@ import type {
 
 type ComposedMail = { subject: string; text: string; html: string };
 const PUBLIC = env.PUBLIC_BASE_URL;
+// Changed on purpose (email v2, 2026-09-28): a mail the reader can switch off
+// carries "Manage emails" in its footer, so the frozen copies of those kinds
+// pass the same link. The wording is untouched.
+const MANAGE = manageEmailsUrl();
 
 // ---------------------------------------------------------------------------
 // The renderers as they were (frozen).
@@ -80,6 +84,7 @@ function soldMail(facts: SoldFacts): ComposedMail {
   return {
     subject: `Congratulations — ${facts.teamName} bought you for ${facts.price}`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${facts.teamName} bought you in the ${facts.season} auction.`,
       heading: `You're a ${facts.teamName} player`,
       paragraphs: [
@@ -119,6 +124,7 @@ function unsoldMail(facts: {
     // just says "unsold" lands too hard.
     subject: `Your ${facts.season} auction`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: "You weren't picked this time — you're still registered.",
       heading: "Not this time",
       paragraphs: [
@@ -171,6 +177,7 @@ function appointmentMail(facts: AppointmentFacts): ComposedMail {
   return {
     subject: `You're the ${title} of ${facts.teamName}`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${facts.orgName} named you ${title} of ${facts.teamName} for ${facts.season}.`,
       heading: `You're the ${title} of ${facts.teamName}`,
       paragraphs: [
@@ -193,6 +200,7 @@ function squadSheetMail(facts: SquadSheetFacts): ComposedMail {
   return {
     subject: `Meet your ${facts.teamName} squad`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${String(count)} players${facts.coach === null ? "" : `, coached by ${facts.coach}`} — the ${facts.teamName} squad for ${facts.season}.`,
       heading: `Meet your ${facts.teamName} squad`,
       paragraphs: [
@@ -219,6 +227,7 @@ function lineupMail(facts: LineupFacts): ComposedMail {
   return {
     subject: `You're in the ${facts.teamName} lineup vs ${facts.opponent}`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${facts.when}${place} — ${facts.season}.`,
       heading: `You're in the ${facts.teamName} lineup`,
       paragraphs: [
@@ -239,6 +248,7 @@ function ownerSummaryMail(facts: OwnerSummaryFacts): ComposedMail {
   return {
     subject: `${facts.teamName}: your squad from the ${facts.season} auction`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `${String(facts.squadSize)} players · ${facts.spent} spent · ${facts.purseLeft} left.`,
       heading: `Your ${facts.teamName} squad`,
       paragraphs: [
@@ -320,6 +330,7 @@ function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMai
   return {
     subject: chosen.subject,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: chosen.lines[0] ?? chosen.heading,
       heading: chosen.heading,
       paragraphs: [`Hi ${facts.name},`, ...chosen.lines],
@@ -600,6 +611,7 @@ function reviewAskMail(
   return {
     subject: "How has DesiAuction worked for you?",
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: "Two minutes on what worked and what got in your way.",
       heading: "How has DesiAuction worked for you?",
       paragraphs: [name === null ? "Hi," : `Hi ${name},`, OPENING[audience].join(" ")],
@@ -650,6 +662,7 @@ function seasonAskMail(input: {
   return {
     subject: `How was ${season}?`,
     ...renderEmail({
+      manageUrl: MANAGE,
       preheader: `Two minutes on ${season} — for the players and owners deciding on next season.`,
       heading: `How was ${season}?`,
       paragraphs: [

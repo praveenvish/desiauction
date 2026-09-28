@@ -68,6 +68,7 @@ export function previewOptions(
   const rows = details(kind, language);
   return {
     variant,
+    language,
     ...(action === undefined
       ? {}
       : { action: { id: action.id, url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/home` } }),
