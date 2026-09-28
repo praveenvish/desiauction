@@ -84,7 +84,8 @@ export interface PlanView {
   auctionStatus: AuctionStatus;
   /** True once the auction is over: the plan stays readable, never editable. */
   readOnly: boolean;
-  team: { id: string; name: string };
+  /** `color` is the team's own primary colour (null: none set) — the squad hero's crest. */
+  team: { id: string; name: string; color: string | null };
   /** Every team this person could plan for (usually one). */
   teams: { id: string; name: string }[];
   rules: AuctionRules;
@@ -149,7 +150,7 @@ export async function planView(
       }
       const [teamRows, lotRows, targets, preSigned, lotMedia] = await Promise.all([
         db
-          .select({ id: teams.id, name: teams.name })
+          .select({ id: teams.id, name: teams.name, color: teams.primaryColor })
           .from(teams)
           .where(inArray(teams.id, gate.planTeamIds)),
         planLots(db, gate.auction.id),

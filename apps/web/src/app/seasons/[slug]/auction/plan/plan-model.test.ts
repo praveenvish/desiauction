@@ -7,7 +7,10 @@ import { describe, expect, it } from "vitest";
 import type { PlanLotRow } from "../../../../../server/auction/owner-plan";
 import { moneyFormat } from "../../../../../lib/money";
 import {
+  boughtLots,
+  countLine,
   groupByPriority,
+  mixSegments,
   refusalMessage,
   roleFacts,
   rupeesFromPaise,
@@ -193,5 +196,62 @@ describe("the amount hint follows the season's unit", () => {
     expect(refusalMessage("invalid_max", {}, moneyFormat("points"))).toBe(
       "Enter a whole number of points, or leave it empty for no cap.",
     );
+  });
+});
+
+describe("after the night", () => {
+  const lot = (over: Partial<PlanLotRow>): PlanLotRow =>
+    ({
+      lotId: "l",
+      registrationId: "r",
+      lotNumber: "L001",
+      seq: 1,
+      status: "sold",
+      basePrice: 0,
+      soldPrice: 0,
+      soldToTeamId: "mine",
+      playerName: "P",
+      role: "batter",
+      number: "1",
+      ...over,
+    }) as PlanLotRow;
+
+  it("lists only this team's buys, dearest first", () => {
+    const rows = boughtLots(
+      [
+        lot({ lotId: "a", soldPrice: paise(1000), seq: 1 }),
+        lot({ lotId: "b", soldPrice: paise(5000), seq: 2 }),
+        lot({ lotId: "c", soldPrice: paise(9000), soldToTeamId: "theirs" }),
+        lot({ lotId: "d", status: "unsold", soldPrice: null }),
+      ],
+      "mine",
+    );
+    expect(rows.map((row) => row.lotId)).toEqual(["b", "a"]);
+  });
+
+  it("draws the mix from held roles only, most first, ties in season order", () => {
+    const mix = mixSegments([
+      { role: "batter", count: 3 },
+      { role: "bowler", count: 3 },
+      { role: "all_rounder", count: 6 },
+      { role: "wicket_keeper", count: 0 },
+    ]);
+    expect(mix.map((m) => m.role)).toEqual(["all_rounder", "batter", "bowler"]);
+    expect(mix[0]?.share).toBe(0.5);
+    expect(mixSegments([])).toEqual([]);
+  });
+
+  it("says counts in running text, skipping empty roles", () => {
+    const label = (role: string | null) => (role === "batter" ? "Batter" : "Bowler");
+    expect(
+      countLine(
+        [
+          { role: "batter", count: 3 },
+          { role: "bowler", count: 1 },
+          { role: "x", count: 0 },
+        ],
+        label,
+      ),
+    ).toBe("3 batters · 1 bowler");
   });
 });
