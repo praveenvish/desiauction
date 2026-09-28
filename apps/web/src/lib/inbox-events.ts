@@ -41,6 +41,8 @@ const PERSON_EVENT_LABELS = {
   "registration.restored": "Your registration is back under review",
   "season.held": "DesiAuction hid one of your seasons from public view",
   "season.released": "DesiAuction lifted its hold on one of your seasons",
+  "auction.owner_joined": "A team owner accepted their invitation",
+  "auction.owners_ready": "Every team has its owner — the auction can go ahead",
   "auth.login.passkey": "Signed in with a passkey",
   "auth.otp.lockout": "Too many wrong codes — sign-in was locked briefly",
   "auth.passkey.enrolled": "Passkey added",

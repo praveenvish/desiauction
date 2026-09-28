@@ -152,6 +152,35 @@ function scheduleFrame(variant: string, language: MessageLanguage): Partial<Rend
   };
 }
 
+/** The owner invitation and "every team has its owner", with the samples (owner-mail.ts). */
+function ownerFrame(
+  kind: EmailNotificationKind,
+  language: MessageLanguage,
+): Partial<RenderOptions> {
+  if (kind !== "owner.invite" && kind !== "auction.owners_ready") return {};
+  const samples = sampleVariables(EMAIL_TEMPLATES[kind], language);
+  const season = String(samples["season"] ?? "");
+  const band = seasonBand({
+    season,
+    orgName: String(
+      samples["orgName"] ?? (language === "hi" ? "मलाड क्रिकेट क्लब" : "Malad Cricket Club"),
+    ),
+    sport: "cricket",
+  });
+  const dateLeaf = auctionDateLeaf(new Date("2026-10-04T14:30:00Z"), season, language);
+  return kind === "owner.invite"
+    ? { band, dateLeaf }
+    : {
+        band,
+        progress: organizerJourney(3, language),
+        details: [
+          ["Cup Kings", "Rahul Mehta"],
+          ["Falcons", "Arjun Rao"],
+          ["Tigers", "Sana Iqbal"],
+        ],
+      };
+}
+
 function seasonFrame(
   kind: EmailNotificationKind,
   language: MessageLanguage,
@@ -190,5 +219,6 @@ export function previewOptions(
     ...seasonFrame(kind, language),
     ...organizerFrame(kind, language),
     ...(kind === "auction.schedule" ? scheduleFrame(variant, language) : {}),
+    ...ownerFrame(kind, language),
   };
 }

@@ -581,6 +581,122 @@ const AUCTION_SCHEDULE: EmailTemplateSpec = {
   },
 };
 
+// --- Team owners: the invitation, and "every team has its owner" (PR7) ----------
+
+const INVITER = text(
+  "inviterName",
+  "The organizer who sent the invitation.",
+  "Priya Shah",
+  "प्रिया शाह",
+);
+const LINK_ONLY_YOURS: LockedBlock = {
+  id: "link-only-yours",
+  field: "after",
+  text: {
+    en: "This link is yours alone. Whoever opens it becomes the owner, so please don't forward it. It works once, for 7 days.",
+    hi: "यह लिंक सिर्फ़ आपके लिए है। जो भी इसे खोलेगा वही मालिक बन जाएगा, इसलिए इसे आगे न भेजें। यह एक बार, 7 दिन तक चलेगा।",
+  },
+  why: "The invitation link IS the ownership: the reader must be told not to pass it on.",
+};
+
+const OWNER_INVITE: EmailTemplateSpec = {
+  kind: "owner.invite",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "accept", description: "The one-time invitation link." }],
+  variables: [SEASON, ORG, TEAM, INVITER],
+  locked: [LINK_ONLY_YOURS],
+  note: "Sent direct, never queued: the link in it is the ownership, and no copy of it is kept.",
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{orgName}} invites you to own {{teamName}}",
+        preheader: "Accept to bid for {{teamName}} in the {{season}} auction.",
+        heading: "You're invited to own {{teamName}}",
+        paragraphs: [
+          "Hello,",
+          "{{inviterName}} from {{orgName}} has invited you to be the owner of {{teamName}} in {{season}}. As owner, you bid for players on auction night and build the squad, from your own phone.",
+        ],
+        after: [LINK_ONLY_YOURS.text.en],
+        actions: { accept: "Accept the invitation" },
+        footnote:
+          "You received this because {{orgName}} entered this address to invite a team owner.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{orgName}} ने आपको {{teamName}} का मालिक बनने के लिए बुलाया है",
+        preheader: "{{season}} की नीलामी में {{teamName}} के लिए बोली लगाने को स्वीकार करें।",
+        heading: "आपको {{teamName}} का मालिक बनने का न्योता है",
+        paragraphs: [
+          "नमस्ते,",
+          "{{orgName}} से {{inviterName}} ने आपको {{season}} में {{teamName}} का मालिक बनने के लिए बुलाया है। मालिक के तौर पर आप नीलामी की रात अपने फ़ोन से खिलाड़ियों पर बोली लगाते हैं और टीम बनाते हैं।",
+        ],
+        after: [LINK_ONLY_YOURS.text.hi],
+        actions: { accept: "न्योता स्वीकार करें" },
+        footnote:
+          "आपको यह इसलिए मिला क्योंकि {{orgName}} ने टीम मालिक को बुलाने के लिए यह पता डाला।",
+      }),
+    ),
+  },
+};
+
+const OWNERS_READY: EmailTemplateSpec = {
+  kind: "auction.owners_ready",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "room", description: "The season's auction setup and room." }],
+  variables: [
+    NAME,
+    SEASON,
+    text("teamCount", "How many teams — all of them now owned.", "3", "3", { computed: true }),
+    flag("ifNoTime", "On when auction night has no time yet: shows the nudge to set one.", false),
+  ],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "All {{teamCount}} owners are in for {{season}}",
+        preheader: "Every team has its owner. Auction night can go ahead.",
+        heading: "Every team has its owner",
+        paragraphs: [
+          "Hi {{name}},",
+          "All {{teamCount}} teams in {{season}} now have an owner. Here's who is bidding for whom:",
+        ],
+        after: [
+          "{{ifNoTime}}Auction night doesn't have a time yet. Set it on the auction page, and every owner and player gets it by email.",
+          "Next: grant each owner their paddle, so they can claim it in the live room.",
+        ],
+        actions: { room: "Open the auction" },
+        footnote: "You received this because you run {{season}} on DesiAuction.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{season}} के सभी {{teamCount}} मालिक जुड़ गए",
+        preheader: "हर टीम का मालिक तय हो गया। नीलामी की रात आगे बढ़ सकती है।",
+        heading: "हर टीम का मालिक तय हो गया",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{season}} की सभी {{teamCount}} टीमों का अब एक मालिक है। कौन किसके लिए बोली लगा रहा है:",
+        ],
+        after: [
+          "{{ifNoTime}}नीलामी की रात का अभी कोई समय तय नहीं है। इसे नीलामी पेज पर तय करें, और हर मालिक और खिलाड़ी को ईमेल से मिल जाएगा।",
+          "आगे: हर मालिक को उसका पैडल दें, ताकि वे लाइव रूम में उसे ले सकें।",
+        ],
+        actions: { room: "नीलामी खोलें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+      }),
+    ),
+  },
+};
+
 const SOLD: EmailTemplateSpec = {
   kind: "auction.sold",
   format: "layout",
@@ -1931,6 +2047,8 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "season.held": SEASON_HELD,
   "season.released": SEASON_RELEASED,
   "auction.schedule": AUCTION_SCHEDULE,
+  "owner.invite": OWNER_INVITE,
+  "auction.owners_ready": OWNERS_READY,
   "auction.sold": SOLD,
   "auction.unsold": UNSOLD,
   "auction.owner_summary": OWNER_SUMMARY,

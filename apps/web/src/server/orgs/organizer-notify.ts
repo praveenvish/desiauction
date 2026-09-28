@@ -1,13 +1,19 @@
 import {
+  auctionOwnerInvites,
+  auctions,
   competitions,
   newId,
+  paddleGrants,
+  teams,
   organizations,
   people,
   registrations,
   type Db,
 } from "@desiauction/db";
 import { messageLanguagesOf } from "@desiauction/messaging/language";
-import { and, count, eq, inArray, ne } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+
+import { env } from "../../env";
 
 import { logSecurityEvent } from "../auth/security-events";
 import { logger } from "../logger";
@@ -19,6 +25,7 @@ import {
   seasonReleasedMail,
 } from "../messaging/organizer-mail";
 import { drainOutbox, enqueueMail, type QueuedMail } from "../messaging/outbox";
+import { ownersReadyMail } from "../messaging/owner-mail";
 import type { NotificationKind } from "../messaging/catalogue";
 import type { TransactionalMailer } from "../messaging/transactional-mail";
 import { holdersOf } from "./orgs";
@@ -226,4 +233,109 @@ export async function notifySeasonHold(
       logger().warn({ err: error, kind }, "organizer_inbox.write_failed");
     }
   }
+}
+
+/**
+ * A TEAM'S OWNER ACCEPTED (email programme PR7). Each organizer gets an inbox
+ * row naming the team; and the acceptance that completes the set — every team
+ * in the season now has an owner — also sends "every team has its owner",
+ * once per auction, with who bids for whom.
+ *
+ * "Has an owner" is an accepted, unrevoked invitation or an active paddle
+ * grant on this auction: the two ways the product makes somebody a team's
+ * bidder. A season with fewer than two teams is never "ready".
+ */
+export async function notifyOwnerJoined(
+  db: Db,
+  input: { auctionId: string; teamName: string },
+  channels: OrganizerNoticeChannels = {},
+): Promise<{ ready: boolean }> {
+  const [auction] = await db
+    .select({ competitionId: auctions.competitionId, orgId: auctions.orgId })
+    .from(auctions)
+    .where(eq(auctions.id, input.auctionId))
+    .limit(1);
+  if (auction === undefined) {
+    return { ready: false };
+  }
+  const organizers = await organizersOf(db, auction.orgId);
+  for (const personId of organizers) {
+    try {
+      await logSecurityEvent(personId, "auction.owner_joined", {
+        competitionId: auction.competitionId,
+        team: input.teamName,
+      });
+    } catch (error) {
+      logger().warn({ err: error }, "organizer_inbox.write_failed");
+    }
+  }
+  const seasonTeams = await db
+    .select({ id: teams.id, name: teams.name })
+    .from(teams)
+    .where(eq(teams.competitionId, auction.competitionId));
+  const owned = [
+    ...(await db
+      .select({ teamId: auctionOwnerInvites.teamId, owner: people.name })
+      .from(auctionOwnerInvites)
+      .innerJoin(people, eq(people.id, auctionOwnerInvites.acceptedBy))
+      .where(
+        and(
+          eq(auctionOwnerInvites.auctionId, input.auctionId),
+          isNotNull(auctionOwnerInvites.acceptedBy),
+          isNull(auctionOwnerInvites.revokedAt),
+        ),
+      )),
+    ...(await db
+      .select({ teamId: paddleGrants.teamId, owner: people.name })
+      .from(paddleGrants)
+      .innerJoin(people, eq(people.id, paddleGrants.personId))
+      .where(and(eq(paddleGrants.auctionId, input.auctionId), isNull(paddleGrants.revokedAt)))),
+  ];
+  const ownerOf = new Map(owned.map((row) => [row.teamId, row.owner?.trim() || "—"]));
+  const ready = seasonTeams.length >= 2 && seasonTeams.every((team) => ownerOf.has(team.id));
+  if (!ready) {
+    return { ready: false };
+  }
+  const season = await seasonOf(db, auction.competitionId);
+  if (season === null) {
+    return { ready: false };
+  }
+  const [timing] = await db
+    .select({ at: competitions.auctionStartsAt })
+    .from(competitions)
+    .where(eq(competitions.id, auction.competitionId))
+    .limit(1);
+  const rows = seasonTeams
+    .map((team) => [team.name, ownerOf.get(team.id) ?? "—"] as const)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  const roomUrl = `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/seasons/${encodeURIComponent(season.seasonSlug)}/auction`;
+  const mails = await forEachOrganizer(
+    db,
+    organizers,
+    {
+      orgId: auction.orgId,
+      kind: "auction.owners_ready",
+      // Once per auction per organizer: an owner leaving and rejoining does
+      // not make the club "ready" twice.
+      key: (personId) => `auction.owners_ready:${input.auctionId}:${personId}`,
+    },
+    (name, language) =>
+      ownersReadyMail(
+        { ...season, name, owners: rows, roomUrl, auctionAt: timing?.at ?? null },
+        language,
+      ),
+  );
+  const fresh = await deliver(mails, channels);
+  if (fresh.length > 0) {
+    for (const personId of organizers) {
+      try {
+        await logSecurityEvent(personId, "auction.owners_ready", {
+          competitionId: auction.competitionId,
+        });
+      } catch (error) {
+        logger().warn({ err: error }, "organizer_inbox.write_failed");
+      }
+    }
+  }
+  return { ready: true };
 }

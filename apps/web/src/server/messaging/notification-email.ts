@@ -83,6 +83,8 @@ const LAYOUT: Readonly<
   "security.phone_changed": { calloutLast: true },
   // "Think this is a mistake?" under a take-down: the way back, boxed.
   "season.held": { calloutLast: true },
+  // "This link is yours alone" — the one line an invited owner must not miss.
+  "owner.invite": { calloutLast: true },
   "registration.approved": { whatsappNudge: true },
   "registration.waitlisted": { whatsappNudge: true },
   "registration.rejected": { whatsappNudge: true },

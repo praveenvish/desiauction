@@ -250,6 +250,20 @@ const ENTRIES = [
     channels: ["email"],
   },
   {
+    // The organizer typed the owner's address beside the invite link. The link
+    // is the capability, so this goes DIRECT (no queued copy of the body) and
+    // nobody's switch applies: the reader may not even have an account yet.
+    key: "owner.invite",
+    label: "Team owner invitation",
+    description: "An organizer emails a team's owner their one-time invitation link.",
+    audience: "owner",
+    category: "transactional",
+    topic: "auction",
+    channels: ["email"],
+    personControllable: false,
+    orgControllable: false,
+  },
+  {
     key: "auction.sold",
     label: "Sold at auction",
     description: "When the auction completes: which team bought the player, and for how much.",
@@ -400,6 +414,26 @@ const ENTRIES = [
     topic: "club",
     channels: ["email", "in_app"],
     personControllable: false,
+    orgControllable: false,
+  },
+  {
+    key: "auction.owner_joined",
+    label: "Owner accepted",
+    description: "A team's owner accepted their invitation — in each organizer's inbox.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["in_app"],
+    orgControllable: false,
+  },
+  {
+    key: "auction.owners_ready",
+    label: "All owners are in",
+    description: "Every team in the auction has its owner — once per auction, to the organizers.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
     orgControllable: false,
   },
   // --- Strangers: a demo requester, a person reporting a problem -------------
