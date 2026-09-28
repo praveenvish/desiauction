@@ -358,7 +358,11 @@ export async function PlayerHome({
           concept="season"
           title="My seasons"
           action={
-            <Link href={`/me/${pack.key}`} className="home-more" data-testid="home-career-link">
+            <Link
+              href={`/me?sport=${pack.key}`}
+              className="home-more"
+              data-testid="home-career-link"
+            >
               My {pack.label.toLowerCase()}
               <IconArrowRight size={16} />
             </Link>

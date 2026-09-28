@@ -1,10 +1,10 @@
-import { SPORTS, roleLabelIn, sportPackFor } from "@desiauction/core";
+import { SPORTS, roleLabelIn, sportPackFor, type MoneyUnit } from "@desiauction/core";
 import {
+  ButtonLink,
   EmptyState,
   HeroBanner,
   IconArrowRight,
   IconCalendar,
-  IconChart,
   IconGavel,
   IconMatch,
   IconPin,
@@ -12,14 +12,16 @@ import {
   IconTrophy,
   IconUsers,
   type KitTone,
-  Notice,
   Pill,
   PlayerImage,
+  RosterMark,
   SectionCard,
   TeamChip,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { CSSProperties } from "react";
 
 import { HeroChip, HeroStatus } from "../../components/season-hero/season-hero";
 import { PageTitle } from "../../components/shell/page-title";
@@ -32,52 +34,66 @@ import {
   playerMatches,
   playerUpcomingMatches,
   type CareerMatch,
+  type CareerSeason,
+  type UpcomingMatch,
 } from "../../server/player/career";
-import { ownPhotoUrl, playerProfileFor, profileCompletenessFor } from "../../server/player/profile";
+import {
+  ownPhotoUrl,
+  playerProfileFor,
+  profileCompletenessFor,
+  sportProfilesFor,
+  type SportProfile,
+} from "../../server/player/profile";
 import { rolesOf, type OwnedTeam } from "../../server/roles/roles";
-import { anyLineupRecorded, matchRecord, profileAsk } from "./me-model";
-import { SeasonRow } from "./registration-card";
+import {
+  STAGE_STEPS,
+  clubsOf,
+  liveStage,
+  matchRecord,
+  profileAsk,
+  recentForm,
+  seasonRecordLine,
+  soldOf,
+  type FormResult,
+  type LiveStage,
+} from "./me-model";
+import { verdictOf } from "./registration-card";
 import "./me.css";
 import { formatDate, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
 import { formatCount } from "../../lib/plural";
 
-export const metadata = { title: "My sports · DesiAuction" };
+export const metadata = { title: "My profile · DesiAuction" };
 
 /**
- * MY SPORTS — every tournament, match and sport, in one place (launch polish,
- * Phase 3). The founder's ask, verbatim: "what all tournaments they have
- * played, what all matches they have played, which all sports they have
- * played". The career used to live one sport per page with no index, and had
- * no matches at all — results were per team. Matches now come from lineups
- * (0074), with "didn't play" and "not recorded" kept apart.
+ * MY PROFILE — everything about this person as a player, on one page: the
+ * sports they play and their role in each, the seasons still live for them,
+ * the career season by season, the clubs and teams, the matches and how they
+ * play. The founder's ask: "give all snapshot about me as player — which all
+ * sports, which all matches, which all seasons and tournaments running, which
+ * all clubs". It replaces the hub + per-sport page pair (/me/[sport] now
+ * redirects to `/me?sport=`), where the same seasons were told twice.
  *
  * Self view only: the person id is the session's, never a parameter.
  */
 
-const RESULT_LABEL: Record<NonNullable<CareerMatch["result"]>, string> = {
+const RESULT_LETTER: Record<NonNullable<CareerMatch["result"]>, string> = {
+  won: "W",
+  lost: "L",
+  tied: "T",
+  no_result: "–",
+};
+
+const RESULT_WORD: Record<NonNullable<CareerMatch["result"]>, string> = {
   won: "Won",
   lost: "Lost",
   tied: "Tied",
   no_result: "No result",
 };
 
-const RESULT_TONE: Record<NonNullable<CareerMatch["result"]>, KitTone> = {
-  won: "green",
-  lost: "red",
-  tied: "amber",
-  no_result: "neutral",
-};
-
-const PLAYED_LABEL: Record<CareerMatch["played"], string> = {
-  played: "Played",
-  bench: "In the squad",
-  unknown: "Not recorded",
-};
-
 function matchDate(kickoffAt: string | null): string {
   if (kickoffAt === null) return "—";
   const day = kickoffAt.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? formatDate(day) : day;
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? formatDate(day).replace(/ \d{4}$/, "") : day;
 }
 
 /** "Sat, 27 Sep · 4:30 pm" from the fixture's local wall-clock text. */
@@ -92,10 +108,16 @@ function kickoffLabel(kickoffAt: string | null): string {
 }
 
 function seasonYear(startsOn: string | null): string {
-  return startsOn === null ? "—" : startsOn.slice(0, 4);
+  return startsOn === null ? "" : startsOn.slice(0, 4);
 }
 
-export default async function MySportsPage({
+function seasonTitle(season: CareerSeason): string {
+  return season.tournamentName ?? season.competitionName;
+}
+
+const ledger = (amount: number, unit: MoneyUnit): string => moneyFormat(unit).ledger(amount);
+
+export default async function MyProfilePage({
   searchParams,
 }: {
   searchParams: Promise<{ sport?: string }>;
@@ -107,64 +129,45 @@ export default async function MySportsPage({
   if (session.name === null || session.name.trim() === "") {
     redirect("/onboarding");
   }
-  // Today in IST — fixture kickoffs are local wall-clock text.
+  // Today in IST — fixture kickoffs and season dates are local calendar text.
   const today = istCalendarDate();
-  const [query, career, matches, upcomingMatches, profile, completeness, photoUrl, roles] =
-    await Promise.all([
-      searchParams,
-      playerCareer(session.personId),
-      playerMatches(session.personId),
-      playerUpcomingMatches(session.personId, today),
-      playerProfileFor(session.personId),
-      profileCompletenessFor(session.personId),
-      ownPhotoUrl(session.personId),
-      rolesOf(session.personId),
-    ]);
+  const [
+    query,
+    career,
+    matches,
+    upcomingMatches,
+    profile,
+    sportProfiles,
+    completeness,
+    photoUrl,
+    roles,
+  ] = await Promise.all([
+    searchParams,
+    playerCareer(session.personId),
+    playerMatches(session.personId),
+    playerUpcomingMatches(session.personId, today),
+    playerProfileFor(session.personId),
+    sportProfilesFor(session.personId),
+    profileCompletenessFor(session.personId),
+    ownPhotoUrl(session.personId),
+    rolesOf(session.personId),
+  ]);
   const owns = roles.owns;
-
-  // Sports this person actually played, in the platform's own order.
-  const played = new Set(career.seasons.map((season) => season.sport));
-  const sports = SPORTS.filter((pack) => played.has(pack.key));
-  const filter = sports.some((pack) => pack.key === query.sport) ? query.sport : undefined;
-  const seasons = career.seasons
-    .filter((season) => filter === undefined || season.sport === filter)
-    .slice()
-    .reverse();
   /** Owns a team and has never entered as a player. */
   const ownerOnly = career.seasons.length === 0 && owns.length > 0;
-  const shownMatches = matches.filter((match) => filter === undefined || match.sport === filter);
-  const shownRecord = matchRecord(shownMatches);
-  /** "Not recorded" on every row said nothing until a club records a lineup. */
-  const showYou = anyLineupRecorded(shownMatches);
-  const shownUpcoming = upcomingMatches.filter(
-    (match) => filter === undefined || match.sport === filter,
-  );
-  const auctioned = career.seasons.filter((season) => season.auction !== null).length;
-  const record = matchRecord(matches.filter((match) => match.played !== "bench"));
   const ask = profileAsk(completeness.missing);
-
-  const bySport = sports.map((pack) => ({
-    key: pack.key,
-    label: pack.label,
-    seasons: career.seasons.filter((season) => season.sport === pack.key).length,
-    matches: matches.filter((match) => match.sport === pack.key && match.played === "played")
-      .length,
-  }));
-  const maxSeasons = Math.max(1, ...bySport.map((row) => row.seasons));
-
-  // The one contained surface: what is coming, if anything is.
-  const waiting = career.seasons.find((season) => season.status === "submitted");
-  const inPool = career.seasons.find(
-    (season) => season.status === "approved" && season.auction === null && season.teamName === null,
+  const crest = (
+    <span className="me-crest-photo">
+      <PlayerImage
+        name={session.name}
+        seed={session.personId}
+        src={photoUrl}
+        size="lg"
+        fluid
+        decorative
+      />
+    </span>
   );
-  const upcoming = waiting ?? inPool;
-  /*
-   * A player's rail held a copy of the squad their home already shows (round
-   * 5: dropped — /me/cricket carries the season table). With no fixtures and
-   * one sport, the rail has nothing but its privacy note, so the page is one
-   * column instead of a short card beside a near-empty rail.
-   */
-  const asideEmpty = !ownerOnly && shownUpcoming.length === 0 && bySport.length <= 1;
   const privacy = (
     <p className="me-privacy">
       <IconShieldCheck size={16} aria-hidden />
@@ -175,37 +178,152 @@ export default async function MySportsPage({
     </p>
   );
 
-  return (
-    <main className="me">
-      {/* Somebody who owns a team and has never played was greeted "My
-          sports" (round 2); their record here is the team. */}
-      {career.totals.seasons === 0 && owns.length > 0 ? (
+  if (ownerOnly) {
+    return (
+      <main className="me">
+        {/* Somebody who owns a team and has never played was greeted as a
+            player (round 2); their record here is the team. */}
         <PageTitle
           title="My teams"
           subtitle="The teams you own — and your seasons, once you play."
         />
-      ) : null}
-      {/* Their own face when they have uploaded one; the branded initials mark
-          (C-25) until then — the same mark every season surface shows. */}
+        <HeroBanner
+          testId="me-hero"
+          crest={crest}
+          title={session.name}
+          meta={[
+            ...(profile.location !== null && profile.location !== ""
+              ? [
+                  <>
+                    <IconPin />
+                    {profile.location}
+                  </>,
+                ]
+              : []),
+            ...owns.map((team) => (
+              <HeroChip key={`${team.auctionId}:${team.teamId}`}>Owner · {team.teamName}</HeroChip>
+            )),
+          ]}
+          actions={
+            <Link href="/account" className="sh-ghost">
+              Account settings
+              <IconArrowRight size={14} />
+            </Link>
+          }
+          sideAlign="start"
+        />
+        <div className="me-layout" data-owner="">
+          <div className="me-main">
+            <OwnedTeams teams={owns} />
+            <p className="me-quiet" data-testid="me-tournaments">
+              <IconTrophy size={16} aria-hidden />
+              <span>
+                Playing too? <Link href="/c">Find a tournament to enter</Link> — your seasons show
+                up here.
+              </span>
+            </p>
+            {privacy}
+          </div>
+          <aside className="me-side" aria-label="Your auction night">
+            {owns[0] !== undefined ? <OwnerNight team={owns[0]} /> : null}
+          </aside>
+        </div>
+      </main>
+    );
+  }
+
+  // Every sport this person plays — entered or set up on their profile — in
+  // the platform's own order. The filter offers only the ones they entered.
+  const entered = new Set(career.seasons.map((season) => season.sport));
+  const profiled = new Map(sportProfiles.map((row) => [row.sport, row]));
+  const sports = SPORTS.filter((pack) => entered.has(pack.key) || profiled.has(pack.key));
+  const filterable = sports.filter((pack) => entered.has(pack.key));
+  const filter = filterable.some((pack) => pack.key === query.sport) ? query.sport : undefined;
+  const inFilter = (sport: string): boolean => filter === undefined || sport === filter;
+
+  const newestFirst = career.seasons.slice().reverse();
+  /** The role a sport is played in: the profile's answer, else the latest entry's. */
+  const roleIn = (sport: string): string | null => {
+    const pack = sportPackFor(sport);
+    const set = profiled.get(sport)?.defaultRole ?? null;
+    const latest = newestFirst.find((season) => season.sport === sport && season.role !== null);
+    const role = set ?? latest?.role ?? null;
+    return role === null ? null : roleLabelIn(pack, role) || null;
+  };
+
+  const live = newestFirst
+    .map((season) => ({ season, stage: liveStage(season, today) }))
+    .filter((row): row is { season: CareerSeason; stage: LiveStage } => row.stage !== null);
+  const playsFor = live.find((row) => row.season.teamName !== null)?.season ?? null;
+  // The card to share: the newest season the auction (or a pre-signing) has
+  // spoken for — an unsold player gets no card (the share-card rule).
+  const shareFrom = newestFirst.find(
+    (season) =>
+      season.status === "approved" && season.auction !== null && season.auction.kind !== "unsold",
+  );
+
+  const finished = matches.filter((match) => match.played !== "bench");
+  const record = matchRecord(finished);
+  const sold = soldOf(career.seasons);
+  const clubs = clubsOf(career.seasons);
+  const nextMatchFor = (registrationId: string): UpcomingMatch | undefined =>
+    upcomingMatches.find((match) => match.registrationId === registrationId);
+
+  const shownLive = live.filter((row) => inFilter(row.season.sport));
+  const shownSeasons = newestFirst.filter((season) => inFilter(season.sport));
+  const shownMatches = matches.filter((match) => inFilter(match.sport));
+  const shownUpcoming = upcomingMatches.filter((match) => inFilter(match.sport));
+  const shownRecord = matchRecord(shownMatches);
+  const shownPlay = sports.filter((pack) => inFilter(pack.key));
+  /** Everything they have is one season waiting on its first step. */
+  const justStarted =
+    career.seasons.length > 0 &&
+    live.length === career.seasons.length &&
+    sold.sold === 0 &&
+    record.played === 0;
+
+  const figures: { value: string; label: string; note?: string }[] = [
+    {
+      value: formatCount(career.totals.seasons),
+      label: career.totals.seasons === 1 ? "Season" : "Seasons",
+      ...(live.length > 0 ? { note: `${String(live.length)} live` } : {}),
+    },
+    {
+      value: formatCount(record.played),
+      label: record.played === 1 ? "Match" : "Matches",
+      ...(record.played > 0 ? { note: `${String(record.won)} won` } : {}),
+    },
+    sold.auctioned > 0
+      ? { value: `${String(sold.sold)} of ${String(sold.auctioned)}`, label: "Times sold" }
+      : {
+          value: formatCount(career.totals.teams),
+          label: career.totals.teams === 1 ? "Team" : "Teams",
+        },
+    career.totals.highestPrice !== null
+      ? {
+          value: moneyFormat(career.totals.highestUnit).compact(career.totals.highestPrice),
+          label: "Top price",
+        }
+      : { value: formatCount(clubs.length), label: clubs.length === 1 ? "Club" : "Clubs" },
+  ];
+
+  return (
+    <main className="me">
       <HeroBanner
         testId="me-hero"
-        crest={
-          <span className="me-crest-photo">
-            <PlayerImage
-              name={session.name}
-              seed={session.personId}
-              src={photoUrl}
-              size="lg"
-              fluid
-              decorative
-            />
-          </span>
-        }
-        // "Player" only for somebody who has played: an owner with no seasons
-        // was badged as one above four zeros.
+        crest={crest}
         {...(career.totals.seasons > 0 ? { eyebrow: <HeroStatus>Player</HeroStatus> } : {})}
         title={session.name}
         meta={[
+          ...sports.map((pack) => {
+            const role = roleIn(pack.key);
+            return (
+              <HeroChip key={pack.key}>
+                {pack.label}
+                {role === null ? null : <span className="mp-chip-role">{role}</span>}
+              </HeroChip>
+            );
+          }),
           ...(profile.location !== null && profile.location !== ""
             ? [
                 <>
@@ -214,83 +332,88 @@ export default async function MySportsPage({
                 </>,
               ]
             : []),
-          ...(sports.length > 0
-            ? sports.map((pack) => <HeroChip key={pack.key}>{pack.label}</HeroChip>)
-            : owns.length > 0
-              ? // A team owner's record is the team: said as a fact, not an absence.
-                owns.map((team) => (
-                  <HeroChip key={`${team.auctionId}:${team.teamId}`}>
-                    Owner · {team.teamName}
-                  </HeroChip>
-                ))
-              : [<>Your playing record starts with your first registration.</>]),
+          ...(playsFor !== null && playsFor.teamName !== null
+            ? [
+                <span className="mp-plays-for">
+                  Plays for <strong>{playsFor.teamName}</strong>
+                </span>,
+              ]
+            : []),
+          ...(sports.length === 0
+            ? [<>Your playing record starts with your first registration.</>]
+            : []),
         ]}
         actions={
-          // An unfinished profile is asked for in the footer, by name; the
-          // corner keeps the plain door. A player-profile count means nothing
-          // to an owner who does not play (their /account asks for no role).
-          ask === null || ownerOnly ? (
-            <Link href="/account" className="sh-ghost">
-              {ownerOnly ? "Account settings" : "Edit profile"}
-              <IconArrowRight size={14} />
+          <span className="mp-hero-actions">
+            <Link href="/account?section=player" className="sh-ghost">
+              Edit profile
             </Link>
-          ) : undefined
+            {shareFrom !== undefined ? (
+              <ButtonLink
+                href={`/seasons/${shareFrom.competitionSlug}/posters`}
+                size="sm"
+                data-testid="me-share-card"
+              >
+                Share my card
+              </ButtonLink>
+            ) : null}
+          </span>
         }
         sideAlign="start"
         footer={
-          career.totals.seasons === 0 &&
-          record.played === 0 &&
-          (ask === null || ownerOnly) ? undefined : (
+          career.totals.seasons === 0 && ask === null ? undefined : (
             <div className="me-hero-foot">
-              {/* THE CAREER STRIP. The page opened on three tiles each saying
-                  "1"; the record is four figures in the hero, and reads the
-                  same at one season as at forty. */}
-              {career.totals.seasons === 0 && record.played === 0 ? null : (
+              {career.totals.seasons === 0 ? null : (
                 <dl className="me-strip" data-testid="me-figures">
-                  <div>
-                    <dt>
-                      {career.totals.seasons === 1 ? "Season" : "Seasons"}
-                      {sports.length > 1 ? ` · ${String(sports.length)} sports` : ""}
-                    </dt>
-                    <dd>{formatCount(career.totals.seasons)}</dd>
-                  </div>
-                  <div>
-                    <dt>
-                      {record.played === 1 ? "Match" : "Matches"}
-                      {record.played > 0 ? ` · ${String(record.won)} won` : ""}
-                    </dt>
-                    <dd>{formatCount(record.played)}</dd>
-                  </div>
-                  <div>
-                    <dt>{career.totals.teams === 1 ? "Team" : "Teams"}</dt>
-                    <dd>{formatCount(career.totals.teams)}</dd>
-                  </div>
-                  <div>
-                    <dt>
-                      {career.totals.highestPrice === null
-                        ? "Auctions"
-                        : `Top price · sold ${career.totals.soldCount === 1 ? "once" : `${String(career.totals.soldCount)}×`}`}
-                    </dt>
-                    <dd>
-                      {career.totals.highestPrice === null
-                        ? formatCount(auctioned)
-                        : moneyFormat(career.totals.highestUnit).compact(
-                            career.totals.highestPrice,
-                          )}
-                    </dd>
-                  </div>
+                  {figures.map((figure) => (
+                    <div key={figure.label}>
+                      <dt>
+                        {figure.label}
+                        {figure.note === undefined ? null : (
+                          <span className="mp-strip-note"> · {figure.note}</span>
+                        )}
+                      </dt>
+                      <dd>{figure.value}</dd>
+                    </div>
+                  ))}
                 </dl>
               )}
-              {ask === null || ownerOnly ? null : (
-                <Link href="/account" className="me-ask" data-testid="me-profile-ask">
+              {clubs.length === 0 ? null : (
+                <ul className="mp-clubs" aria-label="Clubs you've played in" data-testid="me-clubs">
+                  {clubs.map((club) => (
+                    <li key={club.name}>
+                      <span className="mp-club-mark" aria-hidden>
+                        {monogram(club.name)}
+                      </span>
+                      {club.name}
+                      <span className="mp-club-count">
+                        {club.seasons === 1 ? "1 season" : `${String(club.seasons)} seasons`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {ask === null ? null : (
+                <Link
+                  href="/account?section=player"
+                  className="me-ask"
+                  data-testid="me-profile-ask"
+                >
+                  <span
+                    className="mp-ring"
+                    style={{ "--mp-done": String(completeness.score) } as CSSProperties}
+                    aria-hidden
+                  >
+                    <b>
+                      {completeness.done}/{completeness.total}
+                    </b>
+                  </span>
                   <span>
                     <strong>
                       Profile {completeness.done} of {completeness.total}.
                     </strong>{" "}
-                    {ask} — every registration form starts filled in.
-                  </span>
-                  <span className="me-ask-bar" aria-hidden>
-                    <i style={{ width: `${String(Math.round(completeness.score * 100))}%` }} />
+                    {ask}
+                    <span className="mp-ask-why"> — every registration form starts filled in.</span>
                   </span>
                   <IconArrowRight size={16} aria-hidden />
                 </Link>
@@ -300,252 +423,446 @@ export default async function MySportsPage({
         }
       />
 
-      {upcoming !== undefined ? (
-        <Notice
-          tone="info"
-          icon={<IconCalendar />}
-          testId="me-next"
-          title={
-            upcoming.status === "submitted"
-              ? `Your registration for ${upcoming.competitionName} is with the organizer`
-              : `You're in the auction pool for ${upcoming.competitionName}`
-          }
-        >
-          {upcoming.status === "submitted"
-            ? "You'll get a message the moment they approve it."
-            : "We'll message you the moment a team buys you."}
-        </Notice>
-      ) : null}
-
-      {sports.length > 1 ? (
-        <nav className="me-filter" aria-label="Filter by sport">
+      {filterable.length > 1 ? (
+        <nav className="mp-filter" aria-label="Filter by sport">
           <Link href="/me" aria-current={filter === undefined ? "page" : undefined}>
-            All sports
+            All
           </Link>
-          {sports.map((pack) => (
+          {filterable.map((pack) => (
             <Link
               key={pack.key}
               href={`/me?sport=${pack.key}`}
               aria-current={filter === pack.key ? "page" : undefined}
             >
               {pack.label}
+              <span className="mp-filter-count">
+                {career.seasons.filter((season) => season.sport === pack.key).length}
+              </span>
             </Link>
           ))}
         </nav>
       ) : null}
 
-      {/* An owner who does not play has one object — their team — and /teams
-          holds the squad: the rail here was its fourth copy (review r3). One
-          column at a reading measure, not a short card beside a tall rail. */}
-      {/* An owner who does not play: two even columns — the team and its
-          notes on the left, the night on the right — so neither column ends
-          ~120px above the other (round-5 review). */}
-      <div
-        className="me-layout"
-        data-single={asideEmpty ? "" : undefined}
-        data-owner={ownerOnly ? "" : undefined}
-      >
-        <div className="me-main">
-          {owns.length > 0 ? <OwnedTeams teams={owns} /> : null}
-          {seasons.length === 0 && owns.length > 0 ? (
-            // An owner who has never entered as a player: one quiet line, not
-            // a second full-weight card under their team.
-            <p className="me-quiet" data-testid="me-tournaments">
-              <IconTrophy size={16} aria-hidden />
-              <span>
-                Playing too? <Link href="/c">Find a tournament to enter</Link> — your seasons show
-                up here.
-              </span>
-            </p>
-          ) : (
-            <SectionCard
-              icon={<IconTrophy />}
-              title="Season by season"
-              description={
-                seasons.length === 0
-                  ? "Every season you enter shows up here, with where it stands."
-                  : `${String(seasons.length)} ${seasons.length === 1 ? "season" : "seasons"} · newest first`
-              }
-              flush={seasons.length > 0}
-              action={
+      {shownLive.length === 0 ? null : (
+        <section className="mp-now" aria-labelledby="mp-now-title" data-testid="me-now">
+          <h2 id="mp-now-title" className="mp-eyebrow">
+            Right now
+            <span>
+              {" "}
+              · {shownLive.length} live {shownLive.length === 1 ? "season" : "seasons"}
+            </span>
+          </h2>
+          <div className="mp-now-grid">
+            {shownLive.map(({ season, stage }) => (
+              <NowCard
+                key={season.registrationId}
+                season={season}
+                stage={stage}
+                next={nextMatchFor(season.registrationId)}
+                record={seasonRecordLine(matches, season.registrationId)}
+              />
+            ))}
+            {justStarted ? (
+              <section className="mp-now-card mp-now-start">
+                <strong>Your career starts here</strong>
+                <p>
+                  Once a team buys you, every season, team, price and match you play lands on this
+                  page — and on a card you can share.
+                </p>
                 <Link href="/c" className="me-link">
-                  Find a tournament <IconArrowRight size={14} aria-hidden />
+                  Find another tournament <IconArrowRight size={14} aria-hidden />
                 </Link>
-              }
-              data-testid="me-tournaments"
-            >
-              {seasons.length === 0 ? (
-                <EmptyState
-                  size="compact"
-                  icon={<IconTrophy />}
-                  title="No registrations as a player yet"
-                  description="Find a tournament from the link above and your entries line up here."
-                />
-              ) : (
-                <ul className="me-seasons">
-                  {seasons.map((season) => (
-                    <li key={season.registrationId}>
-                      <SeasonRow
-                        season={season}
-                        year={seasonYear(season.startsOn)}
-                        roleLabel={
-                          season.role === null
-                            ? ""
-                            : roleLabelIn(sportPackFor(season.sport), season.role)
-                        }
-                        money={(amount, unit) => moneyFormat(unit).ledger(amount)}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </SectionCard>
-          )}
+              </section>
+            ) : null}
+          </div>
+        </section>
+      )}
 
-          {career.totals.seasons === 0 && shownMatches.length === 0 ? null : shownMatches.length ===
-            0 ? (
-            // No match yet is one quiet line, not a full-weight empty card.
-            <p className="me-quiet" data-testid="me-matches">
-              <IconMatch size={16} aria-hidden />
-              Matches appear here once your team&apos;s fixtures are played.
-            </p>
-          ) : (
-            <SectionCard
-              icon={<IconMatch />}
-              tone="gold"
-              title="Matches"
-              description={
-                shownRecord.played === 0
-                  ? `${String(shownMatches.length)} in progress`
-                  : `${String(shownRecord.won)} won · ${String(shownRecord.lost)} lost${shownRecord.tied > 0 ? ` · ${String(shownRecord.tied)} tied` : ""}`
-              }
-              flush={shownMatches.length > 0}
-              data-testid="me-matches"
-            >
-              {shownMatches.length === 0 ? undefined : (
-                <div className="me-table-wrap">
-                  <table className="me-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Date</th>
-                        <th scope="col">Match</th>
-                        <th scope="col">Result</th>
-                        {showYou ? <th scope="col">You</th> : null}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {shownMatches.map((match) => (
-                        <tr key={match.fixtureId}>
-                          <td className="me-num" data-label="Date">
-                            {matchDate(match.kickoffAt)}
-                          </td>
-                          <td className="me-cell-match">
-                            <strong>
-                              {match.teamName} vs {match.opponentName}
-                            </strong>
-                            <span>
-                              {sportPackFor(match.sport).label} · {match.competitionName}
-                            </span>
-                          </td>
-                          <td data-label="Result">
-                            {match.result === null ? (
-                              <Pill tone="blue" dot>
-                                In progress
-                              </Pill>
-                            ) : (
-                              <Pill tone={RESULT_TONE[match.result]}>
-                                {RESULT_LABEL[match.result]}
-                              </Pill>
-                            )}
-                          </td>
-                          {showYou ? (
-                            <td className={`me-played me-played--${match.played}`} data-label="You">
-                              {PLAYED_LABEL[match.played]}
-                            </td>
-                          ) : null}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </SectionCard>
-          )}
-          {ownerOnly ? privacy : null}
-        </div>
+      {owns.length > 0 ? <OwnedTeams teams={owns} /> : null}
 
-        <aside
-          className="me-side"
-          aria-label={ownerOnly ? "Your auction night" : "Coming up and career by sport"}
+      <div
+        className="mp-cols"
+        data-single={shownMatches.length === 0 && shownUpcoming.length === 0 ? "" : undefined}
+      >
+        <SectionCard
+          icon={<IconTrophy />}
+          title="Career"
+          description={
+            shownSeasons.length === 0
+              ? "Every season you enter shows up here, with where it stands."
+              : `${formatCount(shownSeasons.length)} ${shownSeasons.length === 1 ? "season" : "seasons"} · newest first`
+          }
+          action={
+            <Link href="/c" className="me-link">
+              Find a tournament <IconArrowRight size={14} aria-hidden />
+            </Link>
+          }
+          data-testid="career-seasons"
         >
-          {shownUpcoming.length === 0 ? null : (
-            <SectionCard
-              icon={<IconCalendar />}
-              tone="gold"
-              title="Upcoming matches"
-              description={
-                shownUpcoming.length === 0
-                  ? "Your team's published fixtures appear here."
-                  : "Your team's next published fixtures."
-              }
-              data-testid="me-upcoming"
-            >
-              {shownUpcoming.length === 0 ? undefined : (
-                <ul className="me-upcoming">
-                  {shownUpcoming.map((match) => (
-                    <li key={match.fixtureId}>
-                      <span className="me-upcoming-when">{kickoffLabel(match.kickoffAt)}</span>
-                      <span className="me-upcoming-teams">
-                        <TeamChip color={match.teamColor}>{match.teamName}</TeamChip>
-                        <span className="me-vs">vs</span>
-                        <span className="me-upcoming-opp">{match.opponentName}</span>
-                      </span>
-                      <span className="me-upcoming-comp">{match.competitionName}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </SectionCard>
+          {shownSeasons.length === 0 ? (
+            <EmptyState
+              size="compact"
+              headingLevel={3}
+              icon={<IconTrophy />}
+              title="No seasons yet"
+              description="When you register for a tournament it shows up here — and after auction night, so does your result."
+            />
+          ) : (
+            <ol className="mp-career">
+              {shownSeasons.map((season) => (
+                <CareerEntry
+                  key={season.registrationId}
+                  season={season}
+                  record={seasonRecordLine(matches, season.registrationId)}
+                />
+              ))}
+            </ol>
           )}
+        </SectionCard>
 
-          {/* One sport is not a breakdown: the bar was a full-width stripe
-              saying "100%". */}
-          {bySport.length > 1 ? (
-            <SectionCard
-              icon={<IconChart />}
-              tone="gold"
-              title="Career by sport"
-              description="Seasons and matches, per sport."
-            >
-              <ul className="me-sports">
-                {bySport.map((row) => (
-                  <li key={row.key}>
-                    <div className="me-sport-line">
-                      <Link href={`/me/${row.key}`}>{row.label}</Link>
+        {shownMatches.length === 0 && shownUpcoming.length === 0 ? null : (
+          <SectionCard
+            icon={<IconMatch />}
+            title="Matches"
+            action={<Form results={recentForm(shownMatches)} />}
+            data-testid="me-matches"
+          >
+            {shownUpcoming[0] === undefined ? null : <NextTicket match={shownUpcoming[0]} />}
+            {shownMatches.length === 0 ? (
+              <p className="mp-quiet">
+                Results land here once your team&apos;s matches are played.
+              </p>
+            ) : (
+              <ul className="mp-matches">
+                {shownMatches.slice(0, 6).map((match) => (
+                  <li key={match.fixtureId}>
+                    <span className="mp-match-date">{matchDate(match.kickoffAt)}</span>
+                    <span className="mp-match-body">
+                      <strong>vs {match.opponentName}</strong>
                       <span>
-                        {row.seasons} season{row.seasons === 1 ? "" : "s"} · {row.matches} match
-                        {row.matches === 1 ? "" : "es"}
+                        {match.teamName} · {match.competitionName}
+                        {match.played === "bench" ? " · on the bench" : ""}
                       </span>
-                    </div>
-                    <span className="me-bar" aria-hidden>
-                      <i style={{ width: `${String((row.seasons / maxSeasons) * 100)}%` }} />
                     </span>
+                    {match.result === null ? (
+                      <Pill tone="blue" dot>
+                        Live
+                      </Pill>
+                    ) : (
+                      <span className="mp-result" data-result={match.result}>
+                        <span aria-hidden>{RESULT_LETTER[match.result]}</span>
+                        <VisuallyHidden>{RESULT_WORD[match.result]}</VisuallyHidden>
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
-            </SectionCard>
-          ) : null}
-
-          {/* THE OWNER'S RECORD (round 5). Without the squad rail the page was
-              one card and ~55% blank on a laptop. An owner's record is the
-              night their team was built: what it cost and where it went. */}
-          {ownerOnly && owns[0] !== undefined ? <OwnerNight team={owns[0]} /> : null}
-
-          {ownerOnly ? null : privacy}
-        </aside>
+            )}
+            {shownMatches.length === 0 ? null : (
+              <p className="mp-match-foot">
+                <strong>{formatCount(shownRecord.played)}</strong> played ·{" "}
+                <strong className="mp-won">{formatCount(shownRecord.won)} won</strong> ·{" "}
+                <strong className="mp-lost">{formatCount(shownRecord.lost)} lost</strong>
+                {shownRecord.tied > 0 ? ` · ${String(shownRecord.tied)} tied` : ""}
+                {shownMatches.length > 6 ? (
+                  <span className="mp-match-more"> · latest 6 shown</span>
+                ) : null}
+              </p>
+            )}
+          </SectionCard>
+        )}
       </div>
+
+      {shownPlay.length === 0 ? null : (
+        <SectionCard
+          icon={<IconUsers />}
+          title="How you play"
+          description="Every registration form starts filled in from this."
+          action={
+            <Link href="/account?section=player#sports" className="me-link">
+              Edit <IconArrowRight size={14} aria-hidden />
+            </Link>
+          }
+          data-testid="career-profile"
+        >
+          <div className="mp-play">
+            {shownPlay.map((pack) => (
+              <HowYouPlay key={pack.key} sport={pack.key} profile={profiled.get(pack.key)} />
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {privacy}
     </main>
   );
+}
+
+/** The four steps, the current one lit. */
+function StageTrack({ at }: { at: number }) {
+  return (
+    <ol className="mp-track" aria-label={`Step ${String(at + 1)} of ${String(STAGE_STEPS.length)}`}>
+      {STAGE_STEPS.map((step, index) => (
+        <li
+          key={step}
+          data-state={index < at ? "done" : index === at ? "now" : "todo"}
+          aria-current={index === at ? "step" : undefined}
+        >
+          {step}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** One live season: where it stands, and the one next thing in it. */
+function NowCard({
+  season,
+  stage,
+  next,
+  record,
+}: {
+  season: CareerSeason;
+  stage: LiveStage;
+  next: UpcomingMatch | undefined;
+  record: string | null;
+}) {
+  const pack = sportPackFor(season.sport);
+  const price =
+    season.auction?.kind === "sold"
+      ? `Sold for ${ledger(season.auction.soldPrice, season.auctionUnit)}`
+      : null;
+  const facts = [price, record].filter((part): part is string => part !== null).join(" · ");
+  const line: { head: string; detail: string; href: string | null; cta: string | null } =
+    stage.kind === "waiting"
+      ? {
+          head: "Waiting for the organizer to approve you",
+          detail: "You'll get a message the moment they decide.",
+          href: `/seasons/${season.competitionSlug}/register`,
+          cta: "Your registration",
+        }
+      : stage.kind === "waitlisted"
+        ? {
+            head: "On the waitlist",
+            detail: "If a place opens, the organizer can move you into the pool.",
+            href: `/seasons/${season.competitionSlug}/register`,
+            cta: "Your registration",
+          }
+        : stage.kind === "auction_live"
+          ? {
+              head: "The auction is live now",
+              detail: "Watch the bids — we'll message you the moment a team buys you.",
+              href: `/seasons/${season.competitionSlug}/auction/spectate`,
+              cta: "Watch",
+            }
+          : stage.kind === "pool"
+            ? {
+                head: "You're in the auction pool",
+                detail: "We'll message you the moment a team buys you.",
+                href: null,
+                cta: null,
+              }
+            : next !== undefined
+              ? {
+                  head: `Next: vs ${next.opponentName} · ${kickoffLabel(next.kickoffAt)}`,
+                  detail: facts === "" ? (season.teamName ?? "") : facts,
+                  href: `/seasons/${season.competitionSlug}/register`,
+                  cta: "Your season",
+                }
+              : {
+                  head: season.teamName === null ? "You're in" : `In the ${season.teamName} squad`,
+                  detail:
+                    facts === "" ? "Fixtures show up here once the club publishes them." : facts,
+                  href: `/seasons/${season.competitionSlug}/register`,
+                  cta: "Your season",
+                };
+  return (
+    <section
+      className="mp-now-card"
+      aria-label={`${seasonTitle(season)} — ${STAGE_STEPS[stage.at]}`}
+    >
+      <div className="mp-now-head">
+        <div>
+          <span className="mp-eyebrow">
+            {pack.label} · {season.orgName}
+          </span>
+          <strong className="mp-now-title">
+            {seasonTitle(season)} {seasonYear(season.startsOn)}
+          </strong>
+        </div>
+        {season.teamName !== null ? (
+          <TeamChip color={season.teamColor}>{season.teamName}</TeamChip>
+        ) : null}
+      </div>
+      <StageTrack at={stage.at} />
+      <div className="mp-now-next">
+        <span>
+          <strong>{line.head}</strong>
+          {line.detail === "" ? null : <span>{line.detail}</span>}
+        </span>
+        {line.href !== null && line.cta !== null ? (
+          <Link href={line.href} className="me-link">
+            {line.cta} <IconArrowRight size={14} aria-hidden />
+          </Link>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+const VERDICT_TONE: Partial<Record<KitTone, string>> = {
+  gold: "sold",
+  green: "pool",
+  blue: "wait",
+  amber: "wait",
+  purple: "signed",
+};
+
+/** One season on the career rail: where, for whom, as what, and how it ended. */
+function CareerEntry({ season, record }: { season: CareerSeason; record: string | null }) {
+  const pack = sportPackFor(season.sport);
+  const verdict = verdictOf(season, ledger);
+  const role = season.role === null ? "" : roleLabelIn(pack, season.role);
+  const armband =
+    season.isCaptain && season.auction?.kind !== "captain"
+      ? "captain"
+      : season.isViceCaptain
+        ? "vice-captain"
+        : null;
+  return (
+    <li
+      className="mp-entry"
+      style={
+        season.teamColor === null ? undefined : ({ "--mp-team": season.teamColor } as CSSProperties)
+      }
+      data-team={season.teamName === null ? undefined : ""}
+    >
+      <span className="mp-entry-year">{seasonYear(season.startsOn)}</span>
+      <span className="mp-entry-dot" aria-hidden />
+      <div className="mp-entry-body">
+        <div className="mp-entry-top">
+          <Link href={`/seasons/${season.competitionSlug}/register`} className="mp-entry-name">
+            {seasonTitle(season)}
+            <span className="mp-entry-phone-year"> {seasonYear(season.startsOn)}</span>
+          </Link>
+          <span className="mp-entry-verdict" data-tone={VERDICT_TONE[verdict.tone] ?? "quiet"}>
+            {verdict.label}
+          </span>
+        </div>
+        <span className="mp-entry-where">
+          {pack.label} · {season.orgName}
+          {season.tournamentName !== null && season.tournamentName !== season.competitionName
+            ? ` · ${season.competitionName}`
+            : ""}
+        </span>
+        <span className="mp-entry-facts">
+          {season.teamName !== null ? (
+            <TeamChip color={season.teamColor}>{season.teamName}</TeamChip>
+          ) : null}
+          {role === "" ? null : <span className="mp-tag">{role}</span>}
+          {armband === null ? null : <RosterMark kind={armband} />}
+          {record === null ? null : <span className="mp-entry-record">{record}</span>}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+/** The last few results as letters, oldest first. */
+function Form({ results }: { results: FormResult[] }) {
+  if (results.length === 0) return null;
+  return (
+    <span className="mp-form">
+      <VisuallyHidden>
+        Last {results.length} results, oldest first: {results.join(" ")}
+      </VisuallyHidden>
+      {results.map((result, index) => (
+        <span key={index} data-result={result} aria-hidden>
+          {result}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** The next published fixture, as a ticket. */
+function NextTicket({ match }: { match: UpcomingMatch }) {
+  return (
+    <div className="mp-ticket" data-theme="floodlight" data-testid="me-upcoming">
+      <span className="mp-ticket-when">
+        <IconCalendar size={14} aria-hidden />
+        Next · {kickoffLabel(match.kickoffAt)}
+      </span>
+      <span className="mp-ticket-teams">
+        <span>
+          <i style={{ background: match.teamColor ?? "currentColor" }} aria-hidden />
+          {match.teamName}
+        </span>
+        <span className="mp-ticket-vs">vs</span>
+        <span>
+          <i style={{ background: match.opponentColor ?? "currentColor" }} aria-hidden />
+          {match.opponentName}
+        </span>
+      </span>
+      <span className="mp-ticket-where">
+        {[match.competitionName, match.groundName]
+          .filter((part): part is string => part !== null)
+          .join(" · ")}
+      </span>
+    </div>
+  );
+}
+
+/** One sport's answers — role and styles — or the one line that asks for them. */
+function HowYouPlay({ sport, profile }: { sport: string; profile: SportProfile | undefined }) {
+  const pack = sportPackFor(sport);
+  const role =
+    profile?.defaultRole === null || profile?.defaultRole === undefined
+      ? null
+      : roleLabelIn(pack, profile.defaultRole) || null;
+  const answers = pack.attributes
+    .map((attribute) => {
+      const value = profile?.attributes[attribute.key];
+      const label =
+        value === undefined
+          ? null
+          : (attribute.options.find((option) => option.key === value)?.label ?? null);
+      return label === null ? null : { key: attribute.key, label: attribute.label, value: label };
+    })
+    .filter((row): row is { key: string; label: string; value: string } => row !== null);
+  return (
+    <div className="mp-play-sport">
+      <span className="mp-eyebrow">{pack.label}</span>
+      {role === null && answers.length === 0 ? (
+        <p className="mp-quiet">
+          Nothing set yet. <Link href="/account?section=player#sports">Add how you play</Link>
+        </p>
+      ) : (
+        <dl>
+          <div>
+            <dt>Role</dt>
+            <dd data-empty={role === null ? "true" : undefined}>{role ?? "Not set"}</dd>
+          </div>
+          {answers.map((row) => (
+            <div key={row.key}>
+              <dt>{row.label}</dt>
+              <dd>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
+/** Two letters for a club's or team's mark. */
+function monogram(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("");
 }
 
 const OWNED_STATUS: Record<string, { label: string; tone: KitTone }> = {
@@ -606,7 +923,7 @@ async function OwnedTeams({ teams }: { teams: OwnedTeam[] }) {
                 {/* The home hero's mini version (round 2: "no monogram, colour,
                     purse or squad count"). */}
                 <span className="me-owned-crest" aria-hidden>
-                  {teamMonogram(team.teamName)}
+                  {monogram(team.teamName)}
                 </span>
                 <span className="me-owned-body">
                   <span className="me-reg-top">
@@ -712,14 +1029,4 @@ async function OwnerNight({ team }: { team: OwnedTeam }) {
       </Link>
     </SectionCard>
   );
-}
-
-/** Two letters for a team's crest. */
-function teamMonogram(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join("");
 }

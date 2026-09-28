@@ -25,7 +25,7 @@ const ANNOUNCEMENT: Record<RoleToken, { title: string; item: string }> = {
   owner: { title: "You're now a team owner", item: "My team" },
   auctioneer: { title: "You're now an auctioneer", item: "Auction nights" },
   organizer: { title: "You can now run tournaments", item: "Tournaments" },
-  player: { title: "You're registered to play", item: "My sports" },
+  player: { title: "You're registered to play", item: "My profile" },
 };
 
 export interface RoleChange {

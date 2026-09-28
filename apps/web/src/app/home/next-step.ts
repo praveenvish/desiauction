@@ -184,7 +184,7 @@ export function chooseNextStep(input: NextStepInput): NextStep | null {
       eyebrow: entry.competitionName,
       title: "Your registration is with the organizer",
       why: "You'll get a message the moment they approve it.",
-      cta: { label: "My sports", href: "/me" },
+      cta: { label: "My profile", href: "/me" },
       then: "once approved, you're in the auction pool",
       tone: "calm",
     };

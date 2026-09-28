@@ -4,6 +4,7 @@ import {
   fixtureLineups,
   fixtureResults,
   fixtures,
+  grounds,
   lots,
   organizations,
   registrations,
@@ -31,7 +32,7 @@ import { systemDb } from "../db";
  * verdict and the price). Nothing here can drift from the record because
  * nothing here IS a record.
  *
- * Prices are the PERSON'S OWN — this module serves the self view (/me/cricket).
+ * Prices are the PERSON'S OWN — this module serves the self view (/me).
  * The public career section renders only what the public player page already
  * shows, through its own gated reader in competition/public.ts.
  */
@@ -47,6 +48,10 @@ export interface CareerSeason {
   orgName: string;
   /** Competition start date (ISO) — the career's ordering key. */
   startsOn: string | null;
+  /** Competition end date (ISO) — past it, a season is over for its player. */
+  endsOn: string | null;
+  /** The season's auction, if one was set up (never an abandoned one). */
+  auctionStatus: string | null;
   role: string | null;
   status: string;
   teamName: string | null;
@@ -79,7 +84,7 @@ export interface PlayerCareer {
   };
 }
 
-/** Seasons per page on /me/cricket — plenty for a local career, honest beyond it. */
+/** Seasons per page on /me — plenty for a local career, honest beyond it. */
 export const CAREER_PAGE_SIZE = 50;
 
 export async function playerCareer(personId: string, sport?: string): Promise<PlayerCareer> {
@@ -90,6 +95,8 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
       competitionSlug: competitions.slug,
       sport: competitions.sport,
       startsOn: competitions.startsOn,
+      endsOn: competitions.endsOn,
+      auctionStatus: auctions.status,
       tournamentName: tournaments.name,
       orgName: organizations.name,
       role: registrations.role,
@@ -141,6 +148,8 @@ export async function playerCareer(personId: string, sport?: string): Promise<Pl
     tournamentName: row.tournamentName,
     orgName: row.orgName,
     startsOn: row.startsOn,
+    endsOn: row.endsOn,
+    auctionStatus: row.auctionStatus,
     role: row.role,
     status: row.status,
     teamName: row.teamName,
@@ -239,6 +248,8 @@ export async function personSeasonsInOrg(
  */
 export interface CareerMatch {
   fixtureId: string;
+  /** The season this match belongs to, from this person's side. */
+  registrationId: string;
   kickoffAt: string | null;
   sport: string;
   competitionName: string;
@@ -323,6 +334,7 @@ export async function playerMatches(personId: string): Promise<CareerMatch[]> {
               : "lost";
     return {
       fixtureId: row.fixtureId,
+      registrationId: row.registrationId,
       kickoffAt: row.kickoffAt,
       sport: row.sport,
       competitionName: row.competitionName,
@@ -353,9 +365,14 @@ export interface UpcomingMatch {
   sport: string;
   competitionName: string;
   competitionSlug: string;
+  /** The season this fixture belongs to, from this person's side. */
+  registrationId: string;
   teamName: string;
   teamColor: string | null;
   opponentName: string;
+  opponentColor: string | null;
+  /** Where it is played, when the club named a ground. */
+  groundName: string | null;
 }
 
 export const UPCOMING_LIMIT = 5;
@@ -373,7 +390,9 @@ export async function playerUpcomingMatches(
       sport: competitions.sport,
       competitionName: competitions.name,
       competitionSlug: competitions.slug,
+      registrationId: registrations.id,
       teamId: registrations.teamId,
+      groundName: grounds.name,
       homeTeamId: fixtures.homeTeamId,
       homeName: home.name,
       homeColor: home.primaryColor,
@@ -394,6 +413,7 @@ export async function playerUpcomingMatches(
     )
     .innerJoin(home, eq(home.id, fixtures.homeTeamId))
     .innerJoin(away, eq(away.id, fixtures.awayTeamId))
+    .leftJoin(grounds, eq(grounds.id, fixtures.groundId))
     .where(
       and(
         eq(registrations.personId, personId),
@@ -412,9 +432,12 @@ export async function playerUpcomingMatches(
       sport: row.sport,
       competitionName: row.competitionName,
       competitionSlug: row.competitionSlug,
+      registrationId: row.registrationId,
       teamName: isHome ? row.homeName : row.awayName,
       teamColor: isHome ? row.homeColor : row.awayColor,
       opponentName: isHome ? row.awayName : row.homeName,
+      opponentColor: isHome ? row.awayColor : row.homeColor,
+      groundName: row.groundName,
     };
   });
 }
