@@ -15,6 +15,9 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
   if (view === null) {
     notFound();
   }
+  // The server's read of the status: a finished room offers the recap, not the plan.
+  const finished =
+    view.status === "completed" || view.status === "reconciled" || view.status === "abandoned";
   return (
     // `live-room` scopes the room's own toast placement (live.css): on a phone
     // the paddle is pinned to the foot, and notices rise above it.
@@ -57,7 +60,8 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
                   {/* WR-1: the owner's plan — a door only for someone who holds a
                     team here while planning is on; /auction/plan 404s for
                     everyone else. */}
-                  {view.planAvailable ? (
+                  {/* After the night the plan is the squad again — the room shows it. */}
+                  {view.planAvailable && !finished ? (
                     <ButtonLink
                       href={`/seasons/${slug}/auction/plan`}
                       variant="secondary"
@@ -67,7 +71,7 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
                     </ButtonLink>
                   ) : null}
                   <ButtonLink href={`/seasons/${slug}/auction/spectate`} variant="secondary">
-                    Spectate
+                    {finished ? "Public recap" : "Spectate"}
                   </ButtonLink>
                   {/* The setup page is the organizer's desk. An owner reached a
                     page that is not theirs from the foot of their own room. */}

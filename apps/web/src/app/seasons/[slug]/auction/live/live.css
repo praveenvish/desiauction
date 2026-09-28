@@ -113,7 +113,8 @@
 /* An owner's own result on a finished night: three figures, one row. */
 .live-over-figures {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, max-content));
+  /* Squad · spent · purse left · top buy (2026-09-28: the top buy joined). */
+  grid-template-columns: repeat(4, minmax(0, max-content));
   gap: var(--space-2) var(--space-10);
   margin: var(--space-2) 0 0;
 }
@@ -139,7 +140,7 @@
 
 @media (max-width: 519px) {
   .live-over-figures {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3);
   }
 
@@ -1105,5 +1106,31 @@ button.paddle-chip:focus-visible {
   .owner-won-words {
     align-items: flex-start;
     text-align: start;
+  }
+}
+
+/* ---- The owner's own squad (2026-09-28): first, open, and named ---- */
+
+/* Open, it takes the board's whole width: twelve names in a third of it
+   wrapped every row, while the folded rivals needed one line each. */
+.squad-grid > .squad-team[data-mine][open] {
+  grid-column: 1 / -1;
+}
+
+.squad-grid > .squad-team[data-mine] > .squad-team-head {
+  border-color: var(--accent-line);
+}
+
+.squad-team-mine {
+  color: var(--text-accent);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (min-width: 900px) {
+  .squad-grid > .squad-team[data-mine][open] .squad-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-6);
   }
 }
