@@ -4,7 +4,14 @@ import { EMAIL_TEMPLATES } from "./email-template-defaults";
 import { manageEmailsUrl, renderEmail } from "./email-layout";
 import { defaultContent, type MessageLanguage, type TemplateFields } from "./email-templates";
 import type { GateReason } from "./gate";
-import { providerFetch } from "./provider-fetch";
+import {
+  createResendProvider,
+  type MailProvider,
+  type MailRequest,
+  type MailTransport,
+  type ResendProviderConfig,
+} from "./mail-provider";
+import type { ProviderResponse } from "./provider-fetch";
 
 /**
  * EMAIL DELIVERY OVER HTTP.
@@ -33,15 +40,9 @@ import { providerFetch } from "./provider-fetch";
  * retry storm.
  */
 
-export interface EmailHttpResponse {
-  readonly status: number;
-  readonly body: string;
-}
+export type EmailHttpResponse = ProviderResponse;
 
-export type EmailTransport = (
-  url: string,
-  init: { method: string; headers: Record<string, string>; body: string },
-) => Promise<EmailHttpResponse>;
+export type EmailTransport = MailTransport;
 
 export interface EmailMessage {
   readonly to: string;
@@ -51,24 +52,18 @@ export interface EmailMessage {
   readonly html?: string;
 }
 
-export interface EmailAdapterConfig {
-  readonly endpoint: string;
-  readonly apiKey: string;
-  readonly from: string;
-  /** Header name the provider authenticates with. Bearer is the common case. */
-  readonly authHeader?: string;
-  readonly authScheme?: string;
-  /**
-   * Header the provider deduplicates retries on. `Idempotency-Key` is the
-   * common spelling (Resend, Postmark and Stripe-shaped APIs); SES uses none.
-   *
-   * Set to `null` for a provider that has no such header — the send is then
-   * at-least-once, which is what it was before this existed, rather than
-   * sending a header the provider will reject or ignore.
-   */
-  readonly idempotencyHeader?: string | null;
-  readonly transport?: EmailTransport;
-  readonly buildRequest?: (message: EmailMessage, from: string) => unknown;
+/**
+ * The provider: either one already built (`mailProviderFromEnv` — how both
+ * tiers wire it, SES or Resend), or Resend's settings, from which one is built
+ * here (how the tests and older call sites spell it).
+ */
+export type EmailAdapterProvider =
+  | { readonly provider: MailProvider }
+  | (Omit<ResendProviderConfig, "buildRequest"> & {
+      readonly buildRequest?: (message: EmailMessage, from: string) => unknown;
+    });
+
+export type EmailAdapterConfig = EmailAdapterProvider & {
   /**
    * The subject and text for one dispatch, given who it resolved to. Left out:
    * the English code default (`financeDocumentMail` over the default wording).
@@ -82,23 +77,26 @@ export interface EmailAdapterConfig {
   readonly now?: () => number;
   readonly breakerThreshold?: number;
   readonly breakerCooldownMs?: number;
-}
+};
 
 const DEFAULT_BREAKER_THRESHOLD = 3;
 const DEFAULT_BREAKER_COOLDOWN_MS = 60 * 1000;
 
-// Deadline-bound (provider-fetch.ts): a stalled provider must not outlive the
-// outbox's claim lease, or two drains deliver the same message.
-const defaultTransport: EmailTransport = providerFetch;
-
-/** The intersection of every provider we are choosing between. */
-const defaultBuildRequest = (message: EmailMessage, from: string): unknown => ({
-  from,
-  to: [message.to],
-  subject: message.subject,
-  text: message.text,
-  ...(message.html === undefined ? {} : { html: message.html }),
-});
+/**
+ * The provider a config names. Resend settings keep their old meaning exactly:
+ * Resend's body (the document's text part, plus its branded html part), Bearer auth, and
+ * `Idempotency-Key` unless switched off with `idempotencyHeader: null`.
+ */
+function providerOf(config: EmailAdapterProvider): MailProvider {
+  if ("provider" in config) return config.provider;
+  const { buildRequest, ...resend } = config;
+  return createResendProvider({
+    ...resend,
+    ...(buildRequest === undefined
+      ? {}
+      : { buildRequest: (mail: MailRequest, from: string) => buildRequest(mail, from) }),
+  });
+}
 
 /**
  * Which wording a document dispatch uses — one variant per document type
@@ -358,8 +356,7 @@ export function createHttpEmailAdapter(
   config: EmailAdapterConfig,
   resolve: EmailResolver,
 ): DeliveryPort {
-  const transport = config.transport ?? defaultTransport;
-  const build = config.buildRequest ?? defaultBuildRequest;
+  const provider = providerOf(config);
   const breaker = new EmailBreaker(
     config.now ?? (() => Date.now()),
     config.breakerThreshold ?? DEFAULT_BREAKER_THRESHOLD,
@@ -413,30 +410,6 @@ export function createHttpEmailAdapter(
          */
         return { ok: false as const, code: "no_email_on_file", retryable: false };
       }
-      const headers: Record<string, string> = {
-        "content-type": "application/json",
-        [config.authHeader ?? "authorization"]:
-          `${config.authScheme ?? "Bearer"} ${config.apiKey}`.trim(),
-      };
-      /*
-       * THE ONLY PARTY THAT CAN MAKE THIS SEND EXACTLY-ONCE.
-       *
-       * `runDispatchSend` calls this and only then commits the `sent`
-       * transition, so a crash in between leaves the dispatch `requested` and
-       * the retry arrives here again. That window cannot be closed on our side
-       * — committing first would instead record documents as sent that nobody
-       * received, and this adapter already refuses to tell that particular lie.
-       *
-       * So we hand the provider a key that is identical on every attempt at
-       * this dispatch and let it collapse the duplicate. A provider that
-       * honours it makes delivery effectively-once; one that does not behaves
-       * as it did before, so this can only help (audit PA-1 §16).
-       */
-      const idempotencyHeader =
-        config.idempotencyHeader === undefined ? "idempotency-key" : config.idempotencyHeader;
-      if (idempotencyHeader !== null) {
-        headers[idempotencyHeader] = request.idempotencyKey;
-      }
       // Composed before the provider call, outside its try: a failure to read
       // the person's language is not the provider's, so it must not trip the
       // breaker — it throws, and the job retries like any other refused read.
@@ -445,28 +418,38 @@ export function createHttpEmailAdapter(
           ? financeDocumentMail(defaultFinanceFields(request.templateId), request.body)
           : await config.compose(request, { to, personId });
       try {
-        const response = await transport(config.endpoint, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(
-            build(
-              {
-                to,
-                subject: mail.subject,
-                text: mail.text,
-                ...(mail.html === undefined ? {} : { html: mail.html }),
-              },
-              config.from,
-            ),
-          ),
+        const result = await provider.send({
+          to,
+          subject: mail.subject,
+          text: mail.text,
+          ...(mail.html === undefined ? {} : { html: mail.html }),
+          /*
+           * THE ONLY PARTY THAT CAN MAKE THIS SEND EXACTLY-ONCE.
+           *
+           * `runDispatchSend` calls this and only then commits the `sent`
+           * transition, so a crash in between leaves the dispatch `requested`
+           * and the retry arrives here again. That window cannot be closed on
+           * our side — committing first would instead record documents as sent
+           * that nobody received, and this adapter already refuses to tell that
+           * particular lie.
+           *
+           * So we hand the provider a key that is identical on every attempt at
+           * this dispatch and let it collapse the duplicate. A provider that
+           * honours it (Resend) makes delivery effectively-once; one that does
+           * not (SES) behaves as it did before, so this can only help
+           * (audit PA-1 §16).
+           */
+          idempotencyKey: request.idempotencyKey,
+          // Echoed on SES delivery events, so a bounce can find its dispatch.
+          tags: { dispatch: request.dispatchId },
         });
-        if (response.status >= 400) {
+        if (!result.ok) {
           breaker.recordFailure();
-          // 4xx is the message; 5xx is the provider. Only one is worth retrying.
+          // The provider decides which of its refusals a retry could fix.
           return {
             ok: false as const,
-            code: `provider_rejected_${String(response.status)}`,
-            retryable: response.status >= 500 || response.status === 429,
+            code: `provider_rejected_${String(result.status)}`,
+            retryable: result.retryable,
           };
         }
         breaker.recordSuccess();

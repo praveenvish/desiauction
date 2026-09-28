@@ -1,10 +1,12 @@
 import {
+  ButtonLink,
   EmptyState,
   IconCalendar,
   IconCheckCircle,
   IconGavel,
   IconGlobe,
   IconPin,
+  IconPlay,
   IconTile,
   IconTrophy,
   IconWallet,
@@ -27,6 +29,8 @@ import "../players/players.css";
 import { SquadsBySpend, spendNightOf } from "../../components/team/squads-by-spend";
 import "./auctions.css";
 import { formatCount } from "../../lib/plural";
+import { formatDate } from "../../lib/format-date";
+import { dateTile, doorLabel, nightSections, waitingLine } from "./auctions-model";
 
 export const metadata = { title: "Auctions · DesiAuction" };
 
@@ -62,36 +66,131 @@ function spendHint(totals: AuctionsIndexView["totals"]): string {
   return points === null ? base : `${base} · plus ${points} in points leagues`;
 }
 
-function AuctionCard({ card }: { card: AuctionCardView }) {
-  const status = STATUS[card.facts.status];
-  const { lotsSold, lotsTotal, lotsUnsold } = card.facts;
-  const pct = lotsTotal > 0 ? Math.round((lotsSold / lotsTotal) * 100) : 0;
-  const running = card.facts.status === "live" || card.facts.status === "paused";
+/** The role chip beside a club's name: what this card is FOR. */
+function RoleChip({ label }: { label: string }) {
+  return <span className="ax-role">{label}</span>;
+}
+
+/** Lots sold of the pool, on one bar. */
+function LotsBar({ sold, total }: { sold: number; total: number }) {
+  const pct = total > 0 ? Math.round((sold / total) * 100) : 0;
+  return (
+    <span className="ax-bar" aria-hidden>
+      <span className="ax-bar-fill" style={{ transform: `scaleX(${String(pct / 100)})` }} />
+    </span>
+  );
+}
+
+/**
+ * A LIVE NIGHT — the one place this person should be right now, so it leads
+ * the page as a dark band with its figures and ONE door for their role.
+ */
+function LiveNight({ card }: { card: AuctionCardView }) {
+  const { lotsSold, lotsTotal, teams, moneyMoved, status } = card.facts;
+  const [primary, ...rest] = card.links;
   const dates = dateRange(card.startsOn, card.endsOn);
   return (
+    <section
+      className="ax-live"
+      data-theme="floodlight"
+      data-testid={`auction-card-${card.slug}`}
+      aria-labelledby={`ax-live-${card.slug}`}
+    >
+      <p className="ax-live-top">
+        <span className="ax-live-badge" data-status={status}>
+          <span className="ax-live-dot" aria-hidden />
+          {status === "paused" ? "Paused" : "Live now"}
+        </span>
+        {[dates, card.location].filter((part) => part !== null && part !== "").join(" · ")}
+      </p>
+      <div className="ax-live-main">
+        <div className="ax-live-id">
+          <h2 id={`ax-live-${card.slug}`} className="ax-live-name">
+            {card.seasonName}
+          </h2>
+          <p className="ax-live-org">
+            {card.orgName} <RoleChip label={card.roleLabel} />
+          </p>
+        </div>
+        <span className="ax-live-doors">
+          {primary !== undefined ? (
+            <ButtonLink href={primary.href} size="lg">
+              <IconPlay size={18} aria-hidden />
+              {doorLabel(primary, status)}
+            </ButtonLink>
+          ) : null}
+          {rest.map((link) => (
+            <Link key={link.label} href={link.href} className="ax-live-ghost">
+              {doorLabel(link, status)}
+            </Link>
+          ))}
+        </span>
+      </div>
+      <dl className="ax-live-figs">
+        <div>
+          <dt>lots sold</dt>
+          <dd>
+            {count(lotsSold)} of {count(lotsTotal)}
+          </dd>
+        </div>
+        <div>
+          <dt>still to go</dt>
+          <dd>{count(Math.max(0, lotsTotal - lotsSold - card.facts.lotsUnsold))}</dd>
+        </div>
+        {moneyMoved !== undefined ? (
+          <div>
+            <dt>money moved</dt>
+            <dd data-testid={`auction-money-${card.slug}`}>
+              {moneyFormat(card.auctionUnit).compact(moneyMoved)}
+            </dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>teams bidding</dt>
+          <dd>{count(teams)}</dd>
+        </div>
+      </dl>
+      <LotsBar sold={lotsSold} total={lotsTotal} />
+    </section>
+  );
+}
+
+/** A night still to come: its date, and the one thing it is waiting for. */
+function UpcomingNight({ card }: { card: AuctionCardView }) {
+  const status = STATUS[card.facts.status];
+  const tile = dateTile(card.startsOn);
+  const dates = dateRange(card.startsOn, card.endsOn);
+  const line = waitingLine(card);
+  const [primary] = card.links;
+  const organizerFix = card.facts.status === "none" && primary?.label === "Setup";
+  return (
     <article
-      className="ax-card da-lift"
+      className="ax-card"
       data-status={card.facts.status}
       data-testid={`auction-card-${card.slug}`}
     >
       <header className="ax-head">
-        <IconTile icon={<IconGavel weight="duotone" />} tone="gold" size="sm" />
+        {tile !== null ? (
+          <span className="ax-date" aria-hidden>
+            <span>{tile.month}</span>
+            <b>{tile.day}</b>
+          </span>
+        ) : (
+          <IconTile icon={<IconGavel weight="duotone" />} tone="gold" size="sm" />
+        )}
         <div className="ax-titles">
-          <h2 className="ax-title">
+          <h3 className="ax-title">
             <Link href={`/seasons/${card.slug}/auction`}>{card.seasonName}</Link>
-          </h2>
+          </h3>
           <p className="ax-org">
             {card.orgName}
-            {/* The role is what this card is FOR — a chip by the name, not a
-                low-contrast caption in the footer. */}
-            <span className="ax-role">{card.roleLabel}</span>
+            <RoleChip label={card.roleLabel} />
           </p>
         </div>
         <Pill tone={status.tone} dot testId={`auction-status-${card.slug}`}>
           {status.label}
         </Pill>
       </header>
-
       <ul className="ax-meta">
         {dates !== null ? (
           <li>
@@ -108,59 +207,70 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
           {card.facts.teams === 1 ? "1 team" : `${count(card.facts.teams)} teams`}
         </li>
       </ul>
-
-      {card.facts.status === "none" ? (
-        // Addressed to whoever is reading: the organizer can fix it, the
-        // auctioneer can only wait for it (their card lists no door until then).
-        <p className="ax-note">
-          {card.roleLabel === "Organizer"
-            ? "No auction yet — set the purse and rules to create one."
-            : "The organizer hasn't set this auction up yet. You'll run it from the cockpit when they do."}
+      <div className="ax-next">
+        <p>
+          <strong>{line.lead}</strong>
+          {line.rest}
         </p>
-      ) : (
-        <div className="ax-progress">
-          <div className="ax-progress-row">
-            <span>
-              <strong>{count(lotsSold)}</strong> of {count(lotsTotal)} lots sold
-              {lotsUnsold > 0 ? (
-                <span className="ax-muted"> · {count(lotsUnsold)} unsold</span>
-              ) : null}
-            </span>
-            {card.facts.moneyMoved !== undefined ? (
-              <span className="ax-money" data-testid={`auction-money-${card.slug}`}>
-                {moneyFormat(card.auctionUnit).compact(card.facts.moneyMoved)} moved
-              </span>
-            ) : null}
-          </div>
-          <span className="ax-bar" aria-hidden>
-            <span className="ax-bar-fill" style={{ transform: `scaleX(${String(pct / 100)})` }} />
-          </span>
-        </div>
-      )}
-
-      <footer className="ax-foot">
-        <span className="ax-links">
-          {/* A night with no auction offers an auctioneer nothing to open —
-              the season page, where the dates and the organizer are, instead
-              of an empty footer. */}
-          {card.links.length === 0 ? (
-            <NavButton href={`/seasons/${card.slug}`} variant="secondary" size="sm">
-              See the season
-            </NavButton>
-          ) : null}
-          {card.links.map((link) => (
-            <NavButton
-              key={link.label}
-              href={link.href}
-              variant={link.primary === true && running ? "primary" : "secondary"}
-              size="sm"
-            >
-              {link.label}
-            </NavButton>
-          ))}
-        </span>
-      </footer>
+        {primary !== undefined ? (
+          <NavButton href={primary.href} variant={organizerFix ? "primary" : "secondary"} size="sm">
+            {doorLabel(primary, card.facts.status)}
+          </NavButton>
+        ) : (
+          <NavButton href={`/seasons/${card.slug}`} variant="secondary" size="sm">
+            See the season
+          </NavButton>
+        )}
+      </div>
     </article>
+  );
+}
+
+/** A finished night as a row: how the pool went, what it cost, and its doors. */
+function FinishedNight({ card }: { card: AuctionCardView }) {
+  const status = STATUS[card.facts.status];
+  const { lotsSold, lotsTotal, lotsUnsold, moneyMoved, topPrice } = card.facts;
+  const money = moneyFormat(card.auctionUnit);
+  return (
+    <li className="ax-done" data-testid={`auction-card-${card.slug}`}>
+      <span className="ax-done-id">
+        <span className="ax-done-name">
+          <Link href={`/seasons/${card.slug}/auction`}>{card.seasonName}</Link>
+          <Pill tone={status.tone} testId={`auction-status-${card.slug}`}>
+            {status.label}
+          </Pill>
+        </span>
+        <span className="ax-org">
+          {card.orgName}
+          {card.startsOn !== null ? ` · ${formatDate(card.startsOn)}` : ""}
+          <RoleChip label={card.roleLabel} />
+        </span>
+      </span>
+      <span className="ax-done-lots">
+        <span>
+          <strong>{count(lotsSold)}</strong> of {count(lotsTotal)} sold
+          {lotsUnsold > 0 ? <span className="ax-muted"> · {count(lotsUnsold)} unsold</span> : null}
+        </span>
+        <LotsBar sold={lotsSold} total={lotsTotal} />
+      </span>
+      {moneyMoved !== undefined ? (
+        <span className="ax-done-money">
+          <strong data-testid={`auction-money-${card.slug}`}>{money.compact(moneyMoved)}</strong>
+          {topPrice !== undefined && topPrice !== null ? (
+            <span>top {money.compact(topPrice)}</span>
+          ) : null}
+        </span>
+      ) : (
+        <span className="ax-done-money" aria-hidden />
+      )}
+      <span className="ax-done-doors">
+        {card.links.map((link) => (
+          <NavButton key={link.label} href={link.href} variant="secondary" size="sm">
+            {link.label}
+          </NavButton>
+        ))}
+      </span>
+    </li>
   );
 }
 
@@ -172,6 +282,7 @@ function AuctionCard({ card }: { card: AuctionCardView }) {
 export default async function AuctionsPage() {
   const view = await auctionsIndexView();
   const { totals } = view;
+  const sections = nightSections(view.cards);
   /*
    * "Upcoming" counts the nights still being set up as well as the scheduled
    * ones — /home's "1 in the queue" counts both, and the two pages disagreed
@@ -263,7 +374,7 @@ export default async function AuctionsPage() {
         {totals.completed > 0 ? (
           <span className="ax-summary-item">
             <IconCheckCircle size={16} aria-hidden />
-            <strong>{count(totals.completed)}</strong> completed
+            <strong>{count(totals.completed)}</strong> finished
           </span>
         ) : null}
         {/* "₹0 spent" says nothing — an auctioneer whose nights have sold
@@ -302,10 +413,34 @@ export default async function AuctionsPage() {
         )}
       </p>
 
-      <div className="ax-grid" data-testid="auctions-list">
-        {view.cards.map((card) => (
-          <AuctionCard key={card.slug} card={card} />
+      <div className="ax-sections" data-testid="auctions-list">
+        {sections.live.map((card) => (
+          <LiveNight key={card.slug} card={card} />
         ))}
+        {sections.upcoming.length > 0 ? (
+          <section className="ax-section" aria-labelledby="ax-upcoming">
+            <h2 id="ax-upcoming" className="ax-eyebrow">
+              Coming up <span>· {nights(sections.upcoming.length)}</span>
+            </h2>
+            <div className="ax-grid">
+              {sections.upcoming.map((card) => (
+                <UpcomingNight key={card.slug} card={card} />
+              ))}
+            </div>
+          </section>
+        ) : null}
+        {sections.finished.length > 0 ? (
+          <section className="ax-section" aria-labelledby="ax-finished">
+            <h2 id="ax-finished" className="ax-eyebrow">
+              Finished <span>· {nights(sections.finished.length)}</span>
+            </h2>
+            <ul className="ax-done-list">
+              {sections.finished.map((card) => (
+                <FinishedNight key={card.slug} card={card} />
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
 
       {spendNight !== null ? <SquadsBySpend night={spendNight} testId="auctions-spend" /> : null}

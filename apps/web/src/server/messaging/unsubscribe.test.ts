@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { env } from "../../env";
-import { providerMessageIdOf, HttpTransactionalMailer } from "./transactional-mail";
+import { createResendProvider } from "@desiauction/messaging/mail-provider";
+
+import { HttpTransactionalMailer } from "./transactional-mail";
 import {
   isSelfManagedKind,
   oneClickUnsubscribeUrl,
@@ -61,26 +63,18 @@ describe("which mail carries List-Unsubscribe", () => {
 });
 
 describe("the provider's message id", () => {
-  it("is read from Resend's and Postmark's answers, and nothing else", () => {
-    expect(providerMessageIdOf('{"id":"4ef9a417-02e9-4d39-ad75-9611e0fcc33c"}')).toBe(
-      "4ef9a417-02e9-4d39-ad75-9611e0fcc33c",
-    );
-    expect(providerMessageIdOf('{"MessageID":"b7bc2f4a"}')).toBe("b7bc2f4a");
-    expect(providerMessageIdOf("{}")).toBeNull();
-    expect(providerMessageIdOf("not json")).toBeNull();
-    expect(providerMessageIdOf('{"id":42}')).toBeNull();
-  });
-
   it("comes back from a send, with the headers passed to the provider", async () => {
     let sentBody: Record<string, unknown> = {};
     const mailer = new HttpTransactionalMailer({
-      endpoint: "https://api.resend.com/emails",
-      apiKey: "key",
-      from: "DesiAuction <hello@desiauction.in>",
-      transport: (_url, init) => {
-        sentBody = JSON.parse(init.body) as Record<string, unknown>;
-        return Promise.resolve({ status: 200, body: '{"id":"msg_123"}' });
-      },
+      provider: createResendProvider({
+        endpoint: "https://api.resend.com/emails",
+        apiKey: "key",
+        from: "DesiAuction <hello@desiauction.in>",
+        transport: (_url, init) => {
+          sentBody = JSON.parse(init.body) as Record<string, unknown>;
+          return Promise.resolve({ status: 200, body: '{"id":"msg_123"}' });
+        },
+      }),
     });
     const receipt = await mailer.deliver({
       to: "arjun@example.com",
@@ -96,10 +90,12 @@ describe("the provider's message id", () => {
 
   it("is null on a refusal", async () => {
     const mailer = new HttpTransactionalMailer({
-      endpoint: "https://api.resend.com/emails",
-      apiKey: "key",
-      from: "hello@desiauction.in",
-      transport: () => Promise.resolve({ status: 422, body: '{"id":"never"}' }),
+      provider: createResendProvider({
+        endpoint: "https://api.resend.com/emails",
+        apiKey: "key",
+        from: "hello@desiauction.in",
+        transport: () => Promise.resolve({ status: 422, body: '{"id":"never"}' }),
+      }),
     });
     expect(await mailer.deliver({ to: "a@example.com", subject: "s", text: "t" })).toEqual({
       outcome: "failed",

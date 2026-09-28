@@ -19,7 +19,16 @@ function people(count: number): string {
  * their current team are sent it, so pressing again after a late change tells
  * the newcomers and nobody twice.
  */
-export function SquadSheetsPanel({ slug, view }: { slug: string; view: SquadSheetsPanelView }) {
+export function SquadSheetsPanel({
+  slug,
+  view,
+  layout = "card",
+}: {
+  slug: string;
+  view: SquadSheetsPanelView;
+  /** "row": one line of the Teams tab's "Tell your players" strip. */
+  layout?: "card" | "row";
+}) {
   const router = useRouter();
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
@@ -52,6 +61,69 @@ export function SquadSheetsPanel({ slug, view }: { slug: string; view: SquadShee
         : "Once players are on teams, send each of them their squad: who they play with, the captain, the coach and their first match."
       : `${people(view.pending)} on ${view.teams === 1 ? "1 team" : `${String(view.teams)} teams`} ${view.pending === 1 ? "hasn't" : "haven't"} had their squad sheet yet. Each gets the full squad, the captain and coach, and their first match — by email and in their inbox.${view.sent > 0 ? ` ${people(view.sent)} already sent.` : ""}`);
 
+  const dialog = (
+    <Dialog
+      open={confirming}
+      onClose={() => {
+        setConfirming(false);
+      }}
+      title="Send squad sheets?"
+      footer={
+        <>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setConfirming(false);
+            }}
+          >
+            Not yet
+          </Button>
+          <Button onClick={() => void send()} loading={busy} data-testid="squad-sheets-confirm">
+            Send
+          </Button>
+        </>
+      }
+    >
+      <p className="competitions-hint">
+        {view.pending === 1 ? "This player" : `These ${String(view.pending)} players`} will get
+        their team&apos;s squad now. Send once the squads are final — a sheet can&apos;t be taken
+        back, though anyone moved to another team later gets the new one.
+      </p>
+    </Dialog>
+  );
+  if (layout === "row") {
+    const open = view.blocked === null && view.pending > 0;
+    return (
+      <div className="tm-tell-row" data-testid="squad-sheets-panel">
+        <span className="tm-tell-icon" aria-hidden>
+          <IconFile size={20} />
+        </span>
+        <span className="tm-tell-text">
+          <strong>Send squad sheets</strong>
+          <span className="tm-tell-sub" data-testid="squad-sheets-hint">
+            {view.blocked ??
+              (open
+                ? `${people(view.pending)} on ${view.teams === 1 ? "1 team" : `${String(view.teams)} teams`} — their squad and first match${view.sent > 0 ? ` · ${String(view.sent)} sent` : ""}`
+                : `Every squad member has their sheet (${people(view.sent)}).`)}
+          </span>
+        </span>
+        {open ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setConfirming(true);
+            }}
+            data-testid="squad-sheets-send"
+          >
+            <IconSend size={16} className="icon-lead" aria-hidden />
+            Send to {people(view.pending)}
+          </Button>
+        ) : null}
+        {dialog}
+      </div>
+    );
+  }
   return (
     <>
       <SectionCard
@@ -76,34 +148,7 @@ export function SquadSheetsPanel({ slug, view }: { slug: string; view: SquadShee
           </div>
         ) : null}
       </SectionCard>
-      <Dialog
-        open={confirming}
-        onClose={() => {
-          setConfirming(false);
-        }}
-        title="Send squad sheets?"
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setConfirming(false);
-              }}
-            >
-              Not yet
-            </Button>
-            <Button onClick={() => void send()} loading={busy} data-testid="squad-sheets-confirm">
-              Send
-            </Button>
-          </>
-        }
-      >
-        <p className="competitions-hint">
-          {view.pending === 1 ? "This player" : `These ${String(view.pending)} players`} will get
-          their team&apos;s squad now. Send once the squads are final — a sheet can&apos;t be taken
-          back, though anyone moved to another team later gets the new one.
-        </p>
-      </Dialog>
+      {dialog}
     </>
   );
 }

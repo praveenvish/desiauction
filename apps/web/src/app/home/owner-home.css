@@ -258,3 +258,172 @@
     height: 44px;
   }
 }
+
+/* ======================================================================
+   The season, once the night is done (2026-09-28): the next match as a
+   strip in the team hero, the season in four figures, and Our matches in
+   place of the squad balance card.
+   ====================================================================== */
+
+.ow-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.ow-next-when {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-bold, 700);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+  white-space: nowrap;
+}
+
+.ow-next-vs {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-md-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.ow-next-vs i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+}
+
+.ow-next-word {
+  font-weight: var(--font-weight-regular, 400);
+  color: var(--text-muted);
+}
+
+.ow-next-meta {
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.ow-season-figs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.ow-season-figs > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+}
+
+.ow-season-figs dt {
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.ow-season-figs dd {
+  margin: 0;
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-bold, 700);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+/* The matches lead the pair once the season is on. */
+.hd-duo[data-season] > :last-child {
+  order: -1;
+}
+
+.ow-matches {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ow-match {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ow-match:first-child {
+  border-top: 0;
+}
+
+.ow-match-when {
+  font-size: var(--text-sm-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.ow-match-next {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-bold, 700);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.ow-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--text-secondary);
+}
+
+.ow-result[data-result="won"] {
+  background: var(--success-subtle);
+  color: var(--success-strong);
+}
+
+.ow-result[data-result="lost"] {
+  background: var(--danger-subtle);
+  color: var(--danger-strong);
+}
+
+@media (max-width: 719px) {
+  .ow-next {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ow-season-figs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 559px) {
+  /* Three doors: the squad takes the row, Schedule and Table share the next. */
+  .ow-links:has(> :nth-child(3)) {
+    flex-wrap: wrap;
+  }
+
+  .ow-links:has(> :nth-child(3)) > :first-child {
+    flex-basis: 100%;
+  }
+
+  /* The record is in the hero's figures; the card title stays one line. */
+  [data-testid="home-owner-matches"] .hd-title-sub {
+    display: none;
+  }
+}

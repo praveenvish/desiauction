@@ -91,6 +91,38 @@ describe("web env — production refuses every dev-only default", () => {
     expect(() => parseEnv(raw(PROD_OK))).not.toThrow();
   });
 
+  describe("Amazon SES as the production mailer", () => {
+    const SES_PROD: Raw = {
+      ...PROD_OK,
+      EMAIL_API_ENDPOINT: undefined,
+      EMAIL_API_KEY: undefined,
+      EMAIL_PROVIDER: "ses",
+      SES_REGION: "ap-south-1",
+      SES_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE",
+      SES_SECRET_ACCESS_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    };
+
+    it("boots with SES alone — no Resend settings needed", () => {
+      expect(() => parseEnv(raw(SES_PROD))).not.toThrow();
+    });
+
+    it("refuses EMAIL_PROVIDER=ses with a missing SES setting", () => {
+      expect(() => parseEnv(raw({ ...SES_PROD, SES_SECRET_ACCESS_KEY: undefined }))).toThrow(
+        /EMAIL/,
+      );
+    });
+
+    it("refuses EMAIL_PROVIDER=ses that only has Resend set, rather than quietly using Resend", () => {
+      expect(() =>
+        parseEnv(raw({ ...PROD_OK, EMAIL_PROVIDER: "ses", SES_REGION: "ap-south-1" })),
+      ).toThrow(/EMAIL/);
+    });
+
+    it("refuses a region that is not a region", () => {
+      expect(() => parseEnv(raw({ ...SES_PROD, SES_REGION: "mumbai" }))).toThrow(/SES_REGION/);
+    });
+  });
+
   const CASES: [string, Raw, RegExp][] = [
     ["OTP_PROVIDER", { OTP_PROVIDER: "dev" }, /OTP_PROVIDER=dev/],
     ["MEDIA_STORAGE", { MEDIA_STORAGE: "local" }, /MEDIA_STORAGE=local/],

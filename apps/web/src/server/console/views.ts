@@ -26,7 +26,7 @@ import {
   type PlayersSlice,
   type PlayerStatus,
 } from "./players-index";
-import { seasonReportIn, type SeasonReport } from "./reports";
+import { seasonPlayIn, seasonReportIn, type SeasonPlay, type SeasonReport } from "./reports";
 import { seasonAccess, type SeasonAccess } from "./reach";
 
 /**
@@ -293,6 +293,8 @@ export interface ReportsView {
   /** Whether this viewer holds the season's books — decides every rupee on the page. */
   money: boolean;
   report: SeasonReport | null;
+  /** The season's matches and table — no money in it, so every reviewer gets it. */
+  play: SeasonPlay | null;
 }
 
 /**
@@ -314,11 +316,14 @@ export async function reportsView(slug: string | undefined): Promise<ReportsView
     orgName: season.orgName,
   }));
   if (chosen === undefined) {
-    return { seasons, season: null, money: false, report: null };
+    return { seasons, season: null, money: false, report: null, play: null };
   }
   const money = chosen.access.seesSeasonMoney;
-  const report = await inOrg(personId, chosen.orgId, (db) =>
-    seasonReportIn(db, chosen, { money, readUrl: (key) => storage.readUrl(key) }),
+  const [report, play] = await inOrg(personId, chosen.orgId, (db) =>
+    Promise.all([
+      seasonReportIn(db, chosen, { money, readUrl: (key) => storage.readUrl(key) }),
+      seasonPlayIn(db, chosen),
+    ]),
   );
   return {
     seasons,
@@ -331,5 +336,6 @@ export async function reportsView(slug: string | undefined): Promise<ReportsView
     },
     money,
     report,
+    play,
   };
 }

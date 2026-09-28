@@ -2,6 +2,7 @@ import { auditLog, newId, notificationTemplates, type Db } from "@desiauction/db
 import { isNotificationKind, type EmailNotificationKind } from "@desiauction/messaging/catalogue";
 import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults";
 import {
+  defaultContent,
   isMessageLanguage,
   parseTemplateContent,
   sampleVariables,
@@ -488,6 +489,24 @@ function previewMail(t: Target, variant: string, fields: TemplateFields): Notifi
     sampleVariables(t.spec, t.language),
     previewOptions(t.kind, variant, t.language),
   );
+}
+
+/**
+ * Any email, in its DEFAULT wording, with the samples — the same layout a
+ * real send uses, no database. For `mail:test` (send or preview every design
+ * through the live provider) and nothing that reaches a real recipient.
+ */
+export function sampleMail(
+  kind: EmailNotificationKind,
+  language: MessageLanguage,
+  variant?: string,
+): { mail: NotificationMail; variant: string } {
+  const spec = EMAIL_TEMPLATES[kind];
+  const content = defaultContent(spec, language);
+  const chosen = variant ?? Object.keys(content.variants)[0] ?? "";
+  const fields = content.variants[chosen];
+  if (fields === undefined) throw new Error(`${kind} has no ${chosen} version in ${language}`);
+  return { mail: previewMail({ spec, kind, language }, chosen, fields), variant: chosen };
 }
 
 /** Render the editor's wording with the samples — what the preview shows. */
