@@ -159,6 +159,7 @@ export default async function LoginPage({
             initialTo={params.to ?? ""}
             honoredNext={honoredNext}
             returning={cookieStore.get(RETURNING_COOKIE) !== undefined}
+            phoneDoor={env.OTP_PROVIDER !== "none"}
           />
         </div>
         {/* Below 960px the scene does not render at all, so the marks ride with

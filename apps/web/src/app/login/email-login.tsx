@@ -43,12 +43,15 @@ export function EmailSignIn({
   initialEmail,
   honoredNext,
   returning,
+  phoneDoor = true,
 }: {
   next?: string;
   initialStep: "email" | "code";
   initialEmail: string;
   honoredNext: boolean;
   returning: boolean;
+  /** False under email-only sign-in: no "Use mobile number" door. */
+  phoneDoor?: boolean;
 }) {
   const [step, setStep] = useState(initialStep);
   const [email, setEmail] = useState(initialEmail);
@@ -149,6 +152,7 @@ export function EmailSignIn({
       method="email"
       atStart={atStart}
       returning={returning}
+      otherDoor={phoneDoor}
       {...(next !== undefined ? { next } : {})}
     >
       <form
