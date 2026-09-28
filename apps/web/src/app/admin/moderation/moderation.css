@@ -1,0 +1,162 @@
+/* ---- The moderation desk's own rules (kept out of admin.css) ---- */
+
+.mod-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+}
+
+.mod-figures > div {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-5);
+}
+
+.mod-figures > div + div {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.mod-figures dd {
+  margin: 0;
+  font-size: var(--text-xl-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.mod-figures dd[data-zero] {
+  color: var(--text-muted);
+}
+
+.mod-figures dt {
+  grid-row: 2;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mod-none {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.mod-none > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.mod-none strong {
+  color: var(--text-heading);
+}
+
+/* A public row: the page, what decides its reach, and the two doors. */
+.admin-mod-rows > li.mod-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.mod-reach {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mod-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent-ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mod-open:hover {
+  background: var(--surface-sunken);
+}
+
+.mod-open:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.mod-phone-only {
+  display: none;
+}
+
+/* A phone: three lines a season, both doors labelled — the take-down was an
+   unlabelled eye-slash and the meta line was cut ("created 2…"). */
+@media (max-width: 719px) {
+  .mod-figures > div {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .mod-figures dd {
+    font-size: var(--text-lg-size);
+  }
+
+  .admin-mod-rows > li.mod-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "main main"
+      "reach doors";
+  }
+
+  .admin-mod-rows > li.mod-row .admin-mod-main {
+    grid-area: main;
+  }
+
+  .admin-mod-rows > li.mod-row .admin-mod-main .admin-meta {
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .admin-mod-rows > li.mod-row .mod-reach {
+    grid-area: reach;
+  }
+
+  .admin-mod-rows > li.mod-row .pass-row-actions {
+    grid-area: doors;
+  }
+
+  .admin-mod-rows > li.mod-row .mod-open span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .admin-mod-rows > li.mod-row .admin-quiet-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: nowrap;
+  }
+
+  .admin-mod-rows > li.mod-row .mod-reach .admin-meta {
+    display: none;
+  }
+
+  .mod-phone-only {
+    display: inline;
+  }
+}
