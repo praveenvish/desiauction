@@ -62,6 +62,7 @@ import {
   queryFixtures,
   PUBLIC_SCHEDULE_LIMIT,
   upcomingFixtures,
+  organizerSchedule,
 } from "./fixtures";
 import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
 import { activeGroundsOf, createGround, createVenue, setGroundStatus, venuesOf } from "./venues";
@@ -683,6 +684,19 @@ describe("FIXTURE OPS REGRESSION — calendar, import/export, isolation, scale",
     expect(groups.length).toBeGreaterThan(0);
     const upcoming = await upcomingFixtures(db, comp.id, `${firstDate}T00:00`);
     expect(upcoming.every((f) => f.status !== "cancelled" && f.status !== "completed")).toBe(true);
+  });
+
+  it("the organizer's Coming up keeps today's matches after their kickoff", async () => {
+    // The strip compared kickoff with THIS MINUTE: a match on today at 9:30
+    // vanished at 9:31, and a match being played never showed (census
+    // 2026-09-28). It now reads from the start of the day.
+    const open = (await competitionTimeline(db, comp.id)).find(
+      (f) => f.status !== "cancelled" && f.status !== "completed" && f.kickoffAt !== null,
+    );
+    const kickoff = must(open?.kickoffAt ?? undefined, "an open fixture with a kickoff");
+    const lateThatDay = `${kickoff.slice(0, 10)}T23:59`;
+    const strip = await organizerSchedule(db, owner, lateThatDay, 50);
+    expect(strip.map((f) => f.id)).toContain(open?.id);
   });
 
   it("the published schedule reports its TOTAL, not just the page it returns", async () => {

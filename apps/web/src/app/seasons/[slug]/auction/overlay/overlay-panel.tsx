@@ -317,7 +317,7 @@ export function OverlayPanel({
               the lockup has to survive whatever is behind it. */}
           <div className="obs-bug" data-testid="obs-bug">
             <span className="obs-bug-kicker">Powered by</span>
-            <BrandLockup tone="bug" />
+            <BrandLockup tone="bug" strike="once" />
           </div>
           {sponsor !== null ? (
             <div className="obs-sponsor">

@@ -15,7 +15,7 @@
  * rule, not an omission.
  */
 
-export type SoundCue = "opening" | "bid" | "extension" | "warning" | "sold" | "complete";
+export type SoundCue = "opening" | "bid" | "extension" | "warning" | "sold" | "complete" | "sting";
 
 export const SOUND_CUES: readonly SoundCue[] = [
   "opening",
@@ -24,6 +24,7 @@ export const SOUND_CUES: readonly SoundCue[] = [
   "warning",
   "sold",
   "complete",
+  "sting",
 ];
 
 function tone(
@@ -130,5 +131,24 @@ export function scheduleCue(
       tone(ctx, out, { type: "triangle", freq: 783.99, at: at + 0.24, dur: 0.16, peak: 0.14 });
       tone(ctx, out, { type: "triangle", freq: 1046.5, at: at + 0.36, dur: 0.5, peak: 0.16 });
       return;
+    case "sting": {
+      // The logo's strike (BrandStrike): the SOLD knock and chord, made for the
+      // speakers a logo plays on. "sold" is deliberately quiet — a hall has
+      // big speakers — and on a phone or laptop it is barely a click, mostly
+      // because it is -33 dBFS on average. The sting adds a triangle harmonic
+      // so the thump survives small speakers, and a lift so it peaks at -1 dBFS
+      // after the engine's master gain (measured on the rendered buffer).
+      const lift = ctx.createGain();
+      lift.gain.value = 2.75;
+      lift.connect(out);
+      knock(ctx, lift, at);
+      tone(ctx, lift, { type: "sine", freq: 150, at, dur: 0.16, peak: 0.5, glideTo: 55 });
+      tone(ctx, lift, { type: "triangle", freq: 300, at, dur: 0.14, peak: 0.28, glideTo: 110 });
+      tone(ctx, lift, { type: "sine", freq: 220, at: at + 0.15, dur: 0.9, peak: 0.24 });
+      tone(ctx, lift, { type: "sine", freq: 277.18, at: at + 0.15, dur: 0.9, peak: 0.2 });
+      tone(ctx, lift, { type: "sine", freq: 329.63, at: at + 0.17, dur: 0.95, peak: 0.2 });
+      tone(ctx, lift, { type: "sine", freq: 440, at: at + 0.17, dur: 0.8, peak: 0.08 });
+      return;
+    }
   }
 }

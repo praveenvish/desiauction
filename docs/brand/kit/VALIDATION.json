@@ -1,0 +1,774 @@
+{
+ "R": [
+  {
+   "area": "PNG",
+   "name": "png/da-mark-1024.png",
+   "ok": true,
+   "detail": "1024×1024"
+  },
+  {
+   "area": "PNG",
+   "name": "png/da-mark-512.png",
+   "ok": true,
+   "detail": "512×512"
+  },
+  {
+   "area": "PNG",
+   "name": "png/da-mark-256.png",
+   "ok": true,
+   "detail": "256×256"
+  },
+  {
+   "area": "PNG",
+   "name": "png/da-mark-128.png",
+   "ok": true,
+   "detail": "128×128"
+  },
+  {
+   "area": "PNG",
+   "name": "png/da-mark-64.png",
+   "ok": true,
+   "detail": "64×64"
+  },
+  {
+   "area": "PNG",
+   "name": "png/da-mark-48.png",
+   "ok": true,
+   "detail": "48×48"
+  },
+  {
+   "area": "PNG",
+   "name": "png/da-mark-32.png",
+   "ok": true,
+   "detail": "32×32"
+  },
+  {
+   "area": "PNG",
+   "name": "png/da-mark-24.png",
+   "ok": true,
+   "detail": "24×24"
+  },
+  {
+   "area": "PNG",
+   "name": "png/da-mark-16.png",
+   "ok": true,
+   "detail": "16×16"
+  },
+  {
+   "area": "PNG",
+   "name": "favicon/icon-192.png",
+   "ok": true,
+   "detail": "192×192"
+  },
+  {
+   "area": "PNG",
+   "name": "favicon/icon-512.png",
+   "ok": true,
+   "detail": "512×512"
+  },
+  {
+   "area": "PNG",
+   "name": "favicon/icon-maskable-512.png",
+   "ok": true,
+   "detail": "512×512"
+  },
+  {
+   "area": "PNG",
+   "name": "favicon/apple-touch-icon.png",
+   "ok": true,
+   "detail": "180×180"
+  },
+  {
+   "area": "PNG",
+   "name": "png/og-image-1200x630.png",
+   "ok": true,
+   "detail": "1200×630"
+  },
+  {
+   "area": "PNG",
+   "name": "png/lockup-dark-2400.png",
+   "ok": true,
+   "detail": "2400×561 transparent"
+  },
+  {
+   "area": "PNG",
+   "name": "png/lockup-light-2400.png",
+   "ok": true,
+   "detail": "2400×561 transparent"
+  },
+  {
+   "area": "PNG",
+   "name": "png/wordmark-dark-2400.png",
+   "ok": true,
+   "detail": "2400×304 transparent"
+  },
+  {
+   "area": "PNG",
+   "name": "png/wordmark-light-2400.png",
+   "ok": true,
+   "detail": "2400×304 transparent"
+  },
+  {
+   "area": "PNG",
+   "name": "png/lockup-hindi-dark-2400.png",
+   "ok": true,
+   "detail": "2400×626 transparent"
+  },
+  {
+   "area": "PNG",
+   "name": "png/lockup-hindi-light-2400.png",
+   "ok": true,
+   "detail": "2400×626 transparent"
+  },
+  {
+   "area": "PNG",
+   "name": "png/wordmark-hindi-dark-2400.png",
+   "ok": true,
+   "detail": "2400×496 transparent"
+  },
+  {
+   "area": "PNG",
+   "name": "png/wordmark-hindi-light-2400.png",
+   "ok": true,
+   "detail": "2400×496 transparent"
+  },
+  {
+   "area": "Favicon",
+   "name": "favicon.ico holds 16, 32, 48",
+   "ok": true,
+   "detail": "16, 32, 48"
+  },
+  {
+   "area": "Favicon",
+   "name": "site.webmanifest parses, has a maskable icon",
+   "ok": true,
+   "detail": "3 icons"
+  },
+  {
+   "area": "Pixels",
+   "name": "Kit mark = the validated final",
+   "ok": true,
+   "detail": "0 px differ"
+  },
+  {
+   "area": "Pixels",
+   "name": "Tile corners transparent, centre solid",
+   "ok": true,
+   "detail": "corner α 0, centre α 255"
+  },
+  {
+   "area": "Pixels",
+   "name": "Apple touch icon is full-bleed (iOS rounds it)",
+   "ok": true,
+   "detail": "corner α 255"
+  },
+  {
+   "area": "Pixels",
+   "name": "Maskable glyph inside the 80% safe circle",
+   "ok": true,
+   "detail": "reaches 70% of the radius"
+  },
+  {
+   "area": "Pixels",
+   "name": "One-colour glyph gap is see-through",
+   "ok": true,
+   "detail": "gap α 0, ink α 255"
+  },
+  {
+   "area": "Web",
+   "name": "da-strike.html plays mark + lockup, sound on",
+   "ok": true,
+   "detail": "no errors, audio running"
+  },
+  {
+   "area": "Web",
+   "name": "Reduced motion shows the finished mark",
+   "ok": true,
+   "detail": "no strike, no sweep"
+  },
+  {
+   "area": "Video",
+   "name": "motion/da-strike-1080x1080.mp4",
+   "ok": true,
+   "detail": "1080x1080 · 60 fps · 2.00 s · aac"
+  },
+  {
+   "area": "Video",
+   "name": "motion/da-strike-lockup-1920x1080.mp4",
+   "ok": true,
+   "detail": "1920x1080 · 60 fps · 2.50 s · aac"
+  },
+  {
+   "area": "Video",
+   "name": "motion/da-strike-story-1080x1920.mp4",
+   "ok": true,
+   "detail": "1080x1920 · 60 fps · 2.00 s · aac"
+  },
+  {
+   "area": "Video",
+   "name": "motion/da-strike-alpha-1080x1080.webm",
+   "ok": true,
+   "detail": "1080x1080 · 60 fps · 2.01 s · opus · alpha yes"
+  },
+  {
+   "area": "Video",
+   "name": "motion/da-strike-lockup-alpha-1920x1080.webm",
+   "ok": true,
+   "detail": "1920x1080 · 60 fps · 2.51 s · opus · alpha yes"
+  },
+  {
+   "area": "Video",
+   "name": "Sound lands on the impact frame (400 ms)",
+   "ok": true,
+   "detail": "sound at 400.0 ms · impact at 400 ms · 0.0 ms apart (1 frame = 16.7 ms)"
+  },
+  {
+   "area": "Video",
+   "name": "Encode quality · da-strike-1080x1080.mp4",
+   "ok": true,
+   "detail": "PSNR 59.8 dB (above 40 = visually lossless)"
+  },
+  {
+   "area": "Video",
+   "name": "Encode quality · da-strike-lockup-1920x1080.mp4",
+   "ok": true,
+   "detail": "PSNR 60.7 dB (above 40 = visually lossless)"
+  },
+  {
+   "area": "Video",
+   "name": "Video ends on the exact still logo",
+   "ok": true,
+   "detail": "0 px differ between the last frame and the settled mark"
+  },
+  {
+   "area": "Video",
+   "name": "Frames are deterministic · mark",
+   "ok": true,
+   "detail": "frames 0, 12, 24, 40, 60, 119 re-rendered fresh: worst 0 px differ"
+  },
+  {
+   "area": "Video",
+   "name": "Frames are deterministic · lock",
+   "ok": true,
+   "detail": "frames 40, 70, 149 re-rendered fresh: worst 0 px differ"
+  },
+  {
+   "area": "Print",
+   "name": "da-mark-cmyk.pdf",
+   "ok": true,
+   "detail": "50.0×50.0 mm · vector only · no fonts · CMYK only"
+  },
+  {
+   "area": "Print",
+   "name": "da-mark-spot.pdf",
+   "ok": true,
+   "detail": "50.0×50.0 mm · vector only · no fonts · CMYK only"
+  },
+  {
+   "area": "Print",
+   "name": "da-glyph-black-k100.pdf",
+   "ok": true,
+   "detail": "50.0×37.6 mm · vector only · no fonts · CMYK only"
+  },
+  {
+   "area": "Print",
+   "name": "da-glyph-gold-cmyk.pdf",
+   "ok": true,
+   "detail": "50.0×37.6 mm · vector only · no fonts · CMYK only"
+  },
+  {
+   "area": "Print",
+   "name": "lockup-light-cmyk.pdf",
+   "ok": true,
+   "detail": "150.0×35.1 mm · vector only · no fonts · CMYK only"
+  },
+  {
+   "area": "Print",
+   "name": "lockup-dark-cmyk.pdf",
+   "ok": true,
+   "detail": "150.0×47.1 mm · vector only · no fonts · CMYK only"
+  },
+  {
+   "area": "Print",
+   "name": "lockup-hindi-light-cmyk.pdf",
+   "ok": true,
+   "detail": "150.0×39.1 mm · vector only · no fonts · CMYK only"
+  },
+  {
+   "area": "Print",
+   "name": "lockup-hindi-dark-cmyk.pdf",
+   "ok": true,
+   "detail": "150.0×51.9 mm · vector only · no fonts · CMYK only"
+  },
+  {
+   "area": "Print",
+   "name": "100K letters overprint the gold (PDF)",
+   "ok": true,
+   "detail": "ExtGState /op true, scoped to the black letters"
+  },
+  {
+   "area": "Print",
+   "name": "Spot file carries real separations",
+   "ok": true,
+   "detail": "Separation 'DA Gold' + 'DA Ink' (CMYK alternates), both selected in the page content"
+  },
+  {
+   "area": "Print",
+   "name": "da-mark-cmyk.eps",
+   "ok": true,
+   "detail": "EPSF-3.0 · 0 0 141 141 pt · CMYK only · 100K overprint"
+  },
+  {
+   "area": "Print",
+   "name": "da-glyph-black-k100.eps",
+   "ok": true,
+   "detail": "EPSF-3.0 · 0 0 141 106 pt · CMYK only · 100K overprint"
+  },
+  {
+   "area": "Print",
+   "name": "da-glyph-gold-cmyk.eps",
+   "ok": true,
+   "detail": "EPSF-3.0 · 0 0 141 106 pt · CMYK only · 100K overprint"
+  },
+  {
+   "area": "Print",
+   "name": "lockup-light-cmyk.eps",
+   "ok": true,
+   "detail": "EPSF-3.0 · 0 0 425 99 pt · CMYK only · 100K overprint"
+  },
+  {
+   "area": "Print",
+   "name": "lockup-dark-cmyk.eps",
+   "ok": true,
+   "detail": "EPSF-3.0 · 0 0 425 133 pt · CMYK only · 100K overprint"
+  },
+  {
+   "area": "Print",
+   "name": "lockup-hindi-light-cmyk.eps",
+   "ok": true,
+   "detail": "EPSF-3.0 · 0 0 425 110 pt · CMYK only · 100K overprint"
+  },
+  {
+   "area": "Print",
+   "name": "lockup-hindi-dark-cmyk.eps",
+   "ok": true,
+   "detail": "EPSF-3.0 · 0 0 425 147 pt · CMYK only · 100K overprint"
+  },
+  {
+   "area": "Print",
+   "name": "White text knocks out · lockup-dark-cmyk",
+   "ok": true,
+   "detail": "white fills never share a block with the overprint state"
+  },
+  {
+   "area": "Print",
+   "name": "White text knocks out · lockup-hindi-dark-cmyk",
+   "ok": true,
+   "detail": "white fills never share a block with the overprint state"
+  },
+  {
+   "area": "Print",
+   "name": "Print geometry = screen artwork · da-mark-cmyk",
+   "ok": true,
+   "detail": "99.84% of ink pixels identical at 1600 px (MuPDF vs Chrome)"
+  },
+  {
+   "area": "Print",
+   "name": "Print geometry = screen artwork · da-glyph-black-k100",
+   "ok": true,
+   "detail": "99.86% of ink pixels identical at 1600 px (MuPDF vs Chrome)"
+  },
+  {
+   "area": "Print",
+   "name": "Print geometry = screen artwork · lockup-light-cmyk",
+   "ok": true,
+   "detail": "99.71% of ink pixels identical at 4000 px (MuPDF vs Chrome)"
+  },
+  {
+   "area": "Print",
+   "name": "Print geometry = screen artwork · lockup-hindi-light-cmyk",
+   "ok": true,
+   "detail": "99.49% of ink pixels identical at 4000 px (MuPDF vs Chrome)"
+  },
+  {
+   "area": "Print",
+   "name": "CMYK gold prints back as brand gold",
+   "ok": true,
+   "detail": "ColorSync render (231, 180, 75) vs #E6B24A (230, 178, 74): max 2 levels"
+  },
+  {
+   "area": "Print",
+   "name": "Ink total coverage within press limit",
+   "ok": true,
+   "detail": "rich black C60 M40 Y30 K100 = 230%; ICC ink = 282% (limit 300%)"
+  },
+  {
+   "area": "Print",
+   "name": "brand-print-spec.pdf",
+   "ok": true,
+   "detail": "A4 · 2 pages · fonts embedded (Geist-Regular, Geist-SemiBold) · text inside margins (196 mm)"
+  },
+  {
+   "area": "Hindi",
+   "name": "Shaping matches Chrome (HarfBuzz outlines)",
+   "ok": true,
+   "detail": "देसी · ऑक्शन · खेल · यहीं · से · शुरू: 100.00% ink identical at 600 px; conjunct क्श formed"
+  },
+  {
+   "area": "Hindi",
+   "name": "Stroke weight matches the English wordmark",
+   "ok": true,
+   "detail": "Anek 600: 7.23 px vs Geist 600: 7.44 px mean stroke (3% apart); Anek 500 rejected at 5.51 px"
+  },
+  {
+   "area": "Hindi",
+   "name": "Tagline not letter-spaced",
+   "ok": true,
+   "detail": "Devanagari tracking 0 keeps the shirorekha (headline) joined"
+  },
+  {
+   "area": "Social",
+   "name": "social/facebook-cover-1640x624.png",
+   "ok": true,
+   "detail": "1640×624 · logo 79px inside the safe zone (mobile crops to the centre) · 271 KB"
+  },
+  {
+   "area": "Social",
+   "name": "social/x-header-1500x500.png",
+   "ok": true,
+   "detail": "1500×500 · logo 71px inside the safe zone (clear of the profile photo and the phone trim) · 227 KB"
+  },
+  {
+   "area": "Social",
+   "name": "social/linkedin-cover-1128x191.png",
+   "ok": true,
+   "detail": "1128×191 · logo 22px inside the safe zone (clear of the company logo) · 86 KB"
+  },
+  {
+   "area": "Social",
+   "name": "social/youtube-banner-2560x1440.png",
+   "ok": true,
+   "detail": "2560×1440 · logo 53px inside the safe zone (inside the 1546 x 423 area every device shows) · 585 KB"
+  },
+  {
+   "area": "Social",
+   "name": "social/avatar-1080.png",
+   "ok": true,
+   "detail": "1080×1080 · glyph reaches 70.2% of the circle crop (limit 80%)"
+  }
+ ],
+ "files": [
+  [
+   "README.txt",
+   725
+  ],
+  [
+   "VALIDATION.json",
+   13881
+  ],
+  [
+   "favicon/apple-touch-icon.png",
+   4868
+  ],
+  [
+   "favicon/apple-touch-icon.svg",
+   532
+  ],
+  [
+   "favicon/favicon.ico",
+   3871
+  ],
+  [
+   "favicon/head-snippet.html",
+   214
+  ],
+  [
+   "favicon/icon-192.png",
+   7363
+  ],
+  [
+   "favicon/icon-512.png",
+   24779
+  ],
+  [
+   "favicon/icon-maskable-512.png",
+   18288
+  ],
+  [
+   "favicon/icon-maskable.svg",
+   600
+  ],
+  [
+   "favicon/site.webmanifest",
+   451
+  ],
+  [
+   "index.html",
+   187693
+  ],
+  [
+   "logo/da-glyph-gold.svg",
+   642
+  ],
+  [
+   "logo/da-glyph-ink.svg",
+   642
+  ],
+  [
+   "logo/da-glyph-white.svg",
+   642
+  ],
+  [
+   "logo/da-mark-16.svg",
+   484
+  ],
+  [
+   "logo/da-mark-24.svg",
+   509
+  ],
+  [
+   "logo/da-mark.svg",
+   588
+  ],
+  [
+   "logo/lockup-dark.svg",
+   6762
+  ],
+  [
+   "logo/lockup-hindi-dark.svg",
+   12407
+  ],
+  [
+   "logo/lockup-hindi-light.svg",
+   12407
+  ],
+  [
+   "logo/lockup-light.svg",
+   6762
+  ],
+  [
+   "logo/wordmark-dark.svg",
+   2731
+  ],
+  [
+   "logo/wordmark-hindi-dark.svg",
+   4951
+  ],
+  [
+   "logo/wordmark-hindi-light.svg",
+   4951
+  ],
+  [
+   "logo/wordmark-light.svg",
+   2731
+  ],
+  [
+   "motion/da-strike-1080x1080.mp4",
+   95866
+  ],
+  [
+   "motion/da-strike-480.gif",
+   76916
+  ],
+  [
+   "motion/da-strike-alpha-1080x1080.webm",
+   120471
+  ],
+  [
+   "motion/da-strike-lockup-1920x1080.mp4",
+   110375
+  ],
+  [
+   "motion/da-strike-lockup-alpha-1920x1080.webm",
+   190203
+  ],
+  [
+   "motion/da-strike-story-1080x1920.mp4",
+   99244
+  ],
+  [
+   "motion/da-strike.html",
+   57355
+  ],
+  [
+   "png/da-glyph-gold-1024.png",
+   51692
+  ],
+  [
+   "png/da-glyph-ink-1024.png",
+   51977
+  ],
+  [
+   "png/da-glyph-white-1024.png",
+   43651
+  ],
+  [
+   "png/da-mark-1024.png",
+   63086
+  ],
+  [
+   "png/da-mark-128.png",
+   4905
+  ],
+  [
+   "png/da-mark-16.png",
+   623
+  ],
+  [
+   "png/da-mark-24.png",
+   936
+  ],
+  [
+   "png/da-mark-256.png",
+   10678
+  ],
+  [
+   "png/da-mark-32.png",
+   1298
+  ],
+  [
+   "png/da-mark-48.png",
+   1896
+  ],
+  [
+   "png/da-mark-512.png",
+   24779
+  ],
+  [
+   "png/da-mark-64.png",
+   2577
+  ],
+  [
+   "png/lockup-dark-2400.png",
+   105223
+  ],
+  [
+   "png/lockup-hindi-dark-2400.png",
+   118724
+  ],
+  [
+   "png/lockup-hindi-light-2400.png",
+   122647
+  ],
+  [
+   "png/lockup-light-2400.png",
+   109681
+  ],
+  [
+   "png/og-image-1200x630.png",
+   247863
+  ],
+  [
+   "png/wordmark-dark-2400.png",
+   67716
+  ],
+  [
+   "png/wordmark-hindi-dark-2400.png",
+   79366
+  ],
+  [
+   "png/wordmark-hindi-light-2400.png",
+   84942
+  ],
+  [
+   "png/wordmark-light-2400.png",
+   73640
+  ],
+  [
+   "print/brand-print-spec.pdf",
+   81335
+  ],
+  [
+   "print/da-glyph-black-k100.eps",
+   1340
+  ],
+  [
+   "print/da-glyph-black-k100.pdf",
+   1146
+  ],
+  [
+   "print/da-glyph-gold-cmyk.eps",
+   1388
+  ],
+  [
+   "print/da-glyph-gold-cmyk.pdf",
+   1154
+  ],
+  [
+   "print/da-mark-cmyk.eps",
+   1761
+  ],
+  [
+   "print/da-mark-cmyk.pdf",
+   1257
+  ],
+  [
+   "print/da-mark-spot.pdf",
+   1811
+  ],
+  [
+   "print/lockup-dark-cmyk.eps",
+   24852
+  ],
+  [
+   "print/lockup-dark-cmyk.pdf",
+   4497
+  ],
+  [
+   "print/lockup-hindi-dark-cmyk.eps",
+   65928
+  ],
+  [
+   "print/lockup-hindi-dark-cmyk.pdf",
+   13221
+  ],
+  [
+   "print/lockup-hindi-light-cmyk.eps",
+   65576
+  ],
+  [
+   "print/lockup-hindi-light-cmyk.pdf",
+   13189
+  ],
+  [
+   "print/lockup-light-cmyk.eps",
+   24500
+  ],
+  [
+   "print/lockup-light-cmyk.pdf",
+   4467
+  ],
+  [
+   "social/avatar-1080.png",
+   23317
+  ],
+  [
+   "social/facebook-cover-1640x624.png",
+   277336
+  ],
+  [
+   "social/linkedin-cover-1128x191.png",
+   88098
+  ],
+  [
+   "social/x-header-1500x500.png",
+   232551
+  ],
+  [
+   "social/youtube-banner-2560x1440.png",
+   599423
+  ],
+  [
+   "sound/da-sting.m4a",
+   23181
+  ],
+  [
+   "sound/da-sting.wav",
+   134444
+  ],
+  [
+   "sound/sold-live-room-reference.wav",
+   134444
+  ]
+ ]
+}
