@@ -9,6 +9,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
+import { SeasonOn, type SeasonOnView } from "./season-on";
 import { ShareSeason } from "./share-season";
 import { WithdrawRegistration } from "./withdraw-registration";
 
@@ -155,6 +156,11 @@ export interface RegistrationStatusProps {
   justSubmitted?: boolean;
   /** The auction's verdict on this player, once there is one. */
   auction?: AuctionResult | null;
+  /**
+   * The player's team's season, once the club has published a match for it.
+   * With a signed verdict it replaces the receipt with the season (SeasonOn).
+   */
+  seasonOn?: SeasonOnView | null;
 }
 
 export function RegistrationStatus({
@@ -169,6 +175,7 @@ export function RegistrationStatus({
   rejectionReason,
   justSubmitted = false,
   auction = null,
+  seasonOn = null,
 }: RegistrationStatusProps) {
   // Only an APPROVED player went under the hammer; anything else keeps the
   // status copy whatever a stale lot row might say.
@@ -216,6 +223,25 @@ export function RegistrationStatus({
    */
   const soldPrice =
     signed && result.outcome === "sold" && result.priceLabel !== null ? result.priceLabel : null;
+  if (signed && seasonOn !== null) {
+    return (
+      <SeasonOn
+        view={seasonOn}
+        slug={slug}
+        listed={listed}
+        number={number}
+        name={name}
+        photoUrl={photoUrl}
+        roleLabel={roleLabel}
+        signedLabel={
+          result.outcome === "sold" ? "Sold for" : SIGNED_BADGE[result.outcome as SignedOutcome]
+        }
+        priceLabel={soldPrice}
+        squadHref={result.squadHref}
+        orgName={result.orgName}
+      />
+    );
+  }
   // The registration number is the receipt while a registration is in play —
   // the thing to quote to the club. Once a player is signed it is noise beside
   // their team, so it moves to the one line that says whom to contact.
