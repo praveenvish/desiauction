@@ -169,9 +169,14 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                         an un-translated database value, not a name anyone
                         needs to type back. */}
                     <td data-label="Status" data-cell="figure">
-                      <Pill tone={statusPillTone(competition.status)} dot>
-                        {lifecycleLabel(competition.status)}
-                      </Pill>
+                      {(() => {
+                        const stage = seasonStageOf(competition);
+                        return (
+                          <Pill tone={stage.tone} dot>
+                            {stage.label}
+                          </Pill>
+                        );
+                      })()}
                     </td>
                     <td data-label="Visibility">
                       {competition.held ? (
@@ -355,4 +360,28 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
       </CardGrid>
     </>
   );
+}
+
+/**
+ * THE SEASON'S STAGE, in the console's words (census 2026-09-28). The column
+ * printed the registration column's raw value — "Registration closed" for a
+ * season whose auction had run and whose matches were being played, while the
+ * console called it "Season on". The later facts (the books, the auction) are
+ * read first, as `seasonStage` does for the console.
+ */
+function seasonStageOf(competition: {
+  status: string;
+  auctionStatus: string | null;
+  caseStatus: string | null;
+}): { label: string; tone: ReturnType<typeof statusPillTone> } {
+  if (competition.caseStatus === "settled" || competition.caseStatus === "closed") {
+    return { label: "Finished", tone: statusPillTone("closed") };
+  }
+  if (competition.auctionStatus === "completed" || competition.auctionStatus === "reconciled") {
+    return { label: "Season on", tone: statusPillTone("completed") };
+  }
+  if (competition.auctionStatus === "live" || competition.auctionStatus === "paused") {
+    return { label: "Auction live", tone: statusPillTone(competition.auctionStatus) };
+  }
+  return { label: lifecycleLabel(competition.status), tone: statusPillTone(competition.status) };
 }
