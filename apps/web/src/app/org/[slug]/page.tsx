@@ -4,11 +4,15 @@ import {
   Card,
   EmptyState,
   IconArrowRight,
+  IconBell,
   IconBolt,
   IconCheck,
   IconChevronRight,
+  IconPin,
   IconTile,
   IconTrophy,
+  IconUsers,
+  IconWallet,
   Pill,
   ToastProvider,
   VisuallyHidden,
@@ -29,12 +33,11 @@ import type { CompetitionSummary } from "../../../server/competition/competition
 import type { SeasonRow } from "../../../server/competition/tournament-actions";
 import { orgCatalogue } from "../../../server/orgs/catalogue";
 import { orgMessagingSettingsView } from "../../../server/messaging/actions";
-import { organizerScheduleView, venuesView } from "../../../server/competition/fixture-actions";
+import { venuesView } from "../../../server/competition/fixture-actions";
 import { nowWallClock } from "../../../server/competition/fixtures";
 import { tournamentsView } from "../../../server/competition/tournament-actions";
-import { NeedsYou } from "../../tournaments/needs-you";
 import { dateRange } from "../../tournaments/season-card";
-import { STAGE_LABEL, needsYou, seasonStage } from "../../tournaments/season-stage";
+import { STAGE_LABEL, needsYou, nextStep, seasonStage } from "../../tournaments/season-stage";
 import { VenuesTab } from "./venues/venues-tab";
 import { moneyAuthority } from "../../../server/settlement/actions";
 import { CreateCompetitionForm } from "../../seasons/create-competition-form";
@@ -267,13 +270,6 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
     .filter((season) => !waitingIds.has(season.id))
     .sort((a, b) => (b.startsOn ?? "").localeCompare(a.startsOn ?? ""))
     .slice(0, 5);
-  const clubSlugs = new Set(clubSeasons.map((season) => season.slug));
-  const upcoming =
-    clubSeasons.length === 0
-      ? []
-      : (await organizerScheduleView())
-          .filter((fixture) => clubSlugs.has(fixture.competitionSlug))
-          .slice(0, 3);
   const canManageVenues = venues?.viewer.canManage === true;
   const groundCount = venues?.venues.reduce((sum, venue) => sum + venue.grounds.length, 0) ?? 0;
 
@@ -448,14 +444,6 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
 
   const overviewTab: ReactNode = (
     <div className="od-overview">
-      {overview !== null ? (
-        <AboutBanner
-          slug={slug}
-          description={overview.description}
-          canManage={overview.canManage}
-        />
-      ) : null}
-
       {/* A brand-new club read "0 Tournaments · 0 Seasons · 1 Members · 0 Active
           teams" ten seconds after the user's first successful action: four
           zeros, a tombstone, and no idea what to do next. The /home ladder
@@ -465,49 +453,137 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
 
       <div className="od-overview-grid">
         <div className="od-overview-main">
-          <NeedsYou
-            seasons={waiting}
-            tournamentNames={clubTournamentNames}
-            upcoming={upcoming}
-            today={today}
-          />
-          {otherSeasons.length > 0 ? (
-            <section className="od-seasons" aria-labelledby="od-seasons-title">
+          {/* THE CLUB'S OWN PAGE (2026-09-28). This column was /tournaments
+              again — the same "Needs you now" card and the same "Coming up"
+              list, word for word. Each season is now one row with its one
+              next step; the club itself follows. */}
+          {clubSeasons.length > 0 ? (
+            <section className="od-card od-seasons" aria-labelledby="od-seasons-title">
               <div className="od-section-head">
-                <h2 id="od-seasons-title">{waiting.length > 0 ? "Other seasons" : "Seasons"}</h2>
+                <h2 id="od-seasons-title" className="od-label">
+                  Seasons
+                </h2>
                 <Link href={`/org/${slug}#tournaments`} className="od-more">
                   All tournaments
                   <IconArrowRight size={14} aria-hidden />
                 </Link>
               </div>
               <ul className="od-season-list" data-testid="org-seasons">
-                {otherSeasons.map((season) => {
+                {[...waiting, ...otherSeasons].map((season) => {
                   const when = dateRange(season.startsOn, season.endsOn);
+                  const live = season.counts.live ?? 0;
+                  const step = waitingIds.has(season.id) ? nextStep(season, today) : null;
+                  const parent =
+                    season.tournamentId !== null
+                      ? clubTournamentNames.get(season.tournamentId)
+                      : undefined;
                   return (
-                    <li key={season.id}>
-                      <Link href={`/seasons/${season.slug}`} className="od-season-row">
-                        <span className="od-season-text">
+                    <li key={season.id} className="od-season-row">
+                      <Link href={`/seasons/${season.slug}`} className="od-season-text">
+                        <span className="od-season-name">
                           <strong>{season.name}</strong>
-                          <span>
-                            {[
-                              when,
-                              `${String(season.counts.teams)} ${season.counts.teams === 1 ? "team" : "teams"}`,
-                            ]
-                              .filter((part): part is string => part !== null)
-                              .join(" · ")}
-                          </span>
+                          {live > 0 ? (
+                            <Pill tone="red" dot>
+                              {`Match day · ${String(live)} live`}
+                            </Pill>
+                          ) : (
+                            <Pill tone="neutral">{STAGE_LABEL[seasonStage(season, today)]}</Pill>
+                          )}
                         </span>
-                        <Pill tone="neutral">{STAGE_LABEL[seasonStage(season, today)]}</Pill>
-                        <IconChevronRight size={16} aria-hidden className="od-season-go" />
+                        <span>
+                          {[
+                            parent ?? null,
+                            when,
+                            season.counts.matches > 0
+                              ? `${String(season.counts.played ?? 0)} of ${String(season.counts.matches)} matches played`
+                              : `${String(season.counts.teams)} ${season.counts.teams === 1 ? "team" : "teams"}`,
+                          ]
+                            .filter((part): part is string => part !== null)
+                            .join(" · ")}
+                        </span>
                       </Link>
+                      {step !== null && canManageOrg ? (
+                        <ButtonLink
+                          href={step.href}
+                          size="sm"
+                          variant={step.urgent ? "primary" : "secondary"}
+                        >
+                          {step.label}
+                        </ButtonLink>
+                      ) : (
+                        <IconChevronRight size={16} aria-hidden className="od-season-go" />
+                      )}
                     </li>
                   );
                 })}
               </ul>
             </section>
-          ) : clubSeasons.length === 0 && !laddering ? (
+          ) : !laddering ? (
             <EmptyState size="compact" icon={<IconTrophy />} title="No seasons in this club yet" />
           ) : null}
+
+          <section className="od-club" aria-labelledby="od-club-title">
+            <h2 id="od-club-title" className="od-label">
+              Your club
+            </h2>
+            <ul className="od-tiles" data-testid="org-tiles">
+              <ClubTile
+                href="#members"
+                icon={<IconUsers size={18} aria-hidden />}
+                title="Members"
+                fact={`${String(stats.members)} ${stats.members === 1 ? "person" : "people"}`}
+                sub={
+                  view.pendingInvites.length > 0
+                    ? `${String(view.pendingInvites.length)} ${view.pendingInvites.length === 1 ? "invite" : "invites"} not yet accepted`
+                    : "Who runs the club, owns its teams and helps on the night"
+                }
+              />
+              <ClubTile
+                href={canManageVenues ? `/org/${slug}/venues` : "#venues"}
+                icon={<IconPin size={18} aria-hidden />}
+                title="Venues"
+                fact={
+                  venues === null || venues.venues.length === 0
+                    ? "None yet"
+                    : `${String(venues.venues.length)} ${plural(venues.venues.length, "venue")}`
+                }
+                sub={
+                  groundCount > 0
+                    ? (venues?.venues
+                        .flatMap((venue) => venue.grounds.map((ground) => ground.name))
+                        .slice(0, 3)
+                        .join(" · ") ?? "")
+                    : "Grounds the fixtures are played on"
+                }
+              />
+              {authority !== null ? (
+                <ClubTile
+                  href="#money"
+                  icon={<IconWallet size={18} aria-hidden />}
+                  title="Money & roles"
+                  fact={
+                    authority.grants.length === 0
+                      ? "No money key yet"
+                      : `${String(new Set(authority.grants.map((grant) => grant.personId)).size)} with the money key`
+                  }
+                  sub={
+                    authority.grants.length === 0
+                      ? "Settling rupee seasons needs the money role — separate from running them"
+                      : "Who can settle seasons and keep the club's books"
+                  }
+                />
+              ) : null}
+              {messaging !== null ? (
+                <ClubTile
+                  href="#notifications"
+                  icon={<IconBell size={18} aria-hidden />}
+                  title="Notifications"
+                  fact="Club messages"
+                  sub="What players and owners hear from the club, and on which channel"
+                />
+              ) : null}
+            </ul>
+          </section>
         </div>
 
         <section className="od-activity" aria-labelledby="od-activity-title">
@@ -697,10 +773,18 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                     </Pill>
                   ) : null}
                 </div>
-                <p className="od-hero-meta">
-                  {established === null ? null : <span>Est. {established}</span>}
-                  <span className="od-hero-slug">/{view.org.slug}</span>
-                </p>
+                {/* No slug: "/thane-sports-club-zb7e" in monospace told an
+                    organizer nothing (census 2026-09-28). */}
+                <div className="od-hero-meta">
+                  {established === null ? null : <span>Since {established}</span>}
+                  {overview !== null ? (
+                    <AboutBanner
+                      slug={slug}
+                      description={overview.description}
+                      canManage={overview.canManage}
+                    />
+                  ) : null}
+                </div>
                 {/* The club's figures in one line — they were four tiles the
                     height of the tabs, two of them usually zero. */}
                 <ul className="od-hero-figures" data-testid="org-stats">
@@ -715,18 +799,6 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                   <li>
                     <strong>{stats.teams}</strong> {plural(stats.teams, "team")}
                   </li>
-                  <li>
-                    <strong>{stats.members}</strong> {plural(stats.members, "member")}
-                  </li>
-                  {canManageVenues ? (
-                    <li>
-                      <strong>{venues.venues.length}</strong>{" "}
-                      {plural(venues.venues.length, "venue")}
-                      {groundCount > 0
-                        ? ` · ${String(groundCount)} ${plural(groundCount, "ground")}`
-                        : ""}
-                    </li>
-                  ) : null}
                 </ul>
               </div>
               <div className="od-hero-actions">
@@ -743,6 +815,7 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                   <FormDialog
                     title="New tournament"
                     triggerLabel="+ New tournament"
+                    variant="secondary"
                     size="touch"
                     triggerTestId="org-new-tournament"
                   >
@@ -757,5 +830,34 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
         </main>
       </ToastProvider>
     </AnnouncerProvider>
+  );
+}
+
+/** One of the club's own things, with the fact that matters and the door to its tab. */
+function ClubTile({
+  href,
+  icon,
+  title,
+  fact,
+  sub,
+}: {
+  href: string;
+  icon: ReactNode;
+  title: string;
+  fact: string;
+  sub: string;
+}) {
+  return (
+    <li>
+      <Link href={href} className="od-tile">
+        <span className="od-tile-head">
+          {icon}
+          <strong>{title}</strong>
+          <IconChevronRight size={16} aria-hidden />
+        </span>
+        <span className="od-tile-fact">{fact}</span>
+        <span className="od-tile-sub">{sub}</span>
+      </Link>
+    </li>
   );
 }
