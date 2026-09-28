@@ -11,12 +11,21 @@ import type {
 } from "@desiauction/core";
 import { roleOptions } from "@desiauction/core";
 import { auctionOf } from "@desiauction/auction";
-import { competitions, lots, organizations, teams, withTenantDb, type Db } from "@desiauction/db";
+import {
+  competitions,
+  lots,
+  organizations,
+  paddles,
+  teams,
+  withTenantDb,
+  type Db,
+} from "@desiauction/db";
 import { asc, eq } from "drizzle-orm";
 
 import { dbHandle, systemDb } from "../db";
 import { ledgerRowMatches, type LedgerFilter } from "../../lib/ledger-filter";
 import { ledgerOutcomes, type OutcomePass } from "../../lib/ledger-passes";
+import { ledgerPlayers, type LedgerPlayers } from "../../lib/ledger-players";
 import { storage } from "../media";
 import { engineWsUrl } from "./engine-client";
 import { fetchEngineDiagnostics, fetchEngineSnapshot } from "./engine-reads";
@@ -363,6 +372,14 @@ export interface LedgerView {
   passes: Record<number, OutcomePass>;
   /** Lots + re-runs, so the header can say what "48 results" is made of. */
   outcomes: { lots: number; sold: number; unsold: number; reRuns: number };
+  /** One entry per lot, folded from the whole log (the Players reading). */
+  players: LedgerPlayers;
+  /** Row counts behind each reading's tab, across every page. */
+  readingCounts: Record<LedgerFilter, number>;
+  /** Team colour by team name, for the Players reading's dots and chips. */
+  teamColors: Record<string, string | null>;
+  /** The auction is over: the Players reading is its default. */
+  finished: boolean;
 }
 
 /**
@@ -385,7 +402,7 @@ export async function ledgerView(
     return null;
   }
   const start = performance.now();
-  const [all, lotNumbers, media] = await inGateOrg(gate, (db) =>
+  const [all, lotNumbers, media, teamRows] = await inGateOrg(gate, (db) =>
     Promise.all([
       ledgerOf(db, gate.auction),
       db
@@ -393,8 +410,17 @@ export async function ledgerView(
         .from(lots)
         .where(eq(lots.auctionId, gate.auction.id)),
       lotMediaOf(db, gate.auction.id, (key) => storage.readUrl(key)),
+      db
+        .select({ name: teams.name, color: teams.primaryColor })
+        .from(paddles)
+        .innerJoin(teams, eq(teams.id, paddles.teamId))
+        .where(eq(paddles.auctionId, gate.auction.id)),
     ]),
   );
+  const teamColors: Record<string, string | null> = {};
+  for (const team of teamRows) {
+    teamColors[team.name] = team.color;
+  }
   const faces: LedgerView["faces"] = {};
   for (const { lotId, lotNumber } of lotNumbers) {
     const face = media[lotId];
@@ -406,14 +432,26 @@ export async function ledgerView(
   // the event log — and only the RENDER is bounded. A 500-lot auction would
   // otherwise ship several megabytes to a browser that shows thirty rows.
   // The filter chooses which rows are PAGED, never which are folded.
-  const filter =
-    requested ??
-    (gate.auction.status === "completed" ||
+  const finished =
+    gate.auction.status === "completed" ||
     gate.auction.status === "reconciled" ||
-    gate.auction.status === "abandoned"
-      ? "results"
-      : "all");
-  const kept = filter === "all" ? all : all.filter((row) => ledgerRowMatches(filter, row.result));
+    gate.auction.status === "abandoned";
+  // A finished night opens on its players; a live one on everything.
+  const filter = requested ?? (finished ? "players" : "all");
+  // The Players reading pages no log rows: it is the fold below.
+  const kept =
+    filter === "players"
+      ? []
+      : filter === "all"
+        ? all
+        : all.filter((row) => ledgerRowMatches(filter, row.result));
+  const players = ledgerPlayers(all);
+  const readingCounts: Record<LedgerFilter, number> = {
+    players: players.players.length,
+    results: all.filter((row) => ledgerRowMatches("results", row.result)).length,
+    bids: all.filter((row) => ledgerRowMatches("bids", row.result)).length,
+    all: all.length,
+  };
   const totalPages = Math.max(1, Math.ceil(kept.length / LEDGER_PAGE_SIZE));
   const current = Math.min(Math.max(1, page), totalPages);
   const offset = (current - 1) * LEDGER_PAGE_SIZE;
@@ -444,6 +482,10 @@ export async function ledgerView(
     totalPages,
     generationMs: performance.now() - start,
     faces,
+    players,
+    readingCounts,
+    teamColors,
+    finished,
   };
 }
 
