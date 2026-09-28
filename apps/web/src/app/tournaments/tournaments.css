@@ -734,6 +734,12 @@
   letter-spacing: 0.02em;
 }
 
+/* In the floodlight theme the inverse surface is light, and gold on it fell
+   to 1.8:1 — the crest takes the inverse ink there instead. */
+[data-theme="floodlight"] .tx-crest:not([data-size="sm"], [data-kind="standalone"]) {
+  color: var(--text-inverse);
+}
+
 .tx-crest[data-size="sm"] {
   width: 26px;
   height: 26px;

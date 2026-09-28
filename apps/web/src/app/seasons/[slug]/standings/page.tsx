@@ -93,7 +93,9 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             />
           ) : (
             <>
-              <div className="st-table-wrap">
+              {/* It scrolls sideways on a phone, so a keyboard must be able to
+                  reach it (axe: scrollable-region-focusable). */}
+              <div className="st-table-wrap" tabIndex={0} role="region" aria-label="League table">
                 <table className="st-table sd-table" data-testid="standings-table">
                   <caption>
                     The table, best first: played, won, lost, tied, no result, points
