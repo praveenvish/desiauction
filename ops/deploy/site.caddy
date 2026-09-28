@@ -7,9 +7,13 @@
 #   __PUBLIC_DOMAIN__  / __ENGINE_DOMAIN__ / __S3_DOMAIN__   from the stack's .env
 #   __WEB_EXTRA__      staging: a noindex header; production: nothing
 #
-# Upstreams are the host-unique aliases each stack registers on the `edge`
-# network (`__STACK__-web`, …), so staging and production can never route to
-# each other's containers. The global log filter lives in the platform
+# Lines between `# prod-only:start` and `# prod-only:end` are removed for any
+# stack but da-prod: a hostname without DNS would have Caddy retrying ACME for
+# it forever.
+#
+# Upstreams are the stack-qualified aliases on the stack's own
+# `__STACK__-public` network (`__STACK__-web`, …), so staging and production
+# can never route to each other's containers. The global log filter lives in the platform
 # Caddyfile and applies here too.
 
 __PUBLIC_DOMAIN__ {
@@ -51,6 +55,14 @@ __PUBLIC_DOMAIN__ {
 
 	reverse_proxy __STACK__-web:3000
 }
+
+# prod-only:start
+# www is a courtesy, never a second copy of the site: one canonical origin is
+# what RP_ID, cookies and search engines all assume.
+www.__PUBLIC_DOMAIN__ {
+	redir https://__PUBLIC_DOMAIN__{uri} permanent
+}
+# prod-only:end
 
 # The engine on its own hostname, because ENGINE_ALLOWED_ORIGINS and the
 # browser's WebSocket origin check both key on it. wss:// is what the browser

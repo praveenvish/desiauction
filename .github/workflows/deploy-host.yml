@@ -312,6 +312,8 @@ jobs:
                 -e "s|__S3_DOMAIN__|$(envval S3_DOMAIN)|g" \
                 -e "s|__WEB_EXTRA__|${WEB_EXTRA}|g" \
                 site.caddy > "/srv/platform/sites/${STACK}.caddy.new"
+            [ "$STACK" = da-prod ] \
+              || sed -i '/# prod-only:start/,/# prod-only:end/d' "/srv/platform/sites/${STACK}.caddy.new"
             SITE="/srv/platform/sites/${STACK}.caddy"
             [ -f "$SITE" ] && cp "$SITE" "${SITE}.prev"
             mv "${SITE}.new" "$SITE"
