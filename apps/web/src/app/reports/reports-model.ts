@@ -1,4 +1,4 @@
-import type { SeasonMatchLine, SeasonPlay } from "../../server/console/reports";
+import type { SeasonMatchLine, SeasonPlay } from "../../server/competition/season-play";
 
 /**
  * THE REPORT, put into stages — pure, so where a season stands (the journey
@@ -78,7 +78,10 @@ export function seasonStage(play: Pick<SeasonPlay, "played" | "live" | "toCome">
 }
 
 /** A result as a sentence: "Mumbai Mavericks beat Pune Panthers". */
-export function resultSentence(match: SeasonMatchLine): { lead: string | null; rest: string } {
+export function resultSentence(match: Pick<SeasonMatchLine, "homeName" | "awayName" | "outcome">): {
+  lead: string | null;
+  rest: string;
+} {
   const home = match.homeName ?? "Home";
   const away = match.awayName ?? "Away";
   switch (match.outcome) {

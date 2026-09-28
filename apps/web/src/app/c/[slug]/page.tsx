@@ -1,4 +1,4 @@
-import { cache } from "react";
+import { cache, type CSSProperties } from "react";
 import {
   Badge,
   ButtonLink,
@@ -8,6 +8,7 @@ import {
   IconGavel,
   IconTrophy,
   IconUsers as IconUsersUi,
+  VisuallyHidden,
 } from "@desiauction/ui";
 import { entryCategoryLabel, formatAmount, paise, sportPackFor } from "@desiauction/core";
 import type { Metadata } from "next";
@@ -35,6 +36,8 @@ import {
   type Stat,
 } from "../../../components/public/public-kit";
 import { formatDateRange } from "../format";
+import { dateTile, formatDayDate, formatWallTime, istCalendarDate } from "../../../lib/format-date";
+import { resultSentence } from "../../reports/reports-model";
 import { PublicSeasonReviews } from "../../../components/reviews/season-reviews";
 import { ShowcaseGrid } from "./showcase-grid";
 import "../../marketing.css";
@@ -128,6 +131,13 @@ export default async function PublicCompetitionPage({
       ? null
       : await myAuctionOutcome(view.slug, session.personId);
   const myTeam = mine !== null && mine.teamName !== null && mine.outcome !== "pool" ? mine : null;
+  const today = istCalendarDate();
+  const myNext =
+    myTeam === null
+      ? undefined
+      : view.play.upcoming.find(
+          (match) => match.homeName === myTeam.teamName || match.awayName === myTeam.teamName,
+        );
   // The directory (`/c`) badges a mid-auction tournament "Live now", promises
   // "No account needed" and links straight to the spectate stage. This page knew
   // only open/closed, so a guest who clicked one of those cards through to here
@@ -136,6 +146,22 @@ export default async function PublicCompetitionPage({
   // (`isLive` in server/competition/public.ts): paused is mid-lot, not over, and
   // still watchable.
   const live = view.auctionStatus === "live" || view.auctionStatus === "paused";
+  /*
+   * THE SEASON'S PHASE (2026-09-28). The page stopped at auction night: a
+   * season three matches in, with one being played, still said "Auction
+   * complete" and showed only the matches to come. Once a match has been
+   * played the page is about the season — the table and the matches lead.
+   */
+  const play = view.play;
+  const matchesAll = play.played + play.live + play.toCome;
+  const finished = play.played > 0 && play.live === 0 && play.toCome === 0;
+  const seasonOn = !finished && play.played + play.live > 0;
+  const seasonPhase = seasonOn || finished;
+  // Once the season card lists the next matches, the full schedule below is
+  // only worth its section when it holds more than the card already shows.
+  const scheduleShown = seasonPhase
+    ? view.fixtures.length > play.upcoming.length
+    : view.fixtures.length > 0;
   /**
    * THE COUNTS, SAID ONCE.
    *
@@ -219,13 +245,25 @@ export default async function PublicCompetitionPage({
         status={
           <>
             {live ? <Badge tone="live">Live now</Badge> : null}
-            <Badge tone={view.open ? "success" : "neutral"} data-testid="public-reg-status">
+            <Badge
+              tone={view.open || seasonOn ? "success" : "neutral"}
+              data-testid="public-reg-status"
+            >
               {view.open
                 ? "Registration open"
-                : auctionDone
-                  ? "Auction complete"
-                  : "Registration closed"}
+                : finished
+                  ? "Season complete"
+                  : seasonOn
+                    ? "Season on"
+                    : auctionDone
+                      ? "Auction complete"
+                      : "Registration closed"}
             </Badge>
+            {play.live > 0 ? (
+              <Badge tone="live" data-testid="public-match-live">
+                Match day · {play.live} live
+              </Badge>
+            ) : null}
           </>
         }
         title={goldenName(view.name)}
@@ -279,7 +317,11 @@ export default async function PublicCompetitionPage({
                 the night is over. */}
             {/* After the night, the results lead: the spectate page is the
                 summary, the squads and every price, for anyone. */}
-            {auctionDone ? (
+            {seasonPhase ? (
+              <ButtonLink href="#season-heading" size="lg" data-testid="public-season-cta">
+                {play.table !== null ? "See the table" : "See the season"}
+              </ButtonLink>
+            ) : auctionDone ? (
               <ButtonLink
                 href={`/seasons/${view.slug}/auction/spectate`}
                 size="lg"
@@ -325,6 +367,13 @@ export default async function PublicCompetitionPage({
                   </strong>
                 </>
               ) : null}
+              {myNext !== undefined ? (
+                <>
+                  {" "}
+                  — next: {whenLabel(myNext.kickoffAt, today)} vs{" "}
+                  {myNext.homeName === myTeam.teamName ? myNext.awayName : myNext.homeName}
+                </>
+              ) : null}
             </span>
             {myTeam.teamSlug !== null ? (
               <Link className="public-mine-link" href={`/c/${view.slug}/t/${myTeam.teamSlug}`}>
@@ -334,6 +383,149 @@ export default async function PublicCompetitionPage({
             ) : null}
           </p>
         ) : null}
+        {seasonPhase ? (
+          <PageSection
+            headingId="season-heading"
+            title="The season"
+            lede={
+              finished
+                ? `All ${String(play.played)} matches played.`
+                : `${play.live > 0 ? "Match day — " : ""}${String(play.played)} of ${String(matchesAll)} played.`
+            }
+          >
+            <div className="public-season" data-testid="public-season">
+              {play.table !== null ? (
+                <section className="public-season-card" aria-labelledby="table-title">
+                  <h3 id="table-title" className="public-season-title">
+                    The table
+                    <span>
+                      {finished
+                        ? "final"
+                        : `after ${String(play.played)} of ${String(matchesAll)} matches`}
+                    </span>
+                  </h3>
+                  <table className="public-table" data-testid="public-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">
+                          <VisuallyHidden>Position</VisuallyHidden>
+                        </th>
+                        <th scope="col">
+                          <VisuallyHidden>Team</VisuallyHidden>
+                        </th>
+                        <th scope="col">
+                          <abbr title="Played">P</abbr>
+                        </th>
+                        <th scope="col">
+                          <abbr title="Won">W</abbr>
+                        </th>
+                        <th scope="col">
+                          <abbr title="Lost">L</abbr>
+                        </th>
+                        <th scope="col">Pts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {play.table.map((row, index) => (
+                        <tr key={row.teamId}>
+                          <td className="public-table-pos">{index + 1}</td>
+                          <th scope="row">
+                            <span
+                              className="public-table-dot"
+                              style={
+                                row.color === null
+                                  ? undefined
+                                  : ({ "--team-color": row.color } as CSSProperties)
+                              }
+                              aria-hidden
+                            />
+                            {row.name}
+                          </th>
+                          <td>{row.played}</td>
+                          <td>{row.won}</td>
+                          <td>{row.lost}</td>
+                          <td className="public-table-pts">{row.points}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              ) : null}
+              <section className="public-season-card" aria-labelledby="matches-title">
+                <h3 id="matches-title" className="public-season-title">
+                  Matches
+                  <span>
+                    {play.played} played
+                    {play.live > 0 ? ` · ${String(play.live)} live` : ""}
+                    {play.toCome > 0 ? ` · ${String(play.toCome)} to come` : ""}
+                  </span>
+                </h3>
+                <ul className="public-matches" data-testid="public-matches">
+                  {play.liveMatches.map((match) => (
+                    <li key={match.fixtureId} data-state="live">
+                      <span className="public-match-when">Live</span>
+                      <span className="public-match-body">
+                        <span>
+                          <strong>{match.homeName ?? "Lobby"}</strong>
+                          {match.awayName !== null ? (
+                            <>
+                              {" "}
+                              vs <strong>{match.awayName}</strong>
+                            </>
+                          ) : null}
+                        </span>
+                        <span className="public-match-meta">
+                          {match.groundName ?? "Being played now"}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                  {play.upcoming.map((match) => (
+                    <li key={match.fixtureId} data-state="next">
+                      <span className="public-match-when">{dayWord(match.kickoffAt, today)}</span>
+                      <span className="public-match-body">
+                        <span>
+                          <strong>{match.homeName ?? "Lobby"}</strong>
+                          {match.awayName !== null ? (
+                            <>
+                              {" "}
+                              vs <strong>{match.awayName}</strong>
+                            </>
+                          ) : null}
+                        </span>
+                        <span className="public-match-meta">
+                          {[timeOf(match.kickoffAt), match.groundName]
+                            .filter((part): part is string => part !== null && part !== "")
+                            .join(" · ") || "Time to be announced"}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                  {play.recent.map((match) => {
+                    const said = resultSentence(match);
+                    return (
+                      <li key={match.fixtureId} data-state="done">
+                        <span className="public-match-when">{dayWord(match.kickoffAt, today)}</span>
+                        <span className="public-match-body">
+                          <span>
+                            {said.lead !== null ? <strong>{said.lead}</strong> : null}
+                            {said.rest}
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {scheduleShown ? (
+                  <a className="public-season-more" href="#schedule-heading">
+                    Every match to come <IconArrowRight size={14} aria-hidden />
+                  </a>
+                ) : null}
+              </section>
+            </div>
+          </PageSection>
+        ) : null}
+
         {stats.length > 0 ? <StatStrip label={`${view.name} at a glance`} stats={stats} /> : null}
 
         {/* TOP BUYS — the three sales the season will be remembered by, each
@@ -347,6 +539,16 @@ export default async function PublicCompetitionPage({
               unit={view.auctionUnit}
               testId="public-top-buys"
             />
+            {seasonPhase ? (
+              <p className="public-hint">
+                <Link
+                  href={`/seasons/${view.slug}/auction/spectate`}
+                  data-testid="public-results-cta"
+                >
+                  The whole auction, lot by lot
+                </Link>
+              </p>
+            ) : null}
           </PageSection>
         ) : null}
 
@@ -431,8 +633,11 @@ export default async function PublicCompetitionPage({
           </PageSection>
         )}
 
-        {view.fixtures.length > 0 ? (
-          <PageSection headingId="schedule-heading" title="Published schedule">
+        {scheduleShown ? (
+          <PageSection
+            headingId="schedule-heading"
+            title={seasonPhase ? "Matches to come" : "Published schedule"}
+          >
             <ul className="public-fixture-list" data-testid="public-schedule">
               {view.fixtures.map((fixture) => (
                 <li key={fixture.number} className="public-fixture">
@@ -445,7 +650,7 @@ export default async function PublicCompetitionPage({
                       : `${fixture.homeTeamName} vs ${fixture.awayTeamName ?? "TBA"}`}
                   </span>
                   <span className="public-fixture-when">
-                    {fixture.kickoffAt !== null ? fixture.kickoffAt.replace("T", " ") : "TBA"}
+                    {fixture.kickoffAt !== null ? whenLabel(fixture.kickoffAt, today) : "TBA"}
                     {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
                     {fixture.venueName !== null ? `, ${fixture.venueName}` : ""}
                   </span>
@@ -475,4 +680,38 @@ export default async function PublicCompetitionPage({
       </PageBody>
     </main>
   );
+}
+
+/** "Today", "Tomorrow", else "Mon 29" — a match's day in words. */
+function dayWord(kickoffAt: string | null, today: string): string {
+  if (kickoffAt === null) return "TBA";
+  const day = kickoffAt.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return "TBA";
+  if (day === today) return "Today";
+  if (day === tomorrowOf(today)) return "Tomorrow";
+  const tile = dateTile(day);
+  return `${tile.day} ${tile.month}`;
+}
+
+/** "9:30 am", or null when the kickoff carries no time. */
+function timeOf(kickoffAt: string | null): string | null {
+  if (kickoffAt === null || kickoffAt.length <= 10) return null;
+  return formatWallTime(kickoffAt.replace(" ", "T").slice(0, 16));
+}
+
+/** "Today · 9:30 am", "Mon, 29 Sep · 2:30 pm" — never the raw "2026-09-29 14:30". */
+function whenLabel(kickoffAt: string | null, today: string): string {
+  if (kickoffAt === null) return "Date to be announced";
+  const day = kickoffAt.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return kickoffAt;
+  const date =
+    day === today ? "Today" : day === tomorrowOf(today) ? "Tomorrow" : formatDayDate(day);
+  const time = timeOf(kickoffAt);
+  return time === null ? date : `${date} · ${time}`;
+}
+
+function tomorrowOf(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
 }

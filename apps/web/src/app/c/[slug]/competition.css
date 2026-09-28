@@ -120,3 +120,166 @@
 .pk-body .top-buys {
   margin-bottom: var(--space-4);
 }
+
+/* THE SEASON — the table beside the matches, once a match has been played. */
+.public-season {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.public-season-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.public-season-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--text-md-size);
+  line-height: var(--text-md-line);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.public-season-title > span {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}
+
+.public-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.public-table th,
+.public-table td {
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.public-table thead th {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.public-table abbr {
+  text-decoration: none;
+}
+
+.public-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.public-table tbody th {
+  width: 100%;
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+}
+
+.public-table-pos {
+  width: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.public-table-dot {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-right: var(--space-2);
+  border-radius: 999px;
+  background: var(--team-color, var(--border-strong));
+  vertical-align: 0.05em;
+}
+
+.public-table-pts {
+  font-weight: var(--font-weight-semibold);
+}
+
+.public-matches {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.public-matches > li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+  color: var(--text-primary);
+}
+
+.public-matches > li:last-child {
+  border-bottom: 0;
+}
+
+.public-match-when {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* The live word stays body-coloured (the green fails AA as small text); the
+   dot beside it carries the colour. */
+.public-matches > li[data-state="live"] .public-match-when {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.public-matches > li[data-state="live"] .public-match-when::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: var(--space-2);
+  border-radius: 999px;
+  background: var(--live);
+  vertical-align: 0.1em;
+}
+
+.public-match-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.public-match-meta {
+  color: var(--text-secondary);
+}
+
+.public-season-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  margin-top: auto;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.public-season-more:hover {
+  text-decoration: underline;
+}
