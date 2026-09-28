@@ -257,24 +257,6 @@
   color: var(--success-strong);
 }
 
-.tm-card-purse {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.tm-card-purse-head {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--text-sm-size);
-  color: var(--text-secondary);
-}
-
-.tm-card-purse-head .tm-num {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-}
-
 .tm-bar {
   display: block;
   height: 6px;
@@ -289,41 +271,6 @@
   border-radius: inherit;
   background: var(--team);
   transform-origin: left center;
-}
-
-.tm-card-money {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-  margin: 0;
-}
-
-.tm-card-money > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.tm-card-money dt {
-  font-size: var(--text-xs-size);
-  color: var(--text-secondary);
-}
-
-.tm-card-money dd {
-  margin: 0;
-  font-size: var(--text-md-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
-  overflow-wrap: anywhere;
-}
-
-.tm-card-money dd[data-tone="left"] {
-  color: var(--success-strong);
-}
-
-.tm-card-money dd[data-tone="out"] {
-  color: var(--danger-strong);
 }
 
 .tm-topbuy {
@@ -374,28 +321,6 @@
 
 /* "View team →" reads as a button; the ::after (seasons.css) makes the whole
    card the target. */
-.tm-card-link {
-  box-sizing: border-box;
-  margin-top: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  min-height: 40px;
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  color: var(--text-heading);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  text-decoration: none;
-}
-
-.tm-grid .tm-card:has(.team-card-cover:hover) .tm-card-link {
-  border-color: var(--accent-line);
-  color: var(--text-accent);
-}
 
 /* ---- Announce / squad sheets ---- */
 
@@ -475,36 +400,6 @@
 
 [data-flush="true"] .tm-announce-foot {
   padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
-.tm-foot-note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-sm-size);
-  line-height: var(--text-sm-line);
-  color: var(--text-secondary);
-}
-
-.tm-foot-note[data-tone="info"] {
-  background: var(--info-subtle);
-}
-
-.tm-foot-note[data-tone="info"] svg {
-  flex: none;
-  color: var(--info-strong);
-}
-
-.tm-foot-note[data-tone="success"] {
-  background: var(--success-subtle);
-}
-
-.tm-foot-note[data-tone="success"] svg {
-  flex: none;
-  color: var(--success-strong);
 }
 
 /* A phone: the table's rows become cards of their own. */
@@ -612,10 +507,6 @@
   gap: var(--space-2);
 }
 
-.tm-hero-eyebrow {
-  margin: 0;
-}
-
 .tm-hero-meta {
   display: flex;
   flex-wrap: wrap;
@@ -644,14 +535,6 @@
   flex: none;
 }
 
-.tm-stat-name {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--text-lg-size);
-}
-
 .tm-squad-tab {
   display: flex;
   flex-direction: column;
@@ -661,18 +544,6 @@
 .tm-presign-card .pd-presign {
   padding-block: 0;
   border-block: 0;
-}
-
-.tm-tally {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-1);
-}
-
-.tm-tally b {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-heading);
 }
 
 .tm-roster-scroll {
@@ -912,36 +783,6 @@
   background: var(--team);
 }
 
-.tm-tell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: stretch;
-}
-
-/* Side by side, the two action cards are one height and their buttons sit on
-   one line at the bottom (round 2: 225px beside 162px read as unfinished). */
-.tm-tell > section {
-  height: 100%;
-  box-sizing: border-box;
-}
-
-.tm-tell > section > div:last-child {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-}
-
-.tm-tell .tm-announce-foot {
-  margin-top: auto;
-}
-
-@media (min-width: 1100px) {
-  .tm-tell:has(> [data-testid="appointments-panel"]):has(> [data-testid="squad-sheets-panel"]) {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  }
-}
-
 /* ---- The owner's own squad, inline (wow pass, round 2) ---- */
 
 /* One mark, not two: the team's own top edge (every card has it) and the
@@ -1162,4 +1003,591 @@
 
 .tm-own-link:hover {
   text-decoration: underline;
+}
+
+/* ======================================================================
+   Teams redesign (2026-09-28): one "Tell your players" strip, cards that
+   describe the squad, the setup checklist before the auction, and the team
+   page with the purse in its hero.
+   ====================================================================== */
+
+/* The six role slots: tokens only, told apart by lightness as well as hue. */
+[data-slot="0"] {
+  --tm-role: var(--info-base);
+}
+[data-slot="1"] {
+  --tm-role: var(--danger-base);
+}
+[data-slot="2"] {
+  --tm-role: var(--success-base);
+}
+[data-slot="3"] {
+  --tm-role: var(--warning-base);
+}
+[data-slot="4"] {
+  --tm-role: var(--violet-base);
+}
+[data-slot="5"] {
+  --tm-role: var(--text-muted);
+}
+
+.tm-quiet {
+  color: var(--text-muted);
+}
+
+/* ---- Tell your players ---- */
+
+.tm-tell {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.tm-tell-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--accent-subtle);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.tm-tell-head h2 {
+  margin: 0;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.tm-tell-rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1100px) {
+  .tm-tell-rows:has(> :nth-child(2)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tm-tell-rows > * + * {
+    border-inline-start: 1px solid var(--border-subtle);
+  }
+}
+
+@media (max-width: 1099px) {
+  .tm-tell-rows > * + * {
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+
+.tm-tell-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+}
+
+.tm-tell-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.tm-tell-icon[data-tone="gold"] {
+  background: var(--accent-subtle);
+  color: var(--text-accent);
+}
+
+.tm-tell-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tm-tell-text strong {
+  font-size: var(--text-sm-size);
+  color: var(--text-heading);
+}
+
+.tm-tell-sub {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.tm-tell-row > button {
+  flex: none;
+}
+
+@media (max-width: 599px) {
+  .tm-tell-row {
+    flex-wrap: wrap;
+    padding: var(--space-4);
+  }
+
+  .tm-tell-text {
+    flex: 1 1 0;
+  }
+
+  .tm-tell-row > button {
+    flex-basis: 100%;
+  }
+}
+
+.tm-tell-quiet {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tm-tell-quiet svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.tm-tell-quiet strong {
+  color: var(--text-heading);
+}
+
+.tm-face-stack--sm > * + * {
+  margin-inline-start: -2px;
+}
+
+/* ---- Next: create the auction ---- */
+
+.tm-next {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-xl);
+  background: var(--accent-subtle);
+}
+
+.tm-next-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.tm-next-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tm-next-text strong {
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+}
+
+@media (max-width: 719px) {
+  .tm-next {
+    flex-wrap: wrap;
+  }
+
+  .tm-next > a {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ---- The team card ---- */
+
+.tm-card-go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-inline-start: calc(-1 * var(--space-1));
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+}
+
+.tm-grid .tm-card:has(.team-card-cover:hover) .tm-card-go {
+  color: var(--text-heading);
+}
+
+.tm-card-state {
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--warning-strong);
+}
+
+.tm-card-state[data-done] {
+  color: var(--success-strong);
+}
+
+.tm-card-people {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.tm-card-people .tm-face-stack > * + * {
+  margin-inline-start: -3px;
+}
+
+.tm-face-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--surface-sunken);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.tm-card-staff {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.tm-card-staff > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-cap-mark {
+  margin-inline-end: 4px;
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--text-accent);
+}
+
+.tm-mix {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.tm-mix-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.tm-mix-bar > i {
+  flex-basis: 0;
+  background: var(--tm-role);
+}
+
+.tm-mix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs-size);
+  color: var(--text-secondary);
+}
+
+.tm-mix-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tm-mix-legend li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--tm-role);
+}
+
+.tm-mix-legend b {
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-purse {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.tm-purse-line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tm-purse-line b {
+  font-size: var(--text-md-size);
+  color: var(--text-heading);
+}
+
+.tm-purse-line [data-tone="left"] b {
+  color: var(--money-remaining, var(--success-strong));
+}
+
+.tm-purse-line [data-tone="out"] b {
+  color: var(--text-muted);
+}
+
+.tm-card .tm-topbuy {
+  margin-top: auto;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: none;
+}
+
+.tm-topbuy-label {
+  color: var(--text-secondary);
+}
+
+.tm-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--border-subtle);
+  list-style: none;
+}
+
+.tm-steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+  font-size: var(--text-sm-size);
+  color: var(--text-heading);
+}
+
+.tm-steps li[data-done] {
+  color: var(--text-secondary);
+}
+
+.tm-step-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+}
+
+.tm-steps li[data-done] .tm-step-mark {
+  background: var(--success-base);
+  box-shadow: none;
+  color: var(--text-on-accent);
+}
+
+.tm-step-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Above the card's cover link, so the step's own door wins its click. */
+.tm-step-go {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  margin-inline-end: calc(-1 * var(--space-2));
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.tm-step-go:hover {
+  text-decoration: underline;
+}
+
+/* ---- One team ---- */
+
+.tm-hero-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.tm-hero-meta b {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-hero-meta .tm-cap-mark {
+  margin: 0;
+}
+
+.tm-hero-purse {
+  flex: 0 1 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 240px;
+  padding-inline-start: var(--space-5);
+  border-inline-start: 1px solid var(--border-subtle);
+}
+
+.tm-hero-purse-note {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.tm-hero-purse-note b {
+  color: var(--text-heading);
+}
+
+@media (max-width: 719px) {
+  .tm-hero-purse {
+    flex-basis: 100%;
+    padding-inline-start: 0;
+    padding-top: var(--space-3);
+    border-inline-start: 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+
+.tm-presigned {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.tm-presigned > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-5);
+  cursor: pointer;
+  list-style: none;
+}
+
+.tm-presigned > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tm-presigned > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xl);
+}
+
+.tm-presigned-icon {
+  color: var(--text-accent);
+}
+
+.tm-presigned-title {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}
+
+.tm-presigned-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.tm-presigned-person {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tm-presigned-go {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-accent);
+}
+
+.tm-presigned[open] .tm-presigned-go {
+  color: var(--text-muted);
+}
+
+.tm-presigned-body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tm-squad-mix {
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.tm-squad-mix .tm-mix {
+  max-width: 560px;
+}
+
+.tm-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-role::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--tm-role);
 }

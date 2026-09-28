@@ -2,30 +2,26 @@
 
 import {
   Button,
+  ButtonLink,
   EmptyState,
   Field,
   IconArrowLeft,
   IconArrowRight,
-  IconChart,
+  IconCheck,
   IconCrown,
   IconDownload,
   IconFlag,
-  IconInfo,
+  IconGavel,
   IconLock,
-  IconRupee,
   IconSearch,
   IconTrophy,
   IconUser,
   IconUsers,
-  IconWallet,
   initialsFor,
-  Notice,
   paintOnFill,
   Pill,
   PlayerImage,
   SectionCard,
-  StatCard,
-  StatGrid,
   useToast,
   VisuallyHidden,
 } from "@desiauction/ui";
@@ -53,6 +49,7 @@ import { inviteOwnerAction } from "../../../../server/auction/owner-actions";
 import { ExportDialog } from "../_players/export-dialog";
 import { RosterSheetHost, SquadPreSign } from "./squad-desk";
 import { TeamLogoUploader } from "./team-logo-uploader";
+import { captainOf, preSigned, roleMix, setupSteps, type RoleShare } from "./teams-model";
 
 /**
  * DA-36: ONE monogram algorithm for a team, everywhere.
@@ -181,14 +178,25 @@ function TeamGrid({
       </div>
 
       {/* DA-41: this screen says "add the teams that will bid" and had no concept
-          of the person who bids — every link led to Registrations or back here.
-          It now names the real order and links to the step that unblocks it. */}
+          of the person who bids. Before the auction exists, THE next step is
+          creating it — it sets the purse and squad size, and opens owner invites. */}
       {view.viewer.canManageTeams && view.rulesSource === null && view.teams.length > 0 ? (
-        <Notice tone="info" icon={<IconInfo size={20} />} testId="teams-owner-hint">
-          Next: <Link href={`/seasons/${slug}/auction`}>create the auction</Link>, then invite an
-          owner for each team from its page here. You can keep adding teams until the auction goes
-          live.
-        </Notice>
+        <section className="tm-next" data-testid="teams-owner-hint" aria-labelledby="tm-next-title">
+          <span className="tm-next-icon" aria-hidden>
+            <IconGavel size={22} />
+          </span>
+          <span className="tm-next-text">
+            <strong id="tm-next-title">Next: create the auction</strong>
+            <span>
+              It sets the purse and squad size for every team, and opens an owner invite for each.
+              You can keep adding teams until the auction goes live.
+            </span>
+          </span>
+          <ButtonLink href={`/seasons/${slug}/auction`} data-testid="teams-create-auction">
+            Create the auction
+            <IconArrowRight size={16} aria-hidden />
+          </ButtonLink>
+        </section>
       ) : null}
 
       {/* "Tell your players": announce and squad sheets sit side by side
@@ -227,7 +235,7 @@ function TeamGrid({
         <ul className="tm-grid" data-testid="teams-list">
           {shown.map((team) => (
             <li key={team.id}>
-              <TeamGridCard team={team} slug={slug} own={team.id === ownTeamId} />
+              <TeamGridCard team={team} slug={slug} own={team.id === ownTeamId} view={view} />
             </li>
           ))}
           {shown.length === 0 ? <li className="tm-grid-empty">No teams match “{query}”.</li> : null}
@@ -270,15 +278,81 @@ function teamPaint(color: string | null): CSSProperties | undefined {
   return color !== null ? ({ "--team": color } as CSSProperties) : undefined;
 }
 
-function TeamGridCard({ team, slug, own }: { team: TeamCard; slug: string; own: boolean }) {
+/** The squad's playing roles as one bar and its legend. */
+function RoleMixBar({ shares }: { shares: RoleShare[] }) {
+  if (shares.length === 0) return null;
+  const total = shares.reduce((sum, share) => sum + share.count, 0);
+  return (
+    <div className="tm-mix">
+      <span className="tm-mix-bar" aria-hidden>
+        {shares.map((share) => (
+          <i key={share.key} data-slot={String(share.slot % 6)} style={{ flexGrow: share.count }} />
+        ))}
+      </span>
+      <ul className="tm-mix-legend" aria-label={`Squad by role, ${String(total)} players`}>
+        {shares.map((share) => (
+          <li key={share.key} data-slot={String(share.slot % 6)}>
+            {share.label} <b>{share.count}</b>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Spent and left on one bar, in the team's colour. */
+function PurseLine({ team }: { team: TeamCard }) {
   const money = useMoney();
-  const remaining =
-    team.purseTotal !== undefined && team.spent !== undefined
-      ? Math.max(0, team.purseTotal - team.spent)
-      : null;
-  const owner = team.ownerName !== null ? `Owner · ${team.ownerName}` : "No owner yet";
+  if (team.spent === undefined || team.purseTotal === undefined || team.purseTotal <= 0) {
+    return null;
+  }
+  const left = Math.max(0, team.purseTotal - team.spent);
+  return (
+    <div className="tm-purse">
+      <span className="tm-purse-line">
+        <span>
+          <b className="tm-num">{money.exact(team.spent)}</b> spent
+        </span>
+        <span data-tone={left === 0 ? "out" : "left"}>
+          <b className="tm-num">{money.exact(left)}</b> left
+        </span>
+      </span>
+      <span className="tm-bar" aria-hidden>
+        <span
+          className="tm-bar-fill"
+          style={{
+            transform: `scaleX(${String(Math.min(100, team.usedPct ?? 0) / 100)})`,
+          }}
+        />
+      </span>
+    </div>
+  );
+}
+
+function TeamGridCard({
+  team,
+  slug,
+  own,
+  view,
+}: {
+  team: TeamCard;
+  slug: string;
+  own: boolean;
+  view: TeamsWorkspaceView;
+}) {
+  const money = useMoney();
+  const roster = team.roster;
+  const captain = roster === undefined ? null : captainOf(roster);
+  const auctionExists = view.rulesSource !== null;
+  const started = view.rulesSource?.locked ?? false;
   const full =
     team.squadMax !== undefined && team.squadMax !== null && team.squadFilled >= team.squadMax;
+  const steps = setupSteps(team, captain, auctionExists, view.viewer.canManageTeams);
+  // What can be done now: the coach is optional, and the owner waits for the auction.
+  const stillToSet = steps.filter(
+    (step) => !step.done && step.key !== "coach" && (step.key !== "owner" || auctionExists),
+  );
+  const href = `/seasons/${slug}/teams?team=${team.id}`;
   return (
     <article
       className="team-card tm-card"
@@ -294,86 +368,126 @@ function TeamGridCard({ team, slug, own }: { team: TeamCard; slug: string; own: 
               <span className="tm-card-short">{team.shortName}</span>
             ) : null}
           </span>
-          <span className="tm-card-owner" title={owner}>
-            {own ? <span className="tm-card-yours">Your team · </span> : null}
-            {owner}
-          </span>
-        </div>
-        <span className="tm-card-squad" data-full={full ? "true" : undefined}>
-          {team.squadMax !== undefined && team.squadMax !== null ? (
-            <>
-              {team.squadFilled}/{team.squadMax}
-              <VisuallyHidden> players in the squad</VisuallyHidden>
-            </>
+          {started ? (
+            <span className="tm-card-owner">
+              {own ? <span className="tm-card-yours">Your team · </span> : null}
+              {team.ownerName !== null ? `Owner · ${team.ownerName}` : "No owner"}
+            </span>
           ) : (
-            <>
-              {team.squadFilled}
-              <VisuallyHidden> {team.squadFilled === 1 ? "player" : "players"}</VisuallyHidden>
-            </>
+            <span className="tm-card-state" data-done={stillToSet.length === 0 ? "" : undefined}>
+              {own ? <span className="tm-card-yours">Your team · </span> : null}
+              {stillToSet.length === 0
+                ? auctionExists
+                  ? "Ready for auction night"
+                  : "Captain named"
+                : `${stillToSet.map((step) => step.key).join(" and ")} to set`.replace(
+                    /^./,
+                    (first) => first.toUpperCase(),
+                  )}
+            </span>
           )}
-        </span>
+        </div>
+        {started || team.squadFilled > 0 ? (
+          <span className="tm-card-squad" data-full={full ? "true" : undefined}>
+            {team.squadMax !== undefined && team.squadMax !== null ? (
+              <>
+                {team.squadFilled}/{team.squadMax}
+                <VisuallyHidden> players in the squad</VisuallyHidden>
+              </>
+            ) : (
+              <>
+                {team.squadFilled}
+                <VisuallyHidden> {team.squadFilled === 1 ? "player" : "players"}</VisuallyHidden>
+              </>
+            )}
+          </span>
+        ) : null}
+        {/* DA-43: the card IS the target (SC 2.5.8). The link's ::after covers
+            the whole card; its name stays "View team" for assistive tech. */}
+        <Link
+          href={href}
+          className="tm-card-go team-card-cover"
+          data-testid={`open-roster-${team.id}`}
+        >
+          <VisuallyHidden>View team</VisuallyHidden>
+          <IconArrowRight size={18} aria-hidden />
+        </Link>
       </div>
 
-      {team.usedPct !== undefined && team.usedPct !== null ? (
-        <div className="tm-card-purse">
-          <div className="tm-card-purse-head">
-            <span>Purse used</span>
-            <span className="tm-num">{team.usedPct}%</span>
-          </div>
-          <span className="tm-bar" aria-hidden>
-            <span
-              className="tm-bar-fill"
-              style={{ transform: `scaleX(${String(Math.min(100, team.usedPct) / 100)})` }}
-            />
-          </span>
-        </div>
-      ) : null}
-
-      {team.spent !== undefined ? (
-        <dl className="tm-card-money">
-          <div>
-            <dt>Spent</dt>
-            <dd className="tm-num">{money.exact(team.spent)}</dd>
-          </div>
-          <div>
-            <dt>Remaining</dt>
-            <dd className="tm-num" data-tone={remaining === 0 ? "out" : "left"}>
-              {/* DA-24: no auction yet means no purse yet — "₹0" read as broke. */}
-              {remaining !== null && (team.purseTotal ?? 0) > 0 ? money.exact(remaining) : "—"}
-            </dd>
-          </div>
-        </dl>
-      ) : null}
-
-      {team.topBuyName !== undefined ? (
-        <p className="tm-topbuy" data-empty={team.topBuyName === null ? "true" : undefined}>
-          <IconTrophy size={18} className="tm-topbuy-icon" aria-hidden />
-          {team.topBuyName !== null ? (
-            <>
-              <span className="tm-topbuy-name">
-                <VisuallyHidden>Top buy: </VisuallyHidden>
-                {team.topBuyName}
+      {started ? (
+        <>
+          {roster !== undefined && roster.length > 0 ? (
+            <div className="tm-card-people">
+              <span className="tm-face-stack" aria-hidden>
+                {roster.slice(0, 5).map((row) => (
+                  <PlayerImage
+                    key={row.registrationId}
+                    name={row.name ?? "Player"}
+                    seed={row.registrationId}
+                    src={row.photoUrl}
+                    size="sm"
+                    shape="round"
+                    decorative
+                  />
+                ))}
+                {roster.length > 5 ? (
+                  <span className="tm-face-more">+{roster.length - 5}</span>
+                ) : null}
               </span>
+              <span className="tm-card-staff">
+                <span>
+                  {captain !== null ? (
+                    <>
+                      <b className="tm-cap-mark" aria-hidden>
+                        C
+                      </b>
+                      <VisuallyHidden>Captain </VisuallyHidden>
+                      {captain.name ?? "Unnamed"}
+                    </>
+                  ) : (
+                    <span className="tm-quiet">No captain named</span>
+                  )}
+                </span>
+                <span className={team.coachName === null ? "tm-quiet" : undefined}>
+                  {team.coachName !== null ? `Coach · ${team.coachName}` : "No coach named"}
+                </span>
+              </span>
+            </div>
+          ) : null}
+          {roster !== undefined ? <RoleMixBar shares={roleMix(roster, view.roles)} /> : null}
+          <PurseLine team={team} />
+          {team.topBuyName !== undefined && team.topBuyName !== null ? (
+            <p className="tm-topbuy">
+              <IconTrophy size={16} className="tm-topbuy-icon" aria-hidden />
+              <span className="tm-topbuy-label">Top buy</span>
+              <span className="tm-topbuy-name">{team.topBuyName}</span>
               {team.topBuyPrice !== undefined && team.topBuyPrice !== null ? (
                 <span className="tm-num tm-topbuy-price">{money.exact(team.topBuyPrice)}</span>
               ) : null}
-            </>
-          ) : (
-            <span className="tm-topbuy-name">No buys yet</span>
-          )}
-        </p>
-      ) : null}
-
-      {/* DA-43: the card IS the target (SC 2.5.8). The link's ::after covers
-          the whole card, and its accessible name is still its own text. */}
-      <Link
-        href={`/seasons/${slug}/teams?team=${team.id}`}
-        className="tm-card-link team-card-cover"
-        data-testid={`open-roster-${team.id}`}
-      >
-        View team
-        <IconArrowRight size={16} className="icon-trail" aria-hidden />
-      </Link>
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <ul className="tm-steps" aria-label={`${team.name}: before the auction`}>
+          {steps.map((step) => (
+            <li key={step.key} data-done={step.done ? "" : undefined}>
+              <span className="tm-step-mark" aria-hidden>
+                {step.done ? <IconCheck size={12} /> : null}
+              </span>
+              <span className="tm-step-label">
+                {step.label}
+                <VisuallyHidden>{step.done ? " — done" : " — not set"}</VisuallyHidden>
+              </span>
+              {step.action !== null ? (
+                <Link className="tm-step-go" href={`${href}${step.action.hash}`}>
+                  {step.action.label}
+                  <VisuallyHidden> {step.key}</VisuallyHidden>
+                </Link>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
     </article>
   );
 }
@@ -407,58 +521,85 @@ function RosterDetail({
     return (role: string | null): string =>
       role === null ? "" : (byKey.get(role) ?? role.replace(/_/g, " "));
   }, [view.roles]);
-  const remaining =
-    team.purseTotal !== undefined && team.spent !== undefined
-      ? Math.max(0, team.purseTotal - team.spent)
-      : null;
   const slotsOpen =
     team.squadMax !== undefined && team.squadMax !== null
       ? Math.max(0, team.squadMax - team.squadFilled)
       : null;
-  // `?? []` mints a new array whenever a team carries no roster, so the tally
+  // `?? []` mints a new array whenever a team carries no roster, so the role mix
   // below recomputed on every render of a squad page that had nothing to tally.
   const roster = useMemo(() => team.roster ?? [], [team.roster]);
 
-  // The per-role tally chips, in the design's fixed order.
-  const tally = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of roster) {
-      // A sport with no playing roles has no tally to show.
-      if (row.role === null) {
-        continue;
-      }
-      counts.set(row.role, (counts.get(row.role) ?? 0) + 1);
-    }
-    // The pack declares the order; the design's "fixed order" IS that order.
-    // THIS SEASON's pack, that is — it used to be cricket's for every sport,
-    // under a comment that said the pack decides. An unknown role still sorts
-    // first, exactly as it did before.
-    const order: readonly string[] = view.roles.map((role) => role.key);
-    return [...counts.entries()].sort(
-      (a, b) => order.indexOf(a[0]) + 100 - (order.indexOf(b[0]) + 100),
-    );
-  }, [roster, view.roles]);
+  // The squad by playing role, in the season pack's order (the pack decides).
+  const mix = useMemo(() => roleMix(roster, view.roles), [roster, view.roles]);
+  const signed = useMemo(() => preSigned(roster), [roster]);
+  const captain = captainOf(roster);
+  const locked = view.rulesSource?.locked ?? false;
 
   const squadSection = (
     <div className="tm-squad-tab">
       {canManage && view.viewer.canSeeRoster ? (
-        <SectionCard
-          className="tm-presign-card"
-          icon={<IconCrown />}
-          tone="gold"
-          title="Captain, icons & retained"
-          description="Named before the auction — they join this squad without being bid for."
-        >
-          <SquadPreSign
-            slug={slug}
-            teamId={team.id}
-            teamName={team.name}
-            teamColor={team.color}
-            roster={roster}
-            locked={view.rulesSource?.locked ?? false}
-            settlesAtOpen={view.rulesSource !== null && !view.rulesSource.locked}
-          />
-        </SectionCard>
+        locked ? (
+          /* After the lock the icons and retained are a record, not a form:
+             one line, with the captain (still changeable) behind "Change". */
+          <details className="tm-presigned" data-testid="presigned-line">
+            <summary>
+              <IconCrown size={18} className="tm-presigned-icon" aria-hidden />
+              <span className="tm-presigned-title">Pre-signed</span>
+              <span className="tm-presigned-list">
+                {signed.length === 0 ? (
+                  <span className="tm-quiet">Nobody — every player was bought</span>
+                ) : (
+                  signed.map((row) => (
+                    <span key={row.registrationId} className="tm-presigned-person">
+                      <PlayerImage
+                        name={row.name ?? "Player"}
+                        seed={row.registrationId}
+                        src={row.photoUrl}
+                        size="xs"
+                        shape="round"
+                        decorative
+                      />
+                      {row.name ?? "Unnamed"}
+                      <Pill tone={row.isCaptain ? "blue" : row.isIcon ? "amber" : "purple"}>
+                        {row.isCaptain ? "Captain" : row.isIcon ? "Icon" : "Retained"}
+                      </Pill>
+                    </span>
+                  ))
+                )}
+              </span>
+              <span className="tm-presigned-go">Change captain</span>
+            </summary>
+            <div className="tm-presigned-body">
+              <SquadPreSign
+                slug={slug}
+                teamId={team.id}
+                teamName={team.name}
+                teamColor={team.color}
+                roster={roster}
+                locked
+                settlesAtOpen={false}
+              />
+            </div>
+          </details>
+        ) : (
+          <SectionCard
+            className="tm-presign-card"
+            icon={<IconCrown />}
+            tone="gold"
+            title="Captain, icons & retained"
+            description="Named before the auction — they join this squad without being bid for."
+          >
+            <SquadPreSign
+              slug={slug}
+              teamId={team.id}
+              teamName={team.name}
+              teamColor={team.color}
+              roster={roster}
+              locked={false}
+              settlesAtOpen={view.rulesSource !== null}
+            />
+          </SectionCard>
+        )
       ) : null}
 
       {view.viewer.canSeeRoster ? (
@@ -473,18 +614,12 @@ function RosterDetail({
                   view.viewer.canSeeMoney ? " · dearest buy first" : ""
                 }`
           }
-          action={
-            tally.length > 0 ? (
-              <span className="tm-tally">
-                {tally.map(([role, count]) => (
-                  <Pill key={role} tone="neutral">
-                    {labelOf(role)} <b>{count}</b>
-                  </Pill>
-                ))}
-              </span>
-            ) : undefined
-          }
         >
+          {mix.length > 0 ? (
+            <div className="tm-squad-mix">
+              <RoleMixBar shares={mix} />
+            </div>
+          ) : null}
           {roster.length === 0 ? (
             <EmptyState
               headingLevel={3}
@@ -545,9 +680,15 @@ function RosterDetail({
                               >
                                 {row.name ?? "Unnamed"}
                               </button>
-                              {row.isCaptain ? <Pill tone="blue">Captain</Pill> : null}
-                              {row.isIcon ? <Pill tone="amber">Icon</Pill> : null}
-                              {row.isRetained ? <Pill tone="purple">Retained</Pill> : null}
+                              {/* With the price column the pre-signed word sits there;
+                                  without money sight it is said here instead. */}
+                              {view.viewer.canSeeMoney ? null : (
+                                <>
+                                  {row.isCaptain ? <Pill tone="blue">Captain</Pill> : null}
+                                  {row.isIcon ? <Pill tone="amber">Icon</Pill> : null}
+                                  {row.isRetained ? <Pill tone="purple">Retained</Pill> : null}
+                                </>
+                              )}
                             </span>
                             {/* A player always has one — `submitRegistration` refuses an
                                 account with no number, because SMS is the only way a
@@ -559,14 +700,32 @@ function RosterDetail({
                           </span>
                         </span>
                       </td>
-                      <td data-label="Role">{labelOf(row.role) || "—"}</td>
+                      <td data-label="Role">
+                        {row.role === null ? (
+                          "—"
+                        ) : (
+                          <span
+                            className="tm-role"
+                            data-slot={String(
+                              (mix.find((share) => share.key === row.role)?.slot ?? 0) % 6,
+                            )}
+                          >
+                            {labelOf(row.role)}
+                          </span>
+                        )}
+                      </td>
                       {view.viewer.canSeeMoney ? (
                         <td className="tm-roster-price tm-num" data-label="Buy price">
-                          {row.buyPrice !== undefined && row.buyPrice !== null
-                            ? money.exact(row.buyPrice)
-                            : row.isCaptain || row.isIcon || row.isRetained
-                              ? "Pre-signed"
-                              : "—"}
+                          {row.buyPrice !== undefined && row.buyPrice !== null ? (
+                            money.exact(row.buyPrice)
+                          ) : row.isCaptain || row.isIcon || row.isRetained ? (
+                            <Pill tone={row.isCaptain ? "blue" : row.isIcon ? "amber" : "purple"}>
+                              {row.isCaptain ? "Captain" : row.isIcon ? "Icon" : "Retained"} ·
+                              pre-signed
+                            </Pill>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                       ) : null}
                     </tr>
@@ -600,30 +759,70 @@ function RosterDetail({
       <section className="tm-hero" style={teamPaint(team.color)} aria-label="About this team">
         <Crest team={team} size="lg" />
         <div className="tm-hero-id">
-          {team.shortName !== null ? (
-            <p className="tm-hero-eyebrow">
+          <p className="tm-hero-pills">
+            {team.shortName !== null ? (
               <span className="tm-card-short">{team.shortName}</span>
-            </p>
-          ) : null}
+            ) : null}
+            <Pill tone={slotsOpen === 0 ? "green" : "neutral"}>
+              {slotsOpen !== null && team.squadMax !== undefined && team.squadMax !== null
+                ? `${String(team.squadFilled)}/${String(team.squadMax)} squad${slotsOpen === 0 ? " · full" : ` · ${String(slotsOpen)} open`}`
+                : `${String(team.squadFilled)} player${team.squadFilled === 1 ? "" : "s"}`}
+            </Pill>
+            {locked ? (
+              <Pill tone="amber" icon={<IconLock />}>
+                {view.rulesSource?.finished === true
+                  ? "Locked — the auction is done"
+                  : "Locked — the auction has started"}
+              </Pill>
+            ) : null}
+          </p>
           <ul className="tm-hero-meta">
             <li>
               <IconUser size={16} aria-hidden />
-              {team.ownerName !== null ? `Owner · ${team.ownerName}` : "No owner yet"}
+              {team.ownerName !== null ? (
+                <>
+                  Owner <b>{team.ownerName}</b>
+                </>
+              ) : (
+                "No owner yet"
+              )}
             </li>
+            {captain !== null ? (
+              <li>
+                <b className="tm-cap-mark" aria-hidden>
+                  C
+                </b>
+                Captain <b>{captain.name ?? "Unnamed"}</b>
+              </li>
+            ) : null}
             {team.coachName !== null ? (
               <li>
                 <IconFlag size={16} aria-hidden />
-                Coach · {team.coachName}
+                Coach <b>{team.coachName}</b>
               </li>
             ) : null}
-            <li>
-              <IconUsers size={16} aria-hidden />
-              {slotsOpen !== null && team.squadMax !== undefined && team.squadMax !== null
-                ? `${String(team.squadFilled)}/${String(team.squadMax)} squad · ${String(slotsOpen)} slot${slotsOpen === 1 ? "" : "s"} open`
-                : `${String(team.squadFilled)} player${team.squadFilled === 1 ? "" : "s"}`}
-            </li>
           </ul>
         </div>
+        {team.spent !== undefined && team.purseTotal !== undefined && team.purseTotal > 0 ? (
+          <div className="tm-hero-purse">
+            <PurseLine team={team} />
+            <span className="tm-hero-purse-note">
+              of {money.exact(team.purseTotal)}
+              {team.usedPct !== undefined && team.usedPct !== null
+                ? ` · ${String(team.usedPct)}% used`
+                : ""}
+              {team.topBuyName !== undefined && team.topBuyName !== null ? (
+                <>
+                  {" "}
+                  · top buy <b>{team.topBuyName}</b>
+                  {team.topBuyPrice !== undefined && team.topBuyPrice !== null
+                    ? ` ${money.exact(team.topBuyPrice)}`
+                    : ""}
+                </>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
         {view.viewer.canSeeRoster ? (
           <div className="tm-hero-actions">
             <Button
@@ -640,43 +839,6 @@ function RosterDetail({
           </div>
         ) : null}
       </section>
-
-      {team.spent !== undefined ? (
-        <StatGrid>
-          <StatCard
-            icon={<IconWallet />}
-            tone="gold"
-            value={money.exact(team.spent)}
-            label="Purse spent"
-          />
-          <StatCard
-            icon={money.unit === "points" ? <IconWallet /> : <IconRupee />}
-            concept="money"
-            value={remaining !== null && (team.purseTotal ?? 0) > 0 ? money.exact(remaining) : "—"}
-            label="Remaining"
-          />
-          <StatCard
-            icon={<IconChart />}
-            tone="blue"
-            value={
-              team.usedPct !== undefined && team.usedPct !== null ? `${String(team.usedPct)}%` : "—"
-            }
-            label="Purse used"
-            {...(team.usedPct !== undefined && team.usedPct !== null
-              ? { progress: team.usedPct }
-              : {})}
-          />
-          <StatCard
-            icon={<IconTrophy />}
-            tone="gold"
-            value={<span className="tm-stat-name">{team.topBuyName ?? "—"}</span>}
-            label="Top buy"
-            {...(team.topBuyPrice !== undefined && team.topBuyPrice !== null
-              ? { hint: money.exact(team.topBuyPrice) }
-              : {})}
-          />
-        </StatGrid>
-      ) : null}
 
       {/* Two tabs rather than one long page: the squad is what an organizer
           comes here for; crest, name, coach and owner are set once. */}
