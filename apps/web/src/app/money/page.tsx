@@ -1,9 +1,10 @@
-import { formatPaiseINR, paise } from "@desiauction/core";
+import { formatAmount, formatPaiseINR, paise } from "@desiauction/core";
 import {
   ButtonLink,
   EmptyState,
   IconChevronRight,
   IconLedger,
+  IconLock,
   IconReceipt,
   IconWallet,
   initialsFor,
@@ -22,6 +23,9 @@ import { myOrgs } from "../../server/orgs/actions";
 import { rolesOf, type OwnedTeam } from "../../server/roles/roles";
 import { settlementOrgIds } from "../../server/settlement/actions";
 import { seasonStandings, type SeasonStanding } from "../../server/settlement/standing";
+import { seasonAuctionFacts } from "../../server/console/views";
+import type { AuctionFacts } from "../../server/console/auctions-index";
+import { formatCount } from "../../lib/plural";
 import { CASE_STATUS_LABEL } from "../../server/settlement/worklist";
 import { myDocuments, type MyDocument } from "../../server/financial-operations/my-documents";
 import { formatDate } from "../../lib/format-date";
@@ -57,13 +61,14 @@ export default async function MoneyPage() {
   }
   // The shell already read these for its menus (each is deduped per request),
   // so the clubs' books below cost no new query beyond the season standings.
-  const [documents, orgs, view, settleIds, financeIds, roles] = await Promise.all([
+  const [documents, orgs, view, settleIds, financeIds, roles, facts] = await Promise.all([
     myDocuments(session.personId),
     myOrgs(),
     competitionsView(),
     settlementOrgIds(),
     finopsOrgIds(),
     rolesOf(session.personId),
+    seasonAuctionFacts(),
   ]);
   const settle = new Set(settleIds);
   const standings = new Map(
@@ -80,37 +85,61 @@ export default async function MoneyPage() {
     new Set(financeIds),
     new Set(roles.organizes.map((club) => club.orgId)),
     standings,
+    facts,
   );
   const teams = byTeam(documents);
+  /*
+   * WHO THIS PAGE IS FOR (2026-09-28). An organizer who never owned a team
+   * opened on "No receipts yet … from your team" — they have no team — with
+   * their clubs' books squeezed into a side column. And an owner whose team
+   * plays for points waited for a receipt that will never come.
+   */
+  const unitBySlug = new Map(view.competitions.map((season) => [season.slug, season.auctionUnit]));
+  const pointsOnly =
+    roles.owns.length > 0 &&
+    roles.owns.every((team) => unitBySlug.get(team.competitionSlug) === "points");
+  const receiptsColumn = teams.length > 0 || roles.owns.length > 0 || clubs.length === 0;
 
   return (
-    <main className={clubs.length > 0 ? "my-money my-money--books" : "my-money"}>
-      <div className="mm-column">
-        {teams.length === 0 ? (
-          <NoReceipts owns={roles.owns} books={clubs.length > 0} />
-        ) : (
-          <>
-            <Summary teams={teams} documents={documents.length} />
-            <section className="mm-teams" aria-labelledby="mm-teams-title">
-              <div className="mm-section-head">
-                <h2 id="mm-teams-title">By team</h2>
-                <span>Sealed invoices and receipts, newest first</span>
-              </div>
-              <ul className="mm-team-grid" data-testid="my-documents">
-                {teams.map((team) => (
-                  <TeamMoney key={team.teamId} team={team} />
-                ))}
-              </ul>
-              {/* Say what this page cannot do yet, rather than let a reader assume
+    <main
+      className={
+        !receiptsColumn
+          ? "my-money my-money--books-only"
+          : clubs.length > 0
+            ? "my-money my-money--books"
+            : "my-money"
+      }
+    >
+      {receiptsColumn ? (
+        <div className="mm-column">
+          {teams.length === 0 && pointsOnly ? (
+            <NothingToPay team={roles.owns[0]} />
+          ) : teams.length === 0 ? (
+            <NoReceipts owns={roles.owns} books={clubs.length > 0} />
+          ) : (
+            <>
+              <Summary teams={teams} documents={documents.length} />
+              <section className="mm-teams" aria-labelledby="mm-teams-title">
+                <div className="mm-section-head">
+                  <h2 id="mm-teams-title">By team</h2>
+                  <span>Sealed invoices and receipts, newest first</span>
+                </div>
+                <ul className="mm-team-grid" data-testid="my-documents">
+                  {teams.map((team) => (
+                    <TeamMoney key={team.teamId} team={team} />
+                  ))}
+                </ul>
+                {/* Say what this page cannot do yet, rather than let a reader assume
                   a download exists somewhere they have not looked. */}
-              <p className="mm-foot">
-                These are the sealed records the club&rsquo;s finance desk holds. A downloadable
-                copy isn&rsquo;t available yet — ask the club that issued it.
-              </p>
-            </section>
-          </>
-        )}
-      </div>
+                <p className="mm-foot">
+                  These are the sealed records the club&rsquo;s finance desk holds. A downloadable
+                  copy isn&rsquo;t available yet — ask the club that issued it.
+                </p>
+              </section>
+            </>
+          )}
+        </div>
+      ) : null}
       {clubs.length > 0 ? <ClubBooks clubs={clubs} /> : null}
     </main>
   );
@@ -288,6 +317,32 @@ function TeamMoney({ team }: { team: TeamDocs }) {
   );
 }
 
+/** A team that plays for points: nothing is ever invoiced, so nothing is waited for. */
+function NothingToPay({ team }: { team: OwnedTeam | undefined }) {
+  if (team === undefined) return null;
+  return (
+    <section className="mm-points" data-testid="my-money-points">
+      <span className="mm-points-mark" aria-hidden>
+        {initialsFor(team.teamName).initials ?? "?"}
+      </span>
+      <div className="mm-points-body">
+        <h2>Nothing to pay — {team.competitionName} is played for points</h2>
+        <p>
+          {team.teamName} bought its squad with points, so no invoice or receipt will come. When a
+          club charges your team in rupees, its invoice and receipt land here.
+        </p>
+      </div>
+      <ButtonLink
+        href={`/seasons/${team.competitionSlug}/teams?team=${team.teamId}`}
+        size="sm"
+        variant="secondary"
+      >
+        My team
+      </ButtonLink>
+    </section>
+  );
+}
+
 /** Nothing issued to you yet: say what will land here, and point at your team. */
 function NoReceipts({ owns, books }: { owns: readonly OwnedTeam[]; books: boolean }) {
   const team = owns[0];
@@ -346,6 +401,8 @@ interface ClubRow {
   role: string;
   settlementHref?: string;
   financeHref?: string;
+  /** Rupee seasons whose money this reader holds no key to — said once, with who to ask. */
+  locked: boolean;
   seasons: SeasonRow[];
 }
 
@@ -415,6 +472,7 @@ function clubBooks(
   /** Clubs this person runs: their seasons' standing is theirs to know. */
   runs: Set<string>,
   standings: ReadonlyMap<string, ReadonlyMap<string, SeasonStanding>>,
+  facts: ReadonlyMap<string, AuctionFacts>,
 ): ClubRow[] {
   const clubs: ClubRow[] = [];
   for (const org of orgs) {
@@ -426,9 +484,9 @@ function clubBooks(
           ? {
               key: season.slug,
               name: season.name,
-              href: `/seasons/${season.slug}/teams`,
+              href: `/seasons/${season.slug}/auction`,
               status: { label: "Points", tone: "neutral" },
-              meta: "Ran on points — nothing to settle · see where the points went",
+              meta: pointsLine(facts.get(season.id)),
             }
           : settle.has(org.id)
             ? {
@@ -438,10 +496,13 @@ function clubBooks(
                 ...standingOf(standings.get(org.id)?.get(season.id)),
               }
             : {
+                // No money key: what the reader CAN see, and the season itself
+                // one click away — not a pointer to a desk they can't open.
                 key: season.slug,
                 name: season.name,
-                status: null,
-                meta: "Rupee season — its books are on the club's settlement desk",
+                href: `/seasons/${season.slug}`,
+                status: { label: "Rupees", tone: "neutral" },
+                meta: auctionLine(facts.get(season.id)),
               },
       );
     clubs.push({
@@ -450,6 +511,9 @@ function clubBooks(
       role: runs.has(org.id) ? "You run this club" : "You hold a key to its money desk",
       ...(settle.has(org.id) ? { settlementHref: `/org/${org.slug}/settlement` } : {}),
       ...(finance.has(org.id) ? { financeHref: `/org/${org.slug}/money` } : {}),
+      locked:
+        !settle.has(org.id) &&
+        competitions.some((c) => c.orgId === org.id && c.auctionUnit !== "points"),
       seasons,
     });
   }
@@ -488,6 +552,16 @@ function ClubBooks({ clubs }: { clubs: ClubRow[] }) {
                 </ButtonLink>
               ) : null}
             </div>
+          ) : null}
+          {club.locked ? (
+            <p className="mm-locked" data-testid="money-key-note">
+              <IconLock size={16} aria-hidden />
+              <span>
+                <strong>Its money has its own key.</strong> Settling seasons and the finance desk
+                need the club&rsquo;s money role — separate from running seasons. Ask an owner of{" "}
+                {club.name}.
+              </span>
+            </p>
           ) : null}
           {club.seasons.length > 0 ? (
             <ul className="mm-seasons">
@@ -528,4 +602,34 @@ function ClubBooks({ clubs }: { clubs: ClubRow[] }) {
       ))}
     </section>
   );
+}
+
+/** "30 sold for 1,74,500 pts — played for points, nothing to settle". */
+function pointsLine(facts: AuctionFacts | undefined): string {
+  if (facts === undefined || facts.lotsSold === 0) {
+    return "Played for points — nothing to settle";
+  }
+  const spend =
+    facts.moneyMoved !== undefined ? ` for ${formatAmount(paise(facts.moneyMoved), "points")}` : "";
+  return `${formatCount(facts.lotsSold)} sold${spend} — played for points, nothing to settle`;
+}
+
+/** The auction's state, never its money: "Auction done · 2 teams". */
+function auctionLine(facts: AuctionFacts | undefined): string {
+  const teams =
+    facts !== undefined && facts.teams > 0
+      ? ` · ${formatCount(facts.teams)} ${facts.teams === 1 ? "team" : "teams"}`
+      : "";
+  switch (facts?.status) {
+    case "live":
+    case "paused":
+      return `Auction live${teams}`;
+    case "scheduled":
+      return `Auction scheduled${teams}`;
+    case "completed":
+    case "settled":
+      return `Auction done${teams}`;
+    default:
+      return `No auction yet${teams}`;
+  }
 }
