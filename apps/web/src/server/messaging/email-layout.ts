@@ -11,15 +11,28 @@ import { env } from "../../env";
  * `renderEmail` takes CONTENT — a heading, paragraphs, at most one code, at
  * most one button, a few labelled facts — and returns both an HTML body and
  * the plain-text alternative built from the same content, so the two can
- * never disagree. The HTML is what every client supports: tables, inline
- * styles, no web fonts, no CSS classes, no images but the logo (and the mail
- * reads fine with images blocked). Every dynamic string is escaped.
+ * never disagree. Every dynamic string is escaped.
+ *
+ * EMAIL V2 (docs/design/email-v2, founder-approved 2026-09-28). The HTML is
+ * what every client supports: tables and inline styles, no web fonts, no
+ * images but the logo — so the mail reads fully with images blocked AND with
+ * the <style> block stripped (some Gmail builds do). That block only ADDS:
+ *
+ *   · phone width — tighter card padding and a full-width button;
+ *   · dark mode — the Floodlight palette under `prefers-color-scheme: dark`
+ *     (Apple Mail, iOS Mail, Outlook for Mac). Gmail recolours on its own;
+ *     the light palette is chosen to survive that: a gold fill carries ink
+ *     text, never white.
+ *
+ * The `da-*` class names are those hooks and nothing else.
  *
  * The internal team alerts (a new problem report, a new review, a new demo
  * request) stay plain text: nobody outside the team sees them.
  */
 
 export const SUPPORT_EMAIL = "support@desiauction.in";
+
+export type EmailLanguage = "en" | "hi";
 
 export interface EmailContent {
   /** Hidden preview line most inboxes show beside the subject. */
@@ -53,6 +66,18 @@ export interface EmailContent {
    * the line is shown: see `applyWhatsAppNudge`.
    */
   readonly whatsappNudge?: boolean;
+  /**
+   * The reader's language: the document's `lang` (screen readers pronounce
+   * by it) and the font list (Devanagari first for Hindi). English when
+   * omitted.
+   */
+  readonly language?: EmailLanguage;
+  /**
+   * "Manage emails" in the footer — only for a mail the reader can switch
+   * off themselves (notification-email.ts decides, from the catalogue). A
+   * code or a security alert never carries it: there is nothing to manage.
+   */
+  readonly manageUrl?: string;
 }
 
 export interface RenderedEmail {
@@ -60,19 +85,43 @@ export interface RenderedEmail {
   readonly text: string;
 }
 
-// The console's own palette, as literal colours: mail clients ignore CSS
-// variables. Warm neutrals, gold only for the brand, ink for the action.
-const INK = "#1A1814";
-const TEXT = "#2B2822";
-const MUTED = "#6B6559";
-const RULE = "#E7E4DC";
-const CANVAS = "#F7F6F2";
+// The design tokens (packages/ui/tokens), as literals: mail clients ignore CSS
+// variables. Daylight for the mail itself, Floodlight for its dark mode.
+const CANVAS = "#F7F6F2"; // chalk-50
 const CARD = "#FFFFFF";
-const GOLD_TEXT = "#8A6410";
-const CODE_BG = "#F7F6F2";
+const SUNKEN = "#F0EEE8"; // chalk-100
+const RULE = "#E7E4DC"; // chalk-200
+const INK = "#1A1814"; // chalk-800 — headings
+const TEXT = "#2B2822"; // chalk-700
+const MUTED = "#58534A"; // chalk-600 — AA on the card, the sunken fill and the canvas
+const GOLD = "#F0B43C"; // gold-400 — a FILL, never text
+const GOLD_EDGE = "#B57F14"; // gold-700 — the fill's rim
+const GOLD_TEXT = "#865D12"; // gold-800 — gold as text, on light
+const ON_GOLD = "#070A0F"; // ink-950 — text on a gold fill (white on gold is 1.9:1)
+
+const DARK = {
+  canvas: "#070A0F", // ink-950
+  card: "#101623", // ink-850
+  sunken: "#0B1018", // ink-900
+  rule: "#1F2A3D", // ink-700
+  heading: "#E8EEF9", // ink-100
+  text: "#C9D4E8", // ink-200
+  muted: "#9FB0CC", // ink-300
+  goldText: "#F3D078", // gold-300
+} as const;
 
 const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+// Devanagari first: without one of these, Windows falls back to a face whose
+// matras collide with the line above.
+const FONT_HI =
+  "'Noto Sans Devanagari', 'Kohinoor Devanagari', 'Nirmala UI', Mangal, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+/** The footer's own words — the only words the layout writes itself. */
+export const FOOTER_WORDS: Readonly<Record<EmailLanguage, { manage: string; help: string }>> = {
+  en: { manage: "Manage emails", help: "Help" },
+  hi: { manage: "ईमेल सेटिंग", help: "मदद" },
+};
+
+const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
 
 function escape(value: string): string {
   return value
@@ -83,75 +132,138 @@ function escape(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function base(): string {
+  return env.PUBLIC_BASE_URL.replace(/\/$/, "");
+}
+
 /** An absolute URL on our own host, for the logo. */
 function asset(path: string): string {
-  return `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}${path}`;
+  return `${base()}${path}`;
 }
 
-function paragraph(text: string): string {
-  return `<p style="margin:0 0 16px;font:16px/24px ${FONT};color:${TEXT};">${escape(text)}</p>`;
+function paragraph(text: string, font: string): string {
+  return `<p class="da-text" style="margin:0 0 16px;font:16px/26px ${font};color:${TEXT};">${escape(text)}</p>`;
 }
 
+/** Big, alone, and copied as the digits only — the spacing is letter-spacing, not spaces. */
 function codeBlock(code: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;"><tr><td style="background:${CODE_BG};border:1px solid ${RULE};border-radius:12px;padding:16px 24px;font:600 32px/40px ${MONO};letter-spacing:8px;color:${INK};">${escape(code)}</td></tr></table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:6px 0 24px;"><tr><td align="center" class="da-sunken" style="background:${SUNKEN};border:1px solid ${RULE};border-radius:14px;padding:22px 12px;"><div class="da-heading" style="font:700 40px/48px ${MONO};letter-spacing:12px;padding-left:12px;color:${INK};">${escape(code)}</div></td></tr></table>`;
 }
 
-function button(action: { label: string; url: string }): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;"><tr><td style="background:${INK};border-radius:10px;"><a href="${escape(action.url)}" style="display:inline-block;padding:14px 24px;font:600 15px/20px ${FONT};color:#FFFFFF;text-decoration:none;border-radius:10px;">${escape(action.label)}</a></td></tr></table>`;
+function button(action: { label: string; url: string }, font: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="da-btn-wrap" style="margin:8px 0 24px;"><tr><td align="center" style="background:${GOLD};border:1px solid ${GOLD_EDGE};border-radius:10px;"><a class="da-btn" href="${escape(action.url)}" style="display:inline-block;padding:14px 28px;font:700 16px/20px ${font};color:${ON_GOLD};text-decoration:none;border-radius:10px;">${escape(action.label)}</a></td></tr></table>`;
 }
 
-function detailsTable(details: readonly (readonly [string, string])[]): string {
+function detailsTable(details: readonly (readonly [string, string])[], font: string): string {
   const rows = details
-    .map(
-      ([label, value]) =>
-        `<tr><td style="padding:10px 16px 10px 0;border-top:1px solid ${RULE};font:14px/20px ${FONT};color:${MUTED};white-space:nowrap;vertical-align:top;">${escape(label)}</td><td style="padding:10px 0;border-top:1px solid ${RULE};font:600 14px/20px ${FONT};color:${TEXT};">${escape(value)}</td></tr>`,
-    )
+    .map(([label, value], i) => {
+      const rule = i === 0 ? "" : `border-top:1px solid ${RULE};`;
+      return `<tr><td class="da-muted da-rule" style="padding:11px 16px 11px 0;${rule}font:14px/20px ${font};color:${MUTED};vertical-align:top;">${escape(label)}</td><td class="da-heading da-rule" align="right" style="padding:11px 0;${rule}font:600 14px/20px ${font};color:${INK};text-align:right;vertical-align:top;font-variant-numeric:tabular-nums;">${escape(value)}</td></tr>`;
+    })
     .join("");
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:8px 0 24px;border-bottom:1px solid ${RULE};">${rows}</table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-sunken" style="margin:4px 0 24px;background:${SUNKEN};border-radius:12px;"><tr><td style="padding:4px 18px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table></td></tr></table>`;
+}
+
+/**
+ * Progressive only: everything it styles is already a complete light mail.
+ * Between the markers so a preview can show the dark rendering on any device.
+ */
+const STYLE = `<style>
+body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
+@media (max-width: 520px) {
+  .da-outer { padding:20px 12px 28px !important; }
+  .da-body { padding:26px 22px 8px !important; }
+  .da-btn-wrap { width:100% !important; }
+  .da-btn { display:block !important; }
+}
+/*da:dark*/
+@media (prefers-color-scheme: dark) {
+  .da-canvas { background:${DARK.canvas} !important; }
+  .da-card { background:${DARK.card} !important; border-color:${DARK.rule} !important; }
+  .da-sunken { background:${DARK.sunken} !important; border-color:${DARK.rule} !important; }
+  .da-heading { color:${DARK.heading} !important; }
+  .da-text { color:${DARK.text} !important; }
+  .da-muted { color:${DARK.muted} !important; }
+  .da-gold-text { color:${DARK.goldText} !important; }
+  .da-rule { border-color:${DARK.rule} !important; }
+}
+/*/da:dark*/
+</style>`;
+
+/** The same document with its dark rules unconditional — what a dark Apple Mail shows. */
+export function forceDarkEmail(html: string): string {
+  return html.replace(
+    /\/\*da:dark\*\/\s*@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\}\s*\/\*\/da:dark\*\//,
+    "$1",
+  );
 }
 
 export function renderEmail(content: EmailContent): RenderedEmail {
-  const action = content.action === undefined ? "" : button(content.action);
+  const language = content.language ?? "en";
+  const font = language === "hi" ? FONT_HI : FONT;
+  const action = content.action === undefined ? "" : button(content.action, font);
   const first = content.actionFirst === true;
+  const manage = content.noLinks === true ? undefined : content.manageUrl;
+  const words = FOOTER_WORDS[language];
   const body = [
-    ...content.paragraphs.map(paragraph),
+    ...content.paragraphs.map((p) => paragraph(p, font)),
     content.code === undefined ? "" : codeBlock(content.code),
     first ? action : "",
     content.details === undefined || content.details.length === 0
       ? ""
-      : detailsTable(content.details),
-    ...(content.after ?? []).map(paragraph),
+      : detailsTable(content.details, font),
+    ...(content.after ?? []).map((p) => paragraph(p, font)),
     first ? "" : action,
     content.whatsappNudge === true ? WHATSAPP_NUDGE_MARK : "",
   ].join("");
 
+  const footerLink = (label: string, href: string) =>
+    `<a class="da-muted" href="${escape(href)}" style="color:${MUTED};text-decoration:underline;">${escape(label)}</a>`;
+  const footerLine =
+    content.noLinks === true
+      ? `DesiAuction &middot; ${escape(words.help)}: ${SUPPORT_EMAIL}`
+      : [
+          "DesiAuction",
+          footerLink("desiauction.in", env.PUBLIC_BASE_URL),
+          ...(manage === undefined ? [] : [footerLink(words.manage, manage)]),
+          `${escape(words.help)}: ${footerLink(SUPPORT_EMAIL, `mailto:${SUPPORT_EMAIL}`)}`,
+        ].join(" &middot; ");
+
+  // The zero-width run after the preheader keeps inboxes from padding the
+  // preview line with the first words of the body.
   const html = `<!doctype html>
-<html lang="en">
+<html lang="${language}" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
-<meta name="supported-color-schemes" content="light">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>${escape(content.heading)}</title>
+${STYLE}
 </head>
-<body style="margin:0;padding:0;background:${CANVAS};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${CANVAS};">${escape(content.preheader)}</div>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${CANVAS};">
-<tr><td align="center" style="padding:32px 16px;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;">
-<tr><td style="padding:0 4px 20px;">
+<body class="da-canvas" style="margin:0;padding:0;background:${CANVAS};">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escape(content.preheader)}${"&#8199;&#847; ".repeat(30)}</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-canvas" style="background:${CANVAS};">
+<tr><td align="center" class="da-outer" style="padding:36px 16px 40px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:580px;">
+<tr><td style="padding:0 8px 18px;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-<td style="vertical-align:middle;"><img src="${escape(asset("/brand/mark.png"))}" width="36" height="36" alt="" style="display:block;border:0;border-radius:9px;"></td>
-<td style="vertical-align:middle;padding-left:10px;font:700 18px/24px ${FONT};color:${INK};letter-spacing:-0.2px;">Desi<span style="color:${GOLD_TEXT};">Auction</span></td>
+<td style="vertical-align:middle;"><img src="${escape(asset("/brand/mark.png"))}" width="32" height="32" alt="" style="display:block;border:0;border-radius:8px;"></td>
+<td class="da-heading" style="vertical-align:middle;padding-left:10px;font:700 18px/24px ${FONT};color:${INK};letter-spacing:-0.2px;">Desi<span class="da-gold-text" style="color:${GOLD_TEXT};">Auction</span></td>
 </tr></table>
 </td></tr>
-<tr><td style="background:${CARD};border:1px solid ${RULE};border-radius:16px;padding:32px 32px 16px;">
-<h1 style="margin:0 0 16px;font:700 22px/30px ${FONT};color:${INK};letter-spacing:-0.2px;">${escape(content.heading)}</h1>
+<tr><td>
+<table role="article" aria-roledescription="email" aria-label="${escape(content.heading)}" lang="${language}" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-card" style="background:${CARD};border:1px solid ${RULE};border-radius:16px;">
+<tr><td class="da-body" style="padding:32px 36px 12px;">
+<h1 class="da-heading" style="margin:0 0 16px;font:700 24px/32px ${font};color:${INK};letter-spacing:-0.3px;">${escape(content.heading)}</h1>
 ${body}
 </td></tr>
-<tr><td style="padding:20px 4px 0;font:13px/20px ${FONT};color:${MUTED};">
+</table>
+</td></tr>
+<tr><td class="da-muted" style="padding:22px 8px 0;font:13px/20px ${font};color:${MUTED};">
 <p style="margin:0 0 8px;">${escape(content.footnote)}</p>
-${content.noLinks === true ? `<p style="margin:0;">DesiAuction &middot; Help: ${SUPPORT_EMAIL}</p>` : `<p style="margin:0;">DesiAuction &middot; <a href="${escape(env.PUBLIC_BASE_URL)}" style="color:${MUTED};">desiauction.in</a> &middot; Help: <a href="mailto:${SUPPORT_EMAIL}" style="color:${MUTED};">${SUPPORT_EMAIL}</a></p>`}
+<p style="margin:0;">${footerLine}</p>
 </td></tr>
 </table>
 </td></tr>
@@ -174,12 +286,18 @@ ${content.noLinks === true ? `<p style="margin:0;">DesiAuction &middot; Help: ${
     ...(first ? [] : actionLine),
     "—",
     content.footnote,
+    ...(manage === undefined ? [] : [`${words.manage}: ${manage}`]),
     content.noLinks === true
-      ? `DesiAuction · Help: ${SUPPORT_EMAIL}`
-      : `DesiAuction · ${env.PUBLIC_BASE_URL} · Help: ${SUPPORT_EMAIL}`,
+      ? `DesiAuction · ${words.help}: ${SUPPORT_EMAIL}`
+      : `DesiAuction · ${env.PUBLIC_BASE_URL} · ${words.help}: ${SUPPORT_EMAIL}`,
   ].join("\n");
 
   return { html, text };
+}
+
+/** Where "Manage emails" goes: the notification switches on /account. */
+export function manageEmailsUrl(): string {
+  return `${base()}/account?section=notifications`;
 }
 
 /**
@@ -196,7 +314,7 @@ ${content.noLinks === true ? `<p style="margin:0;">DesiAuction &middot; Help: ${
 export const WHATSAPP_NUDGE_MARK = "<!--da:whatsapp-nudge-->";
 
 export function whatsappNudgeUrl(): string {
-  return `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/account#whatsapp`;
+  return `${base()}/account#whatsapp`;
 }
 
 export function hasWhatsAppNudge(html: string): boolean {
@@ -218,7 +336,7 @@ export function applyWhatsAppNudge(
   const url = whatsappNudgeUrl();
   const html = mail.html.replace(
     WHATSAPP_NUDGE_MARK,
-    `<p style="margin:0 0 16px;font:14px/20px ${FONT};color:${MUTED};">Get these on WhatsApp — <a href="${escape(url)}" style="color:${MUTED};">turn it on in your account</a>.</p>`,
+    `<p class="da-muted" style="margin:0 0 16px;font:14px/20px ${FONT};color:${MUTED};">Get these on WhatsApp — <a class="da-gold-text" href="${escape(url)}" style="color:${GOLD_TEXT};">turn it on in your account</a>.</p>`,
   );
   // The plain part: the line goes just above the footer rule ("—"), where the
   // HTML puts it — after the button, before the fine print.
