@@ -271,6 +271,24 @@ const envSchema = z.object({
    */
   FEEDBACK_JOB_SECRET: z.string().min(16).optional(),
   /**
+   * Web push (email programme PR18): the VAPID key pair (`pnpm push:keys`)
+   * and a contact the push services can reach. All three or none — without
+   * them, /account offers no "notifications on this device" and nothing is
+   * pushed; the inbox is unaffected.
+   */
+  WEB_PUSH_PUBLIC_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{87}$/, "a base64url P-256 public key (pnpm push:keys)")
+    .optional(),
+  WEB_PUSH_PRIVATE_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{43}$/, "a base64url P-256 private key (pnpm push:keys)")
+    .optional(),
+  WEB_PUSH_SUBJECT: z
+    .string()
+    .regex(/^(mailto:|https:\/\/)/, "mailto:… or https://…")
+    .optional(),
+  /**
    * The key demo booking links are DERIVED from (HMAC over the request id).
    *
    * A random token would be unrecoverable once hashed, which the reminder sweep
@@ -495,6 +513,20 @@ const productionSchema = envSchema
       "email needs a configured mailer in production — EMAIL_PROVIDER=ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM (or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM), and not dev — otherwise sign-in codes go to a database table instead of a mailbox",
     path: ["EMAIL_PROVIDER"],
   })
+  .refine(
+    (v) =>
+      [v.WEB_PUSH_PUBLIC_KEY, v.WEB_PUSH_PRIVATE_KEY, v.WEB_PUSH_SUBJECT].every(
+        (value) => value === undefined,
+      ) ||
+      [v.WEB_PUSH_PUBLIC_KEY, v.WEB_PUSH_PRIVATE_KEY, v.WEB_PUSH_SUBJECT].every(
+        (value) => value !== undefined,
+      ),
+    {
+      message:
+        "web push needs WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY and WEB_PUSH_SUBJECT together (pnpm push:keys), or none of them",
+      path: ["WEB_PUSH_PUBLIC_KEY"],
+    },
+  )
   .refine((v) => !serving(v) || v.MEDIA_STORAGE === "bucket", {
     message:
       "MEDIA_STORAGE=local writes uploads to the app host and a built server does not serve them — set MEDIA_STORAGE=bucket",

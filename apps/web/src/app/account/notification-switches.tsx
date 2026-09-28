@@ -1,7 +1,7 @@
 "use client";
 
 import { useAnnouncer } from "@desiauction/ui";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   WHATSAPP_LANGUAGE_LABELS,
@@ -10,6 +10,8 @@ import {
 } from "../../lib/whatsapp-consent";
 import type { PersonChannelRow } from "../../server/messaging/catalogue";
 import {
+  removePushSubscriptionAction,
+  savePushSubscriptionAction,
   setMessageLanguageAction,
   setNotificationPreferenceAction,
   setWhatsappPreferenceAction,
@@ -238,6 +240,138 @@ export function MessageLanguageChoice({ language: initial }: { language: WhatsAp
           ))}
         </div>
       </fieldset>
+      {error !== null ? (
+        <p role="alert" className="notify-error">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+type PushState = "checking" | "unsupported" | "blocked" | "off" | "on";
+
+function base64UrlToBytes(text: string): Uint8Array<ArrayBuffer> {
+  const padded = `${text}${"=".repeat((4 - (text.length % 4)) % 4)}`
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const raw = window.atob(padded);
+  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
+  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
+/** What this browser can do, and whether it is subscribed already. */
+async function detectPush(): Promise<PushState> {
+  const supported =
+    "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  if (!supported) return "unsupported";
+  if (Notification.permission === "denied") return "blocked";
+  try {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    const subscription = (await registration?.pushManager.getSubscription()) ?? null;
+    return subscription === null ? "off" : "on";
+  } catch {
+    return "off";
+  }
+}
+
+/**
+ * NOTIFICATIONS ON THIS DEVICE (email programme PR18) — web push. Your inbox
+ * notices, as a phone or desktop notification, for THIS browser. They follow
+ * the Inbox switches above; this only says whether this device shows them.
+ */
+export function PushDeviceSwitch({ publicKey }: { publicKey: string }) {
+  const announce = useAnnouncer();
+  const [state, setState] = useState<PushState>("checking");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void detectPush().then(setState);
+  }, []);
+
+  const turnOn = async () => {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      setState(permission === "denied" ? "blocked" : "off");
+      return;
+    }
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64UrlToBytes(publicKey),
+    });
+    const json = subscription.toJSON();
+    const result = await savePushSubscriptionAction({
+      endpoint: subscription.endpoint,
+      keys: { p256dh: json.keys?.["p256dh"] ?? "", auth: json.keys?.["auth"] ?? "" },
+      userAgent: navigator.userAgent,
+    });
+    if (!result.ok) {
+      await subscription.unsubscribe();
+      throw new Error(result.error ?? "That did not save.");
+    }
+    setState("on");
+    announce("Notifications on this device turned on", "polite");
+  };
+
+  const turnOff = async () => {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    const subscription = await registration?.pushManager.getSubscription();
+    if (subscription !== null && subscription !== undefined) {
+      await removePushSubscriptionAction(subscription.endpoint);
+      await subscription.unsubscribe();
+    }
+    setState("off");
+    announce("Notifications on this device turned off", "polite");
+  };
+
+  const hint: Record<PushState, string> = {
+    checking: "Checking this device…",
+    unsupported:
+      "This browser can't show notifications. On an iPhone, add DesiAuction to your Home Screen first (Share → Add to Home Screen), then turn them on from there.",
+    blocked:
+      "Notifications are blocked for DesiAuction in this browser's settings. Allow them there, then come back.",
+    off: "Get your inbox notices — sold at auction, a match moved, your lineup — as a notification on this device.",
+    on: "This device shows your inbox notices as notifications. They follow your Inbox switches above.",
+  };
+  const toggleable = state === "on" || state === "off";
+
+  return (
+    <div className="notify-switches" data-testid="push-switch">
+      <label className="notify-switch" htmlFor="notify-push">
+        <input
+          id="notify-push"
+          type="checkbox"
+          checked={state === "on"}
+          disabled={!toggleable || busy}
+          data-testid="notify-push"
+          onChange={(event) => {
+            const next = event.target.checked;
+            setBusy(true);
+            setError(null);
+            void (next ? turnOn() : turnOff())
+              .catch((cause: unknown) => {
+                setError(
+                  cause instanceof Error && cause.message !== ""
+                    ? cause.message
+                    : "That did not work. Try again.",
+                );
+              })
+              .finally(() => {
+                setBusy(false);
+              });
+          }}
+        />
+        <span className="notify-switch-text">
+          <span className="notify-switch-label">Notifications on this device</span>
+          <span className="notify-switch-detail" data-testid="push-hint">
+            {hint[state]}
+          </span>
+        </span>
+      </label>
       {error !== null ? (
         <p role="alert" className="notify-error">
           {error}

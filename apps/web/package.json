@@ -19,6 +19,7 @@
     "grants:verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/verify-grants.ts",
     "db:restore-verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/restore-verify.ts",
     "seed:demo": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/seed-demo.ts",
+    "push:keys": "node node_modules/tsx/dist/cli.mjs scripts/push-keys.ts",
     "mail:gallery": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/mail-gallery.ts",
     "seed:admin": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/seed-platform-admin.ts",
     "backfill:squads": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/backfill-auction-squads.ts",

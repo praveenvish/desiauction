@@ -8,7 +8,7 @@
  * inbox's client component, so the security panel could not reach it. It lives
  * here now and both read it.
  */
-import type { SecurityAction } from "../server/auth/security-events";
+import type { SecurityAction } from "../server/auth/security-actions";
 
 /**
  * EVERY EVENT THE LEDGER CAN WRITE HAS PROSE — checked by the compiler.

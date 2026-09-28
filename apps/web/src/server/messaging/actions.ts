@@ -25,6 +25,7 @@ import {
   platformSwitches,
 } from "./platform-switches";
 import { tenantOfPerson } from "../request-cache";
+import { pushKeys, removePushSubscription, savePushSubscription } from "./push";
 
 /** Membership-checked slug → org, under person-only tenant context. */
 async function resolveTenantScoped(personId: string, slug: string) {
@@ -295,5 +296,63 @@ export async function setOrgMessagingSettingAction(
     return { ok: false, error: "Could not save." };
   }
   revalidatePath(`/org/${slug}`);
+  return { ok: true };
+}
+
+/**
+ * NOTIFICATIONS ON THIS DEVICE (email programme PR18) — web push. The public
+ * key the browser subscribes to, or null when web push is not configured
+ * here (then /account offers nothing).
+ */
+export async function pushPublicKey(): Promise<string | null> {
+  const session = await currentSession();
+  return session === null ? null : (pushKeys()?.publicKey ?? null);
+}
+
+/** Keep this browser's subscription for the signed-in person. */
+export async function savePushSubscriptionAction(subscription: {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  userAgent?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: "Sign in to turn notifications on." };
+  }
+  if (pushKeys() === null) {
+    return { ok: false, error: "Notifications on this device aren't available yet." };
+  }
+  // A browser's push service, over https, and the two keys it must give —
+  // anything else is not a subscription anybody could deliver to.
+  let endpoint: URL;
+  try {
+    endpoint = new URL(subscription.endpoint);
+  } catch {
+    return { ok: false, error: "That didn't work. Try again." };
+  }
+  const key = /^[A-Za-z0-9_-]+$/;
+  if (
+    endpoint.protocol !== "https:" ||
+    !key.test(subscription.keys.p256dh) ||
+    !key.test(subscription.keys.auth)
+  ) {
+    return { ok: false, error: "That didn't work. Try again." };
+  }
+  // On the APP pool: a person's own devices, like their switches.
+  await savePushSubscription(appDb, session.personId, {
+    endpoint: endpoint.toString(),
+    p256dh: subscription.keys.p256dh,
+    auth: subscription.keys.auth,
+    userAgent: subscription.userAgent?.slice(0, 300) ?? null,
+  });
+  return { ok: true };
+}
+
+export async function removePushSubscriptionAction(endpoint: string): Promise<{ ok: boolean }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false };
+  }
+  await removePushSubscription(appDb, session.personId, endpoint);
   return { ok: true };
 }

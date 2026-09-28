@@ -78,6 +78,32 @@ export const people = pgTable("people", {
 });
 
 /**
+ * A PERSON'S DEVICES FOR PUSH (0097, email programme PR18): one row per
+ * browser that turned notifications on — its push-service endpoint and the
+ * keys to encrypt to. Platform-to-person, no RLS; a push follows the person's
+ * Inbox switches. Deleted when the push service answers 404/410.
+ */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: id(),
+    personId: char("person_id", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    lastSentAt: ts("last_sent_at"),
+  },
+  (table) => [
+    uniqueIndex("push_subscriptions_endpoint_uq").on(table.endpoint),
+    index("push_subscriptions_person_idx").on(table.personId),
+  ],
+);
+
+/**
  * A PERSON ASKING TO BE ERASED (0066).
  *
  * Platform-to-person data, like `consent_records`: no org, no RLS; the person
