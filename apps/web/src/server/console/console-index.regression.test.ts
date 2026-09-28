@@ -195,13 +195,15 @@ describe("/auctions — progress, and money moved only with sight", () => {
       lotsTotal: 2,
       teams: 2,
       moneyMoved: 2_500_000,
+      topPrice: 2_500_000,
     });
   });
 
-  it("without sight the key is ABSENT, not zero", async () => {
+  it("without sight the keys are ABSENT, not zero", async () => {
     const facts = (await auctionFactsIn(db, [season.id], new Set())).get(season.id);
     expect(facts).toBeDefined();
     expect(Object.keys(facts ?? {})).not.toContain("moneyMoved");
+    expect(Object.keys(facts ?? {})).not.toContain("topPrice");
   });
 });
 
