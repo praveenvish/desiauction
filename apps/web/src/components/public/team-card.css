@@ -143,8 +143,11 @@
    so every row in a squad keeps one height. */
 .team-card-player-name {
   display: flex;
+  /* The Captain/Icon mark drops under the name when the row is narrow, rather
+     than cutting the name to "Siddhar…" (census, 2026-09-28). */
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: 2px var(--space-2);
   min-width: 0;
   font-size: 0.9375rem;
   line-height: 1.3;

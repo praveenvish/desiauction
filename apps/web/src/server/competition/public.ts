@@ -26,6 +26,7 @@ import { and, asc, desc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
 import { systemDb } from "../db";
+import { seasonPlayIn, type SeasonPlay } from "./season-play";
 import { teamsOf, type TeamSummary } from "./competitions";
 import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
@@ -125,6 +126,13 @@ export interface PublicCompetitionView {
   fixtures: PublicFixture[];
   /** Every published fixture, including any beyond the rendered bound. */
   fixtureTotal: number;
+  /**
+   * THE SEASON, as it stands — results, what is live, what is next and the
+   * table. The page stopped at auction night: a season three matches in still
+   * said "Auction complete". Public statuses only (published, live,
+   * completed), and only for a season that passed the visibility gate above.
+   */
+  play: SeasonPlay;
 }
 
 /**
@@ -197,7 +205,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     return null;
   }
   const open = row.status === "registration_open";
-  const [auctionRows, teams, fixtures] = await Promise.all([
+  const [auctionRows, teams, fixtures, play] = await Promise.all([
     systemDb
       .select({ status: auctions.status, config: auctions.config })
       .from(auctions)
@@ -205,6 +213,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
       .limit(1),
     teamsOf(systemDb, row.id),
     publishedSchedule(systemDb, row.id),
+    seasonPlayIn(systemDb, { id: row.id, sport: row.sport }),
   ]);
   return {
     name: row.name,
@@ -231,6 +240,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     // Carried so the page can say "showing 500 of 640" rather than presenting a
     // truncated list under a heading that claims to be the whole schedule.
     fixtureTotal: fixtures.total,
+    play,
   };
 }
 
