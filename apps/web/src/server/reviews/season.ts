@@ -168,6 +168,114 @@ export async function unaskedParticipants(
   }));
 }
 
+/**
+ * WHY SOMEBODY CANNOT BE ASKED (2026-09-28).
+ *
+ * The console said "Could be asked now: 0 players, 0 owners" on a season of 43
+ * approved players and 3 owners, and listed three possible reasons without
+ * saying which. The answer was one: nobody had an email on file, and the ask
+ * goes by email. This counts the SAME people `unaskedParticipants` starts from
+ * (approved players, paddle holders, a person who did both counted once as the
+ * owner) and puts each in exactly one bucket, first match wins:
+ *
+ *   runs the season → already asked → no email → age rule → can be asked.
+ *
+ * "Can be asked" equals what `unaskedParticipants` + `mayAskParticipant` yield,
+ * so the ask button's count and this breakdown can never disagree.
+ */
+export interface AskBucket {
+  readonly total: number;
+  readonly askable: number;
+  readonly runsSeason: number;
+  readonly alreadyAsked: number;
+  readonly noEmail: number;
+  /** Players: date of birth unknown or under 18. Owners: known to be under 18. */
+  readonly ageRule: number;
+}
+
+export async function askBreakdown(
+  competitionId: string,
+  now: Date,
+): Promise<{ readonly players: AskBucket; readonly owners: AskBucket }> {
+  const rows = await systemDb.execute<{
+    role: SeasonRole;
+    has_email: boolean;
+    already_asked: boolean;
+    runs_season: boolean;
+    date_of_birth: string | null;
+  }>(sql`
+    with players as (
+      select r.person_id, 'player' as role, r.date_of_birth as reg_dob
+      from registrations r
+      where r.competition_id = ${competitionId}
+        and r.status = 'approved' and r.person_id is not null
+    ),
+    owners as (
+      select distinct pd.person_id, 'owner' as role, null::text as reg_dob
+      from paddles pd
+      join auctions a on a.id = pd.auction_id
+      where a.competition_id = ${competitionId}
+    ),
+    everyone as (
+      select distinct on (person_id) person_id, role, reg_dob
+      from (select * from owners union all select * from players) x
+      order by person_id, (role = 'owner') desc
+    )
+    select e.role,
+      pe.email is not null as has_email,
+      exists (
+        select 1 from review_requests rr
+        where rr.person_id = e.person_id and rr.subject_type = 'competition'
+          and rr.competition_id = ${competitionId}
+      ) as already_asked,
+      exists (
+        select 1 from grants g
+        join competitions c on c.id = ${competitionId}
+        where g.person_id = e.person_id and g.revoked_at is null
+          and g.capability_set in ('org:owner', 'org:staff')
+          and ((g.scope_type = 'org' and g.scope_id = c.org_id)
+            or (g.scope_type = 'tournament' and g.scope_id = c.id))
+      ) as runs_season,
+      coalesce(pp.date_of_birth, e.reg_dob,
+        (select rg.date_of_birth from registrations rg
+          where rg.person_id = pe.id and rg.date_of_birth is not null
+          order by rg.created_at desc limit 1)) as date_of_birth
+    from everyone e
+    join people pe on pe.id = e.person_id
+    left join player_profiles pp on pp.person_id = pe.id
+  `);
+  const empty = (): {
+    total: number;
+    askable: number;
+    runsSeason: number;
+    alreadyAsked: number;
+    noEmail: number;
+    ageRule: number;
+  } => ({ total: 0, askable: 0, runsSeason: 0, alreadyAsked: 0, noEmail: 0, ageRule: 0 });
+  const buckets = { player: empty(), owner: empty() };
+  for (const row of rows) {
+    const bucket = buckets[row.role];
+    bucket.total += 1;
+    if (row.runs_season) {
+      bucket.runsSeason += 1;
+    } else if (row.already_asked) {
+      bucket.alreadyAsked += 1;
+    } else if (!row.has_email) {
+      bucket.noEmail += 1;
+    } else if (
+      !mayAskParticipant(
+        { personId: "", name: null, email: "", role: row.role, dateOfBirth: row.date_of_birth },
+        now,
+      )
+    ) {
+      bucket.ageRule += 1;
+    } else {
+      bucket.askable += 1;
+    }
+  }
+  return { players: buckets.player, owners: buckets.owner };
+}
+
 export interface SeasonAskResult {
   readonly asked: number;
   readonly mailed: number;
