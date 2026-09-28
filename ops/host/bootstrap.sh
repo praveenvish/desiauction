@@ -161,9 +161,8 @@ add_user "$DEPLOY_USER" "$DEPLOY_PUBKEY" docker
 # --- Layout -----------------------------------------------------------------
 #   /srv/platform            shared: edge Caddy, logs, alerts (one of each)
 #   /srv/apps/<project>/<env> one Compose project per environment
-log "Directory layout + shared edge network"
+log "Directory layout"
 install -d -m 755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /srv/platform /srv/apps
-docker network inspect edge >/dev/null 2>&1 || docker network create edge
 
 log "Done"
 echo "  ssh   : keys only, root login = $ROOT_LOGIN"

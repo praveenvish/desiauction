@@ -1,8 +1,26 @@
-# The whole platform on one host (DEPLOYMENT.md topology).
+# ONE DESIAUCTION ENVIRONMENT — production or staging — on a shared host.
 #
-# Three app containers, a reverse proxy that terminates TLS, Postgres, a
-# backup sidecar, an off-box mirror for object storage, a scheduler for the web
-# tier's job routes, and an autoheal watchdog. Images are BUILT IN CI and
+# Deployed to /srv/apps/desiauction/<env> as Compose project `da-prod` or
+# `da-staging` (COMPOSE_PROJECT_NAME in that directory's .env). Three app
+# containers, Postgres with a backup sidecar, object storage with an off-box
+# mirror, and a scheduler for the web tier's job routes. TLS, logs, alerts and
+# autoheal are the host's shared layer (ops/platform), not this file's.
+#
+# ISOLATION BETWEEN ENVIRONMENTS. Each stack has its own private network,
+# database, object store, volumes and env files. Web, engine and minio also
+# join this stack's OWN `public` network (`da-prod-public`), which the edge
+# Caddy is connected to and nothing else is. Why not one network shared by
+# every stack: Docker registers each service's plain name (`engine`) on every
+# network it joins, and the web tier calls the engine server-side at
+# ENGINE_URL=http://engine:4000 — on a shared network production's web could
+# resolve STAGING's engine. Here the only thing both stacks can see is Caddy,
+# and Caddy addresses them by project-qualified alias (`da-prod-web`).
+#
+# SIZED BY ENV, NOT BY EDIT. Every service has a memory and CPU ceiling read
+# from .env with the PRODUCTION value as the default; staging's .env sets
+# smaller ones. Moving capacity between stacks is an .env change and
+# `docker compose up -d`. The ceilings are what stop a staging load test (or
+# another project) from starving an auction. Images are BUILT IN CI and
 # pulled here — never built on the production host: the Next.js build peaks at
 # 4-8 GB, and a box sized for that is a box you are paying for around the clock
 # to use for ten minutes a week.
@@ -26,20 +44,16 @@ x-logs: &logs
       max-file: "3"
 
 services:
-  caddy:
-    image: caddy:2-alpine
-    <<: *logs
-    restart: unless-stopped
-    ports: ["80:80", "443:443"]
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data # ACME account + certificates; losing this re-issues
-      - caddy_config:/config
-    depends_on: [web, engine, minio]
-
   web:
     image: ${REGISTRY}/web:${TAG}
     <<: *logs
+    networks:
+      default: {}
+      public:
+        aliases: ["${COMPOSE_PROJECT_NAME}-web"]
+    deploy:
+      resources:
+        limits: { memory: "${WEB_MEM:-1536m}", cpus: "${WEB_CPUS:-2.0}" }
     restart: unless-stopped
     env_file: [./web.env]
     labels: [autoheal=true]
@@ -62,6 +76,10 @@ services:
   engine:
     image: ${REGISTRY}/engine:${TAG}
     <<: *logs
+    networks:
+      default: {}
+      public:
+        aliases: ["${COMPOSE_PROJECT_NAME}-engine"]
     restart: unless-stopped
     env_file: [./engine.env]
     labels: [autoheal=true]
@@ -72,6 +90,8 @@ services:
     # design. Scaling this is not a capacity lever, it is a crash loop.
     deploy:
       replicas: 1
+      resources:
+        limits: { memory: "${ENGINE_MEM:-768m}", cpus: "${ENGINE_CPUS:-1.5}" }
     healthcheck:
       test:
         [
@@ -88,6 +108,9 @@ services:
   runner:
     image: ${REGISTRY}/finops-runner:${TAG}
     <<: *logs
+    deploy:
+      resources:
+        limits: { memory: "${RUNNER_MEM:-512m}", cpus: "${RUNNER_CPUS:-1.0}" }
     restart: unless-stopped
     env_file: [./runner.env]
     depends_on:
@@ -108,6 +131,9 @@ services:
   scheduler:
     image: ${REGISTRY}/web:${TAG}
     <<: *logs
+    deploy:
+      resources:
+        limits: { memory: "${SCHEDULER_MEM:-192m}", cpus: "0.25" }
     restart: unless-stopped
     env_file: [./web.env]
     command: ["/etc/desiauction/scheduler.mjs"]
@@ -133,6 +159,9 @@ services:
   migrator:
     image: ${REGISTRY}/migrator:${TAG}
     <<: *logs
+    deploy:
+      resources:
+        limits: { memory: "1g", cpus: "1.0" }
     profiles: [ops]
     env_file: [./migrator.env]
     volumes:
@@ -170,6 +199,13 @@ services:
     # Verified against the exact minio-init script below; see DEPLOYMENT.md.
     image: pgsty/silo@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46 # RELEASE.2026-09-16T00-00-00Z
     <<: *logs
+    networks:
+      default: {}
+      public:
+        aliases: ["${COMPOSE_PROJECT_NAME}-minio"]
+    deploy:
+      resources:
+        limits: { memory: "${MINIO_MEM:-512m}", cpus: "${MINIO_CPUS:-1.0}" }
     restart: unless-stopped
     # NO PUBLISHED PORTS. Caddy is the only way in, so the console and the
     # admin API are not exposed to the internet by an open firewall rule.
@@ -190,6 +226,9 @@ services:
   minio-init:
     image: pgsty/mc@sha256:cfc83108c3abb371f8fb84d99c1fdc88f8c237e022409b0081fb7c0a3be634dd # RELEASE.2026-09-16T00-00-00Z (Silo's mc; see the minio service)
     <<: *logs
+    deploy:
+      resources:
+        limits: { memory: "128m", cpus: "0.25" }
     env_file: [./minio.env]
     depends_on:
       minio: { condition: service_healthy }
@@ -243,6 +282,42 @@ services:
     # disk that fills until the database stops accepting writes.
     image: ${REGISTRY}/db:${DB_TAG}
     <<: *logs
+    # TUNED FOR THE CONTAINER IT RUNS IN. Stock Postgres assumes a 128MB
+    # machine: shared_buffers 128MB on a host with gigabytes to spare means
+    # nearly every read goes through the kernel instead of Postgres's own
+    # cache. The values below are the production defaults, sized to DB_MEM
+    # (shared_buffers ~25%, effective_cache_size ~75% — a planner hint, not an
+    # allocation); staging's .env shrinks them with DB_MEM. random_page_cost
+    # and effective_io_concurrency describe NVMe, not spinning disk.
+    #
+    # Command-line flags are safe for THESE settings — unlike the archive
+    # settings, which deadlock initdb's temporary server (10-archive.conf).
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-1GB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-3GB}
+      - -c
+      - work_mem=${PG_WORK_MEM:-16MB}
+      - -c
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-256MB}
+      - -c
+      - max_wal_size=${PG_MAX_WAL_SIZE:-2GB}
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+    # Docker's default /dev/shm is 64MB, and Postgres uses it for parallel
+    # query and hash joins: past that, queries fail with "could not resize
+    # shared memory segment" rather than slowing down.
+    shm_size: ${PG_SHM_SIZE:-1g}
+    # Stop gracefully: a checkpoint on a busy database takes longer than
+    # Docker's default 10s, and SIGKILL after 10s means crash recovery on boot.
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits: { memory: "${DB_MEM:-4g}", cpus: "${DB_CPUS:-2.0}" }
     restart: unless-stopped
     # pgbackrest.env is read by the database too, not just the sidecar, because
     # the archive command is a pgbackrest client and needs the same repo.
@@ -284,6 +359,9 @@ services:
   pgbackrest:
     image: ${REGISTRY}/db:${DB_TAG}
     <<: *logs
+    deploy:
+      resources:
+        limits: { memory: "${PGBACKREST_MEM:-512m}", cpus: "1.0" }
     restart: unless-stopped
     env_file: [./pgbackrest.env]
     environment:
@@ -355,6 +433,9 @@ services:
   minio-mirror:
     image: pgsty/mc@sha256:cfc83108c3abb371f8fb84d99c1fdc88f8c237e022409b0081fb7c0a3be634dd # RELEASE.2026-09-16T00-00-00Z (Silo's mc; see the minio service)
     <<: *logs
+    deploy:
+      resources:
+        limits: { memory: "256m", cpus: "0.5" }
     restart: unless-stopped
     env_file: [./minio.env, ./mirror.env]
     depends_on:
@@ -382,108 +463,14 @@ services:
           sleep "$${MIRROR_INTERVAL_SECONDS:-3600}"
         done
 
-  # RESTARTS WHAT DOCKER ONLY LABELS.
-  #
-  # `restart: unless-stopped` acts on a container that EXITS. A container whose
-  # healthcheck fails but whose process lives — a web tier that cannot reach
-  # the database, an engine whose watchdog stopped ticking — is marked
-  # `unhealthy` and then left exactly as it is, for ever. This restarts the
-  # containers labelled `autoheal=true` (web, engine) when that happens, and
-  # its log line is what Grafana's service-health alert fires on.
-  #
-  # NOT the database: a Postgres in long crash recovery fails pg_isready, and
-  # restarting it mid-recovery is how recovery never finishes.
-  #
-  # The Docker socket again — the same trust decision as Alloy's, and the same
-  # containment: pinned by digest, no ports, nothing reaches it from outside.
-  autoheal:
-    image: willfarrell/autoheal@sha256:31f580ef0279eaced5b38d631b08c474d70d8403c1c2fdd6ddcf2e879d5f3f7c # 1.2.0
-    <<: *logs
-    restart: unless-stopped
-    environment:
-      AUTOHEAL_CONTAINER_LABEL: autoheal
-      AUTOHEAL_INTERVAL: "10"
-      # The healthchecks' own start_period already covers boot; this is the
-      # extra grace before autoheal will act on a freshly started container.
-      AUTOHEAL_START_PERIOD: "60"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-  # ONE TIMELINE ACROSS EVERY SERVICE.
-  #
-  # `docker compose logs` was the whole story, and it answers "what did this one
-  # container say" — which is the wrong question during an incident. An auction
-  # breaking at 9pm is web, engine and runner interleaved, and reading three
-  # scrollbacks by eye and matching timestamps is how a ten-minute diagnosis
-  # becomes an hour. Everything already emits structured pino JSON; nothing was
-  # collecting it.
-  #
-  # Loki in single-binary filesystem mode: no object store, no clustering, no
-  # second database to operate. It is the smallest thing that can answer "show
-  # me every service around 21:04".
-  loki:
-    image: grafana/loki@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
-    <<: *logs
-    restart: unless-stopped
-    command: ["-config.file=/etc/loki/loki.yml"]
-    user: "0:0" # owns its volume; the image's default uid cannot create the dirs
-    volumes:
-      - ./observability/loki.yml:/etc/loki/loki.yml:ro
-      - loki_data:/loki
-
-  # Reads container logs and ships them to Loki with the service name attached.
-  #
-  # THE DOCKER SOCKET IS MOUNTED, AND THAT IS A REAL TRUST DECISION rather than
-  # a detail. It is how Alloy learns which container is `web` and which is
-  # `engine` — without it the labels are 64-character ids and the timeline is
-  # unreadable. `:ro` limits the file node, NOT the API: anything that can talk
-  # to this socket can control Docker. Alloy is therefore pinned by digest like
-  # everything else here, reachable from nothing outside, and should be the
-  # first thing removed if the box is ever shared with something less trusted.
-  alloy:
-    image: grafana/alloy@sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
-    <<: *logs
-    restart: unless-stopped
-    command: ["run", "--server.http.listen-addr=0.0.0.0:12345", "/etc/alloy/config.alloy"]
-    volumes:
-      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    depends_on: [loki]
-
-  # NOT EXPOSED TO THE INTERNET, deliberately. Bound to the host's loopback, so
-  # it is reached with `ssh -L 3001:localhost:3001 <host>` and read at
-  # http://localhost:3001. A public Grafana is another login to secure, another
-  # thing to patch on a schedule, and another way into a box that serves money —
-  # for a single operator an SSH tunnel is both safer and less work.
-  grafana:
-    image: grafana/grafana@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
-    <<: *logs
-    restart: unless-stopped
-    ports: ["127.0.0.1:3001:3000"]
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-      GF_AUTH_BASIC_ENABLED: "false"
-      GF_SECURITY_ALLOW_EMBEDDING: "false"
-      GF_ANALYTICS_REPORTING_ENABLED: "false"
-      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
-      # Where alerts go (observability/grafana-alerting.yml). REQUIRED: an alert
-      # rule with nowhere to send it is a dashboard nobody is looking at, so a
-      # missing value stops `docker compose` here rather than at the incident.
-      # Any URL that accepts Grafana's webhook JSON — a Slack/Discord bridge,
-      # ntfy.sh, a PagerDuty/Opsgenie integration URL.
-      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:?set ALERT_WEBHOOK_URL in .env — see ops/deploy/README.md "Alerts"}
-    volumes:
-      - ./observability/grafana-datasource.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
-      - ./observability/grafana-alerting.yml:/etc/grafana/provisioning/alerting/desiauction.yml:ro
-      - grafana_data:/var/lib/grafana
-    depends_on: [loki]
+networks:
+  # Named per stack (da-prod-public). deploy-host.yml connects the edge Caddy
+  # to it; ops/platform/apply.sh reconnects every *-public network whenever
+  # Caddy is recreated.
+  public:
+    name: ${COMPOSE_PROJECT_NAME}-public
 
 volumes:
   pgdata:
-  loki_data:
-  grafana_data:
   pgsocket:
   minio_data:
-  caddy_data:
-  caddy_config:

@@ -9,7 +9,7 @@
 # believed.
 #
 # THE AUTHORITATIVE BACKUP IS ON THE HOST, and this workflow no longer pretends
-# to be it. The `pgbackrest` sidecar (ops/deploy/docker-compose.production.yml)
+# to be it. The `pgbackrest` sidecar (ops/deploy/docker-compose.production.yml, stack da-prod)
 # archives WAL continuously and takes a nightly full/differential into repo1,
 # which belongs on an OFF-BOX S3 bucket (the sidecar refuses an on-box repo
 # unless PGBACKREST_ALLOW_ONBOX_REPO=1). What was missing was anybody checking.
@@ -74,7 +74,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -euo pipefail
-            cd /opt/desiauction
+            cd /srv/apps/desiauction/production
             pgb() { docker compose exec -T pgbackrest su postgres -c "pgbackrest --stanza=desiauction $*"; }
 
             # Repo reachable, stanza valid, and a WAL segment actually archives.

@@ -18,18 +18,24 @@ stateful component. Vercel could never have hosted two of the three services
 anyway: the engine is a long-lived WebSocket server holding a session-level
 advisory lock, and the runner is a persistent worker.
 
+Production and staging are two Compose stacks on that host —
+`/srv/apps/desiauction/{production,staging}`, projects `da-prod` / `da-staging`,
+each with its own database, object store and secrets — beside a shared layer
+(edge Caddy, logs, alerts, autoheal) that later projects reuse. The host is
+`ops/host/README.md`; the shared layer is `ops/platform/README.md`.
+
 | Unit | Where | Artifact | Workflow |
 |------|-------|----------|----------|
 | web | self-hosted container | `apps/web/Dockerfile` (standalone output, distroless, non-root) | `.github/workflows/deploy-host.yml` |
 | engine | same host, **exactly 1** | `apps/engine/Dockerfile` (distroless, non-root) | same |
 | finops-runner | same host | `apps/finops-runner/Dockerfile` (distroless, non-root) | same |
-| caddy | same host | `caddy:2-alpine` | TLS is automatic |
+| caddy (edge) | same host, SHARED by every stack | `caddy:2-alpine` via `ops/platform/`; this stack ships `ops/deploy/site.caddy` | TLS is automatic |
 | Postgres 17 | same host, built from `ops/deploy/db/Dockerfile` | `packages/db/migrations` + `apps/engine/drizzle` | migrate on release |
 | **PITR** | **pgBackRest → an OFF-BOX S3 repo** (`pgbackrest.env`) | `ops/deploy/` | destroy-and-restore, verified 2026-09-11 (on-box repo) |
 | Object storage | MinIO-compatible **Silo** (`pgsty/silo`, pinned by digest), same host; `minio-mirror` copies it off-box hourly | `ops/deploy/` | media + finops buckets |
 | Scheduled jobs | `scheduler` (web image) | `ops/deploy/jobs/scheduler.mjs` | `/api/jobs/*` on a clock |
 | Deploy-time DB work | `migrator` (profile `ops`) | `ops/deploy/migrator/` | freeze, migrate, grants, preflight — on the host |
-| Watchdog + alerts | `autoheal`; Grafana-provisioned rules | `ops/deploy/observability/` | webhook to `ALERT_WEBHOOK_URL` |
+| Watchdog + alerts | `autoheal`; Grafana-provisioned rules (shared host layer) | `ops/platform/` | webhook to `ALERT_WEBHOOK_URL` |
 
 Postgres is BUILT rather than pulled: `archive_command` runs inside the database
 container and `postgres:17-alpine` has no pgbackrest, so every WAL segment failed
@@ -306,7 +312,7 @@ this release ship a migration?"** (pre-deploy checklist item 2).
 ### Decision procedure
 
 1. **No migration in this release** → roll the image back and stop.
-   - All three: set `TAG=` to the previous image tag in `/opt/desiauction/.env`
+   - All three: set `TAG=` to the previous image tag in `/srv/apps/desiauction/<env>/.env`
      on the host and `docker compose up -d`. Images are immutable and every
      build is tagged with its commit, so the previous release is still in the
      registry. State lives in Postgres, not the container. A failed deploy

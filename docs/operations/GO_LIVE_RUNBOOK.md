@@ -23,10 +23,11 @@ compose stack, env files, PITR), [RESTORE_RUNBOOK](RESTORE_RUNBOOK.md),
 
 ## A · Host, DNS and the database (P0-3, first half)
 
-1. **F** — Provision the host. The sizing and the reasons behind it are in
-   PRODUCTION_CHECKLIST §2 (4 vCPU / 8 GB, in India). Turn on the provider's
-   off-server daily backup at the same time; it is the only thing that
-   survives a dead disk until section B's off-host copy exists.
+1. ☑ Provision the host — done 2026-09-28: Hostinger KVM 4, Mumbai, hardened
+   with `ops/host/bootstrap.sh`, shared layer from `ops/platform/apply.sh`
+   (PRODUCTION_CHECKLIST §2). Its weekly backup restores the whole VPS; until
+   section B's off-host copy exists it is the only thing that survives a dead
+   disk.
 2. **F** — Point three DNS records at the host: `PUBLIC_DOMAIN`,
    `ENGINE_DOMAIN`, `S3_DOMAIN`.
    **Proof:** `dig +short <each name>` returns the host's address.

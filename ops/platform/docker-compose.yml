@@ -1,0 +1,134 @@
+# THE SHARED LAYER — one of each per HOST, whatever projects run on it.
+#
+#   /srv/platform            this file, Caddyfile, observability/, sites/
+#   /srv/apps/<project>/<env> each project's own Compose stack (ops/deploy)
+#
+# Only the edge Caddy publishes ports. Each project environment has its own
+# `<stack>-public` network holding ONLY its public-facing services, under
+# stack-qualified aliases (`da-prod-web`); Caddy is connected to every one of
+# them and ships nothing else across. A single network shared by every stack
+# would let `engine` in production resolve to staging's engine (Docker
+# registers plain service names on every network), so there is none.
+# Databases, object stores and workers are unreachable from here.
+#
+# Applied with ops/platform/apply.sh — rarely: it changes when the shared tools
+# are upgraded, not when a project deploys.
+name: platform
+
+x-logs: &logs
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "3"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    # A fixed name, because deploys run `docker network connect <stack>-public
+    # edge-caddy` and apply.sh reconnects after Caddy is recreated.
+    container_name: edge-caddy
+    <<: *logs
+    restart: unless-stopped
+    # 443/udp is HTTP/3. Caddy serves it automatically, and without the UDP
+    # mapping browsers silently stay on HTTP/2.
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
+      - caddy_data:/data # ACME account + certificates; losing this re-issues
+      - caddy_config:/config
+    deploy:
+      resources:
+        limits: { memory: 256m, cpus: "1.0" }
+
+  # ONE TIMELINE ACROSS EVERY SERVICE OF EVERY PROJECT.
+  #
+  # Loki in single-binary filesystem mode: no object store, no clustering, no
+  # second database to operate. Thirty days, enforced by the compactor.
+  loki:
+    image: grafana/loki@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
+    <<: *logs
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    user: "0:0" # owns its volume; the image's default uid cannot create the dirs
+    volumes:
+      - ./observability/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    deploy:
+      resources:
+        limits: { memory: 768m, cpus: "1.0" }
+
+  # Reads EVERY container's logs on the host and labels each line with its
+  # Compose project (`da-prod`, `da-staging`, `platform`, …) and service.
+  #
+  # THE DOCKER SOCKET IS MOUNTED — a real trust decision: `:ro` limits the file
+  # node, not the API, so anything that can talk to it can control Docker. It
+  # is pinned by digest and reachable from nothing outside. Every project on
+  # this host is ours; revisit this before hosting anything less trusted.
+  alloy:
+    image: grafana/alloy@sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
+    <<: *logs
+    restart: unless-stopped
+    command: ["run", "--server.http.listen-addr=0.0.0.0:12345", "/etc/alloy/config.alloy"]
+    volumes:
+      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on: [loki]
+    deploy:
+      resources:
+        limits: { memory: 256m, cpus: "0.5" }
+
+  # NOT EXPOSED TO THE INTERNET. Bound to the host's loopback and reached with
+  #   ssh -L 3001:localhost:3001 da-vps   →   http://localhost:3001
+  # A public Grafana is another login to secure and another way into a box
+  # that serves money.
+  grafana:
+    image: grafana/grafana@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    <<: *logs
+    restart: unless-stopped
+    ports: ["127.0.0.1:3001:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_SECURITY_ALLOW_EMBEDDING: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      # REQUIRED: an alert with nowhere to go is a dashboard nobody watches.
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:?set ALERT_WEBHOOK_URL in /srv/platform/.env — see ops/platform/README.md}
+    volumes:
+      - ./observability/grafana-datasource.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+      - ./observability/grafana-alerting.yml:/etc/grafana/provisioning/alerting/alerts.yml:ro
+      - grafana_data:/var/lib/grafana
+    depends_on: [loki]
+    deploy:
+      resources:
+        limits: { memory: 512m, cpus: "0.5" }
+
+  # RESTARTS WHAT DOCKER ONLY LABELS, in every project.
+  #
+  # `restart: unless-stopped` acts on a container that EXITS; one whose
+  # healthcheck fails while its process lives is marked `unhealthy` and left
+  # alone for ever. This restarts any container labelled `autoheal=true` when
+  # that happens — a project opts in per service. Never label a database:
+  # restarting Postgres mid crash-recovery is how recovery never finishes.
+  autoheal:
+    image: willfarrell/autoheal@sha256:31f580ef0279eaced5b38d631b08c474d70d8403c1c2fdd6ddcf2e879d5f3f7c # 1.2.0
+    <<: *logs
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: "10"
+      AUTOHEAL_START_PERIOD: "60"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        limits: { memory: 64m, cpus: "0.25" }
+
+volumes:
+  loki_data:
+  grafana_data:
+  caddy_data:
+  caddy_config:

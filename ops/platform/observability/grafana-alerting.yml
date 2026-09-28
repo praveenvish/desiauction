@@ -11,6 +11,13 @@
 # without it). `severity=page` vs `ticket` is a label for the receiver to route
 # on; a single operator will want both on the phone at beta.
 #
+# SCOPED TO PRODUCTION. The log stack is shared by every project on the host,
+# so each rule names its Compose project: `da-prod` for DesiAuction's services,
+# `platform` for the shared edge and autoheal (whose lines name the container,
+# hence the `da-prod-` filter). Staging never pages — it is stopped and started
+# freely, and a heartbeat rule on it would fire every time. Another project
+# adds its own group below with its own project label.
+#
 # Every rule's "no data" is OK: a count over a quiet window returns nothing, and
 # `absent_over_time` returns nothing precisely when the heartbeat IS present.
 apiVersion: 1
@@ -49,7 +56,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum(count_over_time({service="autoheal"} |= "found to be unhealthy" [10m]))'
+              expr: 'sum(count_over_time({project="platform", service="autoheal"} |= "found to be unhealthy" |= "da-prod-" [10m]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -82,7 +89,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum(count_over_time({service="autoheal"} |= "found to be unhealthy" |= "engine" [10m]))'
+              expr: 'sum(count_over_time({project="platform", service="autoheal"} |= "found to be unhealthy" |= "da-prod-engine" [10m]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -115,7 +122,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum by (service) (count_over_time({job="docker", level="error"}[5m]))'
+              expr: 'sum by (service) (count_over_time({project="da-prod", level="error"}[5m]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -148,7 +155,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum by (service) (count_over_time({job="docker", level="fatal"}[5m]))'
+              expr: 'sum by (service) (count_over_time({project="da-prod", level="fatal"}[5m]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -181,7 +188,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum(count_over_time({service="runner"} |= "finops-runner started" [30m]))'
+              expr: 'sum(count_over_time({project="da-prod", service="runner"} |= "finops-runner started" [30m]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -214,7 +221,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum(count_over_time({service="caddy"} |= "handled request" |= "/api/webhooks/" | json | status >= 500 [5m]))'
+              expr: 'sum(count_over_time({project="platform", service="caddy"} |= "handled request" |= "/api/webhooks/" | json | status >= 500 [5m]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -247,7 +254,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum(count_over_time({service="caddy"} |= "handled request" |= "/api/webhooks/" | json | status >= 400 and status < 500 [15m]))'
+              expr: 'sum(count_over_time({project="platform", service="caddy"} |= "handled request" |= "/api/webhooks/" | json | status >= 400 and status < 500 [15m]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -280,7 +287,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum(count_over_time({service="pgbackrest"} |~ "BACKUP_FAILED|BACKUP_REFUSED" [1h]))'
+              expr: 'sum(count_over_time({project="da-prod", service="pgbackrest"} |~ "BACKUP_FAILED|BACKUP_REFUSED" [1h]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -313,7 +320,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'absent_over_time({service="pgbackrest"} |= "BACKUP_OK" [26h])'
+              expr: 'absent_over_time({project="da-prod", service="pgbackrest"} |= "BACKUP_OK" [26h])'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -346,7 +353,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum(count_over_time({service="minio-mirror"} |~ "MIRROR_FAILED|MIRROR_REFUSED" [2h]))'
+              expr: 'sum(count_over_time({project="da-prod", service="minio-mirror"} |~ "MIRROR_FAILED|MIRROR_REFUSED" [2h]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -379,7 +386,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'absent_over_time({service="minio-mirror"} |= "MIRROR_OK" [3h])'
+              expr: 'absent_over_time({project="da-prod", service="minio-mirror"} |= "MIRROR_OK" [3h])'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -412,7 +419,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'sum(count_over_time({service="scheduler"} |= "job.failed" [15m]))'
+              expr: 'sum(count_over_time({project="da-prod", service="scheduler"} |= "job.failed" [15m]))'
           - refId: B
             datasourceUid: __expr__
             model:
@@ -445,7 +452,7 @@ groups:
             model:
               refId: A
               queryType: range
-              expr: 'absent_over_time({service="scheduler"} |= "job.ok" [15m])'
+              expr: 'absent_over_time({project="da-prod", service="scheduler"} |= "job.ok" [15m])'
           - refId: B
             datasourceUid: __expr__
             model:

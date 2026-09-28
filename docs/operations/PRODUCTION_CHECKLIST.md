@@ -41,10 +41,12 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
 
 ## 2 · Infrastructure (PRP-1 §2) — all ☐F then ☐E
 
-- ☐F **Contabo Cloud VPS 10, Navi Mumbai** — 4 vCPU / 8GB / 100GB NVMe,
-  ~EUR 7.90/mo. Everything runs on it: web, engine, runner, Postgres, MinIO,
-  Caddy and the log stack. 4GB would OOM under an auction; 2 vCPU is where the
-  engine's timers and WebSocket fan-out start competing with Postgres.
+- ☑ **Hostinger KVM 4, Mumbai** (2026-09-28) — 4 vCPU / 16GB / 200GB NVMe,
+  Ubuntu 26.04, hardened by `ops/host/bootstrap.sh` (ops/host/README.md). It is
+  a SHARED host: DesiAuction production and staging each run as their own
+  Compose stack beside the shared edge/log layer (ops/platform), with room for
+  other projects. 4GB would OOM under an auction; 2 vCPU is where the engine's
+  timers and WebSocket fan-out start competing with Postgres.
 
   IN INDIA, and that is the reason rather than the price. The product's
   defining moment is forty people in a hall watching a countdown: ~20ms from
@@ -54,13 +56,14 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   once Razorpay is handling collections.
 
   NOTHING HERE IS PROVIDER-SPECIFIC. The stack is one compose file; moving is
-  three DNS records and an env file. Contabo bills monthly with no commitment,
-  so a month of real use is the cheapest way to test its one known weakness —
-  CPU oversubscription, which shows up as jitter and is the wrong failure mode
-  for a gavel. Watch steal during a rehearsal auction before trusting it.
-- ☐F **Contabo Auto Backup ON** (~EUR 1.15/mo): daily, stored OFF the server,
-  10 days retained — a whole-machine image, the coarse last resort under the
-  two off-box copies below.
+  three DNS records and an env file. The one known weakness of any shared VPS
+  is CPU oversubscription, which shows up as jitter and is the wrong failure
+  mode for a gavel. Watch `steal` in `top` during a rehearsal auction before
+  trusting it.
+- ☑ **Hostinger weekly backup** (free; daily is paid): stored off the server,
+  but a restore overwrites the WHOLE VPS — every project at once — so it is the
+  coarse last resort under the two off-box copies below, never the way to
+  recover one project's data.
 - ☐F **An off-box S3 bucket for pgBackRest** (different account/provider —
   B2, R2, S3), keys in `pgbackrest.env` (ops/deploy/README "Backups"). ☑ The
   sidecar is automated: WAL archive, nightly full/diff, `BACKUP_OK`/`FAILED`
@@ -163,15 +166,15 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
 
 - ☑ Sentry wired (web + engine) — ☐F production DSNs
 - ☑ Structured pino logs everywhere, collected into Loki and read through
-  Grafana over an SSH tunnel (`ops/deploy/observability/`). Container logs are
+  Grafana over an SSH tunnel (`ops/platform/`, shared by every stack on the host). Container logs are
   size-capped, so they can no longer fill the disk; Loki holds 30 days.
   ☐E ship them off-box — on-box logs are least available exactly when the
   machine is gone, which is the same limitation the backups carry.
-- ☑ Alert rules provisioned from `ops/deploy/observability/grafana-alerting.yml`
+- ☑ Alert rules provisioned from `ops/platform/observability/grafana-alerting.yml`, scoped to `project="da-prod"`
   (2026-09-23): service/engine unhealthy (via `autoheal`), error rate, fatal,
   runner crash loop, webhook 5xx/4xx, backup + mirror failure AND silence,
   scheduled jobs failing or silent — [ALERTS](ALERTS.md) has the map and the gaps.
-  ☐F `ALERT_WEBHOOK_URL` in `.env` (compose refuses to start without it).
+  ☐F `ALERT_WEBHOOK_URL` in `/srv/platform/.env` (Grafana refuses to start without it).
   ☐F External uptime check on `/readyz` + engine `/healthz` + TLS expiry
   ([ALERTS](ALERTS.md) "Outside the box"). ☐F Sentry alert rules on the DSNs.
 - ☐E Metrics-backed alerts still absent: bid-ack p95, WS fan-out, runner tick

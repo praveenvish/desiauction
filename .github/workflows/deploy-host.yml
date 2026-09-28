@@ -14,7 +14,12 @@
 # images, over the same SSH session that swaps the containers.
 #
 # Order: CI green for this exact commit → build → [host] preflight → freeze →
-# pull → migrate → grants → engine swap + /readyz → the rest + /readyz.
+# pull → migrate → grants → engine swap + /readyz → the rest + /readyz →
+# publish the site file to the shared edge Caddy.
+#
+# ONE HOST, MANY STACKS. Each environment lives in /srv/apps/desiauction/<env>
+# as Compose project da-prod or da-staging (ops/deploy/docker-compose.production.yml
+# header); TLS, logs and alerts are the host's shared layer (ops/platform).
 name: deploy-host
 
 on:
@@ -142,7 +147,7 @@ jobs:
 
       # --- The stack's files travel with the release ---------------------------
       #
-      # The compose file, Caddyfile, scheduler and alert rules are code, and a
+      # The compose file, site template, scheduler and Postgres config are code, and a
       # host running last month's copy of them is a deploy nobody reviewed. The
       # env files are NOT in git and are never touched. Anything edited by hand
       # on the host under these names is overwritten — change it here instead.
@@ -152,8 +157,8 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "ops/deploy/docker-compose.production.yml,ops/deploy/Caddyfile,ops/deploy/jobs,ops/deploy/observability,ops/deploy/postgresql.conf.d"
-          target: /opt/desiauction
+          source: "ops/deploy/docker-compose.production.yml,ops/deploy/site.caddy,ops/deploy/jobs,ops/deploy/postgresql.conf.d"
+          target: /srv/apps/desiauction/${{ inputs.environment }}
           strip_components: 2
 
       # --- On the host: gate, migrate, swap, prove ---------------------------
@@ -177,16 +182,26 @@ jobs:
           # is what prints the rollback instructions on a failed swap.
           script: |
             set -Eeuo pipefail
-            cd /opt/desiauction
+            APP_DIR="/srv/apps/desiauction/${{ inputs.environment }}"
+            cd "$APP_DIR"
 
             NEW_TAG="${{ env.TAG }}"
             NEW_DB_TAG="${{ env.DB_TAG }}"
             PREV_TAG="$(sed -n 's/^TAG=//p' .env)"
             STAGE=gates
 
-            # The synced file is the stack; say so once so every plain
-            # `docker compose …` on this host reads it.
+            # The synced file is the stack, and the environment names the
+            # Compose project; say both once so every plain `docker compose …`
+            # in this directory reads the right stack under the right name.
+            STACK="$([ "${{ inputs.environment }}" = production ] && echo da-prod || echo da-staging)"
             grep -q '^COMPOSE_FILE=' .env || echo 'COMPOSE_FILE=docker-compose.production.yml' >> .env
+            grep -q '^COMPOSE_PROJECT_NAME=' .env || echo "COMPOSE_PROJECT_NAME=${STACK}" >> .env
+            grep -qx "COMPOSE_PROJECT_NAME=${STACK}" .env \
+              || { echo "${APP_DIR}/.env names a different Compose project than ${STACK}"; exit 1; }
+
+            # The shared layer must be up: this deploy hands its hostnames to it.
+            docker inspect edge-caddy >/dev/null 2>&1 \
+              || { echo "edge-caddy is not running — apply ops/platform first (ops/platform/README.md)"; exit 1; }
 
             on_failure() {
               echo ""
@@ -199,7 +214,7 @@ jobs:
                   echo "batch rolls back as one transaction; read the error above before retrying." ;;
                 *)
                   echo "Migrations for ${NEW_TAG} are applied. To put the previous images back:"
-                  echo "  cd /opt/desiauction"
+                  echo "  cd ${APP_DIR}"
                   echo "  sed -i 's|^TAG=.*|TAG=${PREV_TAG}|' .env && docker compose up -d"
                   echo "That is safe only if this release's migrations are expand-only —"
                   echo "DEPLOYMENT.md §Rollback decides; a destructive one means restore." ;;
@@ -283,10 +298,33 @@ jobs:
                 || { echo "${svc} is not running"; docker compose logs --tail 60 "$svc"; false; }
             done
 
-            # Bind-mounted config does not reload itself.
-            STAGE=config-reload
-            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
-            docker compose restart grafana alloy
+            # Hand this stack's hostnames to the shared edge. The site file is
+            # rendered from the template with this stack's own .env values;
+            # Caddy joins the stack's public network (idempotent) and validates
+            # before it reloads — a refused reload leaves every site as it was.
+            STAGE=edge
+            envval() { sed -n "s/^$1=//p" .env; }
+            WEB_EXTRA=""
+            [ "$STACK" = da-staging ] && WEB_EXTRA='header X-Robots-Tag "noindex, nofollow"'
+            sed -e "s|__STACK__|${STACK}|g" \
+                -e "s|__PUBLIC_DOMAIN__|$(envval PUBLIC_DOMAIN)|g" \
+                -e "s|__ENGINE_DOMAIN__|$(envval ENGINE_DOMAIN)|g" \
+                -e "s|__S3_DOMAIN__|$(envval S3_DOMAIN)|g" \
+                -e "s|__WEB_EXTRA__|${WEB_EXTRA}|g" \
+                site.caddy > "/srv/platform/sites/${STACK}.caddy.new"
+            SITE="/srv/platform/sites/${STACK}.caddy"
+            [ -f "$SITE" ] && cp "$SITE" "${SITE}.prev"
+            mv "${SITE}.new" "$SITE"
+            docker network connect "${STACK}-public" edge-caddy 2>/dev/null || true
+            # A site file Caddy refuses is put back at once: it sits in the
+            # directory every OTHER stack's reload reads too.
+            if ! docker exec edge-caddy caddy validate --config /etc/caddy/Caddyfile >/dev/null; then
+              if [ -f "${SITE}.prev" ]; then mv "${SITE}.prev" "$SITE"; else rm -f "$SITE"; fi
+              echo "the rendered site file failed validation; the previous one is restored"
+              false
+            fi
+            docker exec edge-caddy caddy reload --config /etc/caddy/Caddyfile
+            rm -f "${SITE}.prev"
 
             docker image prune -f
             trap - ERR
