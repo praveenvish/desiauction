@@ -39,12 +39,25 @@ const AUCTION_OF: Readonly<Record<MessageLanguage, (season: string) => string>> 
 };
 
 /** "8:00 pm IST" — the time alone, for the tile. */
-function timeWords(at: Date): string {
+export function timeWords(at: Date): string {
   const ist = new Date(at.getTime() + IST_OFFSET_MS);
   const hours = ist.getUTCHours();
   const minutes = String(ist.getUTCMinutes()).padStart(2, "0");
   const twelve = hours % 12 === 0 ? 12 : hours % 12;
   return `${String(twelve)}:${minutes} ${hours < 12 ? "am" : "pm"} IST`;
+}
+
+/** The leaf's three lines for a moment — "OCT", "4", "SUN" — in IST and the reader's language. */
+export function leafDate(
+  at: Date,
+  language: MessageLanguage,
+): { month: string; day: string; weekday: string } {
+  const ist = new Date(at.getTime() + IST_OFFSET_MS);
+  return {
+    month: MONTHS[language][ist.getUTCMonth()] ?? "",
+    day: String(ist.getUTCDate()),
+    weekday: WEEKDAYS[language][ist.getUTCDay()] ?? "",
+  };
 }
 
 /** The calendar leaf for a moment, in IST and the reader's language. */
@@ -53,11 +66,8 @@ export function auctionDateLeaf(
   season: string,
   language: MessageLanguage,
 ): EmailDateLeaf {
-  const ist = new Date(at.getTime() + IST_OFFSET_MS);
   return {
-    month: MONTHS[language][ist.getUTCMonth()] ?? "",
-    day: String(ist.getUTCDate()),
-    weekday: WEEKDAYS[language][ist.getUTCDay()] ?? "",
+    ...leafDate(at, language),
     title: AUCTION_OF[language](season),
     detail: timeWords(at),
   };

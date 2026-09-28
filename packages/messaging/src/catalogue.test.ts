@@ -66,6 +66,8 @@ describe("the notification catalogue", () => {
     expect(personTopics().map((t) => t.topic)).toEqual([
       "registration",
       "auction",
+      // Email programme PR11: schedule, a moved match, lineups, match day.
+      "matches",
       "money",
       "feedback",
       // Email programme PR5: the 9 am digest and the club welcome.
@@ -76,7 +78,12 @@ describe("the notification catalogue", () => {
   it("offers a club only the switches its sends actually read", () => {
     // Feedback asks go out on the bare pool with no club named — a club switch
     // for them would be one that silently does nothing.
-    expect(orgTopics().map((t) => t.topic)).toEqual(["registration", "auction", "money"]);
+    expect(orgTopics().map((t) => t.topic)).toEqual([
+      "registration",
+      "auction",
+      "matches",
+      "money",
+    ]);
   });
 
   it("files WhatsApp under the text row", () => {

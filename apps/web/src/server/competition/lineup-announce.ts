@@ -1,6 +1,5 @@
 import {
   auditLog,
-  competitions,
   fixtureLineups,
   fixtures,
   messageOutbox,
@@ -9,7 +8,7 @@ import {
   registrations,
   type Db,
 } from "@desiauction/db";
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
 
 import { messageLanguagesOf } from "@desiauction/messaging/language";
 
@@ -23,8 +22,10 @@ import {
   type QueuedMail,
   type QueuedSms,
 } from "../messaging/outbox";
+import { lineupMatchup } from "../messaging/fixture-mail";
 import { lineupMail, type SquadLine } from "../messaging/player-mail";
 import { smsFit } from "../messaging/templates";
+import { matchesUrl, matchesWhere, seasonOf, toMatch } from "./fixture-notify";
 import { fixtureSnapshot, nowWallClock } from "./fixtures";
 import { shownName } from "./shown-name";
 
@@ -121,12 +122,8 @@ export async function announceLineup(
   if (fixture === null) {
     return { ok: false, reason: "not_found" };
   }
-  const [season] = await db
-    .select({ name: competitions.name, orgId: competitions.orgId })
-    .from(competitions)
-    .where(eq(competitions.id, input.competitionId))
-    .limit(1);
-  if (season === undefined) {
+  const season = await seasonOf(db, input.competitionId);
+  if (season === null) {
     return { ok: false, reason: "not_found" };
   }
   const side =
@@ -182,6 +179,10 @@ export async function announceLineup(
     db,
     fresh.map((player) => player.personId),
   );
+  // The two crests at the top of the mail, and the match its button opens.
+  const [matchRow] = await matchesWhere(db, sql`f.id = ${input.fixtureId}`);
+  const match = matchRow === undefined ? null : toMatch(matchRow);
+  const url = matchesUrl(season, { owner: false }, { matchId: input.fixtureId });
   const mails: QueuedMail[] = await Promise.all(
     fresh.map(async (player) => ({
       personId: player.personId,
@@ -191,7 +192,20 @@ export async function announceLineup(
       ...(await lineupMail(
         {
           name: player.greetingName?.trim() || "there",
-          season: season.name,
+          season: season.season.trim(),
+          orgName: season.orgName.trim(),
+          sport: season.sport,
+          url,
+          ...(match === null
+            ? {}
+            : (() => {
+                const matchup = lineupMatchup(
+                  match,
+                  input.teamId,
+                  languages.get(player.personId) ?? "en",
+                );
+                return matchup === undefined ? {} : { matchup };
+              })()),
           teamName: side.team ?? "",
           opponent: side.opponent ?? "",
           when: formatKickoff(fixture.kickoffAt ?? ""),
@@ -223,7 +237,7 @@ export async function announceLineup(
     try {
       await logSecurityEvent(player.personId, "fixture.lineup_announced", {
         competitionId: input.competitionId,
-        competition: season.name,
+        competition: season.season.trim(),
         team: side.team,
         opponent: side.opponent,
         kickoffAt: fixture.kickoffAt,

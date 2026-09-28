@@ -309,6 +309,10 @@
     "apps/web/src/server/competition/auction-reminders.ts": {
       "class": "by-design",
       "reason": "Auction night reminders (email programme PR8), swept by the messages job with no session: reads, across every club, which seasons' auctions start within a day, their owners, pool players and organizers, and the day-before readiness counts, on the system pool \u2014 the same shape as the 9 am digest (registration-digest.ts). Mail is queued on the app pool (message_outbox, keyed by person) and the drain applies each person's gate inside their club's scope; the half-hour inbox rows go through logSecurityEvent, which scopes to the person. There is no single tenant to scope a cross-club sweep to."
+    },
+    "apps/web/src/server/competition/match-day.ts": {
+      "class": "by-design",
+      "reason": "Match-day notes (email programme PR11), swept by the messages job with no session: reads, across every club, which published fixtures are due a note (7 am IST on the day, 6 pm the evening before an early match), each season's team players, owners and organizers, and which lineups were announced, on the system pool \u2014 the same shape as auction-reminders.ts. Mail is queued on the app pool (message_outbox, keyed by person) and the drain applies each person's gate inside their club's scope. There is no single tenant to scope a cross-club sweep to."
     }
   }
 }

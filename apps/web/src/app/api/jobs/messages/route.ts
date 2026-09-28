@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
 import { sweepAuctionReminders } from "../../../../server/competition/auction-reminders";
+import { sweepMatchDays } from "../../../../server/competition/match-day";
 import { logger, withRequestId } from "../../../../server/logger";
 import { drainOutbox } from "../../../../server/messaging/outbox";
 
@@ -41,8 +42,13 @@ async function handle(request: Request): Promise<NextResponse> {
     logger().error({ err: error }, "auction_reminders.sweep_failed");
     return "failed" as const;
   });
+  // Match-day notes (PR11): the same shape — built when due, drained below.
+  const matchDays = await sweepMatchDays().catch((error: unknown) => {
+    logger().error({ err: error }, "match_day.sweep_failed");
+    return "failed" as const;
+  });
   const drained = await drainOutbox({ limit: 200 });
-  return NextResponse.json({ reminders, drained });
+  return NextResponse.json({ reminders, matchDays, drained });
 }
 
 export function POST(request: Request): Promise<NextResponse> {

@@ -51,6 +51,10 @@ const MANAGEABLE = new Set([
   "team.appointed",
   "team.squad_sheet",
   "lineup.announced",
+  // Match updates (PR11).
+  "schedule.published",
+  "fixture.changed",
+  "match.day",
   "review.platform_ask",
   "review.season_ask",
 ]);
@@ -133,6 +137,54 @@ describe("the layout itself", () => {
     action: { label: "Open", url: `${OWN}/home?a=1&b=2` },
     footnote: "Because.",
   };
+
+  it("lists matches on small leaves, in both parts", () => {
+    const mail = renderEmail({
+      ...content,
+      fixtures: [
+        {
+          month: "OCT",
+          day: "4",
+          weekday: "SUN",
+          title: "vs <Tigers>",
+          detail: "7:30 pm IST · Malad Ground",
+          note: "Moved",
+        },
+      ],
+    });
+    expect(mail.html).toContain("vs &lt;Tigers&gt;");
+    expect(mail.html).toContain("Moved");
+    expect(mail.text).toContain("  SUN 4 OCT · vs <Tigers> · 7:30 pm IST · Malad Ground (Moved)");
+  });
+
+  it("draws the matchup in the teams' colours, and gold for anything that is not one", () => {
+    const side = (name: string, color: string | null, yours: boolean) => ({
+      name,
+      monogram: name.slice(0, 2).toUpperCase(),
+      color,
+      yours,
+    });
+    const mail = renderEmail({
+      ...content,
+      band: { title: "Season", subtitle: "Club", monogram: "SC" },
+      matchup: {
+        kicker: "Match day",
+        home: side("Cup Kings", "#1E6FD9", true),
+        away: side("Tigers", "red;background:url(x)", false),
+        versus: "vs",
+        yoursLabel: "Your team",
+        line: "Sun 4 Oct · 7:30 pm IST · Malad Ground",
+      },
+    });
+    expect(mail.html).toContain("border:3px solid #1E6FD9");
+    expect(mail.html).not.toContain("url(x)");
+    expect(mail.html).toContain("Your team");
+    // The matchup replaces the club band, like the stage.
+    expect(mail.html).not.toContain(">Season<");
+    expect(mail.text.startsWith("Match day: Cup Kings vs Tigers\nSun 4 Oct · 7:30 pm IST")).toBe(
+      true,
+    );
+  });
 
   it("escapes every string", () => {
     const { html } = renderEmail(content);

@@ -1255,7 +1255,12 @@ const LINEUP: EmailTemplateSpec = {
   editableFields: LAYOUT_FIELDS,
   languages: ["en", "hi"],
   variants: DEFAULT_VARIANT,
-  actions: [SEASON_ACTION],
+  actions: [
+    {
+      id: "season",
+      description: "The match — or the player's home, when the season is not public.",
+    },
+  ],
   variables: [
     NAME,
     SEASON,
@@ -1288,7 +1293,7 @@ const LINEUP: EmailTemplateSpec = {
           "You're playing for {{teamName}} against {{opponent}} on {{when}}{{placeClause}}. Here's the lineup.",
         ],
         after: ["Good luck!"],
-        actions: { season: SEE_SEASON.en },
+        actions: { season: "See the match" },
         footnote: `You received this because you play for {{teamName}} in {{season}}.`,
       }),
     ),
@@ -1302,10 +1307,372 @@ const LINEUP: EmailTemplateSpec = {
           "आप {{when}}{{placeClause}} {{opponent}} के ख़िलाफ़ {{teamName}} के लिए खेल रहे हैं। यह रही टीम।",
         ],
         after: ["शुभकामनाएँ!"],
-        actions: { season: SEE_SEASON.hi },
+        actions: { season: "मैच देखें" },
         footnote: `आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} के लिए खेलते हैं।`,
       }),
     ),
+  },
+};
+
+// --- The season's matches (email programme PR11) ----------------------------------
+
+const MATCH_TITLE = text(
+  "matchTitle",
+  "The match, as its teams (“Cup Kings vs Tigers”) — or a lobby (“Lobby 3 · 12 teams”).",
+  "Cup Kings vs Tigers",
+  "कप किंग्स बनाम टाइगर्स",
+  { computed: true },
+);
+const PLAYS_FOR = {
+  en: "You received this because you're on {{teamName}} in {{season}}.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} की टीम में हैं।",
+};
+const IST_NOTE = {
+  en: "All times are in IST. If a match moves, we'll email you.",
+  hi: "सभी समय IST में हैं। कोई मैच आगे-पीछे हुआ, तो हम आपको ईमेल करेंगे।",
+};
+const SEE_MATCHES = { en: "See all matches", hi: "सारे मैच देखें" };
+const SEE_MATCH = { en: "See the match", hi: "मैच देखें" };
+
+const SCHEDULE_PUBLISHED: EmailTemplateSpec = {
+  kind: "schedule.published",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "first", label: "Schedule out" },
+    { id: "updated", label: "More matches published" },
+  ],
+  actions: [{ id: "matches", description: "The season's Matches screen, filtered to the team." }],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    TEAM,
+    text(
+      "matchCount",
+      "How many matches the team has to come (“5 matches”).",
+      "5 matches",
+      "5 मैच",
+      {
+        computed: true,
+      },
+    ),
+    text(
+      "firstMatch",
+      "The team's next match, in short (“Sun 4 Oct vs Tigers”).",
+      "Sun 4 Oct vs Tigers",
+      "रवि 4 अक्टू॰, टाइगर्स से",
+      { computed: true },
+    ),
+    text(
+      "moreLine",
+      "When the list is long: how many more are on the season page. Empty otherwise.",
+      "…and 3 more on the season page.",
+      "…और 3 मैच सीज़न पेज पर।",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  note: "The list of matches is written by the code. Held ten minutes and rebuilt on every publish, so a schedule published in three sittings is one mail.",
+  defaults: {
+    en: {
+      variants: {
+        first: layout({
+          subject: "Your {{teamName}} schedule: {{matchCount}}",
+          preheader: "First up: {{firstMatch}}.",
+          heading: "Your {{teamName}} schedule is out",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has published the {{season}} schedule. {{teamName}} have {{matchCount}} to play — here they are.",
+          ],
+          after: ["{{moreLine}}", IST_NOTE.en],
+          actions: { matches: SEE_MATCHES.en },
+          footnote: PLAYS_FOR.en,
+        }),
+        updated: layout({
+          subject: "More {{teamName}} matches published",
+          preheader: "Next up: {{firstMatch}}.",
+          heading: "More matches for {{teamName}}",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has published more of the {{season}} schedule. Here are all {{matchCount}} {{teamName}} still have to play.",
+          ],
+          after: ["{{moreLine}}", IST_NOTE.en],
+          actions: { matches: SEE_MATCHES.en },
+          footnote: PLAYS_FOR.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        first: layout({
+          subject: "{{teamName}} का शेड्यूल: {{matchCount}}",
+          preheader: "पहला मैच: {{firstMatch}}।",
+          heading: "{{teamName}} का शेड्यूल आ गया",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{season}} का शेड्यूल जारी कर दिया है। {{teamName}} को {{matchCount}} खेलने हैं — ये रहे।",
+          ],
+          after: ["{{moreLine}}", IST_NOTE.hi],
+          actions: { matches: SEE_MATCHES.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+        updated: layout({
+          subject: "{{teamName}} के और मैच जारी हुए",
+          preheader: "अगला मैच: {{firstMatch}}।",
+          heading: "{{teamName}} के लिए और मैच",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{season}} के और मैच जारी किए हैं। ये रहे {{teamName}} के बाक़ी सभी {{matchCount}}।",
+          ],
+          after: ["{{moreLine}}", IST_NOTE.hi],
+          actions: { matches: SEE_MATCHES.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+      },
+    },
+  },
+};
+
+const FIXTURE_CHANGED: EmailTemplateSpec = {
+  kind: "fixture.changed",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "moved", label: "Match moved" },
+    { id: "cancelled", label: "Match called off" },
+  ],
+  actions: [{ id: "match", description: "The match on the season's Matches screen." }],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    TEAM,
+    MATCH_TITLE,
+    text(
+      "when",
+      "The new time (“Sun 4 Oct, 7:30 pm”).",
+      "Sun 4 Oct, 7:30 pm",
+      "रवि 4 अक्टू॰, 7:30 pm",
+      {
+        computed: true,
+        whenEmpty: "blank",
+      },
+    ),
+    text(
+      "previous",
+      "The time it had (“Sat 3 Oct, 4:00 pm”).",
+      "Sat 3 Oct, 4:00 pm",
+      "शनि 3 अक्टू॰, 4:00 pm",
+      { computed: true },
+    ),
+    text(
+      "reasonLine",
+      "The organizer's reason, when they gave one. Empty otherwise.",
+      "The organizer's note: “Rain forecast for Saturday.”",
+      "आयोजक का नोट: “Rain forecast for Saturday.”",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  note: "Held ten minutes; a newer change to the same match replaces a notice still waiting. The date tile and the old time are written by the code.",
+  defaults: {
+    en: {
+      variants: {
+        moved: layout({
+          subject: "Match moved: {{matchTitle}} is now {{when}}",
+          preheader: "It was {{previous}}. Please update your calendar.",
+          heading: "Your match has moved",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has moved {{matchTitle}}. It was {{previous}} — here's the new time.",
+          ],
+          after: [IST_NOTE.en],
+          actions: { match: SEE_MATCH.en },
+          footnote: PLAYS_FOR.en,
+        }),
+        cancelled: layout({
+          subject: "Called off: {{matchTitle}}, {{previous}}",
+          preheader: "{{orgName}} has called this match off.",
+          heading: "A match has been called off",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has called off {{matchTitle}}, which was set for {{previous}}.",
+          ],
+          after: ["{{reasonLine}}", "If it's rearranged, we'll email you the new date."],
+          actions: { match: SEE_MATCHES.en },
+          footnote: PLAYS_FOR.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        moved: layout({
+          subject: "मैच का समय बदला: {{matchTitle}} अब {{when}}",
+          preheader: "पहले यह {{previous}} था। कृपया अपना कैलेंडर बदल लें।",
+          heading: "आपके मैच का समय बदल गया",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{matchTitle}} का समय बदल दिया है। पहले यह {{previous}} था — नया समय यह है।",
+          ],
+          after: [IST_NOTE.hi],
+          actions: { match: SEE_MATCH.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+        cancelled: layout({
+          subject: "मैच रद्द: {{matchTitle}}, {{previous}}",
+          preheader: "{{orgName}} ने यह मैच रद्द कर दिया है।",
+          heading: "एक मैच रद्द हो गया",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{matchTitle}} रद्द कर दिया है, जो {{previous}} को होना था।",
+          ],
+          after: ["{{reasonLine}}", "अगर यह दोबारा तय हुआ, तो हम आपको नई तारीख़ ईमेल करेंगे।"],
+          actions: { match: SEE_MATCHES.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+      },
+    },
+  },
+};
+
+const MATCH_DAY: EmailTemplateSpec = {
+  kind: "match.day",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "player", label: "Player or owner" },
+    { id: "organizer", label: "Organizer (the day at a glance)" },
+  ],
+  actions: [
+    { id: "open", description: "The match, or the organizer's Matches screen for the day." },
+  ],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    text("teamName", "The reader's team.", "Cup Kings", "कप किंग्स", { whenEmpty: "drop" }),
+    text(
+      "matchTitle",
+      "The match (“Cup Kings vs Tigers”).",
+      "Cup Kings vs Tigers",
+      "कप किंग्स बनाम टाइगर्स",
+      {
+        computed: true,
+        whenEmpty: "drop",
+      },
+    ),
+    text("dayWord", "“today”, or “tomorrow” for a match before 11 am.", "today", "आज", {
+      computed: true,
+    }),
+    text("time", "The kick-off (“7:30 pm”).", "7:30 pm", "7:30 pm", {
+      computed: true,
+      whenEmpty: "drop",
+    }),
+    text(
+      "placeClause",
+      "“ at Malad Ground”, when the match has a ground; otherwise nothing.",
+      " at Malad Ground",
+      ", मलाड ग्राउंड में",
+      { computed: true, whenEmpty: "blank" },
+    ),
+    text("matchCount", "How many matches (“3 matches”).", "3 matches", "3 मैच", { computed: true }),
+    text(
+      "lineupLine",
+      "“You're in the lineup.” — only when the lineup was announced and the reader is in it.",
+      "You're in the lineup — good luck!",
+      "आप प्लेइंग टीम में हैं — शुभकामनाएँ!",
+      { computed: true, whenEmpty: "drop" },
+    ),
+    text(
+      "moreLine",
+      "When the reader's team plays more than once that day. Empty otherwise.",
+      "Cup Kings play twice — both matches are below.",
+      "कप किंग्स के दो मैच हैं — दोनों नीचे हैं।",
+      { computed: true, whenEmpty: "drop" },
+    ),
+    text(
+      "gapLine",
+      "For organizers: lineups still to announce, written by DesiAuction. Empty when every lineup is in.",
+      "2 lineups aren't announced yet — announce them from the Matches screen.",
+      "2 प्लेइंग टीमें अभी घोषित नहीं हुईं — मैच पेज से घोषित करें।",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  note: "Sent by the scheduled sweep: at 7 am IST on the day, or at 6 pm the evening before a match that starts before 11 am. The matchup, the list and the ground's address are written by the code.",
+  defaults: {
+    en: {
+      variants: {
+        player: layout({
+          subject: "Match day: {{matchTitle}}, {{time}} {{dayWord}}",
+          preheader: "{{teamName}} play {{dayWord}}{{placeClause}}. Get there early to warm up.",
+          heading: "Your match is {{dayWord}}",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{teamName}} play {{dayWord}} at {{time}}{{placeClause}}. Get there a little early to warm up.",
+          ],
+          after: [
+            "{{lineupLine}}",
+            "{{moreLine}}",
+            "Times are in IST. Check the match page for any late change.",
+          ],
+          actions: { open: SEE_MATCH.en },
+          footnote: PLAYS_FOR.en,
+        }),
+        organizer: layout({
+          subject: "Match day: {{matchCount}} {{dayWord}} in {{season}}",
+          preheader: "Your day at a glance — grounds, times and lineups.",
+          heading: "Your match day at a glance",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{season}} has {{matchCount}} {{dayWord}}. Here's the day:",
+          ],
+          after: ["{{gapLine}}"],
+          actions: { open: "Open the matches" },
+          footnote: "You received this because you run {{season}} on DesiAuction.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        player: layout({
+          subject: "मैच डे: {{matchTitle}}, {{dayWord}} {{time}}",
+          preheader:
+            "{{teamName}} का मैच {{dayWord}}{{placeClause}}। वॉर्म-अप के लिए जल्दी पहुँचें।",
+          heading: "आपका मैच {{dayWord}} है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{teamName}} का मैच {{dayWord}} {{time}} बजे{{placeClause}} है। वॉर्म-अप के लिए थोड़ा पहले पहुँचें।",
+          ],
+          after: [
+            "{{lineupLine}}",
+            "{{moreLine}}",
+            "समय IST में है। आख़िरी समय के किसी बदलाव के लिए मैच पेज देखें।",
+          ],
+          actions: { open: SEE_MATCH.hi },
+          footnote: PLAYS_FOR.hi,
+        }),
+        organizer: layout({
+          subject: "मैच डे: {{season}} में {{dayWord}} {{matchCount}}",
+          preheader: "आपका दिन एक नज़र में — मैदान, समय और प्लेइंग टीमें।",
+          heading: "आपका मैच डे, एक नज़र में",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{season}} में {{dayWord}} {{matchCount}} हैं। पूरा दिन यह रहा:",
+          ],
+          after: ["{{gapLine}}"],
+          actions: { open: "मैच खोलें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+        }),
+      },
+    },
   },
 };
 
@@ -2244,6 +2611,9 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "team.appointed": APPOINTED,
   "team.squad_sheet": SQUAD_SHEET,
   "lineup.announced": LINEUP,
+  "schedule.published": SCHEDULE_PUBLISHED,
+  "fixture.changed": FIXTURE_CHANGED,
+  "match.day": MATCH_DAY,
   "finance.document.issued": FINANCE,
   "review.platform_ask": PLATFORM_ASK,
   "review.season_ask": SEASON_ASK,

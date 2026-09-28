@@ -70,6 +70,54 @@ export interface EmailStage {
   readonly line: string;
 }
 
+/**
+ * One match in a list — a team's schedule, a match day with two games. A small
+ * calendar leaf, then who and where.
+ */
+export interface EmailFixture {
+  /** "OCT" / "अक्टू॰" */
+  readonly month: string;
+  /** "4" */
+  readonly day: string;
+  /** "SUN" / "रवि" */
+  readonly weekday: string;
+  /** "vs Tigers" */
+  readonly title: string;
+  /** "7:30 pm · Malad Ground" */
+  readonly detail: string;
+  /** A short tag on the right — "Moved", "New". Empty or absent for none. */
+  readonly note?: string;
+}
+
+/** One side of a match, for the matchup panel. */
+export interface EmailSide {
+  readonly name: string;
+  /** Initials in the crest — a team logo is a signed, expiring URL, never mailed. */
+  readonly monogram: string;
+  /** The team's colour ("#1E6FD9") for the crest's ring; gold when it has none. */
+  readonly color: string | null;
+  /** The reader's own side, tagged under its name. */
+  readonly yours: boolean;
+}
+
+/**
+ * THE MATCHUP — a Floodlight panel at the top of the card for a match day or a
+ * lineup: two crests, "vs", and when and where under them. Like the stage, it
+ * replaces the club band and stays dark in either theme.
+ */
+export interface EmailMatchup {
+  /** "MATCH DAY" / "LINEUP" */
+  readonly kicker: string;
+  readonly home: EmailSide;
+  readonly away: EmailSide;
+  /** "vs" in the reader's language. */
+  readonly versus: string;
+  /** "YOUR TEAM" in the reader's language. */
+  readonly yoursLabel: string;
+  /** "7:30 pm IST · Malad Ground" */
+  readonly line: string;
+}
+
 /** A calendar leaf: the date is the whole point of a reminder or a time change. */
 export interface EmailDateLeaf {
   /** "OCT" / "अक्टू॰" */
@@ -117,6 +165,10 @@ export interface EmailContent {
   readonly document?: string;
   /** A date tile after the opening paragraphs — auction night, a changed time. */
   readonly dateLeaf?: EmailDateLeaf;
+  /** A list of matches after the opening paragraphs — a team's schedule. */
+  readonly fixtures?: readonly EmailFixture[];
+  /** The match at the top of the card (match day, a lineup). Replaces the club band. */
+  readonly matchup?: EmailMatchup;
   /** The club band at the top of the card (club and season mail). */
   readonly band?: EmailBand;
   /** The season tracker under the heading — Registered → Approved → Auction → Team. */
@@ -238,6 +290,38 @@ const STAGE_GOLD = "#F3D078"; // gold-300
 
 function stageRow(stage: EmailStage, font: string): string {
   return `<tr><td class="da-stage" align="center" style="background:${STAGE_BG};border-radius:16px 16px 0 0;border-bottom:2px solid ${GOLD};padding:30px 32px 26px;"><div style="font:800 12px/16px ${FONT};letter-spacing:3px;color:${STAGE_GOLD};text-transform:uppercase;">${escape(stage.kicker)}</div><div style="width:80px;height:80px;border-radius:40px;border:2px solid ${GOLD};background:${STAGE_PANEL};margin:16px auto 14px;font:700 28px/80px ${FONT};color:${STAGE_HEADING};text-align:center;">${escape(stage.monogram)}</div><div style="font:700 21px/28px ${font};color:${STAGE_HEADING};">${escape(stage.title)}</div><div style="font:800 42px/50px ${FONT};color:${STAGE_GOLD};letter-spacing:-1px;font-variant-numeric:tabular-nums;margin-top:6px;">${escape(stage.figure)}</div>${stage.line === "" ? "" : `<div style="font:14px/20px ${font};color:${STAGE_TEXT};margin-top:6px;">${escape(stage.line)}</div>`}</td></tr>`;
+}
+
+/** A team colour as the panel may use it: a six-digit hex, or gold. */
+function sideColor(color: string | null): string {
+  return color !== null && /^#[0-9a-fA-F]{6}$/.test(color) ? color : GOLD;
+}
+
+function sideCell(side: EmailSide, yoursLabel: string, font: string): string {
+  const tag = side.yours
+    ? `<div style="font:800 10px/14px ${FONT};letter-spacing:1.5px;color:${STAGE_GOLD};text-transform:uppercase;margin-top:4px;">${escape(yoursLabel)}</div>`
+    : "";
+  return `<td width="42%" align="center" style="vertical-align:top;"><div style="width:64px;height:64px;border-radius:32px;border:3px solid ${sideColor(side.color)};background:${STAGE_PANEL};margin:0 auto 10px;font:700 22px/64px ${FONT};color:${STAGE_HEADING};text-align:center;">${escape(side.monogram)}</div><div style="font:700 16px/22px ${font};color:${STAGE_HEADING};">${escape(side.name)}</div>${tag}</td>`;
+}
+
+function matchupRow(matchup: EmailMatchup, font: string): string {
+  return `<tr><td class="da-stage" align="center" style="background:${STAGE_BG};border-radius:16px 16px 0 0;border-bottom:2px solid ${GOLD};padding:26px 24px 24px;"><div style="font:800 12px/16px ${FONT};letter-spacing:3px;color:${STAGE_GOLD};text-transform:uppercase;margin-bottom:18px;">${escape(matchup.kicker)}</div><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${sideCell(matchup.home, matchup.yoursLabel, font)}<td width="16%" align="center" style="vertical-align:top;padding-top:20px;font:800 14px/24px ${font};letter-spacing:1px;color:${STAGE_TEXT};">${escape(matchup.versus)}</td>${sideCell(matchup.away, matchup.yoursLabel, font)}</tr></table>${matchup.line === "" ? "" : `<div style="font:600 14px/20px ${font};color:${STAGE_TEXT};margin-top:18px;">${escape(matchup.line)}</div>`}</td></tr>`;
+}
+
+/** The matches, each on a small leaf — the whole schedule readable at a glance. */
+function fixtureList(list: readonly EmailFixture[], font: string): string {
+  const rows = list
+    .map((fixture, i) => {
+      const rule = i === 0 ? "" : `border-top:1px solid ${RULE};`;
+      const latin = /^[A-Z]+$/.test(fixture.month);
+      const note =
+        fixture.note === undefined || fixture.note === ""
+          ? ""
+          : `<td align="right" class="da-rule" style="${rule}padding:12px 0;vertical-align:middle;white-space:nowrap;"><span class="da-gold-text" style="font:700 12px/16px ${font};color:${GOLD_TEXT};">${escape(fixture.note)}</span></td>`;
+      return `<tr><td width="48" class="da-rule" style="${rule}padding:12px 0;vertical-align:middle;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="48" class="da-leaf" style="border:1px solid ${RULE_STRONG};border-radius:9px;"><tr><td align="center" style="background:${GOLD};border-radius:8px 8px 0 0;font:800 9px/16px ${FONT};letter-spacing:${latin ? "1.5px" : "0"};color:${ON_GOLD};">${escape(fixture.month)}</td></tr><tr><td align="center" class="da-heading" style="font:800 19px/24px ${FONT};color:${INK};">${escape(fixture.day)}</td></tr><tr><td align="center" class="da-muted" style="font:600 ${latin ? "9px" : "10px"}/13px ${FONT};letter-spacing:${latin ? "1px" : "0"};color:${MUTED};padding-bottom:4px;">${escape(fixture.weekday)}</td></tr></table></td><td class="da-rule" style="${rule}padding:12px 0 12px 14px;vertical-align:middle;"><div class="da-heading" style="font:700 15px/21px ${font};color:${INK};">${escape(fixture.title)}</div><div class="da-muted" style="font:14px/20px ${font};color:${MUTED};">${escape(fixture.detail)}</div></td>${note}</tr>`;
+    })
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:4px 0 22px;">${rows}</table>`;
 }
 
 /**
@@ -366,6 +450,9 @@ export function renderEmail(content: EmailContent, publicBaseUrl: string): Rende
     ...content.paragraphs.map((p) => paragraph(p, font)),
     content.document === undefined ? "" : documentBlock(content.document),
     content.dateLeaf === undefined ? "" : dateLeafRow(content.dateLeaf, font),
+    content.fixtures === undefined || content.fixtures.length === 0
+      ? ""
+      : fixtureList(content.fixtures, font),
     content.code === undefined ? "" : codeBlock(content.code),
     first ? action : "",
     content.details === undefined || content.details.length === 0
@@ -416,7 +503,7 @@ ${STYLE}
 </td></tr>
 <tr><td>
 <table role="article" aria-roledescription="email" aria-label="${escape(content.heading)}" lang="${language}" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-card" style="background:${CARD};border:1px solid ${RULE};border-radius:16px;">
-${content.stage !== undefined ? stageRow(content.stage, font) : content.band === undefined ? "" : bandRow(content.band, font)}
+${content.stage !== undefined ? stageRow(content.stage, font) : content.matchup !== undefined ? matchupRow(content.matchup, font) : content.band === undefined ? "" : bandRow(content.band, font)}
 <tr><td class="da-body" style="padding:32px 36px 12px;">
 <h1 class="da-heading" style="margin:0 0 16px;font:700 24px/32px ${font};color:${INK};letter-spacing:-0.3px;">${escape(content.heading)}</h1>
 ${content.progress === undefined || content.progress.length === 0 ? "" : progressRow(content.progress, font)}
@@ -444,7 +531,14 @@ ${body}
           ...(content.stage.line === "" ? [] : [content.stage.line]),
           "",
         ]),
-    ...(content.stage !== undefined || content.band === undefined
+    ...(content.matchup === undefined
+      ? []
+      : [
+          `${content.matchup.kicker}: ${content.matchup.home.name} ${content.matchup.versus} ${content.matchup.away.name}`,
+          ...(content.matchup.line === "" ? [] : [content.matchup.line]),
+          "",
+        ]),
+    ...(content.stage !== undefined || content.matchup !== undefined || content.band === undefined
       ? []
       : [`${content.band.title} · ${content.band.subtitle}`, ""]),
     content.heading,
@@ -458,6 +552,15 @@ ${body}
       ? []
       : [
           `  ${content.dateLeaf.weekday} ${content.dateLeaf.day} ${content.dateLeaf.month} — ${content.dateLeaf.title}, ${content.dateLeaf.detail}`,
+          "",
+        ]),
+    ...(content.fixtures === undefined || content.fixtures.length === 0
+      ? []
+      : [
+          ...content.fixtures.map(
+            (fixture) =>
+              `  ${fixture.weekday} ${fixture.day} ${fixture.month} · ${fixture.title} · ${fixture.detail}${fixture.note === undefined || fixture.note === "" ? "" : ` (${fixture.note})`}`,
+          ),
           "",
         ]),
     ...(content.code === undefined ? [] : [`    ${content.code}`, ""]),

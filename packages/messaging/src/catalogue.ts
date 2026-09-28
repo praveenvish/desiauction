@@ -46,6 +46,7 @@ export type NotificationAudience =
 export type NotificationTopic =
   | "registration"
   | "auction"
+  | "matches"
   | "money"
   | "feedback"
   | "club"
@@ -330,13 +331,50 @@ const ENTRIES = [
     topic: "auction",
     channels: ["email", "in_app"],
   },
+  // --- The season's matches (email programme PR11) ---------------------------
+  // Their own switch ("Match updates"): somebody who has heard enough about the
+  // auction still wants to know their match moved.
+  {
+    // The organizer published fixtures. Held ten minutes and rebuilt on every
+    // publish, so a schedule published in three sittings is one mail with all
+    // of it; a later batch is an update listing the team's matches again.
+    key: "schedule.published",
+    label: "Team schedule published",
+    description:
+      "The team's matches, when the organizer publishes the schedule — to its players and owner.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email"],
+  },
+  {
+    key: "fixture.changed",
+    label: "Match moved or called off",
+    description: "A published match was moved or cancelled — to both teams' players and owners.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email", "in_app"],
+  },
+  {
+    // Built fresh by the sweep when due: the morning of the match, or the
+    // evening before one that starts before 11 am.
+    key: "match.day",
+    label: "Match day",
+    description:
+      "The morning of a match (the evening before an early one): when, where and the lineup — and each organizer's day at a glance.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email"],
+  },
   {
     key: "lineup.announced",
     label: "Named in a lineup",
     description: "The player is in the team's lineup for a match.",
     audience: "player",
     category: "transactional",
-    topic: "auction",
+    topic: "matches",
     channels: ["email", ...TEXT, "in_app"],
     inboxKeys: ["fixture.lineup_announced"],
   },
@@ -645,6 +683,10 @@ const TOPIC_COPY: Readonly<Partial<Record<NotificationTopic, { label: string; de
     auction: {
       label: "Auction updates",
       detail: "When an auction you are in is about to start, and how it went.",
+    },
+    matches: {
+      label: "Match updates",
+      detail: "Your team's schedule, a match that moves, lineups and match-day notes.",
     },
     money: {
       label: "Receipts and money",

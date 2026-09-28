@@ -25,6 +25,8 @@ import {
   renderEmail,
   type EmailBand,
   type EmailDateLeaf,
+  type EmailFixture,
+  type EmailMatchup,
   type EmailStage,
   type EmailStep,
 } from "./email-layout";
@@ -118,6 +120,10 @@ export interface RenderOptions {
   readonly dateLeaf?: EmailDateLeaf;
   /** The auction-night stage — a sale (player-mail.ts `soldMail`). */
   readonly stage?: EmailStage;
+  /** A list of matches — a team's schedule, a busy match day (fixture-mail.ts). */
+  readonly fixtures?: readonly EmailFixture[];
+  /** The match at the top of the card — match day, a lineup (fixture-mail.ts). */
+  readonly matchup?: EmailMatchup;
 }
 
 /**
@@ -154,6 +160,8 @@ export function composeNotificationEmail(
     ...(options.progress === undefined ? {} : { progress: options.progress }),
     ...(options.dateLeaf === undefined ? {} : { dateLeaf: options.dateLeaf }),
     ...(options.stage === undefined ? {} : { stage: options.stage }),
+    ...(options.fixtures === undefined ? {} : { fixtures: options.fixtures }),
+    ...(options.matchup === undefined ? {} : { matchup: options.matchup }),
     ...(filled.after.length === 0 ? {} : { after: filled.after }),
     footnote: filled.footnote,
     ...(layout.noLinks === true ? { noLinks: true } : {}),
