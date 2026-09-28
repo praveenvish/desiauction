@@ -20,7 +20,7 @@ import { withTenantDb, type Db } from "@desiauction/db";
 
 import { currentSession } from "../auth/actions";
 import { canCompetition, requireCompetitionCapability } from "../competition/authz";
-import { type CompetitionSummary } from "../competition/competitions";
+import { auctionStartOf, type CompetitionSummary } from "../competition/competitions";
 import { resolveMemberCompetition } from "../competition/resolve";
 import { ownedTeamIdsOn } from "../competition/posters";
 import { dbHandle } from "../db";
@@ -244,6 +244,8 @@ export interface AuctionDashboard {
   wsUrl: string | null;
   /** The operational dashboard: progress, block, burndown, queue, log. */
   overview: AuctionOverview | null;
+  /** When auction night starts (0095), as an ISO moment; null when not set. */
+  startsAt: string | null;
   /**
    * Every lot's face, keyed by LOT id — the live room's `lotMedia`, same shape
    * and same rule (consent AND age): `photoUrl` (null → draw the mark),
@@ -334,6 +336,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     owners,
     lotMedia,
     poolPhotos,
+    startsAt,
   } = await inCompetitionOrg(session.personId, competition, async (db) => {
     const [readyProjection, auction, conduct, manage, review, ownTeams, photos] = await Promise.all(
       [
@@ -395,6 +398,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
       lotMedia:
         auction === null ? {} : await lotMediaOf(db, auction.id, (key) => storage.readUrl(key)),
       poolPhotos: photos,
+      startsAt: (await auctionStartOf(db, competition.id))?.toISOString() ?? null,
       owners:
         auction === null || !conduct
           ? null
@@ -418,6 +422,7 @@ export async function auctionDashboard(slug: string): Promise<AuctionDashboard |
     overview,
     lotMedia,
     poolPhotos,
+    startsAt,
     ...(owners === null ? {} : { owners }),
   };
 }

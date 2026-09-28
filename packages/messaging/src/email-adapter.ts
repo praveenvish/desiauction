@@ -1,7 +1,8 @@
 import type { DeliveryPort, DeliveryRequest } from "@desiauction/financial-operations";
 
 import { EMAIL_TEMPLATES } from "./email-template-defaults";
-import { defaultContent, type TemplateFields } from "./email-templates";
+import { manageEmailsUrl, renderEmail } from "./email-layout";
+import { defaultContent, type MessageLanguage, type TemplateFields } from "./email-templates";
 import type { GateReason } from "./gate";
 import {
   createResendProvider,
@@ -47,6 +48,8 @@ export interface EmailMessage {
   readonly to: string;
   readonly subject: string;
   readonly text: string;
+  /** The branded part (email programme PR10). The text part alone is still a complete mail. */
+  readonly html?: string;
 }
 
 /**
@@ -70,7 +73,7 @@ export type EmailAdapterConfig = EmailAdapterProvider & {
   readonly compose?: (
     request: DeliveryRequest,
     recipient: { readonly to: string; readonly personId: string | null },
-  ) => Promise<{ readonly subject: string; readonly text: string }>;
+  ) => Promise<{ readonly subject: string; readonly text: string; readonly html?: string }>;
   readonly now?: () => number;
   readonly breakerThreshold?: number;
   readonly breakerCooldownMs?: number;
@@ -81,7 +84,7 @@ const DEFAULT_BREAKER_COOLDOWN_MS = 60 * 1000;
 
 /**
  * The provider a config names. Resend settings keep their old meaning exactly:
- * Resend's body (text only here — a document is plain text), Bearer auth, and
+ * Resend's body (the document's text part, plus its branded html part), Bearer auth, and
  * `Idempotency-Key` unless switched off with `idempotencyHeader: null`.
  */
 function providerOf(config: EmailAdapterProvider): MailProvider {
@@ -118,11 +121,85 @@ export function financeVariantFor(templateId: string): string {
  * default) opening paragraphs, and then the document — always, whole, last.
  * Plain text: the body is the certified document text, reproduced exactly.
  */
+const FINANCE_HEADING: Readonly<Record<string, Readonly<Record<MessageLanguage, string>>>> = {
+  receipt: { en: "Your receipt", hi: "आपकी रसीद" },
+  invoice: { en: "Your invoice", hi: "आपका इनवॉइस" },
+  correction: { en: "A corrected document", hi: "सुधारा हुआ दस्तावेज़" },
+  other: { en: "A document for your team", hi: "आपकी टीम के लिए एक दस्तावेज़" },
+};
+
+const FINANCE_FOOTNOTE: Readonly<Record<MessageLanguage, (club: string | null) => string>> = {
+  en: (club) =>
+    `You received this because ${club ?? "a club on DesiAuction"} issued this document to your team.`,
+  hi: (club) =>
+    `आपको यह इसलिए मिला क्योंकि ${club ?? "DesiAuction पर एक क्लब"} ने यह दस्तावेज़ आपकी टीम को जारी किया।`,
+};
+
+const MONEY_SUBTITLE: Readonly<Record<MessageLanguage, string>> = {
+  en: "Receipts and money",
+  hi: "रसीदें और पैसा",
+};
+
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+function initialsOf(name: string): string {
+  const first = (word: string) =>
+    Array.from(GRAPHEMES.segment(word), (part) => part.segment)[0] ?? "";
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word !== "");
+  return (
+    words.length >= 2 ? `${first(words[0] ?? "")}${first(words[1] ?? "")}` : first(words[0] ?? "")
+  ).toUpperCase();
+}
+
+/**
+ * A FINANCE DOCUMENT'S EMAIL: the registry's subject and opening lines, then
+ * the document itself.
+ *
+ * The TEXT part is exactly what it always was — the opening lines and the
+ * document, as issued — and stays so: the document is the club's record. With
+ * `layout` (email programme PR10) there is also a branded HTML part around the
+ * same words: the club, a heading, the opening lines, and the document in a
+ * monospace panel, reproduced character for character. No wording is added
+ * that the text part lacks except the heading and the footer's why.
+ */
 export function financeDocumentMail(
   fields: TemplateFields,
   body: string,
-): { subject: string; text: string } {
-  return { subject: fields.subject, text: [...fields.paragraphs, body].join("\n\n") };
+  layout?: {
+    readonly publicBaseUrl: string;
+    readonly templateId: string;
+    readonly language?: MessageLanguage;
+    readonly orgName?: string | null;
+  },
+): { subject: string; text: string; html?: string } {
+  const text = [...fields.paragraphs, body].join("\n\n");
+  if (layout === undefined) {
+    return { subject: fields.subject, text };
+  }
+  const language = layout.language ?? "en";
+  const club = layout.orgName?.trim() || null;
+  const heading = FINANCE_HEADING[financeVariantFor(layout.templateId)] ?? FINANCE_HEADING["other"];
+  const { html } = renderEmail(
+    {
+      preheader: fields.paragraphs[0] ?? fields.subject,
+      heading: heading?.[language] ?? fields.subject,
+      paragraphs: fields.paragraphs,
+      document: body,
+      footnote: FINANCE_FOOTNOTE[language](club),
+      language,
+      manageUrl: manageEmailsUrl(layout.publicBaseUrl),
+      ...(club === null
+        ? {}
+        : {
+            band: { title: club, subtitle: MONEY_SUBTITLE[language], monogram: initialsOf(club) },
+          }),
+    },
+    layout.publicBaseUrl,
+  );
+  return { subject: fields.subject, text, html };
 }
 
 function defaultFinanceFields(templateId: string): TemplateFields {
@@ -345,6 +422,7 @@ export function createHttpEmailAdapter(
           to,
           subject: mail.subject,
           text: mail.text,
+          ...(mail.html === undefined ? {} : { html: mail.html }),
           /*
            * THE ONLY PARTY THAT CAN MAKE THIS SEND EXACTLY-ONCE.
            *

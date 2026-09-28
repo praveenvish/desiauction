@@ -27,3 +27,6 @@ test-results/
 *.tsbuildinfo
 .local/
 test-results-sim/
+
+# pnpm mail:gallery output (every rendered email + screenshots)
+.mail-gallery/

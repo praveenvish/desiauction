@@ -347,6 +347,41 @@ export const messageOutbox = pgTable(
 );
 
 /**
+ * Every email sent DIRECTLY — a code, a security warning, a demo or review
+ * mail — recorded (0094). The outbox is already the record of what it
+ * delivers; these went straight to the provider and left nothing. A ledger,
+ * never a copy: no subject, no body, no address — the recipient's domain only.
+ * Platform-level, no RLS; swept with the outbox's keys after a year.
+ */
+export const emailSends = pgTable(
+  "email_sends",
+  {
+    id: id(),
+    kind: text("kind").notNull(),
+    personId: char("person_id", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    orgId: char("org_id", { length: 26 }),
+    recipientDomain: text("recipient_domain").notNull(),
+    outcome: text("outcome", {
+      enum: ["sent", "suppressed", "failed", "unconfigured", "breaker-open"],
+    }).notNull(),
+    reason: text("reason"),
+    providerMessageId: text("provider_message_id"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("email_sends_provider_message_uq")
+      .on(table.providerMessageId)
+      .where(sql`provider_message_id is not null`),
+    index("email_sends_window_idx").on(table.createdAt, table.kind, table.outcome),
+    index("email_sends_person_idx")
+      .on(table.personId)
+      .where(sql`person_id is not null`),
+  ],
+);
+
+/**
  * What people send us on WhatsApp (0085): one row per inbound message id, so a
  * callback Meta retries is handled once. Keeps only the keyword the body was
  * read as, never the body; swept after ninety days. Platform-level, no RLS.
@@ -568,6 +603,7 @@ export const consentRecords = pgTable(
         "sms_start",
         "whatsapp_stop",
         "whatsapp_start",
+        "email_unsubscribe",
         "import",
         "support",
         "login",
@@ -949,6 +985,12 @@ export const competitions = pgTable(
     location: text("location"),
     startsOn: text("starts_on"),
     endsOn: text("ends_on"),
+    /**
+     * When auction night starts (0095): a moment, entered and shown in IST.
+     * On the season, not the auction row — that row only exists once the
+     * auction is created, and players want the date while they register.
+     */
+    auctionStartsAt: ts("auction_starts_at"),
     createdBy: char("created_by", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),

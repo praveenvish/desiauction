@@ -30,6 +30,7 @@ import { verifiedEmailOf } from "./email-change";
 import { maskEmail, notifyEmailChanged, notifyPhoneChangedByEmail } from "./email-changed-notice";
 import { MailSendError } from "./email-sender";
 import { sendSignInCodeMail } from "../messaging/notify";
+import { currentRequestContext, type RequestContext } from "../messaging/request-context";
 import { confirmPhoneChange, requestPhoneChange } from "./phone-change";
 import { createOtpSenderFromEnv, OtpSendError } from "./otp-sender";
 import { logger } from "../logger";
@@ -440,6 +441,8 @@ export async function requestEmailLoginAction(
         result.email,
         result.code,
         result.isNew === true ? "signup" : "login",
+        undefined,
+        await currentRequestContext(),
       );
     } catch (error) {
       if (error instanceof MailSendError) {
@@ -1047,7 +1050,12 @@ export async function confirmPhoneChangeAction(
    * must cost a warning message, never leave the account half-moved.
    */
   try {
-    await notifyPhoneChanged(session.personId, result.previousPhone, result.newPhone);
+    await notifyPhoneChanged(
+      session.personId,
+      result.previousPhone,
+      result.newPhone,
+      await currentRequestContext(),
+    );
   } catch {
     // Deliberately swallowed. See above.
   }
@@ -1058,6 +1066,7 @@ async function notifyPhoneChanged(
   personId: string,
   previousPhone: string | null,
   newPhone: string,
+  context: RequestContext,
 ): Promise<void> {
   if (previousPhone === null) {
     // An email-anchored account attaching its FIRST number (0062). There is no
@@ -1080,7 +1089,7 @@ async function notifyPhoneChanged(
       slots: { last4: newPhone.slice(-4) },
     }),
     verifiedEmailOf(db, personId).then((email) =>
-      notifyPhoneChangedByEmail(db, email, newPhone, undefined, personId),
+      notifyPhoneChangedByEmail(db, email, newPhone, undefined, personId, context),
     ),
   ]);
 }
@@ -1149,7 +1158,14 @@ export async function requestEmailVerificationAction(
     return { step: previous.step, error: message[result.reason] };
   }
   try {
-    await sendSignInCodeMail(db, result.email, result.code, "email_change", session.personId);
+    await sendSignInCodeMail(
+      db,
+      result.email,
+      result.code,
+      "email_change",
+      session.personId,
+      await currentRequestContext(),
+    );
   } catch (error) {
     if (error instanceof MailSendError) {
       logger().warn({ reason: error.message }, "email.send_failed");
@@ -1207,6 +1223,7 @@ export async function confirmEmailVerificationAction(
       result.email,
       undefined,
       session.personId,
+      await currentRequestContext(),
     );
     if (outcome === "failed") {
       logger().warn("email.change_notice_failed");

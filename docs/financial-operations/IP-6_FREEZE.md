@@ -237,3 +237,31 @@ Re-proven on the full corpus, 2026-08-31:
 | IP-6 web regressions (`src/server/financial-operations`) | 137/137 pass |
 | Full web integration suite (`vitest run src`) | 806/806 pass, 59 files |
 | `pnpm verify` (lint · typecheck · all package tests · format · depcruise · motion) | exit 0 |
+
+### A-2 · A branded HTML part beside the document email (2026-09-28)
+
+**Founder decision, email programme PR10.** A receipt or invoice went out as
+plain text only. It now also carries a branded HTML part: the club band, a
+heading for the document type, the registry's opening lines, and the document
+in a monospace panel, reproduced character for character.
+
+**No frozen surface changed.** `packages/financial-operations` is untouched: no
+event type, port, table, policy, migration or capability set. `DeliveryRequest`,
+the document `body`, its `bodyDigest` and the dispatch lanes are exactly as they
+were. What changed sits outside the frozen package:
+
+- `packages/messaging` — the one email layout moved here from apps/web so the
+  runner can use it; `financeDocumentMail` takes an optional layout and returns
+  an `html` part; the HTTP adapter forwards `html` when present. The **text part
+  is byte-for-byte unchanged** (pinned by `email-parity.test.ts` and
+  `finance-mail.test.ts`).
+- `apps/finops-runner` — passes the site address to the composer; a new
+  optional `PUBLIC_BASE_URL` (default `https://desiauction.in`), so production
+  needs no new setting.
+- The composer reads the issuing club's name for the band — best effort, on the
+  runner role's existing SELECT (`organizations` added to verify-grants'
+  RUNNER_DELIVERY_READS so a revoke cannot silently drop it).
+
+**Proof.** Runner posture suite as `desiauction_runner`: 5/5. IP-6 web
+regressions (`src/server/financial-operations`): 141/141. Full web integration, the
+web posture suite (36/36) and `grants:verify` pass.

@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, useToast } from "@desiauction/ui";
+import { Badge, Button, Field, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -10,6 +10,7 @@ import { personContact } from "../../../../../lib/person-label";
 import type { AuctionDashboard } from "../../../../../server/auction/actions";
 import {
   grantPaddleAction,
+  emailOwnerInviteAction,
   inviteOwnerAction,
   revokeOwnerInviteAction,
 } from "../../../../../server/auction/owner-actions";
@@ -240,6 +241,7 @@ export function OwnersStep({
                       Send on WhatsApp
                     </a>
                   </div>
+                  {canManage ? <EmailInviteForm slug={slug} teamId={team.id} link={link} /> : null}
                   <span className="as-hint">
                     Works once, for 7 days. Anyone holding it can accept it.
                   </span>
@@ -283,5 +285,68 @@ export function OwnersStep({
         })}
       </ul>
     </div>
+  );
+}
+
+/**
+ * "Or email it to the owner" — the third way to send the link (email
+ * programme PR7). We send a branded invitation to the address typed here and
+ * keep neither the address nor a copy of the link.
+ */
+function EmailInviteForm({ slug, teamId, link }: { slug: string; teamId: string; link: string }) {
+  const toast = useToast();
+  const [address, setAddress] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  if (sentTo !== null) {
+    return (
+      <p className="as-hint" role="status" data-testid={`owner-invite-emailed-${teamId}`}>
+        Invitation emailed to {sentTo}.
+      </p>
+    );
+  }
+  return (
+    <form
+      className="as-owner-email"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setBusy(true);
+        setError(null);
+        void emailOwnerInviteAction(slug, link, address).then((result) => {
+          setBusy(false);
+          if (result.ok) {
+            setSentTo(result.sentTo);
+            toast({ title: `Invitation emailed to ${result.sentTo}.`, tone: "success" });
+          } else {
+            setError(result.error);
+          }
+        });
+      }}
+    >
+      <Field
+        label="Or email it to the owner"
+        name={`owner-email-${teamId}`}
+        type="email"
+        autoComplete="off"
+        placeholder="owner@example.com"
+        value={address}
+        onChange={(event) => {
+          setAddress(event.target.value);
+        }}
+        {...(error === null ? {} : { error })}
+      />
+      <Button
+        type="submit"
+        size="sm"
+        variant="secondary"
+        loading={busy}
+        disabled={address.trim() === ""}
+        data-testid={`email-owner-invite-${teamId}`}
+      >
+        Email the invite
+      </Button>
+    </form>
   );
 }

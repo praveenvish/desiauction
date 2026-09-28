@@ -37,12 +37,39 @@ export interface OutgoingMail {
     readonly contentType: string;
     readonly contentBase64: string;
   };
+  /**
+   * Extra message headers — today only List-Unsubscribe (unsubscribe.ts).
+   * Each provider puts them where its API wants (mail-provider.ts).
+   */
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 export type MailOutcome = "sent" | "unconfigured" | "breaker-open" | "failed";
 
+/** What became of one send, and the id the provider gave it (a bounce is matched on it). */
+export interface MailReceipt {
+  readonly outcome: MailOutcome;
+  readonly providerMessageId: string | null;
+}
+
 export interface TransactionalMailer {
   send(mail: OutgoingMail): Promise<MailOutcome>;
+  /**
+   * The same send, with the provider's message id. Optional so a test double
+   * stays one line; `deliverMail` falls back to `send` without it.
+   */
+  deliver?(mail: OutgoingMail): Promise<MailReceipt>;
+}
+
+/** Send and keep the provider's id when the mailer can give one. */
+export async function deliverMail(
+  mailer: TransactionalMailer,
+  mail: OutgoingMail,
+): Promise<MailReceipt> {
+  if (mailer.deliver !== undefined) {
+    return mailer.deliver(mail);
+  }
+  return { outcome: await mailer.send(mail), providerMessageId: null };
 }
 
 const BREAKER_THRESHOLD = 3;
@@ -68,10 +95,14 @@ export class HttpTransactionalMailer implements TransactionalMailer {
   }
 
   async send(mail: OutgoingMail): Promise<MailOutcome> {
+    return (await this.deliver(mail)).outcome;
+  }
+
+  async deliver(mail: OutgoingMail): Promise<MailReceipt> {
     // One melted provider must not turn a burst of requests into a retry storm
     // — the same reason the finops sender carries a breaker.
     if (this.breaker.isOpen()) {
-      return "breaker-open";
+      return { outcome: "breaker-open", providerMessageId: null };
     }
     try {
       const result = await this.config.provider.send({
@@ -81,13 +112,13 @@ export class HttpTransactionalMailer implements TransactionalMailer {
       });
       if (!result.ok) {
         this.breaker.recordFailure();
-        return "failed";
+        return { outcome: "failed", providerMessageId: null };
       }
       this.breaker.recordSuccess();
-      return "sent";
+      return { outcome: "sent", providerMessageId: result.messageId };
     } catch {
       this.breaker.recordFailure();
-      return "failed";
+      return { outcome: "failed", providerMessageId: null };
     }
   }
 }

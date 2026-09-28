@@ -162,6 +162,11 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
       "server/competition/appointments.ts": "queues only — delivery is the gated drain",
       "server/competition/lineup-announce.ts": "queues only — delivery is the gated drain",
       "server/competition/squad-sheets.ts": "queues only — delivery is the gated drain",
+      "server/orgs/organizer-notify.ts": "queues only — delivery is the gated drain",
+      "server/competition/registration-digest.ts": "queues only — delivery is the gated drain",
+      "server/competition/auction-reminders.ts": "queues only — delivery is the gated drain",
+      "server/competition/auction-schedule-notify.ts":
+        "queues only, held ten minutes — delivery is the gated drain",
     },
   },
   {
@@ -282,8 +287,12 @@ const WORDING_TOKENS: readonly { token: string; allowed: Readonly<Record<string,
   {
     token: "renderEmail(",
     allowed: {
-      "server/messaging/email-layout.ts": "defines the layout",
+      "packages/messaging/src/email-layout.ts":
+        "defines the layout (shared with the finops runner)",
+      "server/messaging/email-layout.ts": "binds the layout to this site's address",
       "server/messaging/notification-email.ts": "the one renderer — wording from the registry",
+      "packages/messaging/src/email-adapter.ts":
+        "lays a finance document out around its registry wording; the text part stays the document",
     },
   },
   {

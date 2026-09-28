@@ -160,6 +160,8 @@ const PLAYER_NOTICE: Partial<Record<RegistrationEvent["type"], SecurityAction>> 
   approve: "registration.approved",
   reject: "registration.rejected",
   waitlist: "registration.waitlisted",
+  withdraw: "registration.withdrawn",
+  restore: "registration.restored",
 };
 
 async function notifyPlayer(

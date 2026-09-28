@@ -1,8 +1,8 @@
 import type { RejectionReason } from "@desiauction/core";
-import { auditLog, newId, people, registrations, type Db } from "@desiauction/db";
+import { auditLog, newId, organizations, people, registrations, type Db } from "@desiauction/db";
 import { eq, inArray } from "drizzle-orm";
 
-import { messageLanguagesOf } from "@desiauction/messaging/language";
+import { messageLanguageOf, messageLanguagesOf } from "@desiauction/messaging/language";
 
 import {
   drainOutbox,
@@ -12,7 +12,14 @@ import {
   type QueuedMail,
   type QueuedSms,
 } from "../messaging/outbox";
-import { registrationDecisionMail } from "../messaging/player-mail";
+import { logSecurityEvent } from "../auth/security-events";
+import {
+  registrationDecisionMail,
+  registrationReceivedMail,
+  submittedDetails,
+} from "../messaging/player-mail";
+
+export { submittedDetails };
 import type { PlayerSmsSender, TemplatedSms } from "../messaging/sms";
 import {
   SMS_TEMPLATES,
@@ -189,6 +196,10 @@ export async function notifyDecision(
     event: NotifiableEvent;
     reason?: RejectionReason;
     actorId: string;
+    /** The email's button opens the player's page for this season (SMS keeps its fixed link). */
+    seasonSlug?: string;
+    /** Named in the email's club band. */
+    sport?: string;
   },
   channels: NoticeChannels = {},
 ): Promise<{ sent: number; failed: number; suppressed: number; pending: number }> {
@@ -297,6 +308,7 @@ export async function notifyDecision(
     db,
     rows.map((row) => row.personId),
   );
+  const orgName = await orgNameOf(db, input.orgId);
   const mails: QueuedMail[] = await Promise.all(
     rows.map(async (row) => ({
       personId: row.personId,
@@ -307,6 +319,9 @@ export async function notifyDecision(
         {
           name: row.name?.trim() || "there",
           season: input.competitionName.trim(),
+          orgName,
+          ...(input.seasonSlug === undefined ? {} : { seasonSlug: input.seasonSlug }),
+          ...(input.sport === undefined ? {} : { sport: input.sport }),
           decision: input.event,
           ...(input.event === "reject"
             ? { reason: REASON_TO_PLAYER[input.reason ?? "other"] }
@@ -392,4 +407,86 @@ export async function notifyDecision(
     }
   }
   return { sent, failed, suppressed, pending };
+}
+
+/** The club's name, for the email's band and sentences. Never blank. */
+async function orgNameOf(db: Db, orgId: string): Promise<string> {
+  const [org] = await db
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+    .limit(1);
+  return org?.name.trim() || "Your organizer";
+}
+
+/**
+ * "WE'VE GOT YOUR REGISTRATION" (email programme PR4) — the player who just
+ * registered THEMSELVES is told what they sent and what happens next, by email
+ * and in their inbox. Never for an organizer's add or an import: those are
+ * not the player's moment, and they would get it with no idea why.
+ *
+ * Best effort, after the registration has committed (the action's `after()`):
+ * a provider outage costs a receipt, never a registration. Through the queue
+ * like every decision, so the same three-layer gate decides and the ledger
+ * says what happened.
+ */
+export async function notifyRegistrationReceived(
+  db: Db,
+  input: {
+    orgId: string;
+    competitionId: string;
+    competitionName: string;
+    seasonSlug: string;
+    sport: string;
+    registrationId: string;
+    personId: string;
+    role: string;
+    answers: Readonly<Record<string, string>>;
+  },
+  channels: NoticeChannels = {},
+): Promise<void> {
+  // The inbox row first: it needs nothing from the mail and must not wait on it.
+  await logSecurityEvent(input.personId, "registration.received", {
+    competitionId: input.competitionId,
+  });
+  const [person] = await db
+    .select({ name: people.name })
+    .from(people)
+    .where(eq(people.id, input.personId))
+    .limit(1);
+  const language = await messageLanguageOf(db, input.personId);
+  const mail = await registrationReceivedMail(
+    {
+      name: person?.name?.trim() || "there",
+      season: input.competitionName.trim(),
+      orgName: await orgNameOf(db, input.orgId),
+      seasonSlug: input.seasonSlug,
+      sport: input.sport,
+      submitted: submittedDetails(input.sport, input.role, input.answers, language),
+    },
+    language,
+  );
+  // A player can withdraw and register again; each registration is its own moment.
+  const key = `registration.received:${input.registrationId}:${newId()}`;
+  const outboxDb = channels.outboxDb;
+  await enqueueMail(
+    [
+      {
+        ...mail,
+        personId: input.personId,
+        orgId: input.orgId,
+        kind: "registration.received",
+        dedupeKey: key,
+      },
+    ],
+    outboxDb,
+  );
+  await drainOutbox({
+    ...(outboxDb === undefined ? {} : { db: outboxDb }),
+    dedupeKeys: [key],
+    limit: 1,
+    ...(channels.mailer === undefined ? {} : { mailer: channels.mailer }),
+    ...(channels.whatsapp === undefined ? {} : { whatsapp: channels.whatsapp }),
+    ...(channels.now === undefined ? {} : { now: channels.now }),
+  });
 }
