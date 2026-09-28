@@ -1,3 +1,4 @@
+import { mailerConfigured } from "@desiauction/messaging/mail-provider-config";
 import { z } from "zod";
 
 const envSchema = z.object({
@@ -177,8 +178,12 @@ const envSchema = z.object({
    *
    * `auto` keeps every existing caller's behaviour byte for byte: real mailer
    * when configured, dev inbox when not.
+   *
+   * `ses` is Amazon SES (the SES_* settings below); `resend` is Resend over
+   * EMAIL_API_*; `http` is Resend's historical name and means the same. Which
+   * one is a restart, not a deploy — the rollback path (mail-provider.ts).
    */
-  EMAIL_PROVIDER: z.enum(["auto", "dev", "http"]).default("auto"),
+  EMAIL_PROVIDER: z.enum(["auto", "dev", "http", "resend", "ses"]).default("auto"),
   EMAIL_API_ENDPOINT: z.url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),
@@ -190,6 +195,36 @@ const envSchema = z.object({
    * provider counts as configured.
    */
   EMAIL_REPLY_TO: z.email().optional(),
+  /**
+   * Amazon SES (EMAIL_PROVIDER=ses). Server-only, never NEXT_PUBLIC: the key
+   * belongs to an IAM user that may call `ses:SendEmail` from the one From
+   * address and nothing else (docs/EMAIL_INFRASTRUCTURE.md). EMAIL_FROM is
+   * shared with Resend — the From address does not change with the provider.
+   */
+  SES_REGION: z
+    .string()
+    .regex(/^[a-z]{2}(-[a-z]+)+-\d$/, "an AWS region such as ap-south-1")
+    .optional(),
+  SES_ACCESS_KEY_ID: z.string().min(16).optional(),
+  SES_SECRET_ACCESS_KEY: z.string().min(20).optional(),
+  /** Configuration set for reputation metrics and (later) bounce events. */
+  SES_CONFIGURATION_SET: z.string().min(1).optional(),
+  /**
+   * Where SES emails bounce/complaint reports — a Zoho alias a person reads.
+   * Must be verified in SES. Unset: SES sends them to the From address, which
+   * has no mailbox.
+   */
+  SES_FEEDBACK_ADDRESS: z.email().optional(),
+  /**
+   * The SNS topic SES publishes bounce/complaint/delivery events to. Unset
+   * CLOSES /api/webhooks/ses (404) — the sibling webhooks' rule. Only messages
+   * from exactly this topic are acted on, because any AWS account can get a
+   * validly signed SNS message from a topic of its own.
+   */
+  SES_SNS_TOPIC_ARN: z
+    .string()
+    .regex(/^arn:aws:sns:[a-z]{2}(-[a-z]+)+-\d:\d{12}:[A-Za-z0-9_-]{1,256}$/, "an SNS topic ARN")
+    .optional(),
   /**
    * "Get photos from Google Drive" (Google Picker + drive.file). All three are
    * PUBLIC by design — they sit in the page, and the key is locked to our
@@ -453,21 +488,13 @@ const productionSchema = envSchema
       "OTP_PROVIDER=dev writes codes to a table nobody can read in production — set OTP_PROVIDER=whatsapp (or msg91) with credentials",
     path: ["OTP_PROVIDER"],
   })
-  .refine(
-    (v) =>
-      !serving(v) ||
-      (v.EMAIL_PROVIDER !== "dev" &&
-        v.EMAIL_API_ENDPOINT !== undefined &&
-        v.EMAIL_API_KEY !== undefined &&
-        v.EMAIL_FROM !== undefined),
-    {
-      // `auto` without credentials silently falls back to the dev inbox: email
-      // sign-in codes land in plain text in otp_inbox and nobody receives them.
-      message:
-        "email needs EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM in production (and EMAIL_PROVIDER not dev) — otherwise sign-in codes go to a database table instead of a mailbox",
-      path: ["EMAIL_PROVIDER"],
-    },
-  )
+  .refine((v) => !serving(v) || mailerConfigured(v), {
+    // `auto` without credentials silently falls back to the dev inbox: email
+    // sign-in codes land in plain text in otp_inbox and nobody receives them.
+    message:
+      "email needs a configured mailer in production — EMAIL_PROVIDER=ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM (or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM), and not dev — otherwise sign-in codes go to a database table instead of a mailbox",
+    path: ["EMAIL_PROVIDER"],
+  })
   .refine((v) => !serving(v) || v.MEDIA_STORAGE === "bucket", {
     message:
       "MEDIA_STORAGE=local writes uploads to the app host and a built server does not serve them — set MEDIA_STORAGE=bucket",

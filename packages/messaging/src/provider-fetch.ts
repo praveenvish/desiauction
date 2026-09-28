@@ -20,6 +20,11 @@ export const PROVIDER_TIMEOUT_MS = 10_000;
 export interface ProviderResponse {
   readonly status: number;
   readonly body: string;
+  /**
+   * Lower-cased response headers. Optional so every existing test fake stays
+   * valid; SES is the one reader (it names its errors in `x-amzn-errortype`).
+   */
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -34,7 +39,11 @@ export async function providerFetch(
   timeoutMs: number = PROVIDER_TIMEOUT_MS,
 ): Promise<ProviderResponse> {
   const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-  return { status: response.status, body: await response.text() };
+  return {
+    status: response.status,
+    body: await response.text(),
+    headers: Object.fromEntries(response.headers.entries()),
+  };
 }
 
 /**

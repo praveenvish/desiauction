@@ -14,6 +14,7 @@
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "env:check": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/check-env.ts",
+    "mail:test": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/mail-test.ts",
     "rls:verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/verify-rls.ts",
     "grants:verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/verify-grants.ts",
     "db:restore-verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/restore-verify.ts",

@@ -8,9 +8,10 @@ import {
   runnerTick,
 } from "@desiauction/financial-operations/server";
 import { scrub } from "@desiauction/core";
+import { selectedProvider } from "@desiauction/messaging/mail-provider-config";
 import * as Sentry from "@sentry/node";
 
-import { mailConfigFor, runnerDelivery } from "./delivery";
+import { runnerDelivery } from "./delivery";
 import { env } from "./env";
 import { logger } from "./logger";
 
@@ -127,7 +128,7 @@ async function main(): Promise<void> {
       tickMs: env.RUNNER_TICK_MS,
       // Said at boot so a runner mailing receipts to its own disk is one log
       // line away from noticed, rather than a founder asking where they went.
-      emailDelivery: mailConfigFor(env) === null ? "file-outbox" : "http",
+      emailDelivery: selectedProvider(env) ?? "file-outbox",
     },
     "finops-runner started",
   );

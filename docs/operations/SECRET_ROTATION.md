@@ -9,7 +9,8 @@ Drilled locally 2026-07-16 against a live engine; measured results inline.
 | `ENGINE_SECRET` | web (mints commands + spectator tickets), engine (verifies) | HARD CUTOVER — see drill |
 | `SYSTEM_DATABASE_URL` / `DATABASE_URL` passwords | web, engine, finops-runner | Connection-pool refresh on restart |
 | Razorpay `key_secret` + `webhook_secret` | web (settlement adapter) | Razorpay dashboard supports dual active webhook secrets during transition |
-| `EMAIL_API_KEY` | web (transactional mailer) | Overlapping keys are allowed — create, deploy, then revoke; no cutover |
+| `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` | web + finops-runner (every mailer) | IAM allows two keys per user — create, deploy both tiers, then deactivate and delete; no cutover |
+| `EMAIL_API_KEY` (Resend, rollback only) | web + finops-runner | Overlapping keys are allowed — create, deploy, then revoke; no cutover |
 | `SENTRY_DSN` | web, engine | Non-secret-ish; rotate at leisure |
 | Session tokens | user browsers | Self-rotating per login (identity/SESSIONS.md); nothing to do |
 
@@ -55,7 +56,15 @@ envelope-pinned).
 
 ## Email provider API key
 
-Resend allows several live keys at once, so this rotates without a cutover:
+**Amazon SES (the live provider).** The IAM user `desiauction-mailer` may hold
+two access keys at once, so this rotates without a cutover: IAM → Users →
+`desiauction-mailer` → Security credentials → Create access key; put the new
+pair in BOTH `web.env` and `runner.env`; restart both; `pnpm --filter web
+mail:test --to=<you>` on the host; then Deactivate the old key, wait a day for
+anything still holding it to surface, and Delete it. Rotate every 90 days — the
+key never expires on its own. See `docs/EMAIL_INFRASTRUCTURE.md`.
+
+**Resend (the rollback).** Resend allows several live keys at once, so this rotates without a cutover:
 create the new key (sending access, scoped to `mail.desiauction.in`), deploy
 it, confirm one real send, then revoke the old one. Nothing to coordinate.
 
@@ -64,9 +73,9 @@ key does not stop mail failing closed and loud: with any of the three send
 settings absent the mailer becomes `UnconfiguredMailer` and reports
 `"unconfigured"`, so a botched rotation degrades to silence-with-a-signal
 rather than to dropped mail. And the DKIM private keys live at the providers —
-rotating those means regenerating a selector in the Zoho or Resend console and
+rotating those means regenerating a selector in the Zoho, SES or Resend console and
 replacing the matching TXT record, which is a DNS change with propagation, not
-a secret swap. See `docs/operations/EMAIL_SETUP.md`.
+a secret swap. See `docs/EMAIL_INFRASTRUCTURE.md`.
 
 ## Cadence
 

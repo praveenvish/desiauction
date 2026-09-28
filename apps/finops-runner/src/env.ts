@@ -1,3 +1,4 @@
+import { mailerConfigured } from "@desiauction/messaging/mail-provider-config";
 import { z } from "zod";
 
 const envSchema = z.object({
@@ -45,8 +46,9 @@ const envSchema = z.object({
    * platform's filesystem outbox in production: every document was "delivered"
    * to a `.txt` file on the runner's disk and nobody received one.
    *
-   *   · auto — the real mailer when all three are set, the file outbox when not.
-   *   · http — the real mailer, and boot is refused without all three.
+   *   · auto — the real mailer when configured, the file outbox when not.
+   *   · ses  — Amazon SES (SES_*), and boot is refused without its settings.
+   *   · resend / http — Resend (EMAIL_API_*), likewise refused half-set.
    *   · dev  — the file outbox even with credentials (a local suite whose
    *            .env.local carries live keys must not mail test addresses).
    *
@@ -54,23 +56,27 @@ const envSchema = z.object({
    * must match the web tier's: its provider callback route confirms what this
    * process sent.
    */
-  EMAIL_PROVIDER: z.enum(["auto", "dev", "http"]).default("auto"),
+  EMAIL_PROVIDER: z.enum(["auto", "dev", "http", "resend", "ses"]).default("auto"),
   EMAIL_API_ENDPOINT: z.url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),
+  // Amazon SES — the same values as web.env (docs/EMAIL_INFRASTRUCTURE.md).
+  SES_REGION: z
+    .string()
+    .regex(/^[a-z]{2}(-[a-z]+)+-\d$/, "an AWS region such as ap-south-1")
+    .optional(),
+  SES_ACCESS_KEY_ID: z.string().min(16).optional(),
+  SES_SECRET_ACCESS_KEY: z.string().min(20).optional(),
+  SES_CONFIGURATION_SET: z.string().min(1).optional(),
+  SES_FEEDBACK_ADDRESS: z.email().optional(),
 });
 
-/** All three mail settings present — what "configured" means in both tiers. */
-export function mailConfigured(v: {
-  EMAIL_API_ENDPOINT?: string | undefined;
-  EMAIL_API_KEY?: string | undefined;
-  EMAIL_FROM?: string | undefined;
-}): boolean {
-  return (
-    v.EMAIL_API_ENDPOINT !== undefined &&
-    v.EMAIL_API_KEY !== undefined &&
-    v.EMAIL_FROM !== undefined
-  );
+/**
+ * A real mailer is selected — what "configured" means in both tiers
+ * (mail-provider-config.ts). `dev` is never configured.
+ */
+export function mailConfigured(v: Parameters<typeof mailerConfigured>[0]): boolean {
+  return mailerConfigured(v);
 }
 
 /**
@@ -105,13 +111,22 @@ const productionSchema = envSchema
     message: "EMAIL_PROVIDER=http needs EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM",
     path: ["EMAIL_PROVIDER"],
   })
+  .refine((v) => v.EMAIL_PROVIDER !== "resend" || mailConfigured(v), {
+    message: "EMAIL_PROVIDER=resend needs EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM",
+    path: ["EMAIL_PROVIDER"],
+  })
+  .refine((v) => v.EMAIL_PROVIDER !== "ses" || mailConfigured(v), {
+    message:
+      "EMAIL_PROVIDER=ses needs SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM",
+    path: ["EMAIL_PROVIDER"],
+  })
   // THE FILE OUTBOX IS NOT A PRODUCTION CHANNEL. Without this a production
   // runner boots, drains every dispatch, records each as delivered and writes
   // it to its own disk — the defect this refinement exists to make impossible.
   // The rehearsal escape keeps serving() false, exactly as for SENTRY_DSN.
-  .refine((v) => !serving(v) || (v.EMAIL_PROVIDER !== "dev" && mailConfigured(v)), {
+  .refine((v) => !serving(v) || mailConfigured(v), {
     message:
-      "receipts need EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM in production (and EMAIL_PROVIDER not dev) — otherwise every financial document is written to a file on the runner's disk instead of being emailed",
+      "receipts need a configured mailer in production (EMAIL_PROVIDER=ses with SES_*, or EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM; not dev) — otherwise every financial document is written to a file on the runner's disk instead of being emailed",
     path: ["EMAIL_PROVIDER"],
   });
 
