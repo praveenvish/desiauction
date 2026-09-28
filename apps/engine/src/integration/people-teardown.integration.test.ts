@@ -1,5 +1,5 @@
 import { grants, newId, paddleGrants, people } from "@desiauction/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { db, sql } from "../db.js";
@@ -96,8 +96,23 @@ describe("deletePeopleCascading", () => {
   });
 
   it("is a no-op on an empty list rather than deleting the table", async () => {
-    const before = await db.select({ id: people.id }).from(people);
+    // Asserts on rows this test planted, never on the size of `people`: the
+    // integration files of every package share one database, so a whole-table
+    // count moves whenever a neighbour seeds or tears down its own people
+    // between the two reads (PR #121's CI: "expected [] to have a length of 360").
+    // An empty `in ()` gone wrong deletes everything, these three included.
+    const planted = [newId(), newId(), newId()];
+    for (const [index, id] of planted.entries()) {
+      await plantPerson(id, `0${String(index + 3)}`);
+    }
+
     await deletePeopleCascading([]);
-    expect(await db.select({ id: people.id }).from(people)).toHaveLength(before.length);
+    const survivors = await db
+      .select({ id: people.id })
+      .from(people)
+      .where(inArray(people.id, planted));
+    expect(survivors.map((row) => row.id).sort()).toEqual([...planted].sort());
+
+    await deletePeopleCascading(planted);
   });
 });
