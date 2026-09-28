@@ -5,6 +5,7 @@ import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 import { env } from "../../env";
 import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import { providerFetch } from "../messaging/provider-fetch";
+import { requestDetails, type RequestContext } from "../messaging/request-context";
 import { providerMessageIdOf } from "../messaging/transactional-mail";
 
 /**
@@ -47,6 +48,8 @@ export interface CodeMailer {
     code: string,
     purpose: CodeMailPurpose,
     language?: MessageLanguage,
+    /** Where and when the code was asked for — shown so a stranger's request is obvious. */
+    context?: RequestContext,
   ): Promise<CodeMailReceipt | null>;
 }
 
@@ -64,8 +67,18 @@ export function codeMailCopy(
   code: string,
   purpose: CodeMailPurpose,
   language: MessageLanguage = "en",
+  context?: RequestContext,
 ): Promise<NotificationMail> {
-  return renderNotificationEmail("auth.email_code", language, { code }, { variant: purpose, code });
+  return renderNotificationEmail(
+    "auth.email_code",
+    language,
+    { code },
+    {
+      variant: purpose,
+      code,
+      ...(context === undefined ? {} : { details: requestDetails(context, "code", language) }),
+    },
+  );
 }
 
 export class DevInboxMailer implements CodeMailer {
@@ -125,9 +138,10 @@ export class HttpMailer implements CodeMailer {
     code: string,
     purpose: CodeMailPurpose,
     language: MessageLanguage = "en",
+    context?: RequestContext,
   ): Promise<CodeMailReceipt> {
     const transport = this.config.transport ?? defaultTransport;
-    const copy = await codeMailCopy(code, purpose, language);
+    const copy = await codeMailCopy(code, purpose, language, context);
     let response: MailerHttpResponse;
     try {
       response = await transport(this.config.endpoint, {

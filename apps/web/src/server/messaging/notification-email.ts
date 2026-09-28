@@ -1,9 +1,5 @@
 import type { Db } from "@desiauction/db";
-import {
-  notificationOf,
-  personTopics,
-  type EmailNotificationKind,
-} from "@desiauction/messaging/catalogue";
+import type { EmailNotificationKind } from "@desiauction/messaging/catalogue";
 import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults";
 import {
   fillTemplate,
@@ -24,6 +20,7 @@ import { env } from "../../env";
 import { db as appDb } from "../db";
 import { logger } from "../logger";
 import { manageEmailsUrl, renderEmail } from "./email-layout";
+import { isSelfManagedKind } from "./unsubscribe";
 
 /**
  * EVERY EMAIL'S WORDS COME FROM HERE (Notification Control Center, Phase 2).
@@ -63,16 +60,21 @@ export interface NotificationMail {
  *     point is the click (a review ask).
  *   · whatsappNudge: the personal moments leave room for "Get these on
  *     WhatsApp" (email-layout.ts) — never a security mail or a code.
+ *   · calloutLast: the closing "didn't ask?" / "wasn't you?" line boxed.
  */
 const LAYOUT: Readonly<
   Partial<
     Record<
       EmailNotificationKind,
-      { noLinks?: boolean; actionFirst?: boolean; whatsappNudge?: boolean }
+      { noLinks?: boolean; actionFirst?: boolean; whatsappNudge?: boolean; calloutLast?: boolean }
     >
   >
 > = {
-  "auth.email_code": { noLinks: true },
+  // The last line of a code or a security alert — "didn't ask for this?",
+  // "if it wasn't you" — is the one a worried reader looks for: boxed.
+  "auth.email_code": { noLinks: true, calloutLast: true },
+  "security.email_changed": { calloutLast: true },
+  "security.phone_changed": { calloutLast: true },
   "registration.approved": { whatsappNudge: true },
   "registration.waitlisted": { whatsappNudge: true },
   "registration.rejected": { whatsappNudge: true },
@@ -96,17 +98,6 @@ export interface RenderOptions {
   readonly code?: string;
   /** The reader's language — the document's `lang` and its fonts. English when omitted. */
   readonly language?: MessageLanguage;
-}
-
-/**
- * "Manage emails" goes only on a mail the reader can switch off themselves:
- * its topic is one of their /account switches. A code, a security alert, a
- * demo booking (no account) and our staff notices have nothing to manage.
- */
-const MANAGEABLE_TOPICS: ReadonlySet<string> = new Set(personTopics().map((t) => t.topic));
-
-function manageable(kind: EmailNotificationKind): boolean {
-  return MANAGEABLE_TOPICS.has(notificationOf(kind).topic);
 }
 
 /**
@@ -144,7 +135,10 @@ export function composeNotificationEmail(
     ...(layout.noLinks === true ? { noLinks: true } : {}),
     ...(layout.whatsappNudge === true ? { whatsappNudge: true } : {}),
     ...(options.language === undefined ? {} : { language: options.language }),
-    ...(manageable(spec.kind) ? { manageUrl: manageEmailsUrl() } : {}),
+    // "Manage emails" exactly where the one-click unsubscribe header goes: the
+    // reader has an /account switch for this kind (unsubscribe.ts).
+    ...(isSelfManagedKind(spec.kind) ? { manageUrl: manageEmailsUrl() } : {}),
+    ...(layout.calloutLast === true ? { calloutLast: true } : {}),
   });
   return { subject: filled.subject, text: body.text, html: body.html } as NotificationMail;
 }

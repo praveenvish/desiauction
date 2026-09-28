@@ -341,61 +341,64 @@ function registrationDecisionMail(facts: RegistrationDecisionFacts): ComposedMai
   };
 }
 
+// Changed on purpose (email v2 PR3, 2026-09-28): the code leads every
+// subject, the opening line says what to do with it, and the closing line —
+// "did not try to sign in?", "if it wasn't you" — is boxed (calloutLast). The
+// locked lines (expiry, if-not-you) are word for word what they were.
 function codeMailCopy(
   code: string,
   purpose: CodeMailPurpose,
 ): { subject: string; text: string; html: string } {
   if (purpose === "signup") {
-    /*
-     * A DIFFERENT PERSON IS READING THIS. "Sign-in code" to somebody who has no
-     * account reads as a mistake or a breach, and the closing sentence of the
-     * login copy — "your account is safe" — is about an account that does not
-     * exist. Both halves have to change together.
-     */
     return {
-      subject: "Your DesiAuction sign-up code",
+      subject: `${code} is your DesiAuction sign-up code`,
       ...renderEmail({
-        preheader: `Your sign-up code is ${code}. It expires in 15 minutes.`,
+        preheader: "Enter it to finish creating your account. It works for 15 minutes.",
         heading: "Welcome to DesiAuction",
-        paragraphs: ["Your sign-up code is:"],
+        paragraphs: ["Enter this code to finish creating your account."],
         code,
         after: [
           "It expires in 15 minutes. Entering it creates your account on this address.",
-          "If you did not ask for this, ignore this message — nothing is created until the code is used.",
+          "Didn't ask for this? You can ignore this email. Nothing is created until the code is entered.",
         ],
-        footnote: "You received this because this address was entered on our sign-up page.",
+        calloutLast: true,
+        footnote:
+          "You received this because this address was entered on the DesiAuction sign-up page.",
         noLinks: true,
       }),
     };
   }
   if (purpose === "login") {
     return {
-      subject: "Your DesiAuction sign-in code",
+      subject: `${code} is your DesiAuction sign-in code`,
       ...renderEmail({
-        preheader: `Your sign-in code is ${code}. It expires in 15 minutes.`,
+        preheader: "It works for 15 minutes. DesiAuction will never ask you for it.",
         heading: "Your sign-in code",
-        paragraphs: ["Your DesiAuction sign-in code is:"],
+        paragraphs: ["Enter this code on the DesiAuction sign-in page to continue."],
         code,
         after: [
           "It expires in 15 minutes.",
-          "If you did not try to sign in, someone entered your address on our sign-in page. Your account is safe as long as you do not share this code.",
+          "Did not try to sign in? Someone entered your address on our sign-in page. Your account is safe as long as you do not share this code, and DesiAuction will never call or message you to ask for it.",
         ],
-        footnote: "You received this because this address was entered on our sign-in page.",
+        calloutLast: true,
+        footnote:
+          "You received this because this address was entered on the DesiAuction sign-in page.",
         noLinks: true,
       }),
     };
   }
   return {
-    subject: "Confirm your email for DesiAuction",
+    subject: `${code} is your code to confirm this email`,
     ...renderEmail({
-      preheader: `Your confirmation code is ${code}.`,
+      preheader: "Enter it on your DesiAuction account page. It works for 15 minutes.",
       heading: "Confirm your email",
-      paragraphs: [`Your DesiAuction confirmation code is ${code}.`],
+      paragraphs: ["Use this code to add this address to your DesiAuction account."],
       code,
       after: [
         "Enter it on your account page to confirm this address. It expires in 15 minutes.",
-        "If you did not ask for this, ignore this message.",
+        "Didn't ask for this? You can ignore this email. The address is only added when the code is entered.",
       ],
+      calloutLast: true,
       footnote: "You received this because this address was added to a DesiAuction account.",
       noLinks: true,
     }),
@@ -419,15 +422,16 @@ function emailChangedCopy(newEmail: string): {
   return {
     subject: "Your DesiAuction sign-in email was changed",
     ...renderEmail({
-      preheader: `This account now signs in with ${masked}.`,
+      preheader: `It now signs in with ${masked}. If this wasn't you, write to us right away.`,
       heading: "Your sign-in email was changed",
       paragraphs: [
         `The DesiAuction account that used this address now signs in with ${masked}. Codes and account mail go there from now on, and every other device was signed out.`,
-        "If that was you, there is nothing to do.",
+        "If that was you, there's nothing to do.",
       ],
       after: [
         `If it wasn't you, somebody may have reached your account. Write to ${SUPPORT_EMAIL} straight away from this address and we will help you get it back.`,
       ],
+      calloutLast: true,
       action: { label: "Get help", url: `${PUBLIC}/support` },
       footnote:
         "You received this because this address was the sign-in email on a DesiAuction account until a moment ago.",
@@ -443,15 +447,16 @@ function phoneChangedCopy(last4: string): {
   return {
     subject: "Your DesiAuction mobile number was changed",
     ...renderEmail({
-      preheader: `This account's mobile number now ends ${last4}.`,
+      preheader: `It now ends in ${last4}. If this wasn't you, write to us right away.`,
       heading: "Your mobile number was changed",
       paragraphs: [
-        `The mobile number on your DesiAuction account was changed to one ending ${last4}. Sign-in codes and texts go there from now on, and every other device was signed out.`,
-        "If that was you, there is nothing to do.",
+        `The mobile number on your DesiAuction account now ends in ${last4}. Sign-in codes and texts go there from now on, and every other device was signed out.`,
+        "If that was you, there's nothing to do.",
       ],
       after: [
         `If it wasn't you, somebody may have reached your account. Write to ${SUPPORT_EMAIL} straight away from this address and we will help you get it back.`,
       ],
+      calloutLast: true,
       action: { label: "Get help", url: `${PUBLIC}/support` },
       footnote:
         "You received this because this is the verified email on a DesiAuction account whose mobile number just changed.",

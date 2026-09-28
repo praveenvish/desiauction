@@ -52,6 +52,12 @@ export interface EmailContent {
   readonly details?: readonly (readonly [string, string])[];
   /** Paragraphs after the code, button or details. */
   readonly after?: readonly string[];
+  /**
+   * The last `after` paragraph as a highlighted box, its first sentence in
+   * bold — "Didn't ask for this?" under a code, "If it wasn't you…" under a
+   * security alert. The words stay the template's; only the setting is code.
+   */
+  readonly calloutLast?: boolean;
   /** Why this person received this mail. */
   readonly footnote: string;
   /**
@@ -97,6 +103,8 @@ const MUTED = "#58534A"; // chalk-600 — AA on the card, the sunken fill and th
 const GOLD = "#F0B43C"; // gold-400 — a FILL, never text
 const GOLD_EDGE = "#B57F14"; // gold-700 — the fill's rim
 const GOLD_TEXT = "#865D12"; // gold-800 — gold as text, on light
+const NOTICE = "#FDF4DE"; // gold-100 — a callout's fill
+const NOTICE_EDGE = "#F3D078"; // gold-300
 const ON_GOLD = "#070A0F"; // ink-950 — text on a gold fill (white on gold is 1.9:1)
 
 const DARK = {
@@ -108,6 +116,8 @@ const DARK = {
   text: "#C9D4E8", // ink-200
   muted: "#9FB0CC", // ink-300
   goldText: "#F3D078", // gold-300
+  notice: "#1C1608",
+  noticeEdge: "#5E410B", // gold-900
 } as const;
 
 const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -154,11 +164,26 @@ function button(action: { label: string; url: string }, font: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="da-btn-wrap" style="margin:8px 0 24px;"><tr><td align="center" style="background:${GOLD};border:1px solid ${GOLD_EDGE};border-radius:10px;"><a class="da-btn" href="${escape(action.url)}" style="display:inline-block;padding:14px 28px;font:700 16px/20px ${font};color:${ON_GOLD};text-decoration:none;border-radius:10px;">${escape(action.label)}</a></td></tr></table>`;
 }
 
+/** "Didn't ask for this? You can ignore…" → the question in bold, the rest plain. */
+function splitFirstSentence(text: string): [string, string] {
+  const match = /^(.+?[.?!।])\s+(.+)$/su.exec(text);
+  return match === null ? [text, ""] : [match[1] ?? text, match[2] ?? ""];
+}
+
+function callout(text: string, font: string): string {
+  const [lead, rest] = splitFirstSentence(text);
+  const body =
+    rest === ""
+      ? `<strong class="da-heading" style="color:${INK};">${escape(lead)}</strong>`
+      : `<strong class="da-heading" style="color:${INK};">${escape(lead)}</strong> ${escape(rest)}`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-notice" style="margin:4px 0 20px;background:${NOTICE};border:1px solid ${NOTICE_EDGE};border-radius:12px;"><tr><td class="da-text" style="padding:14px 16px;font:14px/22px ${font};color:${TEXT};">${body}</td></tr></table>`;
+}
+
 function detailsTable(details: readonly (readonly [string, string])[], font: string): string {
   const rows = details
     .map(([label, value], i) => {
       const rule = i === 0 ? "" : `border-top:1px solid ${RULE};`;
-      return `<tr><td class="da-muted da-rule" style="padding:11px 16px 11px 0;${rule}font:14px/20px ${font};color:${MUTED};vertical-align:top;">${escape(label)}</td><td class="da-heading da-rule" align="right" style="padding:11px 0;${rule}font:600 14px/20px ${font};color:${INK};text-align:right;vertical-align:top;font-variant-numeric:tabular-nums;">${escape(value)}</td></tr>`;
+      return `<tr><td class="da-muted da-rule" style="padding:11px 16px 11px 0;${rule}font:14px/20px ${font};color:${MUTED};vertical-align:top;white-space:nowrap;">${escape(label)}</td><td class="da-heading da-rule" align="right" style="padding:11px 0;${rule}font:600 14px/20px ${font};color:${INK};text-align:right;vertical-align:top;font-variant-numeric:tabular-nums;">${escape(value)}</td></tr>`;
     })
     .join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="da-sunken" style="margin:4px 0 24px;background:${SUNKEN};border-radius:12px;"><tr><td style="padding:4px 18px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}</table></td></tr></table>`;
@@ -186,6 +211,7 @@ body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
   .da-muted { color:${DARK.muted} !important; }
   .da-gold-text { color:${DARK.goldText} !important; }
   .da-rule { border-color:${DARK.rule} !important; }
+  .da-notice { background:${DARK.notice} !important; border-color:${DARK.noticeEdge} !important; }
 }
 /*/da:dark*/
 </style>`;
@@ -212,7 +238,9 @@ export function renderEmail(content: EmailContent): RenderedEmail {
     content.details === undefined || content.details.length === 0
       ? ""
       : detailsTable(content.details, font),
-    ...(content.after ?? []).map((p) => paragraph(p, font)),
+    ...(content.after ?? []).map((p, i, all) =>
+      content.calloutLast === true && i === all.length - 1 ? callout(p, font) : paragraph(p, font),
+    ),
     first ? "" : action,
     content.whatsappNudge === true ? WHATSAPP_NUDGE_MARK : "",
   ].join("");

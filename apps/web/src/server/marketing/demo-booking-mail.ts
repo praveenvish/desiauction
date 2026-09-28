@@ -5,7 +5,7 @@ import { SUPPORT_EMAIL } from "../messaging/email-layout";
 import { sendNotificationMail, type GatedMailOutcome } from "../messaging/notify";
 import { renderNotificationEmail, type NotificationMail } from "../messaging/notification-email";
 import { buildInvite, inviteUid } from "./demo-ics";
-import { IST_OFFSET_MINUTES, dayLabel, istDayKey, timeLabel } from "./demo-slots";
+import { whenWords } from "./demo-slots";
 
 /**
  * WHAT WE SEND WHEN A TIME IS AGREED.
@@ -22,15 +22,9 @@ import { IST_OFFSET_MINUTES, dayLabel, istDayKey, timeLabel } from "./demo-slots
  * the gate, because by then we are the ones starting the conversation.
  */
 
-const MINUTE_MS = 60 * 1000;
-
-/** "Tue 9 Sep, 7:00 pm IST" — one string, one timezone, said out loud. */
-export function whenWords(at: Date): string {
-  const dayKey = istDayKey(at);
-  const minutes =
-    (at.getTime() + IST_OFFSET_MINUTES * MINUTE_MS - Date.parse(`${dayKey}T00:00:00Z`)) / MINUTE_MS;
-  return `${dayLabel(dayKey)}, ${timeLabel(Math.round(minutes))} IST`;
-}
+// Moved to demo-slots.ts, beside the day and time labels it is built from;
+// the sign-in and security mails say their times the same way.
+export { whenWords };
 
 /*
  * NOTHING THE STRANGER TYPED GOES BACK OUT — the booking half (gate leftover).

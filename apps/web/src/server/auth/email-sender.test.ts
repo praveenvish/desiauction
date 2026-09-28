@@ -23,14 +23,30 @@ describe("codeMailCopy", () => {
     // Not "ignore this" — that is advice for spam. Their address is known to
     // someone, and their account is safe only while the code stays unshared.
     const copy = await codeMailCopy("123456", "login");
-    expect(copy.text).toContain("did not try to sign in");
+    // The question now opens the boxed line, so it is capitalised there.
+    expect(copy.text.toLowerCase()).toContain("did not try to sign in");
     expect(copy.text).toContain("do not share this code");
   });
 
-  it("leaves the confirmation copy exactly as it was", async () => {
+  it("leads every subject with the code, and names the confirmation as one", async () => {
+    // Email v2 (2026-09-28): the code in the subject is on the lock screen and
+    // gets Gmail's "Copy code" — the person never has to open the mail.
+    for (const purpose of ["login", "signup", "email_change"] as const) {
+      expect((await codeMailCopy("123456", purpose)).subject.startsWith("123456 ")).toBe(true);
+    }
     const copy = await codeMailCopy("123456", "email_change");
-    expect(copy.subject).toBe("Confirm your email for DesiAuction");
-    expect(copy.text).toContain("confirmation code is 123456");
+    expect(copy.subject.toLowerCase()).toContain("confirm");
+    expect(copy.text).toContain("123456");
+  });
+
+  it("shows where and when the code was asked for, when it knows", async () => {
+    const at = new Date("2026-09-28T14:12:00Z");
+    const copy = await codeMailCopy("123456", "login", "en", { device: "Chrome on macOS", at });
+    expect(copy.text).toContain("Device: Chrome on macOS");
+    expect(copy.text).toContain("Requested: Mon 28 Sep, 7:42 pm IST");
+    const hi = await codeMailCopy("123456", "login", "hi", { device: null, at });
+    expect(hi.text).not.toContain("डिवाइस");
+    expect(hi.text).toContain("माँगा गया: ");
   });
 
   it("puts NO link in either — a typed code cannot be followed out of a forward", async () => {

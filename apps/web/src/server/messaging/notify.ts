@@ -8,6 +8,7 @@ import { logger } from "../logger";
 import type { NotificationKind } from "./catalogue";
 import { notificationGate, type GateDecision } from "./gate";
 import { recordEmailSend } from "./email-sends";
+import type { RequestContext } from "./request-context";
 import type { NotificationMail } from "./notification-email";
 import {
   deliverMail,
@@ -139,6 +140,8 @@ export async function sendSignInCodeMail(
   purpose: CodeMailPurpose,
   /** Whose account it is, when known (a new address being confirmed). */
   personId?: string,
+  /** Where and when it was asked for (request-context.ts), shown in the mail. */
+  context?: RequestContext,
 ): Promise<void> {
   const decision = await notificationGate(db, {
     kind: "auth.email_code",
@@ -156,7 +159,7 @@ export async function sendSignInCodeMail(
     purpose === "signup" ? "en" : await languageForMail(db, { personId: personId ?? null, email });
   const record = { kind: "auth.email_code", to: email, personId: personId ?? null };
   try {
-    const receipt = await createCodeMailer(db).send(email, code, purpose, language);
+    const receipt = await createCodeMailer(db).send(email, code, purpose, language, context);
     // Null is the dev inbox: nothing left the building.
     await recordEmailSend(
       receipt === null

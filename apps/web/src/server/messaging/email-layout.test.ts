@@ -166,6 +166,26 @@ describe("the layout itself", () => {
     expect(dark).toContain(".da-card { background:#101623 !important;");
   });
 
+  it("boxes the closing line when asked, its first sentence in bold", () => {
+    const html = renderEmail({
+      ...content,
+      after: ["It expires in 15 minutes.", "Did not try to sign in? Someone entered your address."],
+      calloutLast: true,
+    }).html;
+    expect(html).toContain('class="da-notice"');
+    expect(html).toContain(
+      '<strong class="da-heading" style="color:#1A1814;">Did not try to sign in?</strong> Someone entered your address.',
+    );
+    // Only the last one: the expiry line stays a plain paragraph.
+    expect(html.match(/da-notice/g)?.length).toBe(2); // the box, and its dark-mode rule
+    const hindi = renderEmail({
+      ...content,
+      after: ["आपने यह नहीं माँगा? इसे अनदेखा करें।"],
+      calloutLast: true,
+    }).html;
+    expect(hindi).toContain(">आपने यह नहीं माँगा?</strong> इसे अनदेखा करें।");
+  });
+
   it("keeps room for the WhatsApp nudge and fills it at send time", () => {
     const mail = renderEmail({ ...content, whatsappNudge: true });
     const filled = applyWhatsAppNudge(mail, true);

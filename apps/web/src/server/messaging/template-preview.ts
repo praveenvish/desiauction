@@ -3,6 +3,7 @@ import { EMAIL_TEMPLATES } from "@desiauction/messaging/email-template-defaults"
 import type { MessageLanguage } from "@desiauction/messaging/email-templates";
 
 import { env } from "../../env";
+import { requestDetails } from "./request-context";
 import type { RenderOptions } from "./notification-email";
 
 /**
@@ -11,6 +12,8 @@ import type { RenderOptions } from "./notification-email";
  * sample code, and a sample details table in the reader's language. The
  * wording is the editor's; these only make the preview look like the mail.
  */
+
+const SAMPLE_REQUEST = { device: "Chrome on macOS", at: new Date("2026-09-28T14:12:00Z") };
 
 const SQUAD: Readonly<Record<MessageLanguage, readonly (readonly [string, string])[]>> = {
   en: [
@@ -53,6 +56,12 @@ function details(
         ["How", "We call the number you gave us"],
         ["Length", "About twenty minutes"],
       ];
+    // Where and when — the facts a code or an alert shows (request-context.ts).
+    case "auth.email_code":
+      return requestDetails(SAMPLE_REQUEST, "code", language);
+    case "security.email_changed":
+    case "security.phone_changed":
+      return requestDetails(SAMPLE_REQUEST, "change", language);
     default:
       return undefined;
   }

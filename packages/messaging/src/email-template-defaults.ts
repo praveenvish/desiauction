@@ -143,34 +143,43 @@ const EMAIL_CODE: EmailTemplateSpec = {
   defaults: {
     en: {
       variants: {
+        // The code LEADS the subject: the lock screen shows it, and Gmail
+        // offers "Copy code" — the person never has to open the mail at all.
         login: layout({
-          subject: "Your DesiAuction sign-in code",
-          preheader: "Your sign-in code is {{code}}. It expires in 15 minutes.",
+          subject: "{{code}} is your DesiAuction sign-in code",
+          preheader: "It works for 15 minutes. DesiAuction will never ask you for it.",
           heading: "Your sign-in code",
-          paragraphs: ["Your DesiAuction sign-in code is:"],
+          paragraphs: ["Enter this code on the DesiAuction sign-in page to continue."],
           after: [
             CODE_EXPIRY.login.en,
-            "If you did not try to sign in, someone entered your address on our sign-in page. Your account is safe as long as you do not share this code.",
+            // Not "ignore this" (that is advice for spam): somebody knows their
+            // address, and the account is safe only while the code stays theirs.
+            "Did not try to sign in? Someone entered your address on our sign-in page. Your account is safe as long as you do not share this code, and DesiAuction will never call or message you to ask for it.",
           ],
-          footnote: "You received this because this address was entered on our sign-in page.",
+          footnote:
+            "You received this because this address was entered on the DesiAuction sign-in page.",
         }),
         signup: layout({
-          subject: "Your DesiAuction sign-up code",
-          preheader: "Your sign-up code is {{code}}. It expires in 15 minutes.",
+          subject: "{{code}} is your DesiAuction sign-up code",
+          preheader: "Enter it to finish creating your account. It works for 15 minutes.",
           heading: "Welcome to DesiAuction",
-          paragraphs: ["Your sign-up code is:"],
+          paragraphs: ["Enter this code to finish creating your account."],
           after: [
             CODE_EXPIRY.signup.en,
-            "If you did not ask for this, ignore this message — nothing is created until the code is used.",
+            "Didn't ask for this? You can ignore this email. Nothing is created until the code is entered.",
           ],
-          footnote: "You received this because this address was entered on our sign-up page.",
+          footnote:
+            "You received this because this address was entered on the DesiAuction sign-up page.",
         }),
         email_change: layout({
-          subject: "Confirm your email for DesiAuction",
-          preheader: "Your confirmation code is {{code}}.",
+          subject: "{{code}} is your code to confirm this email",
+          preheader: "Enter it on your DesiAuction account page. It works for 15 minutes.",
           heading: "Confirm your email",
-          paragraphs: ["Your DesiAuction confirmation code is {{code}}."],
-          after: [CODE_EXPIRY.email_change.en, "If you did not ask for this, ignore this message."],
+          paragraphs: ["Use this code to add this address to your DesiAuction account."],
+          after: [
+            CODE_EXPIRY.email_change.en,
+            "Didn't ask for this? You can ignore this email. The address is only added when the code is entered.",
+          ],
           footnote: "You received this because this address was added to a DesiAuction account.",
         }),
       },
@@ -178,33 +187,36 @@ const EMAIL_CODE: EmailTemplateSpec = {
     hi: {
       variants: {
         login: layout({
-          subject: "आपका DesiAuction साइन-इन कोड",
-          preheader: "आपका साइन-इन कोड {{code}} है। यह 15 मिनट में खत्म हो जाएगा।",
+          subject: "{{code}} आपका DesiAuction साइन-इन कोड है",
+          preheader: "यह 15 मिनट तक चलेगा। DesiAuction कभी भी आपसे यह कोड नहीं माँगेगा।",
           heading: "आपका साइन-इन कोड",
-          paragraphs: ["आपका DesiAuction साइन-इन कोड है:"],
+          paragraphs: ["आगे बढ़ने के लिए यह कोड DesiAuction के साइन-इन पेज पर डालें।"],
           after: [
             CODE_EXPIRY.login.hi,
-            "अगर आपने साइन-इन की कोशिश नहीं की, तो किसी ने हमारे साइन-इन पेज पर आपका पता डाला है। जब तक आप यह कोड किसी को नहीं बताते, आपका अकाउंट सुरक्षित है।",
+            "आपने साइन-इन की कोशिश नहीं की? किसी ने हमारे साइन-इन पेज पर आपका पता डाला है। जब तक आप यह कोड किसी को नहीं बताते, आपका अकाउंट सुरक्षित है, और DesiAuction कभी फ़ोन या मैसेज करके यह कोड नहीं माँगेगा।",
           ],
-          footnote: "आपको यह इसलिए मिला क्योंकि हमारे साइन-इन पेज पर यह पता डाला गया था।",
+          footnote: "आपको यह इसलिए मिला क्योंकि DesiAuction के साइन-इन पेज पर यह पता डाला गया था।",
         }),
         signup: layout({
-          subject: "आपका DesiAuction साइन-अप कोड",
-          preheader: "आपका साइन-अप कोड {{code}} है। यह 15 मिनट में खत्म हो जाएगा।",
+          subject: "{{code}} आपका DesiAuction साइन-अप कोड है",
+          preheader: "अकाउंट बनाने के लिए इसे डालें। यह 15 मिनट तक चलेगा।",
           heading: "DesiAuction में आपका स्वागत है",
-          paragraphs: ["आपका साइन-अप कोड है:"],
+          paragraphs: ["अपना अकाउंट बनाने के लिए यह कोड डालें।"],
           after: [
             CODE_EXPIRY.signup.hi,
-            "अगर आपने यह नहीं माँगा, तो इस मेल को अनदेखा करें — कोड डाले बिना कुछ नहीं बनेगा।",
+            "आपने यह नहीं माँगा? इस ईमेल को अनदेखा करें। कोड डाले बिना कुछ नहीं बनेगा।",
           ],
-          footnote: "आपको यह इसलिए मिला क्योंकि हमारे साइन-अप पेज पर यह पता डाला गया था।",
+          footnote: "आपको यह इसलिए मिला क्योंकि DesiAuction के साइन-अप पेज पर यह पता डाला गया था।",
         }),
         email_change: layout({
-          subject: "DesiAuction के लिए अपना ईमेल पक्का करें",
-          preheader: "आपका पुष्टि कोड {{code}} है।",
+          subject: "{{code}} — अपना ईमेल पक्का करने का कोड",
+          preheader: "इसे अपने DesiAuction अकाउंट पेज पर डालें। यह 15 मिनट तक चलेगा।",
           heading: "अपना ईमेल पक्का करें",
-          paragraphs: ["आपका DesiAuction पुष्टि कोड {{code}} है।"],
-          after: [CODE_EXPIRY.email_change.hi, "अगर आपने यह नहीं माँगा, तो इस मेल को अनदेखा करें।"],
+          paragraphs: ["इस पते को अपने DesiAuction अकाउंट में जोड़ने के लिए यह कोड इस्तेमाल करें।"],
+          after: [
+            CODE_EXPIRY.email_change.hi,
+            "आपने यह नहीं माँगा? इस ईमेल को अनदेखा करें। कोड डाले बिना यह पता नहीं जुड़ेगा।",
+          ],
           footnote: "आपको यह इसलिए मिला क्योंकि यह पता एक DesiAuction अकाउंट में जोड़ा गया था।",
         }),
       },
@@ -240,11 +252,11 @@ const PHONE_CHANGED: EmailTemplateSpec = {
     en: one(
       layout({
         subject: "Your DesiAuction mobile number was changed",
-        preheader: "This account's mobile number now ends {{last4}}.",
+        preheader: "It now ends in {{last4}}. If this wasn't you, write to us right away.",
         heading: "Your mobile number was changed",
         paragraphs: [
-          "The mobile number on your DesiAuction account was changed to one ending {{last4}}. Sign-in codes and texts go there from now on, and every other device was signed out.",
-          "If that was you, there is nothing to do.",
+          "The mobile number on your DesiAuction account now ends in {{last4}}. Sign-in codes and texts go there from now on, and every other device was signed out.",
+          "If that was you, there's nothing to do.",
         ],
         after: [IF_NOT_YOU.text.en],
         actions: { help: "Get help" },
@@ -255,7 +267,7 @@ const PHONE_CHANGED: EmailTemplateSpec = {
     hi: one(
       layout({
         subject: "आपका DesiAuction मोबाइल नंबर बदल दिया गया है",
-        preheader: "इस अकाउंट का मोबाइल नंबर अब {{last4}} पर खत्म होता है।",
+        preheader: "अब यह {{last4}} पर खत्म होता है। अगर यह आपने नहीं किया, तो तुरंत हमें लिखें।",
         heading: "आपका मोबाइल नंबर बदल दिया गया है",
         paragraphs: [
           "आपके DesiAuction अकाउंट का मोबाइल नंबर बदलकर {{last4}} पर खत्म होने वाला नंबर कर दिया गया है। अब साइन-इन कोड और मैसेज उसी नंबर पर जाएँगे, और बाकी सभी डिवाइस से साइन आउट कर दिया गया है।",
@@ -292,11 +304,12 @@ const EMAIL_CHANGED: EmailTemplateSpec = {
     en: one(
       layout({
         subject: "Your DesiAuction sign-in email was changed",
-        preheader: "This account now signs in with {{maskedEmail}}.",
+        preheader:
+          "It now signs in with {{maskedEmail}}. If this wasn't you, write to us right away.",
         heading: "Your sign-in email was changed",
         paragraphs: [
           "The DesiAuction account that used this address now signs in with {{maskedEmail}}. Codes and account mail go there from now on, and every other device was signed out.",
-          "If that was you, there is nothing to do.",
+          "If that was you, there's nothing to do.",
         ],
         after: [IF_NOT_YOU.text.en],
         actions: { help: "Get help" },
@@ -307,7 +320,8 @@ const EMAIL_CHANGED: EmailTemplateSpec = {
     hi: one(
       layout({
         subject: "आपका DesiAuction साइन-इन ईमेल बदल दिया गया है",
-        preheader: "यह अकाउंट अब {{maskedEmail}} से साइन इन होता है।",
+        preheader:
+          "अब यह {{maskedEmail}} से साइन इन होता है। अगर यह आपने नहीं किया, तो तुरंत हमें लिखें।",
         heading: "आपका साइन-इन ईमेल बदल दिया गया है",
         paragraphs: [
           "जो DesiAuction अकाउंट इस पते से चलता था, वह अब {{maskedEmail}} से साइन इन होता है। अब कोड और अकाउंट के मेल वहीं जाएँगे, और बाकी सभी डिवाइस से साइन आउट कर दिया गया है।",

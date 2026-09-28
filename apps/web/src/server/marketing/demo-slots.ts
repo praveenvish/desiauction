@@ -238,3 +238,11 @@ export async function hasBookableSlots(now: Date = new Date()): Promise<boolean>
     return false;
   }
 }
+
+/** "Tue 9 Sep, 7:00 pm IST" — one string, one timezone, said out loud. */
+export function whenWords(at: Date): string {
+  const dayKey = istDayKey(at);
+  const minutes =
+    (at.getTime() + IST_OFFSET_MINUTES * 60_000 - Date.parse(`${dayKey}T00:00:00Z`)) / 60_000;
+  return `${dayLabel(dayKey)}, ${timeLabel(Math.round(minutes))} IST`;
+}
