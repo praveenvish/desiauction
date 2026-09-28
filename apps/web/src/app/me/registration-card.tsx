@@ -89,3 +89,62 @@ export function RegistrationCard({
     </Link>
   );
 }
+
+/**
+ * One season as a ROW of the career (My sports): year, the season and club,
+ * the team in its own colour, the role, and where it ended — a sold price is
+ * the row's loudest figure. The card above stays for /home, where a season is
+ * one of a few things on the page; here the seasons ARE the page.
+ */
+export function SeasonRow({
+  season,
+  year,
+  roleLabel,
+  money,
+}: {
+  season: CareerSeason;
+  year: string;
+  roleLabel: string;
+  money: (paise: number, unit: MoneyUnit) => string;
+}) {
+  const outcome = season.auction;
+  const verdict = verdictOf(season, money);
+  return (
+    <Link href={`/seasons/${season.competitionSlug}/register`} className="me-season">
+      <span className="me-season-year">{year}</span>
+      <span className="me-season-name">
+        <strong>
+          {season.tournamentName !== null && season.tournamentName !== season.competitionName
+            ? `${season.tournamentName} · ${season.competitionName}`
+            : season.competitionName}
+        </strong>
+        <span>
+          {season.orgName}
+          <span className="me-season-phone-year"> · {year}</span>
+        </span>
+      </span>
+      <span className="me-season-team">
+        {season.teamName !== null ? (
+          <TeamChip color={season.teamColor}>{season.teamName}</TeamChip>
+        ) : (
+          <span className="me-reg-noteam">No team yet</span>
+        )}
+        {season.isCaptain && outcome?.kind !== "captain" ? (
+          <RosterMark kind="captain" />
+        ) : season.isViceCaptain ? (
+          <RosterMark kind="vice-captain" />
+        ) : null}
+      </span>
+      <span className="me-season-role">{roleLabel === "" ? "—" : roleLabel}</span>
+      <span className="me-season-end">
+        {outcome?.kind === "sold" ? (
+          <span className="me-season-price">{money(outcome.soldPrice, season.auctionUnit)}</span>
+        ) : (
+          <Pill tone={verdict.tone} dot>
+            {verdict.label}
+          </Pill>
+        )}
+      </span>
+    </Link>
+  );
+}
