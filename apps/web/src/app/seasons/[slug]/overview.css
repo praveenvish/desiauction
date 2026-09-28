@@ -305,6 +305,19 @@ a.ov-hero-club:focus-visible {
   gap: var(--space-4);
 }
 
+/* Name the champion (PR12): the team picker and the button, one row when it fits. */
+.ov-champion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+}
+
+.ov-champion > :first-child {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
 .ov-retro-actions {
   display: flex;
   flex-wrap: wrap;

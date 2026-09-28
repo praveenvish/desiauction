@@ -404,10 +404,13 @@ export function OverviewPanel({
   slug,
   pass,
   now,
+  finale,
   mineTeamIds = [],
 }: {
   view: SeasonOverviewView;
   slug: string;
+  /** Name the champion, once every match is done (champion-card.tsx), drawn by the page. */
+  finale?: ReactNode;
   /** What is happening now (the matches and the table), drawn by the page. */
   now?: ReactNode;
   /** Teams the viewer owns in this season — marked "Your team" in the list. */
@@ -834,6 +837,7 @@ export function OverviewPanel({
       </div>
 
       <div className="ov-journey" data-testid="lifecycle-panel">
+        {finale}
         {finished ? (
           <Retrospective view={view} slug={slug} runAgain={runAgainButton(true)} />
         ) : null}

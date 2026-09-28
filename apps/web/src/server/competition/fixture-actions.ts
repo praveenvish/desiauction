@@ -24,6 +24,7 @@ import { orgsFor } from "../orgs/orgs";
 import { acrossOrgs, asPerson } from "../tenant";
 import { resolveMemberCompetition } from "./resolve";
 import { notifyFixtureChanged, notifySchedulePublished } from "./fixture-notify";
+import { announceChampion, finaleState, type FinaleState } from "./season-finale";
 import { fixtureSnapshot } from "./fixtures";
 import { canCompetition, requireCompetitionCapability } from "./authz";
 import {
@@ -1403,4 +1404,49 @@ export async function recordLobbyResultAction(
   revalidatePath(`/seasons/${slug}/fixtures`);
   revalidatePath(`/seasons/${slug}/standings`);
   return { ok: true, amended: result.amended };
+}
+
+/**
+ * The season's end (email programme PR12): the final table and whether a
+ * champion was named — for the people who run the season, and only once every
+ * match is done or a champion is already named. Null otherwise.
+ */
+export async function finaleView(slug: string): Promise<FinaleState | null> {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
+    return null;
+  }
+  const state = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    finaleState(db, gate.competition.id),
+  );
+  return state.matchesDone || state.announced !== null ? state : null;
+}
+
+/** Name the champion and tell every team — once. */
+export async function announceChampionAction(
+  slug: string,
+  teamId: string,
+): Promise<{ ok: boolean; told?: number; error?: string }> {
+  const gate = await fixtureGate(slug);
+  if (!gate.ok) {
+    return { ok: false, error: gate.error };
+  }
+  const result = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+    announceChampion(db, {
+      competitionId: gate.competition.id,
+      teamId,
+      actorId: gate.personId,
+    }),
+  );
+  if (!result.ok) {
+    const message = {
+      not_done: "Every match has to be played or called off first.",
+      not_a_team: "That team isn't in this season.",
+      already: "The champion has already been announced.",
+      not_found: "Not available.",
+    } as const;
+    return { ok: false, error: message[result.reason] };
+  }
+  revalidatePath(`/seasons/${slug}`);
+  return { ok: true, told: result.told };
 }

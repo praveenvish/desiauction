@@ -1676,6 +1676,132 @@ const MATCH_DAY: EmailTemplateSpec = {
   },
 };
 
+// --- The season's end (email programme PR12) ------------------------------------
+
+const CHAMPION = text("champion", "The champion team.", "Cup Kings", "कप किंग्स");
+
+const SEASON_CHAMPION: EmailTemplateSpec = {
+  kind: "season.champion",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "champion", label: "The champion team" },
+    { id: "team", label: "Every other team" },
+    { id: "organizer", label: "Organizer (the final table)" },
+  ],
+  actions: [
+    { id: "season", description: "The season's page, or the organizer's season overview." },
+  ],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    text("teamName", "The reader's team.", "Tigers", "टाइगर्स", { whenEmpty: "drop" }),
+    CHAMPION,
+    text(
+      "recordLine",
+      "The champion's season in one line (“7 wins from 8 matches · 14 points”).",
+      "7 wins from 8 matches · 14 points",
+      "8 मैचों में 7 जीत · 14 अंक",
+      { computed: true },
+    ),
+    text("place", "Where the reader's team finished (“3rd of 8”).", "3rd of 8", "8 में से तीसरे", {
+      computed: true,
+      whenEmpty: "drop",
+    }),
+  ],
+  locked: [],
+  note: "Sent once, when the organizer announces the champion from the season overview. The trophy panel and the final table are written by the code.",
+  defaults: {
+    en: {
+      variants: {
+        champion: layout({
+          subject: "Champions! {{champion}} win {{season}}",
+          preheader: "{{recordLine}}. What a season.",
+          heading: "You're the {{season}} champions",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has named {{champion}} the {{season}} champions — {{recordLine}}. Congratulations to you and the whole squad.",
+          ],
+          after: ["Thank you for playing. We hope to see you next season."],
+          actions: { season: "See the final table" },
+          footnote: "You received this because you're on {{champion}} in {{season}}.",
+        }),
+        team: layout({
+          subject: "{{season}} is a wrap — {{champion}} are champions",
+          preheader: "{{teamName}} finished {{place}}. Here's the final table.",
+          heading: "{{season}} is a wrap",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has named {{champion}} the {{season}} champions. {{teamName}} finished {{place}} — here's how the table ended.",
+          ],
+          after: ["Thank you for playing. We hope to see you next season."],
+          actions: { season: "See the final table" },
+          footnote: "You received this because you're on {{teamName}} in {{season}}.",
+        }),
+        organizer: layout({
+          subject: "{{champion}} are your {{season}} champions",
+          preheader: "Every team has been told. Here's the final table.",
+          heading: "{{champion}} are your champions",
+          paragraphs: [
+            "Hi {{name}},",
+            "You've named {{champion}} the {{season}} champions — {{recordLine}}. We've told every player and owner. Here's the final table:",
+          ],
+          after: [
+            "Running it again? Start the next season from this one — your teams, rules and venues come with it.",
+          ],
+          actions: { season: "Open the season" },
+          footnote: "You received this because you run {{season}} on DesiAuction.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        champion: layout({
+          subject: "चैंपियन! {{champion}} ने {{season}} जीता",
+          preheader: "{{recordLine}}। क्या शानदार सीज़न रहा।",
+          heading: "आप {{season}} के चैंपियन हैं",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{champion}} को {{season}} का चैंपियन घोषित किया है — {{recordLine}}। आपको और पूरी टीम को बधाई।",
+          ],
+          after: ["खेलने के लिए धन्यवाद। अगले सीज़न में फिर मिलेंगे।"],
+          actions: { season: "फ़ाइनल टेबल देखें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप {{season}} में {{champion}} की टीम में हैं।",
+        }),
+        team: layout({
+          subject: "{{season}} पूरा हुआ — {{champion}} चैंपियन",
+          preheader: "{{teamName}} {{place}} स्थान पर रहे। यह रही फ़ाइनल टेबल।",
+          heading: "{{season}} पूरा हुआ",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{champion}} को {{season}} का चैंपियन घोषित किया है। {{teamName}} {{place}} स्थान पर रहे — टेबल ऐसे ख़त्म हुई।",
+          ],
+          after: ["खेलने के लिए धन्यवाद। अगले सीज़न में फिर मिलेंगे।"],
+          actions: { season: "फ़ाइनल टेबल देखें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप {{season}} में {{teamName}} की टीम में हैं।",
+        }),
+        organizer: layout({
+          subject: "{{champion}} आपके {{season}} चैंपियन हैं",
+          preheader: "हर टीम को बता दिया गया है। यह रही फ़ाइनल टेबल।",
+          heading: "{{champion}} आपके चैंपियन हैं",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "आपने {{champion}} को {{season}} का चैंपियन घोषित किया है — {{recordLine}}। हमने हर खिलाड़ी और मालिक को बता दिया है। यह रही फ़ाइनल टेबल:",
+          ],
+          after: [
+            "फिर से चलाना है? अगला सीज़न इसी से शुरू करें — आपकी टीमें, नियम और मैदान साथ आ जाएँगे।",
+          ],
+          actions: { season: "सीज़न खोलें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+        }),
+      },
+    },
+  },
+};
+
 // --- Money -----------------------------------------------------------------------
 
 const FINANCE: EmailTemplateSpec = {
@@ -2614,6 +2740,7 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "schedule.published": SCHEDULE_PUBLISHED,
   "fixture.changed": FIXTURE_CHANGED,
   "match.day": MATCH_DAY,
+  "season.champion": SEASON_CHAMPION,
   "finance.document.issued": FINANCE,
   "review.platform_ask": PLATFORM_ASK,
   "review.season_ask": SEASON_ASK,

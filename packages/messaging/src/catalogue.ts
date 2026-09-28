@@ -369,6 +369,19 @@ const ENTRIES = [
     channels: ["email"],
   },
   {
+    // The organizer names the champion when the matches are done (email
+    // programme PR12) — announced, not derived: a season has no stored end and
+    // its final may have been played off the app. Once per season.
+    key: "season.champion",
+    label: "Season champions",
+    description:
+      "When the organizer names the champion: a celebration for the winning team, the final place for every other team, the final table for organizers.",
+    audience: "player",
+    category: "transactional",
+    topic: "matches",
+    channels: ["email", "in_app"],
+  },
+  {
     key: "lineup.announced",
     label: "Named in a lineup",
     description: "The player is in the team's lineup for a match.",

@@ -170,6 +170,7 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
       "server/competition/fixture-notify.ts":
         "queues only, held ten minutes — delivery is the gated drain",
       "server/competition/match-day.ts": "queues only — delivery is the gated drain",
+      "server/competition/season-finale.ts": "queues only — delivery is the gated drain",
     },
   },
   {

@@ -55,6 +55,7 @@ const MANAGEABLE = new Set([
   "schedule.published",
   "fixture.changed",
   "match.day",
+  "season.champion",
   "review.platform_ask",
   "review.season_ask",
 ]);

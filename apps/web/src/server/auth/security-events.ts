@@ -91,6 +91,8 @@ export type SecurityAction =
   | "fixture.lineup_announced"
   // Email programme PR11: a published match moved or was called off.
   | "fixture.changed"
+  // Email programme PR12: the organizer named the season's champion.
+  | "season.champion"
   // The person asked for their account to be erased, or took the request back.
   // On their own ledger because it is the one request that ends the account;
   // the DECISION is on the request itself, which /account reads.

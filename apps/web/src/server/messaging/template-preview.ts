@@ -16,6 +16,7 @@ import {
   wallInstant,
   type MatchFacts,
 } from "./fixture-mail";
+import { finaleTable, recordWords, type FinaleRow } from "./finale-mail";
 import { digestDetails, organizerJourney, welcomeFrame } from "./organizer-mail";
 import { journey, seasonBand, submittedDetails } from "./player-mail";
 import { requestDetails } from "./request-context";
@@ -258,6 +259,52 @@ function matchesFrame(
   }
 }
 
+/** A season's sample final table (finale-mail.ts). */
+const SAMPLE_TABLE: readonly FinaleRow[] = [
+  { teamId: "cup-kings", teamName: "Cup Kings", played: 8, won: 7, points: 14 },
+  { teamId: "falcons", teamName: "Falcons", played: 8, won: 5, points: 10 },
+  { teamId: "tigers", teamName: "Tigers", played: 8, won: 4, points: 8 },
+  { teamId: "royals", teamName: "Royals", played: 8, won: 2, points: 4 },
+  { teamId: "strikers", teamName: "Strikers", played: 8, won: 2, points: 4 },
+];
+
+/** The champion's trophy, or the final table (finale-mail.ts). */
+function finaleFrame(
+  kind: EmailNotificationKind,
+  variant: string,
+  language: MessageLanguage,
+): Partial<RenderOptions> {
+  if (kind !== "season.champion") return {};
+  const samples = sampleVariables(EMAIL_TEMPLATES[kind], language);
+  const season = String(samples["season"] ?? "");
+  const role = variant === "champion" || variant === "organizer" ? variant : "team";
+  const details = finaleTable(
+    {
+      table: SAMPLE_TABLE,
+      championId: "cup-kings",
+      teamId: role === "organizer" ? null : role === "champion" ? "cup-kings" : "tigers",
+      role,
+    },
+    language,
+  );
+  const [first] = SAMPLE_TABLE;
+  return role === "champion" && first !== undefined
+    ? {
+        stage: {
+          kicker: season,
+          monogram: "CK",
+          title: first.teamName,
+          figure: language === "hi" ? "चैंपियन" : "Champions",
+          line: recordWords(first, language),
+        },
+        details,
+      }
+    : {
+        band: seasonBand({ season, orgName: String(samples["orgName"] ?? ""), sport: "cricket" }),
+        details,
+      };
+}
+
 /** Auction night's band and date tile, with the sample season (auction-schedule-mail.ts). */
 function scheduleFrame(variant: string, language: MessageLanguage): Partial<RenderOptions> {
   const samples = sampleVariables(EMAIL_TEMPLATES["auction.schedule"], language);
@@ -415,5 +462,6 @@ export function previewOptions(
     ...(kind === "auction.reminder" ? reminderFrame(variant, language) : {}),
     ...resultsFrame(kind, language),
     ...matchesFrame(kind, variant, language),
+    ...finaleFrame(kind, variant, language),
   };
 }
