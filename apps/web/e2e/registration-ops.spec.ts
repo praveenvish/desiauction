@@ -208,7 +208,7 @@ test("the operations journey: import, dashboard, search, filter, bulk, export, a
   await expect(poolValue).toHaveText("7");
   // The hint has to name BOTH pre-signed marks or the subtraction printed
   // beside the figure does not come out.
-  await expect(poolHint).toHaveText("8 approved − 1 retained");
+  await expect(poolHint).toHaveText("8 approved, less 1 retained");
   // None of these imported players has a team, so retaining one strands them in
   // no auction and no squad — the warning that used to name icons only.
   await expect(page.getByTestId("orphan-pre-signed-warning")).toContainText("Retained");

@@ -68,7 +68,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
           description={
             standings.playable === 0
               ? "No match has been played yet — the table fills as results come in."
-              : `Built from ${String(standings.recorded)} recorded result${standings.recorded === 1 ? "" : "s"}, on every read.`
+              : `From ${String(standings.recorded)} recorded result${standings.recorded === 1 ? "" : "s"} — it updates the moment a score is entered.`
           }
           action={
             /* Said whenever it is not the whole story. A table built from three

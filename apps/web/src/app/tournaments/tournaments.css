@@ -1953,3 +1953,18 @@ a.tx-desk:hover strong {
     margin-inline-start: 0;
   }
 }
+
+/* The "Needs you now" card's road and its word: the word had no rule at all,
+   so it butted against the last dot ("—◉Season on", census 8). */
+.tx-now-road {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.tx-stage-word {
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-heading);
+}

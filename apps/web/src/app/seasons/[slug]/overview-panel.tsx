@@ -1025,7 +1025,10 @@ export function OverviewPanel({
             </SectionCard>
 
             <SectionCard
-              title="Pool by role"
+              // Every approved player, pre-signed ones included — so not the
+              // auction "pool" (the registrations desk's 37 of 43), which the
+              // two cards disagreed about (census 8).
+              title="Players by role"
               data-testid="pool-card"
               {...(view.viewer.canReview && view.poolByRole.length > 0
                 ? {

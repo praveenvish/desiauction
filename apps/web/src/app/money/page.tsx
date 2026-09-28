@@ -561,6 +561,21 @@ function clubBooks(
   return clubs;
 }
 
+/**
+ * A club's mark: the first letters of its first two words ("Thane Sports
+ * Club" → "TS"), as every other surface draws it. `initialsFor` is the
+ * person-name rule (first and last), which made this one page say "TC".
+ */
+function clubMark(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return (
+    words
+      .slice(0, 2)
+      .map((word) => String.fromCodePoint(word.codePointAt(0) ?? 63).toUpperCase())
+      .join("") || "?"
+  );
+}
+
 function ClubBooks({ clubs }: { clubs: ClubRow[] }) {
   return (
     <section className="mm-books" aria-labelledby="my-money-books-title">
@@ -571,7 +586,7 @@ function ClubBooks({ clubs }: { clubs: ClubRow[] }) {
         <article key={club.orgId} className="mm-club" aria-labelledby={`mm-club-${club.orgId}`}>
           <div className="mm-club-top">
             <span className="mm-club-mark" aria-hidden>
-              {initialsFor(club.name).initials ?? "?"}
+              {clubMark(club.name)}
             </span>
             <div className="mm-team-name">
               <h3 id={`mm-club-${club.orgId}`}>{club.name}</h3>

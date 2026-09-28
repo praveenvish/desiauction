@@ -125,7 +125,7 @@ test("the player desk: review in one pass, pre-sign, edit in place, export what 
   await expect(firstRow.getByTestId("captain-flag")).toBeVisible();
   await expect(page.getByTestId("stat-auction-pool").locator(".stat-value")).toHaveText("3");
   await expect(page.getByTestId("stat-auction-pool").locator(".stat-hint")).toHaveText(
-    "4 approved − 1 captain",
+    "4 approved, less 1 captain",
   );
 
   // EDIT IN PLACE: no Save button — leave the field and it is kept.

@@ -87,7 +87,7 @@ describe("a season's road, derived", () => {
       { withTeams: false },
     );
     expect(steps.map((step) => step.key)).toEqual(["setup", "registration", "auction", "fixtures"]);
-    expect(steps[3]).toMatchObject({ state: "current", hint: "Not scheduled", label: "Fixtures" });
+    expect(steps[3]).toMatchObject({ state: "current", hint: "Not scheduled", label: "Matches" });
     const scheduled = seasonJourney(
       {
         ...BASE,
