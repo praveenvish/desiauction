@@ -7,6 +7,11 @@
   text-transform: capitalize;
 }
 
+/* "Result due" is said as every other screen says it, not title-cased. */
+.fx-status[data-due="true"] {
+  text-transform: none;
+}
+
 /* ---- Lobby placings ---- */
 
 .fx-squad-row {

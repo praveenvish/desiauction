@@ -46,6 +46,12 @@ describe("rowStep", () => {
     ).toMatchObject({ action: "start" });
   });
 
+  it("asks for the score, not a start, once a published match's day has passed", () => {
+    expect(
+      rowStep(duel({ kickoffAt: "2026-09-01T14:30" }), { scored: false, today }),
+    ).toMatchObject({ action: "start", label: "Enter score" });
+  });
+
   it("asks for lineups before a match days away, and not once both are in", () => {
     expect(
       rowStep(duel(), { scored: false, today, lineups: { home: 11, away: null } }),

@@ -80,7 +80,10 @@ export function rowStep(
       if (ahead && lineupsMissing) {
         return { kind: "lineups", label: "Set lineups" };
       }
-      return { kind: "lifecycle", action: "start", label: "Start" };
+      // Its day has passed and nobody started it: what is owed is the score.
+      // Starting is how a score is taken (it opens the match's result form).
+      const past = day !== null && day < context.today;
+      return { kind: "lifecycle", action: "start", label: past ? "Enter score" : "Start" };
     }
     case "in_progress":
       return { kind: "score", label: lobby ? "Enter placings" : "Enter score", urgent: true };

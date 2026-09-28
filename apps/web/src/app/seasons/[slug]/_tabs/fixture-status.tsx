@@ -42,8 +42,8 @@ export function FixtureStatusPill({
 }) {
   if (overdue) {
     return (
-      <span className="fx-status">
-        <Pill tone="amber">result due</Pill>
+      <span className="fx-status" data-due="true">
+        <Pill tone="amber">Result due</Pill>
       </span>
     );
   }

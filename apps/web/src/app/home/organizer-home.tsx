@@ -862,7 +862,9 @@ export async function OrganizerHome({
             hint={
               focusOverview.pendingPlayers > 0
                 ? `${formatCount(focusOverview.pendingPlayers)} to review`
-                : "In the auction pool"
+                : // The count is every approved player; the auction pool is the
+                  // ones not pre-signed (37 of 43), so it is not "in the pool".
+                  "Approved"
             }
             {...(tileDoor.players !== undefined
               ? { href: tileDoor.players, linkComponent: Link }

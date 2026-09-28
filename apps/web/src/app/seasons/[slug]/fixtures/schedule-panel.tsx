@@ -106,6 +106,14 @@ export function SchedulePanel({
   const lobbySeason = fixtureShape === "lobby";
   const grounds = view.grounds ?? [];
   const outstanding = view.outstanding ?? [];
+  // What is owed a result, oldest first: played-and-unscored, then the week's
+  // matches whose day passed with none.
+  const owedRows = [
+    ...outstanding,
+    ...view.rows.filter(
+      (row) => awaitsResult(row, today) && !outstanding.some((owed) => owed.id === row.id),
+    ),
+  ].sort((a, b) => (a.kickoffAt ?? "").localeCompare(b.kickoffAt ?? ""));
   // Being played NOW: a match left open from an earlier day awaits a result.
   const liveNow = Math.max(
     0,
@@ -457,16 +465,24 @@ export function SchedulePanel({
             : "Start it, move it or cancel it."}
         </Notice>
       ) : null}
-      {canManage && outstanding.length > 0 ? (
+      {/*
+        THE RESULTS DESK (census 10). Every "Enter results" button in the
+        product lands here, and the page opened on a week strip — the owed
+        matches sat in their day groups, two of them offering "Start". The
+        owed ones now lead: played-and-unscored plus every match whose day
+        passed with no result, each a door to its score.
+      */}
+      {canManage && owedRows.length > 0 ? (
         <Notice
           tone="warning"
           icon={<IconAlert size={20} />}
-          title={`${String(outstanding.length)} played ${outstanding.length === 1 ? noun : nouns} still ${outstanding.length === 1 ? "needs" : "need"} a score`}
+          title={`${String(owedRows.length)} ${owedRows.length === 1 ? noun : nouns} ${owedRows.length === 1 ? "needs" : "need"} a result`}
           testId="results-owed"
         >
           <span className="mx-owed">
-            The table is built from results, so these are not in it yet.{" "}
-            {outstanding.slice(0, 6).map((fixture) => (
+            The table is built from results, so {owedRows.length === 1 ? "it is" : "these are"} not
+            in it yet.{" "}
+            {owedRows.slice(0, 6).map((fixture) => (
               <Link
                 key={fixture.id}
                 href={matchHref(fixture.id)}
@@ -474,7 +490,7 @@ export function SchedulePanel({
                 className="mx-owed-link"
                 data-testid={`owed-${fixture.number}`}
               >
-                {describe(fixture)}
+                {owedLabel(fixture)}
               </Link>
             ))}
           </span>
@@ -814,6 +830,15 @@ export function SchedulePanel({
 }
 
 /** "F004 · Thane Tuskers v Pune Panthers" — a match named in a sentence. */
+/** "Mon 28 Sep · Mumbai Mavericks v Thane Tuskers" — the day, not the match code. */
+function owedLabel(fixture: Row): string {
+  const day = fixture.kickoffAt?.slice(0, 10) ?? null;
+  const when = day === null ? "Undated" : `${wallDay(day).weekday} ${wallDay(day).date}`;
+  return isLobby(fixture)
+    ? `${when} · lobby of ${String(fixture.squadCount)}`
+    : `${when} · ${fixture.homeTeamName ?? "TBA"} v ${fixture.awayTeamName ?? "TBA"}`;
+}
+
 function describe(fixture: Row): string {
   return isLobby(fixture)
     ? `${fixture.number} · lobby of ${String(fixture.squadCount)}`
@@ -892,6 +917,10 @@ function MatchRow({
       <span className="mx-sub" data-tone="result">
         {resultSentence(result.outcome, fixture.homeTeamName, fixture.awayTeamName)}
       </span>
+    ) : awaitsResult(fixture, today) ? (
+      <span className="mx-sub" data-tone="due">
+        Its day has passed — enter the score
+      </span>
     ) : canManage && lineups !== undefined && fixture.status !== "completed" ? (
       <span className="mx-sub">
         {lineupSummary(
@@ -958,7 +987,9 @@ function MatchRow({
           {step === null ? null : step.kind === "lifecycle" ? (
             <Button
               size="sm"
-              variant="secondary"
+              // An owed score is the row's urgent act, as "Enter score" on a
+              // match in progress already is.
+              variant={awaitsResult(fixture, today) ? "primary" : "secondary"}
               loading={pending}
               onClick={() => {
                 onLifecycle(step.action);
