@@ -659,7 +659,9 @@ const SURFACE_SUBTITLES: [string, string][] = [
   ["/orgs", "The clubs and academies you run tournaments under."],
   // What the page ships, not more: /money sums sealed receipts (it claims no
   // due — the club's case owns that) and, for organizers, each club's books.
-  ["/money", "What your teams paid, and your clubs' books."],
+  // One line for both readers — "What your teams paid" told an organizer who
+  // owns no team about teams they do not have.
+  ["/money", "Receipts for the teams you own, and books for the clubs you run."],
   ["/inbox", "Approvals, auction results, receipts and account activity."],
   ["/account", "Your sign-in, profile and security."],
   ["/players", "Every player across the seasons you run — search, filter, open their sheet."],

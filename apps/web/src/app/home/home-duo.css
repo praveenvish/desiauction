@@ -58,7 +58,15 @@
   color: var(--accent-ink);
 }
 
+/* One line, always: on a phone "Your matches · 2 played · 2 won" broke the
+   title itself onto two lines ("Your / matches"). The title keeps its words
+   whole and the count after it is what gives way. */
+.hd-title {
+  white-space: nowrap;
+}
+
 .hd-title-sub {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

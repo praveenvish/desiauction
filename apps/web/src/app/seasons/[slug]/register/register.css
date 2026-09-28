@@ -1227,7 +1227,7 @@
   line-height: var(--text-sm-line);
 }
 
-/* A URL, so it wraps at the slashes on a 320px screen. */
+/* The door to the public player page (it printed the raw path until census 7). */
 .reg-status-public-url {
   color: var(--text-accent);
   font-weight: var(--font-weight-semibold);
