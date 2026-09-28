@@ -364,6 +364,14 @@ export function LivePanel({
           spent: feed.resolved
             .filter((row) => row.status === "sold" && row.teamId === myPaddle.teamId)
             .reduce((sum, row) => sum + (row.soldPrice ?? 0), 0),
+          /** The team's dearest signing — the one number an owner quotes. */
+          topBuy: feed.resolved
+            .filter((row) => row.status === "sold" && row.teamId === myPaddle.teamId)
+            .reduce<(typeof feed.resolved)[number] | null>(
+              (best, row) =>
+                best === null || (row.soldPrice ?? 0) > (best.soldPrice ?? 0) ? row : best,
+              null,
+            ),
         };
 
   /**
@@ -480,6 +488,7 @@ export function LivePanel({
         squadMax={view.rules.squadMax}
         showPurse={view.viewer.canSeeAllPurses}
         collapsible={boardTeams.length > 1}
+        mineTeamId={myPaddle?.teamId ?? null}
         note={
           view.viewer.canSeeAllSquads
             ? null
@@ -524,10 +533,13 @@ export function LivePanel({
           viewer={
             myPaddle === null
               ? undefined
-              : {
-                  teamName: myTeam?.shortName ?? myPaddle.teamName,
-                  paddleNumber: myPaddle.paddleNumber,
-                }
+              : finished
+                ? // Once the night is over the paddle is history: the team is who they are.
+                  { label: myPaddle.teamName }
+                : {
+                    teamName: myTeam?.shortName ?? myPaddle.teamName,
+                    paddleNumber: myPaddle.paddleNumber,
+                  }
           }
         />
       </PageStatus>
@@ -564,7 +576,7 @@ export function LivePanel({
                    record is — sold and unsold from the server's own read, and
                    the doors to the full story. */
               <Card className="live-card live-over" data-testid="live-over">
-                <h2>This auction is over</h2>
+                <h2>{myOutcome !== null ? "Your squad is final" : "This auction is over"}</h2>
                 {myOutcome !== null ? (
                   /* AN OWNER'S RESULT, not a pointer to the squads. The card
                        held two lines and a "See the squads" button that led to
@@ -575,8 +587,8 @@ export function LivePanel({
                       {/* The team names the figures below; the night's
                             count is its own sentence (round-5 review: "Mumbai
                             Mavericks · 30 sold" read as Mumbai's 30). */}
-                      Your team: {myOutcome.teamName}. The night: {soldCount} sold · {unsoldCount}{" "}
-                      unsold. Every squad below is final.
+                      {myOutcome.teamName}. The night: {soldCount} sold · {unsoldCount} unsold. Your
+                      squad is below, open.
                     </p>
                     <dl className="live-over-figures" data-testid="live-over-mine">
                       <div>
@@ -596,6 +608,14 @@ export function LivePanel({
                           {money.ledger(Math.max(0, view.rules.pursePerTeam - myOutcome.spent))}
                         </dd>
                       </div>
+                      {myOutcome.topBuy !== null ? (
+                        <div>
+                          <dt>
+                            Top buy · {myOutcome.topBuy.playerName ?? myOutcome.topBuy.lotNumber}
+                          </dt>
+                          <dd>{money.ledger(myOutcome.topBuy.soldPrice ?? 0)}</dd>
+                        </div>
+                      ) : null}
                     </dl>
                   </>
                 ) : (
@@ -697,16 +717,25 @@ export function LivePanel({
               />
             ) : null}
 
-            <section className="room-card room-tabs" id="live-tabs" aria-label="The room">
-              <Tabs
-                label="The room"
-                selectedId={
-                  roomTabs.some((tab) => tab.id === roomTab) ? roomTab : (roomTabs[0]?.id ?? "")
-                }
-                onSelect={setRoomTab}
-                tabs={roomTabs}
-              />
-            </section>
+            {/* One panel is not a choice: a finished, offline room used to
+                draw a tab strip holding only "Squads" above the board's own
+                "Squads" heading. */}
+            {roomTabs.length === 1 ? (
+              <section className="room-card room-tabs" id="live-tabs" aria-label="The room">
+                {roomTabs[0]?.content}
+              </section>
+            ) : (
+              <section className="room-card room-tabs" id="live-tabs" aria-label="The room">
+                <Tabs
+                  label="The room"
+                  selectedId={
+                    roomTabs.some((tab) => tab.id === roomTab) ? roomTab : (roomTabs[0]?.id ?? "")
+                  }
+                  onSelect={setRoomTab}
+                  tabs={roomTabs}
+                />
+              </section>
+            )}
           </div>
 
           {overOffline ? null : (
