@@ -5,13 +5,13 @@ of Docker Compose projects. It is idempotent — re-running it converges.
 
 ## Current host
 
-|              |                                                                     |
-| ------------ | ------------------------------------------------------------------- |
-| Provider     | Hostinger KVM 4 — India, Mumbai (the DesiAuction ops account)       |
-| Size         | 4 vCPU (AMD EPYC 9354P), 16 GB RAM, 200 GB NVMe, 16 TB/month        |
-| OS           | Ubuntu 26.04 LTS                                                    |
-| Address      | `145.223.20.134` (`srv2014292.hstgr.cloud`)                         |
-| Bootstrapped | 2026-09-28                                                          |
+|              |                                                               |
+| ------------ | ------------------------------------------------------------- |
+| Provider     | Hostinger KVM 4 — India, Mumbai (the DesiAuction ops account) |
+| Size         | 4 vCPU (AMD EPYC 9354P), 16 GB RAM, 200 GB NVMe, 16 TB/month  |
+| OS           | Ubuntu 26.04 LTS                                              |
+| Address      | `145.223.20.134` (`srv2014292.hstgr.cloud`)                   |
+| Bootstrapped | 2026-09-28                                                    |
 
 Measured on the empty box: 1.1 GB/s write, 830 MB/s read, ~1,400 fsyncs/s,
 ~67 MB/s from GitHub, 5.7 ms to ghcr.io.
