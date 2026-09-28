@@ -769,6 +769,12 @@ export interface MyAuctionOutcome {
   teamName: string | null;
   /** `/c/<slug>/t/<teamSlug>` segment — only a published season has the page. */
   teamSlug: string | null;
+  /**
+   * The team this player is on, resolved here from their own row — the key the
+   * season page hands `teamSeason` for the matches and the table place.
+   */
+  teamId: string | null;
+  teamColor: string | null;
   /** Hammer price ×100 in `unit`, sold only. */
   pricePaise: number | null;
   unit: MoneyUnit;
@@ -839,7 +845,7 @@ export async function myAuctionOutcome(
     teamId === null
       ? []
       : await systemDb
-          .select({ name: teams.name })
+          .select({ name: teams.name, color: teams.primaryColor })
           .from(teams)
           .where(and(eq(teams.id, teamId), eq(teams.competitionId, row.competitionId)))
           .limit(1);
@@ -848,6 +854,8 @@ export async function myAuctionOutcome(
     outcome: outcome === "sold" && team === undefined ? "pool" : outcome,
     teamName: team?.name ?? null,
     teamSlug: team === undefined ? null : teamSlugOf(team.name),
+    teamId: team === undefined ? null : teamId,
+    teamColor: team?.color ?? null,
     pricePaise: outcome === "sold" ? (lot?.soldPrice ?? null) : null,
     unit: row.unit,
     orgName: row.orgName,
