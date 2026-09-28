@@ -264,6 +264,28 @@ const ENTRIES = [
     orgControllable: false,
   },
   {
+    // The day before auction night: owners (their team, their paddle), pool
+    // players (when, and where to watch), organizers (is the room ready?).
+    // Built fresh by the sweep when it is due, so the readiness is true.
+    key: "auction.reminder",
+    label: "Auction tomorrow",
+    description:
+      "24 hours before auction night — to owners, pool players, and organizers with a readiness check.",
+    audience: "player",
+    category: "transactional",
+    topic: "auction",
+    channels: ["email"],
+  },
+  {
+    key: "auction.starting_soon",
+    label: "Auction starts in 30 minutes",
+    description: "Half an hour before auction night, in the inbox of everybody in the room.",
+    audience: "player",
+    category: "transactional",
+    topic: "auction",
+    channels: ["in_app"],
+  },
+  {
     key: "auction.sold",
     label: "Sold at auction",
     description: "When the auction completes: which team bought the player, and for how much.",

@@ -697,6 +697,132 @@ const OWNERS_READY: EmailTemplateSpec = {
   },
 };
 
+// --- The day before auction night (email programme PR8) ------------------------
+
+const REMINDER_FOOTNOTE = {
+  en: "You received this because you're in the {{season}} auction.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में हैं।",
+};
+
+const AUCTION_REMINDER: EmailTemplateSpec = {
+  kind: "auction.reminder",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "owner", label: "Team owner" },
+    { id: "player", label: "Pool player" },
+    { id: "organizer", label: "Organizer (readiness)" },
+  ],
+  actions: [
+    { id: "open", description: "The owner's room, the live broadcast, or the auction setup." },
+  ],
+  variables: [
+    NAME,
+    SEASON,
+    ORG,
+    text(
+      "when",
+      'When it starts, in IST ("Sun 4 Oct, 8:00 pm IST").',
+      "Sun 4 Oct, 8:00 pm IST",
+      "रवि, 4 अक्टू॰, 8:00 pm IST",
+      { computed: true },
+    ),
+    text("teamName", "The owner's team.", "Cup Kings", "कप किंग्स", { whenEmpty: "drop" }),
+    text(
+      "gapLine",
+      'For organizers: what is still missing, written by DesiAuction ("2 owners haven\'t joined yet"). Empty when the room is ready.',
+      "2 owners haven't joined yet — resend their links from the auction page.",
+      "2 मालिक अभी जुड़े नहीं हैं — नीलामी पेज से उन्हें लिंक दोबारा भेजें।",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [],
+  defaults: {
+    en: {
+      variants: {
+        owner: layout({
+          subject: "Tomorrow: the {{season}} auction, {{when}}",
+          preheader: "You're bidding for {{teamName}}. Open your owner room a few minutes early.",
+          heading: "Your auction is tomorrow",
+          paragraphs: [
+            "Hi {{name}},",
+            "The {{season}} auction starts {{when}}. You're bidding for {{teamName}} — open your owner room a few minutes early so your paddle is ready for the first player.",
+          ],
+          after: [
+            "It works on a phone or a laptop. Keep your phone charged and on Wi-Fi if you can.",
+          ],
+          actions: { open: "Open your owner room" },
+          footnote: REMINDER_FOOTNOTE.en,
+        }),
+        player: layout({
+          subject: "Tomorrow: the {{season}} auction, {{when}}",
+          preheader: "You're in the pool. Watch live and see which team buys you.",
+          heading: "Your auction is tomorrow",
+          paragraphs: [
+            "Hi {{name}},",
+            "The {{season}} auction starts {{when}}, and you're in the player pool. Watch it live and see which team buys you — we'll email you the moment it happens.",
+          ],
+          actions: { open: "Watch it live" },
+          footnote: REMINDER_FOOTNOTE.en,
+        }),
+        organizer: layout({
+          subject: "Tomorrow: is the {{season}} auction ready?",
+          preheader: "Auction night is {{when}}. Here's where the room stands.",
+          heading: "Auction night is tomorrow",
+          paragraphs: [
+            "Hi {{name}},",
+            "The {{season}} auction starts {{when}}. Here's where the room stands:",
+          ],
+          after: ["{{gapLine}}"],
+          actions: { open: "Open the auction" },
+          footnote: "You received this because you run {{season}} on DesiAuction.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        owner: layout({
+          subject: "कल: {{season}} की नीलामी, {{when}}",
+          preheader: "आप {{teamName}} के लिए बोली लगा रहे हैं। अपना ओनर रूम कुछ मिनट पहले खोल लें।",
+          heading: "आपकी नीलामी कल है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{season}} की नीलामी {{when}} शुरू होगी। आप {{teamName}} के लिए बोली लगा रहे हैं — अपना ओनर रूम कुछ मिनट पहले खोल लें, ताकि पहले खिलाड़ी के आते ही आपका पैडल तैयार हो।",
+          ],
+          after: ["फ़ोन या लैपटॉप, दोनों पर चलता है। हो सके तो फ़ोन चार्ज रखें और Wi-Fi पर रहें।"],
+          actions: { open: "अपना ओनर रूम खोलें" },
+          footnote: REMINDER_FOOTNOTE.hi,
+        }),
+        player: layout({
+          subject: "कल: {{season}} की नीलामी, {{when}}",
+          preheader: "आप खिलाड़ियों की सूची में हैं। लाइव देखें कि कौन-सी टीम आपको ख़रीदती है।",
+          heading: "आपकी नीलामी कल है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{season}} की नीलामी {{when}} शुरू होगी, और आप खिलाड़ियों की सूची में हैं। लाइव देखें कि कौन-सी टीम आपको ख़रीदती है — ऐसा होते ही हम आपको ईमेल करेंगे।",
+          ],
+          actions: { open: "लाइव देखें" },
+          footnote: REMINDER_FOOTNOTE.hi,
+        }),
+        organizer: layout({
+          subject: "कल: क्या {{season}} की नीलामी तैयार है?",
+          preheader: "नीलामी की रात {{when}} है। रूम की स्थिति नीचे है।",
+          heading: "नीलामी की रात कल है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{season}} की नीलामी {{when}} शुरू होगी। रूम की स्थिति:",
+          ],
+          after: ["{{gapLine}}"],
+          actions: { open: "नीलामी खोलें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि आप DesiAuction पर {{season}} चलाते हैं।",
+        }),
+      },
+    },
+  },
+};
+
 const SOLD: EmailTemplateSpec = {
   kind: "auction.sold",
   format: "layout",
@@ -2049,6 +2175,7 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "auction.schedule": AUCTION_SCHEDULE,
   "owner.invite": OWNER_INVITE,
   "auction.owners_ready": OWNERS_READY,
+  "auction.reminder": AUCTION_REMINDER,
   "auction.sold": SOLD,
   "auction.unsold": UNSOLD,
   "auction.owner_summary": OWNER_SUMMARY,

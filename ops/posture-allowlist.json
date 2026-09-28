@@ -305,6 +305,10 @@
     "apps/web/src/server/competition/registration-digest.ts": {
       "class": "by-design",
       "reason": "The organizers' 9 am digest (email programme PR5), run by the feedback job with no session: it reads, across every club, which seasons have registrations in 'submitted' and which owners/staff (live grant AND membership) review them \u2014 counts, season names and person ids only, on the system pool, the same shape as reviews/review-sweep.ts. Each digest is then queued on the app pool (message_outbox, keyed by person, no RLS) and the drain applies each person's gate inside their club's scope (outbox.ts mayDeliver). There is no single tenant to scope a cross-club sweep to."
+    },
+    "apps/web/src/server/competition/auction-reminders.ts": {
+      "class": "by-design",
+      "reason": "Auction night reminders (email programme PR8), swept by the messages job with no session: reads, across every club, which seasons' auctions start within a day, their owners, pool players and organizers, and the day-before readiness counts, on the system pool \u2014 the same shape as the 9 am digest (registration-digest.ts). Mail is queued on the app pool (message_outbox, keyed by person) and the drain applies each person's gate inside their club's scope; the half-hour inbox rows go through logSecurityEvent, which scopes to the person. There is no single tenant to scope a cross-club sweep to."
     }
   }
 }

@@ -5,6 +5,7 @@ import { sampleVariables, type MessageLanguage } from "@desiauction/messaging/em
 import { sportPackFor } from "@desiauction/core";
 
 import { env } from "../../env";
+import { readinessRows } from "./auction-reminder-mail";
 import { auctionDateLeaf } from "./auction-schedule-mail";
 import { digestDetails, organizerJourney, welcomeFrame } from "./organizer-mail";
 import { journey, seasonBand, submittedDetails } from "./player-mail";
@@ -181,6 +182,34 @@ function ownerFrame(
       };
 }
 
+/** The day-before reminder's band, date and facts, per reader (auction-reminder-mail.ts). */
+function reminderFrame(variant: string, language: MessageLanguage): Partial<RenderOptions> {
+  const samples = sampleVariables(EMAIL_TEMPLATES["auction.reminder"], language);
+  const season = String(samples["season"] ?? "");
+  const hi = language === "hi";
+  return {
+    band: seasonBand({ season, orgName: String(samples["orgName"] ?? ""), sport: "cricket" }),
+    dateLeaf: auctionDateLeaf(new Date("2026-10-04T14:30:00Z"), season, language),
+    ...(variant === "owner"
+      ? {
+          details: [
+            [hi ? "आपकी टीम" : "Your team", String(samples["teamName"] ?? "")],
+            [hi ? "आपका पैडल" : "Your paddle", hi ? "तैयार" : "Ready"],
+          ],
+        }
+      : {}),
+    ...(variant === "organizer"
+      ? {
+          progress: organizerJourney(3, language),
+          details: readinessRows(
+            { auctionCreated: true, teams: 8, owned: 6, paddles: 5, pool: 43 },
+            language,
+          ),
+        }
+      : {}),
+  };
+}
+
 function seasonFrame(
   kind: EmailNotificationKind,
   language: MessageLanguage,
@@ -220,5 +249,6 @@ export function previewOptions(
     ...organizerFrame(kind, language),
     ...(kind === "auction.schedule" ? scheduleFrame(variant, language) : {}),
     ...ownerFrame(kind, language),
+    ...(kind === "auction.reminder" ? reminderFrame(variant, language) : {}),
   };
 }

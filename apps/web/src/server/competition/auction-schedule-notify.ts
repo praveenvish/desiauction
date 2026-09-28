@@ -37,46 +37,46 @@ export const SETTLE_MS = 10 * 60 * 1000;
 
 const BASE = (): string => env.PUBLIC_BASE_URL.replace(/\/$/, "");
 
-interface Recipient {
+export interface AuctionPerson {
   readonly personId: string;
   readonly name: string;
   /** The team an owner bids for; null for a player. */
   readonly teamName: string | null;
+  /** An owner holding an active paddle grant — ready for the night. */
+  readonly hasPaddle: boolean;
 }
 
-async function recipientsOf(db: Db, competitionId: string): Promise<Recipient[]> {
+/** The auction's owners and pool players, each once (an owner who is also a player is the owner). */
+export async function auctionPeopleOf(db: Db, competitionId: string): Promise<AuctionPerson[]> {
   const [auction] = await db
     .select({ id: auctions.id })
     .from(auctions)
     .where(and(eq(auctions.competitionId, competitionId), ne(auctions.status, "abandoned")))
     .limit(1);
-  const owners =
+  const invited =
     auction === undefined
       ? []
-      : [
-          ...(await db
-            .select({
-              personId: auctionOwnerInvites.acceptedBy,
-              name: people.name,
-              team: teams.name,
-            })
-            .from(auctionOwnerInvites)
-            .innerJoin(people, eq(people.id, auctionOwnerInvites.acceptedBy))
-            .innerJoin(teams, eq(teams.id, auctionOwnerInvites.teamId))
-            .where(
-              and(
-                eq(auctionOwnerInvites.auctionId, auction.id),
-                isNotNull(auctionOwnerInvites.acceptedBy),
-                isNull(auctionOwnerInvites.revokedAt),
-              ),
-            )),
-          ...(await db
-            .select({ personId: paddleGrants.personId, name: people.name, team: teams.name })
-            .from(paddleGrants)
-            .innerJoin(people, eq(people.id, paddleGrants.personId))
-            .innerJoin(teams, eq(teams.id, paddleGrants.teamId))
-            .where(and(eq(paddleGrants.auctionId, auction.id), isNull(paddleGrants.revokedAt)))),
-        ];
+      : await db
+          .select({ personId: auctionOwnerInvites.acceptedBy, name: people.name, team: teams.name })
+          .from(auctionOwnerInvites)
+          .innerJoin(people, eq(people.id, auctionOwnerInvites.acceptedBy))
+          .innerJoin(teams, eq(teams.id, auctionOwnerInvites.teamId))
+          .where(
+            and(
+              eq(auctionOwnerInvites.auctionId, auction.id),
+              isNotNull(auctionOwnerInvites.acceptedBy),
+              isNull(auctionOwnerInvites.revokedAt),
+            ),
+          );
+  const granted =
+    auction === undefined
+      ? []
+      : await db
+          .select({ personId: paddleGrants.personId, name: people.name, team: teams.name })
+          .from(paddleGrants)
+          .innerJoin(people, eq(people.id, paddleGrants.personId))
+          .innerJoin(teams, eq(teams.id, paddleGrants.teamId))
+          .where(and(eq(paddleGrants.auctionId, auction.id), isNull(paddleGrants.revokedAt)));
   const players = await db
     .select({ personId: registrations.personId, name: people.name })
     .from(registrations)
@@ -88,16 +88,30 @@ async function recipientsOf(db: Db, competitionId: string): Promise<Recipient[]>
         sql`not (${registrations.isIcon} or ${registrations.isCaptain} or ${registrations.isRetained})`,
       ),
     );
-  const byPerson = new Map<string, Recipient>();
+  const byPerson = new Map<string, AuctionPerson>();
+  const owners = [
+    ...invited.map((row) => ({ ...row, paddle: false })),
+    ...granted.map((row) => ({ ...row, paddle: true })),
+  ];
   for (const owner of owners) {
     if (owner.personId === null) continue;
     const personId = owner.personId.trim();
-    byPerson.set(personId, { personId, name: owner.name?.trim() || "there", teamName: owner.team });
+    byPerson.set(personId, {
+      personId,
+      name: owner.name?.trim() || "there",
+      teamName: owner.team,
+      hasPaddle: owner.paddle || (byPerson.get(personId)?.hasPaddle ?? false),
+    });
   }
   for (const player of players) {
     const personId = player.personId.trim();
     if (!byPerson.has(personId)) {
-      byPerson.set(personId, { personId, name: player.name?.trim() || "there", teamName: null });
+      byPerson.set(personId, {
+        personId,
+        name: player.name?.trim() || "there",
+        teamName: null,
+        hasPaddle: false,
+      });
     }
   }
   return [...byPerson.values()];
@@ -130,7 +144,7 @@ export async function notifyAuctionSchedule(
   }
   const prefix = `auction.schedule:${input.competitionId}:`;
   const superseded = await supersedePending(prefix, options.outboxDb);
-  const recipients = await recipientsOf(db, input.competitionId);
+  const recipients = await auctionPeopleOf(db, input.competitionId);
   if (recipients.length === 0) {
     return { queued: 0, superseded };
   }
@@ -174,5 +188,5 @@ export async function notifyAuctionSchedule(
 
 /** For a test: the people this season's notices go to. */
 export async function scheduleRecipientIds(db: Db, competitionId: string): Promise<string[]> {
-  return (await recipientsOf(db, competitionId)).map((person) => person.personId);
+  return (await auctionPeopleOf(db, competitionId)).map((person) => person.personId);
 }

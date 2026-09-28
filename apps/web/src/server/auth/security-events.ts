@@ -72,6 +72,8 @@ export type SecurityAction =
   // Email programme PR7: a team's owner accepted, and every team has one.
   | "auction.owner_joined"
   | "auction.owners_ready"
+  // Email programme PR8: half an hour before auction night, in everyone's inbox.
+  | "auction.starting_soon"
   | "registration.rejected"
   | "registration.waitlisted"
   // The night itself. Being sold at auction is the moment this whole product

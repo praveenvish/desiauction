@@ -43,6 +43,7 @@ const PERSON_EVENT_LABELS = {
   "season.released": "DesiAuction lifted its hold on one of your seasons",
   "auction.owner_joined": "A team owner accepted their invitation",
   "auction.owners_ready": "Every team has its owner — the auction can go ahead",
+  "auction.starting_soon": "The auction starts in 30 minutes",
   "auth.login.passkey": "Signed in with a passkey",
   "auth.otp.lockout": "Too many wrong codes — sign-in was locked briefly",
   "auth.passkey.enrolled": "Passkey added",
