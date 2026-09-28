@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { BrandStrike } from "./brand-strike";
 import "./brand.css";
 
 // The DesiAuction vector identity. It lives in the app (not @desiauction/ui) so the
@@ -66,11 +67,26 @@ export function BrandWordmark({ tone = "header" }: { tone?: BrandTone }) {
  * big screen, the overlay, onboarding). The mark is decorative; the words name
  * the product.
  */
-export function BrandLockup({ tone = "page" }: { tone?: BrandTone }) {
+export function BrandLockup({
+  tone = "page",
+  strike = "none",
+}: {
+  tone?: BrandTone;
+  /**
+   * The motion logo (brand-strike.tsx), for surfaces that open a night — the
+   * board and the stream overlay. `once` strikes on mount; `sound` also
+   * replays it with the sting when the person switches sound on.
+   */
+  strike?: "none" | "once" | "sound";
+}) {
   return (
     <span className={`da-lockup da-lockup--${tone}`} data-testid="brand-lockup">
       <span className="da-lockup-mark" aria-hidden="true">
-        <BrandMark size={64} />
+        {strike === "none" ? (
+          <BrandMark size={64} />
+        ) : (
+          <BrandStrike replayOnSound={strike === "sound"} />
+        )}
       </span>
       <BrandWordmark tone={tone} />
     </span>

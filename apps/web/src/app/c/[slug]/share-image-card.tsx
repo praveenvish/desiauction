@@ -18,7 +18,7 @@ export const SHARE_IMAGE_SIZE = { width: 1200, height: 630 } as const;
  * the two identical, so a redrawn mark cannot leave the cards behind.
  */
 export const BRAND_MARK_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">\n  <rect x="1" y="1" width="62" height="62" rx="17" fill="#E6B24A"/>\n  <path d="M13 16h10c9 0 16 7 16 16s-7 16-16 16H13V16Zm7 7v18h3a9 9 0 0 0 0-18h-3Z" fill="#0B1018"/>\n  <path d="m30 48 13-32h7L37 48h-7Z" fill="#E6B24A" stroke="#E6B24A" stroke-width="5" stroke-linejoin="round"/>\n  <path d="m30 48 13-32h7l-13 32h-7Z" fill="#0B1018"/>\n  <path d="m46.5 24 9 24h-7l-2-6h-8l3-7h3l-1.5-4 3.5-7Z" fill="#0B1018"/>\n</svg>\n';
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">\n  <rect x="1" y="1" width="62" height="62" rx="17" fill="#E6B24A"/>\n  <g transform="translate(-2.25 0)">\n    <path d="M13 16h10c9 0 16 7 16 16s-7 16-16 16H13V16Zm7 7v18h3a9 9 0 0 0 0-18h-3Z" fill="#0B1018"/>\n    <path d="M23 44h5v4h-5z" fill="#0B1018"/>\n    <path d="M30 48 43 16h7L37 48h-7Z" fill="#E6B24A" stroke="#E6B24A" stroke-width="5" stroke-linejoin="round"/>\n    <path d="M30 48 43 16h7L37 48h-7Z" fill="#0B1018"/>\n    <path d="m46.5 24 9 24h-7l-2-6h-8l3-7h3l-1.5-4 3.5-7Z" fill="#0B1018"/>\n  </g>\n</svg>\n';
 
 const BRAND_MARK_URI = `data:image/svg+xml;base64,${Buffer.from(BRAND_MARK_SVG).toString("base64")}`;
 
