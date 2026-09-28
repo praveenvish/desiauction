@@ -25,6 +25,16 @@ vi.mock("next/headers", () => ({
   headers: () => Promise.resolve(new Headers()),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined, revalidateTag: () => undefined }));
+// The request / withdrawn / declined / deleted emails (PR14) go after the
+// response. Run here, collected, so the last test proves they work under the
+// app role too — reading the person's contact inside their own scope.
+const afterResponse: Promise<unknown>[] = [];
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => {
+    afterResponse.push(Promise.resolve().then(task));
+  },
+}));
 
 const { requestErasureAction, withdrawErasureAction, myErasureRequest } =
   await import("../server/privacy/actions");
@@ -306,5 +316,10 @@ describe("POSTURE — erasure under the app role", () => {
     await askToBeErased(asker);
     expect(await withdrawErasureAction()).toEqual({ ok: true });
     expect((await myErasureRequest())?.status).toBe("withdrawn");
+  });
+
+  it("tells the person at every step without failing under the app role", async () => {
+    expect(afterResponse.length).toBeGreaterThan(0);
+    await expect(Promise.all(afterResponse)).resolves.toBeDefined();
   });
 });

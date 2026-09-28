@@ -85,6 +85,9 @@ const LAYOUT: Readonly<
   "auth.email_code": { noLinks: true, calloutLast: true },
   "security.email_changed": { calloutLast: true },
   "security.phone_changed": { calloutLast: true },
+  "security.passkey_changed": { calloutLast: true },
+  // "Didn't ask for this?" under a deletion request; the next step under the rest.
+  "security.account_deletion": { calloutLast: true },
   // "Think this is a mistake?" under a take-down: the way back, boxed.
   "season.held": { calloutLast: true },
   // "This link is yours alone" — the one line an invited owner must not miss.

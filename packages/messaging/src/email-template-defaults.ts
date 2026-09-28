@@ -1802,6 +1802,262 @@ const SEASON_CHAMPION: EmailTemplateSpec = {
   },
 };
 
+// --- Passkeys and account deletion (email programme PR14) -----------------------
+
+const SECURITY_PAGE = [
+  { id: "security", description: "The account's sign-in devices and passkeys." },
+] as const;
+
+const PASSKEY_CHANGED: EmailTemplateSpec = {
+  kind: "security.passkey_changed",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "added", label: "Passkey added" },
+    { id: "removed", label: "Passkey removed" },
+  ],
+  actions: SECURITY_PAGE,
+  variables: [
+    text("passkeyName", "The passkey's name (“iPhone 15”).", "iPhone 15", "iPhone 15", {
+      whenEmpty: "blank",
+    }),
+  ],
+  locked: [IF_NOT_YOU],
+  note: "The device and time rows are written by the code, from the request that made the change.",
+  defaults: {
+    en: {
+      variants: {
+        added: layout({
+          subject: "A passkey was added to your DesiAuction account",
+          preheader:
+            "“{{passkeyName}}” can now sign in without a code. If this wasn't you, act now.",
+          heading: "A passkey was added",
+          paragraphs: [
+            "A new passkey, “{{passkeyName}}”, was added to your DesiAuction account. It signs in with a fingerprint, face or screen lock — no code needed.",
+            "If that was you, there's nothing to do.",
+          ],
+          after: [IF_NOT_YOU.text.en],
+          actions: { security: "Review your passkeys" },
+          footnote: "You received this because this is the email on your DesiAuction account.",
+        }),
+        removed: layout({
+          subject: "A passkey was removed from your DesiAuction account",
+          preheader: "“{{passkeyName}}” can no longer sign in. If this wasn't you, act now.",
+          heading: "A passkey was removed",
+          paragraphs: [
+            "The passkey “{{passkeyName}}” was removed from your DesiAuction account and can no longer sign in.",
+            "If that was you, there's nothing to do.",
+          ],
+          after: [IF_NOT_YOU.text.en],
+          actions: { security: "Review your passkeys" },
+          footnote: "You received this because this is the email on your DesiAuction account.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        added: layout({
+          subject: "आपके DesiAuction अकाउंट में एक पासकी जोड़ी गई",
+          preheader:
+            "“{{passkeyName}}” अब बिना कोड के साइन इन कर सकती है। अगर यह आपने नहीं किया, तो तुरंत कदम उठाएँ।",
+          heading: "एक पासकी जोड़ी गई",
+          paragraphs: [
+            "आपके DesiAuction अकाउंट में एक नई पासकी, “{{passkeyName}}”, जोड़ी गई है। यह फ़िंगरप्रिंट, चेहरे या स्क्रीन लॉक से साइन इन करती है — कोड की ज़रूरत नहीं।",
+            "अगर यह आपने किया है, तो कुछ करने की ज़रूरत नहीं है।",
+          ],
+          after: [IF_NOT_YOU.text.hi],
+          actions: { security: "अपनी पासकी देखें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि यह आपके DesiAuction अकाउंट का ईमेल है।",
+        }),
+        removed: layout({
+          subject: "आपके DesiAuction अकाउंट से एक पासकी हटाई गई",
+          preheader:
+            "“{{passkeyName}}” अब साइन इन नहीं कर सकती। अगर यह आपने नहीं किया, तो तुरंत कदम उठाएँ।",
+          heading: "एक पासकी हटाई गई",
+          paragraphs: [
+            "पासकी “{{passkeyName}}” आपके DesiAuction अकाउंट से हटा दी गई है और अब साइन इन नहीं कर सकती।",
+            "अगर यह आपने किया है, तो कुछ करने की ज़रूरत नहीं है।",
+          ],
+          after: [IF_NOT_YOU.text.hi],
+          actions: { security: "अपनी पासकी देखें" },
+          footnote: "आपको यह इसलिए मिला क्योंकि यह आपके DesiAuction अकाउंट का ईमेल है।",
+        }),
+      },
+    },
+  },
+};
+
+const NOT_YOUR_REQUEST: LockedBlock = {
+  id: "not-your-request",
+  field: "after",
+  variants: ["requested"],
+  text: {
+    en: `Didn't ask for this? Withdraw it from your account page and write to ${SUPPORT} straight away — somebody may have reached your account.`,
+    hi: `यह आपने नहीं माँगा? अपने अकाउंट पेज से इसे वापस लें और तुरंत ${SUPPORT} पर लिखें — हो सकता है किसी और ने आपके अकाउंट तक पहुँच बना ली हो।`,
+  },
+  why: "A deletion request filed from a stolen session must be stoppable by the owner.",
+};
+
+const ERASURE_FOOTNOTE = {
+  en: "You received this because this is the email on your DesiAuction account.",
+  hi: "आपको यह इसलिए मिला क्योंकि यह आपके DesiAuction अकाउंट का ईमेल है।",
+};
+
+const ERASURE: EmailTemplateSpec = {
+  kind: "security.account_deletion",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "requested", label: "Request received" },
+    { id: "withdrawn", label: "Request withdrawn" },
+    { id: "declined", label: "Request declined" },
+    { id: "completed", label: "Account deleted" },
+  ],
+  actions: [
+    { id: "account", description: "The account page, where the request can be seen or withdrawn." },
+  ],
+  variables: [
+    NAME,
+    text(
+      "reasonLine",
+      "Why it was declined, in the privacy desk's words. Empty otherwise.",
+      "You're the only owner of Malad Cricket Club — appoint another owner first.",
+      "You're the only owner of Malad Cricket Club — appoint another owner first.",
+      { computed: true, whenEmpty: "drop" },
+    ),
+  ],
+  locked: [NOT_YOUR_REQUEST],
+  note: "The last mail, “deleted”, goes to the address the account had, a moment before it is removed.",
+  defaults: {
+    en: {
+      variants: {
+        requested: layout({
+          subject: "We've received your request to delete your DesiAuction account",
+          preheader: "A person reviews every request. We reply within seven days.",
+          heading: "Your deletion request is in",
+          paragraphs: [
+            "Hi {{name}},",
+            "We've received your request to delete your DesiAuction account. A person on our team reviews every request, and we reply within seven days.",
+            "When it's deleted, your profile, sign-in devices and photo go, and your name, number and email are removed from every club you're in. Your registrations, bids and receipts stay in those clubs' records, without your name.",
+          ],
+          after: [
+            "Changed your mind? Withdraw the request from your account page any time before we act on it.",
+            NOT_YOUR_REQUEST.text.en,
+          ],
+          actions: { account: "See your request" },
+          footnote: ERASURE_FOOTNOTE.en,
+        }),
+        withdrawn: layout({
+          subject: "Your DesiAuction account stays — request withdrawn",
+          preheader: "Nothing has been deleted.",
+          heading: "Your account stays",
+          paragraphs: [
+            "Hi {{name}},",
+            "You withdrew your request to delete your DesiAuction account, so nothing has been deleted. You can ask again any time from your account page.",
+          ],
+          actions: { account: "Open your account" },
+          footnote: ERASURE_FOOTNOTE.en,
+        }),
+        declined: layout({
+          subject: "We couldn't delete your DesiAuction account yet",
+          preheader: "Here's why, and what to do next.",
+          heading: "We couldn't delete your account yet",
+          paragraphs: [
+            "Hi {{name}},",
+            "We looked at your request to delete your DesiAuction account and couldn't go ahead just now.",
+          ],
+          after: [
+            "{{reasonLine}}",
+            `Once that's sorted, you can ask again from your account page. Questions? Write to ${SUPPORT}.`,
+          ],
+          actions: { account: "Open your account" },
+          footnote: ERASURE_FOOTNOTE.en,
+        }),
+        completed: layout({
+          subject: "Your DesiAuction account has been deleted",
+          preheader: "As you asked. This is the last email we'll send to this address.",
+          heading: "Your account has been deleted",
+          paragraphs: [
+            "As you asked, we've deleted your DesiAuction account. Your profile, sign-in devices and photo are gone, and your name, number and email have been removed from every club you were in.",
+            "Your registrations, bids and receipts stay in those clubs' records, without your name.",
+          ],
+          after: [
+            `This is the last email we'll send to this address. If you ever want to come back, you're welcome to sign up again. Questions? Write to ${SUPPORT}.`,
+          ],
+          actions: { account: "Get help" },
+          footnote:
+            "You received this because you asked us to delete the account that used this address.",
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        requested: layout({
+          subject: "आपका DesiAuction अकाउंट हटाने का अनुरोध हमें मिल गया है",
+          preheader: "हर अनुरोध एक व्यक्ति देखता है। हम सात दिन के अंदर जवाब देंगे।",
+          heading: "आपका अनुरोध मिल गया है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "आपका DesiAuction अकाउंट हटाने का अनुरोध हमें मिल गया है। हमारी टीम का एक व्यक्ति हर अनुरोध देखता है, और हम सात दिन के अंदर जवाब देंगे।",
+            "अकाउंट हटने पर आपकी प्रोफ़ाइल, साइन-इन डिवाइस और फ़ोटो हट जाएँगे, और हर क्लब से आपका नाम, नंबर और ईमेल हटा दिया जाएगा। आपके रजिस्ट्रेशन, बोलियाँ और रसीदें उन क्लबों के रिकॉर्ड में आपके नाम के बिना रहेंगी।",
+          ],
+          after: [
+            "मन बदल गया? हमारे कदम उठाने से पहले कभी भी अपने अकाउंट पेज से अनुरोध वापस लें।",
+            NOT_YOUR_REQUEST.text.hi,
+          ],
+          actions: { account: "अपना अनुरोध देखें" },
+          footnote: ERASURE_FOOTNOTE.hi,
+        }),
+        withdrawn: layout({
+          subject: "आपका DesiAuction अकाउंट बना रहेगा — अनुरोध वापस लिया गया",
+          preheader: "कुछ भी हटाया नहीं गया है।",
+          heading: "आपका अकाउंट बना रहेगा",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "आपने अपना DesiAuction अकाउंट हटाने का अनुरोध वापस ले लिया है, इसलिए कुछ भी हटाया नहीं गया है। आप अपने अकाउंट पेज से कभी भी फिर से अनुरोध कर सकते हैं।",
+          ],
+          actions: { account: "अपना अकाउंट खोलें" },
+          footnote: ERASURE_FOOTNOTE.hi,
+        }),
+        declined: layout({
+          subject: "हम अभी आपका DesiAuction अकाउंट नहीं हटा सके",
+          preheader: "वजह और आगे क्या करें, यहाँ है।",
+          heading: "हम अभी आपका अकाउंट नहीं हटा सके",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "हमने आपका DesiAuction अकाउंट हटाने का अनुरोध देखा, लेकिन अभी आगे नहीं बढ़ सके।",
+          ],
+          after: [
+            "{{reasonLine}}",
+            `यह ठीक होने के बाद आप अपने अकाउंट पेज से फिर से अनुरोध कर सकते हैं। कोई सवाल? ${SUPPORT} पर लिखें।`,
+          ],
+          actions: { account: "अपना अकाउंट खोलें" },
+          footnote: ERASURE_FOOTNOTE.hi,
+        }),
+        completed: layout({
+          subject: "आपका DesiAuction अकाउंट हटा दिया गया है",
+          preheader: "जैसा आपने कहा था। इस पते पर यह हमारा आख़िरी ईमेल है।",
+          heading: "आपका अकाउंट हटा दिया गया है",
+          paragraphs: [
+            "जैसा आपने कहा था, हमने आपका DesiAuction अकाउंट हटा दिया है। आपकी प्रोफ़ाइल, साइन-इन डिवाइस और फ़ोटो हट गए हैं, और हर क्लब से आपका नाम, नंबर और ईमेल हटा दिया गया है।",
+            "आपके रजिस्ट्रेशन, बोलियाँ और रसीदें उन क्लबों के रिकॉर्ड में आपके नाम के बिना रहेंगी।",
+          ],
+          after: [
+            `इस पते पर यह हमारा आख़िरी ईमेल है। कभी लौटना चाहें तो फिर से साइन अप करें, आपका स्वागत है। कोई सवाल? ${SUPPORT} पर लिखें।`,
+          ],
+          actions: { account: "मदद लें" },
+          footnote:
+            "आपको यह इसलिए मिला क्योंकि आपने वह अकाउंट हटाने को कहा था जो इस पते से चलता था।",
+        }),
+      },
+    },
+  },
+};
+
 // --- Money -----------------------------------------------------------------------
 
 const FINANCE: EmailTemplateSpec = {
@@ -2748,6 +3004,8 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "auth.email_code": EMAIL_CODE,
   "security.phone_changed": PHONE_CHANGED,
   "security.email_changed": EMAIL_CHANGED,
+  "security.passkey_changed": PASSKEY_CHANGED,
+  "security.account_deletion": ERASURE,
   "registration.received": RECEIVED,
   "registration.approved": decision("registration.approved", {
     en: {

@@ -179,6 +179,31 @@ const ENTRIES = [
     topic: "security",
     channels: ["email", "whatsapp"],
   },
+  {
+    // A passkey signs in with no code at all, so one added by somebody holding
+    // a stolen session is a key they keep (email programme PR14). Removing
+    // the owner's own passkey is the other half of a takeover.
+    key: "security.passkey_changed",
+    label: "Passkey added or removed",
+    description: "Warns the account's verified email the moment a passkey is added or removed.",
+    audience: "account",
+    category: "security",
+    topic: "security",
+    channels: ["email"],
+  },
+  {
+    // The account-deletion request, from filing to its outcome (PR14). A
+    // security notice because a stolen session could file one, and because
+    // the last mail — "deleted" — must reach the address before it is gone.
+    key: "security.account_deletion",
+    label: "Account deletion request",
+    description:
+      "Received, withdrawn, declined (with the reason) or done — told to the account's verified email.",
+    audience: "account",
+    category: "security",
+    topic: "security",
+    channels: ["email"],
+  },
   // --- The player's season ----------------------------------------------------
   {
     // The first mail a player ever gets from us. Email and inbox only for now:

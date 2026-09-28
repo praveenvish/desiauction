@@ -72,6 +72,16 @@ export async function withdrawRequest(db: Db, personId: string): Promise<boolean
   return updated.length > 0;
 }
 
+/** Whose request this is — for telling them the outcome. */
+export async function requesterOf(db: Db, requestId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ personId: erasureRequests.personId })
+    .from(erasureRequests)
+    .where(eq(erasureRequests.id, requestId))
+    .limit(1);
+  return row?.personId ?? null;
+}
+
 /** Declining needs a reason the person will read. */
 export async function declineRequest(
   db: Db,

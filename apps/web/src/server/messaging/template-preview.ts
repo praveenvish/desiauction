@@ -92,6 +92,7 @@ function details(
     case "auth.email_code":
       return requestDetails(SAMPLE_REQUEST, "code", language);
     case "security.email_changed":
+    case "security.passkey_changed":
     case "security.phone_changed":
       return requestDetails(SAMPLE_REQUEST, "change", language);
     case "registration.received":
