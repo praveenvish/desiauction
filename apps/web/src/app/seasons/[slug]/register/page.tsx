@@ -25,14 +25,18 @@ import { notificationSettings } from "../../../../server/messaging/actions";
 import {
   myAuctionOutcome,
   publicCompetitionView,
+  publicTeam,
   publicTopBuys,
 } from "../../../../server/competition/public";
+import { teamSeason, type TeamSeasonMatch } from "../../../../server/player/career";
+import { formatWallDate, formatWallTime, istCalendarDate } from "../../../../lib/format-date";
 import { TopBuysPodium } from "../../../c/top-buys";
 import { SHARE_IMAGE_SIZE } from "../../../c/[slug]/share-image-card";
 import { REASON_TO_PLAYER } from "../../../../server/competition/registration-notify";
 import { dateRange } from "../../../tournaments/season-card";
 import { RegisterFlow } from "./register-flow";
 import { RegistrationStatus } from "./registration-status";
+import type { SeasonOnMatch } from "./season-on";
 import { VerifyStep } from "./verify-step";
 import "../../seasons.css";
 import "./register.css";
@@ -149,6 +153,33 @@ export async function generateMetadata({
 }
 
 /** The season's own line under its name: "1 Aug – 15 Sep 2026 · Malad, Mumbai". */
+/** "1st", "2nd", "3rd", "11th". */
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${String(n)}${suffix}`;
+}
+
+/** A team-season match in the words the season panel prints. */
+function seasonMatch(match: TeamSeasonMatch): SeasonOnMatch {
+  const kickoff = match.kickoffAt ?? "";
+  const day = kickoff.slice(0, 10);
+  const dated = /^\d{4}-\d{2}-\d{2}$/.test(day);
+  // "Sun, 4 Oct 2026" → weekday "Sun", "4 Oct".
+  const [weekday = "", rest = ""] = dated ? formatWallDate(day).split(", ") : [];
+  const [dayOfMonth = "", month = ""] = rest.split(" ");
+  return {
+    fixtureId: match.fixtureId,
+    dayLabel: dated ? `${dayOfMonth} ${month}` : "TBA",
+    tile: dated ? { weekday, day: dayOfMonth, month } : null,
+    time: kickoff.length > 10 ? formatWallTime(kickoff.replace(" ", "T").slice(0, 16)) : null,
+    opponentName: match.opponentName,
+    groundName: match.groundName,
+    live: match.live,
+    result: match.result,
+  };
+}
+
 function seasonMeta(
   preview: { startsOn: string | null; endsOn: string | null; location: string | null } | null,
 ): string | null {
@@ -240,19 +271,29 @@ function RegisterFrame({
   season,
   meta,
   aside,
+  seasonOn = false,
   children,
 }: {
   season: string | null;
   meta: string | null;
   aside?: ReactNode;
+  /** A signed player whose team has matches: the page is their season now. */
+  seasonOn?: boolean;
   children: ReactNode;
 }) {
   return (
     <main className="register">
       <div className="register-panel" data-layout={aside === undefined ? "single" : "sheet"}>
         <header className="reg-hero">
-          <p className="reg-kicker">Player registration</p>
-          <h1>{season ?? "Player registration"}</h1>
+          <p className="reg-kicker">{seasonOn ? "Your season" : "Player registration"}</p>
+          <h1 className={seasonOn ? "reg-hero-on" : undefined}>
+            {season ?? "Player registration"}
+            {seasonOn ? (
+              <Badge tone="success" data-testid="season-on">
+                Season on
+              </Badge>
+            ) : null}
+          </h1>
           {meta !== null ? <p className="reg-meta">{meta}</p> : null}
         </header>
         {aside}
@@ -365,8 +406,51 @@ export default async function RegisterPage({
                 : formatAmount(paise(outcome.pricePaise), outcome.unit),
             orgName: outcome.orgName,
           };
+    /*
+     * The player's team's season — the same read the owner's home makes, keyed
+     * by the team resolved from this player's own row (never the request).
+     * "On" once the club has published a match for the team.
+     */
+    const today = istCalendarDate();
+    const [season, squad] =
+      auction === null || outcome === null || outcome.teamId === null
+        ? [null, null]
+        : await Promise.all([
+            teamSeason(outcome.teamId, today),
+            landing.listed && outcome.teamSlug !== null
+              ? publicTeam(slug, outcome.teamSlug)
+              : Promise.resolve(null),
+          ]);
+    const seasonOn =
+      auction !== null &&
+      auction.outcome !== "passed" &&
+      auction.teamName !== null &&
+      season !== null &&
+      season.upcoming.length + season.results.length > 0
+        ? {
+            teamName: auction.teamName,
+            teamColor: outcome?.teamColor ?? null,
+            place:
+              season.place === null
+                ? null
+                : `${ordinal(season.place.position)} of ${String(season.place.of)} · ${String(season.place.points)} pts`,
+            squadCount: squad === null ? null : squad.members.length,
+            next: season.upcoming[0] === undefined ? null : seasonMatch(season.upcoming[0]),
+            results: season.results.slice(0, 3).map(seasonMatch),
+            record: { played: season.record.played, won: season.record.won },
+            toCome: season.upcoming.length,
+          }
+        : null;
     return (
-      <RegisterFrame season={landing.competitionName} meta={meta}>
+      <RegisterFrame
+        season={landing.competitionName}
+        meta={
+          seasonOn === null || auction === null
+            ? meta
+            : [auction.orgName, meta].filter(Boolean).join(" · ")
+        }
+        seasonOn={seasonOn !== null}
+      >
         <RegistrationStatus
           competitionName={landing.competitionName}
           slug={landing.slug}
@@ -377,6 +461,7 @@ export default async function RegisterPage({
           photoUrl={photoUrl}
           roleLabel={mine.role === null ? null : roleLabelIn(pack, mine.role)}
           auction={auction}
+          seasonOn={seasonOn}
           // NEVER THE RAW COLUMN. The organizer's words must not reach the
           // player (invariant 6); a value outside the closed enum gets a
           // generic sentence that cannot leak.
