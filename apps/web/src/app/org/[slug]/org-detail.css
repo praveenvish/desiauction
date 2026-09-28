@@ -543,6 +543,20 @@
   outline-offset: 2px;
 }
 
+/* "Or email it to them" (PR13): the address and its button, one row when it fits. */
+.od-invite-email {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.od-invite-email > :first-child {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
 .od-invite-actions {
   display: flex;
   align-items: center;

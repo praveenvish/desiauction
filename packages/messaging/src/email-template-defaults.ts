@@ -1900,6 +1900,130 @@ const CLUB_WELCOME: EmailTemplateSpec = {
   },
 };
 
+// --- Club invitations (email programme PR13) --------------------------------------
+
+const CLUB_LINK_ONLY_YOURS: LockedBlock = {
+  id: "club-link-only-yours",
+  field: "after",
+  text: {
+    en: "This link is yours alone. Whoever opens it joins the club, so please don't forward it. It works once, for 7 days.",
+    hi: "यह लिंक सिर्फ़ आपके लिए है। जो भी इसे खोलेगा वह क्लब में जुड़ जाएगा, इसलिए इसे आगे न भेजें। यह एक बार, 7 दिन तक चलेगा।",
+  },
+  why: "The invitation link IS the access: the reader must be told not to pass it on.",
+};
+const ROLE_NAME = text(
+  "roleName",
+  "The access the link gives (“staff”, “a member”).",
+  "staff",
+  "स्टाफ़",
+  {
+    computed: true,
+  },
+);
+const ROLE_LINE = text(
+  "roleLine",
+  "What that access lets them do, written by DesiAuction.",
+  "As staff you can run seasons, teams, registrations and matches — not the money or who has access.",
+  "स्टाफ़ के तौर पर आप सीज़न, टीमें, रजिस्ट्रेशन और मैच चला सकते हैं — पैसे या एक्सेस नहीं।",
+  { computed: true },
+);
+
+const CLUB_INVITE: EmailTemplateSpec = {
+  kind: "club.invite",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "accept", description: "The one-time link that joins the club." }],
+  variables: [ORG, INVITER, ROLE_NAME, ROLE_LINE],
+  locked: [CLUB_LINK_ONLY_YOURS],
+  note: "Sent directly, never queued: the link is the access itself.",
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{inviterName}} invited you to join {{orgName}} on DesiAuction",
+        preheader: "Join as {{roleName}} — the link works once, for 7 days.",
+        heading: "Join {{orgName}}",
+        paragraphs: [
+          "Hi,",
+          "{{inviterName}} has invited you to help run {{orgName}} on DesiAuction, as {{roleName}}.",
+          "{{roleLine}}",
+        ],
+        after: [CLUB_LINK_ONLY_YOURS.text.en],
+        actions: { accept: "Join {{orgName}}" },
+        footnote: "You received this because {{inviterName}} entered this address to invite you.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{inviterName}} ने आपको DesiAuction पर {{orgName}} से जुड़ने के लिए बुलाया है",
+        preheader: "{{roleName}} के रूप में जुड़ें — लिंक एक बार, 7 दिन तक चलेगा।",
+        heading: "{{orgName}} से जुड़ें",
+        paragraphs: [
+          "नमस्ते,",
+          "{{inviterName}} ने आपको DesiAuction पर {{orgName}} चलाने में मदद के लिए {{roleName}} के रूप में बुलाया है।",
+          "{{roleLine}}",
+        ],
+        after: [CLUB_LINK_ONLY_YOURS.text.hi],
+        actions: { accept: "{{orgName}} से जुड़ें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि {{inviterName}} ने आपको बुलाने के लिए यह पता डाला।",
+      }),
+    ),
+  },
+};
+
+const CLUB_MEMBER_JOINED: EmailTemplateSpec = {
+  kind: "club.member_joined",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: DEFAULT_VARIANT,
+  actions: [{ id: "members", description: "The club's members, where access can be changed." }],
+  variables: [
+    NAME,
+    ORG,
+    text("memberName", "Who joined, as they gave their name.", "Rahul Mehta", "राहुल मेहता"),
+    ROLE_NAME,
+  ],
+  locked: [],
+  defaults: {
+    en: one(
+      layout({
+        subject: "{{memberName}} joined {{orgName}} as {{roleName}}",
+        preheader: "They used an invite link. You can change their access any time.",
+        heading: "{{memberName}} joined {{orgName}}",
+        paragraphs: [
+          "Hi {{name}},",
+          "{{memberName}} used an invite link and joined {{orgName}} as {{roleName}}.",
+        ],
+        after: [
+          "Not someone you expected? Remove them from the members page — their access ends at once.",
+        ],
+        actions: { members: "See the members" },
+        footnote: "You received this because you sent the invite or own {{orgName}}.",
+      }),
+    ),
+    hi: one(
+      layout({
+        subject: "{{memberName}} {{roleName}} के रूप में {{orgName}} से जुड़े",
+        preheader: "उन्होंने इनवाइट लिंक इस्तेमाल किया। आप कभी भी उनका एक्सेस बदल सकते हैं।",
+        heading: "{{memberName}} {{orgName}} से जुड़े",
+        paragraphs: [
+          "नमस्ते {{name}},",
+          "{{memberName}} ने इनवाइट लिंक से {{orgName}} जॉइन किया है, {{roleName}} के रूप में।",
+        ],
+        after: [
+          "क्या आप इनकी उम्मीद नहीं कर रहे थे? उन्हें मेंबर्स पेज से हटा दें — उनका एक्सेस तुरंत ख़त्म हो जाएगा।",
+        ],
+        actions: { members: "मेंबर्स देखें" },
+        footnote: "आपको यह इसलिए मिला क्योंकि आपने इनवाइट भेजा या आप {{orgName}} के मालिक हैं।",
+      }),
+    ),
+  },
+};
+
 const PLAYER_NAME = text(
   "playerName",
   "The player who registered, as they gave their name.",
@@ -2722,6 +2846,8 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
     },
   }),
   "club.welcome": CLUB_WELCOME,
+  "club.invite": CLUB_INVITE,
+  "club.member_joined": CLUB_MEMBER_JOINED,
   "registration.first": REGISTRATION_FIRST,
   "registration.digest": REGISTRATION_DIGEST,
   "season.held": SEASON_HELD,

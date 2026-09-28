@@ -16,6 +16,7 @@ import {
   wallInstant,
   type MatchFacts,
 } from "./fixture-mail";
+import { clubBand } from "./club-mail";
 import { finaleTable, recordWords, type FinaleRow } from "./finale-mail";
 import { digestDetails, organizerJourney, welcomeFrame } from "./organizer-mail";
 import { journey, seasonBand, submittedDetails } from "./player-mail";
@@ -463,5 +464,13 @@ export function previewOptions(
     ...resultsFrame(kind, language),
     ...matchesFrame(kind, variant, language),
     ...finaleFrame(kind, variant, language),
+    ...(kind === "club.invite" || kind === "club.member_joined"
+      ? {
+          band: clubBand(
+            String(sampleVariables(EMAIL_TEMPLATES[kind], language)["orgName"] ?? ""),
+            language,
+          ),
+        }
+      : {}),
   };
 }

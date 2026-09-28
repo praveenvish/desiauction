@@ -123,6 +123,7 @@ const EVENT_ICON: Record<string, { icon: ReactNode; tone: KitTone }> = {
   "fixture.lineup_announced": { icon: <IconMatch />, tone: "green" },
   "fixture.changed": { icon: <IconClock />, tone: "amber" },
   "season.champion": { icon: <IconTrophy />, tone: "gold" },
+  "club.member_joined": { icon: <IconUsers />, tone: "blue" },
   "finance.document.issued": { icon: <IconReceipt />, tone: "blue" },
   "privacy.erasure.requested": { icon: <IconShieldCheck />, tone: "red" },
   "privacy.erasure.withdrawn": { icon: <IconShieldCheck />, tone: "neutral" },

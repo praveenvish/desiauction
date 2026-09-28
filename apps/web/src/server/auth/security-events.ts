@@ -93,6 +93,8 @@ export type SecurityAction =
   | "fixture.changed"
   // Email programme PR12: the organizer named the season's champion.
   | "season.champion"
+  // Email programme PR13: someone used a club invite link (to its sender and owners).
+  | "club.member_joined"
   // The person asked for their account to be erased, or took the request back.
   // On their own ledger because it is the one request that ends the account;
   // the DECISION is on the request itself, which /account reads.

@@ -13,9 +13,10 @@ import {
 } from "@desiauction/db";
 import { and, eq, isNull } from "drizzle-orm";
 
-// Shareable-link invites (IP-2_DESIGN D9, RC-3): the platform sends nothing —
-// the organizer forwards the link. Tokens are one-time, expiring, revocable,
-// and stored only as hashes.
+// Shareable-link invites (IP-2_DESIGN D9, RC-3): the organizer forwards the
+// link — or, since email programme PR13, types an address and we email it
+// (sent directly: the link is the access). Tokens are one-time, expiring,
+// revocable, and stored only as hashes.
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -138,7 +139,58 @@ export async function previewInvite(db: Db, token: string): Promise<InvitePrevie
   return landing.state === "valid" ? landing.preview : null;
 }
 
-export type AcceptResult = { ok: true; orgSlug: string; orgName: string } | { ok: false };
+export type AcceptResult =
+  | {
+      ok: true;
+      inviteId: string;
+      orgId: string;
+      orgSlug: string;
+      orgName: string;
+      /** Who minted the link, and what it gave — for "someone joined" (PR13). */
+      invitedBy: string;
+      capabilitySet: string;
+    }
+  | { ok: false };
+
+/** ".../join/<token>" → the token; anything else → null. */
+export function clubInviteTokenFrom(joinUrl: string): string | null {
+  return /\/join\/([A-Za-z0-9_-]{16,})\/?$/.exec(joinUrl.trim())?.[1] ?? null;
+}
+
+/**
+ * The invite this token opens, if it may still be emailed: in THIS club, not
+ * accepted, not revoked, not expired. A link from another club, or one
+ * already used, is not an invitation anybody may be sent.
+ */
+export async function liveClubInvite(
+  db: Db,
+  orgId: string,
+  token: string,
+  now: Date = new Date(),
+): Promise<{ id: string; capabilitySet: string; expiresAt: Date } | null> {
+  const [row] = await db
+    .select({
+      id: invites.id,
+      orgId: invites.orgId,
+      capabilitySet: invites.capabilitySet,
+      expiresAt: invites.expiresAt,
+      acceptedAt: invites.acceptedAt,
+      revokedAt: invites.revokedAt,
+    })
+    .from(invites)
+    .where(eq(invites.tokenHash, hashToken(token)))
+    .limit(1);
+  if (
+    row === undefined ||
+    row.orgId.trim() !== orgId.trim() ||
+    row.acceptedAt !== null ||
+    row.revokedAt !== null ||
+    row.expiresAt.getTime() < now.getTime()
+  ) {
+    return null;
+  }
+  return { id: row.id, capabilitySet: row.capabilitySet, expiresAt: row.expiresAt };
+}
 
 /**
  * One-time acceptance: expired, revoked, replayed and unknown tokens are all
@@ -212,7 +264,15 @@ export async function acceptInvite(db: Db, personId: string, token: string): Pro
     .from(organizations)
     .where(eq(organizations.id, row.orgId))
     .limit(1);
-  return { ok: true, orgSlug: org?.slug ?? "", orgName: org?.name ?? "" };
+  return {
+    ok: true,
+    inviteId: row.id,
+    orgId: row.orgId,
+    orgSlug: org?.slug ?? "",
+    orgName: org?.name ?? "",
+    invitedBy: row.createdBy,
+    capabilitySet: row.capabilitySet,
+  };
 }
 
 /**

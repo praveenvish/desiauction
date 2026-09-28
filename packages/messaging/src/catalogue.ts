@@ -445,6 +445,35 @@ const ENTRIES = [
     orgControllable: false,
   },
   {
+    // The organizer typed an address beside a club invite link (email
+    // programme PR13). The link is the capability — whoever opens it joins —
+    // so this goes DIRECT, never queued, and no switch applies: the reader
+    // may not have an account yet.
+    key: "club.invite",
+    label: "Club invitation",
+    description:
+      "An organizer emails someone their one-time link to join the club as staff or a member.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email"],
+    personControllable: false,
+    orgControllable: false,
+  },
+  {
+    // Somebody used a club invite link: the person who sent it, and the
+    // club's owners, hear who now has access — access is a security fact.
+    key: "club.member_joined",
+    label: "Someone joined the club",
+    description:
+      "Tells whoever sent the invite, and the club's owners, who joined and with what access.",
+    audience: "organizer",
+    category: "transactional",
+    topic: "club",
+    channels: ["email", "in_app"],
+    orgControllable: false,
+  },
+  {
     key: "registration.first",
     label: "First registration in",
     description: "Tells a season's organizers its first player has registered.",

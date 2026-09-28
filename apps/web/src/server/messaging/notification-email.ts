@@ -89,6 +89,9 @@ const LAYOUT: Readonly<
   "season.held": { calloutLast: true },
   // "This link is yours alone" — the one line an invited owner must not miss.
   "owner.invite": { calloutLast: true },
+  "club.invite": { calloutLast: true },
+  // "Not someone you expected?" — the way to take access back, boxed.
+  "club.member_joined": { calloutLast: true },
   "registration.approved": { whatsappNudge: true },
   "registration.waitlisted": { whatsappNudge: true },
   "registration.rejected": { whatsappNudge: true },

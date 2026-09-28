@@ -26,6 +26,7 @@ import {
 } from "../messaging/organizer-mail";
 import { drainOutbox, enqueueMail, type QueuedMail } from "../messaging/outbox";
 import { ownersReadyMail } from "../messaging/owner-mail";
+import { memberJoinedMail } from "../messaging/club-mail";
 import type { NotificationKind } from "../messaging/catalogue";
 import type { TransactionalMailer } from "../messaging/transactional-mail";
 import { holdersOf } from "./orgs";
@@ -338,4 +339,63 @@ export async function notifyOwnerJoined(
     }
   }
   return { ready: true };
+}
+
+/**
+ * SOMEBODY USED A CLUB INVITE LINK (email programme PR13). Whoever minted the
+ * link, and the club's owners, hear who now has access and what kind — by
+ * email and in the inbox — because a link that reached the wrong person is
+ * only ever noticed this way. Once per invitation (keyed by the invite).
+ */
+export async function notifyMemberJoined(
+  db: Db,
+  input: {
+    inviteId: string;
+    orgId: string;
+    orgName: string;
+    orgSlug: string;
+    memberId: string;
+    invitedBy: string;
+    capabilitySet: string;
+  },
+  channels: OrganizerNoticeChannels = {},
+): Promise<number> {
+  const owners = await holdersOf(db, input.orgId, "org:owner");
+  // Never the new member themselves — an owner invite makes them an owner.
+  const told = [...new Set([input.invitedBy, ...owners])].filter((id) => id !== input.memberId);
+  if (told.length === 0) {
+    return 0;
+  }
+  const memberName = (await namesOf(db, [input.memberId])).get(input.memberId) ?? "Someone";
+  const mails = await forEachOrganizer(
+    db,
+    told,
+    {
+      orgId: input.orgId,
+      kind: "club.member_joined",
+      key: (personId) => `club.member_joined:${input.inviteId}:${personId}`,
+    },
+    (name, language) =>
+      memberJoinedMail(
+        {
+          name,
+          orgName: input.orgName,
+          orgSlug: input.orgSlug,
+          memberName,
+          capabilitySet: input.capabilitySet,
+        },
+        language,
+      ),
+  );
+  const fresh = await deliver(mails, channels);
+  if (fresh.length > 0) {
+    for (const personId of told) {
+      try {
+        await logSecurityEvent(personId, "club.member_joined", { member: memberName });
+      } catch (error) {
+        logger().warn({ err: error }, "organizer_inbox.write_failed");
+      }
+    }
+  }
+  return fresh.length;
 }
