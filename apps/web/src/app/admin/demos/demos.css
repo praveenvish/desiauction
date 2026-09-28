@@ -58,28 +58,88 @@
   gap: var(--space-2);
 }
 
-/* ---- Availability desk ------------------------------------------------- */
+/* ---- Availability desk (redesign 2026-09-28) ---------------------------
+   What the public page offers, then the week — which is the editor — then
+   blocked days. Every control on a form line shares the 44px touch height. */
 
-.demo-availability-form {
+.demo-offer {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: flex-end;
+  align-items: center;
+  gap: var(--space-4);
+  padding: clamp(var(--space-4), 3vw, var(--space-6));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-1);
+}
+
+.demo-offer[data-live] {
+  border-color: var(--success-base);
+  background:
+    radial-gradient(
+      60% 140% at 100% 0%,
+      color-mix(in srgb, var(--success-base) 12%, transparent),
+      transparent 60%
+    ),
+    var(--surface-raised);
+}
+
+.demo-offer-text {
+  display: flex;
+  flex: 1 1 20rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.demo-offer-eyebrow {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.demo-offer-title {
   margin: 0;
+  color: var(--text-heading);
+  font-size: var(--text-xl-size);
+  line-height: var(--text-xl-line);
+  font-weight: var(--font-weight-semibold);
 }
 
-.demo-window-list li > span:first-child {
-  color: var(--text-primary);
+.demo-offer-sub {
+  margin: 0;
+  color: var(--text-secondary);
   font-size: var(--text-sm-size);
-  font-variant-numeric: tabular-nums;
 }
 
-/* Inside a padded card: rows run to the card's edge, under a hairline. */
-.admin-rows.demo-window-list {
-  border-top: 1px solid var(--border-subtle);
+.demo-offer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
 }
 
-/* ── wow pass round 2: the week at a glance ── */
+.demo-offer-link:hover {
+  border-color: var(--accent-line);
+}
+
+.demo-offer-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The week: a column a day on a laptop, a row a day on a phone. An empty day
+   is an outline, not a grey fill — it reads "nothing yet", not "disabled". */
 .demo-week {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -92,27 +152,31 @@
 .demo-week-day {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-2);
   min-width: 0;
-  min-height: 64px;
-  padding: var(--space-2);
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
+  min-height: 150px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
 }
 
 .demo-week-day[data-open] {
-  border-style: solid;
-  border-color: var(--accent-line);
+  border-color: var(--border-strong);
   background: var(--surface-raised);
 }
 
 .demo-week-name {
-  color: var(--text-secondary);
-  font-size: var(--text-xs-size);
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+}
+
+.demo-week-slots {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .demo-week-none {
@@ -121,14 +185,227 @@
 }
 
 .demo-week-slot {
-  color: var(--text-primary);
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-medium);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-2);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 599px) {
+.demo-week-time > span {
+  white-space: nowrap;
+}
+
+.demo-week-time {
+  color: var(--text-heading);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.demo-week-len {
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+}
+
+.demo-week-retire {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.demo-week-retire:hover {
+  color: var(--danger-strong);
+}
+
+.demo-week-retire:focus-visible,
+.demo-week-add:focus-visible,
+.demo-add-day:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.demo-week-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 36px;
+  margin-top: auto;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-accent);
+  font: inherit;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.demo-week-add:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-subtle);
+}
+
+/* The add line: day buttons, From, To, Slots, Publish — one height. */
+.demo-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.demo-add-days {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.demo-add-label {
+  color: var(--text-heading);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.demo-add-day-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.demo-add-day {
+  min-width: 48px;
+  height: 44px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.demo-add-day[aria-pressed="true"] {
+  border-color: var(--text-heading);
+  background: var(--text-heading);
+  color: var(--surface-raised);
+}
+
+/* Blocked days: a line each, the day in words. */
+.demo-blocked {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.demo-blocked > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 0 var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm-size);
+}
+
+.demo-blocked strong {
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.demo-blocked-why {
+  overflow: hidden;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.demo-block-form {
+  margin: var(--space-4) var(--space-5) var(--space-5);
+}
+
+/* The reason is the one free-text field: it takes the room. */
+.demo-block-form > :nth-child(2) {
+  flex: 1 1 16rem;
+}
+
+@media (max-width: 719px) {
   .demo-week {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .demo-week-day {
+    flex-direction: row;
+    align-items: center;
+    min-height: 52px;
+    padding: var(--space-2) 0;
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0;
+  }
+
+  .demo-week-day[data-open] {
+    background: none;
+  }
+
+  .demo-week-name {
+    flex: 0 0 2.5rem;
+  }
+
+  .demo-week-slots {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .demo-week-add {
+    flex: none;
+    margin-top: 0;
+    padding: 0 var(--space-3);
+  }
+
+  .demo-add > * {
+    flex: 1 1 100%;
+  }
+
+  /* From and To side by side: a pair, read together. */
+  .demo-add:not(.demo-block-form) > :nth-child(2),
+  .demo-add:not(.demo-block-form) > :nth-child(3) {
+    flex: 1 1 calc(50% - var(--space-3));
+  }
+
+  .demo-add-day {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .demo-add-day-row {
+    flex-wrap: nowrap;
+  }
+
+  .demo-blocked > li {
+    padding-inline: var(--space-4);
+  }
+
+  .demo-block-form {
+    margin-inline: var(--space-4);
   }
 }
