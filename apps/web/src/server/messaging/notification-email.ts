@@ -19,7 +19,13 @@ import {
 import { env } from "../../env";
 import { db as appDb } from "../db";
 import { logger } from "../logger";
-import { manageEmailsUrl, renderEmail, type EmailBand, type EmailStep } from "./email-layout";
+import {
+  manageEmailsUrl,
+  renderEmail,
+  type EmailBand,
+  type EmailDateLeaf,
+  type EmailStep,
+} from "./email-layout";
 import { isSelfManagedKind } from "./unsubscribe";
 
 /**
@@ -104,6 +110,8 @@ export interface RenderOptions {
   readonly band?: EmailBand;
   /** Where the player is in the season (player-mail.ts `journey`). */
   readonly progress?: readonly EmailStep[];
+  /** A date tile — auction night (auction-schedule-mail.ts). */
+  readonly dateLeaf?: EmailDateLeaf;
 }
 
 /**
@@ -138,6 +146,7 @@ export function composeNotificationEmail(
     ...(options.details === undefined ? {} : { details: options.details }),
     ...(options.band === undefined ? {} : { band: options.band }),
     ...(options.progress === undefined ? {} : { progress: options.progress }),
+    ...(options.dateLeaf === undefined ? {} : { dateLeaf: options.dateLeaf }),
     ...(filled.after.length === 0 ? {} : { after: filled.after }),
     footnote: filled.footnote,
     ...(layout.noLinks === true ? { noLinks: true } : {}),

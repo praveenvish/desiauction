@@ -237,6 +237,19 @@ const ENTRIES = [
     channels: ["email", ...TEXT, "in_app"],
   },
   {
+    // The organizer set, moved or cleared auction night (0095). Held ten
+    // minutes before it goes, and a newer change replaces a pending one, so an
+    // organizer correcting a typo sends one mail, not three.
+    key: "auction.schedule",
+    label: "Auction time set or changed",
+    description:
+      "Tells the season's owners and pool players when auction night is — and when it moves.",
+    audience: "player",
+    category: "transactional",
+    topic: "auction",
+    channels: ["email"],
+  },
+  {
     key: "auction.sold",
     label: "Sold at auction",
     description: "When the auction completes: which team bought the player, and for how much.",

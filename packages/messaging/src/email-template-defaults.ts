@@ -445,6 +445,142 @@ const AUCTION_FOOTNOTE_SWITCH = {
 const SEASON_ACTION = { id: "season", description: "The player's home, with the season on it." };
 const SEE_SEASON = { en: "See your season", hi: "अपना सीज़न देखें" };
 
+// --- Auction night: set, moved, cleared (email programme PR6) ------------------
+
+const AUCTION_WHEN = text(
+  "when",
+  'When auction night starts, in IST ("Sat 4 Oct, 8:00 pm IST").',
+  "Sun 4 Oct, 8:00 pm IST",
+  "रवि, 4 अक्टू॰, 8:00 pm IST",
+  { computed: true, whenEmpty: "drop" },
+);
+const PREVIOUS = text(
+  "previous",
+  "The time it was before — only when it moved.",
+  "Sat 3 Oct, 7:00 pm IST",
+  "शनि, 3 अक्टू॰, 7:00 pm IST",
+  { computed: true, whenEmpty: "drop" },
+);
+const OWNER_TEAM = text(
+  "teamName",
+  "The team an OWNER bids for — empty for a player, and the owner line is left out.",
+  "Cup Kings",
+  "कप किंग्स",
+  { whenEmpty: "drop" },
+);
+// The preview shows the OWNER's mail (teamName filled, this off): a real send
+// carries one line or the other, never both.
+const IF_PLAYER = flag("ifPlayer", "On for a pool player: shows the player's line.", false);
+
+const SCHEDULE_FOOTNOTE = {
+  en: "You received this because you're in the {{season}} auction.",
+  hi: "आपको यह इसलिए मिला क्योंकि आप {{season}} की नीलामी में हैं।",
+};
+const OWNER_LINE = {
+  en: "You're bidding for {{teamName}}. Open your owner room a few minutes early on the night, so your paddle is ready for the first player.",
+  hi: "आप {{teamName}} के लिए बोली लगा रहे हैं। उस रात अपना ओनर रूम कुछ मिनट पहले खोल लें, ताकि पहले खिलाड़ी के आते ही आपका पैडल तैयार हो।",
+};
+const PLAYER_LINE = {
+  en: "{{ifPlayer}}You're in the player pool. Watch it live on DesiAuction and see which team buys you.",
+  hi: "{{ifPlayer}}आप खिलाड़ियों की सूची में हैं। DesiAuction पर लाइव देखें कि कौन-सी टीम आपको ख़रीदती है।",
+};
+
+const AUCTION_SCHEDULE: EmailTemplateSpec = {
+  kind: "auction.schedule",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: [
+    { id: "set", label: "Time set" },
+    { id: "moved", label: "Time changed" },
+    { id: "cleared", label: "Time taken off" },
+  ],
+  actions: [
+    { id: "season", description: "The owner's auction room, or the player's season page." },
+  ],
+  variables: [NAME, SEASON, ORG, AUCTION_WHEN, PREVIOUS, OWNER_TEAM, IF_PLAYER],
+  locked: [],
+  note: "Held ten minutes before it goes; a newer change replaces a notice still waiting, so a corrected typo sends one mail.",
+  defaults: {
+    en: {
+      variants: {
+        set: layout({
+          subject: "{{season}} auction: {{when}}",
+          preheader: "Save the date — {{orgName}} has set auction night.",
+          heading: "Auction night is set",
+          paragraphs: ["Hi {{name}},", "{{orgName}} has set the {{season}} auction for {{when}}."],
+          after: [OWNER_LINE.en, PLAYER_LINE.en],
+          actions: { season: "See the season" },
+          footnote: SCHEDULE_FOOTNOTE.en,
+        }),
+        moved: layout({
+          subject: "New time: the {{season}} auction is now {{when}}",
+          preheader: "It was {{previous}}. Please update your calendar.",
+          heading: "The auction has moved",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has moved the {{season}} auction. It was {{previous}}; it's now {{when}}.",
+          ],
+          after: [OWNER_LINE.en, PLAYER_LINE.en],
+          actions: { season: "See the season" },
+          footnote: SCHEDULE_FOOTNOTE.en,
+        }),
+        cleared: layout({
+          subject: "{{season}} auction: new time to follow",
+          preheader: "{{orgName}} will share the new time soon.",
+          heading: "The auction time is off for now",
+          paragraphs: [
+            "Hi {{name}},",
+            "{{orgName}} has taken the time off the {{season}} auction for now. We'll email you as soon as a new time is set.",
+          ],
+          actions: { season: "See the season" },
+          footnote: SCHEDULE_FOOTNOTE.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        set: layout({
+          subject: "{{season}} की नीलामी: {{when}}",
+          preheader: "तारीख़ नोट कर लें — {{orgName}} ने नीलामी की रात तय कर दी है।",
+          heading: "नीलामी की रात तय हो गई",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{season}} की नीलामी {{when}} के लिए तय की है।",
+          ],
+          after: [OWNER_LINE.hi, PLAYER_LINE.hi],
+          actions: { season: "सीज़न देखें" },
+          footnote: SCHEDULE_FOOTNOTE.hi,
+        }),
+        moved: layout({
+          subject: "नया समय: {{season}} की नीलामी अब {{when}}",
+          preheader: "पहले यह {{previous}} थी। कृपया अपना कैलेंडर बदल लें।",
+          heading: "नीलामी का समय बदल गया",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने {{season}} की नीलामी का समय बदल दिया है। पहले यह {{previous}} थी; अब {{when}} है।",
+          ],
+          after: [OWNER_LINE.hi, PLAYER_LINE.hi],
+          actions: { season: "सीज़न देखें" },
+          footnote: SCHEDULE_FOOTNOTE.hi,
+        }),
+        cleared: layout({
+          subject: "{{season}} की नीलामी: नया समय जल्द",
+          preheader: "{{orgName}} जल्द ही नया समय बताएगा।",
+          heading: "नीलामी का समय अभी तय नहीं है",
+          paragraphs: [
+            "नमस्ते {{name}},",
+            "{{orgName}} ने अभी के लिए {{season}} की नीलामी का समय हटा दिया है। नया समय तय होते ही हम आपको ईमेल करेंगे।",
+          ],
+          actions: { season: "सीज़न देखें" },
+          footnote: SCHEDULE_FOOTNOTE.hi,
+        }),
+      },
+    },
+  },
+};
+
 const SOLD: EmailTemplateSpec = {
   kind: "auction.sold",
   format: "layout",
@@ -1794,6 +1930,7 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "registration.digest": REGISTRATION_DIGEST,
   "season.held": SEASON_HELD,
   "season.released": SEASON_RELEASED,
+  "auction.schedule": AUCTION_SCHEDULE,
   "auction.sold": SOLD,
   "auction.unsold": UNSOLD,
   "auction.owner_summary": OWNER_SUMMARY,

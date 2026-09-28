@@ -659,6 +659,13 @@
       "when": 1791820800000,
       "tag": "0094_email_sends",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1791907200000,
+      "tag": "0095_competition_auction_starts_at",
+      "breakpoints": true
     }
   ]
 }

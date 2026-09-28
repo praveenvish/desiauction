@@ -48,6 +48,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { cache } from "react";
 
@@ -79,6 +80,7 @@ import {
   importSheetOf,
   markImportSheetSynced,
   publishBlockers,
+  setAuctionStart,
   setCompetitionVisibility,
   setImportSheet,
   setTeamCoach,
@@ -132,7 +134,9 @@ import {
   savedMappingFor,
   type SavedMapping,
 } from "./import-mappings";
+import { parseIstLocal } from "../../lib/ist-time";
 import { notifyFirstRegistration } from "../orgs/organizer-notify";
+import { notifyAuctionSchedule } from "./auction-schedule-notify";
 import { notifyDecision, notifyRegistrationReceived } from "./registration-notify";
 import { seasonOverview, type SeasonOverview } from "./season-overview";
 import { teamsWorkspace, workspaceSightFor, type TeamsWorkspace } from "./team-workspace";
@@ -721,6 +725,75 @@ export async function updateCompetitionDetailsAction(
     }
   }
   return { ok: true };
+}
+
+/**
+ * WHEN IS AUCTION NIGHT? (0095) — set, move or clear it. `value` is the
+ * `datetime-local` field's text, read as IST (lib/ist-time.ts); "" clears it.
+ *
+ * `competition.manage`, like every other change to the season. The owners and
+ * pool players are told after the response, held ten minutes first so a
+ * corrected typo sends one mail (auction-schedule-notify.ts).
+ */
+export async function setAuctionStartAction(
+  slug: string,
+  value: string,
+): Promise<{ ok: boolean; error?: string; startsAt?: string | null }> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "competition.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage this season." };
+  }
+  const next = value.trim() === "" ? null : parseIstLocal(value);
+  if (value.trim() !== "" && next === null) {
+    return { ok: false, error: "Enter a date and a time." };
+  }
+  const result = await inCompetitionOrg(session.personId, competition, (db) =>
+    setAuctionStart(db, competition, session.personId, next),
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error:
+        result.reason === "in_past"
+          ? "Pick a time that hasn't passed yet."
+          : "The auction has started — its time can't change now.",
+    };
+  }
+  if (result.changed) {
+    const change = result.previous === null ? "set" : result.next === null ? "cleared" : "moved";
+    after(async () => {
+      try {
+        await inCompetitionOrg(session.personId, competition, (db) =>
+          notifyAuctionSchedule(db, {
+            competitionId: competition.id,
+            change,
+            at: result.next,
+            previous: result.previous,
+          }),
+        );
+      } catch (error) {
+        logger().warn(
+          { err: error, competitionId: competition.id },
+          "auction.schedule_notice_failed",
+        );
+      }
+    });
+  }
+  revalidatePath(`/seasons/${slug}`, "layout");
+  return { ok: true, startsAt: result.next?.toISOString() ?? null };
 }
 
 export async function createTeamAction(

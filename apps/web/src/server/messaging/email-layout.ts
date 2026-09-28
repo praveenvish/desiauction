@@ -50,6 +50,20 @@ export interface EmailStep {
   readonly state: "done" | "now" | "next";
 }
 
+/** A calendar leaf: the date is the whole point of a reminder or a time change. */
+export interface EmailDateLeaf {
+  /** "OCT" / "अक्टू॰" */
+  readonly month: string;
+  /** "4" */
+  readonly day: string;
+  /** "SAT" / "शनि" */
+  readonly weekday: string;
+  /** "Malad Premier League 2026 auction" */
+  readonly title: string;
+  /** "8:00 pm IST" */
+  readonly detail: string;
+}
+
 export interface EmailContent {
   /** Hidden preview line most inboxes show beside the subject. */
   readonly preheader: string;
@@ -74,6 +88,8 @@ export interface EmailContent {
    * security alert. The words stay the template's; only the setting is code.
    */
   readonly calloutLast?: boolean;
+  /** A date tile after the opening paragraphs — auction night, a changed time. */
+  readonly dateLeaf?: EmailDateLeaf;
   /** The club band at the top of the card (club and season mail). */
   readonly band?: EmailBand;
   /** The season tracker under the heading — Registered → Approved → Auction → Team. */
@@ -215,6 +231,12 @@ function progressRow(steps: readonly EmailStep[], font: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:2px 0 24px;"><tr>${cells}</tr></table>`;
 }
 
+/** The leaf beside its title and time. Letter-spacing only on Latin capitals: it splits Devanagari. */
+function dateLeafRow(leaf: EmailDateLeaf, font: string): string {
+  const latin = /^[A-Z]+$/.test(leaf.month);
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:4px 0 22px;"><tr><td width="72" style="vertical-align:top;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="72" class="da-leaf" style="border:1px solid ${RULE_STRONG};border-radius:12px;"><tr><td align="center" style="background:${GOLD};border-radius:11px 11px 0 0;font:800 11px/22px ${FONT};letter-spacing:${latin ? "2px" : "0"};color:${ON_GOLD};">${escape(leaf.month)}</td></tr><tr><td align="center" class="da-heading" style="font:800 30px/38px ${FONT};color:${INK};padding-top:4px;">${escape(leaf.day)}</td></tr><tr><td align="center" class="da-muted" style="font:600 ${latin ? "11px" : "12px"}/16px ${FONT};letter-spacing:${latin ? "1px" : "0"};color:${MUTED};padding-bottom:8px;">${escape(leaf.weekday)}</td></tr></table></td><td style="vertical-align:middle;padding-left:16px;"><div class="da-heading" style="font:700 17px/24px ${font};color:${INK};">${escape(leaf.title)}</div><div class="da-text" style="font:15px/22px ${font};color:${TEXT};margin-top:2px;">${escape(leaf.detail)}</div></td></tr></table>`;
+}
+
 /** "✓ Registered → ● Approved → ○ Auction → ○ Team" — the tracker, in plain text. */
 function progressText(steps: readonly EmailStep[]): string {
   const mark = { done: "✓", now: "●", next: "○" } as const;
@@ -279,6 +301,7 @@ body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
   .da-notice { background:${DARK.notice} !important; border-color:${DARK.noticeEdge} !important; }
   .da-now, .da-next { background:${DARK.card} !important; border-color:${DARK.heading} !important; }
   .da-now-dot { background:${DARK.heading} !important; }
+  .da-leaf { border-color:${DARK.rule} !important; }
   .da-crest { background:${DARK.heading} !important; color:${DARK.canvas} !important; }
 }
 /*/da:dark*/
@@ -301,6 +324,7 @@ export function renderEmail(content: EmailContent): RenderedEmail {
   const words = FOOTER_WORDS[language];
   const body = [
     ...content.paragraphs.map((p) => paragraph(p, font)),
+    content.dateLeaf === undefined ? "" : dateLeafRow(content.dateLeaf, font),
     content.code === undefined ? "" : codeBlock(content.code),
     first ? action : "",
     content.details === undefined || content.details.length === 0
@@ -379,6 +403,12 @@ ${body}
       ? []
       : [progressText(content.progress), ""]),
     ...content.paragraphs.flatMap((p) => [p, ""]),
+    ...(content.dateLeaf === undefined
+      ? []
+      : [
+          `  ${content.dateLeaf.weekday} ${content.dateLeaf.day} ${content.dateLeaf.month} — ${content.dateLeaf.title}, ${content.dateLeaf.detail}`,
+          "",
+        ]),
     ...(content.code === undefined ? [] : [`    ${content.code}`, ""]),
     ...(first ? actionLine : []),
     ...(content.details === undefined

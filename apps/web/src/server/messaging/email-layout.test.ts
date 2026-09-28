@@ -31,6 +31,7 @@ const OWN = new URL(env.PUBLIC_BASE_URL).origin;
 
 /** The kinds a reader can switch off on /account (notification-email.ts). */
 const MANAGEABLE = new Set([
+  "auction.schedule",
   // "Club updates" (PR5) — but never a moderation notice: no switch stops those.
   "club.welcome",
   "registration.first",

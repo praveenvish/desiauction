@@ -985,6 +985,12 @@ export const competitions = pgTable(
     location: text("location"),
     startsOn: text("starts_on"),
     endsOn: text("ends_on"),
+    /**
+     * When auction night starts (0095): a moment, entered and shown in IST.
+     * On the season, not the auction row — that row only exists once the
+     * auction is created, and players want the date while they register.
+     */
+    auctionStartsAt: ts("auction_starts_at"),
     createdBy: char("created_by", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),

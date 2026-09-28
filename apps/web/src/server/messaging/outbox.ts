@@ -67,6 +67,11 @@ export interface QueuedMail extends NotificationMail {
   readonly orgId: string | null;
   /** What happened — its catalogue entry (`auction.sold`, `team.appointed`, …). */
   readonly kind: NotificationKind;
+  /**
+   * Not sent before this moment (the drain's `next_attempt_at`). For a notice
+   * that should settle first — a time an organizer may still be correcting.
+   */
+  readonly notBefore?: Date;
   /** One per person per moment; a repeat is ignored. */
   readonly dedupeKey: string;
 }
@@ -144,11 +149,28 @@ export async function enqueueMail(mails: readonly QueuedMail[], db: Db = appDb):
         subject: mail.subject,
         bodyText: mail.text,
         bodyHtml: mail.html ?? "",
+        ...(mail.notBefore === undefined ? {} : { nextAttemptAt: mail.notBefore }),
       })),
     )
     .onConflictDoNothing({ target: messageOutbox.dedupeKey })
     .returning({ dedupeKey: messageOutbox.dedupeKey });
   return inserted.map((row) => row.dedupeKey);
+}
+
+/**
+ * A newer version of a notice replaces the one still waiting: every PENDING
+ * row whose key starts with `prefix` is settled as suppressed, "superseded".
+ * Anything already sent stays sent — a correction goes out as its own mail,
+ * nothing sent is ever unsent. Returns how many were withdrawn.
+ */
+export async function supersedePending(prefix: string, db: Db = appDb): Promise<number> {
+  const withdrawn = await db.execute<{ id: string } & Record<string, unknown>>(sql`
+    update ${messageOutbox}
+    set status = 'suppressed', last_error = 'superseded by a newer notice'
+    where status = 'pending' and dedupe_key like ${`${prefix.replace(/[\\%_]/g, "\\$&")}%`}
+    returning id
+  `);
+  return withdrawn.length;
 }
 
 /**

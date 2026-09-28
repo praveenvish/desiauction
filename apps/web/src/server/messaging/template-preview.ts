@@ -5,6 +5,7 @@ import { sampleVariables, type MessageLanguage } from "@desiauction/messaging/em
 import { sportPackFor } from "@desiauction/core";
 
 import { env } from "../../env";
+import { auctionDateLeaf } from "./auction-schedule-mail";
 import { digestDetails, organizerJourney, welcomeFrame } from "./organizer-mail";
 import { journey, seasonBand, submittedDetails } from "./player-mail";
 import { requestDetails } from "./request-context";
@@ -139,6 +140,18 @@ function organizerFrame(
   }
 }
 
+/** Auction night's band and date tile, with the sample season (auction-schedule-mail.ts). */
+function scheduleFrame(variant: string, language: MessageLanguage): Partial<RenderOptions> {
+  const samples = sampleVariables(EMAIL_TEMPLATES["auction.schedule"], language);
+  const season = String(samples["season"] ?? "");
+  return {
+    band: seasonBand({ season, orgName: String(samples["orgName"] ?? ""), sport: "cricket" }),
+    ...(variant === "cleared"
+      ? {}
+      : { dateLeaf: auctionDateLeaf(new Date("2026-10-04T14:30:00Z"), season, language) }),
+  };
+}
+
 function seasonFrame(
   kind: EmailNotificationKind,
   language: MessageLanguage,
@@ -176,5 +189,6 @@ export function previewOptions(
     ...(kind === "auth.email_code" ? { code: "482913" } : {}),
     ...seasonFrame(kind, language),
     ...organizerFrame(kind, language),
+    ...(kind === "auction.schedule" ? scheduleFrame(variant, language) : {}),
   };
 }
