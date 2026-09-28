@@ -163,7 +163,7 @@ describe("one-click unsubscribe", () => {
   const url = (topic: string, token: string) =>
     `${env.PUBLIC_BASE_URL}/api/email/unsubscribe?p=${reader}&topic=${topic}&t=${token}`;
 
-  it("turns the /account switch off — email and text — and says where it came from", async () => {
+  it("turns the topic's EMAIL switch off — texts keep theirs — and says where it came from", async () => {
     const response = await POST(
       new Request(url("auction", unsubscribeToken(reader, "auction")), {
         method: "POST",
@@ -183,10 +183,7 @@ describe("one-click unsubscribe", () => {
           eq(notificationPreferences.topic, "auction"),
         ),
       );
-    expect(prefs.map((p) => `${p.channel}:${String(p.allowed)}`).sort()).toEqual([
-      "email:false",
-      "sms:false",
-    ]);
+    expect(prefs.map((p) => `${p.channel}:${String(p.allowed)}`).sort()).toEqual(["email:false"]);
     const consents = await db
       .select({ source: consentRecords.source })
       .from(consentRecords)

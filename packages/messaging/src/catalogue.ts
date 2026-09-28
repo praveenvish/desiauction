@@ -847,6 +847,10 @@ export function rowChannelOf(channel: NotificationChannel): "sms" | "email" | "i
   return channel;
 }
 
+/** A person's switch ROWS, in the order /account shows them (PR17). */
+export const PERSON_CHANNEL_ROWS = ["email", "sms", "in-app"] as const;
+export type PersonChannelRow = (typeof PERSON_CHANNEL_ROWS)[number];
+
 /** The channels a club's switch writes, and the gate reads — one per ROW. */
 export const ORG_SWITCH_CHANNELS = ["sms", "email"] as const;
 

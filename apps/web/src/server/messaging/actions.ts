@@ -10,10 +10,22 @@ import { db as appDb, dbHandle, systemDb } from "../db";
 import { parseWhatsAppLanguage, type WhatsAppLanguage } from "../../lib/whatsapp-consent";
 import { setWhatsappOptIn, whatsappOptedIn } from "./whatsapp";
 import { ForbiddenError, can, requireCapability } from "../orgs/authz";
-import { ORG_SWITCH_CHANNELS, PERSON_SWITCH_CHANNELS } from "./catalogue";
+import {
+  ORG_SWITCH_CHANNELS,
+  PERSON_CHANNEL_ROWS,
+  PERSON_SWITCH_CHANNELS,
+  type NotificationTopic,
+  type PersonChannelRow,
+} from "./catalogue";
 import { orgSwitchesFor, preferencesFor, setOrgMessagingSetting, setPreference } from "./consent";
-import { orgSwitchTopics, personSwitchTopics, platformSwitches } from "./platform-switches";
+import {
+  orgSwitchTopics,
+  personSwitchChannels,
+  personSwitchTopics,
+  platformSwitches,
+} from "./platform-switches";
 import { tenantOfPerson } from "../request-cache";
+import { pushKeys, removePushSubscription, savePushSubscription } from "./push";
 
 /** Membership-checked slug → org, under person-only tenant context. */
 async function resolveTenantScoped(personId: string, slug: string) {
@@ -29,7 +41,18 @@ async function resolveTenantScoped(personId: string, slug: string) {
  */
 
 export interface NotificationSettings {
-  readonly topics: readonly { topic: string; label: string; detail: string; allowed: boolean }[];
+  readonly topics: readonly {
+    topic: string;
+    label: string;
+    detail: string;
+    /** On for at least one channel. */
+    allowed: boolean;
+    /**
+     * Each channel this topic is sent on, and whether it is on (PR17): email,
+     * texts (WhatsApp or SMS — one row, 0044) and the inbox.
+     */
+    channels: readonly { channel: PersonChannelRow; allowed: boolean }[];
+  }[];
   /** WhatsApp: the one text channel, and only for somebody who opted in. */
   readonly whatsapp: boolean;
   /**
@@ -45,11 +68,18 @@ export async function notificationSettings(): Promise<NotificationSettings | nul
   if (session === null) {
     return null;
   }
-  const [current, whatsapp, platform] = await Promise.all([
+  const [email, sms, inApp, whatsapp, platform] = await Promise.all([
+    preferencesFor(systemDb, session.personId, "email"),
     preferencesFor(systemDb, session.personId, "sms"),
+    preferencesFor(systemDb, session.personId, "in-app"),
     whatsappOptedIn(systemDb, session.personId),
     platformSwitches(systemDb),
   ]);
+  const rows: Record<PersonChannelRow, Record<string, boolean>> = {
+    email,
+    sms,
+    "in-app": inApp,
+  };
   return {
     whatsapp: whatsapp.optedIn,
     // whatsappOptedIn resolves the same chain email uses, people.language first.
@@ -57,18 +87,27 @@ export async function notificationSettings(): Promise<NotificationSettings | nul
     // Only the topics still the person's to switch: a platform admin can take
     // a kind's switch away (/admin/notifications), and a topic none of whose
     // kinds still listens to the person would be a switch that does nothing.
-    topics: personSwitchTopics(platform).map((entry) => ({
-      topic: entry.topic,
-      label: entry.label,
-      detail: entry.detail,
-      allowed: current[entry.topic] ?? true,
-    })),
+    topics: personSwitchTopics(platform).map((entry) => {
+      const channels = personSwitchChannels(platform, entry.topic).map((channel) => ({
+        channel,
+        allowed: rows[channel][entry.topic] ?? true,
+      }));
+      return {
+        topic: entry.topic,
+        label: entry.label,
+        detail: entry.detail,
+        allowed: channels.some((row) => row.allowed),
+        channels,
+      };
+    }),
   };
 }
 
 export async function setNotificationPreferenceAction(
   topic: string,
   allowed: boolean,
+  /** One channel's row (PR17); omitted, every text and email row as before. */
+  channel?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const session = await currentSession();
   if (session === null) {
@@ -90,8 +129,18 @@ export async function setNotificationPreferenceAction(
   // and worked everywhere else, because every local process is the DB owner.
   // No RLS on the table; the lock is that it only ever writes the session's
   // own person.
-  for (const channel of PERSON_SWITCH_CHANNELS) {
-    await setPreference(appDb, { personId: session.personId, topic, channel, allowed });
+  let channels: readonly PersonChannelRow[] = PERSON_SWITCH_CHANNELS;
+  if (channel !== undefined) {
+    // Only a channel this topic is sent on and still the person's to switch.
+    const offered = personSwitchChannels(platform, topic as NotificationTopic);
+    const row = PERSON_CHANNEL_ROWS.find((candidate) => candidate === channel);
+    if (row === undefined || !offered.includes(row)) {
+      return { ok: false, error: "That is not a notification you can change." };
+    }
+    channels = [row];
+  }
+  for (const row of channels) {
+    await setPreference(appDb, { personId: session.personId, topic, channel: row, allowed });
   }
   revalidatePath("/account");
   return { ok: true };
@@ -247,5 +296,63 @@ export async function setOrgMessagingSettingAction(
     return { ok: false, error: "Could not save." };
   }
   revalidatePath(`/org/${slug}`);
+  return { ok: true };
+}
+
+/**
+ * NOTIFICATIONS ON THIS DEVICE (email programme PR18) — web push. The public
+ * key the browser subscribes to, or null when web push is not configured
+ * here (then /account offers nothing).
+ */
+export async function pushPublicKey(): Promise<string | null> {
+  const session = await currentSession();
+  return session === null ? null : (pushKeys()?.publicKey ?? null);
+}
+
+/** Keep this browser's subscription for the signed-in person. */
+export async function savePushSubscriptionAction(subscription: {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  userAgent?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false, error: "Sign in to turn notifications on." };
+  }
+  if (pushKeys() === null) {
+    return { ok: false, error: "Notifications on this device aren't available yet." };
+  }
+  // A browser's push service, over https, and the two keys it must give —
+  // anything else is not a subscription anybody could deliver to.
+  let endpoint: URL;
+  try {
+    endpoint = new URL(subscription.endpoint);
+  } catch {
+    return { ok: false, error: "That didn't work. Try again." };
+  }
+  const key = /^[A-Za-z0-9_-]+$/;
+  if (
+    endpoint.protocol !== "https:" ||
+    !key.test(subscription.keys.p256dh) ||
+    !key.test(subscription.keys.auth)
+  ) {
+    return { ok: false, error: "That didn't work. Try again." };
+  }
+  // On the APP pool: a person's own devices, like their switches.
+  await savePushSubscription(appDb, session.personId, {
+    endpoint: endpoint.toString(),
+    p256dh: subscription.keys.p256dh,
+    auth: subscription.keys.auth,
+    userAgent: subscription.userAgent?.slice(0, 300) ?? null,
+  });
+  return { ok: true };
+}
+
+export async function removePushSubscriptionAction(endpoint: string): Promise<{ ok: boolean }> {
+  const session = await currentSession();
+  if (session === null) {
+    return { ok: false };
+  }
+  await removePushSubscription(appDb, session.personId, endpoint);
   return { ok: true };
 }

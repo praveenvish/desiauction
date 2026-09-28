@@ -45,7 +45,7 @@ export function EmailUnsubscribeForm({
         <h1>You&apos;re unsubscribed</h1>
         <form action={formAction} className="unsubscribe-form">
           <p role="status" className="content-lead" data-testid="email-unsubscribed">
-            You won&apos;t get &ldquo;{label}&rdquo; from DesiAuction by email or WhatsApp any more.
+            You won&apos;t get &ldquo;{label}&rdquo; from DesiAuction by email any more.
           </p>
           {hidden}
           <input type="hidden" name="intent" value="undo" />
@@ -71,8 +71,8 @@ export function EmailUnsubscribeForm({
         ) : null}
         <p className="content-lead">{detail}</p>
         <p>
-          This one switch covers email and WhatsApp. Sign-in codes and security alerts always reach
-          you.
+          This stops the emails. WhatsApp messages and your inbox have their own switches in your
+          account. Sign-in codes and security alerts always reach you.
         </p>
         {hidden}
         <input type="hidden" name="intent" value="unsubscribe" />

@@ -8,7 +8,7 @@
  * inbox's client component, so the security panel could not reach it. It lives
  * here now and both read it.
  */
-import type { SecurityAction } from "../server/auth/security-events";
+import type { SecurityAction } from "../server/auth/security-actions";
 
 /**
  * EVERY EVENT THE LEDGER CAN WRITE HAS PROSE — checked by the compiler.
@@ -107,7 +107,10 @@ export function isKnownEvent(action: string): boolean {
 }
 
 /**
- * The device's "I have read up to here" watermark, PER ACCOUNT.
+ * LEGACY (before PR16 moved read state to the server, people.inbox_seen_at):
+ * the device's "I have read up to here" watermark, PER ACCOUNT. Still read
+ * once — the first /inbox visit on the new build seeds the server from it, so
+ * nobody's whole history turns "new" — and cleared on sign-out.
  *
  * It used to be one origin-global key, `da:inbox-seen-at`, written by the inbox
  * and read by the shell's bell, and sign-out cleared only the session cookie.

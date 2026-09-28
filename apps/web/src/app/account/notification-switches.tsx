@@ -1,14 +1,17 @@
 "use client";
 
 import { useAnnouncer } from "@desiauction/ui";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   WHATSAPP_LANGUAGE_LABELS,
   WHATSAPP_LANGUAGES,
   type WhatsAppLanguage,
 } from "../../lib/whatsapp-consent";
+import type { PersonChannelRow } from "../../server/messaging/catalogue";
 import {
+  removePushSubscriptionAction,
+  savePushSubscriptionAction,
   setMessageLanguageAction,
   setNotificationPreferenceAction,
   setWhatsappPreferenceAction,
@@ -29,53 +32,83 @@ import {
  * in has been handed a worse outcome than the one they were avoiding — and a
  * switch that silently exempts itself would be the dishonest version of that.
  */
+const CHANNEL_LABEL: Record<PersonChannelRow, string> = {
+  email: "Email",
+  sms: "WhatsApp / SMS",
+  "in-app": "Inbox",
+};
+
+type Key = `${string}:${PersonChannelRow}`;
+
 export function NotificationSwitches({ settings }: { settings: NotificationSettings }) {
   const announce = useAnnouncer();
   const [pending, startTransition] = useTransition();
   const [state, setState] = useState(
-    () => new Map(settings.topics.map((entry) => [entry.topic, entry.allowed])),
+    () =>
+      new Map<Key, boolean>(
+        settings.topics.flatMap((entry) =>
+          entry.channels.map((row) => [`${entry.topic}:${row.channel}`, row.allowed]),
+        ),
+      ),
   );
   const [error, setError] = useState<string | null>(null);
 
-  const toggle = (topic: string, label: string, next: boolean) => {
+  // ONE SWITCH PER CHANNEL (email programme PR17): "stop the emails about the
+  // auction, keep the WhatsApp" is a thing people want, and the gate always
+  // read a row per channel — only this screen could not write one.
+  const toggle = (topic: string, label: string, channel: PersonChannelRow, next: boolean) => {
+    const key: Key = `${topic}:${channel}`;
     // Optimistic, then reconciled. A switch that waits on a round-trip before
     // moving reads as broken on a slow connection, which is most of them here.
-    setState((current) => new Map(current).set(topic, next));
+    setState((current) => new Map(current).set(key, next));
     setError(null);
     startTransition(async () => {
-      const result = await setNotificationPreferenceAction(topic, next);
+      const result = await setNotificationPreferenceAction(topic, next, channel);
       if (result.ok) {
-        announce(next ? `${label} turned on` : `${label} turned off`, "polite");
+        announce(
+          `${label} by ${CHANNEL_LABEL[channel].toLowerCase()} turned ${next ? "on" : "off"}`,
+          "polite",
+        );
         return;
       }
-      setState((current) => new Map(current).set(topic, !next));
+      setState((current) => new Map(current).set(key, !next));
       setError(result.error ?? "That did not save. Try again.");
     });
   };
 
   return (
     <div className="notify-switches" data-testid="notification-switches">
-      {settings.topics.map((entry) => {
-        const on = state.get(entry.topic) ?? entry.allowed;
-        return (
-          <label key={entry.topic} className="notify-switch" htmlFor={`notify-${entry.topic}`}>
-            <input
-              id={`notify-${entry.topic}`}
-              type="checkbox"
-              checked={on}
-              disabled={pending}
-              data-testid={`notify-${entry.topic}`}
-              onChange={(event) => {
-                toggle(entry.topic, entry.label, event.target.checked);
-              }}
-            />
-            <span className="notify-switch-text">
-              <span className="notify-switch-label">{entry.label}</span>
-              <span className="notify-switch-detail">{entry.detail}</span>
-            </span>
-          </label>
-        );
-      })}
+      {settings.topics.map((entry) => (
+        <fieldset key={entry.topic} className="notify-topic" data-testid={`notify-${entry.topic}`}>
+          <legend className="notify-switch-text">
+            <span className="notify-switch-label">{entry.label}</span>
+            <span className="notify-switch-detail">{entry.detail}</span>
+          </legend>
+          <div className="notify-channels">
+            {entry.channels.map((row) => {
+              const key: Key = `${entry.topic}:${row.channel}`;
+              const on = state.get(key) ?? row.allowed;
+              const id = `notify-${entry.topic}-${row.channel}`;
+              return (
+                <label key={row.channel} className="notify-channel" htmlFor={id}>
+                  <input
+                    id={id}
+                    type="checkbox"
+                    checked={on}
+                    disabled={pending}
+                    data-testid={id}
+                    aria-label={`${entry.label} by ${CHANNEL_LABEL[row.channel]}`}
+                    onChange={(event) => {
+                      toggle(entry.topic, entry.label, row.channel, event.target.checked);
+                    }}
+                  />
+                  <span aria-hidden>{CHANNEL_LABEL[row.channel]}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      ))}
       {error !== null ? (
         <p role="alert" className="notify-error">
           {error}
@@ -207,6 +240,138 @@ export function MessageLanguageChoice({ language: initial }: { language: WhatsAp
           ))}
         </div>
       </fieldset>
+      {error !== null ? (
+        <p role="alert" className="notify-error">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+type PushState = "checking" | "unsupported" | "blocked" | "off" | "on";
+
+function base64UrlToBytes(text: string): Uint8Array<ArrayBuffer> {
+  const padded = `${text}${"=".repeat((4 - (text.length % 4)) % 4)}`
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const raw = window.atob(padded);
+  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
+  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
+/** What this browser can do, and whether it is subscribed already. */
+async function detectPush(): Promise<PushState> {
+  const supported =
+    "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  if (!supported) return "unsupported";
+  if (Notification.permission === "denied") return "blocked";
+  try {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    const subscription = (await registration?.pushManager.getSubscription()) ?? null;
+    return subscription === null ? "off" : "on";
+  } catch {
+    return "off";
+  }
+}
+
+/**
+ * NOTIFICATIONS ON THIS DEVICE (email programme PR18) — web push. Your inbox
+ * notices, as a phone or desktop notification, for THIS browser. They follow
+ * the Inbox switches above; this only says whether this device shows them.
+ */
+export function PushDeviceSwitch({ publicKey }: { publicKey: string }) {
+  const announce = useAnnouncer();
+  const [state, setState] = useState<PushState>("checking");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void detectPush().then(setState);
+  }, []);
+
+  const turnOn = async () => {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      setState(permission === "denied" ? "blocked" : "off");
+      return;
+    }
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64UrlToBytes(publicKey),
+    });
+    const json = subscription.toJSON();
+    const result = await savePushSubscriptionAction({
+      endpoint: subscription.endpoint,
+      keys: { p256dh: json.keys?.["p256dh"] ?? "", auth: json.keys?.["auth"] ?? "" },
+      userAgent: navigator.userAgent,
+    });
+    if (!result.ok) {
+      await subscription.unsubscribe();
+      throw new Error(result.error ?? "That did not save.");
+    }
+    setState("on");
+    announce("Notifications on this device turned on", "polite");
+  };
+
+  const turnOff = async () => {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    const subscription = await registration?.pushManager.getSubscription();
+    if (subscription !== null && subscription !== undefined) {
+      await removePushSubscriptionAction(subscription.endpoint);
+      await subscription.unsubscribe();
+    }
+    setState("off");
+    announce("Notifications on this device turned off", "polite");
+  };
+
+  const hint: Record<PushState, string> = {
+    checking: "Checking this device…",
+    unsupported:
+      "This browser can't show notifications. On an iPhone, add DesiAuction to your Home Screen first (Share → Add to Home Screen), then turn them on from there.",
+    blocked:
+      "Notifications are blocked for DesiAuction in this browser's settings. Allow them there, then come back.",
+    off: "Get your inbox notices — sold at auction, a match moved, your lineup — as a notification on this device.",
+    on: "This device shows your inbox notices as notifications. They follow your Inbox switches above.",
+  };
+  const toggleable = state === "on" || state === "off";
+
+  return (
+    <div className="notify-switches" data-testid="push-switch">
+      <label className="notify-switch" htmlFor="notify-push">
+        <input
+          id="notify-push"
+          type="checkbox"
+          checked={state === "on"}
+          disabled={!toggleable || busy}
+          data-testid="notify-push"
+          onChange={(event) => {
+            const next = event.target.checked;
+            setBusy(true);
+            setError(null);
+            void (next ? turnOn() : turnOff())
+              .catch((cause: unknown) => {
+                setError(
+                  cause instanceof Error && cause.message !== ""
+                    ? cause.message
+                    : "That did not work. Try again.",
+                );
+              })
+              .finally(() => {
+                setBusy(false);
+              });
+          }}
+        />
+        <span className="notify-switch-text">
+          <span className="notify-switch-label">Notifications on this device</span>
+          <span className="notify-switch-detail" data-testid="push-hint">
+            {hint[state]}
+          </span>
+        </span>
+      </label>
       {error !== null ? (
         <p role="alert" className="notify-error">
           {error}

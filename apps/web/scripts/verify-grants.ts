@@ -241,7 +241,16 @@ const APP_WRITES_UNPROTECTED = [
  * through the SYSTEM pool, which holds no INSERT here, so every switch failed in
  * production and passed locally as the owner. It rides the app pool now.
  */
-const APP_WRITES_PERSON = ["player_profiles", "consent_records", "notification_preferences"];
+/*
+ * `push_subscriptions` joined with web push (0097): the /account "notifications
+ * on this device" button writes it on the app pool.
+ */
+const APP_WRITES_PERSON = [
+  "player_profiles",
+  "consent_records",
+  "notification_preferences",
+  "push_subscriptions",
+];
 
 function expectations(allTables: string[]): Expectation[] {
   const out: Expectation[] = [];
@@ -294,6 +303,15 @@ function expectations(allTables: string[]): Expectation[] {
       });
     }
   }
+
+  // Turning a device off, and a push service's "gone", delete the row (PR18).
+  out.push({
+    role: "desiauction_app",
+    table: "push_subscriptions",
+    verb: "DELETE",
+    allowed: true,
+    why: "a person turns a device's notifications off, and a dead endpoint is forgotten",
+  });
 
   for (const table of ENGINE_WRITES) {
     for (const verb of ["INSERT", "UPDATE", "DELETE"] as const) {

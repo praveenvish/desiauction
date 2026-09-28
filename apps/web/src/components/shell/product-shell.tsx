@@ -37,12 +37,12 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { AdminSectionNav } from "../../app/admin/admin-section-nav";
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
 import { LEGAL_IDENTITY } from "../../content/company";
-import { inboxSeenKey } from "../../lib/inbox-events";
+import { UNREAD_CAP } from "../../lib/inbox-cap";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
@@ -77,12 +77,7 @@ export interface ShellSession {
   /** Nullable since 0062 — an email-anchored account has no phone. */
   phone: string | null;
   email: string | null;
-  /**
-   * Who is signed in. The bell's unread watermark is namespaced by it — one
-   * origin-global key meant that on a shared handset, person A reading their
-   * inbox marked person B's unread approval as already read. See
-   * `inboxSeenKey` in lib/inbox-events.
-   */
+  /** Who is signed in. */
   personId: string;
 }
 
@@ -133,69 +128,44 @@ export interface ProductShellProps {
    * decision. One input, one function, one menu.
    */
   navRoles?: NavRoles | null;
-  /** Newest person-scoped event timestamp (ISO) — drives the bell's unread dot. */
-  latestEventAt?: string | null;
+  /** Notices newer than the person's read watermark (server) — the bell's count. */
+  unreadCount?: number;
   /** The existing logout server action, passed through from the server layout. */
   logout: () => Promise<void>;
   children: ReactNode;
 }
 
-function subscribeToStorage(onChange: () => void): () => void {
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener("storage", onChange);
-  };
+/** "3", or "9+" — the badge never grows wider than two characters. */
+function unreadLabel(count: number): string {
+  return count > UNREAD_CAP ? `${String(UNREAD_CAP)}+` : String(count);
 }
 
-/** The device's inbox watermark for this person; undefined when storage is unreadable. */
-function readInboxSeen(personId: string): string | null | undefined {
-  try {
-    return window.localStorage.getItem(inboxSeenKey(personId));
-  } catch {
-    return undefined;
-  }
-}
-
-/** Bell with unread dot: newest event vs. the device's last inbox visit. */
-function BellLink({
-  latestEventAt,
-  pathname,
-  personId,
-}: {
-  latestEventAt: string | null;
-  pathname: string;
-  /** Namespaces the watermark. Without it the bell reads whoever last used
-      this device, which on a shared handset is the wrong person. */
-  personId: string;
-}) {
-  // The watermark is read from storage on every render (useSyncExternalStore
-  // re-reads its snapshot each time), so leaving /inbox — which has just moved
-  // it — shows the new answer at once. Another tab reading the inbox clears
-  // this tab's dot through `storage`. Undefined means "not known yet": the
-  // server render and the hydrating one show no dot rather than guess.
-  const seen = useSyncExternalStore(
-    subscribeToStorage,
-    () => readInboxSeen(personId),
-    () => undefined,
-  );
-  const unread =
-    latestEventAt !== null &&
-    // Standing ON the notifications page, the answer is already "you are
-    // reading them" — the page advances the watermark as it renders, so the dot
-    // must not stay lit over the very list it was pointing at.
-    !pathname.startsWith("/inbox") &&
-    seen !== undefined &&
-    (seen === null || latestEventAt > seen);
+/**
+ * The bell with its count (email programme PR16). The count is the SERVER's:
+ * notices newer than the person's own watermark (people.inbox_seen_at), so a
+ * notice read on the phone is read on the laptop too. /inbox moves the
+ * watermark and refreshes, so the count clears on the way out.
+ */
+function BellLink({ unreadCount, pathname }: { unreadCount: number; pathname: string }) {
+  // Standing ON the notifications page, the answer is already "you are reading
+  // them" — the count must not stay lit over the very list it points at.
+  const unread = unreadCount > 0 && !pathname.startsWith("/inbox");
+  const label = unreadLabel(unreadCount);
   return (
     <Link
       className="shell-icon-button shell-bell"
       href="/inbox"
-      aria-label={unread ? "Notifications — new activity" : "Notifications"}
+      aria-label={unread ? `Notifications — ${label} new` : "Notifications"}
       data-testid="shell-bell"
       data-unread={unread}
+      data-count={unread ? unreadCount : 0}
     >
       <IconBell />
-      {unread ? <span className="shell-bell-dot" aria-hidden /> : null}
+      {unread ? (
+        <span className="shell-bell-count" aria-hidden>
+          {label}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -340,7 +310,7 @@ export function ProductShell({
   competitions,
   serverAction,
   navRoles = null,
-  latestEventAt = null,
+  unreadCount = 0,
   logout,
   children,
 }: ProductShellProps) {
@@ -1047,11 +1017,7 @@ export function ProductShell({
               <span className="shell-desktop-only">
                 <ThemeToggle />
               </span>
-              <BellLink
-                latestEventAt={latestEventAt}
-                pathname={pathname}
-                personId={session.personId}
-              />
+              <BellLink unreadCount={unreadCount} pathname={pathname} />
               {/* Switchers live with the other controls now — one cluster, in the
                 same place, whether you are switching season or organization. */}
               {seasonSwitcherFor !== null && competitions.length > 1 ? (
