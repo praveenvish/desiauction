@@ -2,6 +2,8 @@
 
 > Canon: C-1, C-5, C-6 · v1.0 · 2026-07-11 · Status: direction ratified, final artwork pending a design sprint
 
+> **Superseded 2026-09-28.** The shipped mark is the DA monogram: a gold tile with a slash that falls in front of the D and doubles as the A's left leg. It is not "The Beam" below. The final artwork, the hand-drawn 16px and 24px versions, the "strike" motion logo, the Hindi lockup and the print files are in [`docs/brand/kit/`](brand/kit/index.html), with their validation in `docs/brand/kit/VALIDATION.json`. This document is kept as the record of the directions that were explored.
+
 ## Requirements
 
 The mark must: work at 16px (favicon) and 40ft (projector); read in Ink-on-Chalk, Chalk-on-Ink, and Volt contexts; survive one-color print; feel athletic *and* financial; avoid gavel clichés (every competitor uses a gavel) and casino iconography.

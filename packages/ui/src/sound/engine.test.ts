@@ -71,7 +71,7 @@ describe("sound engine", () => {
       started.length = 0;
       engine.play(cue);
       expect(started.length, cue).toBeGreaterThan(0);
-      if (cue === "sold") expect(started).toContain("noise");
+      if (cue === "sold" || cue === "sting") expect(started).toContain("noise");
     }
   });
 
