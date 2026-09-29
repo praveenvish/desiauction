@@ -66,14 +66,27 @@ function TabLink({ tab, children }: { tab: string; children: string }) {
   );
 }
 
+/** A team's place in the season table: 1-based position, points, played. */
+export type TeamStanding = Readonly<
+  Record<string, { position: number; points: number; played: number }>
+>;
+
+function ordinal(n: number): string {
+  const tail = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${String(n)}${tail}`;
+}
+
 export function OverviewDashboard({
   slug,
   dashboard,
   appointments,
   idleHint,
+  standing,
 }: {
   slug: string;
   dashboard: AuctionDashboard;
+  /** Each team's place in the table, once a match has been played. */
+  standing?: TeamStanding;
   appointments: AppointmentsPanelView | null;
   idleHint: string;
 }) {
@@ -759,6 +772,7 @@ export function OverviewDashboard({
           <ul className="dash-teams">
             {paddles.map((paddle) => {
               const held = heldBy.get(paddle.paddleNumber);
+              const place = standing?.[paddle.teamId];
               const used =
                 paddle.purseTotal !== undefined &&
                 paddle.spent !== undefined &&
@@ -777,6 +791,15 @@ export function OverviewDashboard({
                             went under the hammer, so this is not the squad. */}
                         {held !== undefined ? ` · ${String(held.squadSize)} bought` : ""}
                       </span>
+                      {/* HOW THE NIGHT'S SPENDING IS DOING (census 18): the
+                          results page was an archive that never changed once
+                          the season began; the table now sits by the spend. */}
+                      {place !== undefined ? (
+                        <span className="dash-team-standing" data-testid="auction-team-standing">
+                          {ordinal(place.position)} · {String(place.points)}{" "}
+                          {place.points === 1 ? "pt" : "pts"} in the table
+                        </span>
+                      ) : null}
                     </span>
                     {used !== null ? (
                       <span
