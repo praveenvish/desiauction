@@ -14,6 +14,7 @@ import {
 import type { LobbyParticipantRow } from "../../../../server/competition/results";
 import { TeamCrest } from "../_tabs/team-crest";
 import { suggestedOutcome, type ModelResult } from "./schedule-model";
+import "./result-form.css";
 
 /**
  * THE SCORE, WHERE THE MATCH IS. Recording a result used to be a worklist card
@@ -28,6 +29,18 @@ import { suggestedOutcome, type ModelResult } from "./schedule-model";
  */
 
 type Fixture = ScheduleView["rows"][number];
+/** What the duel form reads of a match — so the Today list can host it too. */
+type DuelFixture = Pick<
+  Fixture,
+  | "id"
+  | "status"
+  | "homeTeamName"
+  | "awayTeamName"
+  | "homeTeamShort"
+  | "awayTeamShort"
+  | "homeTeamColor"
+  | "awayTeamColor"
+>;
 type ScoreFields = ScheduleView["scoreFields"];
 
 const OUTCOMES = (home: string, away: string) => [
@@ -127,13 +140,21 @@ export function DuelResultForm({
   result,
   scoreFields,
   next = null,
+  overdue = false,
 }: {
   slug: string;
-  fixture: Fixture;
+  fixture: DuelFixture;
   result: ModelResult | undefined;
   scoreFields: ScoreFields;
   /** Opened after "save and finish" when more results are owed. */
   next?: NextOwed | null;
+  /**
+   * A match whose day has passed (the Today list's "Result due"). It is over,
+   * so the one step is "save and finish" — and a match never started on the
+   * app is started first, rather than sending the organizer to press Start on
+   * a game played yesterday.
+   */
+  overdue?: boolean;
 }) {
   const homeName = fixture.homeTeamName ?? "Home";
   const awayName = fixture.awayTeamName ?? "Away";
@@ -150,6 +171,7 @@ export function DuelResultForm({
   const { run, busy } = useFinish(slug, next);
   const primary = scoreFields[0]?.key ?? "";
   const live = fixture.status === "in_progress";
+  const startFirst = overdue && fixture.status === "published";
 
   // Until the scorer picks it, the outcome is whatever the score says.
   const shown = outcomeTouched
@@ -158,13 +180,18 @@ export function DuelResultForm({
 
   const save = (finish: boolean) =>
     run(
-      () =>
-        recordResultAction(slug, fixture.id, {
+      async () => {
+        if (startFirst) {
+          const started = await fixtureLifecycleAction(slug, fixture.id, "start");
+          if (!started.ok) return started;
+        }
+        return recordResultAction(slug, fixture.id, {
           outcome: shown,
           home,
           away,
           method,
-        }),
+        });
+      },
       fixture.id,
       finish,
       { recorded: "Result recorded", amended: "Result amended" },
@@ -246,7 +273,7 @@ export function DuelResultForm({
         />
       </details>
       <div className="mx-result-go">
-        {live ? (
+        {live || overdue ? (
           <>
             <Button
               size="touch"
@@ -258,16 +285,18 @@ export function DuelResultForm({
               <IconCheck size={18} aria-hidden />
               Save result and finish match
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              loading={busy}
-              disabled={shown === ""}
-              onClick={() => void save(false)}
-              data-testid="result-submit"
-            >
-              Save score, still playing
-            </Button>
+            {overdue ? null : (
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={busy}
+                disabled={shown === ""}
+                onClick={() => void save(false)}
+                data-testid="result-submit"
+              >
+                Save score, still playing
+              </Button>
+            )}
           </>
         ) : (
           <Button

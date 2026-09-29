@@ -1,6 +1,7 @@
 "use client";
 
 import { CrestImage } from "../../../../components/team/crest-image";
+import "./team-crest.css";
 
 /**
  * A team's tile: its uploaded crest, or its initials on a wash of its own

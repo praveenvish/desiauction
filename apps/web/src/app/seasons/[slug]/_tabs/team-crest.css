@@ -1,0 +1,45 @@
+/* ---- Team tile: the crest, or the team's initials on its own colour ---- */
+
+.st-crest {
+  --team: var(--text-muted);
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  /* The TeamChip formula: a wash of the team's colour with its initials in a
+     deepened version of it — legible whatever colour a club picked. */
+  background: color-mix(in srgb, var(--team) 16%, var(--surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--team) 30%, transparent);
+  color: color-mix(in srgb, var(--team) 55%, var(--text-heading));
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.st-crest[data-size="lg"] {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm-size);
+}
+
+.st-crest[data-size="xl"] {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-md-size);
+}
+
+.st-crest img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.st-crest[data-logo="true"] {
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
