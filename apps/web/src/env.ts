@@ -696,6 +696,16 @@ const productionSchema = envSchema
     message:
       "SENTRY_DSN must be set in production so errors are captured (a missing DSN is silent)",
     path: ["SENTRY_DSN"],
+  })
+  // The engine has refused this since the go-live gate; the web tier only had
+  // preflight's word for it. At 0 no forwarded address is trusted, so there is
+  // no client address at all behind the proxy — and every per-address limit
+  // (sign-in codes above all) is skipped without a word, because the code that
+  // applies them reads "no address" as "nothing to limit".
+  .refine((v) => !serving(v) || v.TRUSTED_PROXY_COUNT >= 1, {
+    message:
+      "TRUSTED_PROXY_COUNT must be at least 1 in production — behind the proxy, 0 means no client address, and every per-address limit is silently skipped",
+    path: ["TRUSTED_PROXY_COUNT"],
   });
 
 export type Env = z.infer<typeof envSchema>;

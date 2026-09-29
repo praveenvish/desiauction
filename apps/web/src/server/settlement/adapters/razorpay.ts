@@ -236,11 +236,21 @@ function entityFor(
   return wrapper === null ? null : obj(wrapper["entity"]);
 }
 
+/**
+ * A ceiling on waiting for the gateway. `createOrder` is called from inside the
+ * settlement flow, so a provider that accepted the connection and then said
+ * nothing held the organizer's action — and the database transaction around it
+ * — for as long as the socket lived. Every other provider call in the product
+ * has carried a deadline since PA-1 (messaging/provider-fetch); this one was
+ * missed because the gateway is not switched on yet.
+ */
+const GATEWAY_TIMEOUT_MS = 10_000;
+
 async function defaultTransport(
   url: string,
   init: { method: string; headers: Record<string, string>; body?: string },
 ): Promise<HttpResponse> {
-  const response = await fetch(url, init);
+  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(GATEWAY_TIMEOUT_MS) });
   return { status: response.status, body: await response.text() };
 }
 

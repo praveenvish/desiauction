@@ -18,13 +18,32 @@ import { env } from "../../env";
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * How long the database gets to answer. A probe that waits for ever is not a
+ * probe: with the pool exhausted, `select 1` simply queued, the caller's own
+ * timeout fired first, and "busy" was reported as "down". Two seconds is far
+ * above a healthy answer (a millisecond or two) and inside every caller's
+ * patience (the container check allows five).
+ */
+const DB_ANSWER_MS = 2_000;
+
 export async function GET(): Promise<NextResponse<HealthResponse>> {
   let dbOk = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await dbHandle.sql`select 1`;
+    await Promise.race([
+      dbHandle.sql`select 1`,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error("readyz: database did not answer in time"));
+        }, DB_ANSWER_MS);
+      }),
+    ]);
     dbOk = true;
   } catch {
     dbOk = false;
+  } finally {
+    clearTimeout(timer);
   }
   // PRR P1-1: surface the rehearsal escape so a monitor (or a human) can see at
   // a glance that an instance is running with development adapters. It is a

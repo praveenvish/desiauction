@@ -7,7 +7,7 @@ import {
   teams,
 } from "@desiauction/db";
 import { formattedNumber } from "@desiauction/financial-operations";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { systemDb } from "../db";
 import { storage } from "../media";
@@ -52,10 +52,42 @@ export interface MyDocument {
 }
 
 export async function myDocuments(personId: string): Promise<MyDocument[]> {
+  /*
+   * THEIR teams — and not the ones they were removed from (PRR 2026-09-29).
+   *
+   * A paddle row is for ever: it is auction history, and removing an owner
+   * revokes their GRANT, not their paddle. So this read, keyed on paddles
+   * alone, kept showing a removed owner every receipt issued to the team they
+   * no longer own — on the pool that bypasses row security, so nothing behind
+   * it would have stopped it either.
+   *
+   * A revoked grant with no active one beside it is what "removed" looks like.
+   * A paddle that was merely RELEASED (handed to a co-owner for the night) is
+   * still that person's team, and a paddle issued with no grant at all (the
+   * organizer bidding for an absent owner, DA-02) is unaffected.
+   */
   const myTeams = await systemDb
     .selectDistinct({ teamId: paddles.teamId })
     .from(paddles)
-    .where(eq(paddles.personId, personId));
+    .where(
+      and(
+        eq(paddles.personId, personId),
+        sql`not (
+          exists (
+            select 1 from paddle_grants g
+             where g.person_id = ${personId}
+               and g.team_id = ${paddles.teamId}
+               and g.revoked_at is not null
+          )
+          and not exists (
+            select 1 from paddle_grants g
+             where g.person_id = ${personId}
+               and g.team_id = ${paddles.teamId}
+               and g.revoked_at is null
+          )
+        )`,
+      ),
+    );
   const teamIds = myTeams.map((row) => row.teamId);
   if (teamIds.length === 0) {
     return [];
