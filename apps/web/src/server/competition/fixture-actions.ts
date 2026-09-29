@@ -89,6 +89,7 @@ import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
 import { DAYS_SHOWN, focusStart, weekStrip, type WeekStrip } from "./schedule-week";
 import { formOf, nextOf, type FormLetter, type TeamNext } from "./standings-form";
 import { lineupFixtures, lineupSides, type LineupSide } from "./lineups";
+import { lineupSidesFor } from "./lineup-access";
 import { ownedTeamIdsOn } from "./team-ownership";
 import { lineupAnnounceStates, type LineupAnnounceState } from "./lineup-announce";
 import {
@@ -948,15 +949,16 @@ export async function scheduleView(
         lineupFixture !== undefined &&
         picked.status !== "cancelled"
       ) {
-        const sides = (await lineupSides(db, competition.id, lineupFixture))
-          .filter((side) => canManage || ownedTeams.includes(side.teamId))
-          .map((side) => ({
-            ...side,
-            players: side.players.map((player) => ({
-              ...player,
-              role: player.role === null ? null : roleLabelIn(pack, player.role),
-            })),
-          }));
+        const sides = lineupSidesFor(await lineupSides(db, competition.id, lineupFixture), {
+          canManage,
+          ownedTeams,
+        }).map((side) => ({
+          ...side,
+          players: side.players.map((player) => ({
+            ...player,
+            role: player.role === null ? null : roleLabelIn(pack, player.role),
+          })),
+        }));
         selected = {
           fixture: picked,
           sides,
