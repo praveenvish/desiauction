@@ -185,6 +185,65 @@ describe("Razorpay adapter — webhook verification (the trusted-envelope core)"
     });
   });
 
+  // The shape the provider sends for a refund raised from its dashboard: the
+  // refund's own notes are empty (an empty LIST, not an object), and the
+  // payment it refunds rides along in the same signed body.
+  const refundBody = (refund: Record<string, unknown>, paid: Record<string, unknown>): string =>
+    JSON.stringify({
+      event: "refund.processed",
+      contains: ["refund", "payment"],
+      created_at: Math.floor(NOW / 1000),
+      payload: {
+        refund: {
+          entity: { id: "rfnd_1", amount: 5_000, currency: "INR", notes: [], ...refund },
+        },
+        payment: {
+          entity: {
+            id: "pay_1",
+            order_id: "order_1",
+            amount: 20_000,
+            currency: "INR",
+            notes: { paymentId: PAYMENT, orgId: ORG },
+            ...paid,
+          },
+        },
+      },
+    });
+
+  it("finds a refund's payment through the payment it refunds, when its own notes are empty", () => {
+    const body = refundBody({ payment_id: "pay_1" }, {});
+    const result = adapter.verifyWebhook(body, sign(body), NOW);
+    expect(result).toMatchObject({
+      ok: true,
+      envelope: {
+        kind: "refunded",
+        paymentId: PAYMENT,
+        orgId: ORG,
+        providerRef: "rfnd_1",
+        // What the pin check compares with the provider payment we recorded.
+        orderRef: "pay_1",
+        amount: 5_000,
+      },
+    });
+  });
+
+  it("REJECTS a refund whose body carries a DIFFERENT payment than the one it refunds", () => {
+    const body = refundBody({ payment_id: "pay_other" }, {});
+    expect(adapter.verifyWebhook(body, sign(body), NOW)).toEqual({
+      ok: false,
+      reason: "malformed_envelope",
+    });
+  });
+
+  it("prefers the refund's own anchor when it has one", () => {
+    const body = refundBody(
+      { payment_id: "pay_1", notes: { paymentId: PAYMENT, orgId: ORG } },
+      { notes: { paymentId: "someone-else", orgId: "another-org" } },
+    );
+    const result = adapter.verifyWebhook(body, sign(body), NOW);
+    expect(result).toMatchObject({ ok: true, envelope: { paymentId: PAYMENT, orgId: ORG } });
+  });
+
   it("REJECTS an envelope with no trusted anchor (missing notes)", () => {
     const body = JSON.stringify({
       event: "payment.captured",

@@ -869,6 +869,89 @@ describe("M-IP5-2 · Wallet projections & audit", () => {
     expect((captureAudit?.meta as { source?: string }).source).toBe("webhook:razorpay");
   });
 
+  it("ACKNOWLEDGES a genuine event it does not act on — 200, so the provider keeps delivering", async () => {
+    const body = JSON.stringify({
+      event: "order.paid",
+      created_at: Math.floor(NOW / 1000),
+      payload: {},
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toEqual({ ok: false, status: 200, reason: "unhandled_event" });
+    // Forged, the same body is still a 401: the kind is only looked at after
+    // the signature.
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: "0".repeat(64), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 401 });
+  });
+
+  // A dispute arrives as the provider's PAYMENT entity: its own id is the
+  // provider payment, and `order_id` is the order that payment paid. These two
+  // are the shape Razorpay sends — the first version of the order binding
+  // compared the wrong pair and refused every one of them.
+  it("REFUSES a dispute about a DIFFERENT provider payment that names this one — 409", async () => {
+    const body = webhookBody(lionsPaymentId, "payment.dispute.created", {
+      id: "pay_somebody_else",
+      order_id: await pinnedOrder(lionsPaymentId),
+      amount: 2_000_000,
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({
+      ok: false,
+      status: 409,
+      reason: "envelope_mismatch",
+      check: "provider_payment",
+    });
+  });
+
+  it("REFUSES a dispute on a DIFFERENT order that names this payment — 409", async () => {
+    const body = webhookBody(lionsPaymentId, "payment.dispute.created", {
+      id: "pay_lions",
+      order_id: "order_somebody_else",
+      amount: 2_000_000,
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 409, reason: "envelope_mismatch", check: "order" });
+  });
+
+  it("ACCEPTS a genuine dispute: the payment entity, its own order, its own provider id", async () => {
+    const before = (await deps.store.loadStream("payment", lionsPaymentId)).length;
+    const body = webhookBody(lionsPaymentId, "payment.dispute.created", {
+      id: "pay_lions",
+      order_id: await pinnedOrder(lionsPaymentId),
+      amount: 2_000_000,
+    });
+    const result = await handleRazorpayWebhook(
+      deps,
+      { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+      passThroughTenant,
+    );
+    // Past every envelope check AND recorded: the chargeback is on the books.
+    expect(result).toMatchObject({ ok: true, ack: { ok: true } });
+    const after = await deps.store.loadStream("payment", lionsPaymentId);
+    expect(after.length).toBe(before + 1);
+    expect(after.at(-1)?.type).toBe("PaymentDisputed");
+    expect((await deps.store.loadPayment(lionsPaymentId))?.status).toBe("disputed");
+  });
+
   it("RLS: the payments table blocks cross-tenant reads and writes", async () => {
     const role = `rls_pay_${RUN}`;
     await handle.sql.unsafe(`drop role if exists ${role}`);

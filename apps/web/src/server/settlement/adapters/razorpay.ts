@@ -146,7 +146,7 @@ export function createRazorpayAdapter(config: RazorpayConfig): PaymentGatewayPor
       if (entity === null) {
         return { ok: false, reason: "no_entity" };
       }
-      const notes = obj(entity["notes"]);
+      const notes = anchorOf(payload, kind, entity);
       const paymentId = notes === null ? null : str(notes, "paymentId");
       const orgId = notes === null ? null : str(notes, "orgId");
       const providerRef = str(entity, "id");
@@ -221,6 +221,42 @@ const KIND_OF: Record<string, WebhookEnvelope["kind"]> = {
   "refund.created": "refunded",
   "payment.dispute.created": "disputed",
 };
+
+/**
+ * WHERE THE TRUSTED ANCHOR IS, FOR THIS KIND OF EVENT (PRR 2026-09-29).
+ *
+ * The anchor (`paymentId`, `orgId`) is written into the notes when the order
+ * is created, and travels on the provider's PAYMENT entity. A REFUND entity
+ * has notes of its own — whatever was typed when the refund was raised, which
+ * from the provider's dashboard is nothing — so reading the anchor off it
+ * refused every refund as malformed, and the refund never reached the books.
+ *
+ * A refund event carries the payment it refunds in the same signed body. The
+ * anchor is read from there, and only when that payment is the one the refund
+ * names: two entities in one body that do not refer to each other are not
+ * evidence about each other.
+ *
+ * Written against the provider's documented payload. NOT YET VERIFIED against
+ * a live or test-mode delivery: that is a go-live item (PRODUCTION_CHECKLIST).
+ */
+function anchorOf(
+  payload: Readonly<Record<string, unknown>>,
+  kind: WebhookEnvelope["kind"],
+  entity: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> | null {
+  const own = obj(entity["notes"]);
+  if (kind !== "refunded" || (own !== null && str(own, "paymentId") !== null)) {
+    return own;
+  }
+  const container = obj(payload["payload"]);
+  const wrapper = container === null ? null : obj(container["payment"]);
+  const paid = wrapper === null ? null : obj(wrapper["entity"]);
+  if (paid === null) {
+    return own;
+  }
+  const refunds = str(entity, "payment_id");
+  return refunds !== null && refunds === str(paid, "id") ? obj(paid["notes"]) : own;
+}
 
 /** Razorpay nests the entity under `payload.<entity>.entity`. */
 function entityFor(
