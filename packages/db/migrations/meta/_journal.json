@@ -680,6 +680,13 @@
       "when": 1792080000000,
       "tag": "0097_push_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792166400000,
+      "tag": "0098_service_roles_identity_reads",
+      "breakpoints": true
     }
   ]
 }

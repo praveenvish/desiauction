@@ -270,4 +270,14 @@ revoke all on notification_templates from desiauction_engine;
 revoke all on provider_template_mappings, provider_template_status, provider_template_syncs
   from desiauction_engine, desiauction_runner;
 
+-- 0098: identity. Session hashes, sign-in code digests, passkeys, push keys
+-- and the mail ledger are read by the web tier alone; the engine holds the
+-- secret the code digests are keyed with, which is one more reason it must not
+-- be able to read them. `people`, `consent_records` and
+-- `notification_preferences` stay: the runner addresses receipts and asks the
+-- consent gate. `grants:verify` pins it (IDENTITY_TABLES).
+revoke all on sessions, otp_codes, otp_inbox, passkey_credentials,
+  email_verifications, push_subscriptions, email_sends
+  from desiauction_engine, desiauction_runner;
+
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'
