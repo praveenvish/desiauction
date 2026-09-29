@@ -12,6 +12,7 @@ import {
   tournaments,
   type Db,
 } from "@desiauction/db";
+import { foldMatchSaves } from "../../lib/event-names";
 import type { MoneyUnit } from "@desiauction/core";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
@@ -307,7 +308,7 @@ function foldActivity(
     }
     (domain === "finops" ? finance : organizer).push(row);
   }
-  const kept: HomeActivityRow[] = organizer
+  const kept: HomeActivityRow[] = foldMatchSaves(organizer)
     .slice(0, finance.length > 0 ? ACTIVITY_ROWS - 1 : ACTIVITY_ROWS)
     .map((row) => ({
       id: row.id,
