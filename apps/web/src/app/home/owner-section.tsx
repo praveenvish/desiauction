@@ -10,6 +10,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
+import { lineupWords } from "../../lib/lineup-words";
 import { moneyFormat } from "../../lib/money";
 import { planView } from "../../server/auction/owner-plan-actions";
 import { publicTeam, teamSlugOf } from "../../server/competition/public";
@@ -559,6 +560,7 @@ function NextStrip({ season, today }: { season: TeamSeason; today: string }) {
       <span className="ow-next-meta">
         {[
           next.groundName,
+          next.live ? null : lineupWords(next.lineup),
           rest > 0 ? `${String(rest)} more to come` : null,
           season.awaiting.length > 0 ? `${String(season.awaiting.length)} awaiting a result` : null,
         ]

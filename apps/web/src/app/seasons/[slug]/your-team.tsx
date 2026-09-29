@@ -1,6 +1,7 @@
 import { ButtonLink, IconArrowRight } from "@desiauction/ui";
 
 import { formatWallTime } from "../../../lib/format-date";
+import { lineupWords } from "../../../lib/lineup-words";
 import type { TeamSeason } from "../../../server/player/career";
 import { TeamCrest } from "./_tabs/team-crest";
 import { relativeDay, wallDay } from "./fixtures/schedule-model";
@@ -51,6 +52,7 @@ export function YourTeam({
               {next.live ? "" : `${whenOf(next.kickoffAt, today)} `}vs {next.opponentName}
             </strong>
             {next.groundName !== null ? ` · ${next.groundName}` : ""}
+            {next.live ? "" : ` · ${lineupWords(next.lineup)}`}
             {/* Said here as on owner home and /me (census 12). */}
             {owed > 0
               ? ` · ${String(owed)} ${owed === 1 ? "result" : "results"} still to come`
