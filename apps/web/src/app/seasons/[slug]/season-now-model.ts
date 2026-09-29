@@ -46,11 +46,17 @@ export function nowRows<F extends NowFixture>(
     .filter((row) => UPCOMING.has(row.status) && (row.kickoffAt ?? "9999") >= today)
     .slice(0, 2);
   const last = byKickoff.filter((row) => row.status === "completed" && hasResult(row.id)).slice(-1);
+  // What is on and what is next, then the past — owed and played together,
+  // newest first — so one date's rows are never split by state (census 15:
+  // "Sun 27 Sep … Result due" sat above that day's earlier result).
+  const past = [
+    ...due.map((fixture) => ({ fixture, state: "due" as const })),
+    ...last.map((fixture) => ({ fixture, state: "result" as const })),
+  ].sort((a, b) => (b.fixture.kickoffAt ?? "").localeCompare(a.fixture.kickoffAt ?? ""));
   return [
     ...live.map((fixture) => ({ fixture, state: "live" as const })),
-    ...due.map((fixture) => ({ fixture, state: "due" as const })),
     ...next.map((fixture) => ({ fixture, state: "next" as const })),
-    ...last.map((fixture) => ({ fixture, state: "result" as const })),
+    ...past,
   ];
 }
 

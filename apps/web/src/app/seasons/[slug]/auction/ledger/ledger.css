@@ -114,7 +114,7 @@
 }
 
 .lp-chip-n {
-  opacity: 0.75;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -350,4 +350,8 @@
   .lp-when {
     width: 4rem;
   }
+}
+
+.lp-chip[aria-pressed="true"] .lp-chip-n {
+  color: inherit;
 }
