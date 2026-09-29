@@ -6,11 +6,10 @@ import { redirect } from "next/navigation";
 
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
+import { mayPickLineup } from "./lineup-access";
 import { saveLineup } from "./lineups";
-import { ownTeamsIn } from "./team-ownership";
 import { announceLineup } from "./lineup-announce";
 import { resolveMemberCompetition } from "./resolve";
-import { personCanCompetition } from "../request-cache";
 
 /**
  * Lineups are an organizer's record, gated on `fixture.manage` — the same key
@@ -32,12 +31,12 @@ async function gate(slug: string, teamId: string) {
   if (competition === null) {
     return null;
   }
-  const scope = { orgId: competition.orgId, competitionId: competition.id };
-  if (await personCanCompetition(session.personId, scope, "fixture.manage")) {
-    return { personId: session.personId, competition };
-  }
-  const owned = await ownTeamsIn(session.personId, competition);
-  return owned.includes(teamId) ? { personId: session.personId, competition } : null;
+  const allowed = await withTenantDb(
+    dbHandle,
+    { personId: session.personId, orgId: competition.orgId },
+    (db) => mayPickLineup(db, session.personId, competition, teamId),
+  );
+  return allowed ? { personId: session.personId, competition } : null;
 }
 
 const MAX_LINEUP = 60;
