@@ -414,6 +414,25 @@ empty database.
   real payments to a terminal failed state, so a wrong threshold destroys valid
   records. Not shipped blind.
 
+## 12 · Production-readiness audit (2026-09-29)
+
+Full report: `docs/audits/PRR-2026-09-29/REPORT.md`.
+
+- ☐E **Count the rows that break the rules the database does not enforce yet.**
+  29 foreign keys are `NOT VALID` and about two dozen relationship columns have
+  none. Enforcing either refuses the deploy if one existing row disagrees, so
+  count first. Read-only, safe during an auction:
+
+  ```bash
+  docker compose exec -T db psql -U postgres -d desiauction -X -q -f - < ops/db/check-integrity.sql
+  ```
+
+  Every line should read `ok` / `0`. Only then write the migration that
+  validates or adds the constraints. Measured on the test database only.
+- ☑ **The engine's migration set is frozen.** It shares the platform's
+  bookkeeping table, so anything added there would be skipped everywhere.
+  `packages/db/scripts/check-journal.mjs` now fails CI if it grows.
+
 ## Go-live gate
 
 Every ☐ above closed, plus: production smoke (OTP login → auction → payment
