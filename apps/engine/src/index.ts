@@ -78,6 +78,7 @@ const { server, hub } = buildServer({
   allowedOrigins: env.ENGINE_ALLOWED_ORIGINS,
   maxSocketsPerRoom: env.WS_MAX_SOCKETS_PER_ROOM,
   maxSocketsPerIp: env.WS_MAX_SOCKETS_PER_IP,
+  compressFrames: env.WS_COMPRESSION === "on",
   trustedProxies: env.TRUSTED_PROXY_COUNT,
 });
 

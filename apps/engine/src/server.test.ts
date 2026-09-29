@@ -298,6 +298,89 @@ describe("engine transport", () => {
     expect(await closeCode).toBe(1001);
   });
 
+  /**
+   * One spectator, one broadcast: what arrived, what was negotiated, and how
+   * many bytes the broadcast took on the TCP connection.
+   */
+  async function spectateOnce(
+    compressFrames: boolean | undefined,
+    clientOffers: boolean,
+    serialized: string,
+  ): Promise<{ extensions: string; frame: string; wireBytes: number }> {
+    built = buildServer({
+      logger: silentLogger,
+      version: "test",
+      checkDb: () => Promise.resolve(true),
+      engine: stubEngine(),
+      engineSecret: "test-secret-123",
+      nodeEnv: "test",
+      ...(compressFrames === undefined ? {} : { compressFrames }),
+    });
+    await built.server.listen({ port: 0, host: "127.0.0.1" });
+    const { port } = built.server.server.address() as AddressInfo;
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${String(port)}/ws?auction=a1&ticket=${wsTicket("a1", "test-secret-123")}`,
+      { perMessageDeflate: clientOffers },
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.once("open", () => {
+        resolve();
+      });
+      ws.once("error", reject);
+    });
+    const tcp = (ws as unknown as { _socket: { bytesRead: number } })._socket;
+    const before = tcp.bytesRead;
+    const arrived = new Promise<string>((resolve) => {
+      ws.once("message", (raw: Buffer) => {
+        resolve(raw.toString("utf8"));
+      });
+    });
+    built.hub.broadcast("a1", serialized, 7);
+    const frame = await arrived;
+    const result = { extensions: ws.extensions, frame, wireBytes: tcp.bytesRead - before };
+    ws.terminate();
+    return result;
+  }
+
+  /** Shaped like a night's snapshot: long, and repetitive the way JSON is. */
+  const BIG_SNAPSHOT = JSON.stringify({
+    queue: Array.from({ length: 250 }, (_, i) => ({
+      lotId: `lot-${String(i).padStart(4, "0")}`,
+      name: `Player ${String(i)}`,
+      role: "batter",
+      basePrice: 2_000_000,
+      status: "queued",
+    })),
+  });
+
+  it("frames are NOT compressed unless the engine is told to (the default changes nothing)", async () => {
+    const plain = await spectateOnce(undefined, true, BIG_SNAPSHOT);
+    expect(plain.extensions).toBe("");
+    expect(plain.wireBytes).toBeGreaterThan(BIG_SNAPSHOT.length);
+    expect((JSON.parse(plain.frame) as { snapshot: unknown }).snapshot).toEqual(
+      JSON.parse(BIG_SNAPSHOT),
+    );
+  });
+
+  it("with compression on, the same frame arrives intact in a fraction of the bytes", async () => {
+    const packed = await spectateOnce(true, true, BIG_SNAPSHOT);
+    expect(packed.extensions).toContain("permessage-deflate");
+    const frame = JSON.parse(packed.frame) as { kind: string; version: number; snapshot: unknown };
+    expect(frame.kind).toBe("snapshot");
+    expect(frame.version).toBe(7);
+    expect(frame.snapshot).toEqual(JSON.parse(BIG_SNAPSHOT));
+    expect(packed.wireBytes).toBeLessThan(BIG_SNAPSHOT.length / 4);
+  });
+
+  it("with compression on, a client that never offered it is still served, uncompressed", async () => {
+    const plain = await spectateOnce(true, false, BIG_SNAPSHOT);
+    expect(plain.extensions).toBe("");
+    expect((JSON.parse(plain.frame) as { snapshot: unknown }).snapshot).toEqual(
+      JSON.parse(BIG_SNAPSHOT),
+    );
+    expect(plain.wireBytes).toBeGreaterThan(BIG_SNAPSHOT.length);
+  });
+
   it("an unticketed /ws upgrade is refused", async () => {
     built = makeServer(true);
     await built.server.listen({ port: 0, host: "127.0.0.1" });

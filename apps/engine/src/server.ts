@@ -31,6 +31,8 @@ export interface ServerDeps {
   allowedOrigins?: string[];
   maxSocketsPerRoom?: number;
   maxSocketsPerIp?: number;
+  /** Offer permessage-deflate to clients. Default false (env WS_COMPRESSION). */
+  compressFrames?: boolean;
   /** Proxy hops in front (Caddy = 1); the per-client cap keys on the address they forwarded. */
   trustedProxies?: number;
 }
@@ -41,6 +43,26 @@ export interface ServerDeps {
  * leaked ticket stops working within two windows) with no wire-format change —
  * the URL still carries a single hex string. MIN-2 remediation.
  */
+/**
+ * HOW SNAPSHOT FRAMES ARE COMPRESSED, WHEN THEY ARE (WS_COMPRESSION=on).
+ *
+ * NO CONTEXT TAKEOVER, both ways: each frame is compressed on its own, so a
+ * socket owns no zlib window between frames. Keeping one would compress a
+ * little better and cost about 300 KB of memory per spectator for as long as
+ * they watch — the fragmentation `ws` warns about, multiplied by the room.
+ *
+ * LEVEL 1. A snapshot is repetitive JSON: the fastest level already takes
+ * most of what there is to take, and the engine has one thread to do the
+ * rest of its work on. Heartbeats (under the threshold) go out as they are.
+ */
+const FRAME_COMPRESSION = {
+  serverNoContextTakeover: true,
+  clientNoContextTakeover: true,
+  threshold: 1024,
+  zlibDeflateOptions: { level: 1 },
+  concurrencyLimit: 8,
+} as const;
+
 /** How long live sockets get to say goodbye on shutdown before they are cut. */
 const CLOSE_GRACE_MS = 2_000;
 
@@ -470,7 +492,11 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
   // the socket is receive-only. `ws` defaults to a 100 MiB ceiling, which it
   // buffers before telling anyone — that is a memory-exhaustion budget handed
   // to any holder of a ticket.
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 });
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: 4 * 1024,
+    perMessageDeflate: deps.compressFrames === true ? FRAME_COMPRESSION : false,
+  });
   const allowedOrigins = deps.allowedOrigins ?? [];
   const maxPerRoom = deps.maxSocketsPerRoom ?? 2_000;
   const maxPerIp = deps.maxSocketsPerIp ?? 50;

@@ -55,6 +55,7 @@ const SPECTATOR_SCALES = [50, 100, 250, 500, 1000];
 const TEAMS = 10;
 /** How long one bid may take to reach every spectator before the run fails. */
 const CONVERGE_TIMEOUT_MS = 15_000;
+const COMPRESS = process.env["PERF_WS_COMPRESSION"] === "on";
 
 // No expiry mid-run: the timer authority is measured in perf-live, not here.
 const CONFIG: AuctionConfig = {
@@ -63,6 +64,17 @@ const CONFIG: AuctionConfig = {
   squadMax: 3000, // scale runs must never hit the squad guard
   pursePerTeam: DEFAULT_AUCTION_CONFIG.pursePerTeam,
 };
+
+/** Bytes that have arrived on these sockets' TCP connections so far. */
+function wireBytes(sockets: readonly WebSocket[]): number {
+  let total = 0;
+  for (const ws of sockets) {
+    // `_socket` is the underlying net.Socket; `ws` has no public byte counter.
+    const tcp = (ws as unknown as { _socket?: { bytesRead?: number } })._socket;
+    total += tcp?.bytesRead ?? 0;
+  }
+  return total;
+}
 
 function stats(samples: number[]): { median: number; p95: number } {
   const sorted = [...samples].sort((a, b) => a - b);
@@ -443,6 +455,10 @@ async function runSpectatorScale(): Promise<void> {
     // nothing past 50 and exited 1. perf-live carries the same override; this
     // measures fan-out, and the cap has its own tests (server.test.ts).
     maxSocketsPerIp: 10_000,
+    // PERF_WS_COMPRESSION=on measures the same night with frames compressed
+    // (the engine's WS_COMPRESSION=on). The `ws` client offers
+    // permessage-deflate by default, as every browser does.
+    compressFrames: COMPRESS,
   });
   hubRef = hub;
   await server.listen({ host: "127.0.0.1", port: 0 });
@@ -537,7 +553,17 @@ async function runSpectatorScale(): Promise<void> {
 
     // FAN-OUT: one real bid → every spectator receives the new snapshot.
     const fanout: number[] = [];
+    // What one bid costs each spectator ON THE WIRE, and this process in CPU.
+    // Bytes are read off the TCP socket, so they are what a phone would be
+    // billed for — after compression, with framing. The CPU figure includes
+    // the simulated clients (they share the process and must inflate what the
+    // engine deflated), so it OVERSTATES the engine's share: read it as a
+    // ceiling, and compare it between the two modes.
+    const wireSamples: number[] = [];
+    const cpuSamples: number[] = [];
     for (let round = 0; round < 5; round++) {
+      const bytesBefore = wireBytes(sockets);
+      const cpuBefore = process.cpuUsage();
       const bidder = s.bidderIds[round % TEAMS] as string;
       const target = engine.snapshotOf(s.auctionId)?.version ?? 0;
       const arrivals: number[] = [];
@@ -584,9 +610,16 @@ async function runSpectatorScale(): Promise<void> {
       );
       await converged;
       fanout.push(Math.max(...arrivals));
+      const cpu = process.cpuUsage(cpuBefore);
+      cpuSamples.push((cpu.user + cpu.system) / 1000);
+      wireSamples.push((wireBytes(sockets) - bytesBefore) / sockets.length / 1024);
     }
     const fan = stats(fanout);
     record(spectators, "bid → ALL spectators converged (last)", fan.median, fan.p95, 5);
+    const wire = stats(wireSamples);
+    record(spectators, "wire KiB per spectator per bid", wire.median, wire.p95, 5);
+    const cpu = stats(cpuSamples);
+    record(spectators, "process CPU ms per bid (engine + clients)", cpu.median, cpu.p95, 5);
   }
 
   for (const ws of sockets) {
