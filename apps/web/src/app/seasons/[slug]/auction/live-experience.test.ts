@@ -2,18 +2,30 @@ import type { AuctionSnapshot } from "@desiauction/core";
 import { describe, expect, it } from "vitest";
 
 import { moneyFormat } from "../../../../lib/money";
-import { foldSnapshot, type FeedState } from "./live-experience";
+import type { ResolvedLot } from "../../../../server/auction/live-summary";
+import { foldSnapshot, initialFeed, reconcileFeed, type FeedState } from "./live-experience";
 
 const INR = moneyFormat("inr");
 
-const EMPTY: FeedState = {
-  resolved: [],
-  events: [],
-  folded: null,
-  seenSeqs: new Set(),
-  lastStatus: null,
-  recoveries: 0,
-};
+const EMPTY: FeedState = initialFeed([]);
+
+/** A resolved lot as the SERVER lists it: thick, with the ids the socket lacks. */
+function serverRow(partial: Partial<ResolvedLot> & { lotId: string }): ResolvedLot {
+  return {
+    registrationId: `reg-${partial.lotId}`,
+    isCaptain: false,
+    isViceCaptain: false,
+    lotNumber: partial.lotId,
+    seq: 1,
+    playerName: "Asha",
+    role: "batter",
+    status: "sold",
+    soldPrice: 500_000,
+    teamId: "team-falcons",
+    teamName: "Falcons",
+    ...partial,
+  } as ResolvedLot;
+}
 
 /** Only the fields the fold reads; the rest of a snapshot is irrelevant here. */
 function snap(partial: {
@@ -100,5 +112,69 @@ describe("the live feed fold", () => {
       moneyFormat("points"),
     );
     expect(points.events[0]?.detail).toBe("1,250 pts");
+  });
+});
+
+describe("the server's rows, met with the socket's", () => {
+  const sold = { atSeq: 7, lotId: "lot-7", kind: "sold", amount: 500_000 } as const;
+
+  it("a sale seen on the socket has no team id — and gets one from the next server read", () => {
+    let feed = foldSnapshot(EMPTY, snap({ version: 1, lastOutcome: sold }), INR);
+    expect(feed.resolved[0]?.teamId).toBeNull();
+    // The page refreshes its data; the same sale arrives, thick.
+    feed = reconcileFeed(feed, [serverRow({ lotId: "lot-7" })]);
+    expect(feed.resolved).toHaveLength(1);
+    expect(feed.resolved[0]).toMatchObject({
+      lotId: "lot-7",
+      teamId: "team-falcons",
+      registrationId: "reg-lot-7",
+      soldPrice: 500_000,
+    });
+    expect(feed.optimistic.has("lot-7")).toBe(false);
+  });
+
+  it("a render that started before the hammer does not take the sale back off the board", () => {
+    let feed = foldSnapshot(EMPTY, snap({ version: 1, lastOutcome: sold }), INR);
+    // A server read from a moment earlier: it has never heard of lot 7.
+    feed = reconcileFeed(feed, [serverRow({ lotId: "lot-3" })]);
+    expect(feed.resolved.map((row) => row.lotId).sort()).toEqual(["lot-3", "lot-7"]);
+    expect(feed.optimistic.has("lot-7")).toBe(true);
+  });
+
+  it("when the two disagree about a lot, the socket's row stands until the server catches up", () => {
+    // Passed, requeued, and bought on the second round — all in this tab.
+    let feed = foldSnapshot(EMPTY, snap({ version: 1, lastOutcome: sold }), INR);
+    const stale = serverRow({ lotId: "lot-7", status: "unsold", soldPrice: null, teamId: null });
+    feed = reconcileFeed(feed, [stale]);
+    expect(feed.resolved).toHaveLength(1);
+    expect(feed.resolved[0]?.status).toBe("sold");
+    // The server catches up.
+    feed = reconcileFeed(feed, [serverRow({ lotId: "lot-7" })]);
+    expect(feed.resolved[0]).toMatchObject({ status: "sold", teamId: "team-falcons" });
+  });
+
+  it("a row only the server ever listed goes when the server stops listing it", () => {
+    let feed = initialFeed([serverRow({ lotId: "lot-1" }), serverRow({ lotId: "lot-2" })]);
+    feed = reconcileFeed(feed, [serverRow({ lotId: "lot-2" })]);
+    expect(feed.resolved.map((row) => row.lotId)).toEqual(["lot-2"]);
+  });
+
+  it("the same server rows again change nothing, not even the object — new array or not", () => {
+    const feed = initialFeed([serverRow({ lotId: "lot-1" })]);
+    // A caller that rebuilds its list every render hands over a NEW array with
+    // the same contents. Reconciling on that would be a state update in every
+    // render, which is a loop.
+    expect(reconcileFeed(feed, [serverRow({ lotId: "lot-1" })])).toBe(feed);
+  });
+
+  it("an undone sale leaves the board at once", () => {
+    let feed = initialFeed([serverRow({ lotId: "lot-7" })]);
+    feed = foldSnapshot(
+      feed,
+      snap({ version: 2, lastOutcome: { atSeq: 9, lotId: "lot-7", kind: "reopened" } }),
+      INR,
+    );
+    expect(feed.resolved).toEqual([]);
+    expect(feed.events[0]?.kind).toBe("reopened");
   });
 });
