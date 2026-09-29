@@ -164,3 +164,27 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* On a phone the season's name and its door share the first line; the pill
+   and the count go under them (census 14: the door dropped to a line of its
+   own and the card took ~140px for one line of facts). */
+@media (max-width: 719px) {
+  .ot-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .ot-open {
+    min-height: 36px;
+  }
+}
+
+/* On a narrow phone "Enter score" says it: the pill beside it pushed every
+   owed row onto two lines. */
+@media (max-width: 479px) {
+  .ot-jobs li[data-kind="owed"] .ot-due {
+    display: none;
+  }
+}

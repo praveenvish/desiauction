@@ -6,12 +6,13 @@ import {
   IconCheckCircle,
   IconDownload,
   IconLock,
-  type KitTone,
   Notice,
+  Pill,
   PlayerImage,
   Toolbar,
   ToolbarSpacer,
   VisuallyHidden,
+  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
@@ -670,8 +671,9 @@ export default async function ReportsPage({
                         </span>
                         <span>
                           {match.homeName ?? "Lobby"}
-                          {match.awayName !== null ? ` v ${match.awayName}` : ""} · result due
+                          {match.awayName !== null ? ` v ${match.awayName}` : ""}
                         </span>
+                        <Pill tone="amber">Result due</Pill>
                       </li>
                     ))}
                     {play.recent.map((match) => {

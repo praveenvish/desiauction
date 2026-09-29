@@ -151,8 +151,11 @@ export function OrganizerToday({
                   <strong>{sides(fixture)}</strong>
                   <span>
                     {when(fixture.kickoffAt, today)}
-                    {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""} · result due
+                    {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
                   </span>
+                </span>
+                <span className="ot-due">
+                  <Pill tone="amber">Result due</Pill>
                 </span>
                 <ButtonLink
                   href={`${base}/fixtures?match=${fixture.id}`}
