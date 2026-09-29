@@ -1,12 +1,61 @@
 # DESIAUCTION PRODUCTION READINESS REPORT
 
-**Date:** 2026-09-29 · **Audited commit:** `origin/main` @ `e18d3972` (the commit production was deployed from at 09:49 UTC the same day) · **Fix branch:** `audit/prr-2026-09-29` (local, not pushed)
+**Date:** 2026-09-29 · **Audited commit:** `origin/main` @ `e18d3972` (the commit production was deployed from at 09:49 UTC the same day) · **Fix branch:** `audit/prr-2026-09-29` (local, committed, NOT pushed, NOT merged, not tracking `main`)
 
 **Method.** Six independent read-only audits (authentication, authorization and tenancy, database, jobs and integrations, frontend, deploy and recovery) plus a direct review of the auction engine, followed by verification of every finding in code before anything was changed. Every gate the repository has was run on a pristine Postgres 17 with all migrations applied and the four production database roles created. Each fix has a test that fails on the old code, or a measurement.
 
 **Status words used below.** VERIFIED = proven by a test or command run in this review. PARTIALLY VERIFIED = proven in code or locally, not on the production host. NOT VERIFIED = could not be checked, with the reason. NOT APPLICABLE = the system has no such component.
 
 ---
+
+## 0. Second pass: review of the fixes themselves
+
+After the first pass the branch was reviewed adversarially, by an independent
+reviewer told to find what the fixes could BREAK. Production was running real
+auctions, so that question mattered more than any new finding. It found one
+HIGH and two MEDIUM regression risks **in this branch's own fixes**. All were
+corrected before anything left the branch.
+
+| # | Risk in the first-pass fix | Severity | What was done |
+|---|---|---|---|
+| R1 | The live socket asked the router to refresh after six failed reconnects. A refresh that cannot reach the server becomes a full navigation, so a phone that lost signal, or a projector on venue Wi-Fi, would have been left on the browser's error page | HIGH | Removed. A page reloads for a new ticket only if it is over 20 hours old, online, and the server has answered first. A young page never reloads |
+| R2 | A waiting owner's page refreshed on every snapshot version, which is every bid: one full page render per bid per such viewer | MEDIUM | Refreshes only when a paddle changes, or before the night on any event. Never more than once in ten seconds |
+| R3 | The deploy freeze counted any season with a start time, so one abandoned test season could hold every deploy for five hours | MEDIUM | Only a season whose auction exists and is waiting to start counts |
+| R4 | The owner-invite mail held one pooled connection and asked the same pool for a second | LOW | Counts on the transaction it already holds |
+| R5 | The send lock queued behind its holder, so a flood from one address could pin the connection pool the auction shares | LOW | The lock is tried, never waited for. A taken lock is answered at once |
+| R6 | The "results announced" marker could fail the completion's transaction | LOW | Written behind a savepoint |
+| R7 | A push subscription that moved between accounts could be deleted by the device cap the moment it arrived | LOW | The row just saved always survives |
+| R8 | A push host missing from the allow-list would have unsubscribed its users silently | LOW | Unknown hosts are skipped, never deleted |
+| R9 | Twenty invite mails an hour would refuse a 24-team league | LOW | Sixty |
+
+Also closed in the second pass, from the first pass's open list:
+
+| ID | Finding | Status |
+|---|---|---|
+| FE-4 | Cockpit showed each team's spend as ₹0 until reload | **FIXED**. The feed now meets the server's rows; an undone sale leaves the board at once. 6 tests |
+| FE-8 | No error reporting from the browser | **FIXED**. Same-origin capped endpoint, no third-party script. 6 tests |
+| FE-10 | A signed-out bidder landed on `/home` | **FIXED**. Returns to the season's auction |
+| REL-2 | Bulk approval lost its audit rows when sending outlasted the idle limit | **FIXED**. Proven against Postgres |
+| REL-6 | Finance runner force-killed on every deploy | **FIXED**. Stops within its tick |
+| OPS-10 | Old release images never pruned | **FIXED** in the deploy. Disk alerting still open |
+| OPS-5 | No escrow procedure for the backup passphrase | **Procedure written**. Doing it is the founder's |
+| OPS-6 | Production backup never restored | **Script written and rehearsed** (`ops/deploy/restore-drill-production.sh`). Running it on the host is the founder's |
+| — | Secret rotation runbook described a deployment that no longer exists | **REWRITTEN** for the real stack, 20 secrets |
+
+### Left alone on purpose
+
+The instruction for this pass was that nothing working may break. These were
+judged to carry more risk than they remove today, and each has a reason:
+
+| Item | Why it was not changed |
+|---|---|
+| Splitting `ENGINE_SECRET` into per-purpose keys | Needs web and engine to change together. During the gap every socket ticket and every sign-in code in flight fails. It is a planned maintenance, not a patch |
+| Durable command ids on `auction_events`, unique index on the leading bid | Both touch the certified auction aggregate. The integrity test shows no harm without them |
+| Missing foreign keys, validating the 29 `NOT VALID` ones | A row that fails validation refuses the deploy. Needs a read of production data first |
+| Razorpay order binding | The gateway is switched off and its certified tests use fixed order ids. Must be done before switching it on |
+| Spectator frame size | A design change to the snapshot contract |
+| Email-change confirm step-up, money grants to non-members | Low severity; the first would add friction to a flow the e2e suite exercises with older sessions |
+| About 20 client files that can strand a busy state | Breadth. Their failures are now at least reported (FE-8) |
 
 ## Executive Summary
 
@@ -20,9 +69,9 @@ The conditions are operational, not algorithmic. This review found **10 HIGH fin
 |---|---|---|---|
 | BLOCKER | 0 | 0 | 0 |
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 10 | 8 | 2 |
-| MEDIUM | 27 | 17 | 10 |
-| LOW | 19 | 5 | 14 |
+| HIGH | 10 | 8 | 2 (both need the host: restore proof, alert proof) |
+| MEDIUM | 27 | 22 | 5 |
+| LOW | 19 | 7 | 12 |
 
 **The answer to the question asked.** DesiAuction can run a real auction correctly. It should not run one that matters until the five conditions in section 67 are closed, because today a lost host may mean lost data, and a broken night may page nobody.
 
@@ -239,7 +288,41 @@ Measured on a developer laptop under load from other containers, Postgres 17 in 
 | PERF-1 | MEDIUM | Snapshot size grows with the pool and is sent whole, uncompressed, on every bid. At 250 players and 200 viewers that is 7.8 MB per bid. A phone spectator on mobile data receives roughly 40 to 60 MB over a night | OPEN. The first bottleneck at scale is **bandwidth**, not CPU or database |
 | PERF-2 | LOW | Per-command cost grows with the event log (full re-fold). 45 ms at 5,000 events against a 2 second web budget | OPEN, monitored. A new alert fires at 1 second |
 | PERF-3 | — | First-load JavaScript: all 106 routes within the 146 kB budget | VERIFIED |
-| PERF-4 | — | Web route latency under concurrent load | **NOT VERIFIED**. No load test was run against the web tier |
+| PERF-4 | — | Web route latency under concurrent load | VERIFIED locally, see "Web tier under load" below. NOT VERIFIED on production hardware |
+
+### Web tier under load
+
+One `next start` process from a production build, on the same laptop, against
+the seeded database. A closed loop: each of N workers requests again the
+moment its last answer arrives, so N is far harsher than N people browsing.
+
+Single request, warm (median of 5):
+
+| Who | Route | Time to first byte |
+|---|---|---|
+| Guest | `/`, `/pricing`, `/help`, `/login`, `/c`, `/legal` | 5 to 13 ms |
+| Organizer | `/home`, `/orgs`, `/org/…`, season pages, `/inbox` | 13 to 31 ms |
+| Founder | `/admin`, `/money` | 20 to 34 ms |
+
+Sustained load, 8 seconds per level, **zero errors at every level**:
+
+| Route | Concurrent | Requests per second | p50 | p95 | p99 |
+|---|---|---|---|---|---|
+| `/` | 10 | 169 | 58 ms | 69 ms | 78 ms |
+| `/` | 100 | 178 | 558 ms | 700 ms | 1,012 ms |
+| `/c/<season>` (public season) | 10 | 131 | 74 ms | 96 ms | 141 ms |
+| `/c/<season>` | 100 | 140 | 728 ms | 808 ms | 872 ms |
+| `/login` | 100 | 372 | 261 ms | 319 ms | 452 ms |
+| `/home` (signed in) | 10 | 78 | 125 ms | 154 ms | 209 ms |
+| `/home` (signed in) | 50 | 88 | 599 ms | 673 ms | 699 ms |
+| Registrations desk (signed in) | 50 | 106 | 485 ms | 539 ms | 560 ms |
+
+What this says: one web process renders about 90 signed-in pages or 170 public
+pages a second, and past that requests queue rather than fail. The limit is the
+single Node process's CPU, not the database (16 connections in use of 200). A
+thousand signed-in people each loading a page every ten seconds is about that
+ceiling. Production has 2 CPUs allotted to web against this laptop's shared
+cores, so treat these as an order of magnitude, not a promise.
 
 ### Scalability
 
@@ -259,11 +342,11 @@ Horizontal scaling of the engine is not possible by design (single writer). The 
 | ID | Severity | Finding | Status |
 |---|---|---|---|
 | REL-1 | MEDIUM | Two outbound calls had no timeout: finance object storage (one hung socket stalls every receipt) and the payment gateway | **FIXED** |
-| REL-2 | MEDIUM | Bulk approve sends messages while a database transaction is held open. A large batch can exceed the 60 second idle limit, losing the audit rows and reporting failure for messages that were sent | OPEN |
+| REL-2 | MEDIUM | Bulk approve sends messages while a database transaction is held open. A large batch can exceed the 60 second idle limit, losing the audit rows and reporting failure for messages that were sent | **FIXED** (second pass) |
 | REL-3 | MEDIUM | The outbox is written after the business transaction commits, not inside it. A crash in between loses the message with no repair | OPEN. AI-2 was the worst case and now self-repairs |
 | REL-4 | MEDIUM | Auction commands could not be traced end to end. The engine logged a command only when it threw | **FIXED**. One line per command with its id, actor, result, version and timings |
 | REL-5 | MEDIUM | Every build generated new server action identifiers, so each deploy broke forms and bids in tabs that were already open. Confirmed in the framework source | **FIXED** in the build. Needs one secret added, see section 67 |
-| REL-6 | LOW | Finance runner sleeps 15 seconds before it sees a stop signal, so it is force-killed on every deploy. Its jobs are leased, so nothing is lost | OPEN |
+| REL-6 | LOW | Finance runner sleeps 15 seconds before it sees a stop signal, so it is force-killed on every deploy. Its jobs are leased, so nothing is lost | **FIXED** (second pass) |
 | REL-7 | LOW | Duplicate email possible if the process dies between provider send and marking sent | OPEN, accepted |
 
 Graceful shutdown: VERIFIED in code for the engine (sockets told, lease released, 8 second deadline) and the web tier. Failure injection: engine restart mid-auction VERIFIED by test. Database outage and provider outage NOT VERIFIED by injection.
@@ -320,13 +403,13 @@ Migrations: journal VERIFIED (98 entries, strictly increasing). No destructive s
 |---|---|---|---|
 | FE-1, FE-2 | HIGH | See section 2 | **FIXED** |
 | FE-3 | MEDIUM | The `/live` conduct card and cockpit shortcut keys worked on a stale screen. A gavel held over a frozen view sells to whoever actually leads | **FIXED** |
-| FE-4 | MEDIUM | Cockpit end-of-night card shows each team's spend as ₹0 until reload | OPEN |
+| FE-4 | MEDIUM | Cockpit end-of-night card shows each team's spend as ₹0 until reload | **FIXED** (second pass) |
 | FE-5 | MEDIUM | Three cockpit handlers left the screen permanently busy if a request never returned | **FIXED**. About 20 other client files share the pattern, OPEN |
 | FE-6 | MEDIUM | A waiting owner was told the claim button would appear when granted, and it never did without a reload | **FIXED** |
 | FE-7 | MEDIUM | Several refusals reached users as "Try again" when retrying cannot work | **FIXED**, with a test that reads the reasons from the source so the next one fails the build |
-| FE-8 | MEDIUM | No error reporting from the browser. A crash in the room is invisible to operators | OPEN |
-| FE-9 | MEDIUM | An expired socket ticket retried the same URL for ever | **FIXED** |
-| FE-10 | LOW | Session loss mid-auction lands on `/home`, not back in the room | OPEN |
+| FE-8 | MEDIUM | No error reporting from the browser. A crash in the room is invisible to operators | **FIXED** (second pass) |
+| FE-9 | MEDIUM | An expired socket ticket retried the same URL for ever | **FIXED**, and the first fix replaced after review (section 0, R1) |
+| FE-10 | LOW | Session loss mid-auction lands on `/home`, not back in the room | **FIXED** (second pass) |
 | FE-11 | LOW | Five places, including the help centre, said an owner link cannot be withdrawn. It can | **FIXED** |
 
 Auctioneer, owner and spectator flows were reviewed in code. Bid double-tap protection, stale-state bid locking, confirmation on abort, complete and undo are all present. VERIFIED in code.
@@ -346,7 +429,7 @@ VERIFIED in code: the bid ribbon is a polite live region with the countdown hidd
 | OPS-1, OPS-3, SEC-6, SEC-7 | HIGH | See section 2 | **FIXED** |
 | OPS-8 | MEDIUM | The nightly verification was cancelled at its 60 minute limit four nights running, reported as "cancelled" not "failed", with nothing uploaded and nobody told | **FIXED**. Split per browser, traces uploaded, failures reported |
 | OPS-9 | MEDIUM | The role script ran statement by statement, so a failure left wide grants standing | **FIXED**, single transaction |
-| OPS-10 | MEDIUM | Old images are never pruned. Disk growth is unbounded and unwatched | OPEN |
+| OPS-10 | MEDIUM | Old images are never pruned. Disk growth is unbounded and unwatched | **FIXED** for images. A disk alert is still open |
 | OPS-11 | MEDIUM | The scale harness could not measure past 50 spectators and left a live auction in the database when it failed | **FIXED** |
 | OPS-12 | LOW | Base images pinned by tag not digest, no `.dockerignore`, no read-only root filesystem | OPEN |
 
@@ -370,19 +453,22 @@ VERIFIED in code: non-root distroless images, no host ports on database, storage
 | Suite | Result in this review |
 |---|---|
 | Lint, typecheck, format, dependency rules, motion tokens | PASS |
-| Unit | **1,351 pass** across 9 packages |
-| Integration, web | **2,533 pass** (229 files) |
+| Unit | **1,358 pass** across 9 packages |
+| Integration, web | **2,554 pass** (232 files) |
 | Integration, engine | **75 pass** |
 | Integration, runner under its production role | 5 pass |
 | Grants manifest | 455 expectations pass |
 | Row security probe, posture suite | PASS, 37 tests |
 | Production build, bundle budget | PASS |
 | Dependency audit | No known vulnerabilities |
-| End to end, Chromium | **NOT RUN in this review** (usage limit reached). CI ran it green on the audited commit `e18d3972`; it has not been run against the fixes. One spec was edited (`conduct-ceremony.spec.ts`) |
+| End to end, Chromium, full suite on the final code | **156 passed, 0 failed, 0 flaky**, 29 skipped by design |
+| End to end, first run on the first-pass fixes | 155 passed, 1 passed on retry (sign-in cooldown message). Not reproduced in 170 further runs of the sign-in specs, 20 in isolation and 144 under three parallel workers. Main's own CI shows a different single flaky test in 3 of its last 12 runs |
+| Auction-room journeys, re-run after the last edit | 31 passed |
+| Design-system journeys (dev server), photo journey | 28 passed, 1 passed |
 
-Tests added: 12 files, about 60 tests. Every behavioural fix has one that fails on the old code.
+Tests added: 18 files, about 90 tests. Every behavioural fix has one that fails on the old code.
 
-Gaps: no load test for the web tier, no failure-injection suite for database or provider outage, no device lab.
+Gaps: no failure-injection suite for database or provider outage, no device lab, no load test on production hardware.
 
 ## 15. Disaster Recovery Findings
 

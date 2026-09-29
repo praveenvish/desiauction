@@ -212,28 +212,34 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
      * on the browser's error page (see `ticketMayHaveExpired`).
      */
     const renewTicketIfStale = () => {
-      if (
-        renewing ||
-        !ticketMayHaveExpired({
-          consecutiveFailures: failures,
-          pageAgeMs: Date.now() - mountedAtMs,
-          online: window.navigator.onLine,
-        })
-      ) {
-        return;
+      // Inside a try, all of it: this runs on the reconnect path, and an
+      // exception here would stop the next attempt from ever being scheduled.
+      try {
+        if (
+          renewing ||
+          !ticketMayHaveExpired({
+            consecutiveFailures: failures,
+            pageAgeMs: Date.now() - mountedAtMs,
+            online: window.navigator.onLine,
+          })
+        ) {
+          return;
+        }
+        renewing = true;
+        void fetch("/healthz", { cache: "no-store" })
+          .then((response) => {
+            if (response.ok && !closed) {
+              window.location.reload();
+              return;
+            }
+            renewing = false;
+          })
+          .catch(() => {
+            renewing = false;
+          });
+      } catch {
+        renewing = false;
       }
-      renewing = true;
-      void fetch("/healthz", { cache: "no-store", signal: AbortSignal.timeout(5_000) })
-        .then((response) => {
-          if (response.ok && !closed) {
-            window.location.reload();
-            return;
-          }
-          renewing = false;
-        })
-        .catch(() => {
-          renewing = false;
-        });
     };
 
     const retry = () => {
