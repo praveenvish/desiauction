@@ -1099,6 +1099,8 @@ async function OwnerSeason({ team, season }: { team: OwnedTeam; season: TeamSeas
             opponentName: next.opponentName,
             opponentColor: next.opponentColor,
             groundName: next.groundName,
+            // An owner's ticket: lineups are the players' news, not this card's.
+            announcedIn: false,
           }}
           live={next.live}
         />
