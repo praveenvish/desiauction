@@ -37,7 +37,7 @@ const isAction = (route: Route): boolean =>
 
 test("a lost request lets go of the screen, says so, and the retry works", async ({ page }) => {
   test.setTimeout(120_000);
-  await otpLogin(page, `83${STAMP}`);
+  await otpLogin(page, `69${STAMP}`);
 
   await page.goto("/orgs");
   await page.getByTestId("new-org").click();

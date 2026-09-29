@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import type { Row } from "./labels";
+import { overridesAfterPage } from "./roster-overrides";
 
 /**
  * THE SCREEN CHANGES WHEN YOU CLICK, NOT WHEN THE SERVER ANSWERS.
@@ -20,7 +21,9 @@ import type { Row } from "./labels";
  *
  * Overrides are dropped when a fresh server page arrives — but only for rows
  * with no write still in flight, or a slow write's optimistic value would
- * flicker back to the old one while it was still on its way.
+ * flicker back to the old one while it was still on its way. And not for a
+ * confirmed change the page DISAGREES with: that page was asked for before
+ * the write landed, and would put the row back (roster-overrides.ts).
  */
 export interface Roster {
   rows: Row[];
@@ -45,20 +48,16 @@ export function useRoster(serverRows: readonly Row[]): Roster {
   const [inflight, setInflight] = useState<ReadonlyMap<string, number>>(new Map());
   const [seenRows, setSeenRows] = useState(serverRows);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // How many pages have disagreed with each change that is being kept.
+  const [doubts, setDoubts] = useState<ReadonlyMap<string, number>>(new Map());
 
-  // A fresh page from the server is the truth for every row nobody is writing.
+  // A fresh page from the server is the truth — as of when it was asked for.
   // (React's "adjust state when a prop changes" pattern — no effect, no flash.)
   if (seenRows !== serverRows) {
     setSeenRows(serverRows);
-    setOverrides((current) => {
-      const kept: Record<string, Partial<Row>> = {};
-      for (const [id, patch] of Object.entries(current)) {
-        if (inflight.has(id)) {
-          kept[id] = patch;
-        }
-      }
-      return kept;
-    });
+    const after = overridesAfterPage(overrides, inflight, doubts, serverRows);
+    setOverrides(after.kept);
+    setDoubts(after.doubts);
   }
 
   const rows = useMemo(
