@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { withTenantDb } from "@desiauction/db";
 import { setMessageLanguage } from "@desiauction/messaging/language";
+import { isPushServiceEndpoint } from "@desiauction/messaging/web-push";
 
 import { currentSession } from "../auth/actions";
 import { db as appDb, dbHandle, systemDb } from "../db";
@@ -322,30 +323,38 @@ export async function savePushSubscriptionAction(subscription: {
   if (pushKeys() === null) {
     return { ok: false, error: "Notifications on this device aren't available yet." };
   }
-  // A browser's push service, over https, and the two keys it must give —
-  // anything else is not a subscription anybody could deliver to.
-  let endpoint: URL;
-  try {
-    endpoint = new URL(subscription.endpoint);
-  } catch {
-    return { ok: false, error: "That didn't work. Try again." };
-  }
-  const key = /^[A-Za-z0-9_-]+$/;
+  // The arguments are the browser's claim, not their TypeScript type: a server
+  // action is a public endpoint and anything may arrive in its place.
+  const claimed = subscription as unknown as {
+    endpoint?: unknown;
+    keys?: { p256dh?: unknown; auth?: unknown } | null;
+    userAgent?: unknown;
+  } | null;
+  const endpoint = claimed?.endpoint;
+  const p256dh = claimed?.keys?.p256dh;
+  const auth = claimed?.keys?.auth;
+  // A browser's push service (one of the known operators — see
+  // isPushServiceEndpoint for why "https" alone was not enough) and the two
+  // keys it must give: a 65-byte P-256 point and a 16-byte secret, base64url.
   if (
-    endpoint.protocol !== "https:" ||
-    !key.test(subscription.keys.p256dh) ||
-    !key.test(subscription.keys.auth)
+    typeof endpoint !== "string" ||
+    typeof p256dh !== "string" ||
+    typeof auth !== "string" ||
+    !isPushServiceEndpoint(endpoint) ||
+    !/^[A-Za-z0-9_-]{80,100}$/.test(p256dh) ||
+    !/^[A-Za-z0-9_-]{16,32}$/.test(auth)
   ) {
     return { ok: false, error: "That didn't work. Try again." };
   }
+  const userAgent = typeof claimed?.userAgent === "string" ? claimed.userAgent.slice(0, 300) : null;
   // On the APP pool: a person's own devices, like their switches.
-  await savePushSubscription(appDb, session.personId, {
-    endpoint: endpoint.toString(),
-    p256dh: subscription.keys.p256dh,
-    auth: subscription.keys.auth,
-    userAgent: subscription.userAgent?.slice(0, 300) ?? null,
+  const saved = await savePushSubscription(appDb, session.personId, {
+    endpoint: new URL(endpoint).toString(),
+    p256dh,
+    auth,
+    userAgent,
   });
-  return { ok: true };
+  return saved ? { ok: true } : { ok: false, error: "That didn't work. Try again." };
 }
 
 export async function removePushSubscriptionAction(endpoint: string): Promise<{ ok: boolean }> {

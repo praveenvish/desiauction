@@ -50,8 +50,49 @@ export type BookResult =
   | { readonly ok: true; readonly booking: IssuedBooking }
   | {
       readonly ok: false;
-      readonly reason: "taken" | "gone" | "unknown-request" | "already-booked";
+      readonly reason: "taken" | "gone" | "unknown-request" | "already-booked" | "too-many-changes";
     };
+
+/**
+ * HOW MANY TIMES ONE REQUEST MAY TAKE A SLOT (PRR 2026-09-29).
+ *
+ * Every booking and every move sends a confirmation, with a calendar invite,
+ * to the address on the request — an address nobody has verified, typed into a
+ * public form by somebody with no account. The hourly ceiling in
+ * `demo-requests.ts` covers the first acknowledgement only, so one request and
+ * a loop (move to slot A, move to slot B, or book, cancel, book) was an
+ * unlimited supply of mail from this domain to anybody's inbox, and it held a
+ * slot in the founder's calendar the whole time.
+ *
+ * A booking row is written for every one of those, so the rows ARE the count:
+ * the first booking and five changes of mind. Past that the link still shows
+ * the booking and still cancels it; moving it again is a conversation.
+ */
+export const MAX_BOOKINGS_PER_REQUEST = 6;
+
+/** Thrown inside the booking transaction; never leaves this module. */
+class TooManyChanges extends Error {}
+
+/**
+ * Inside the booking's own transaction, behind a lock on the request, so the
+ * count and the insert it guards are one step — two moves arriving together
+ * cannot both read "five".
+ */
+async function refuseBeyondCeiling(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  requestId: string,
+): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`demo-request:${requestId}`}, 0))`,
+  );
+  const [row] = (await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(demoBookings)
+    .where(eq(demoBookings.demoRequestId, requestId))) as [{ count: number }];
+  if (row.count >= MAX_BOOKINGS_PER_REQUEST) {
+    throw new TooManyChanges();
+  }
+}
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -159,6 +200,7 @@ export async function bookSlot(
   const bookingId = newId();
   try {
     await db.transaction(async (tx) => {
+      await refuseBeyondCeiling(tx, requestId);
       // A request that cancelled and is booking again would collide with its
       // OWN retired row: the token is derived from the request, and `token_hash`
       // is UNIQUE across every row. The dead booking surrenders the hash first
@@ -188,6 +230,9 @@ export async function bookSlot(
       });
     });
   } catch (error) {
+    if (error instanceof TooManyChanges) {
+      return { ok: false, reason: "too-many-changes" };
+    }
     if (isUniqueViolation(error)) {
       return { ok: false, reason: "taken" };
     }
@@ -256,7 +301,10 @@ export async function cancelBooking(
 
 export type RescheduleResult =
   | { readonly ok: true; readonly token: string; readonly slotStart: Date }
-  | { readonly ok: false; readonly reason: "unknown" | "already-cancelled" | "taken" | "gone" };
+  | {
+      readonly ok: false;
+      readonly reason: "unknown" | "already-cancelled" | "taken" | "gone" | "too-many-changes";
+    };
 
 /**
  * The old booking steps aside and a new one takes its place, carrying the SAME
@@ -305,6 +353,7 @@ export async function rescheduleBooking(
   const newBookingId = newId();
   try {
     await db.transaction(async (tx) => {
+      await refuseBeyondCeiling(tx, existing.requestId);
       // The old row keeps its history but surrenders the token: a UNIQUE index
       // will not hold the same hash on two rows, and the retired booking has no
       // further use for it.
@@ -328,6 +377,9 @@ export async function rescheduleBooking(
       });
     });
   } catch (error) {
+    if (error instanceof TooManyChanges) {
+      return { ok: false, reason: "too-many-changes" };
+    }
     if (isUniqueViolation(error)) {
       return { ok: false, reason: "taken" };
     }

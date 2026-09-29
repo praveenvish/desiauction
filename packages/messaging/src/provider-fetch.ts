@@ -39,6 +39,13 @@ export async function providerFetch(
     method: string;
     headers: Record<string, string>;
     body?: string | Uint8Array<ArrayBuffer>;
+    /**
+     * `"error"` refuses to follow a 3xx. A provider whose address is OURS to
+     * choose never needs it; web push sets it because the address there came
+     * from a browser, and a redirect is how an allow-listed host would be
+     * turned into a request to somewhere else (web-push.ts).
+     */
+    redirect?: "error" | "follow";
   },
   /** Tests shorten it; nothing else should. */
   timeoutMs: number = PROVIDER_TIMEOUT_MS,

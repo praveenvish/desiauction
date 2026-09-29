@@ -154,14 +154,19 @@ export async function handleSesWebhook(
   if (envelope === null) {
     return { status: 400, body: null };
   }
-  if (!(await deps.verify(envelope))) {
-    deps.log({ type: envelope.Type }, "ses_webhook.bad_signature");
-    return { status: 403, body: null };
-  }
-  // AFTER the signature: a valid signature from somebody else's topic is still
-  // somebody else's (sns.ts has why).
+  // THE TOPIC FIRST, because it costs nothing to check and verifying the
+  // signature does not: `verify` fetches the signing certificate, so with the
+  // order reversed any stranger's POST made this server go and fetch a URL
+  // (pinned to Amazon's hosts, but still an outbound call on demand) before it
+  // was refused. A message for another topic is refused whatever its signature
+  // says; one that names OUR topic has proved nothing yet, and is verified
+  // next. Both must hold — the order only decides what a stranger can spend.
   if (envelope.TopicArn !== deps.topicArn) {
     deps.log({ type: envelope.Type }, "ses_webhook.foreign_topic");
+    return { status: 403, body: null };
+  }
+  if (!(await deps.verify(envelope))) {
+    deps.log({ type: envelope.Type }, "ses_webhook.bad_signature");
     return { status: 403, body: null };
   }
 

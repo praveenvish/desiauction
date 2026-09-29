@@ -28,6 +28,7 @@ import { currentSession } from "../auth/actions";
 import { normalizeEmail } from "../auth/email-address";
 import { maskEmail } from "../auth/email-changed-notice";
 import { clubInviteMail } from "../messaging/club-mail";
+import { claimInviteMailBudget, inviteMailRefusal } from "../messaging/invite-mail-budget";
 import { languageForMail, sendNotificationMail } from "../messaging/notify";
 import { dbHandle, systemDb } from "../db";
 import { canFinops } from "../financial-operations/authz";
@@ -593,6 +594,16 @@ export async function emailClubInviteAction(
             ok: false as const,
             error: "That link has been used, revoked or has expired. Create a new one.",
           };
+        }
+        // Before anything is sent: the ceilings on invitation mail, counted
+        // across every club this person is in (invite-mail-budget.ts).
+        const budget = await claimInviteMailBudget(db, systemDb, {
+          actor: session.personId,
+          orgId: org.id,
+          inviteId: invite.id,
+        });
+        if (budget !== "ok") {
+          return { ok: false as const, error: inviteMailRefusal(budget) };
         }
         const [inviter] = await db
           .select({ name: people.name })

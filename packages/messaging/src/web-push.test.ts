@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   encryptPushPayload,
   generateVapidKeys,
+  isPushServiceEndpoint,
   sendWebPush,
   vapidAuthorization,
   type PushTransport,
@@ -150,5 +151,72 @@ describe("sendWebPush", () => {
     expect(await sendWebPush(subscription, {}, keys, { transport: answering(410) })).toBe("gone");
     expect(await sendWebPush(subscription, {}, keys, { transport: answering(404) })).toBe("gone");
     expect(await sendWebPush(subscription, {}, keys, { transport: answering(500) })).toBe("failed");
+  });
+
+  it("never calls an address that is not a push service, and forgets the row", async () => {
+    let called = 0;
+    const counting: PushTransport = () => {
+      called += 1;
+      return Promise.resolve({ status: 201, body: "" });
+    };
+    for (const endpoint of [
+      "https://attacker.example/collect",
+      "https://169.254.169.254/latest/meta-data/",
+      "https://db:5432/",
+    ]) {
+      expect(
+        await sendWebPush({ ...subscription, endpoint }, {}, keys, { transport: counting }),
+      ).toBe("gone");
+    }
+    expect(called).toBe(0);
+  });
+
+  it("refuses to follow a redirect", async () => {
+    let redirect: string | undefined;
+    const transport: PushTransport = (_url, init) => {
+      redirect = init.redirect;
+      return Promise.resolve({ status: 201, body: "" });
+    };
+    await sendWebPush(subscription, {}, keys, { transport });
+    expect(redirect).toBe("error");
+  });
+
+  it("answers failed, not a throw, for keys that are not a P-256 point", async () => {
+    expect(
+      await sendWebPush({ ...subscription, p256dh: "AAAA" }, {}, keys, {
+        transport: answering(201),
+      }),
+    ).toBe("failed");
+  });
+});
+
+describe("isPushServiceEndpoint", () => {
+  it("admits the browsers' own push services", () => {
+    for (const endpoint of [
+      "https://fcm.googleapis.com/fcm/send/abc:def",
+      "https://updates.push.services.mozilla.com/wpush/v2/xyz",
+      "https://wns2-pn1p.notify.windows.com/w/?token=abc",
+      "https://web.push.apple.com/QGuQ",
+    ]) {
+      expect(isPushServiceEndpoint(endpoint), endpoint).toBe(true);
+    }
+  });
+
+  it("refuses everything else", () => {
+    for (const endpoint of [
+      "not a url",
+      "http://fcm.googleapis.com/fcm/send/abc", // plain http
+      "https://fcm.googleapis.com:8443/fcm/send/abc", // another port
+      "https://user:pass@fcm.googleapis.com/fcm/send/abc", // credentials
+      "https://fcm.googleapis.com.attacker.example/x", // suffix on the wrong side
+      "https://notify.windows.com.attacker.example/x",
+      "https://evilnotify.windows.com/x", // no dot before the suffix
+      "https://localhost/x",
+      "https://10.0.0.5/x",
+      "https://attacker.example/?h=fcm.googleapis.com",
+      `https://fcm.googleapis.com/${"a".repeat(3000)}`, // unbounded
+    ]) {
+      expect(isPushServiceEndpoint(endpoint), endpoint).toBe(false);
+    }
   });
 });

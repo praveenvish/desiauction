@@ -119,9 +119,71 @@ export function encryptPushPayload(
 
 export type PushOutcome = "sent" | "gone" | "failed";
 
+/**
+ * THE PUSH SERVICES A BROWSER CAN HAND US, AND NOTHING ELSE (PRR 2026-09-29).
+ *
+ * A subscription's endpoint is a URL the BROWSER supplies, and the server then
+ * POSTs to it. The only check was `https:`, so any signed-in person could save
+ * `https://anything/` as a device and have this server call it on their next
+ * notice — a request forged from inside the network (a 3xx carried it on to
+ * plain-http internal addresses), with the 404/410 "gone" branch reporting back
+ * which addresses answered. Each such call also held its turn for the full
+ * provider deadline.
+ *
+ * Web push has a closed set of operators: a browser subscribes with its
+ * vendor's service and no other. So the endpoint is matched against that set,
+ * on the default port, with no credentials in the URL — when it is saved AND
+ * again when it is sent to, because rows written before this rule existed are
+ * still in the table.
+ *
+ *   · Chrome, Edge (Android), Opera, Brave, Samsung Internet — FCM
+ *   · Firefox — Mozilla autopush
+ *   · Edge (desktop) — Windows Notification Service
+ *   · Safari — Apple Push
+ */
+const PUSH_SERVICE_HOSTS: readonly string[] = [
+  "fcm.googleapis.com",
+  "jmt17.google.com",
+  "updates.push.services.mozilla.com",
+  "web.push.apple.com",
+];
+const PUSH_SERVICE_SUFFIXES: readonly string[] = [
+  ".push.services.mozilla.com",
+  ".notify.windows.com",
+  ".push.apple.com",
+];
+
+/** Longest endpoint any push service issues is a few hundred characters. */
+export const PUSH_ENDPOINT_MAX_LENGTH = 2048;
+
+export function isPushServiceEndpoint(endpoint: string): boolean {
+  if (endpoint.length > PUSH_ENDPOINT_MAX_LENGTH) {
+    return false;
+  }
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.port !== "" || url.username !== "" || url.password !== "") {
+    return false;
+  }
+  const host = url.hostname.toLowerCase();
+  return (
+    PUSH_SERVICE_HOSTS.includes(host) ||
+    PUSH_SERVICE_SUFFIXES.some((suffix) => host.endsWith(suffix))
+  );
+}
+
 export type PushTransport = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body: Uint8Array<ArrayBuffer> },
+  init: {
+    method: string;
+    headers: Record<string, string>;
+    body: Uint8Array<ArrayBuffer>;
+    redirect: "error";
+  },
 ) => Promise<ProviderResponse>;
 
 const defaultTransport: PushTransport = (url, init) => providerFetch(url, init);
@@ -132,10 +194,19 @@ export async function sendWebPush(
   keys: VapidKeys,
   options: { now?: number; ttlSeconds?: number; transport?: PushTransport } = {},
 ): Promise<PushOutcome> {
-  const body = encryptPushPayload(subscription, Buffer.from(JSON.stringify(message)));
+  // Not a push service: not a subscription. "gone" so the caller forgets the
+  // row, exactly as it would for one the service itself had dropped.
+  if (!isPushServiceEndpoint(subscription.endpoint)) {
+    return "gone";
+  }
   try {
+    // Inside the try: the keys are the browser's claim, and a malformed one
+    // throws out of node:crypto. That is a failed push, never a failed request.
+    const body = encryptPushPayload(subscription, Buffer.from(JSON.stringify(message)));
     const response = await (options.transport ?? defaultTransport)(subscription.endpoint, {
       method: "POST",
+      // A push service answers the address it issued; it does not send us on.
+      redirect: "error",
       headers: {
         authorization: vapidAuthorization(subscription.endpoint, keys, options.now ?? Date.now()),
         "content-encoding": "aes128gcm",

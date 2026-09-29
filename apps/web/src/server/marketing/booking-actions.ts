@@ -43,6 +43,10 @@ export type SlotActionState =
   | { readonly status: "moved" }
   | { readonly status: "error"; readonly message: string };
 
+/** Said when a request has used its changes (MAX_BOOKINGS_PER_REQUEST). */
+const TOO_MANY_CHANGES =
+  "This demo has been moved a few times already. Reply to your confirmation email and we'll find a time together.";
+
 /** How many times this request's slot has moved — the invite's SEQUENCE. */
 async function sequenceFor(requestId: string): Promise<number> {
   const [row] = (await db
@@ -93,7 +97,9 @@ export async function bookSlotAction(
           ? "Somebody just took that time. Pick another and we'll hold it."
           : result.reason === "already-booked"
             ? "You already have a demo booked. Use the link in your email to move it."
-            : "We couldn't find that request. Start again from the demo page.",
+            : result.reason === "too-many-changes"
+              ? TOO_MANY_CHANGES
+              : "We couldn't find that request. Start again from the demo page.",
     };
   }
 
@@ -194,7 +200,9 @@ export async function rescheduleBookingAction(
           ? "Somebody just took that time. Pick another."
           : result.reason === "already-cancelled"
             ? "That demo was cancelled. Book a new one from the demo page."
-            : "That link is not valid.",
+            : result.reason === "too-many-changes"
+              ? TOO_MANY_CHANGES
+              : "That link is not valid.",
     };
   }
 
