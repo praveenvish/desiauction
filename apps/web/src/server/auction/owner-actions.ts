@@ -149,7 +149,11 @@ export async function emailOwnerInviteAction(
   // so the lock inside the claim is held until that row can be seen.
   return systemDb.transaction(async (raw): Promise<EmailOwnerInviteResult> => {
     const tx = raw as unknown as typeof systemDb;
-    const budget = await claimInviteMailBudget(tx, systemDb, {
+    // Counted on THIS transaction, not on a second connection from the same
+    // pool: ten of these at once would each hold one connection and wait for
+    // another, and the pool is ten wide. The system role sees every club's
+    // rows either way.
+    const budget = await claimInviteMailBudget(tx, tx, {
       actor: gate.personId,
       orgId: gate.auction.orgId,
       inviteId: invite.id,

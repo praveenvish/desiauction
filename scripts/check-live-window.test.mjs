@@ -69,8 +69,13 @@ test("the questions are the two the freeze is for", () => {
   assert.match(LIVE_QUERY, /status in \('live', 'paused'\)/);
   assert.match(IMMINENT_QUERY, /auction_starts_at <= now\(\) \+ make_interval\(mins => :lead\)/);
   assert.match(IMMINENT_QUERY, /auction_starts_at >= now\(\) - make_interval\(mins => :late\)/);
-  // An auction that has started is question one's; one that is over is nobody's.
-  assert.match(IMMINENT_QUERY, /a\.status <> 'scheduled'/);
+  // Only an auction that EXISTS and is waiting: one that has started is
+  // question one's, one that is over is nobody's, and a date on a season with
+  // no auction at all is a plan — it must not be able to freeze a deploy.
+  assert.match(
+    IMMINENT_QUERY,
+    /join auctions a on a\.competition_id = c\.id and a\.status = 'scheduled'/,
+  );
 });
 
 test("END TO END: an unreachable database refuses (exit 2) and the password is nowhere in the output", () => {

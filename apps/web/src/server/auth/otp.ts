@@ -79,64 +79,71 @@ export async function requestOtp(
 
   // The limits and the row they count are ONE step (send-lock.ts): without the
   // lock, parallel requests all read the table before any of them wrote to it.
-  const issued = await withSendLock(db, { subject: phone, requestIp }, async (tx) => {
-    // Cooldown guards spam on a pending code; a consumed code (successful
-    // login) never blocks an immediate second-device sign-in. Abuse is still
-    // capped by the hourly limits below.
-    const [latest] = await tx
-      .select({ createdAt: otpCodes.createdAt })
-      .from(otpCodes)
-      .where(and(eq(otpCodes.phone, phone), isNull(otpCodes.consumedAt)))
-      .orderBy(desc(otpCodes.createdAt))
-      .limit(1);
-    if (latest !== undefined && now - latest.createdAt.getTime() < RESEND_COOLDOWN_MS) {
-      return { ok: false, reason: "cooldown" } as const;
-    }
+  const issued = await withSendLock(
+    db,
+    { subject: phone, requestIp },
+    async (tx) => {
+      // Cooldown guards spam on a pending code; a consumed code (successful
+      // login) never blocks an immediate second-device sign-in. Abuse is still
+      // capped by the hourly limits below.
+      const [latest] = await tx
+        .select({ createdAt: otpCodes.createdAt })
+        .from(otpCodes)
+        .where(and(eq(otpCodes.phone, phone), isNull(otpCodes.consumedAt)))
+        .orderBy(desc(otpCodes.createdAt))
+        .limit(1);
+      if (latest !== undefined && now - latest.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+        return { ok: false, reason: "cooldown" } as const;
+      }
 
-    const [{ count }] = (await tx
-      .select({ count: sql<number>`count(*)::int` })
-      .from(otpCodes)
-      .where(
-        and(eq(otpCodes.phone, phone), gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000))),
-      )) as [{ count: number }];
-    if (count >= MAX_PER_HOUR) {
-      return { ok: false, reason: "hourly-limit" } as const;
-    }
-
-    if (requestIp !== null) {
-      const [{ count: ipCount }] = (await tx
+      const [{ count }] = (await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(otpCodes)
         .where(
-          and(
-            eq(otpCodes.requestIp, requestIp),
-            gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)),
-          ),
+          and(eq(otpCodes.phone, phone), gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000))),
         )) as [{ count: number }];
-      if (ipCount >= MAX_PER_HOUR_PER_IP) {
+      if (count >= MAX_PER_HOUR) {
         return { ok: false, reason: "hourly-limit" } as const;
       }
-    }
 
-    const [{ count: platformCount }] = (await tx
-      .select({ count: sql<number>`count(*)::int` })
-      .from(otpCodes)
-      .where(gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)))) as [{ count: number }];
-    if (platformCount >= globalPerHour) {
-      return { ok: false, reason: "busy" } as const;
-    }
+      if (requestIp !== null) {
+        const [{ count: ipCount }] = (await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(otpCodes)
+          .where(
+            and(
+              eq(otpCodes.requestIp, requestIp),
+              gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)),
+            ),
+          )) as [{ count: number }];
+        if (ipCount >= MAX_PER_HOUR_PER_IP) {
+          return { ok: false, reason: "hourly-limit" } as const;
+        }
+      }
 
-    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-    await tx.insert(otpCodes).values({
-      id: newId(),
-      phone,
-      codeHash: phoneCodeDigest(purpose, phone, code, boundTo),
-      purpose,
-      expiresAt: new Date(now + CODE_TTL_MS),
-      requestIp,
-    });
-    return { ok: true, code } as const;
-  });
+      const [{ count: platformCount }] = (await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(otpCodes)
+        .where(gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)))) as [{ count: number }];
+      if (platformCount >= globalPerHour) {
+        return { ok: false, reason: "busy" } as const;
+      }
+
+      const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+      await tx.insert(otpCodes).values({
+        id: newId(),
+        phone,
+        codeHash: phoneCodeDigest(purpose, phone, code, boundTo),
+        purpose,
+        expiresAt: new Date(now + CODE_TTL_MS),
+        requestIp,
+      });
+      return { ok: true, code } as const;
+    },
+    // Somebody is sending to this handset this instant: that IS the cooldown.
+    // From this address: the same answer the platform gives when it is full.
+    (lock) => ({ ok: false, reason: lock === "subject" ? "cooldown" : "busy" }) as const,
+  );
   if (!issued.ok) {
     return issued;
   }

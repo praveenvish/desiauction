@@ -14,7 +14,7 @@ import {
   useToast,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   submitAuctionCommand,
@@ -312,27 +312,53 @@ export function LivePanel({
    * (`myGrantTeamIds`, `myPaddle`) is rendered on the server, and the room
    * only asked the server again after the owner's OWN claim, release or
    * completion. A grant is the ORGANIZER's act. So the owner sat looking at
-   * "ask the organizer" after the organizer had done it, until they thought to
-   * reload — on auction night, with the first lot about to open.
+   * "ask the organizer" after the organizer had done it, until they reloaded.
    *
-   * Every grant and every issued paddle is an event, and every event moves the
-   * snapshot version the socket already delivers. While this person holds
-   * nothing, a moved version is worth one look at the server. Once they hold a
-   * paddle this stops: a bidding owner's page is not re-rendered per bid.
+   * WHAT IT LISTENS FOR IS NARROW, ON PURPOSE. The first version asked again
+   * on every change of the snapshot's version, which is every BID — and an
+   * owner can hold no paddle all night (a co-owner whose partner has it, an
+   * owner the organizer is bidding for). That was a full page render per bid
+   * per such person, against the database a live auction is using. Caught in
+   * review. Two things can change what this person may claim:
+   *
+   *   · the paddles themselves — one issued, claimed or released. That is in
+   *     the snapshot, so the page asks again exactly when it changes;
+   *   · a grant, which is not in the snapshot. Grants are given BEFORE the
+   *     night, so while the auction is still `scheduled` (when events are a
+   *     handful, not a stream) any event is worth one look.
+   *
+   * Never more than once in ten seconds either way, and not at all once this
+   * person holds a paddle.
    */
   const waitingForPaddle = myPaddle === null && !view.viewer.canConduct;
+  const paddleSignature = (snapshot?.paddles ?? [])
+    .map((paddle) => `${paddle.paddleId}:${paddle.released ? "r" : "h"}`)
+    .join(",");
+  const beforeTheNight = snapshot?.auctionStatus === "scheduled";
+  const waitingSignal = beforeTheNight ? `${paddleSignature}@${String(version)}` : paddleSignature;
+  const lastAskedRef = useRef({ signal: "", atMs: 0 });
   useEffect(() => {
-    if (!waitingForPaddle || version === 0) {
+    if (!waitingForPaddle || snapshot === null) {
       return;
     }
-    // One look per burst of events, not one per event.
+    const last = lastAskedRef.current;
+    if (last.signal === "") {
+      // The page was rendered from the same facts a moment ago: nothing to ask.
+      lastAskedRef.current = { signal: waitingSignal, atMs: 0 };
+      return;
+    }
+    if (last.signal === waitingSignal) {
+      return;
+    }
+    const wait = Math.max(750, 10_000 - (Date.now() - last.atMs));
     const timer = setTimeout(() => {
+      lastAskedRef.current = { signal: waitingSignal, atMs: Date.now() };
       router.refresh();
-    }, 750);
+    }, wait);
     return () => {
       clearTimeout(timer);
     };
-  }, [waitingForPaddle, version, router]);
+  }, [waitingForPaddle, waitingSignal, snapshot, router]);
   // The squad board's row universe. A conductor keeps every franchise; a bidder
   // gets their own — see `viewer.canSeeAllSquads`.
   const boardTeams = view.viewer.canSeeAllSquads

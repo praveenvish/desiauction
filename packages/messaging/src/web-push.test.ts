@@ -153,7 +153,7 @@ describe("sendWebPush", () => {
     expect(await sendWebPush(subscription, {}, keys, { transport: answering(500) })).toBe("failed");
   });
 
-  it("never calls an address that is not a push service, and forgets the row", async () => {
+  it("never calls an address that is not a push service — and does not forget the row either", async () => {
     let called = 0;
     const counting: PushTransport = () => {
       called += 1;
@@ -166,7 +166,7 @@ describe("sendWebPush", () => {
     ]) {
       expect(
         await sendWebPush({ ...subscription, endpoint }, {}, keys, { transport: counting }),
-      ).toBe("gone");
+      ).toBe("failed");
     }
     expect(called).toBe(0);
   });

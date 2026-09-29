@@ -45,19 +45,46 @@ export function mustReplaceSocket(input: {
   return input.nowMs - input.lastFrameAtMs > FRAME_STALE_AFTER_MS;
 }
 
-/** How many failed attempts in a row before the page asks for a new ticket. */
-export const REFRESH_EVERY_ATTEMPTS = 6;
+/** Failures in a row before an old page is suspected of holding a dead ticket. */
+export const RENEW_AFTER_FAILURES = 6;
 
 /**
- * Should the page re-render on the server, to be handed a fresh socket URL?
- *
- * The URL carries a ticket minted when the page was rendered, good for a day
- * or two. A tab left open past that retried the SAME expired ticket for ever —
- * the engine refuses it by dropping the connection, which looks exactly like
- * an outage, so the room said "Reconnecting…" with no way to succeed. Every
- * few failures the page now asks again; if the ticket was the problem the new
- * URL fixes it, and if the engine is simply down nothing changes.
+ * A ticket is good for the day it was minted in and the day after (engine
+ * `TICKET_WINDOW_MS`), so one younger than this cannot have expired — whatever
+ * is refusing the socket, it is not the ticket.
  */
-export function shouldRefreshTicket(consecutiveFailures: number): boolean {
-  return consecutiveFailures > 0 && consecutiveFailures % REFRESH_EVERY_ATTEMPTS === 0;
+export const TICKET_CANNOT_HAVE_EXPIRED_BEFORE_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * Is a new ticket worth asking for — by loading the page again?
+ *
+ * The socket URL carries a ticket minted when the page was rendered. A tab
+ * left open past its life retried the SAME expired ticket for ever; the engine
+ * refuses it by dropping the connection, which looks exactly like an outage,
+ * so the room said "Reconnecting…" with no way to succeed.
+ *
+ * THE FIRST ANSWER TO THAT WAS WRONG, AND WORSE THAN THE PROBLEM. It asked the
+ * router to refresh after every six failures, at any page age. A refresh that
+ * cannot reach the server makes the router fall back to a full navigation — so
+ * a phone that lost signal for thirty seconds, or a projector on venue Wi-Fi
+ * that blinked, was taken off the auction and left on the browser's own error
+ * page, where nothing reconnects. It also re-rendered every open page every
+ * fifteen seconds for the length of an engine outage, to be handed a ticket
+ * that is the same all day. Caught in review, before it shipped.
+ *
+ * So: only a page OLD ENOUGH for its ticket to have expired, only while the
+ * device says it is online — and the caller must then confirm the server
+ * answers before it reloads anything. A young page never reloads, which is
+ * every page on an ordinary auction night.
+ */
+export function ticketMayHaveExpired(input: {
+  consecutiveFailures: number;
+  pageAgeMs: number;
+  online: boolean;
+}): boolean {
+  return (
+    input.online &&
+    input.consecutiveFailures >= RENEW_AFTER_FAILURES &&
+    input.pageAgeMs >= TICKET_CANNOT_HAVE_EXPIRED_BEFORE_MS
+  );
 }

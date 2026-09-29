@@ -24,7 +24,7 @@ function serverRow(partial: Partial<ResolvedLot> & { lotId: string }): ResolvedL
     teamId: "team-falcons",
     teamName: "Falcons",
     ...partial,
-  } as ResolvedLot;
+  };
 }
 
 /** Only the fields the fold reads; the rest of a snapshot is irrelevant here. */

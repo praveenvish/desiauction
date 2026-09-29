@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   BACKOFF_CEILING_MS,
   FRAME_STALE_AFTER_MS,
-  REFRESH_EVERY_ATTEMPTS,
+  RENEW_AFTER_FAILURES,
+  TICKET_CANNOT_HAVE_EXPIRED_BEFORE_MS,
   mustReplaceSocket,
   reconnectDelayMs,
-  shouldRefreshTicket,
+  ticketMayHaveExpired,
 } from "./socket-policy";
 
 const OPEN = 1;
@@ -77,13 +78,38 @@ describe("backoff", () => {
   });
 });
 
-describe("asking for a new ticket", () => {
-  it("asks every few consecutive failures, and never before the first", () => {
-    expect(shouldRefreshTicket(0)).toBe(false);
-    expect(shouldRefreshTicket(1)).toBe(false);
-    expect(shouldRefreshTicket(REFRESH_EVERY_ATTEMPTS - 1)).toBe(false);
-    expect(shouldRefreshTicket(REFRESH_EVERY_ATTEMPTS)).toBe(true);
-    expect(shouldRefreshTicket(REFRESH_EVERY_ATTEMPTS + 1)).toBe(false);
-    expect(shouldRefreshTicket(REFRESH_EVERY_ATTEMPTS * 2)).toBe(true);
+describe("loading the page again for a new ticket", () => {
+  const old = TICKET_CANNOT_HAVE_EXPIRED_BEFORE_MS;
+  const stuck = RENEW_AFTER_FAILURES;
+
+  it("NEVER on a page young enough that its ticket cannot have expired", () => {
+    // Every page on an ordinary auction night. A dropped connection, a venue
+    // Wi-Fi blink, an engine restart: the page stays where it is and retries.
+    for (const pageAgeMs of [0, 60_000, 4 * 60 * 60 * 1000, old - 1]) {
+      for (const consecutiveFailures of [stuck, 60, 6_000]) {
+        expect(
+          ticketMayHaveExpired({ consecutiveFailures, pageAgeMs, online: true }),
+          `${String(pageAgeMs)}ms, ${String(consecutiveFailures)} failures`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("never while the device is offline, however old the page", () => {
+    expect(
+      ticketMayHaveExpired({ consecutiveFailures: 600, pageAgeMs: old * 3, online: false }),
+    ).toBe(false);
+  });
+
+  it("not on the first few failures of an old page — that is an ordinary reconnect", () => {
+    expect(
+      ticketMayHaveExpired({ consecutiveFailures: stuck - 1, pageAgeMs: old * 2, online: true }),
+    ).toBe(false);
+  });
+
+  it("only when all three hold: old page, online, and stuck", () => {
+    expect(ticketMayHaveExpired({ consecutiveFailures: stuck, pageAgeMs: old, online: true })).toBe(
+      true,
+    );
   });
 });

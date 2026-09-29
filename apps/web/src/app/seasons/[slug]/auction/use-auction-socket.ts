@@ -1,14 +1,13 @@
 "use client";
 
 import { deriveCeremony, type AuctionSnapshot, type CeremonyState } from "@desiauction/core";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import {
   FRAME_STALE_AFTER_MS,
   mustReplaceSocket,
   reconnectDelayMs,
-  shouldRefreshTicket,
+  ticketMayHaveExpired,
 } from "./socket-policy";
 
 // The shared live-socket hook (M-IP4-3). One implementation for the cockpit,
@@ -121,7 +120,6 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
   const [version, setVersion] = useState(0);
   const prevRef = useRef<AuctionSnapshot | null>(null);
 
-  const router = useRouter();
   /** Abandon the current socket and connect again; set by the connect effect. */
   const replaceSocketRef = useRef<(reason: "silent" | "online") => void>(() => undefined);
   /** The current socket's readyState, or null when there is none. */
@@ -202,19 +200,47 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let socket: WebSocket | null = null;
 
-    // Failures since the last socket that actually OPENED — what decides
-    // whether the ticket in `wsUrl` is worth asking for again.
+    // Failures since the last socket that actually OPENED.
     let failures = 0;
+    const mountedAtMs = Date.now();
+    let renewing = false;
+
+    /**
+     * A page old enough for its ticket to have died, online, and getting
+     * nowhere: load it again for a new one — but only once the web tier has
+     * ANSWERED. Reloading into a server that is not there is how a tab ends up
+     * on the browser's error page (see `ticketMayHaveExpired`).
+     */
+    const renewTicketIfStale = () => {
+      if (
+        renewing ||
+        !ticketMayHaveExpired({
+          consecutiveFailures: failures,
+          pageAgeMs: Date.now() - mountedAtMs,
+          online: window.navigator.onLine,
+        })
+      ) {
+        return;
+      }
+      renewing = true;
+      void fetch("/healthz", { cache: "no-store", signal: AbortSignal.timeout(5_000) })
+        .then((response) => {
+          if (response.ok && !closed) {
+            window.location.reload();
+            return;
+          }
+          renewing = false;
+        })
+        .catch(() => {
+          renewing = false;
+        });
+    };
 
     const retry = () => {
       setConnection("reconnecting");
       attempt += 1;
       failures += 1;
-      if (shouldRefreshTicket(failures)) {
-        // A new render mints a new ticket; if the URL changes, this effect
-        // restarts on it. If the engine is simply down, nothing changes.
-        router.refresh();
-      }
+      renewTicketIfStale();
       timer = setTimeout(connect, reconnectDelayMs(attempt));
     };
 
@@ -340,8 +366,7 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
       }
       socket?.close();
     };
-    // `router` is stable for the life of the page (next/navigation).
-  }, [wsUrl, router]);
+  }, [wsUrl]);
 
   // Countdown: render-only; endsAt is server truth, drift-corrected.
   //

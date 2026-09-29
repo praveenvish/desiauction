@@ -14,15 +14,16 @@ import { and, eq, gt, inArray, sql } from "drizzle-orm";
  * Two ceilings, both counted from the audit rows these actions already write,
  * so a restart cannot reset them and there is nothing new to store:
  *
- *   · per PERSON, per hour, across every club they belong to — twenty is a
- *     whole league's worth of team owners in one sitting;
+ *   · per PERSON, per hour, across every club they belong to — sixty, which
+ *     is a twenty-four team league's owners and its committee in one sitting
+ *     with room to spare, and still a ceiling on a relay;
  *   · per INVITE, for its life — a link that has been mailed five times has
  *     reached whoever it was for.
  *
  * Over either, Copy link still works: the organizer loses the convenience, not
  * the ability to invite.
  */
-export const INVITE_MAILS_PER_PERSON_PER_HOUR = 20;
+export const INVITE_MAILS_PER_PERSON_PER_HOUR = 60;
 export const INVITE_MAILS_PER_INVITE = 5;
 
 /** Longer than any invite lives (seven days), with a day to spare. */

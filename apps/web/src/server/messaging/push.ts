@@ -203,15 +203,19 @@ export async function savePushSubscription(
   if (saved.length === 0) {
     return false;
   }
-  // The newest ten stay; the browser that was just saved is always among them.
+  // The browser that was just saved stays, whatever its age — a subscription
+  // that moved here from another person keeps the date it was first made, and
+  // ordering by date alone deleted it the moment it arrived. Beside it, the
+  // newest nine.
   await db.delete(pushSubscriptions).where(
     and(
       eq(pushSubscriptions.personId, personId),
+      sql`${pushSubscriptions.endpoint} <> ${subscription.endpoint}`,
       sql`${pushSubscriptions.id} not in (
         select id from push_subscriptions
-        where person_id = ${personId}
+        where person_id = ${personId} and endpoint <> ${subscription.endpoint}
         order by created_at desc, id desc
-        limit ${MAX_DEVICES_PER_PERSON}
+        limit ${MAX_DEVICES_PER_PERSON - 1}
       )`,
     ),
   );

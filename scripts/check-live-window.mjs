@@ -21,7 +21,8 @@
 //      Seasons carry the announced start (`competitions.auction_starts_at`,
 //      0095), so the freeze now opens LEAD minutes before it and stays open
 //      LATE minutes after it for a night that is running behind — for as long
-//      as the auction has not started. Once it starts, question 1 holds it.
+//      as the auction exists and has not started. Once it starts, question 1
+//      holds it. A season with a date and no auction yet does not count.
 //
 //   node scripts/check-live-window.mjs          # refuse inside a live window
 //   node scripts/check-live-window.mjs --warn   # report, exit 0 (staging)
@@ -64,25 +65,28 @@ export const LIVE_QUERY = `
 `;
 
 /**
- * A season whose auction is announced inside the window and has not started.
+ * A season whose auction is announced inside the window, EXISTS, and has not
+ * started.
  *
- * "Has not started" is "no auction row past `scheduled`": a season with no
- * auction row yet counts (creating one takes a minute, and the organizer is
- * about to), a completed or abandoned one does not (the night is over, however
- * recently). The minutes arrive as psql variables, never spliced into the text.
+ * The auction has to exist — a row in `scheduled` — because anybody who runs a
+ * club can type a start time into a season, and a date on a season that never
+ * got as far as creating its auction is a plan, not a night. Counting those
+ * let one abandoned test season hold every production deploy for five hours,
+ * an urgent fix included (caught in review). An auction that has been created
+ * is an organizer who is setting the room up.
+ *
+ * One that has started is question one's. One that is completed or abandoned
+ * is over, however recently. The minutes arrive as psql variables, never
+ * spliced into the text.
  */
 export const IMMINENT_QUERY = `
   select c.name,
          to_char(c.auction_starts_at at time zone 'Asia/Kolkata', 'DD Mon HH24:MI') as starts_ist
     from competitions c
+    join auctions a on a.competition_id = c.id and a.status = 'scheduled'
    where c.auction_starts_at is not null
      and c.auction_starts_at >= now() - make_interval(mins => :late)
      and c.auction_starts_at <= now() + make_interval(mins => :lead)
-     and not exists (
-           select 1 from auctions a
-            where a.competition_id = c.id
-              and a.status <> 'scheduled'
-         )
    order by c.auction_starts_at
 `;
 

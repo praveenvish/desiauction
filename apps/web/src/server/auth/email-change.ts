@@ -139,6 +139,8 @@ export async function requestEmailVerification(
       });
       return { ok: true, email, code };
     },
+    // Another request from this account, or this address, is in hand.
+    () => ({ ok: false, reason: "busy" }),
   );
 }
 

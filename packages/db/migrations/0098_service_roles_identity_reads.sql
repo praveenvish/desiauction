@@ -76,9 +76,16 @@ CREATE INDEX IF NOT EXISTS "email_verifications_email_idx"
 -- discharged against amount) are the certified writer's rules and move with
 -- it; pinning them here would make the schema a second, stale copy of them.
 --
--- NOT VALID then VALIDATE: adding the constraint takes its lock for an instant
--- and new writes are checked at once; validating the rows already there takes
--- only a SHARE UPDATE EXCLUSIVE lock, so neither step blocks reads or writes.
+-- NOT VALID then VALIDATE, in the form 0085 and 0094 use. One thing that form
+-- does NOT buy here, stated so nobody relies on it: the migrator applies the
+-- whole batch in ONE transaction, so the ACCESS EXCLUSIVE lock each ADD
+-- CONSTRAINT takes is held until that transaction commits, VALIDATE included.
+-- These three tables are small (the money rows of one platform) and the
+-- migrator runs with lock_timeout = 5s outside any live window, so the cost is
+-- milliseconds and the failure mode is a refused deploy, never a stalled one.
+-- A row that fails VALIDATE also refuses the deploy: no writer produces one
+-- (the journal rejects a leg under zero, the commands an amount under zero),
+-- so it would be a hand edit, and that is worth stopping for.
 ALTER TABLE "payments"
   ADD CONSTRAINT "payments_amounts_nonneg"
   CHECK ("amount" >= 0 AND "captured" >= 0 AND "refunded_total" >= 0) NOT VALID;--> statement-breakpoint

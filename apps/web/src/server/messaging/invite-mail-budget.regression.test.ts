@@ -68,7 +68,7 @@ describe("the ceilings on invitation mail", () => {
     expect(await send(who, orgId, newId())).toBe("ok");
   });
 
-  it("one person sends twenty an hour ACROSS clubs and both kinds of invite", async () => {
+  it("one person's hourly ceiling holds ACROSS clubs and both kinds of invite", async () => {
     const who = actor();
     for (let i = 0; i < INVITE_MAILS_PER_PERSON_PER_HOUR; i++) {
       // A new club and a new invite every time: what the abuse looks like.

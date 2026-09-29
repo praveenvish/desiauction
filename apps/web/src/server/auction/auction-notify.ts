@@ -10,6 +10,7 @@ import {
   registrations,
   teams,
   withTenantDb,
+  writeSurvivingConstraint,
   type Db,
 } from "@desiauction/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -309,15 +310,26 @@ export async function completeAuctionOnce<T>(
       // Written AFTER, on this transaction: if the process dies mid-announce
       // there is no marker, and the next Complete finishes the job (the
       // outbox's dedupe keys make the messages safe to enqueue again).
-      await db.insert(auditLog).values({
-        id: newId(),
-        actor: input.personId,
-        action: ANNOUNCED_ACTION,
-        scopeType: "org",
-        scopeId: input.orgId,
-        subject: input.auctionId,
-        meta: { told: String(told), recovered: owed ? "yes" : "no" },
-      });
+      //
+      // Behind a SAVEPOINT (`writeSurvivingConstraint`): a statement that
+      // fails inside a transaction poisons the whole of it, and this one is
+      // the transaction the completion's answer is returned from. The auction
+      // has already completed in the engine; a marker that could not be
+      // written must cost the marker and nothing else.
+      const marked = await writeSurvivingConstraint(db, (tx) =>
+        tx.insert(auditLog).values({
+          id: newId(),
+          actor: input.personId,
+          action: ANNOUNCED_ACTION,
+          scopeType: "org",
+          scopeId: input.orgId,
+          subject: input.auctionId,
+          meta: { told: String(told), recovered: owed ? "yes" : "no" },
+        }),
+      );
+      if (!marked) {
+        logger().error({ auctionId: input.auctionId }, "auction.announce_marker_failed");
+      }
     }
     return result;
   });

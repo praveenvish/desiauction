@@ -194,10 +194,13 @@ export async function sendWebPush(
   keys: VapidKeys,
   options: { now?: number; ttlSeconds?: number; transport?: PushTransport } = {},
 ): Promise<PushOutcome> {
-  // Not a push service: not a subscription. "gone" so the caller forgets the
-  // row, exactly as it would for one the service itself had dropped.
+  // Not a push service we know: never called. "failed", not "gone" — "gone"
+  // makes the caller DELETE the row, and if this list is ever missing a real
+  // browser's service, that would unsubscribe its users in silence. A row that
+  // is skipped costs nothing and can be delivered to the day the list learns
+  // its host.
   if (!isPushServiceEndpoint(subscription.endpoint)) {
-    return "gone";
+    return "failed";
   }
   try {
     // Inside the try: the keys are the browser's claim, and a malformed one
