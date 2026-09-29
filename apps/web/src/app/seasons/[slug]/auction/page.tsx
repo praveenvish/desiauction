@@ -14,6 +14,7 @@ import { auctionDashboard } from "../../../../server/auction/actions";
 import { auctioneerPanelView } from "../../../../server/auction/auctioneer-actions";
 import { appointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
+import { standingsView } from "../../../../server/competition/fixture-actions";
 import { AuctionPanel } from "./auction-panel";
 import { AuctioneerPanel } from "./auctioneer-panel";
 import "../../seasons.css";
@@ -60,11 +61,14 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   // See /seasons: `auction/spectate` next door is public, so no gate layout.
   await requireOnboarded();
-  const [dashboard, auctioneers, appointments] = await Promise.all([
+  const [dashboard, auctioneers, appointments, table] = await Promise.all([
     auctionDashboard(slug),
     auctioneerPanelView(slug),
     // Captains & icons still to be told — null unless this viewer may set them.
     appointmentsPanelView(slug),
+    // How the squads are doing since the night (census 18) — the same read as
+    // the Table tab, so the two cannot disagree.
+    standingsView(slug),
   ]);
   if (dashboard === null) {
     notFound();
@@ -75,6 +79,15 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
   // "Go live" leads to a room that is actually open. Before that there is
   // nothing to watch, and after it there is nothing to bid on.
   const inProgress = status === "live" || status === "paused";
+  const rows = table?.standings.rows ?? [];
+  const standing = rows.some((row) => row.played > 0)
+    ? Object.fromEntries(
+        rows.map((row, index) => [
+          row.teamId,
+          { position: index + 1, points: row.points, played: row.played },
+        ]),
+      )
+    : undefined;
   return (
     <ToastProvider>
       <main className="registrations-dash">
@@ -148,6 +161,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
             slug={slug}
             dashboard={dashboard}
             appointments={appointments}
+            {...(standing !== undefined ? { standing } : {})}
             auctioneersSlot={
               auctioneers !== null ? (
                 <AuctioneerPanel key="auctioneers" slug={slug} view={auctioneers} />

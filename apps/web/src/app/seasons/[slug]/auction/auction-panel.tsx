@@ -42,7 +42,7 @@ import { AbortDialog } from "./abort-dialog";
 import { AuctionSetupFlow } from "./setup/setup-flow";
 import { RulesCard } from "./live-experience";
 import { LotStatusPill, PaddleChip, eventLabel } from "./auction-bits";
-import { OverviewDashboard } from "./overview-dashboard";
+import { OverviewDashboard, type TeamStanding } from "./overview-dashboard";
 import { useHydrated } from "../../../../lib/use-hydrated";
 import "./hub.css";
 import "./dashboard.css";
@@ -113,9 +113,12 @@ export function AuctionPanel({
   dashboard,
   appointments = null,
   auctioneersSlot,
+  standing,
 }: {
   slug: string;
   dashboard: AuctionDashboard;
+  /** Each team's place in the table, once a match has been played. */
+  standing?: TeamStanding;
   /** Captains & icons not yet told — only for whoever may set them (team.manage). */
   appointments?: AppointmentsPanelView | null;
   /** Who else may run this room. */
@@ -293,6 +296,7 @@ export function AuctionPanel({
         slug={slug}
         dashboard={dashboard}
         appointments={appointments}
+        {...(standing !== undefined ? { standing } : {})}
         idleHint={
           terminal
             ? "The hammer is down on every player — the squads are final."

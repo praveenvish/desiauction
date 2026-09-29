@@ -893,6 +893,15 @@
   font-size: var(--text-xs-size);
 }
 
+/* The team's place in the table since the night, beside what it spent. */
+.dash-team-standing {
+  flex-basis: 100%;
+  color: var(--accent-ink);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
 .dash-team-money {
   display: flex;
   flex-direction: column;
