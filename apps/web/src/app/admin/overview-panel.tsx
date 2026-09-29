@@ -140,12 +140,13 @@ export function OverviewPanel({
             ) : (
               <>
                 <ul className="adm-rows adm-feed" data-testid="admin-recent">
-                  {recent.map((row) => (
+                  {groupRuns(recent).map(({ row, times }) => (
                     <li key={row.id} className="adm-feed-row">
                       <RelativeTime at={row.at} />
                       <span className="adm-feed-action" title={row.action}>
                         {humanAction(row.action)}
                         {row.subjectLabel != null ? ` · ${row.subjectLabel}` : null}
+                        {times > 1 ? ` ×${String(times)}` : null}
                       </span>
                       <span className="adm-feed-actor">{actorLabel(row.actor, row.actorName)}</span>
                     </li>
@@ -557,4 +558,29 @@ function StatusList({
       })}
     </div>
   );
+}
+
+/**
+ * A run of the same event by the same person about the same thing is one row
+ * with a count: eight "Made a player poster" lines pushed everything else off
+ * the Overview (census 18). Read 40, fold, show twelve.
+ */
+function groupRuns<
+  T extends { action: string; actor: string; subjectLabel?: string | null | undefined },
+>(rows: readonly T[]): { row: T; times: number }[] {
+  const out: { row: T; times: number }[] = [];
+  for (const row of rows) {
+    const last = out[out.length - 1];
+    if (
+      last !== undefined &&
+      last.row.action === row.action &&
+      last.row.actor === row.actor &&
+      (last.row.subjectLabel ?? null) === (row.subjectLabel ?? null)
+    ) {
+      last.times += 1;
+    } else {
+      out.push({ row, times: 1 });
+    }
+  }
+  return out.slice(0, 12);
 }

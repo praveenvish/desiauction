@@ -15,7 +15,7 @@ describe("matchDayFigures", () => {
     expect(figures.map((f) => [f.key, f.value, f.label])).toEqual([
       ["kickoff", "5 days", "to kickoff"],
       ["lineup", "Awaited", "lineup"],
-      ["last", "Won", "last match · vs Pune Panthers"],
+      ["last", "Won", "last result · vs Pune Panthers"],
       ["record", "2 – 0", "won – lost"],
     ]);
   });

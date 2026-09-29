@@ -1708,7 +1708,8 @@ function OutcomeStrip({ stats }: { stats: RegistrationStats }) {
         <span className="pd-pool-hint">
           {unsold === 0
             ? "Every approved player has a team."
-            : `${String(unsold)} without a team — add them to a squad from their row.`}
+            : // Unsold is a normal outcome of a night, not a to-do (census 18).
+              `${String(unsold)} unsold — you can still add one to a squad from their row.`}
         </span>
       </div>
       {parts.length > 0 ? (
