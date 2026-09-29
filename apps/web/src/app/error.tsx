@@ -1,6 +1,9 @@
 "use client";
 
 import { Button, ButtonLink, ErrorState } from "@desiauction/ui";
+import { useEffect } from "react";
+
+import { reportClientError } from "../lib/report-client-error";
 
 // PX-2: branded error boundary (PX-1 P-07). The digest is the support handle;
 // retry re-renders the failed segment. Copy per the content guide (05 §5).
@@ -19,6 +22,12 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // Somebody on our side has to hear about it too. A failure that began in
+  // the browser carries no digest, so until this the person had nothing to
+  // quote and we had nothing to read (lib/client-error-report).
+  useEffect(() => {
+    reportClientError(error, "boundary");
+  }, [error]);
   return (
     <main
       style={{

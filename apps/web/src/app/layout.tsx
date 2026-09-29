@@ -15,6 +15,7 @@ import { env } from "../env";
 import { ReportProblemProvider } from "../components/report-problem/report-problem";
 import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
+import { ClientErrorListener } from "../components/client-error-listener";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
 import { platformDoorCapabilities } from "../server/admin/actions";
@@ -284,6 +285,8 @@ export default async function RootLayout({
         />
         {/* Every shell, every route: a click is answered before the network is. */}
         <NavigationProgress />
+        {/* …and a failure in the browser is heard about (renders nothing). */}
+        <ClientErrorListener />
         <AppLinkProvider>
           <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
             <ProductShell

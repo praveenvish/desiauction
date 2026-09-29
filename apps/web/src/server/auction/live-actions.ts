@@ -39,6 +39,7 @@ import {
   type LotMedia,
 } from "./live-summary";
 import { planLots, planRulesOf, targetsOf, toLivePlanLot, type LivePlan } from "./owner-plan";
+import { signInPathFor } from "./sign-in-path";
 
 // Live auction actions (M-IP4-2, extended M-IP4-3). The web tier
 // authenticates, resolves the tenant and capabilities, then SUBMITS A COMMAND
@@ -46,10 +47,10 @@ import { planLots, planRulesOf, targetsOf, toLivePlanLot, type LivePlan } from "
 // production owner model); conduct commands require auction.conduct; the
 // compensating undo additionally requires auction.override.
 
-async function requireSession() {
+async function requireSession(slug: string) {
   const session = await currentSession();
   if (session === null) {
-    redirect("/login");
+    redirect(signInPathFor(slug));
   }
   return session;
 }
@@ -187,7 +188,7 @@ export async function liveGate(slug: string): Promise<LiveGate | null> {
  * which is what `liveGate` above now says.
  */
 export async function auctionMemberGate(slug: string): Promise<LiveGate | null> {
-  const session = await requireSession();
+  const session = await requireSession(slug);
   const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
