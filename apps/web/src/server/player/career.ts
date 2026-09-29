@@ -3,6 +3,7 @@ import {
   competitions,
   fixtureLineups,
   fixtureResults,
+  messageOutbox,
   fixtures,
   grounds,
   lots,
@@ -12,7 +13,7 @@ import {
   tournaments,
 } from "@desiauction/db";
 import { sportPackFor, type MoneyUnit } from "@desiauction/core";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
@@ -374,6 +375,13 @@ export interface UpcomingMatch {
   opponentColor: string | null;
   /** Where it is played, when the club named a ground. */
   groundName: string | null;
+  /**
+   * The organizer announced this player's place in the lineup, and they are
+   * still in it. Only the announcement is the player's to know: a saved
+   * lineup that was never announced (or a place taken away after it — the
+   * founder's rule is that nobody is told that) says nothing.
+   */
+  announcedIn: boolean;
 }
 
 export const UPCOMING_LIMIT = 5;
@@ -427,6 +435,17 @@ async function playerOpenMatches(
       registrationId: registrations.id,
       teamId: registrations.teamId,
       groundName: grounds.name,
+      announcedIn: sql<boolean>`(
+        exists (
+          select 1 from ${fixtureLineups}
+          where ${fixtureLineups.fixtureId} = ${fixtures.id}
+            and ${fixtureLineups.registrationId} = ${registrations.id}
+        )
+        and exists (
+          select 1 from ${messageOutbox}
+          where ${messageOutbox.dedupeKey} = 'lineup.announced:' || ${fixtures.id} || ':' || ${registrations.id}
+        )
+      )`,
       homeTeamId: fixtures.homeTeamId,
       homeName: home.name,
       homeColor: home.primaryColor,
@@ -465,6 +484,7 @@ async function playerOpenMatches(
       opponentName: isHome ? row.awayName : row.homeName,
       opponentColor: isHome ? row.awayColor : row.homeColor,
       groundName: row.groundName,
+      announcedIn: row.announcedIn,
     };
   });
 }

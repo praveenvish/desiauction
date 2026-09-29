@@ -2,7 +2,9 @@ import {
   auctions,
   competitions,
   createDb,
+  fixtureLineups,
   fixtures,
+  messageOutbox,
   lots,
   newId,
   organizations,
@@ -13,7 +15,7 @@ import {
   tournaments,
   type DbHandle,
 } from "@desiauction/db";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
@@ -302,6 +304,49 @@ describe("playerCareer (PI-1)", () => {
       competitionName: "CPL 1",
     });
     expect(await playerUpcomingMatches(newId(), "2026-01-01")).toEqual([]);
+  });
+
+  it("says a player is in the lineup only once the organizer announced it", async () => {
+    const next = async () =>
+      (await playerUpcomingMatches(personId, "2026-01-01")).find(
+        (match) => match.fixtureId === fixtureIds[0],
+      );
+    expect((await next())?.announcedIn).toBe(false);
+    // Saved, not announced: a lineup is often the record of who played.
+    await db.insert(fixtureLineups).values({
+      fixtureId: fixtureIds[0],
+      registrationId: regSold,
+      teamId,
+      orgId,
+      competitionId: soldCompId,
+      recordedBy: personId,
+    });
+    expect((await next())?.announcedIn).toBe(false);
+    const key = `lineup.announced:${fixtureIds[0]}:${regSold}`;
+    await db.insert(messageOutbox).values({
+      id: newId(),
+      personId,
+      orgId,
+      kind: "lineup.announced",
+      channel: "email",
+      dedupeKey: key,
+      subject: "",
+      bodyText: "",
+      bodyHtml: "",
+      status: "suppressed",
+    });
+    expect((await next())?.announcedIn).toBe(true);
+    // Taken out after being told: nothing is said (the founder's rule).
+    await db
+      .delete(fixtureLineups)
+      .where(
+        and(
+          eq(fixtureLineups.fixtureId, fixtureIds[0]),
+          eq(fixtureLineups.registrationId, regSold),
+        ),
+      );
+    expect((await next())?.announcedIn).toBe(false);
+    await db.delete(messageOutbox).where(eq(messageOutbox.dedupeKey, key));
   });
 
   it("reads a team's season for its owner — public, upcoming, from the team's side", async () => {

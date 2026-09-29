@@ -3,6 +3,7 @@ import {
   ButtonLink,
   IconArrowRight,
   IconCalendar,
+  IconCheckCircle,
   IconFileCheck,
   IconTrophy,
   IconUser,
@@ -367,6 +368,14 @@ function MatchHero({
           <p className="pm-stage-line">
             {when ?? "No more matches on the schedule yet — the club publishes them."}
           </p>
+          {/* The organizer announced it (and they are still in it): the one
+              line a player opens the app for before a match. */}
+          {next?.announcedIn === true ? (
+            <p className="pm-lineup" data-testid="home-in-lineup">
+              <IconCheckCircle size={16} aria-hidden />
+              You&apos;re in the lineup
+            </p>
+          ) : null}
         </div>
         {registration.posterReady ? (
           <ButtonLink href={`${base}/posters`} size="lg" variant="secondary">
