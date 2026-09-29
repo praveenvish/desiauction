@@ -8,6 +8,7 @@ import { notificationGate } from "../messaging/gate";
 import { boundSubject, codeDigest } from "./code-digest";
 import type { OtpSender } from "./otp-sender";
 import { logSecurityEvent } from "./security-events";
+import { withSendLock } from "./send-lock";
 
 const CODE_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
@@ -76,61 +77,70 @@ export async function requestOtp(
   const phone = normalized.phone;
   const now = Date.now();
 
-  // Cooldown guards spam on a pending code; a consumed code (successful
-  // login) never blocks an immediate second-device sign-in. Abuse is still
-  // capped by the hourly limits below.
-  const [latest] = await db
-    .select({ createdAt: otpCodes.createdAt })
-    .from(otpCodes)
-    .where(and(eq(otpCodes.phone, phone), isNull(otpCodes.consumedAt)))
-    .orderBy(desc(otpCodes.createdAt))
-    .limit(1);
-  if (latest !== undefined && now - latest.createdAt.getTime() < RESEND_COOLDOWN_MS) {
-    return { ok: false, reason: "cooldown" };
-  }
+  // The limits and the row they count are ONE step (send-lock.ts): without the
+  // lock, parallel requests all read the table before any of them wrote to it.
+  const issued = await withSendLock(db, { subject: phone, requestIp }, async (tx) => {
+    // Cooldown guards spam on a pending code; a consumed code (successful
+    // login) never blocks an immediate second-device sign-in. Abuse is still
+    // capped by the hourly limits below.
+    const [latest] = await tx
+      .select({ createdAt: otpCodes.createdAt })
+      .from(otpCodes)
+      .where(and(eq(otpCodes.phone, phone), isNull(otpCodes.consumedAt)))
+      .orderBy(desc(otpCodes.createdAt))
+      .limit(1);
+    if (latest !== undefined && now - latest.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+      return { ok: false, reason: "cooldown" } as const;
+    }
 
-  const [{ count }] = (await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(otpCodes)
-    .where(
-      and(eq(otpCodes.phone, phone), gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000))),
-    )) as [{ count: number }];
-  if (count >= MAX_PER_HOUR) {
-    return { ok: false, reason: "hourly-limit" };
-  }
-
-  if (requestIp !== null) {
-    const [{ count: ipCount }] = (await db
+    const [{ count }] = (await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(otpCodes)
       .where(
-        and(
-          eq(otpCodes.requestIp, requestIp),
-          gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)),
-        ),
+        and(eq(otpCodes.phone, phone), gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000))),
       )) as [{ count: number }];
-    if (ipCount >= MAX_PER_HOUR_PER_IP) {
-      return { ok: false, reason: "hourly-limit" };
+    if (count >= MAX_PER_HOUR) {
+      return { ok: false, reason: "hourly-limit" } as const;
     }
-  }
 
-  const [{ count: platformCount }] = (await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(otpCodes)
-    .where(gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)))) as [{ count: number }];
-  if (platformCount >= globalPerHour) {
-    return { ok: false, reason: "busy" };
-  }
+    if (requestIp !== null) {
+      const [{ count: ipCount }] = (await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(otpCodes)
+        .where(
+          and(
+            eq(otpCodes.requestIp, requestIp),
+            gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)),
+          ),
+        )) as [{ count: number }];
+      if (ipCount >= MAX_PER_HOUR_PER_IP) {
+        return { ok: false, reason: "hourly-limit" } as const;
+      }
+    }
 
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  await db.insert(otpCodes).values({
-    id: newId(),
-    phone,
-    codeHash: phoneCodeDigest(purpose, phone, code, boundTo),
-    purpose,
-    expiresAt: new Date(now + CODE_TTL_MS),
-    requestIp,
+    const [{ count: platformCount }] = (await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(otpCodes)
+      .where(gt(otpCodes.createdAt, new Date(now - 60 * 60 * 1000)))) as [{ count: number }];
+    if (platformCount >= globalPerHour) {
+      return { ok: false, reason: "busy" } as const;
+    }
+
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    await tx.insert(otpCodes).values({
+      id: newId(),
+      phone,
+      codeHash: phoneCodeDigest(purpose, phone, code, boundTo),
+      purpose,
+      expiresAt: new Date(now + CODE_TTL_MS),
+      requestIp,
+    });
+    return { ok: true, code } as const;
   });
+  if (!issued.ok) {
+    return issued;
+  }
+  const code = issued.code;
   /*
    * The gate, for a sign-in code, always says yes (catalogue: `login`, locked —
    * not even a STOP; gate.ts says why). It is asked so the code is one of the

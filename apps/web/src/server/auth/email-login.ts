@@ -10,6 +10,7 @@ import {
 import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import { codeDigest } from "./code-digest";
+import { withSendLock } from "./send-lock";
 import { normalizeEmail } from "./email-change";
 import { DEFAULT_GLOBAL_PER_HOUR } from "./otp";
 
@@ -112,89 +113,96 @@ export async function requestEmailLogin(
   }
   const since = new Date(Date.now() - 60 * 60 * 1000);
 
-  /*
-   * THROTTLE BEFORE LOOKUP, and throttle the unknown addresses too.
-   *
-   * If only real accounts consumed the budget, the difference between a
-   * throttled and an unthrottled response would itself reveal which addresses
-   * are real — the enumeration the uniform result above exists to prevent,
-   * leaking through timing instead of wording.
-   */
-  const [{ count }] = (await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(emailVerifications)
-    .where(
-      and(
-        eq(emailVerifications.email, email),
-        eq(emailVerifications.purpose, "login"),
-        gt(emailVerifications.createdAt, since),
-      ),
-    )) as [{ count: number }];
-  if (count >= MAX_PER_HOUR) {
-    return { ok: false, reason: "hourly-limit" };
-  }
-  if (input.requestIp !== undefined && input.requestIp !== null && input.requestIp !== "") {
-    const [ip] = (await db
+  // The limits and the row they count are ONE step (send-lock.ts).
+  const requestIp =
+    input.requestIp !== undefined && input.requestIp !== null && input.requestIp !== ""
+      ? input.requestIp
+      : null;
+  return withSendLock(db, { subject: email, requestIp }, async (tx): Promise<EmailLoginRequest> => {
+    /*
+     * THROTTLE BEFORE LOOKUP, and throttle the unknown addresses too.
+     *
+     * If only real accounts consumed the budget, the difference between a
+     * throttled and an unthrottled response would itself reveal which addresses
+     * are real — the enumeration the uniform result above exists to prevent,
+     * leaking through timing instead of wording.
+     */
+    const [{ count }] = (await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(emailVerifications)
       .where(
         and(
-          eq(emailVerifications.requestIp, input.requestIp),
+          eq(emailVerifications.email, email),
           eq(emailVerifications.purpose, "login"),
           gt(emailVerifications.createdAt, since),
         ),
       )) as [{ count: number }];
-    if (ip.count >= MAX_PER_HOUR_PER_IP) {
+    if (count >= MAX_PER_HOUR) {
       return { ok: false, reason: "hourly-limit" };
     }
-  }
+    if (input.requestIp !== undefined && input.requestIp !== null && input.requestIp !== "") {
+      const [ip] = (await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(emailVerifications)
+        .where(
+          and(
+            eq(emailVerifications.requestIp, input.requestIp),
+            eq(emailVerifications.purpose, "login"),
+            gt(emailVerifications.createdAt, since),
+          ),
+        )) as [{ count: number }];
+      if (ip.count >= MAX_PER_HOUR_PER_IP) {
+        return { ok: false, reason: "hourly-limit" };
+      }
+    }
 
-  // PLATFORM-WIDE CEILING, before the lookup like every other throttle here, so
-  // it answers identically for real and unknown addresses. See otp.ts.
-  const [platform] = (await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(emailVerifications)
-    .where(gt(emailVerifications.createdAt, since))) as [{ count: number }];
-  if (platform.count >= (input.globalPerHour ?? DEFAULT_GLOBAL_PER_HOUR)) {
-    return { ok: false, reason: "busy" };
-  }
+    // PLATFORM-WIDE CEILING, before the lookup like every other throttle here, so
+    // it answers identically for real and unknown addresses. See otp.ts.
+    const [platform] = (await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(emailVerifications)
+      .where(gt(emailVerifications.createdAt, since))) as [{ count: number }];
+    if (platform.count >= (input.globalPerHour ?? DEFAULT_GLOBAL_PER_HOUR)) {
+      return { ok: false, reason: "busy" };
+    }
 
-  /*
-   * VERIFIED addresses only. An unverified `people.email` is a string somebody
-   * typed; treating it as proof of a mailbox would let anyone who guessed a
-   * colleague's address take their account. The unique index on `lower(email)`
-   * means at most one person can match.
-   */
-  const [person] = await db
-    .select({ id: people.id, verifiedAt: people.emailVerifiedAt })
-    .from(people)
-    .where(eq(people.email, email))
-    .limit(1);
-  if (person !== undefined && person.verifiedAt === null) {
-    // Claimed but unproved — see the doc above. Silent, and indistinguishable
-    // from every other outcome.
-    return { ok: true, sent: true, email };
-  }
+    /*
+     * VERIFIED addresses only. An unverified `people.email` is a string somebody
+     * typed; treating it as proof of a mailbox would let anyone who guessed a
+     * colleague's address take their account. The unique index on `lower(email)`
+     * means at most one person can match.
+     */
+    const [person] = await tx
+      .select({ id: people.id, verifiedAt: people.emailVerifiedAt })
+      .from(people)
+      .where(eq(people.email, email))
+      .limit(1);
+    if (person !== undefined && person.verifiedAt === null) {
+      // Claimed but unproved — see the doc above. Silent, and indistinguishable
+      // from every other outcome.
+      return { ok: true, sent: true, email };
+    }
 
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  await db.insert(emailVerifications).values({
-    id: newId(),
-    // Null means "nobody yet" (0063). `verifyEmailLogin` creates the person
-    // when the code comes back proved, and not one moment sooner: minting the
-    // account here would let anyone manufacture `people` rows from a public
-    // form, and would take an address on behalf of somebody who never replies.
-    personId: person?.id ?? null,
-    email,
-    codeHash: codeDigest("email:login", email, code),
-    purpose: "login",
-    expiresAt: new Date(Date.now() + CODE_TTL_MS),
-    ...(input.requestIp !== undefined && input.requestIp !== null
-      ? { requestIp: input.requestIp }
-      : {}),
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    await tx.insert(emailVerifications).values({
+      id: newId(),
+      // Null means "nobody yet" (0063). `verifyEmailLogin` creates the person
+      // when the code comes back proved, and not one moment sooner: minting the
+      // account here would let anyone manufacture `people` rows from a public
+      // form, and would take an address on behalf of somebody who never replies.
+      personId: person?.id ?? null,
+      email,
+      codeHash: codeDigest("email:login", email, code),
+      purpose: "login",
+      expiresAt: new Date(Date.now() + CODE_TTL_MS),
+      ...(input.requestIp !== undefined && input.requestIp !== null
+        ? { requestIp: input.requestIp }
+        : {}),
+    });
+    return person === undefined
+      ? { ok: true, sent: true, email, code, isNew: true }
+      : { ok: true, sent: true, email, code, personId: person.id, isNew: false };
   });
-  return person === undefined
-    ? { ok: true, sent: true, email, code, isNew: true }
-    : { ok: true, sent: true, email, code, personId: person.id, isNew: false };
 }
 
 export type EmailLoginResult =

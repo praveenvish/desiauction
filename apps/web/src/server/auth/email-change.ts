@@ -4,6 +4,7 @@ import { emailVerifications, newId, people, type Db } from "@desiauction/db";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import { boundSubject, codeDigest } from "./code-digest";
+import { withSendLock } from "./send-lock";
 import { normalizeEmail } from "./email-address";
 import { DEFAULT_GLOBAL_PER_HOUR } from "./otp";
 
@@ -75,62 +76,70 @@ export async function requestEmailVerification(
   if (person?.email === email && person.verifiedAt !== null) {
     return { ok: false, reason: "same-email" };
   }
-  const [{ count }] = (await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(emailVerifications)
-    .where(
-      and(
-        eq(emailVerifications.personId, input.personId),
-        gt(emailVerifications.createdAt, new Date(Date.now() - 60 * 60 * 1000)),
-      ),
-    )) as [{ count: number }];
-  if (count >= MAX_PER_HOUR) {
-    // Per PERSON, not per address: the abuse this stops is using a signed-in
-    // account to spray verification mail at arbitrary mailboxes, and rotating
-    // the address is exactly what that looks like.
-    return { ok: false, reason: "hourly-limit" };
-  }
-  const since = new Date(Date.now() - 60 * 60 * 1000);
   const requestIp =
     input.requestIp !== undefined && input.requestIp !== null && input.requestIp !== ""
       ? input.requestIp
       : null;
-  if (requestIp !== null) {
-    const [ip] = (await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(emailVerifications)
-      .where(
-        and(
-          eq(emailVerifications.requestIp, requestIp),
-          eq(emailVerifications.purpose, "email_change"),
-          gt(emailVerifications.createdAt, since),
-        ),
-      )) as [{ count: number }];
-    if (ip.count >= MAX_PER_HOUR_PER_IP) {
-      return { ok: false, reason: "hourly-limit" };
-    }
-  }
-  const [platform] = (await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(emailVerifications)
-    .where(gt(emailVerifications.createdAt, since))) as [{ count: number }];
-  if (platform.count >= (input.globalPerHour ?? DEFAULT_GLOBAL_PER_HOUR)) {
-    return { ok: false, reason: "busy" };
-  }
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  await db.insert(emailVerifications).values({
-    id: newId(),
-    personId: input.personId,
-    email,
-    codeHash: codeDigest("email:email_change", boundSubject(input.personId, email), code),
-    // Explicit, though it matches the column default: this flow's codes must
-    // never be consumable by sign-in, and saying so here means a future change
-    // to the default cannot silently widen what they prove.
-    purpose: "email_change",
-    expiresAt: new Date(Date.now() + CODE_TTL_MS),
-    ...(requestIp === null ? {} : { requestIp }),
-  });
-  return { ok: true, email, code };
+  // The limits and the row they count are ONE step (send-lock.ts). Keyed on
+  // the ACCOUNT, as the cap is: rotating the address is what the abuse looks like.
+  return withSendLock(
+    db,
+    { subject: `person:${input.personId}`, requestIp },
+    async (tx): Promise<EmailVerificationRequest> => {
+      const [{ count }] = (await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(emailVerifications)
+        .where(
+          and(
+            eq(emailVerifications.personId, input.personId),
+            gt(emailVerifications.createdAt, new Date(Date.now() - 60 * 60 * 1000)),
+          ),
+        )) as [{ count: number }];
+      if (count >= MAX_PER_HOUR) {
+        // Per PERSON, not per address: the abuse this stops is using a signed-in
+        // account to spray verification mail at arbitrary mailboxes, and rotating
+        // the address is exactly what that looks like.
+        return { ok: false, reason: "hourly-limit" };
+      }
+      const since = new Date(Date.now() - 60 * 60 * 1000);
+      if (requestIp !== null) {
+        const [ip] = (await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(emailVerifications)
+          .where(
+            and(
+              eq(emailVerifications.requestIp, requestIp),
+              eq(emailVerifications.purpose, "email_change"),
+              gt(emailVerifications.createdAt, since),
+            ),
+          )) as [{ count: number }];
+        if (ip.count >= MAX_PER_HOUR_PER_IP) {
+          return { ok: false, reason: "hourly-limit" };
+        }
+      }
+      const [platform] = (await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(emailVerifications)
+        .where(gt(emailVerifications.createdAt, since))) as [{ count: number }];
+      if (platform.count >= (input.globalPerHour ?? DEFAULT_GLOBAL_PER_HOUR)) {
+        return { ok: false, reason: "busy" };
+      }
+      const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+      await tx.insert(emailVerifications).values({
+        id: newId(),
+        personId: input.personId,
+        email,
+        codeHash: codeDigest("email:email_change", boundSubject(input.personId, email), code),
+        // Explicit, though it matches the column default: this flow's codes must
+        // never be consumable by sign-in, and saying so here means a future change
+        // to the default cannot silently widen what they prove.
+        purpose: "email_change",
+        expiresAt: new Date(Date.now() + CODE_TTL_MS),
+        ...(requestIp === null ? {} : { requestIp }),
+      });
+      return { ok: true, email, code };
+    },
+  );
 }
 
 export type EmailVerificationResult =
