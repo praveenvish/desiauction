@@ -62,6 +62,7 @@ const ACTIVITY_PHRASE: Record<string, string> = {
   "auction.AuctionCreated": "Auction created",
   "auction.AuctionOpened": "Auction opened",
   "auction.AuctionClosed": "Auction closed",
+  "auction.outcomes_announced": "Players told their results",
   "auction.LotSold": "Lot sold",
   "auction.LotUnsold": "Lot went unsold",
   "auction.owner_join": "Team owner joined",

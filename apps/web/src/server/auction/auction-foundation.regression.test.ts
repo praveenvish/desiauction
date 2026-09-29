@@ -617,6 +617,124 @@ describe("AUCTION FOUNDATION — bids: the gauntlet + immutable evidence", () =>
     }
   });
 
+  it("announces a completion the engine committed but never acknowledged — once, on the retry", async () => {
+    // What a Complete that outlives the web tier's two-second budget looks
+    // like from here: the engine has committed (row completed, AuctionClosed
+    // in the log) and the answer that came back was "engine unreachable".
+    const kohli = await personBehind(auction.id, "Kohli Local");
+    const soldRows = async () =>
+      (
+        await db
+          .select({ id: auditLog.id })
+          .from(auditLog)
+          .where(and(eq(auditLog.scopeId, kohli), eq(auditLog.action, "auction.sold")))
+      ).length;
+    const markers = async () =>
+      (
+        await db
+          .select({ id: auditLog.id })
+          .from(auditLog)
+          .where(
+            and(
+              eq(auditLog.scopeId, org.id),
+              eq(auditLog.action, "auction.outcomes_announced"),
+              eq(auditLog.subject, auction.id),
+            ),
+          )
+      ).length;
+    const input = {
+      personId: owner,
+      orgId: org.id,
+      auctionId: auction.id,
+      competition: { id: comp.id, name: comp.name, auctionUnit: comp.auctionUnit },
+    };
+    const [row] = await db
+      .select({ status: auctionsTable.status })
+      .from(auctionsTable)
+      .where(eq(auctionsTable.id, auction.id));
+    const liveStatus = must(row, "auction row").status;
+    // The earlier test announced this auction; forget that, as a night that
+    // was never announced has nothing to remember.
+    await db
+      .delete(auditLog)
+      .where(and(eq(auditLog.scopeId, org.id), eq(auditLog.action, "auction.outcomes_announced")));
+    const [tail] = await db
+      .select({ seq: auctionEventsTable.seq })
+      .from(auctionEventsTable)
+      .where(eq(auctionEventsTable.auctionId, auction.id))
+      .orderBy(desc(auctionEventsTable.seq))
+      .limit(1);
+    const closedSeq = must(tail, "event tail").seq + 1;
+    const closedEventId = newId();
+    const before = await soldRows();
+    try {
+      await completeAuctionOnce(
+        input,
+        async () => {
+          // The engine's half: committed.
+          await db
+            .update(auctionsTable)
+            .set({ status: "completed" })
+            .where(eq(auctionsTable.id, auction.id));
+          await db.insert(auctionEventsTable).values({
+            id: closedEventId,
+            orgId: org.id,
+            auctionId: auction.id,
+            seq: closedSeq,
+            type: "AuctionClosed",
+            atMs: Date.now(),
+            actor: owner,
+            correlationId: newId(),
+            payload: {},
+          });
+          // The web tier's half: it gave up waiting.
+          return { accepted: false };
+        },
+        (ack) => ack.accepted,
+      );
+      // THE FIX: the completion is there, recent and unannounced — so it is
+      // announced, whatever the acknowledgement said.
+      expect(await soldRows()).toBe(before + 1);
+      expect(await markers()).toBe(1);
+
+      // The organizer presses Complete again; the engine refuses (already
+      // completed). Nobody is told twice.
+      await completeAuctionOnce(
+        input,
+        () => Promise.resolve({ accepted: false }),
+        (ack) => ack.accepted,
+      );
+      expect(await soldRows()).toBe(before + 1);
+      expect(await markers()).toBe(1);
+
+      // A season that finished long ago and has no marker (every auction
+      // completed before this rule existed) is NOT announced by a stray press.
+      await db
+        .delete(auditLog)
+        .where(
+          and(eq(auditLog.scopeId, org.id), eq(auditLog.action, "auction.outcomes_announced")),
+        );
+      await db
+        .update(auctionEventsTable)
+        .set({ atMs: Date.now() - 3 * 24 * 60 * 60 * 1000 })
+        .where(eq(auctionEventsTable.id, closedEventId));
+      await completeAuctionOnce(
+        input,
+        () => Promise.resolve({ accepted: false }),
+        (ack) => ack.accepted,
+      );
+      expect(await soldRows()).toBe(before + 1);
+      expect(await markers()).toBe(0);
+    } finally {
+      // The rest of the suite runs the auction on, from the log it had.
+      await db.delete(auctionEventsTable).where(eq(auctionEventsTable.id, closedEventId));
+      await db
+        .update(auctionsTable)
+        .set({ status: liveStatus })
+        .where(eq(auctionsTable.id, auction.id));
+    }
+  });
+
   it("pass requires NO leading bid; unsold requeues per policy until exhausted", async () => {
     const lot2 = await lotByPlayer(auction.id, "Sharma Local");
     expect((await transitionLot(db, auction, lot2.id, owner, "open")).ok).toBe(true);

@@ -1,7 +1,10 @@
 import { formatAmount, paise, type MoneyUnit } from "@desiauction/core";
 import {
+  auctionEvents,
   auctions,
+  auditLog,
   lots,
+  newId,
   paddles,
   people,
   registrations,
@@ -9,10 +12,11 @@ import {
   withTenantDb,
   type Db,
 } from "@desiauction/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { logSecurityEvent } from "../auth/security-events";
 import { dbHandle } from "../db";
+import { logger } from "../logger";
 import { enqueueMail, enqueueSms, kickDrain } from "../messaging/outbox";
 import { auctionOutcomeMessages } from "./outcome-mail";
 
@@ -127,7 +131,15 @@ export async function announceAuctionOutcomes(input: {
           auctionOutcomeMessages(db, {
             auctionId: input.auctionId,
             competitionId: input.competition.id,
-          }).catch(() => ({ mails: [], texts: [] })),
+          }).catch((error: unknown) => {
+            // Said out loud: every one of these used to be a bare `catch {}`,
+            // so a night whose players were never told left no trace anywhere.
+            logger().error(
+              { err: error, auctionId: input.auctionId },
+              "auction.announce_messages_failed",
+            );
+            return { mails: [], texts: [] };
+          }),
         ]),
     );
     // The personal emails (sold, unsold, each owner's squad) are QUEUED, not
@@ -140,21 +152,69 @@ export async function announceAuctionOutcomes(input: {
       await enqueueMail(messages.mails);
       await enqueueSms(messages.texts);
       kickDrain();
-    } catch {
+    } catch (error) {
       // The inbox rows below still carry every outcome.
+      logger().error({ err: error, auctionId: input.auctionId }, "auction.announce_enqueue_failed");
     }
+    let failed = 0;
     for (const outcome of outcomes) {
       try {
         await logSecurityEvent(outcome.personId, outcome.action, outcome.meta);
         sent += 1;
       } catch {
         // One unreachable player must not cost the other eighty-nine theirs.
+        failed += 1;
       }
     }
-  } catch {
+    if (failed > 0) {
+      logger().error(
+        { auctionId: input.auctionId, failed, sent },
+        "auction.announce_inbox_rows_failed",
+      );
+    }
+  } catch (error) {
     // Nor may the whole announcement cost the auction its completion.
+    logger().error({ err: error, auctionId: input.auctionId }, "auction.announce_failed");
   }
   return sent;
+}
+
+/** The ledger row that says "this auction's outcomes have been announced". */
+const ANNOUNCED_ACTION = "auction.outcomes_announced";
+
+/**
+ * How long after the hammer a completion that was never announced may still be
+ * announced by a retry. Long enough for an organizer to come back to a screen
+ * that said "engine unreachable"; short enough that pressing Complete on a
+ * season that finished last month (before this marker existed) tells nobody
+ * anything twice.
+ */
+const ANNOUNCE_RECOVERY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+async function alreadyAnnounced(db: Db, orgId: string, auctionId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: auditLog.id })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.scopeId, orgId),
+        eq(auditLog.action, ANNOUNCED_ACTION),
+        eq(auditLog.subject, auctionId),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
+/** When the auction closed, by its own event log; null if it has not. */
+async function closedAtMs(db: Db, auctionId: string): Promise<number | null> {
+  const [row] = await db
+    .select({ atMs: auctionEvents.atMs })
+    .from(auctionEvents)
+    .where(and(eq(auctionEvents.auctionId, auctionId), eq(auctionEvents.type, "AuctionClosed")))
+    .orderBy(desc(auctionEvents.seq))
+    .limit(1);
+  return row === undefined ? null : row.atMs;
 }
 
 /**
@@ -168,9 +228,23 @@ export async function announceAuctionOutcomes(input: {
  * and texts were already deduped by the outbox key; the inbox rows were not.
  *
  * The acknowledgement cannot tell a fresh completion from a replayed one, but
- * the auction row can: announce only when it was NOT already completed before
- * this command ran. The per-auction advisory lock makes that read and the
- * command one step, so two concurrent retries cannot both read "live".
+ * the auction row can: announce when it was NOT already completed before this
+ * command ran. The per-auction advisory lock makes that read and the command
+ * one step, so two concurrent retries cannot both read "live".
+ *
+ * AND THE COMPLETION THAT WAS NEVER ANNOUNCED AT ALL (PRR 2026-09-29). That
+ * rule alone had a hole with no way back out of it. The web tier gives the
+ * engine two seconds to answer; a Complete that took longer COMMITTED in the
+ * engine and came back here as "engine unreachable". Not accepted, so nothing
+ * was announced — and every retry then found the row already completed and
+ * announced nothing either. Ninety players, no email, no text, no inbox row,
+ * and until now no log line.
+ *
+ * So an announcement leaves a row behind it (`auction.outcomes_announced`, on
+ * the club's ledger), and a command that finds the auction completed, recently,
+ * with no such row, announces — whatever its own acknowledgement said. Emails
+ * and texts are deduplicated by the outbox key as before; the marker is what
+ * keeps the inbox rows to one set.
  *
  * `send` returns whatever its caller's command path returns; `accepted` says
  * whether it succeeded.
@@ -208,8 +282,42 @@ export async function completeAuctionOnce<T>(
      * swallows its own failures so a completed auction can never be undone by
      * a notification.
      */
-    if (accepted(result) && before?.status !== "completed") {
-      await announceAuctionOutcomes(input);
+    const fresh = accepted(result) && before?.status !== "completed";
+    let owed = false;
+    if (!fresh) {
+      const [after] = await db
+        .select({ status: auctions.status })
+        .from(auctions)
+        .where(eq(auctions.id, input.auctionId))
+        .limit(1);
+      if (after?.status === "completed") {
+        const closedAt = await closedAtMs(db, input.auctionId);
+        owed =
+          closedAt !== null &&
+          Date.now() - closedAt < ANNOUNCE_RECOVERY_WINDOW_MS &&
+          !(await alreadyAnnounced(db, input.orgId, input.auctionId));
+        if (owed) {
+          logger().warn(
+            { auctionId: input.auctionId },
+            "auction.announce_recovered — completed earlier without an announcement",
+          );
+        }
+      }
+    }
+    if (fresh || owed) {
+      const told = await announceAuctionOutcomes(input);
+      // Written AFTER, on this transaction: if the process dies mid-announce
+      // there is no marker, and the next Complete finishes the job (the
+      // outbox's dedupe keys make the messages safe to enqueue again).
+      await db.insert(auditLog).values({
+        id: newId(),
+        actor: input.personId,
+        action: ANNOUNCED_ACTION,
+        scopeType: "org",
+        scopeId: input.orgId,
+        subject: input.auctionId,
+        meta: { told: String(told), recovered: owed ? "yes" : "no" },
+      });
     }
     return result;
   });
