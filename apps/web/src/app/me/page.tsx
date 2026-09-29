@@ -63,6 +63,7 @@ import { verdictOf } from "./registration-card";
 import "./me.css";
 import { formatDate, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
 import { formatCount } from "../../lib/plural";
+import { lineupWords } from "../../lib/lineup-words";
 
 export const metadata = { title: "My profile · DesiAuction" };
 
@@ -1104,6 +1105,11 @@ async function OwnerSeason({ team, season }: { team: OwnedTeam; season: TeamSeas
           }}
           live={next.live}
         />
+      )}
+      {next === undefined || next.live ? null : (
+        <p className="mp-match-foot" data-testid="me-owner-lineup">
+          Next match: {lineupWords(next.lineup)}.
+        </p>
       )}
       {results.length + due.length === 0 ? null : (
         <ul className="mp-matches">

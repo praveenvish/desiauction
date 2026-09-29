@@ -510,6 +510,12 @@ export interface TeamSeasonMatch {
   live: boolean;
   /** From this team's side; null while it is being played or still to come. */
   result: "won" | "lost" | "tied" | "no_result" | null;
+  /**
+   * This team's side of the lineup: how many players are saved, and whether
+   * the organizer has announced it to them. For the owner — whose team it is
+   * — so they know whether their players have heard (census 12).
+   */
+  lineup: { saved: number; announced: boolean };
 }
 
 export interface TeamSeason {
@@ -551,6 +557,18 @@ export async function teamSeason(teamId: string, today: string): Promise<TeamSea
       awayColor: away.primaryColor,
       groundName: grounds.name,
       outcome: fixtureResults.outcome,
+      lineupSaved: sql<number>`(
+        select count(*)::int from ${fixtureLineups}
+        where ${fixtureLineups.fixtureId} = ${fixtures.id}
+          and ${fixtureLineups.teamId} = ${teamId}
+      )`,
+      lineupAnnounced: sql<boolean>`exists (
+        select 1 from ${fixtureLineups}
+        inner join ${messageOutbox}
+          on ${messageOutbox.dedupeKey} = 'lineup.announced:' || ${fixtureLineups.fixtureId} || ':' || ${fixtureLineups.registrationId}
+        where ${fixtureLineups.fixtureId} = ${fixtures.id}
+          and ${fixtureLineups.teamId} = ${teamId}
+      )`,
     })
     .from(fixtures)
     .innerJoin(home, eq(home.id, fixtures.homeTeamId))
@@ -588,6 +606,7 @@ export async function teamSeason(teamId: string, today: string): Promise<TeamSea
         groundName: row.groundName,
         live: row.status === "in_progress",
         result,
+        lineup: { saved: row.lineupSaved, announced: row.lineupAnnounced },
       },
     };
   });
