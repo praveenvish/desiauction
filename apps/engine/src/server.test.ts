@@ -120,6 +120,102 @@ describe("engine transport", () => {
   // and index.ts turns any uncaught exception into process.exit(1). One
   // unauthenticated line killed the live auction runtime. Every path out of the
   // upgrade handler must now be a socket.destroy(), never a throw.
+  it("private routes do not exist for a request that came through the proxy — right secret or not", async () => {
+    // Deployed behind one proxy, as production is.
+    built = buildServer({
+      logger: silentLogger,
+      version: "test",
+      checkDb: () => Promise.resolve(true),
+      engine: stubEngine(Date.now()),
+      engineSecret: "test-secret-123",
+      nodeEnv: "production",
+      trustedProxies: 1,
+    });
+    const command = {
+      commandId: VALID_ID,
+      auctionId: "a",
+      type: "PlaceBid",
+      actor: "01AAAAAAAAAAAAAAAAAAAAAAAA",
+      payload: {},
+    };
+    const secret = { "x-engine-secret": "test-secret-123" };
+    const forwarded = { "x-forwarded-for": "203.0.113.9" };
+
+    // From the internet, WITH the secret: the route is not there.
+    const stolen = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: { ...secret, ...forwarded },
+      payload: command,
+    });
+    expect(stolen.statusCode).toBe(404);
+    // …and without it the answer is the same, so nothing is learned either way.
+    const probing = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: forwarded,
+      payload: command,
+    });
+    expect(probing.statusCode).toBe(404);
+    // Spelled so that a guard comparing the URL's TEXT would not recognise it.
+    const disguised = await built.server.inject({
+      method: "POST",
+      url: "/%63ommand",
+      headers: { ...secret, ...forwarded },
+      payload: command,
+    });
+    expect(disguised.statusCode).toBe(404);
+    for (const url of ["/snapshot/a", "/diagnostics/a", "/snapshot/a?x=1", "/%73napshot/a"]) {
+      const read = await built.server.inject({
+        method: "GET",
+        url,
+        headers: { ...secret, ...forwarded },
+      });
+      expect(read.statusCode, url).toBe(404);
+    }
+    // The RFC 7239 spelling of the same fact.
+    const rfc = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: { ...secret, forwarded: "for=203.0.113.9" },
+      payload: command,
+    });
+    expect(rfc.statusCode).toBe(404);
+
+    // The web tier, on the private network, is served exactly as before.
+    const direct = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: secret,
+      payload: command,
+    });
+    expect(direct.statusCode).toBe(200);
+    // And what a browser needs through the proxy still answers.
+    const health = await built.server.inject({
+      method: "GET",
+      url: "/healthz",
+      headers: forwarded,
+    });
+    expect(health.statusCode).toBe(200);
+  });
+
+  it("with no proxy in front (local, tests) a forwarded header changes nothing", async () => {
+    built = makeServer(true, Date.now());
+    const response = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: { "x-engine-secret": "test-secret-123", "x-forwarded-for": "203.0.113.9" },
+      payload: {
+        commandId: VALID_ID,
+        auctionId: "a",
+        type: "PlaceBid",
+        actor: "01AAAAAAAAAAAAAAAAAAAAAAAA",
+        payload: {},
+      },
+    });
+    expect(response.statusCode).toBe(200);
+  });
+
   it("malformed upgrade targets are refused without taking the process down", async () => {
     built = makeServer(true);
     await built.server.listen({ port: 0, host: "127.0.0.1" });

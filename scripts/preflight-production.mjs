@@ -183,6 +183,28 @@ check(
   `ENGINE_URL=${env.ENGINE_URL ?? "(unset)"}`,
   "point ENGINE_URL at the deployed engine, not localhost",
 );
+// THE WEB TIER TALKS TO THE ENGINE ON THE PRIVATE NETWORK, NEVER THROUGH THE
+// PUBLIC HOSTNAME. The engine now refuses its private routes (/command,
+// /snapshot, /diagnostics) to any request that arrived through the proxy, so
+// an ENGINE_URL pointing at the public engine host would have every bid and
+// every gavel answered 404. Caught here, before anything is swapped.
+{
+  const hostOf = (value) => {
+    try {
+      return new URL(String(value)).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+  const internal = hostOf(env.ENGINE_URL);
+  const publicHost = hostOf(env.ENGINE_PUBLIC_WS_URL);
+  check(
+    "ENGINE_URL-private",
+    internal !== "" && internal !== publicHost,
+    `ENGINE_URL host is "${internal}", the public socket host is "${publicHost}"`,
+    "point ENGINE_URL at the engine on the private network (http://engine:4000 in the compose stack) — the public hostname is for browsers' sockets only",
+  );
+}
 check(
   "ENGINE_PUBLIC_WS_URL-wss",
   typeof env.ENGINE_PUBLIC_WS_URL === "string" && env.ENGINE_PUBLIC_WS_URL.startsWith("wss://"),

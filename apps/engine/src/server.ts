@@ -324,6 +324,53 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
     });
   });
 
+  /**
+   * THE PRIVATE HALF OF THIS SERVER IS PRIVATE BY ROUTE, NOT ONLY BY SECRET
+   * (PRR 2026-09-29).
+   *
+   * One listener serves two audiences. Browsers reach `/ws` and the health
+   * routes through the edge proxy, because a spectator has to. The web tier
+   * reaches `/command`, `/snapshot` and `/diagnostics` directly, on the
+   * private network, and nothing else ever should. But the proxy forwards the
+   * whole host, so those routes were on the public internet too, guarded by
+   * the shared secret alone — a secret that also keys the sign-in code
+   * digests, and whose leak would let anybody, from anywhere, place a bid as
+   * any person in any auction.
+   *
+   * A request that came through a proxy says so: the proxy adds
+   * `x-forwarded-for`, and no caller on the far side of it can take that
+   * header off. So when this engine is deployed behind one (TRUSTED_PROXY_COUNT
+   * ≥ 1, which production requires), a forwarded request to a private route is
+   * told the route does not exist — before the secret is even looked at, so a
+   * stranger cannot use the difference between 401 and 404 to learn anything.
+   *
+   * The web tier must therefore call the engine DIRECTLY (ENGINE_URL on the
+   * private network); `preflight:production` refuses a deploy where it would
+   * go through the public hostname instead.
+   */
+  const privateOnly = (deps.trustedProxies ?? 0) > 0;
+  const cameThroughProxy = (headers: Record<string, unknown>): boolean =>
+    privateOnly && (headers["x-forwarded-for"] !== undefined || headers["forwarded"] !== undefined);
+
+  // Matched on the ROUTE the router chose, not on the text of the URL: the
+  // router decodes a path before matching it, so `/%63ommand` IS `/command`,
+  // and a guard that compared strings would have waved it through.
+  const PRIVATE_ROUTES: ReadonlySet<string> = new Set([
+    "/command",
+    "/admin/reset",
+    "/snapshot/:auctionId",
+    "/diagnostics/:auctionId",
+  ]);
+  server.addHook("onRequest", (request, reply, done) => {
+    const route = request.routeOptions.url ?? "";
+    if (PRIVATE_ROUTES.has(route) && cameThroughProxy(request.headers)) {
+      deps.logger.warn({ route }, "private engine route asked for through the proxy — refused");
+      void reply.status(404).send({ error: "not_found" });
+      return;
+    }
+    done();
+  });
+
   // The command endpoint: web-tier only (shared secret). Every command gets a
   // deterministic Accepted/Rejected ack — no silent failures.
   server.post("/command", async (request, reply) => {
