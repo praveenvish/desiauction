@@ -51,6 +51,7 @@ import { PlanWhatIf } from "./plan-what-if";
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { useMoney } from "../../../../../components/money-unit";
 import type { MoneyFormat } from "../../../../../lib/money";
+import { release } from "../../../../../lib/release";
 
 /**
  * MY PLAN — the page (WR-1).
@@ -186,14 +187,18 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     setAddError(null);
     setBusy(lot.registrationId);
     startTransition(async () => {
-      const result = await addTargetAction(slug, view.team.id, {
-        registrationId: lot.registrationId,
-        maxRupees: "",
-        priority: 3,
-        fallbackRegistrationId: null,
-        atSeq: null,
-      });
-      setBusy(null);
+      const result = await release(
+        addTargetAction(slug, view.team.id, {
+          registrationId: lot.registrationId,
+          maxRupees: "",
+          priority: 3,
+          fallbackRegistrationId: null,
+          atSeq: null,
+        }),
+        () => {
+          setBusy(null);
+        },
+      );
       settle(
         result,
         (next) => {
@@ -221,14 +226,18 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     const lot = lotsByRegistration.get(row.registrationId);
     setBusy(row.id);
     startTransition(async () => {
-      const result = await updateTargetAction(slug, view.team.id, row.id, {
-        maxRupees: patch.maxRupees ?? drafts[row.id] ?? rupeesFromPaise(row.maxBid),
-        priority: patch.priority ?? row.priority,
-        fallbackRegistrationId:
-          patch.fallback === undefined ? row.fallbackRegistrationId : patch.fallback,
-        atSeq: null,
-      });
-      setBusy(null);
+      const result = await release(
+        updateTargetAction(slug, view.team.id, row.id, {
+          maxRupees: patch.maxRupees ?? drafts[row.id] ?? rupeesFromPaise(row.maxBid),
+          priority: patch.priority ?? row.priority,
+          fallbackRegistrationId:
+            patch.fallback === undefined ? row.fallbackRegistrationId : patch.fallback,
+          atSeq: null,
+        }),
+        () => {
+          setBusy(null);
+        },
+      );
       settle(
         result,
         (next) => {
@@ -254,8 +263,9 @@ export function PlanPanel({ slug, view }: { slug: string; view: PlanView }) {
     const lot = lotsByRegistration.get(row.registrationId);
     setBusy(row.id);
     startTransition(async () => {
-      const result = await removeTargetAction(slug, view.team.id, row.id, null);
-      setBusy(null);
+      const result = await release(removeTargetAction(slug, view.team.id, row.id, null), () => {
+        setBusy(null);
+      });
       settle(
         result,
         (next) => {

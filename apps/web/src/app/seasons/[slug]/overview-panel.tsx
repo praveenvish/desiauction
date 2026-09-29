@@ -59,6 +59,7 @@ import { track } from "../../../lib/telemetry";
 import { TeamCrest } from "./_tabs/team-crest";
 import { SeasonImageCard } from "./season-image-card";
 import { ShareRegistration } from "./registrations/share-registration";
+import { release } from "../../../lib/release";
 
 /**
  * The Season Workspace overview (founder mockup 1, 2026-09-19).
@@ -527,11 +528,12 @@ export function OverviewPanel({
       return;
     }
     setBusy(true);
-    const result = await advanceCompetitionAction(
-      slug,
-      step.to as SeasonOverviewView["competition"]["status"],
+    const result = await release(
+      advanceCompetitionAction(slug, step.to as SeasonOverviewView["competition"]["status"]),
+      () => {
+        setBusy(false);
+      },
     );
-    setBusy(false);
     if (result.ok) {
       setBlocked(false);
       toast({ title: ADVANCE_ANNOUNCEMENT[step.to] ?? "Season updated.", tone: "success" });
@@ -551,8 +553,9 @@ export function OverviewPanel({
   // the organizer into next season's setup.
   const runItAgain = async () => {
     setBusy(true);
-    const result = await cloneCompetitionAction(slug);
-    setBusy(false);
+    const result = await release(cloneCompetitionAction(slug), () => {
+      setBusy(false);
+    });
     if (result.ok && result.slug !== undefined) {
       track("competition.cloned");
       toast({ title: "New draft created from this season.", tone: "success" });
@@ -564,8 +567,9 @@ export function OverviewPanel({
 
   const setVisibility = async (visibility: "private" | "public") => {
     setBusy(true);
-    const result = await setCompetitionVisibilityAction(slug, visibility);
-    setBusy(false);
+    const result = await release(setCompetitionVisibilityAction(slug, visibility), () => {
+      setBusy(false);
+    });
     setPublishOpen(false);
     if (result.ok) {
       toast({
@@ -1470,15 +1474,19 @@ function SeasonSettingsDialog({
 
   const save = async () => {
     setPending(true);
-    const result = await updateCompetitionDetailsAction(slug, {
-      name,
-      location,
-      startsOn,
-      endsOn,
-      entryCategory,
-      ...(unitLocked ? {} : { auctionUnit }),
-    });
-    setPending(false);
+    const result = await release(
+      updateCompetitionDetailsAction(slug, {
+        name,
+        location,
+        startsOn,
+        endsOn,
+        entryCategory,
+        ...(unitLocked ? {} : { auctionUnit }),
+      }),
+      () => {
+        setPending(false);
+      },
+    );
     if (result.ok) {
       setError(null);
       onSaved();

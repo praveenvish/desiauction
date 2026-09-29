@@ -79,6 +79,7 @@ import { AddPlayerDialog } from "./add-player-dialog";
 import { ImportDialog } from "./import-dialog";
 import { RegistrationStatusGlyph } from "../../../../components/status/registration-status-glyph";
 import "../_players/players-desk.css";
+import { release, releaseIfLost } from "../../../../lib/release";
 
 const SORTS = ["recent", "oldest", "name", "number", "status"];
 const SORT_LABEL: Record<string, string> = {
@@ -471,15 +472,19 @@ export function RegistrationDashboardPanel({
 
   const selectAllMatching = async () => {
     setBulkBusy("select");
-    const result = await selectAllMatchingAction(slug, {
-      ...(filters.search !== "" ? { search: filters.search } : {}),
-      ...(filters.status !== "" ? { status: filters.status } : {}),
-      ...(filters.outcome !== "" ? { outcome: filters.outcome } : {}),
-      ...(filters.fee !== "" ? { fee: filters.fee } : {}),
-      ...(filters.team !== "" ? { teamId: filters.team } : {}),
-      ...(filters.role !== "" ? { role: filters.role } : {}),
-    });
-    setBulkBusy(null);
+    const result = await release(
+      selectAllMatchingAction(slug, {
+        ...(filters.search !== "" ? { search: filters.search } : {}),
+        ...(filters.status !== "" ? { status: filters.status } : {}),
+        ...(filters.outcome !== "" ? { outcome: filters.outcome } : {}),
+        ...(filters.fee !== "" ? { fee: filters.fee } : {}),
+        ...(filters.team !== "" ? { teamId: filters.team } : {}),
+        ...(filters.role !== "" ? { role: filters.role } : {}),
+      }),
+      () => {
+        setBulkBusy(null);
+      },
+    );
     if (!result.ok) {
       toast({ title: result.error, tone: "danger" });
       return;
@@ -514,8 +519,9 @@ export function RegistrationDashboardPanel({
     const undoes = rows
       .filter((row) => selected.has(row.id))
       .map((row) => roster.apply(row.id, { status: target }));
-    const result = await bulkTriageAction(slug, ids, action, reason, note);
-    setBulkBusy(null);
+    const result = await release(bulkTriageAction(slug, ids, action, reason, note), () => {
+      setBulkBusy(null);
+    });
     if (!result.ok) {
       undoes.forEach((undo) => {
         undo();
@@ -547,18 +553,27 @@ export function RegistrationDashboardPanel({
    */
   const approveAllSubmitted = async () => {
     setApprovingAll(true);
-    const found = await selectAllMatchingAction(slug, { status: "submitted" });
+    const found = await releaseIfLost(
+      selectAllMatchingAction(slug, { status: "submitted" }),
+      () => {
+        setApprovingAll(false);
+      },
+    );
     if (!found.ok) {
       setApprovingAll(false);
       toast({ title: found.error, tone: "danger" });
       return;
     }
-    const result = await bulkTriageAction(
-      slug,
-      found.rows.map((row) => row.id),
-      "approve",
+    const result = await release(
+      bulkTriageAction(
+        slug,
+        found.rows.map((row) => row.id),
+        "approve",
+      ),
+      () => {
+        setApprovingAll(false);
+      },
     );
-    setApprovingAll(false);
     setApproveAllOpen(false);
     if (!result.ok) {
       toast({ title: result.error ?? "Approving everyone failed.", tone: "danger" });
@@ -658,8 +673,9 @@ export function RegistrationDashboardPanel({
   const [reopening, setReopening] = useState(false);
   const reopen = async () => {
     setReopening(true);
-    const result = await advanceCompetitionAction(slug, "registration_open");
-    setReopening(false);
+    const result = await release(advanceCompetitionAction(slug, "registration_open"), () => {
+      setReopening(false);
+    });
     if (!result.ok) {
       toast({ title: result.error ?? "Registration couldn't be reopened.", tone: "danger" });
       return;

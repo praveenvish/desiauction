@@ -23,6 +23,7 @@ import { submitAuctionCommand } from "../../../../../server/auction/live-actions
 import { useHydrated } from "../../../../../lib/use-hydrated";
 import { usePolled } from "../../../../admin/use-polled";
 import { formatCount } from "../../../../../lib/plural";
+import { release } from "../../../../../lib/release";
 
 // RECOVERY DASHBOARD + ENGINE DIAGNOSTICS (M-IP4-3). Everything read-only,
 // polled from the engine's diagnostics feed through the conduct-gated proxy.
@@ -117,8 +118,12 @@ export function EnginePanel({ slug, record }: { slug: string; record?: EngineRec
   const recover = async () => {
     setConfirmOpen(false);
     setBusy(true);
-    const ack = await submitAuctionCommand(slug, crypto.randomUUID(), "RecoverAuction", {});
-    setBusy(false);
+    const ack = await release(
+      submitAuctionCommand(slug, crypto.randomUUID(), "RecoverAuction", {}),
+      () => {
+        setBusy(false);
+      },
+    );
     if (ack.accepted) {
       toast({ title: `Recovered: ${ack.reason ?? "verified"}`, tone: "success" });
     } else {

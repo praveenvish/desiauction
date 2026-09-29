@@ -45,6 +45,7 @@ import {
   type Row,
 } from "./labels";
 import type { Mutate } from "./use-mutate";
+import { release } from "../../../../lib/release";
 
 export type SheetTab = "details" | "squad" | "fee" | "activity";
 
@@ -161,10 +162,12 @@ export function PlayerSheet({
           : action === "restore"
             ? "submitted"
             : row.status;
-    const result = await mutate(row, { status: nextStatus }, () =>
-      triageRegistrationAction(slug, row.id, action),
+    const result = await release(
+      mutate(row, { status: nextStatus }, () => triageRegistrationAction(slug, row.id, action)),
+      () => {
+        setDeciding(null);
+      },
     );
-    setDeciding(null);
     if (result.ok) {
       toast({ title: decisionToast(row.name ?? row.number, action, result), tone: "success" });
       onDecided?.(row, action);
@@ -988,8 +991,9 @@ function ActivityTab({ slug, row }: { slug: string; row: Row }) {
   const add = async () => {
     setAdding(true);
     setError(null);
-    const result = await addNoteAction(slug, row.id, note);
-    setAdding(false);
+    const result = await release(addNoteAction(slug, row.id, note), () => {
+      setAdding(false);
+    });
     if (!result.ok) {
       setError(result.error ?? "Could not add the note.");
       return;

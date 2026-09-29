@@ -15,6 +15,7 @@ import { env } from "../env";
 import { ReportProblemProvider } from "../components/report-problem/report-problem";
 import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
+import { ActionFailureNotice } from "../components/action-failure-notice";
 import { ClientErrorListener } from "../components/client-error-listener";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
@@ -287,6 +288,8 @@ export default async function RootLayout({
         <NavigationProgress />
         {/* …and a failure in the browser is heard about (renders nothing). */}
         <ClientErrorListener />
+        {/* …and said to the person, when what they asked for never came back. */}
+        <ActionFailureNotice />
         <AppLinkProvider>
           <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
             <ProductShell

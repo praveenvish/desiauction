@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { withdrawMyRegistrationAction } from "../../../../server/competition/actions";
+import { release } from "../../../../lib/release";
 
 /**
  * DA-35: a player could not withdraw. `withdraw` was a declared transition with
@@ -24,8 +25,9 @@ export function WithdrawRegistration({ slug }: { slug: string }) {
   const withdraw = async () => {
     setBusy(true);
     setError(null);
-    const result = await withdrawMyRegistrationAction(slug);
-    setBusy(false);
+    const result = await release(withdrawMyRegistrationAction(slug), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       setOpen(false);
       router.refresh();

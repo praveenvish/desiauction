@@ -16,6 +16,7 @@ import {
   exportRegistrationsAction,
   type DashboardParams,
 } from "../../../../server/competition/actions";
+import { release } from "../../../../lib/release";
 
 interface Remembered {
   columns: string[];
@@ -135,13 +136,17 @@ function OpenExportDialog({
   const run = async () => {
     setBusy(true);
     const ordered = columns.filter((column) => chosen.has(column.key)).map((column) => column.key);
-    const result = await exportRegistrationsAction(slug, {
-      columns: ordered,
-      rows,
-      ...(teamId !== "" ? { teamId } : {}),
-      ...(rows === "view" && view !== undefined ? { view } : {}),
-    });
-    setBusy(false);
+    const result = await release(
+      exportRegistrationsAction(slug, {
+        columns: ordered,
+        rows,
+        ...(teamId !== "" ? { teamId } : {}),
+        ...(rows === "view" && view !== undefined ? { view } : {}),
+      }),
+      () => {
+        setBusy(false);
+      },
+    );
     if (!result.ok) {
       toast({ title: result.error, tone: "danger" });
       return;

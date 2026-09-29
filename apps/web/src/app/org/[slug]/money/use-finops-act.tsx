@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { useOutcomeFocus } from "../../../../lib/use-outcome-focus";
 import type { FinopsResult } from "../../../../server/financial-operations/actions";
+import { release } from "../../../../lib/release";
 
 /**
  * The one command runner for the org money desks.
@@ -32,8 +33,9 @@ export function useFinopsAct(): {
 
   const act = async (run: () => Promise<FinopsResult>, done: string): Promise<boolean> => {
     setBusy(true);
-    const result = await run();
-    setBusy(false);
+    const result = await release(run(), () => {
+      setBusy(false);
+    });
     const text = result.ok ? done : result.error;
     toast({ title: text, tone: result.ok ? "success" : "danger" });
     if (!result.ok) {

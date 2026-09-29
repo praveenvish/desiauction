@@ -14,6 +14,7 @@ import {
   inviteOwnerAction,
   revokeOwnerInviteAction,
 } from "../../../../../server/auction/owner-actions";
+import { release } from "../../../../../lib/release";
 
 type Owners = NonNullable<AuctionDashboard["owners"]>;
 
@@ -95,8 +96,9 @@ export function OwnersStep({
 
   const inviteOne = async (teamId: string, replacing?: string) => {
     setPending(`invite-${teamId}`);
-    const ok = await mint(teamId, replacing);
-    setPending(null);
+    const ok = await release(mint(teamId, replacing), () => {
+      setPending(null);
+    });
     if (ok) {
       toast({ title: "Link ready — send it to the team's owner.", tone: "success" });
       router.refresh();
@@ -106,12 +108,17 @@ export function OwnersStep({
   const inviteAll = async () => {
     setPending("invite-all");
     let made = 0;
-    for (const { team, stage } of withoutLink) {
-      if (await mint(team.id, stage.stage === "expired" ? stage.inviteId : undefined)) {
-        made += 1;
+    try {
+      for (const { team, stage } of withoutLink) {
+        if (await mint(team.id, stage.stage === "expired" ? stage.inviteId : undefined)) {
+          made += 1;
+        }
       }
+    } finally {
+      // Whether or not every request came back: a link that WAS made is still
+      // announced below, and the screen is never left busy (lib/release).
+      setPending(null);
     }
-    setPending(null);
     if (made > 0) {
       toast({
         title: `${String(made)} link${made === 1 ? "" : "s"} ready — send each to its team's owner.`,
@@ -123,8 +130,9 @@ export function OwnersStep({
 
   const grant = async (teamId: string, personId: string) => {
     setPending(`grant-${teamId}`);
-    const result = await grantPaddleAction(slug, teamId, personId);
-    setPending(null);
+    const result = await release(grantPaddleAction(slug, teamId, personId), () => {
+      setPending(null);
+    });
     if (result.ok) {
       toast({ title: "Paddle granted — they can claim it in the live room.", tone: "success" });
       router.refresh();

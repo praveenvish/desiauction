@@ -24,6 +24,7 @@ import {
   type VenuesView,
 } from "../../../../server/competition/fixture-actions";
 import { useHydrated } from "../../../../lib/use-hydrated";
+import { release } from "../../../../lib/release";
 
 // Venue → Ground management (M-IP3-3). Server actions do all the deciding;
 // this panel renders lists and submits intents.
@@ -80,8 +81,9 @@ export function VenuesPanel({
   const toggleGround = async (groundId: string, status: string) => {
     setBusy(true);
     const next = status === "active" ? "unavailable" : "active";
-    const result = await setGroundStatusAction(slug, groundId, next);
-    setBusy(false);
+    const result = await release(setGroundStatusAction(slug, groundId, next), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       router.refresh();
     } else {
@@ -290,8 +292,9 @@ function VenueForm({
 
   const submit = async () => {
     setBusy(true);
-    const result = await createVenueAction(slug, name, address, city);
-    setBusy(false);
+    const result = await release(createVenueAction(slug, name, address, city), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       setName("");
       setAddress("");
@@ -368,14 +371,18 @@ function GroundForm({
   const submit = async () => {
     setBusy(true);
     const seats = Number.parseInt(capacity, 10);
-    const result = await createGroundAction(slug, venueId, {
-      name,
-      surface,
-      ...(Number.isFinite(seats) && seats > 0 ? { capacity: seats } : {}),
-      floodlights,
-      indoor,
-    });
-    setBusy(false);
+    const result = await release(
+      createGroundAction(slug, venueId, {
+        name,
+        surface,
+        ...(Number.isFinite(seats) && seats > 0 ? { capacity: seats } : {}),
+        floodlights,
+        indoor,
+      }),
+      () => {
+        setBusy(false);
+      },
+    );
     if (result.ok) {
       onDone();
     } else {

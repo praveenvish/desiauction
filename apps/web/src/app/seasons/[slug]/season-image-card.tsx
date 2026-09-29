@@ -20,6 +20,7 @@ import {
   removeCompetitionImage,
   requestMediaUpload,
 } from "../../../server/media/actions";
+import { release } from "../../../lib/release";
 
 /**
  * The season's own two pictures, one card each: the square crest the public
@@ -99,8 +100,9 @@ export function SeasonImageCard({
 
   async function remove() {
     setBusy("remove");
-    const result = await removeCompetitionImage({ slug, slot });
-    setBusy(null);
+    const result = await release(removeCompetitionImage({ slug, slot }), () => {
+      setBusy(null);
+    });
     if (result.ok) {
       setPreview(null);
       setError(null);

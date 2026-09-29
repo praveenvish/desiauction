@@ -20,6 +20,7 @@ import {
   type FixtureImportPreview,
   type ScheduleView,
 } from "../../../../server/competition/fixture-actions";
+import { release } from "../../../../lib/release";
 
 /**
  * THE PLAN TOOLS — everything that makes or unmakes many matches at once:
@@ -43,8 +44,9 @@ function useAct() {
     done?: string | ((result: T) => { title: string; tone: "success" | "info" | "danger" }),
   ): Promise<T> => {
     setBusy(true);
-    const result = await fn();
-    setBusy(false);
+    const result = await release(fn(), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       if (typeof done === "function") {
         toast(done(result));
@@ -198,8 +200,9 @@ export function GenerateForm({
 
   const askToGenerate = async () => {
     setPreviewing(true);
-    const result = await previewGenerationAction(slug, generateInput());
-    setPreviewing(false);
+    const result = await release(previewGenerationAction(slug, generateInput()), () => {
+      setPreviewing(false);
+    });
     if (!result.ok) {
       toast({ title: result.error, tone: "danger" });
       return;
