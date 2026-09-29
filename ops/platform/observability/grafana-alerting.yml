@@ -184,6 +184,116 @@ groups:
         annotations:
           summary: "A process logged fatal - it is about to die (engine lease loss, runner unhandled rejection)."
           action: "ALERTS.md 2 - fatal is only emitted on the way down; read the lines just before it."
+      # THE AUCTION STOPPED ITSELF (PRR 2026-09-29). The engine halts an auction
+      # when its record and its rows disagree, and says so ONCE, at error level.
+      # The error-rate rule above needs more than ten lines in five minutes, so
+      # the single most serious thing the runtime can report never crossed it:
+      # a room frozen mid-lot paged nobody. Every halt line ends the same way.
+      - uid: da-engine-halted
+        title: "Engine halted an auction"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: 'sum(count_over_time({project="da-prod", service="engine"} |= "auction halted" [5m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: page }
+        annotations:
+          summary: "The engine stopped an auction because its record and its live state disagreed. Nothing is accepted in that room until Recover succeeds."
+          action: "docs/auction/RUNBOOKS.md - open the cockpit, Recover engine. If Recover answers replay_failed, stop and restore: the event log itself is damaged."
+      # A Complete that outlived the web tier's budget used to tell no player
+      # their result and leave no line. It now announces on the retry and says
+      # so; this is how somebody hears that it happened, or that telling the
+      # players failed outright.
+      - uid: da-auction-announce
+        title: "Auction results were not announced cleanly"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: 'sum(count_over_time({project="da-prod", service="web"} |= "auction.announce_" [15m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "An auction completed and telling the players either failed or had to be recovered on a retry."
+          action: "Check /admin/notifications for that season: every sold player should have an inbox row and a queued message. Re-run Complete from the cockpit if none exist."
+      # The engine re-folds the whole event log on every command and the web
+      # tier stops waiting at two seconds. This line is written at one.
+      - uid: da-engine-slow-command
+        title: "Engine commands are getting slow"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: 'sum(count_over_time({project="da-prod", service="engine"} |= "SLOW COMMAND" [15m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "A command took over a second in the engine. At two seconds the web tier gives up waiting and bidders see the auction service did not answer."
+          action: "Check host CPU and Postgres first. If the auction has many thousands of events this is the re-fold cost: finish the night, then schedule the checkpointed fold."
       - uid: da-runner-crashloop
         title: "FinOps runner crash loop"
         condition: C

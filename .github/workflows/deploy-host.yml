@@ -100,27 +100,42 @@ jobs:
           echo "This is only correct when the engine is already broken and the deploy is the repair." >> "$GITHUB_STEP_SUMMARY"
 
       # --- Build the images ---------------------------------------------------
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push
+        env:
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
           REG="ghcr.io/${GITHUB_REPOSITORY,,}"
           TAG="${GITHUB_SHA::12}"
+          # The web image takes one build SECRET: the key that keeps server
+          # action ids the same from one release to the next (apps/web/Dockerfile
+          # says why). Without it every deploy breaks the pages people already
+          # have open, so its absence is announced rather than passed over.
+          WEB_SECRET=""
+          if [ -n "${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-}" ]; then
+            WEB_SECRET="--secret id=server_actions_key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY"
+          else
+            echo "::warning::NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set for this environment — pages open during this deploy must be reloaded before their forms work again"
+            echo "⚠️ No \`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY\` secret for **${{ inputs.environment }}**: every page open during this deploy must be reloaded before its forms and bids work again. Add one (\`openssl rand -base64 32\`) to the environment's secrets." >> "$GITHUB_STEP_SUMMARY"
+          fi
           for app in web engine finops-runner; do
+            EXTRA=""
+            if [ "$app" = web ]; then EXTRA="$WEB_SECRET"; fi
+            # $EXTRA is unquoted on purpose: it is either empty or two words.
+            # shellcheck disable=SC2086
             docker buildx build \
               --file "apps/${app}/Dockerfile" \
               --build-arg "APP_VERSION=${TAG}" \
               --tag "${REG}/${app}:${TAG}" \
+              $EXTRA \
               --push .
           done
-
-          # The deploy-time database toolbox, same commit as the apps: the
-          # migrations it applies are exactly the ones these images expect.
           docker buildx build \
             --file ops/deploy/migrator/Dockerfile \
             --build-arg "APP_VERSION=${TAG}" \
@@ -163,7 +178,7 @@ jobs:
       # env files are NOT in git and are never touched. Anything edited by hand
       # on the host under these names is overwritten — change it here instead.
       - name: Ship the stack definition to the host
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -188,7 +203,7 @@ jobs:
       # the swap begins — a refused deploy leaves the host exactly as it was,
       # so a later manual `docker compose up -d` cannot half-apply it.
       - name: Gate, migrate and swap on the host
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -244,7 +259,13 @@ jobs:
                   echo "Nothing was changed. The previous release (${PREV_TAG}) is still serving." ;;
                 migrate)
                   echo "Serving containers were NOT swapped (still ${PREV_TAG}). A failed migration"
-                  echo "batch rolls back as one transaction; read the error above before retrying." ;;
+                  echo "batch rolls back as one transaction; the roles and grants steps run after"
+                  echo "it has committed and are safe to re-run. Read the error above before retrying." ;;
+                freeze)
+                  echo "An auction went live, or came within its start window, WHILE this deploy was"
+                  echo "running. Serving containers were NOT swapped (still ${PREV_TAG}) and the room"
+                  echo "was not touched. Migrations for ${NEW_TAG} are applied; they are expand-only,"
+                  echo "so ${PREV_TAG} keeps serving on them. Dispatch again when the auction is over." ;;
                 *)
                   echo "Migrations for ${NEW_TAG} are applied. To put the previous images back:"
                   echo "  cd ${APP_DIR}"
@@ -293,6 +314,18 @@ jobs:
             ops migrator roles
             ops migrator grants
 
+            # 3b. ASK AGAIN, immediately before anything in the room is touched.
+            #    The first answer is minutes old by now — the images were pulled
+            #    and the migrations ran in between — and an organizer who
+            #    pressed Start in that time would have the engine swapped under
+            #    their first lot. Same script, same override, new answer.
+            STAGE=freeze
+            if [ "${{ inputs.deploy_anyway }}" = "true" ]; then
+              ops -e DEPLOY_ANYWAY=1 migrator live-window
+            else
+              ops migrator live-window
+            fi
+
             # 4. Swap. Engine first: it hands its single-writer lease back on
             #    graceful SIGTERM and the replacement claims it at once. A brief
             #    overlap is normal — the new one exits 1 and retries.
@@ -321,6 +354,15 @@ jobs:
               done
               echo "${svc}: /readyz healthy"
             }
+
+            # postgresql.conf.d was shipped above, and Postgres only reads it
+            # at start or when told to. Tell it: a setting that is on disk and
+            # not in the running server (archive_timeout was the case in point)
+            # is a recovery objective the runbook states and nothing delivers.
+            # Never fatal — a reload that cannot be sent must not stop a deploy
+            # that is otherwise sound — but never silent either.
+            docker compose exec -T db psql -U postgres -qAtc "select pg_reload_conf()" >/dev/null \
+              || echo "WARNING: could not reload Postgres — postgresql.conf.d changes are NOT live yet"
 
             docker compose up -d --no-deps engine
             wait_ready engine 4000 180

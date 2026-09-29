@@ -23,7 +23,31 @@ ENV NODE_ENV=production \
     DATABASE_URL=postgres://build:build@localhost:5432/build \
     SYSTEM_DATABASE_URL=postgres://build2:build2@localhost:5432/build \
     PUBLIC_BASE_URL=https://build.invalid
-RUN pnpm --filter @desiauction/web build
+# ONE KEY ACROSS BUILDS, OR EVERY DEPLOY BREAKS EVERY OPEN TAB (PRR 2026-09-29).
+#
+# Next derives the id of each server action from a salt, and the salt is the
+# "server actions encryption key". With none supplied it invents one PER BUILD
+# (next/dist/build/webpack-config.js: `serverReferenceHashSalt: encryptionKey`),
+# and a CI build starts from a clean checkout every time. So each release
+# renamed every action: a bid, a registration, a saved lineup sent from a page
+# that was loaded before the deploy reached a server that no longer knew the
+# name, and failed until the person reloaded — with a message about the
+# connection, since that is what an unknown action looks like from the browser.
+#
+# Supplied as a BuildKit SECRET, never an ARG: an ARG is recorded in the image
+# history. The mount is optional on purpose — CI's image job and a laptop build
+# have no secret, and build exactly as before with a throwaway key. The deploy
+# passes it when the environment has one (deploy-host.yml), and says so loudly
+# when it does not. The key: `openssl rand -base64 32`, one per environment.
+RUN --mount=type=secret,id=server_actions_key \
+    if [ -s /run/secrets/server_actions_key ]; then \
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$(cat /run/secrets/server_actions_key)"; \
+      export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY; \
+      echo "server actions key: pinned for this environment"; \
+    else \
+      echo "server actions key: none supplied, generated for this build only"; \
+    fi; \
+    pnpm --filter @desiauction/web build
 
 # `distroless/nodejs` has no shell, so `next start` (a bin script) cannot run.
 # The standalone output ships its own server.js, which is the entrypoint.

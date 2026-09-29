@@ -60,13 +60,21 @@ services:
     depends_on:
       db: { condition: service_healthy }
     healthcheck:
-      # /readyz reflects DB reachability, not just "the process is up" (PRR P2).
+      # LIVENESS, because this check is what autoheal RESTARTS on (the label
+      # above). It asked /readyz, which answers 503 whenever Postgres cannot
+      # be reached — so a database blip of 45 seconds, or a pool that was
+      # merely busy, restarted a healthy web process and killed every request
+      # and queued send in flight, for a fault a restart cannot fix. The
+      # engine's check has always been liveness for exactly this reason
+      # (apps/engine/src/server.ts). Readiness is still asked where it
+      # belongs: the deploy waits on /readyz before it moves on
+      # (deploy-host.yml `wait_ready`), and a monitor can poll it.
       test:
         [
           "CMD",
           "/nodejs/bin/node",
           "-e",
-          "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
