@@ -610,7 +610,8 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                 (row) =>
                   `${row.action.startsWith("grant.") ? "grant.*" : row.action}|${row.subjectName ?? ""}|${row.actorName ?? ""}`,
               )
-                .slice(0, 8)
+                // Fold first, then cap: six groups, however long the runs.
+                .slice(0, 6)
                 .map(({ row, times }) => (
                   <ActivityRow key={row.id} row={row} times={times} />
                 ))}

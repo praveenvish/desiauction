@@ -58,7 +58,7 @@ export function matchDayFigures(input: {
     out.push({
       key: "last",
       value: LAST_WORD[last.result],
-      label: `last match · vs ${last.opponentName}`,
+      label: `last result · vs ${last.opponentName}`,
       ...(last.result === "won"
         ? { tone: "good" as const }
         : last.result === "lost"
