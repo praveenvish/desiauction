@@ -366,9 +366,14 @@ function isMoneyAction(action: string): boolean {
   return domain === "finops" || domain === "settlement" || domain === "payment";
 }
 
-/** Rows shown, and rows read so the capability filter still fills the panel. */
-const ACTIVITY_PAGE = 6;
-const ACTIVITY_SCAN = 40;
+/**
+ * Rows sent, and rows read so the capability filter still fills the panel.
+ * The page folds repeats ("Made a player poster ×6") and then shows six
+ * groups, so it needs more than six rows: six posters in a row used to fold
+ * the whole feed into one line (census 18).
+ */
+const ACTIVITY_PAGE = 30;
+const ACTIVITY_SCAN = 60;
 
 export interface OrgOverview {
   /** ISO — the header's "Est. {year}" and nothing more precise is shown. */

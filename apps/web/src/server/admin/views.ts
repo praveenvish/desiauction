@@ -420,7 +420,7 @@ export async function platformOverview(deps: FinopsDeps, db: Db): Promise<Platfo
     // lines of people signing in and zero lines of the platform doing
     // anything. The audit explorer still shows every one of them — this is the
     // same disclosure-not-concealment trade the admin.accessed exclusion makes.
-    recentActivity(db, 12, [
+    recentActivity(db, 40, [
       ADMIN_ACCESS_ACTION,
       "auth.login.otp",
       // Excluded for the same reason as the others: the admin overview is for
