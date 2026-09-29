@@ -12,6 +12,7 @@ import {
   type QueuedMail,
   type QueuedSms,
 } from "../messaging/outbox";
+import { keepingTransactionAlive } from "../messaging/hold-transaction";
 import { logSecurityEvent } from "../auth/security-events";
 import {
   registrationDecisionMail,
@@ -342,18 +343,22 @@ export async function notifyDecision(
    * (`mayDeliver`), for the "registration" topic — the same three layers that
    * used to be checked here, now checked once, where every channel is decided.
    */
-  await drainOutbox({
-    ...(outboxDb === undefined ? {} : { db: outboxDb }),
-    dedupeKeys: keys,
-    limit: keys.length,
-    ...(channels.sms === undefined ? {} : { sms: channels.sms }),
-    ...(channels.whatsapp === undefined ? {} : { whatsapp: channels.whatsapp }),
-    ...(channels.whatsappTemplate === undefined
-      ? {}
-      : { whatsappTemplate: channels.whatsappTemplate }),
-    ...(channels.mailer === undefined ? {} : { mailer: channels.mailer }),
-    ...(channels.now === undefined ? {} : { now: channels.now }),
-  });
+  // `db` is the club's transaction, and it has nothing to do while these go
+  // out — which is long enough, for a bulk approval, to be ended as idle.
+  await keepingTransactionAlive(db, () =>
+    drainOutbox({
+      ...(outboxDb === undefined ? {} : { db: outboxDb }),
+      dedupeKeys: keys,
+      limit: keys.length,
+      ...(channels.sms === undefined ? {} : { sms: channels.sms }),
+      ...(channels.whatsapp === undefined ? {} : { whatsapp: channels.whatsapp }),
+      ...(channels.whatsappTemplate === undefined
+        ? {}
+        : { whatsappTemplate: channels.whatsappTemplate }),
+      ...(channels.mailer === undefined ? {} : { mailer: channels.mailer }),
+      ...(channels.now === undefined ? {} : { now: channels.now }),
+    }),
+  );
   const settled = await outboxOutcomes(keys, outboxDb);
   let sent = 0;
   let failed = 0;
