@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 import {
   auctionEvents,
   auctions,
@@ -80,13 +82,29 @@ function emailOf(personId: string): string {
   return `fr1p4-${personId.toLowerCase()}@example.test`;
 }
 
+// A phone that is unique for real. The old one kept only the DIGITS of a ULID's
+// last eight characters and filled the rest with "3" — a ULID's tail is mostly
+// letters, so it was usually exactly +919633333333, and this suite asks for TWO
+// phone-only people: the second insert hit people_phone_unique (CI run
+// 36482605128). Random digits, never repeated within the run; the MARK-name
+// cleanup in beforeAll/afterAll still removes every row.
+const issuedPhones = new Set<string>();
+function uniquePhone(): string {
+  let phone: string;
+  do {
+    phone = `+9196${String(randomInt(0, 100_000_000)).padStart(8, "0")}`;
+  } while (issuedPhones.has(phone));
+  issuedPhones.add(phone);
+  return phone;
+}
+
 async function person(opts: { email?: boolean; dob?: string } = {}): Promise<string> {
   const id = newId();
   await db.insert(people).values({
     id,
     name: `${MARK} ${id.slice(-4)}`,
     email: opts.email === false ? null : emailOf(id),
-    phone: opts.email === false ? `+9196${id.slice(-8).replace(/\D/g, "3").padEnd(8, "3")}` : null,
+    phone: opts.email === false ? uniquePhone() : null,
   });
   if (opts.dob !== undefined) {
     await db.insert(playerProfiles).values({ id: newId(), personId: id, dateOfBirth: opts.dob });
