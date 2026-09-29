@@ -17,8 +17,10 @@ import {
   type RegistrationStatus,
 } from "@desiauction/core";
 import {
+  auctions,
   auditLog,
   competitions,
+  lots,
   newId,
   people,
   registrations,
@@ -476,6 +478,12 @@ export interface RegistrationRow {
   status: RegistrationStatus;
   teamId: string | null;
   teamName: string | null;
+  /**
+   * The hammer price (×100, the season's own unit) when the room sold this
+   * player — the room's public record, as the ledger and the squad pages say
+   * it. Null before the night, for a pre-signed player, and for an unsold one.
+   */
+  soldPrice: number | null;
   // Icon (marquee) player: pre-assigned to their team, excluded from the auction.
   isIcon: boolean;
   // Retained from a prior season: pre-assigned and excluded the same way. The
@@ -871,6 +879,16 @@ export async function queryRegistrations(
       status: registrations.status,
       teamId: registrations.teamId,
       teamName: teams.name,
+      // The desk said "Sold" and nothing else (census 12): the price is one
+      // lookup away, on the season's one non-abandoned auction.
+      soldPrice: sql<number | null>`(
+        select ${lots.soldPrice}::float8 from ${lots}
+        inner join ${auctions} on ${auctions.id} = ${lots.auctionId}
+        where ${lots.registrationId} = ${registrations.id}
+          and ${lots.status} = 'sold'
+          and ${auctions.status} <> 'abandoned'
+        limit 1
+      )`,
       isIcon: registrations.isIcon,
       isRetained: registrations.isRetained,
       isCaptain: registrations.isCaptain,

@@ -662,6 +662,18 @@ export default async function ReportsPage({
                         <span>{resultSentence(match).rest}</span>
                       </li>
                     ))}
+                    {/* Owed a result: listed, as the count above says (census 12). */}
+                    {play.awaitingMatches.map((match) => (
+                      <li key={match.fixtureId} data-due="">
+                        <span className="rp-match-when">
+                          {match.kickoffAt === null ? "—" : shortDate(match.kickoffAt)}
+                        </span>
+                        <span>
+                          {match.homeName ?? "Lobby"}
+                          {match.awayName !== null ? ` v ${match.awayName}` : ""} · result due
+                        </span>
+                      </li>
+                    ))}
                     {play.recent.map((match) => {
                       const said = resultSentence(match);
                       return (

@@ -37,6 +37,8 @@ import {
   VisuallyHidden,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
+
+import { useMoney } from "../../../../components/money-unit";
 import {
   useCallback,
   useEffect,
@@ -1756,6 +1758,7 @@ function PlayerRow({
   onDecline: () => void;
 }) {
   const triage = canTriage(row);
+  const money = useMoney();
   const name = row.name ?? "Unnamed";
   return (
     <tr
@@ -1906,7 +1909,9 @@ function PlayerRow({
               ? "Unsold"
               : row.isIcon || row.isCaptain || row.isRetained
                 ? "Pre-signed"
-                : "Sold"}
+                : row.soldPrice !== null
+                  ? `Sold · ${money.ledger(row.soldPrice)}`
+                  : "Sold"}
           </span>
         ) : row.status === "approved" ? (
           <span className="pd-status-quiet">{STATUS_WORD.approved}</span>

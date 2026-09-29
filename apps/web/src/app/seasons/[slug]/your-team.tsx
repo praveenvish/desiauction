@@ -25,6 +25,7 @@ export function YourTeam({
   const place = season?.place ?? null;
   const record = season?.record;
   const next = season?.upcoming[0];
+  const owed = season?.awaiting.length ?? 0;
   const standing = [
     place !== null ? `${ordinal(place.position)} of ${String(place.of)}` : null,
     place !== null ? `${String(place.points)} ${place.points === 1 ? "pt" : "pts"}` : null,
@@ -50,6 +51,14 @@ export function YourTeam({
               {next.live ? "" : `${whenOf(next.kickoffAt, today)} `}vs {next.opponentName}
             </strong>
             {next.groundName !== null ? ` · ${next.groundName}` : ""}
+            {/* Said here as on owner home and /me (census 12). */}
+            {owed > 0
+              ? ` · ${String(owed)} ${owed === 1 ? "result" : "results"} still to come`
+              : ""}
+          </p>
+        ) : owed > 0 ? (
+          <p className="ov-yours-next">
+            {String(owed)} {owed === 1 ? "match is" : "matches are"} awaiting a result
           </p>
         ) : null}
       </div>
