@@ -158,6 +158,8 @@ import {
   type OrphanPreSigned,
   type RegistrationPage,
   type RegistrationQuery,
+  REGISTRATION_OUTCOMES,
+  type RegistrationOutcome,
   type RegistrationRow,
   type RegistrationSort,
   type RegistrationStats,
@@ -1586,6 +1588,8 @@ export interface DashboardParams {
   status?: string;
   /** A fee state — the desk's own filter. */
   fee?: string;
+  /** After the auction: sold, presigned or unsold. */
+  outcome?: string;
   teamId?: string;
   /** A playing role — the pack's key. */
   role?: string;
@@ -1611,6 +1615,9 @@ function dashboardFilter(
     // a `where` clause, and an unknown one should narrow to nothing rather than
     // quietly widening to everything.
     ...(isFeeStatus(params.fee ?? "") ? { fee: params.fee as FeeStatus } : {}),
+    ...(REGISTRATION_OUTCOMES.includes(params.outcome as RegistrationOutcome)
+      ? { outcome: params.outcome as RegistrationOutcome }
+      : {}),
     ...(params.teamId !== undefined && params.teamId !== "" ? { teamId: params.teamId } : {}),
     // Compared for equality in SQL, so an unknown role narrows to nobody.
     ...(params.role !== undefined && params.role !== "" ? { role: params.role } : {}),

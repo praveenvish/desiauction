@@ -22,6 +22,7 @@ export default async function RegistrationsPage({
     ...(sp["q"] !== undefined ? { search: sp["q"] } : {}),
     ...(sp["status"] !== undefined ? { status: sp["status"] } : {}),
     ...(sp["fee"] !== undefined ? { fee: sp["fee"] } : {}),
+    ...(sp["outcome"] !== undefined ? { outcome: sp["outcome"] } : {}),
     ...(sp["team"] !== undefined ? { teamId: sp["team"] } : {}),
     ...(sp["role"] !== undefined ? { role: sp["role"] } : {}),
     ...(sp["sort"] !== undefined ? { sort: sp["sort"] } : {}),
@@ -83,6 +84,7 @@ export default async function RegistrationsPage({
             filters={{
               search: sp["q"] ?? "",
               status: sp["status"] ?? "",
+              outcome: sp["outcome"] ?? "",
               fee: sp["fee"] ?? "",
               team: sp["team"] ?? "",
               role: sp["role"] ?? "",

@@ -796,6 +796,17 @@ section.rd-card[data-flush="true"] {
   background: var(--text-secondary);
 }
 
+/* After the auction: sold gold, pre-signed blue, unsold grey. */
+.pd-pool-bar > span[data-outcome="presigned"],
+.pd-pool-dot[data-outcome="presigned"] {
+  background: var(--info-base);
+}
+
+.pd-pool-bar > span[data-outcome="unsold"],
+.pd-pool-dot[data-outcome="unsold"] {
+  background: var(--text-muted);
+}
+
 .pd-pool-legend {
   display: flex;
   flex-wrap: wrap;
