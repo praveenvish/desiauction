@@ -188,3 +188,24 @@
     display: none;
   }
 }
+
+/* Next up: each match's lineup state, and the door to pick it. */
+.ot-job-text > .ot-lineup {
+  color: var(--warning-strong, var(--text-secondary));
+  font-weight: var(--font-weight-semibold);
+}
+
+.ot-job-text > .ot-lineup[data-ready="true"] {
+  color: var(--success-strong);
+}
+
+.ot-set {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-accent);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
