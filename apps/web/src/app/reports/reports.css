@@ -740,3 +740,9 @@
     padding: var(--space-4);
   }
 }
+
+/* An owed match carries its "Result due" pill in a third column. */
+.rp-matches li[data-due] {
+  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  align-items: center;
+}

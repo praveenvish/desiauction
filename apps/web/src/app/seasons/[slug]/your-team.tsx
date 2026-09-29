@@ -54,9 +54,7 @@ export function YourTeam({
             {next.groundName !== null ? ` · ${next.groundName}` : ""}
             {next.live ? "" : ` · ${lineupWords(next.lineup)}`}
             {/* Said here as on owner home and /me (census 12). */}
-            {owed > 0
-              ? ` · ${String(owed)} ${owed === 1 ? "result" : "results"} still to come`
-              : ""}
+            {owed > 0 ? ` · ${String(owed)} awaiting a result` : ""}
           </p>
         ) : owed > 0 ? (
           <p className="ov-yours-next">
