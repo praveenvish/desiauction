@@ -30,10 +30,18 @@ export function SeasonNow({
   standings: StandingsPageView | null;
   now: string;
 }) {
-  const rows =
+  // The overview reads the schedule's week (two days back, four ahead); the
+  // season's next match can sit beyond it — Sunday's, on a Tuesday — and the
+  // card then had no "next" at all behind three results due (census 16).
+  const ahead = schedule?.upcoming ?? null;
+  const pool =
     schedule === null
       ? []
-      : nowRows(schedule.rows, now, (id) => schedule.results[id] !== undefined);
+      : ahead !== null && !schedule.rows.some((row) => row.id === ahead.id)
+        ? [...schedule.rows, ahead]
+        : schedule.rows;
+  const rows =
+    schedule === null ? [] : nowRows(pool, now, (id) => schedule.results[id] !== undefined);
   const table = standings?.standings.rows.slice(0, 4) ?? [];
   if (rows.length === 0 && table.length === 0) {
     return null;
@@ -68,10 +76,14 @@ export function SeasonNow({
                     ? "Time to be set"
                     : day === today
                       ? `Today ${formatWallTime(kickoff)}`
-                      : state === "next"
-                        ? `${wallDay(day).weekday} ${formatWallTime(kickoff)}`
-                        : // A past day names its date: "Sun 9:30 am" read as next Sunday.
-                          `${wallDay(day).weekday} ${wallDay(day).date}`;
+                      : // Every other day names its date: "Sun 3:00 pm" sat over
+                        // "Sun 27 Sep" and read as the same Sunday (census 16).
+                        `${wallDay(day).weekday} ${wallDay(day).date}`;
+              // A next match's time rides with its ground on the right.
+              const at =
+                state === "next" && kickoff !== null && day !== today
+                  ? formatWallTime(kickoff)
+                  : null;
               const result = schedule?.results[fixture.id];
               const sides =
                 fixture.homeTeamId === null ? `Lobby · ${String(fixture.squadCount)} squads` : null;
@@ -109,8 +121,10 @@ export function SeasonNow({
                     <span className="ov-now-result">
                       {resultWords(result.outcome, fixture.homeTeamName, fixture.awayTeamName)}
                     </span>
-                  ) : fixture.groundName !== null ? (
-                    <span className="ov-now-ground">{fixture.groundName}</span>
+                  ) : at !== null || fixture.groundName !== null ? (
+                    <span className="ov-now-ground">
+                      {[at, fixture.groundName].filter((part) => part !== null).join(" · ")}
+                    </span>
                   ) : null}
                 </li>
               );

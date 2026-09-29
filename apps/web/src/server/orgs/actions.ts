@@ -5,6 +5,7 @@ import {
   auctions,
   auditLog,
   competitions,
+  fixtures,
   grants,
   newId,
   organizations,
@@ -16,7 +17,9 @@ import {
 import { isFinopsCapabilitySet } from "@desiauction/financial-operations";
 import { isSettlementCapabilitySet } from "@desiauction/settlement";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
+import { foldMatchSaves, isMatchAction } from "../../lib/event-names";
 import { personLabel } from "../../lib/person-label";
 import { cookies } from "next/headers";
 import { after } from "next/server";
@@ -453,9 +456,9 @@ export async function orgOverview(slug: string): Promise<OrgOverview | null> {
       .limit(ACTIVITY_SCAN),
   ]);
   const sets = grantRows.map((row) => row.capabilitySet);
-  const visible = activityRows
-    .filter((row) => canSeeMoney || !isMoneyAction(row.action))
-    .slice(0, ACTIVITY_PAGE);
+  const visible = foldMatchSaves(
+    activityRows.filter((row) => canSeeMoney || !isMoneyAction(row.action)),
+  ).slice(0, ACTIVITY_PAGE);
   // "Access granted" with no who, to whom or by whom is a log line, not news.
   // The names are directory data, so they ride the directory's own gate.
   const named = new Map<string, string | null>();
@@ -472,6 +475,34 @@ export async function orgOverview(slug: string): Promise<OrgOverview | null> {
         .where(inArray(people.id, ids));
       for (const row of peopleRows) {
         named.set(row.id, row.name);
+      }
+    }
+  }
+  // A match row is ABOUT a match: "Result entered · TT v PP", not a bare
+  // event. Team names are the season's public face, not directory data.
+  const matchIds = [
+    ...new Set(
+      visible
+        .filter((row) => isMatchAction(row.action) && row.subject !== null)
+        .map((row) => row.subject ?? ""),
+    ),
+  ];
+  if (matchIds.length > 0) {
+    const home = alias(teams, "activity_home");
+    const away = alias(teams, "activity_away");
+    const matchRows = await systemDb
+      .select({
+        id: fixtures.id,
+        home: sql<string | null>`coalesce(${home.shortName}, ${home.name})`,
+        away: sql<string | null>`coalesce(${away.shortName}, ${away.name})`,
+      })
+      .from(fixtures)
+      .leftJoin(home, eq(home.id, fixtures.homeTeamId))
+      .leftJoin(away, eq(away.id, fixtures.awayTeamId))
+      .where(and(eq(fixtures.orgId, org.id), inArray(fixtures.id, matchIds)));
+    for (const row of matchRows) {
+      if (row.home !== null && row.away !== null) {
+        named.set(row.id, `${row.home} v ${row.away}`);
       }
     }
   }
