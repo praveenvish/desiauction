@@ -116,3 +116,31 @@ describe("scrubError — an error made safe for a log line, and still useful in 
     expect(scrubError(null)).toBeNull();
   });
 });
+
+describe("an address is redacted; a package version is not", () => {
+  it("still redacts every shape an address takes", () => {
+    for (const address of [
+      "asha@example.com",
+      "asha.k+league@mail.example.co.in",
+      "a_b-c@sub.domain.org",
+      "UPPER@EXAMPLE.IN",
+    ]) {
+      expect(scrubText(`mail to ${address} failed`), address).toBe("mail to [email] failed");
+    }
+  });
+
+  it("leaves the frames of a stack trace readable", () => {
+    const frame =
+      "at run (/app/node_modules/.pnpm/next@15.5.25_react-dom@19.2.7/node_modules/next/dist/server.js:12:3)";
+    expect(scrubText(frame)).toBe(frame);
+    const scoped =
+      "at x (node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/a.js)";
+    expect(scrubText(scoped)).toBe(scoped);
+  });
+
+  it("redacts an address sitting inside such a line", () => {
+    expect(scrubText("next@15.5.25 could not mail asha@example.com")).toBe(
+      "next@15.5.25 could not mail [email]",
+    );
+  });
+});

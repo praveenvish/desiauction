@@ -104,6 +104,39 @@ export async function handleRazorpayWebhook(
       return { ok: false, status: 409, reason: "envelope_mismatch" };
     }
 
+    /*
+     * 6b · THE EVENT MUST BE ABOUT THE ORDER THIS PAYMENT OPENED (PRR 2026-09-29).
+     *
+     * Everything above compares what the envelope SAYS about itself — and the
+     * part that names the payment (`notes.paymentId`, `notes.orgId`) is copied
+     * from the order's notes, which a checkout can also set from the browser.
+     * So a payer could pay their OWN order and name somebody else's payment of
+     * the same amount in the notes: the signature is genuine (the provider
+     * really did capture money), the amount matches, and the wrong team's dues
+     * were discharged. The order reference was extracted by the adapter, stored
+     * at initiation, and never compared.
+     *
+     * The provider's own identifiers are not the payer's to choose:
+     *   · a payment event carries the ORDER it paid, which must be the order
+     *     pinned when this payment was initiated;
+     *   · a refund or dispute carries the provider's PAYMENT id, which must be
+     *     the one recorded when this payment was captured.
+     * And a gateway event may only ever land on a gateway payment.
+     */
+    if (payment.method !== gateway.method) {
+      return { ok: false, status: 409, reason: "envelope_mismatch" };
+    }
+    const aboutThePayment =
+      envelope.kind === "authorized" || envelope.kind === "captured" || envelope.kind === "failed";
+    if (aboutThePayment) {
+      const pinned = await pinnedOrderRef(tenantDeps, envelope.paymentId);
+      if (pinned !== null && envelope.orderRef !== pinned) {
+        return { ok: false, status: 409, reason: "envelope_mismatch" };
+      }
+    } else if (payment.providerRef !== null && envelope.orderRef !== payment.providerRef) {
+      return { ok: false, status: 409, reason: "envelope_mismatch" };
+    }
+
     // 7 · process — provider truth mapped onto the machine, idempotent by
     // providerEventId (a replayed webhook returns the original ack, appends nothing).
     const facts: WebhookFacts = {
@@ -119,6 +152,19 @@ export async function handleRazorpayWebhook(
     // not change the verdict. Only infrastructure faults surface as 5xx.
     return { ok: true, ack };
   });
+}
+
+/**
+ * The order this payment opened at the gateway, as recorded in its own first
+ * event. Null only for a payment with no initiation event — which the product
+ * cannot create for a gateway method, and which is therefore left to the
+ * checks above rather than refused on a technicality.
+ */
+async function pinnedOrderRef(deps: SettlementDeps, paymentId: string): Promise<string | null> {
+  const events = await deps.store.loadStream("payment", paymentId);
+  const initiated = events.find((event) => event.type === "PaymentInitiated");
+  const orderRef = initiated?.payload["orderRef"];
+  return typeof orderRef === "string" && orderRef !== "" ? orderRef : null;
 }
 
 /** The payment projection carries orgId only via the row; expose it for the pin

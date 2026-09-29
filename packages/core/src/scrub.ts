@@ -42,7 +42,11 @@ export const REDACTED = "[redacted]";
 const PATTERNS: readonly { readonly re: RegExp; readonly label: string }[] = [
   // E.164 India, the shape every phone in this product takes.
   { re: /\+91\d{10}/g, label: "[phone]" },
-  { re: /[\w.+-]+@[\w-]+\.[\w.-]+/g, label: "[email]" },
+  // The last label must be LETTERS: `name@host.tld` is an address, and
+  // `next@15.5.25` is a package in a stack trace. The looser pattern redacted
+  // every frame of every stack (`.pnpm/@[email]/node_modules/…`), which
+  // cost the path that says where an error came from and protected nobody.
+  { re: /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}(?![\w-])/g, label: "[email]" },
   // Long opaque credentials: provider keys and bearer tokens.
   { re: /\b(?:sk|rzp)_[A-Za-z0-9_]{8,}/g, label: "[key]" },
   // A URL's sensitive query values. The SMS provider's API takes the one-time

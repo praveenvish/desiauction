@@ -155,6 +155,16 @@ function webhookBody(paymentId: string, event: string, entity: Record<string, un
   });
 }
 
+/** The order Lions' payment opened at the gateway, read from its own first event. */
+async function pinnedOrder(paymentId: string): Promise<string> {
+  const events = await deps.store.loadStream("payment", paymentId);
+  const orderRef = events.find((event) => event.type === "PaymentInitiated")?.payload["orderRef"];
+  if (typeof orderRef !== "string") {
+    throw new Error("the payment has no pinned order");
+  }
+  return orderRef;
+}
+
 async function login(phone: string): Promise<string> {
   await requestOtp(db, sender, phone);
   const [row] = await db
@@ -554,11 +564,56 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
     await expectBooksAgreeWithCase();
   });
 
+  it("REFUSES a genuine capture of a DIFFERENT order that names this payment — 409, untouched", async () => {
+    // Somebody paid their own order of the same amount, and put Lions' payment
+    // in the notes. The signature is real; the money was really captured.
+    const body = webhookBody(lionsPaymentId, "payment.captured", {
+      id: "pay_somebody_else",
+      order_id: "order_somebody_else",
+      amount: LIONS_DUE,
+    });
+    const before = await deps.store.loadStream("payment", lionsPaymentId);
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 409, reason: "envelope_mismatch" });
+    expect((await deps.store.loadPayment(lionsPaymentId))?.status).toBe("created");
+    expect(await deps.store.loadStream("payment", lionsPaymentId)).toHaveLength(before.length);
+  });
+
+  it("REFUSES a gateway event that names a CASH payment — 409", async () => {
+    const cashId = newId();
+    const paid = await createPayment(deps, actor, {
+      paymentId: cashId,
+      commandId: newId(),
+      caseId,
+      teamId: lions(),
+      method: "manual:cash",
+      amount: 100_00,
+    });
+    expect(paid.ok).toBe(true);
+    const body = webhookBody(cashId, "payment.captured", {
+      id: "pay_for_cash",
+      order_id: "order_for_cash",
+      amount: 100_00,
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 409, reason: "envelope_mismatch" });
+  });
+
   it("captures via a SIGNED webhook OUT OF ORDER → Overpaid Collection + refund liability", async () => {
     // A capture webhook with no prior authorize (provider truth, out of order).
     const body = webhookBody(lionsPaymentId, "payment.captured", {
       id: "pay_lions",
-      order_id: "order_lions",
+      order_id: await pinnedOrder(lionsPaymentId),
       amount: LIONS_DUE, // the pinned ₹25,000
     });
     const result = await handleRazorpayWebhook(
@@ -607,7 +662,7 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
   it("is idempotent on a DUPLICATE webhook (provider replay) — original ack, no double capture", async () => {
     const body = webhookBody(lionsPaymentId, "payment.captured", {
       id: "pay_lions",
-      order_id: "order_lions",
+      order_id: await pinnedOrder(lionsPaymentId),
       amount: LIONS_DUE,
     });
     const journalBefore = await deps.store.loadStream("journal", org.id);
@@ -671,6 +726,22 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
     const len = (await deps.store.loadStream("journal", org.id)).length;
     await runPaymentCoordination(deps, actor, lionsPaymentId);
     expect((await deps.store.loadStream("journal", org.id)).length).toBe(len);
+  });
+
+  it("REFUSES a refund of a DIFFERENT provider payment that names this one — 409", async () => {
+    const body = webhookBody(lionsPaymentId, "refund.processed", {
+      id: "rfnd_somebody_else",
+      payment_id: "pay_somebody_else",
+      amount: 500_000,
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 409, reason: "envelope_mismatch" });
+    expect((await deps.store.loadPayment(lionsPaymentId))?.refundedTotal).toBe(0);
   });
 
   it("refunds the ₹5,000 overpayment — liability-first, nothing reinstated", async () => {
