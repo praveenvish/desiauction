@@ -49,13 +49,102 @@ judged to carry more risk than they remove today, and each has a reason:
 
 | Item | Why it was not changed |
 |---|---|
-| Splitting `ENGINE_SECRET` into per-purpose keys | Needs web and engine to change together. During the gap every socket ticket and every sign-in code in flight fails. It is a planned maintenance, not a patch |
+| Splitting `ENGINE_SECRET` into per-purpose keys | **Done in the third pass as an optional key** (section 0b). Switching it on is still a planned act |
 | Durable command ids on `auction_events`, unique index on the leading bid | Both touch the certified auction aggregate. The integrity test shows no harm without them |
-| Missing foreign keys, validating the 29 `NOT VALID` ones | A row that fails validation refuses the deploy. Needs a read of production data first |
-| Razorpay order binding | The gateway is switched off and its certified tests use fixed order ids. Must be done before switching it on |
-| Spectator frame size | A design change to the snapshot contract |
+| Missing foreign keys, validating the 29 `NOT VALID` ones | A row that fails validation refuses the deploy. Needs a read of production data first. **The read-only check now exists** (section 0b) |
+| Razorpay order binding | **Done in the third pass** (section 0b) |
+| Spectator frame size | A design change to the snapshot contract. **Compression shipped as an opt-in instead** (section 0b) |
 | Email-change confirm step-up, money grants to non-members | Low severity; the first would add friction to a flow the e2e suite exercises with older sessions |
-| About 20 client files that can strand a busy state | Breadth. Their failures are now at least reported (FE-8) |
+| About 20 client files that can strand a busy state | **Done in the third pass** (section 0b) |
+
+## 0b. Third pass: the open list, and a second review
+
+The third pass worked through what the second had left open, under the same
+rule: nothing that works may break, and nothing leaves the branch. It was then
+reviewed adversarially a second time. That review found **one defect that
+would have been a BLOCKER had it shipped**, in this branch's own webhook fix.
+It was corrected, with tests, before anything left this machine.
+
+### What was closed
+
+| Item | What was done | Proof |
+|---|---|---|
+| SEC-10, one secret doing four jobs | Optional `AUTH_CODE_SECRET` for sign-in codes and passkey challenges. Unset, nothing changes | Tests for both states; boot refuses a value equal to the engine's |
+| SEC-12, webhook order binding | Events bound to the pinned order or the recorded provider payment | 7 refusal and acceptance tests |
+| FE-5, screens left busy | 48 handlers in 31 files, one notice for a lost request | Browser test: network cut under a real button |
+| DB-3, DB-6, foreign keys | Read-only integrity check for production | Run on the test database: every line `ok` |
+| DB-7, engine migration set | CI guard | Fails when a file is added, passes without |
+| OPS-7, disk and certificate alerts | Sidecar plus three rules | All 19 rules loaded in Grafana; three alerts delivered to a webhook |
+| PERF-1, frame size | Opt-in compression | Measured, table below |
+
+### What the second review found in this pass's own work
+
+| # | Finding | Severity | What was done |
+|---|---|---|---|
+| T1 | The order binding compared a dispute's ORDER with our provider PAYMENT id. Different identifiers: every genuine chargeback would have been refused and never reached the books | **BLOCKER, had it shipped** | A dispute is bound to the pinned order and to the recorded provider payment. Three tests in the shape the provider sends |
+| T2 | The stale-page notice matched the sentence the server logs. The browser receives a different one, so the one case a reload fixes was never recognised | HIGH | Matches what the installed framework version actually throws, read from its source |
+| T3 | The notice stayed until dismissed, over the retry that succeeded, and sat where the live room keeps its bid buttons | MEDIUM | Leaves after 15 seconds or on navigation; moved to the top |
+| T4 | Compression kept about 270 KB of memory per spectator, a quarter of a gigabyte at a thousand | MEDIUM | 32 KB. Six settings measured, the cheapest kept |
+| T5 | Invite-all announced nothing when a later request was lost | LOW | Links already made are announced |
+| T7 | A proxy error during a restart was called a stale page | LOW | Treated as a dropped request |
+| T8 | The integrity check had no time limit | LOW | Two minutes, and a note not to run it during a deploy |
+| T9 | A blank `AUTH_CODE_SECRET=` passed preflight and then stopped the server booting | LOW | Read as unset |
+| T10 | A refused webhook left no trace | LOW | Every refusal logged with the check that refused it |
+| S1 | One non-JSON line in the disk stream failed the alert query, and a failed query on a paging rule pages | MEDIUM | Filtered. Proven against Loki with bad lines |
+
+T6 was left as it is: a session-expiry redirect now re-enables the button for an instant before the page leaves. The second click redirects too.
+
+### Found along the way, not raised by the first audit
+
+| ID | Finding | Severity | Status |
+|---|---|---|---|
+| FE-11 | **An approved player could flip back to "waiting", and the review walk then jumped back instead of finishing.** A page asked for before an approval and arriving after it was believed over the approval. This is the `player-desk` e2e test that fails about one run in four. Present on main; not caused by this branch | MEDIUM | **FIXED**. A confirmed change is kept against a page that disagrees, three times at most. Measured on a test that delivers every page late: 6 failures in 20 before, 0 in 20 after. A first attempt (stamping when each page was asked for) was measured, failed 2 in 10, and was discarded |
+| API-7 | A signed, fresh gateway event the product does not act on (`order.paid`) was answered 400. A provider that sees a day of failed deliveries switches the webhook off | MEDIUM | **FIXED**. Answered 200 |
+| API-8 | A refund raised from the provider's dashboard carries no anchor of its own, so every such refund was refused as malformed | MEDIUM | **FIXED against the documented payload**: the anchor is read from the payment the refund names, in the same signed body. NOT VERIFIED against a real delivery |
+| SEC-16 | `code-digest.ts` held two raw NUL bytes. git treated the file as binary and text search skipped it in silence | LOW | **FIXED**. Written as escapes; a known-answer test proves stored codes still match |
+| SEC-17 | A connection URL's login (`postgres://user:password@host`) was scrubbed from error text only by accident, and not when the host was an IP or a bare name | LOW | **FIXED**, by shape |
+
+### Frame compression, measured
+
+One machine, a 250-player night, real WebSockets, the engine and the simulated
+spectators in one process. The CPU and memory figures therefore include the
+spectators and overstate the engine's share; compare the two columns.
+
+| Spectators | Wire per spectator per bid | | Last spectator has the bid | | 40-bid burst settles | |
+|---|---|---|---|---|---|---|
+| | off | on | off | on | off | on |
+| 50 | 37.7 KiB | 6.2 KiB | 21 ms | 23 ms | 0.7 s | 0.8 s |
+| 250 | 46.9 KiB | 8.1 KiB | 39 ms | 50 ms | 1.0 s | 1.1 s |
+| 500 | 51.6 KiB | 9.0 KiB | 68 ms | 89 ms | 1.2 s | 2.3 s |
+| 1,000 | 56.2 KiB | 9.9 KiB | 130 ms | 180 ms | 1.8 s | 6.0 s |
+
+No spectator was dropped in any burst, in either mode. The frame grows through
+the run because the lot's bid history grows. Recommendation: switch it on in
+staging first; it is worth having up to about 500 spectators per room, and
+costs real delivery time under sustained bursts beyond that.
+
+### Validation of the final commit
+
+Every figure below was produced by a command run in this pass, on a database
+rebuilt from nothing.
+
+| Suite | Result |
+|---|---|
+| Lint, typecheck, format, dependency rules, motion tokens, posture (static), script tests, journal | PASS |
+| Unit | **1,366 pass** |
+| Integration, web | **2,587 pass** (237 files) |
+| Integration, engine | **75 pass** |
+| Runner under its production role | 5 pass |
+| Grants manifest | 455 expectations pass |
+| Row security probe with seeded data | PASS |
+| Posture suite under production roles | 37 pass |
+| Production build, bundle budget | PASS, 106 routes |
+| End to end, full suite | **158 passed, 0 failed, 0 flaky**, 29 skipped by design |
+| Design-system journeys, photo journey (dev server) | 28 passed, 1 passed |
+| Alert rules in Grafana | 19 loaded, 0 unhealthy |
+
+One earlier full run in this pass had one flaky test (`player-desk`). That is
+FE-11 above, since fixed; the run after the fix had none.
 
 ## Executive Summary
 
@@ -63,15 +152,15 @@ judged to carry more risk than they remove today, and each has a reason:
 
 The auction core is sound. No defect was found that produces a wrong auction result, a double sale, a negative purse, a cross-tenant read or an authorization bypass. That conclusion rests on evidence, not on reading: 75 engine integration tests, a new randomized integrity test run on four seeds, and 2,533 web integration tests under the production database roles.
 
-The conditions are operational, not algorithmic. This review found **10 HIGH findings, 0 BLOCKER and 0 CRITICAL**. Eight of the ten are fixed on the branch. None of the fixes is deployed yet, so production today still carries them. Two HIGH items need the founder and the host, and cannot be closed from a repository: proof that the backups can actually be restored, and proof that an alert reaches a person.
+The conditions are operational, not algorithmic. This review found **10 HIGH findings, 0 BLOCKER and 0 CRITICAL**. Eight of the ten are fixed on the branch. The third pass added three MEDIUM and two LOW findings, all fixed, and closed DB-7 and the binding half of SEC-12 (section 0b). None of the fixes is deployed yet, so production today still carries them. Two HIGH items need the founder and the host, and cannot be closed from a repository: proof that the backups can actually be restored, and proof that an alert reaches a person.
 
 | Severity | Found | Fixed on the branch | Open |
 |---|---|---|---|
 | BLOCKER | 0 | 0 | 0 |
 | CRITICAL | 0 | 0 | 0 |
 | HIGH | 10 | 8 | 2 (both need the host: restore proof, alert proof) |
-| MEDIUM | 27 | 22 | 5 |
-| LOW | 19 | 7 | 12 |
+| MEDIUM | 30 | 25 | 5 |
+| LOW | 21 | 10 | 11 |
 
 **The answer to the question asked.** DesiAuction can run a real auction correctly. It should not run one that matters until the five conditions in section 67 are closed, because today a lost host may mean lost data, and a broken night may page nobody.
 
@@ -166,7 +255,7 @@ BLOCKER and CRITICAL: none. HIGH findings, all of them:
 | FE-1 | HIGH | Live room | A connection that died without closing was detected and only relabelled. Nothing reconnected | Owner locked out of bidding until they reloaded | **FIXED**, policy VERIFIED by unit test, NOT VERIFIED on a real device |
 | FE-2 | HIGH | Live room | "Withdraw" was one click beside "Open", and withdrawal is the one lot command with no undo | A mis-tap removes a player from the auction for good | **FIXED**, e2e updated |
 | OPS-5 | HIGH | Recovery | No evidence the backup encryption passphrase and the env files exist anywhere but the host. The production backup has never been restored | Host lost means backups unreadable | **OPEN**, founder and host required |
-| OPS-7 | HIGH | Alerting | An engine-halted auction logs one error line, below the error-rate threshold. No disk, certificate or external uptime alert. A Grafana silence may still mute production | A frozen auction pages nobody | **PARTIALLY FIXED**: three rules added. Delivery NOT VERIFIED |
+| OPS-7 | HIGH | Alerting | An engine-halted auction logs one error line, below the error-rate threshold. No disk, certificate or external uptime alert. A Grafana silence may still mute production | A frozen auction pages nobody | **PARTIALLY FIXED**: six rules added (engine halted, slow command, results not announced, disk filling, disk watcher silent, certificate renewal) and a disk-watch sidecar. All 19 rules were loaded into a local Grafana from the real files and evaluate healthy; the disk, silence and certificate alerts were each delivered to a local webhook. Delivery from the PRODUCTION host is still NOT VERIFIED, and the external uptime check is the founder's |
 
 ---
 
@@ -181,9 +270,9 @@ BLOCKER and CRITICAL: none. HIGH findings, all of them:
 | SEC-5 | MEDIUM | Engine and runner roles, both able to bypass row security, could read every session hash, sign-in code digest, passkey and push key | **FIXED**. Migration 0098, pinned in the grants manifest |
 | SEC-8 | MEDIUM | Web and engine logs wrote phone numbers from database errors in free text, and redacted the error code that would diagnose them. Reproduced | **FIXED**. One shared scrubber in all three services |
 | SEC-9 | MEDIUM | The engine's command endpoint was reachable from the internet, protected by the shared secret alone | **FIXED** in the engine: private routes answer 404 to any request that came through the proxy. Preflight refuses a misconfigured environment |
-| SEC-10 | MEDIUM | `ENGINE_SECRET` is one value doing four jobs: engine auth, socket tickets, sign-in code digests, passkey challenges | **OPEN**. Needs a planned rotation. SEC-5 and SEC-9 remove the two worst consequences |
+| SEC-10 | MEDIUM | `ENGINE_SECRET` is one value doing four jobs: engine auth, socket tickets, sign-in code digests, passkey challenges | **MECHANISM SHIPPED, NOT SWITCHED ON**. `AUTH_CODE_SECRET` (optional) gives sign-in codes and passkey challenges a key the engine never holds. Unset, nothing changes. Setting it is a planned act in a quiet window (SECRET_ROTATION.md): codes in flight, a few minutes' worth, stop matching. Engine auth and socket tickets still share `ENGINE_SECRET`, which both tiers must hold |
 | SEC-11 | MEDIUM | The script Content Security Policy is report-only in production. Observed on the live response header | **OPEN**, already planned. Set `CSP_ENFORCE=1` after a clean week |
-| SEC-12 | MEDIUM | Razorpay webhook does not compare the event's order with the one pinned at initiation, and order creation has no idempotency key | **OPEN, dormant**. Gateway payments cannot be initiated today. Must be closed before they are switched on |
+| SEC-12 | MEDIUM | Razorpay webhook does not compare the event's order with the one pinned at initiation, and order creation has no idempotency key | **BINDING FIXED** (third pass). Every event is bound to the order pinned at initiation or to the provider payment recorded at capture, and a gateway event can only land on a gateway payment. Tested against the provider's DOCUMENTED payloads; NOT VERIFIED against a live or test-mode delivery. The idempotency key on order creation is still OPEN. Gateway payments remain switched off |
 | SEC-13 | LOW | A removed team owner kept reading that team's receipts | **FIXED** |
 | SEC-14 | LOW | Mail feedback webhook fetched a signing certificate before checking the topic | **FIXED** |
 | SEC-15 | LOW | Web tier did not refuse to boot with no trusted proxy hop, which silently disables every per-address limit | **FIXED** |
@@ -285,7 +374,7 @@ Measured on a developer laptop under load from other containers, Postgres 17 in 
 
 | ID | Severity | Finding | Status |
 |---|---|---|---|
-| PERF-1 | MEDIUM | Snapshot size grows with the pool and is sent whole, uncompressed, on every bid. At 250 players and 200 viewers that is 7.8 MB per bid. A phone spectator on mobile data receives roughly 40 to 60 MB over a night | OPEN. The first bottleneck at scale is **bandwidth**, not CPU or database |
+| PERF-1 | MEDIUM | Snapshot size grows with the pool and is sent whole, uncompressed, on every bid. At 250 players and 200 viewers that is 7.8 MB per bid. A phone spectator on mobile data receives roughly 40 to 60 MB over a night | **OPT-IN FIX SHIPPED, OFF BY DEFAULT**. `WS_COMPRESSION=on` cuts the frame about sixfold (measured below). The snapshot contract itself is unchanged. The first bottleneck at scale is **bandwidth**, not CPU or database |
 | PERF-2 | LOW | Per-command cost grows with the event log (full re-fold). 45 ms at 5,000 events against a 2 second web budget | OPEN, monitored. A new alert fires at 1 second |
 | PERF-3 | — | First-load JavaScript: all 106 routes within the 146 kB budget | VERIFIED |
 | PERF-4 | — | Web route latency under concurrent load | VERIFIED locally, see "Web tier under load" below. NOT VERIFIED on production hardware |
@@ -372,11 +461,11 @@ Graceful shutdown: VERIFIED in code for the engine (sockets told, lease released
 |---|---|---|---|
 | DB-1 | MEDIUM | Service roles could read identity tables | **FIXED**, migration 0098 |
 | DB-2 | MEDIUM | Money projections had no value checks | **FIXED**, validated on existing rows |
-| DB-3 | MEDIUM | About 24 relationship columns have no foreign key. Zero orphans found locally | OPEN |
+| DB-3 | MEDIUM | About 24 relationship columns have no foreign key. Zero orphans found locally | OPEN, **with the tool to close it**: `ops/db/check-integrity.sql` counts, read-only, the rows that would refuse each constraint. Run it on production, then write the migration |
 | DB-4 | MEDIUM | 36 tables have no row security, including identity tables. 205 call sites use the pool that bypasses it | OPEN, by design and tracked by the posture check |
 | DB-5 | LOW | The default sign-in path had no index on email | **FIXED** |
-| DB-6 | LOW | 29 foreign keys added as `NOT VALID` were never validated | OPEN |
-| DB-7 | LOW | The engine's own migration set is silently skipped (its timestamp predates the platform's). Harmless today, its one table is unused | OPEN |
+| DB-6 | LOW | 29 foreign keys added as `NOT VALID` were never validated | OPEN, same tool: zero rows break them on the test database |
+| DB-7 | LOW | The engine's own migration set is silently skipped (its timestamp predates the platform's). Harmless today, its one table is unused | **FIXED**: the journal check fails CI if the engine's set grows |
 | DB-8 | LOW | 15 redundant indexes on hot write paths | OPEN |
 
 Migrations: journal VERIFIED (98 entries, strictly increasing). No destructive statement in 0080 to 0098. All 139 time columns carry a time zone. Pools sum to about 41 connections against a limit of 100.
@@ -404,7 +493,7 @@ Migrations: journal VERIFIED (98 entries, strictly increasing). No destructive s
 | FE-1, FE-2 | HIGH | See section 2 | **FIXED** |
 | FE-3 | MEDIUM | The `/live` conduct card and cockpit shortcut keys worked on a stale screen. A gavel held over a frozen view sells to whoever actually leads | **FIXED** |
 | FE-4 | MEDIUM | Cockpit end-of-night card shows each team's spend as ₹0 until reload | **FIXED** (second pass) |
-| FE-5 | MEDIUM | Three cockpit handlers left the screen permanently busy if a request never returned | **FIXED**. About 20 other client files share the pattern, OPEN |
+| FE-5 | MEDIUM | Three cockpit handlers left the screen permanently busy if a request never returned | **FIXED everywhere** (third pass): 48 handlers in 31 files let go of the screen whether or not the request returns, and one notice says what happened. Proven in a real browser with the network cut under a button press |
 | FE-6 | MEDIUM | A waiting owner was told the claim button would appear when granted, and it never did without a reload | **FIXED** |
 | FE-7 | MEDIUM | Several refusals reached users as "Try again" when retrying cannot work | **FIXED**, with a test that reads the reasons from the source so the next one fails the build |
 | FE-8 | MEDIUM | No error reporting from the browser. A crash in the room is invisible to operators | **FIXED** (second pass) |
@@ -453,20 +542,20 @@ VERIFIED in code: non-root distroless images, no host ports on database, storage
 | Suite | Result in this review |
 |---|---|
 | Lint, typecheck, format, dependency rules, motion tokens | PASS |
-| Unit | **1,358 pass** across 9 packages |
-| Integration, web | **2,554 pass** (232 files) |
+| Unit | **1,366 pass** across 9 packages (third pass) |
+| Integration, web | **2,587 pass** (237 files) (third pass) |
 | Integration, engine | **75 pass** |
 | Integration, runner under its production role | 5 pass |
 | Grants manifest | 455 expectations pass |
 | Row security probe, posture suite | PASS, 37 tests |
 | Production build, bundle budget | PASS |
 | Dependency audit | No known vulnerabilities |
-| End to end, Chromium, full suite on the final code | **156 passed, 0 failed, 0 flaky**, 29 skipped by design |
+| End to end, Chromium, full suite on the final code | **158 passed, 0 failed, 0 flaky**, 29 skipped by design (third pass; 156 before its two new specs) |
 | End to end, first run on the first-pass fixes | 155 passed, 1 passed on retry (sign-in cooldown message). Not reproduced in 170 further runs of the sign-in specs, 20 in isolation and 144 under three parallel workers. Main's own CI shows a different single flaky test in 3 of its last 12 runs |
 | Auction-room journeys, re-run after the last edit | 31 passed |
 | Design-system journeys (dev server), photo journey | 28 passed, 1 passed |
 
-Tests added: 18 files, about 90 tests. Every behavioural fix has one that fails on the old code.
+Tests added: 25 files, about 130 tests. Every behavioural fix has one that fails on the old code.
 
 Gaps: no failure-injection suite for database or provider outage, no device lab, no load test on production hardware.
 
@@ -622,10 +711,12 @@ Not because the auction is wrong. It is not. Because two of the things a real ni
 
 1. **Deploy this branch.** Review, merge, deploy outside any auction window. It closes eight HIGH findings.
 2. **Prove the backup restores.** Put the backup passphrase and the env files somewhere off the host. Restore the production backup into a scratch volume. Write the time down.
-3. **Prove an alert arrives.** Send a test alert to the webhook. Delete the Grafana silence on `da-prod`. Add an external check on `/readyz`, the engine's `/healthz`, and certificate expiry.
+3. **Prove an alert arrives.** Apply the platform stack (`ops/platform/apply.sh`), which now carries the disk watcher and six new rules. Send a test alert to the webhook. Delete the Grafana silence on `da-prod`. Add an external check on `/readyz`, the engine's `/healthz`, and certificate expiry.
 4. **Prove a person can sign in.** One real code to one outside mailbox, in production.
 5. **Add the build secret.** `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`) in the production environment's GitHub secrets, so a deploy stops breaking open pages.
 
 **After those five: GO for a controlled first auction**, with one rehearsal on real phones on the venue's network, and `WS_MAX_SOCKETS_PER_IP` raised for the hall.
 
-**Before broad launch:** enforce the script CSP, split the engine secret, add browser error reporting, and trim the spectator frame.
+**Before switching gateway payments on:** prove one capture, one dashboard refund and one dispute in the provider's test mode. The handler is tested against documented payloads only.
+
+**Before broad launch:** enforce the script CSP, set `AUTH_CODE_SECRET` in a quiet window, run the integrity check on production and add the foreign keys it clears, and switch frame compression on after a staging night.
