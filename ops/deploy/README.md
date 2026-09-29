@@ -1,8 +1,17 @@
-# Self-hosted deployment
+# Self-hosted deployment — one DesiAuction environment
 
-Three app containers, one Caddy, one Postgres, and the sidecars that keep it
-honest — pgBackRest, an off-box object-storage mirror, a scheduler for the web
-tier's job routes, and autoheal — on one host.
+Three app containers, one Postgres, and the sidecars that keep it honest —
+pgBackRest, an off-box object-storage mirror, and a scheduler for the web
+tier's job routes — as ONE Compose stack per environment on a shared host:
+
+| Environment | Directory                          | Compose project | Public network      |
+| ----------- | ---------------------------------- | --------------- | ------------------- |
+| production  | `/srv/apps/desiauction/production` | `da-prod`       | `da-prod-public`    |
+| staging     | `/srv/apps/desiauction/staging`    | `da-staging`    | `da-staging-public` |
+
+TLS, logs, alerts and autoheal are NOT here: they are the host's shared layer,
+one of each for every project on the machine — see `ops/platform/README.md`,
+and `ops/host/` for how the machine itself is set up.
 This directory holds the files that describe it; `docs/operations/DEPLOYMENT.md`
 holds the procedure and the rollback decision tree.
 
@@ -20,18 +29,30 @@ It also means every deploy passes the same quality gates as `main`.
 | File                            | What it is                                                  |
 | ------------------------------- | ----------------------------------------------------------- |
 | `docker-compose.production.yml` | The stack. Images pinned by `TAG`, Postgres pinned to 17    |
-| `Caddyfile`                     | TLS termination + reverse proxy. Certificates are automatic |
+| `site.caddy`                    | This stack's hostnames, rendered into the shared edge Caddy |
 | `jobs/scheduler.mjs`            | The clock for `/api/jobs/*` (see "Scheduled jobs")          |
-| `observability/`                | Alloy → Loki → Grafana, and the provisioned alert rules     |
 | `migrator/`                     | The deploy-time DB toolbox image (see "How a deploy runs")  |
 | `db/`                           | The Postgres + pgBackRest image                             |
 | `*.env`                         | **Not in git.** Created on the host, `chmod 600`            |
 
-`deploy-host.yml` copies the compose file, Caddyfile, `jobs/`, `observability/`
-and `postgresql.conf.d/` to `/opt/desiauction` on EVERY deploy. They are code:
+`deploy-host.yml` copies the compose file, `site.caddy`, `jobs/` and
+`postgresql.conf.d/` to `/srv/apps/desiauction/<env>` on EVERY deploy, then
+renders `site.caddy` into `/srv/platform/sites/<stack>.caddy` and reloads the
+edge. They are code:
 a hand edit on the host is overwritten by the next release, so make it here.
 
 ## The env files the host needs
+
+`init-env.sh` creates all of them ON THE HOST, generating every internal secret
+there (database roles, object storage, engine and job secrets, the backup
+cipher) and never overwriting a file that exists:
+
+```bash
+sudo bash init-env.sh production desiauction.in
+```
+
+What only a person can supply is left commented out under a `FOUNDER` marker,
+and the script ends by listing it. The split, for reference:
 
 Copy from the production template and split by service:
 
@@ -55,9 +76,42 @@ Copy from the production template and split by service:
   (`postgres://postgres:<POSTGRES_PASSWORD>@db:5432/<POSTGRES_DB>`), used only by
   the deploy's migrate / freeze / grants steps
 - `.env` — `REGISTRY`, `TAG`, `DB_TAG`, `PUBLIC_DOMAIN`, `ENGINE_DOMAIN`,
-  `S3_DOMAIN`, `ALERT_WEBHOOK_URL` (**required** — compose refuses to start
-  without it, see "Alerts"), and `COMPOSE_FILE=docker-compose.production.yml`
-  (the deploy adds it if missing, so a plain `docker compose …` reads this stack)
+  `S3_DOMAIN`, `COMPOSE_PROJECT_NAME` (`da-prod` / `da-staging`) and
+  `COMPOSE_FILE=docker-compose.production.yml` (the deploy adds the last two
+  if missing, and refuses a directory whose project name is the other
+  environment's), plus any sizing overrides (see "Sizing")
+
+`ENGINE_URL` in `web.env` is `http://engine:4000`: the plain service name
+resolves only inside this stack, which is why stacks never share a network.
+`pgbackrest.env` sets `PGBACKREST_REPO1_PATH` per environment
+(`/pgbackrest/da-prod`, `/pgbackrest/da-staging`) so the two never write into
+one repo.
+
+## Sizing
+
+Every service has a memory and CPU ceiling read from `.env`, defaulting to
+the production value. Staging sets smaller ones; moving capacity between
+stacks — or away from a project that has gone quiet — is an `.env` edit and
+`docker compose up -d`, never a file change.
+
+| Knob                                           | Production default | Staging (suggested) |
+| ---------------------------------------------- | ------------------ | ------------------- |
+| `WEB_MEM` / `WEB_CPUS`                         | 1536m / 2.0        | 768m / 1.0          |
+| `ENGINE_MEM` / `ENGINE_CPUS`                   | 768m / 1.5         | 384m / 0.5          |
+| `RUNNER_MEM` / `RUNNER_CPUS`                   | 512m / 1.0         | 256m / 0.5          |
+| `DB_MEM` / `DB_CPUS`                           | 4g / 2.0           | 1g / 1.0            |
+| `PG_SHARED_BUFFERS`                            | 1GB                | 256MB               |
+| `PG_EFFECTIVE_CACHE_SIZE`                      | 3GB                | 768MB               |
+| `PG_WORK_MEM` / `PG_MAINTENANCE_WORK_MEM`      | 16MB / 256MB       | 8MB / 64MB          |
+| `MINIO_MEM`, `PGBACKREST_MEM`, `SCHEDULER_MEM` | 512m, 512m, 192m   | 256m, 256m, 128m    |
+
+These are starting points. Measure a simulated auction night on staging
+(`docker stats`) and set each production ceiling at about 1.5× its peak.
+Keep `PG_SHARED_BUFFERS` near a quarter of `DB_MEM` and
+`PG_EFFECTIVE_CACHE_SIZE` near three quarters.
+
+Stopping staging during a live auction is one command and frees its whole
+share: `cd /srv/apps/desiauction/staging && docker compose stop`.
 
 `web.env` must also carry the three job secrets — `FEEDBACK_JOB_SECRET`,
 `SETTLEMENT_JOB_SECRET`, `DEMO_JOB_SECRET` (≥16 chars each). The scheduler reads
@@ -167,12 +221,12 @@ that runs after initdb and before the real server.
 and runs on its own; what it cannot do is invent a second place to put the
 copies. Those credentials are the founder's.
 
-| Piece                                          | Automated in this stack                                               | Founder-held                                                            |
-| ---------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| WAL archive + nightly full/diff (PITR)         | `db` archive_command + `pgbackrest` sidecar                           | an off-box S3 bucket + keys in `pgbackrest.env`                         |
-| Object storage copy (photos, finops artifacts) | `minio-mirror`, hourly                                                | an off-box S3 bucket + keys in `mirror.env`                             |
-| "Did last night's backup happen?"              | Grafana `da-backup-*` rules; `backup-production.yml` nightly over SSH | `ALERT_WEBHOOK_URL`; `DEPLOY_*` secrets in the `production` environment |
-| The whole machine                              | —                                                                     | Contabo Auto Backup (PRODUCTION_CHECKLIST §2)                           |
+| Piece                                          | Automated in this stack                                               | Founder-held                                                             |
+| ---------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| WAL archive + nightly full/diff (PITR)         | `db` archive_command + `pgbackrest` sidecar                           | an off-box S3 bucket + keys in `pgbackrest.env`                          |
+| Object storage copy (photos, finops artifacts) | `minio-mirror`, hourly                                                | an off-box S3 bucket + keys in `mirror.env`                              |
+| "Did last night's backup happen?"              | Grafana `da-backup-*` rules; `backup-production.yml` nightly over SSH | `ALERT_WEBHOOK_URL`; `DEPLOY_*` secrets in the `production` environment  |
+| The whole machine                              | —                                                                     | Hostinger weekly backup (restores the WHOLE VPS — every project at once) |
 
 **repo1 belongs on a different machine.** A repo on the MinIO beside the
 database protects a bad migration, a dropped table, a bug that writes nonsense —
@@ -183,9 +237,14 @@ logging `BACKUP_REFUSED`, unless `PGBACKREST_ALLOW_ONBOX_REPO=1` says in writing
 that this is an interim state. The database's own `archive_command` reads the
 same file, so WAL goes wherever the sidecar's backups go.
 
-Any S3-compatible bucket in a **different account** works (Backblaze B2,
-Cloudflare R2, AWS S3, a second provider's object storage). pgBackRest needs
-TLS for an S3 repo, which every hosted one serves:
+Any S3-compatible bucket with a **different provider from the host** works.
+Production uses **AWS S3 in Mumbai** (ap-south-1) — the data stays in India —
+with two versioned, private, encrypted buckets (`desiauction-prod-pitr`,
+`desiauction-prod-copies`), a 30-day non-current-version expiry, and an IAM
+user that can write and delete-mark but NOT erase versions, so a stolen host
+key cannot destroy history. pgBackRest needs TLS for an S3 repo (and the db
+image needs `ca-certificates` to verify it). Prove it with
+`sudo bash ops/deploy/backup-drill.sh production` from a checkout on the host:
 
 ```sh
 PGBACKREST_STANZA=desiauction
@@ -193,12 +252,12 @@ PGBACKREST_PG1_PATH=/var/lib/postgresql/data
 PGBACKREST_PG1_SOCKET_PATH=/var/run/postgresql
 PGBACKREST_REPO1_TYPE=s3
 PGBACKREST_REPO1_PATH=/pgbackrest
-PGBACKREST_REPO1_S3_ENDPOINT=s3.eu-central-003.backblazeb2.com   # off-box
-PGBACKREST_REPO1_S3_BUCKET=desiauction-pitr
+PGBACKREST_REPO1_S3_ENDPOINT=s3.ap-south-1.amazonaws.com   # off-box, India
+PGBACKREST_REPO1_S3_BUCKET=desiauction-prod-pitr
 PGBACKREST_REPO1_S3_KEY=...
 PGBACKREST_REPO1_S3_KEY_SECRET=...
-PGBACKREST_REPO1_S3_REGION=eu-central-003
-PGBACKREST_REPO1_S3_URI_STYLE=path
+PGBACKREST_REPO1_S3_REGION=ap-south-1
+PGBACKREST_REPO1_S3_URI_STYLE=host
 PGBACKREST_REPO1_RETENTION_FULL=2
 # PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc   # recommended off-box
 # PGBACKREST_REPO1_CIPHER_PASS=...           # keep a copy OFF this box too
@@ -229,11 +288,11 @@ hours; `backup-production.yml` checks the same from outside every night.
 or `MIRROR_FAILED`; unconfigured, it refuses (`MIRROR_REFUSED`) and restarts:
 
 ```sh
-MIRROR_S3_ENDPOINT=https://s3.eu-central-003.backblazeb2.com
+MIRROR_S3_ENDPOINT=https://s3.ap-south-1.amazonaws.com
 MIRROR_S3_ACCESS_KEY=...
 MIRROR_S3_SECRET_KEY=...
-MIRROR_MEDIA_BUCKET=desiauction-media-copy
-MIRROR_FINOPS_BUCKET=desiauction-finops-copy
+MIRROR_MEDIA_BUCKET=desiauction-prod-copies/media    # bucket/prefix works
+MIRROR_FINOPS_BUCKET=desiauction-prod-copies/finops
 ```
 
 The finops copy never deletes (artifacts are append-only records, and a delete
@@ -289,33 +348,13 @@ secret is unset logs `job.disabled` once at boot. A `job.failed` with status 404
 means the ROUTE thinks it is unconfigured — the web tier and the scheduler are
 reading different values, which can only happen if one container is stale.
 
-## Alerts
+## Alerts and logs
 
-`observability/grafana-alerting.yml` provisions the rules in
-docs/operations/ALERTS.md that logs can express — plus backup, mirror and
-scheduler failure and silence — and one webhook contact point from
-`ALERT_WEBHOOK_URL` in `.env`. Compose **refuses to start** without that value:
-an alert with nowhere to go is a dashboard nobody is watching. Any endpoint that
-accepts Grafana's webhook JSON works — ntfy.sh, a Slack/Discord bridge, a
-PagerDuty or Opsgenie integration URL. Each rule carries `severity=page` or
-`ticket` for the receiver to route on.
-
-`autoheal` restarts `web` and `engine` (label `autoheal=true`) when their
-healthcheck fails — `restart: unless-stopped` only acts on a process that
-EXITS, and an unhealthy one that stays up was otherwise left alone for ever.
-Postgres is deliberately not labelled: restarting it mid crash-recovery is how
-recovery never finishes. Autoheal's restart line is what the service-health
-alerts fire on.
-
-What Grafana on this box cannot do is tell you the box is gone — it goes silent
-with it. The external uptime check in ALERTS.md "Outside the box" covers that,
-and it is founder-held.
-
-Caddy logs **only** `/api/webhooks/*` requests (the webhook alerts' signal),
-and every Caddy line — access or error — has headers, client addresses and
-query strings removed. Before that filter an upstream-error line carried the
-full request, so a webhook arriving during a restart wrote its provider
-signature into Loki.
+Both are the host's shared layer (`ops/platform/README.md`): Alloy ships every
+container's logs to Loki labelled `project` + `service`, and the Grafana rules
+in `ops/platform/observability/grafana-alerting.yml` watch `project="da-prod"`
+— staging never pages. `autoheal` restarts the containers this file labels
+`autoheal=true` (web, engine); Postgres is deliberately unlabelled.
 
 ## How a deploy runs
 
@@ -327,10 +366,15 @@ the stack files, then over SSH on the host:
    (blocking for production, advisory for staging)
 2. `migrator live-window` — the C-22 freeze; `deploy_anyway` passes
    `DEPLOY_ANYWAY=1` explicitly, and the rooms are still named in the log
-3. `docker compose pull`, `migrator migrate`, `migrator grants`
+3. `docker compose pull`, `migrator migrate`, `migrator roles` (the four
+   runtime roles and their grants from `ops/db/create-app-role.sql`, passwords
+   read from the service env files — idempotent, so the first deploy onto an
+   empty database creates them), `migrator grants`
 4. engine swapped, its `/readyz` polled (180 s); then everything else, web's
    `/readyz` polled; runner and scheduler must be running
-5. Caddy reloaded, Grafana and Alloy restarted for their bind-mounted config
+5. `site.caddy` rendered into `/srv/platform/sites/<stack>.caddy`, the edge
+   Caddy connected to `<stack>-public`, validated (a refused file is put back)
+   and reloaded
 
 `.env` keeps the old `TAG` until step 4, so a refused deploy leaves the host
 exactly as it was. A failure after that prints the one-line image rollback — and
@@ -341,64 +385,6 @@ The migrator is a profile-gated service (`--profile ops`) that `up` never
 starts. It reaches the database over the compose network, which is why none of
 these steps needs a published database port — the thing that made the old
 runner-side steps impossible.
-
-## Reading the logs
-
-`docker compose logs` answers "what did this one container say", which is the
-wrong question during an incident. An auction breaking at 9pm is web, engine and
-runner interleaved, and matching three scrollbacks by eye is how a ten-minute
-diagnosis becomes an hour. Everything already emits structured pino JSON;
-nothing was collecting it.
-
-**Every container's logs are capped.** Docker's default `json-file` driver has
-NO size limit, so container logs grow until the disk is gone — the same ending
-as the WAL bug, by a slower road and with no warning either. `x-logs` at the top
-of the compose file sets three files of 20MB per service, so the whole stack is
-bounded at roughly 500MB. That part is not optional and is not about
-convenience.
-
-**Loki holds thirty days**, single binary, local filesystem — no object store,
-no clustering, no second database to keep alive during the incident it exists to
-explain. Retention is enforced by the compactor; without `retention_enabled` the
-`retention_period` is decorative and the disk ends where it would have anyway.
-
-**Grafana is NOT exposed to the internet.** It binds to the host's loopback:
-
-```sh
-ssh -L 3001:localhost:3001 <user>@<host>
-# then open http://localhost:3001
-```
-
-A public Grafana is another login to secure, another thing to patch, and another
-way into a box that serves money. For one operator an SSH tunnel is both safer
-and less work. The Loki datasource is provisioned from a file rather than
-clicked, because a datasource configured by hand lives in `grafana_data` and
-disappears the moment that volume is recreated — exactly when somebody is trying
-to read logs in a hurry.
-
-The query that earns the whole thing:
-
-```logql
-{job="docker", level="error"}          # every error, every service, one timeline
-{job="docker", service=~"web|engine"}  # an auction, both sides, interleaved
-```
-
-`level` is pino's number named — 50 error, 40 warn, 30 info, 20 debug. Anything
-that is not pino JSON (Caddy, Postgres, MinIO log plain text) is `unknown`
-rather than a literal `<no value>`, which is what the first version produced.
-
-Three things worth knowing before you rely on it:
-
-- **Alloy reads the Docker socket**, which is how a container id becomes
-  `engine`. `:ro` limits the file node, NOT the API — anything that can talk to
-  that socket can control Docker. It is pinned by digest, reachable from nothing
-  outside, and should be the first thing reconsidered if this box is ever shared
-  with something less trusted.
-- **It collects EVERY container on the host**, not just this stack. Correct for
-  a dedicated box; surprising if you put a second project beside it.
-- **These logs are on the box.** Like the backups, they are least available
-  exactly when the machine is gone. Shipping them off-box is a Loki endpoint
-  change, not a redesign.
 
 ## The engine is exactly one process
 

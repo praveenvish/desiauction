@@ -178,6 +178,7 @@ export function LoginFrame({
   atStart,
   returning,
   next,
+  otherDoor = true,
   children,
 }: {
   title: string;
@@ -188,6 +189,12 @@ export function LoginFrame({
   atStart: boolean;
   returning: boolean;
   next?: string;
+  /**
+   * Offer the other door at all. False under email-only sign-in
+   * (OTP_PROVIDER=none): a "Use mobile number" button there led back to this
+   * same email form, which reads as broken.
+   */
+  otherDoor?: boolean;
   children: ReactNode;
 }) {
   const nextProp = next !== undefined ? { next } : {};
@@ -213,7 +220,7 @@ export function LoginFrame({
         <>
           <Divider label="or" />
           <div className="login-alternatives">
-            <OtherDoor method={method} {...nextProp} />
+            {otherDoor ? <OtherDoor method={method} {...nextProp} /> : null}
             {returning ? null : <PasskeyLogin {...nextProp} />}
           </div>
           <LoginConsent />

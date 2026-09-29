@@ -49,7 +49,14 @@ const envSchema = z.object({
    * channel doc C-19 always named first ("WhatsApp OTP first with SMS
    * fallback"). `msg91` stays as the SMS fallback and is not deprecated.
    */
-  OTP_PROVIDER: z.enum(["dev", "msg91", "whatsapp"]).default("dev"),
+  /*
+   * `none` — EMAIL-ONLY SIGN-IN, said out loud. No phone codes are sent at all:
+   * the login page offers only the email door and the phone door explains why.
+   * For a production that is live before its text channel is (Meta's number
+   * and template approval can trail a launch by days). Unlike `dev`, nothing
+   * pretends to send — so it is allowed on a production server.
+   */
+  OTP_PROVIDER: z.enum(["dev", "msg91", "whatsapp", "none"]).default("dev"),
   /**
    * Which door /login opens on. `email` until SMS is live: Indian SMS needs DLT
    * registration before a single code can be sent, and an email code needs
@@ -501,6 +508,11 @@ const productionSchema = envSchema
       path: ["WHATSAPP_APP_SECRET"],
     },
   )
+  .refine((v) => v.OTP_PROVIDER !== "none" || v.LOGIN_DEFAULT_METHOD === "email", {
+    message:
+      "OTP_PROVIDER=none means no phone codes — LOGIN_DEFAULT_METHOD must be email, or the login page opens on a door that cannot send",
+    path: ["LOGIN_DEFAULT_METHOD"],
+  })
   .refine((v) => !serving(v) || v.OTP_PROVIDER !== "dev", {
     message:
       "OTP_PROVIDER=dev writes codes to a table nobody can read in production — set OTP_PROVIDER=whatsapp (or msg91) with credentials",

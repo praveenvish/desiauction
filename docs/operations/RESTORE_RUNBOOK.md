@@ -37,7 +37,7 @@ hour on the same host. See [DISASTER_RECOVERY](DISASTER_RECOVERY.md) for the
 full table. Neither is measured against the off-box repo yet — record the first
 drill below.
 
-All commands run in `/opt/desiauction` on the host.
+All commands run in `/srv/apps/desiauction/production` on the host (`/srv/apps/desiauction/staging` for a staging drill).
 
 1. **Stop writers, then the database.** Nothing may write while PGDATA is
    replaced.

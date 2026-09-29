@@ -19,6 +19,8 @@ export interface LoginPanelProps {
   honoredNext: boolean;
   /** This device has signed in before — lead with the passkey. */
   returning: boolean;
+  /** Phone codes can be sent (OTP_PROVIDER is not `none`). */
+  phoneDoor: boolean;
 }
 
 /**
@@ -33,6 +35,7 @@ export function LoginPanel({
   initialTo,
   honoredNext,
   returning,
+  phoneDoor,
 }: LoginPanelProps) {
   const shared = { honoredNext, returning, ...(next !== undefined ? { next } : {}) };
   return method === "email" ? (
@@ -40,6 +43,7 @@ export function LoginPanel({
       {...shared}
       initialStep={initialStep === "code" ? "code" : "email"}
       initialEmail={initialTo}
+      phoneDoor={phoneDoor}
     />
   ) : (
     <PhoneSignIn

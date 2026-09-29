@@ -17,8 +17,9 @@ without an action is a notification, and notifications get muted.
 
 Until this date none of the five below was evaluated by anything. The
 self-hosted stack now provisions the rules from
-`ops/deploy/observability/grafana-alerting.yml` (Grafana → Loki), delivers them
-to ONE webhook from `ALERT_WEBHOOK_URL` (compose refuses to start without it),
+`ops/platform/observability/grafana-alerting.yml` (Grafana → Loki, scoped to
+`project="da-prod"`), delivers them to ONE webhook from `ALERT_WEBHOOK_URL` in
+`/srv/platform/.env` (Grafana refuses to start without it),
 and restarts unhealthy web/engine containers with `autoheal`. What a log cannot
 say is marked, with who owns closing it.
 

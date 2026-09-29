@@ -31,6 +31,7 @@ RUN pnpm install --frozen-lockfile \
       --filter @desiauction/db... \
       --filter @desiauction/engine... \
       --filter @desiauction/web...
+COPY ops/db/create-app-role.sql ./ops/db/create-app-role.sql
 COPY ops/deploy/migrator/run.sh /usr/local/bin/migrator
 ARG APP_VERSION=dev
 ENV NODE_ENV=production APP_VERSION=$APP_VERSION

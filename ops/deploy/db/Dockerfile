@@ -15,9 +15,13 @@ FROM postgres:17
 
 # Pinned to the major so a rebuild cannot silently move the tool that owns the
 # only rollback this deployment has. PGDG is already configured in this image.
+# ca-certificates IS NOT OPTIONAL. --no-install-recommends leaves it out, and
+# pgBackRest then cannot verify ANY https repo: every off-box backup and WAL
+# push fails with "unable to get local issuer certificate" (found in the S3
+# Mumbai drill, 2026-09-29 — the earlier drill used the on-box repo).
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends pgbackrest; \
+    apt-get install -y --no-install-recommends pgbackrest ca-certificates; \
     rm -rf /var/lib/apt/lists/*; \
     pgbackrest version
 
