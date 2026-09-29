@@ -209,3 +209,37 @@
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
 }
+
+/* Enter score, in place: the form opens under its match, full width. */
+.ot-jobs li[data-kind="owed"] {
+  flex-wrap: wrap;
+}
+
+.ot-score {
+  flex-basis: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.ot-score .st-note {
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+@media (min-width: 720px) {
+  .ot-score .mx-result {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ot-score .mx-result > :not(.mx-score-side) {
+    grid-column: 1 / -1;
+  }
+
+  .ot-score .mx-result-go {
+    flex-direction: row;
+  }
+}

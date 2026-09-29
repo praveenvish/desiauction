@@ -1,3 +1,4 @@
+import { sportPackFor } from "@desiauction/core";
 import {
   ButtonLink,
   IconArrowRight,
@@ -7,6 +8,7 @@ import {
   IconTrophy,
   Pill,
   SectionCard,
+  ToastProvider,
 } from "@desiauction/ui";
 import Link from "next/link";
 
@@ -18,6 +20,7 @@ import type { OrganizerFixture } from "../../server/competition/fixtures";
 import type { StandingsPageView } from "../../server/competition/fixture-actions";
 import { awaitsResult } from "../seasons/[slug]/_tabs/fixture-status";
 import { monogram } from "../../components/season-hero/season-hero";
+import { TodayScore } from "./today-score";
 import "./organizer-today.css";
 
 /**
@@ -117,244 +120,266 @@ export function OrganizerToday({
       ? `${cardAmount(season.auctionUnit, overview.purseCommitted)} committed`
       : null,
   ].filter((part): part is string => part !== null);
+  // The season's score, in the words its scorer types (cricket's overs).
+  const scoreFields = sportPackFor(season.sport).result.scoreFields.map((field) => ({
+    key: field.key,
+    label: field.entry?.label ?? field.label,
+    ...(field.entry?.help !== undefined ? { help: field.entry.help } : {}),
+  }));
   const nothing = owed.length + live.length + todays.length + jobs.length === 0;
 
   return (
-    <div className="ot" data-testid="organizer-today">
-      {/* ---- one line: which season, where it is, the door to it ---- */}
-      <header className="ot-head" data-testid="organizer-today-head">
-        <span className="ot-crest" aria-hidden>
-          {monogram(season.name)}
-        </span>
-        <span className="ot-head-text">
-          <strong>{season.name}</strong>
-          <span className="ot-head-meta">
-            <Pill tone="green" dot>
-              {live.length > 0 ? "Match day · live" : "Season on"}
-            </Pill>
-            <span>
-              Matches · {formatCount(played)} of {formatCount(overview.fixtureCount)} played
+    // The score form below says "Result recorded" as a toast; the provider sits
+    // above the list so the toast outlives the row it saved.
+    <ToastProvider>
+      <div className="ot" data-testid="organizer-today">
+        {/* ---- one line: which season, where it is, the door to it ---- */}
+        <header className="ot-head" data-testid="organizer-today-head">
+          <span className="ot-crest" aria-hidden>
+            {monogram(season.name)}
+          </span>
+          <span className="ot-head-text">
+            <strong>{season.name}</strong>
+            <span className="ot-head-meta">
+              <Pill tone="green" dot>
+                {live.length > 0 ? "Match day · live" : "Season on"}
+              </Pill>
+              <span>
+                Matches · {formatCount(played)} of {formatCount(overview.fixtureCount)} played
+              </span>
             </span>
           </span>
-        </span>
-        <Link href={base} className="ot-open">
-          Open season
-          <IconArrowRight size={14} aria-hidden />
-        </Link>
-      </header>
+          <Link href={base} className="ot-open">
+            Open season
+            <IconArrowRight size={14} aria-hidden />
+          </Link>
+        </header>
 
-      {/* ---- TODAY: everything waiting on this organizer, in one list ---- */}
-      <SectionCard
-        icon={<IconBolt />}
-        concept={nothing ? "done" : "alert"}
-        title="Today"
-        description={
-          nothing
-            ? upcoming[0] !== undefined
-              ? `Nothing waiting on you. Next match ${when(upcoming[0].kickoffAt, today)}.`
-              : "Nothing waiting on you."
-            : undefined
-        }
-        data-testid="organizer-today-jobs"
-      >
-        {nothing ? null : (
-          <ul className="ot-jobs">
-            {owed.map((fixture) => (
-              <li key={fixture.id} data-kind="owed">
-                <span className="ot-job-text">
-                  <strong>{sides(fixture)}</strong>
-                  <span>
-                    {when(fixture.kickoffAt, today)}
-                    {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
-                  </span>
-                </span>
-                <span className="ot-due">
-                  <Pill tone="amber">Result due</Pill>
-                </span>
-                <ButtonLink
-                  href={`${base}/fixtures?match=${fixture.id}`}
-                  size="sm"
-                  data-testid={`today-score-${fixture.id}`}
-                >
-                  Enter score
-                </ButtonLink>
-              </li>
-            ))}
-            {live.map((fixture) => (
-              <li key={fixture.id} data-kind="live">
-                <span className="ot-job-text">
-                  <strong>{sides(fixture)}</strong>
-                  <span>
-                    Being played now
-                    {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
-                  </span>
-                </span>
-                <ButtonLink href={`${base}/fixtures?match=${fixture.id}`} size="sm">
-                  Enter score
-                </ButtonLink>
-              </li>
-            ))}
-            {todays.map((fixture) => {
-              // Today's match with a side still unpicked: picking it is the job
-              // (and "You're in the lineup" only reaches players once it is
-              // announced from there).
-              const lineup = lineupLine(fixture);
-              const pick = lineup !== null && !lineup.ready;
-              return (
-                <li key={fixture.id} data-kind="today">
+        {/* ---- TODAY: everything waiting on this organizer, in one list ---- */}
+        <SectionCard
+          icon={<IconBolt />}
+          concept={nothing ? "done" : "alert"}
+          title="Today"
+          description={
+            nothing
+              ? upcoming[0] !== undefined
+                ? `Nothing waiting on you. Next match ${when(upcoming[0].kickoffAt, today)}.`
+                : "Nothing waiting on you."
+              : undefined
+          }
+          data-testid="organizer-today-jobs"
+        >
+          {nothing ? null : (
+            <ul className="ot-jobs">
+              {owed.map((fixture) => (
+                <li key={fixture.id} data-kind="owed">
                   <span className="ot-job-text">
                     <strong>{sides(fixture)}</strong>
                     <span>
                       {when(fixture.kickoffAt, today)}
                       {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
-                      {lineup !== null ? ` · ${lineup.words}` : ""}
                     </span>
                   </span>
-                  <ButtonLink
-                    href={`${base}/fixtures?match=${fixture.id}`}
-                    size="sm"
-                    variant={pick ? "primary" : "secondary"}
-                    data-testid={`today-open-${fixture.id}`}
-                  >
-                    {pick ? "Set lineups" : "Open"}
+                  <span className="ot-due">
+                    <Pill tone="amber">Result due</Pill>
+                  </span>
+                  {fixture.homeTeamId === null ? (
+                    <ButtonLink
+                      href={`${base}/fixtures?match=${fixture.id}`}
+                      size="sm"
+                      data-testid={`today-score-${fixture.id}`}
+                    >
+                      Enter placings
+                    </ButtonLink>
+                  ) : (
+                    <TodayScore
+                      slug={season.slug}
+                      fixture={fixture}
+                      scoreFields={scoreFields}
+                      overdue
+                    />
+                  )}
+                </li>
+              ))}
+              {live.map((fixture) => (
+                <li key={fixture.id} data-kind="live">
+                  <span className="ot-job-text">
+                    <strong>{sides(fixture)}</strong>
+                    <span>
+                      Being played now
+                      {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
+                    </span>
+                  </span>
+                  <ButtonLink href={`${base}/fixtures?match=${fixture.id}`} size="sm">
+                    Enter score
                   </ButtonLink>
                 </li>
-              );
-            })}
-            {jobs.map((job) => (
-              <li key={job.key} data-kind="job">
-                <span className="ot-job-text">
-                  <strong>{job.label}</strong>
-                  <span>{job.detail}</span>
-                </span>
-                <ButtonLink href={job.href} size="sm" variant="secondary">
-                  {job.verb ?? "Open"}
-                </ButtonLink>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
-
-      <div className="ot-duo">
-        {/* ---- NEXT UP: the matches still to come (owed ones live above) ---- */}
-        <SectionCard
-          icon={<IconCalendar />}
-          concept="fixtures"
-          title="Next up"
-          action={
-            <Link href={`${base}/fixtures`} className="home-more">
-              Full schedule
-              <IconArrowRight size={14} aria-hidden />
-            </Link>
-          }
-          data-testid="organizer-today-next"
-        >
-          {upcoming.length === 0 ? (
-            <p className="ot-quiet">No more matches on the schedule yet.</p>
-          ) : (
-            <ul className="ot-next">
-              {upcoming.slice(0, 3).map((fixture) => {
-                const tile =
-                  fixture.kickoffAt === null ? null : dateTile(fixture.kickoffAt.slice(0, 10));
+              ))}
+              {todays.map((fixture) => {
+                // Today's match with a side still unpicked: picking it is the job
+                // (and "You're in the lineup" only reaches players once it is
+                // announced from there).
                 const lineup = lineupLine(fixture);
+                const pick = lineup !== null && !lineup.ready;
                 return (
-                  <li key={fixture.id}>
-                    <span className="home-date" aria-hidden>
-                      <b>{tile?.day.padStart(2, "0") ?? "--"}</b>
-                      <span>{tile?.month.toUpperCase() ?? "TBD"}</span>
-                    </span>
+                  <li key={fixture.id} data-kind="today">
                     <span className="ot-job-text">
                       <strong>{sides(fixture)}</strong>
                       <span>
                         {when(fixture.kickoffAt, today)}
                         {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
+                        {lineup !== null ? ` · ${lineup.words}` : ""}
                       </span>
-                      {lineup !== null ? (
-                        <span data-ready={lineup.ready ? "true" : undefined} className="ot-lineup">
-                          {lineup.words}
-                        </span>
-                      ) : null}
                     </span>
-                    {lineup !== null && !lineup.ready ? (
-                      <Link
-                        href={`${base}/fixtures?match=${fixture.id}`}
-                        className="ot-set"
-                        data-testid={`next-lineups-${fixture.id}`}
-                      >
-                        Set lineups
-                      </Link>
-                    ) : null}
+                    <ButtonLink
+                      href={`${base}/fixtures?match=${fixture.id}`}
+                      size="sm"
+                      variant={pick ? "primary" : "secondary"}
+                      data-testid={`today-open-${fixture.id}`}
+                    >
+                      {pick ? "Set lineups" : "Open"}
+                    </ButtonLink>
                   </li>
                 );
               })}
+              {jobs.map((job) => (
+                <li key={job.key} data-kind="job">
+                  <span className="ot-job-text">
+                    <strong>{job.label}</strong>
+                    <span>{job.detail}</span>
+                  </span>
+                  <ButtonLink href={job.href} size="sm" variant="secondary">
+                    {job.verb ?? "Open"}
+                  </ButtonLink>
+                </li>
+              ))}
             </ul>
           )}
         </SectionCard>
 
-        {/* ---- THE TABLE: what an organizer is asked about at the ground ---- */}
-        {table !== null && table.standings.rows.length > 0 ? (
+        <div className="ot-duo">
+          {/* ---- NEXT UP: the matches still to come (owed ones live above) ---- */}
           <SectionCard
-            icon={<IconTrophy />}
-            concept="results"
-            title="Table"
-            description={
-              leader !== undefined && leader.played > 0
-                ? `${leader.teamName} lead on ${String(leader.points)} ${leader.points === 1 ? "pt" : "pts"}`
-                : undefined
-            }
+            icon={<IconCalendar />}
+            concept="fixtures"
+            title="Next up"
             action={
-              <Link href={`${base}/standings`} className="home-more">
-                Full table
+              <Link href={`${base}/fixtures`} className="home-more">
+                Full schedule
                 <IconArrowRight size={14} aria-hidden />
               </Link>
             }
-            data-testid="organizer-today-table"
+            data-testid="organizer-today-next"
           >
-            <table className="ot-table">
-              <thead>
-                <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Team</th>
-                  <th scope="col">P</th>
-                  <th scope="col">W</th>
-                  <th scope="col">Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {table.standings.rows.slice(0, 3).map((row, index) => (
-                  <tr key={row.teamId}>
-                    <td>{index + 1}</td>
-                    <th scope="row">{row.teamName}</th>
-                    <td>{row.played}</td>
-                    <td>{row.won}</td>
-                    <td>
-                      <strong>{row.points}</strong>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {upcoming.length === 0 ? (
+              <p className="ot-quiet">No more matches on the schedule yet.</p>
+            ) : (
+              <ul className="ot-next">
+                {upcoming.slice(0, 3).map((fixture) => {
+                  const tile =
+                    fixture.kickoffAt === null ? null : dateTile(fixture.kickoffAt.slice(0, 10));
+                  const lineup = lineupLine(fixture);
+                  return (
+                    <li key={fixture.id}>
+                      <span className="home-date" aria-hidden>
+                        <b>{tile?.day.padStart(2, "0") ?? "--"}</b>
+                        <span>{tile?.month.toUpperCase() ?? "TBD"}</span>
+                      </span>
+                      <span className="ot-job-text">
+                        <strong>{sides(fixture)}</strong>
+                        <span>
+                          {when(fixture.kickoffAt, today)}
+                          {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
+                        </span>
+                        {lineup !== null ? (
+                          <span
+                            data-ready={lineup.ready ? "true" : undefined}
+                            className="ot-lineup"
+                          >
+                            {lineup.words}
+                          </span>
+                        ) : null}
+                      </span>
+                      {lineup !== null && !lineup.ready ? (
+                        <Link
+                          href={`${base}/fixtures?match=${fixture.id}`}
+                          className="ot-set"
+                          data-testid={`next-lineups-${fixture.id}`}
+                        >
+                          Set lineups
+                        </Link>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </SectionCard>
+
+          {/* ---- THE TABLE: what an organizer is asked about at the ground ---- */}
+          {table !== null && table.standings.rows.length > 0 ? (
+            <SectionCard
+              icon={<IconTrophy />}
+              concept="results"
+              title="Table"
+              description={
+                leader !== undefined && leader.played > 0
+                  ? `${leader.teamName} lead on ${String(leader.points)} ${leader.points === 1 ? "pt" : "pts"}`
+                  : undefined
+              }
+              action={
+                <Link href={`${base}/standings`} className="home-more">
+                  Full table
+                  <IconArrowRight size={14} aria-hidden />
+                </Link>
+              }
+              data-testid="organizer-today-table"
+            >
+              <table className="ot-table">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Team</th>
+                    <th scope="col">P</th>
+                    <th scope="col">W</th>
+                    <th scope="col">Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {table.standings.rows.slice(0, 3).map((row, index) => (
+                    <tr key={row.teamId}>
+                      <td>{index + 1}</td>
+                      <th scope="row">{row.teamName}</th>
+                      <td>{row.played}</td>
+                      <td>{row.won}</td>
+                      <td>
+                        <strong>{row.points}</strong>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </SectionCard>
+          ) : null}
+        </div>
+
+        {/* ---- the season's size, said once and quietly ---- */}
+        <p className="ot-numbers" data-testid="organizer-today-numbers">
+          <IconCheckCircle size={16} aria-hidden />
+          {numbers.join(" · ")}
+        </p>
+        {otherSeasons.length > 0 ? (
+          <p className="ot-others">
+            Your other seasons:{" "}
+            {otherSeasons.map((other, index) => (
+              <span key={other.slug}>
+                {index > 0 ? " · " : ""}
+                <Link href={`/home?season=${encodeURIComponent(other.slug)}`}>{other.name}</Link>
+              </span>
+            ))}
+          </p>
         ) : null}
       </div>
-
-      {/* ---- the season's size, said once and quietly ---- */}
-      <p className="ot-numbers" data-testid="organizer-today-numbers">
-        <IconCheckCircle size={16} aria-hidden />
-        {numbers.join(" · ")}
-      </p>
-      {otherSeasons.length > 0 ? (
-        <p className="ot-others">
-          Your other seasons:{" "}
-          {otherSeasons.map((other, index) => (
-            <span key={other.slug}>
-              {index > 0 ? " · " : ""}
-              <Link href={`/home?season=${encodeURIComponent(other.slug)}`}>{other.name}</Link>
-            </span>
-          ))}
-        </p>
-      ) : null}
-    </div>
+    </ToastProvider>
   );
 }
