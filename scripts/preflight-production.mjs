@@ -175,6 +175,27 @@ warn(
   `ENGINE_SECRET is ${String(secret.length)} chars`,
   "use >=32 random chars for the shared secret",
 );
+// The sign-in codes' own key (apps/web/src/env.ts AUTH_CODE_SECRET). A WARN,
+// never a blocker: unset, the web tier keys them with ENGINE_SECRET as it
+// always has, and a deploy must not be refused for a separation that is a
+// planned act. What IS refused is setting it to the engine's value.
+{
+  const authSecret = env.AUTH_CODE_SECRET ?? "";
+  warn(
+    "AUTH_CODE_SECRET-set",
+    authSecret !== "",
+    "sign-in codes and passkey challenges are keyed with ENGINE_SECRET, which the engine also holds",
+    "set AUTH_CODE_SECRET in web.env in a quiet window (openssl rand -hex 32) — SECRET_ROTATION.md",
+  );
+  if (authSecret !== "") {
+    check(
+      "AUTH_CODE_SECRET-separate",
+      authSecret !== secret && authSecret.length >= 32,
+      "AUTH_CODE_SECRET must be at least 32 characters and must not equal ENGINE_SECRET",
+      "generate a value of its own: openssl rand -hex 32",
+    );
+  }
+}
 check(
   "ENGINE_URL-remote",
   typeof env.ENGINE_URL === "string" &&

@@ -13,6 +13,7 @@ longer exists and listed seven secrets of the twenty below.
 | Secret | File(s) | Rotation effect |
 |--------|---------|-----------------|
 | `ENGINE_SECRET` | `web.env`, `engine.env` | HARD CUTOVER — see the drill below. It does FOUR jobs: authenticates web-to-engine commands, signs spectator socket tickets, keys the digests of sign-in codes (`auth/code-digest.ts`), and signs the passkey challenge cookie (`auth/actions.ts`). Rotating it also invalidates every sign-in code in flight (five to fifteen minutes' worth) and every passkey sign-in in progress |
+| `AUTH_CODE_SECRET` | `web.env` only, optional | Keys the sign-in code digests and the passkey challenge cookie INSTEAD of `ENGINE_SECRET` once set, so the engine no longer holds the key to them. Setting or changing it invalidates the codes in flight (five to fifteen minutes' worth) and any passkey sign-in in progress; nothing else. `openssl rand -hex 32`, then `sudo set-secret production AUTH_CODE_SECRET web.env`, then restart web. **Recommended once, in a quiet window**; after that `ENGINE_SECRET` does two jobs, not four |
 | Database owner password (`POSTGRES_PASSWORD`) | `db.env`, `migrator.env` | `alter role postgres password …`, then both files. Used only by the migrator and by hand |
 | `desiauction_app` / `desiauction_system` passwords | `web.env` (`DATABASE_URL`, `SYSTEM_DATABASE_URL`) | See "Database credential rotation" |
 | `desiauction_engine` password | `engine.env` | Same; restarts the engine, so outside a live window only |

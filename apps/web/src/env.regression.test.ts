@@ -153,6 +153,12 @@ describe("web env — production refuses every dev-only default", () => {
     ["FINOPS bucket missing config", { FINOPS_S3_BUCKET: undefined }, /FINOPS_S3/],
     ["SENTRY_DSN unset", { SENTRY_DSN: undefined }, /SENTRY_DSN/],
     ["no trusted proxy hop", { TRUSTED_PROXY_COUNT: undefined }, /TRUSTED_PROXY_COUNT/],
+    [
+      "a sign-in key that is the engine's secret under another name",
+      { AUTH_CODE_SECRET: "x".repeat(40), ENGINE_SECRET: "x".repeat(40) },
+      /AUTH_CODE_SECRET/,
+    ],
+    ["a sign-in key too short to be one", { AUTH_CODE_SECRET: "short" }, /AUTH_CODE_SECRET/],
     ["zero trusted proxy hops", { TRUSTED_PROXY_COUNT: "0" }, /TRUSTED_PROXY_COUNT/],
   ];
 

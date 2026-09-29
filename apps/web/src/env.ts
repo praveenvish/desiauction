@@ -41,6 +41,23 @@ const envSchema = z.object({
   ENGINE_URL: z.url().default("http://localhost:4000"),
   ENGINE_PUBLIC_WS_URL: z.string().default("ws://localhost:4000/ws"),
   ENGINE_SECRET: z.string().min(8).default("dev-engine-secret"),
+  /**
+   * THE KEY FOR SIGN-IN CODES AND PASSKEY CHALLENGES, APART FROM THE ENGINE'S
+   * (PRR 2026-09-29).
+   *
+   * `ENGINE_SECRET` was one value doing four jobs: it authenticates commands
+   * to the engine, signs spectator socket tickets, keys the stored digest of
+   * every sign-in code, and seals the passkey challenge cookie. The first two
+   * belong to the engine. The last two have nothing to do with it — and the
+   * engine holds the secret, so a leak of the ENGINE's environment was also
+   * the key to every six-digit code in the database.
+   *
+   * Optional, and that is the point: unset, the two sign-in jobs keep using
+   * `ENGINE_SECRET` exactly as before, so deploying this changes nothing.
+   * Setting it is a planned act (SECRET_ROTATION.md): the codes in flight at
+   * that moment — a few minutes' worth — stop matching, and people ask again.
+   */
+  AUTH_CODE_SECRET: z.string().min(32).optional(),
   // OTP delivery (PX-3): "dev" writes to /dev/inbox; "msg91" sends real SMS.
   // Production deploys MUST set msg91 + credentials (beta checklist §B) —
   // the dev sender is structurally invisible outside development.
@@ -607,6 +624,11 @@ const productionSchema = envSchema
   .refine((v) => !serving(v) || v.REVIEW_TOKEN_SECRET.length >= 32, {
     message: "REVIEW_TOKEN_SECRET must be at least 32 characters in production",
     path: ["REVIEW_TOKEN_SECRET"],
+  })
+  .refine((v) => v.AUTH_CODE_SECRET === undefined || v.AUTH_CODE_SECRET !== v.ENGINE_SECRET, {
+    message:
+      "AUTH_CODE_SECRET must not be the same value as ENGINE_SECRET — a second name for one secret separates nothing",
+    path: ["AUTH_CODE_SECRET"],
   })
   .refine((v) => !serving(v) || v.ENGINE_SECRET.length >= 32, {
     message: "ENGINE_SECRET must be at least 32 characters in production",

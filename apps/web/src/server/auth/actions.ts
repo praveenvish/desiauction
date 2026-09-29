@@ -20,6 +20,7 @@ import { clientIp } from "../../lib/client-ip";
 import { db, dbHandle } from "../db";
 import { sendAccountAlert } from "../messaging/account-alert";
 import { openChallenge, sealChallenge } from "./challenge-cookie";
+import { authCodeSecret } from "./auth-secret";
 import { requestOtp, verifyOtp } from "./otp";
 import {
   confirmEmailVerification,
@@ -139,7 +140,7 @@ function clearSessionCookies(store: Awaited<ReturnType<typeof cookies>>): void {
  * secret production already requires to be strong (preflight refuses the dev
  * default), so sealing adds no new variable an operator can forget to set.
  */
-const CHALLENGE_KEY = `passkey-challenge-key:${env.ENGINE_SECRET}`;
+const CHALLENGE_KEY = `passkey-challenge-key:${authCodeSecret(env)}`;
 
 async function setChallenge(challenge: string): Promise<void> {
   (await cookies()).set(CHALLENGE_COOKIE, sealChallenge(CHALLENGE_KEY, challenge), {
