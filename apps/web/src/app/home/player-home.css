@@ -230,21 +230,6 @@
   color: var(--text-secondary);
 }
 
-/* "You're in the lineup" — announced by the organizer, on the floodlight hero. */
-.pm-lineup {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  background: var(--success-subtle);
-  color: var(--success-strong);
-  font-size: var(--text-sm-size);
-  font-weight: var(--font-weight-semibold);
-  width: fit-content;
-}
-
 .pm-track {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -440,4 +425,19 @@
   .pm-figs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Match-day figures: a place in the lineup and a win read green, a loss red. */
+.pm-figs dd {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.pm-figs > div[data-tone="good"] dd {
+  color: var(--success-strong);
+}
+
+.pm-figs > div[data-tone="bad"] dd {
+  color: var(--danger-strong);
 }
