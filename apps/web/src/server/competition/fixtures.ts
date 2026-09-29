@@ -2,6 +2,7 @@ import { addDays, type FixtureStatus } from "@desiauction/core";
 import {
   auditLog,
   competitions,
+  fixtureLineups,
   fixtures,
   grounds,
   orgMembers,
@@ -605,6 +606,11 @@ export async function matchDay(
 export interface OrganizerFixture extends FixtureSnapshot {
   readonly competitionName: string;
   readonly competitionSlug: string;
+  /**
+   * Players saved in each side's lineup — for the organizer's match-day lists
+   * ("Lineups not set · Set lineups"). Zero for a lobby's absent sides.
+   */
+  readonly lineups: { readonly home: number; readonly away: number };
 }
 
 /** The organizer schedule: upcoming fixtures across every org they belong to. */
@@ -619,6 +625,16 @@ export async function organizerSchedule(
       ...SNAPSHOT_COLUMNS,
       competitionName: competitions.name,
       competitionSlug: competitions.slug,
+      lineupHome: sql<number>`(
+        select count(*)::int from ${fixtureLineups}
+        where ${fixtureLineups.fixtureId} = ${fixtures.id}
+          and ${fixtureLineups.teamId} = ${fixtures.homeTeamId}
+      )`,
+      lineupAway: sql<number>`(
+        select count(*)::int from ${fixtureLineups}
+        where ${fixtureLineups.fixtureId} = ${fixtures.id}
+          and ${fixtureLineups.teamId} = ${fixtures.awayTeamId}
+      )`,
     })
     .from(fixtures)
     .innerJoin(
@@ -652,8 +668,13 @@ export async function organizerSchedule(
     .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
     .limit(limit);
   return rows.map((row) => {
-    const { competitionName, competitionSlug, ...rest } = row;
-    return Object.freeze({ ...toSnapshot(rest), competitionName, competitionSlug });
+    const { competitionName, competitionSlug, lineupHome, lineupAway, ...rest } = row;
+    return Object.freeze({
+      ...toSnapshot(rest),
+      competitionName,
+      competitionSlug,
+      lineups: { home: lineupHome, away: lineupAway },
+    });
   });
 }
 
