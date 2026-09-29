@@ -609,11 +609,12 @@ function OurMatches({
           </span>
         </span>
         {overdue ? (
-          <span className="ow-match-next" data-state="due">
-            Result due
-          </span>
+          // The pills every other surface uses (census 18).
+          <Pill tone="amber">Result due</Pill>
         ) : upcoming || match.result === null ? (
-          <span className="ow-match-next">{match.live ? "Live" : "Next"}</span>
+          <Pill tone={match.live ? "red" : "gold"} dot={match.live}>
+            {match.live ? "Live" : "Next"}
+          </Pill>
         ) : (
           <span className="ow-result" data-result={match.result}>
             <span aria-hidden>
