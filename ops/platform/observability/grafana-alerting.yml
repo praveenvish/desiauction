@@ -294,6 +294,111 @@ groups:
         annotations:
           summary: "A command took over a second in the engine. At two seconds the web tier gives up waiting and bidders see the auction service did not answer."
           action: "Check host CPU and Postgres first. If the auction has many thousands of events this is the re-fold cost: finish the night, then schedule the checkpointed fold."
+      # A full disk stops Postgres, Loki and Docker together, and takes the alerting
+      # with it — so it is said at 85, while there is still room to act. The sidecar
+      # writes the larger of space and inodes every five minutes.
+      - uid: da-disk-filling
+        title: "Disk is filling"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: 'max(max_over_time({project="platform", service="disk-watch"} | json | unwrap worstPct [15m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: page }
+        annotations:
+          summary: "A filesystem on the host is over 85 percent full, by space or by inodes. At 100 Postgres stops and so does this alerting."
+          action: "docs/operations/ALERTS.md - Disk. docker system df; docker image prune; check Loki and Postgres WAL growth before deleting anything."
+      # A measurement that stops arriving looks exactly like a healthy disk.
+      - uid: da-disk-watch-silent
+        title: "Disk watcher went silent"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: 'absent_over_time({project="platform", service="disk-watch"} |~ "disk (usage|filling)" [30m])'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "Nothing has reported disk usage for 30 minutes. The disk alert cannot fire while this is true."
+          action: "On the host: cd /srv/platform && docker compose ps disk-watch && docker compose logs --tail 20 disk-watch."
+      # Caddy renews thirty days ahead and retries for weeks, so a failure here is a
+      # warning with time to spare — EXPIRY itself is the external check's to catch.
+      - uid: da-certificate-renewal
+        title: "TLS certificate could not be obtained or renewed"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: instant
+              expr: 'sum(count_over_time({project="platform", service="caddy"} |~ "tls\\.(obtain|renew)" |= "\"level\":\"error\"" [1h]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: ticket }
+        annotations:
+          summary: "Caddy failed to obtain or renew a certificate. It retries by itself and the current certificate keeps working until it expires."
+          action: "docs/operations/ALERTS.md - Certificates. Check DNS still points here and ports 80/443 are reachable; docker compose logs caddy | grep tls."
       - uid: da-runner-crashloop
         title: "FinOps runner crash loop"
         condition: C

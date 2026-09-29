@@ -2,13 +2,14 @@
 
 One of each per host, whatever projects run on it:
 
-| Service    | Job                                                                     |
-| ---------- | ----------------------------------------------------------------------- |
-| `caddy`    | The ONLY thing publishing ports (80, 443, 443/udp). TLS is automatic.   |
-| `loki`     | Thirty days of every container's logs, one timeline                     |
-| `alloy`    | Ships the logs, labelled `project` (Compose project) and `service`      |
-| `grafana`  | Queries and alert rules; loopback only, reached over an SSH tunnel      |
-| `autoheal` | Restarts any container labelled `autoheal=true` whose healthcheck fails |
+| Service      | Job                                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `caddy`      | The ONLY thing publishing ports (80, 443, 443/udp). TLS is automatic.                                              |
+| `loki`       | Thirty days of every container's logs, one timeline                                                                |
+| `alloy`      | Ships the logs, labelled `project` (Compose project) and `service`                                                 |
+| `grafana`    | Queries and alert rules; loopback only, reached over an SSH tunnel                                                 |
+| `autoheal`   | Restarts any container labelled `autoheal=true` whose healthcheck fails                                            |
+| `disk-watch` | Writes how full each filesystem is as a log line, so Loki can alert on it. Host root mounted read-only, no network |
 
 ## The host, as a picture
 

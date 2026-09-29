@@ -35,6 +35,8 @@ say is marked, with who owns closing it.
 | 5 | Webhook refusals | `da-webhook-5xx` (page), `da-webhook-4xx` (>3 / 15 min) from Caddy's webhook-only access log | — |
 | 6 | Backups | `da-backup-failed`, `da-backup-stale` (no `BACKUP_OK` in 26 h), `da-mirror-failed`, `da-mirror-stale` (3 h) | Off-box targets — founder (`pgbackrest.env`, `mirror.env`) |
 | 7 | Jobs went silent | `da-jobs-failed`, `da-jobs-silent` (no `job.ok` in 15 min) | — |
+| 8 | Disk | `da-disk-filling` (page): any filesystem over 85 % by space or inodes. `da-disk-watch-silent` (ticket): no measurement in 30 min. Added 2026-09-29 with the `disk-watch` sidecar | — |
+| 9 | Certificates | `da-certificate-renewal` (ticket): Caddy logged an error obtaining or renewing | EXPIRY itself: **external uptime check** below — founder |
 
 Every rule's no-data state is OK: a quiet count and a present heartbeat both
 return nothing, which is not an incident.
@@ -193,6 +195,33 @@ secret is unset — check `FEEDBACK_JOB_SECRET` / `SETTLEMENT_JOB_SECRET` /
 and usually arrives with alert 1.
 
 ---
+
+## 8 · Disk
+
+**Rule:** `da-disk-filling`, `da-disk-watch-silent`. **Source:** the
+`disk-watch` sidecar in the platform stack, one JSON line per filesystem every
+five minutes (`ops/platform/observability/disk-watch.sh`).
+
+A full disk stops Postgres (it cannot write WAL), Loki (so the alerts go
+quiet) and Docker (it cannot pull the fix) at the same moment. 85 % leaves room
+to act.
+
+1. `docker system df` — images and build cache are the usual answer.
+   `docker image prune -a --filter "until=168h"` is safe: a deploy keeps the
+   running and the previous release by tag.
+2. `du -sh /var/lib/docker/volumes/* | sort -h | tail` — if it is the database
+   volume, look at `pg_wal` before anything else. WAL piles up when archiving
+   fails, and `da-backup-failed` will be firing too. **Never delete WAL by
+   hand.** Fix the archive and Postgres removes it itself.
+3. Loki keeps thirty days. If it is the largest volume, shorten
+   `retention_period` in `loki.yml` rather than deleting chunks.
+
+## 9 · Certificates
+
+**Rule:** `da-certificate-renewal`. Caddy renews thirty days before expiry and
+retries for weeks, so this is a warning with time to spare. The usual causes
+are DNS no longer pointing at this host, or port 80 closed. The certificate in
+use keeps working until it expires; expiry itself is only visible from outside.
 
 ## Outside the box (founder-held)
 
