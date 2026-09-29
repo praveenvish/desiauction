@@ -304,6 +304,35 @@ export function LivePanel({
     }
   }, [lotId, holdsPaddle]);
   const grantedTeams = view.teams.filter((team) => view.myGrantTeamIds.includes(team.id));
+  /*
+   * AN OWNER WITH NO PADDLE IS WAITING ON SOMEBODY ELSE — SO THE PAGE LISTENS.
+   *
+   * The hint below promises "you'll be able to claim it here the moment they
+   * do", and the page could not keep it: what an owner may claim
+   * (`myGrantTeamIds`, `myPaddle`) is rendered on the server, and the room
+   * only asked the server again after the owner's OWN claim, release or
+   * completion. A grant is the ORGANIZER's act. So the owner sat looking at
+   * "ask the organizer" after the organizer had done it, until they thought to
+   * reload — on auction night, with the first lot about to open.
+   *
+   * Every grant and every issued paddle is an event, and every event moves the
+   * snapshot version the socket already delivers. While this person holds
+   * nothing, a moved version is worth one look at the server. Once they hold a
+   * paddle this stops: a bidding owner's page is not re-rendered per bid.
+   */
+  const waitingForPaddle = myPaddle === null && !view.viewer.canConduct;
+  useEffect(() => {
+    if (!waitingForPaddle || version === 0) {
+      return;
+    }
+    // One look per burst of events, not one per event.
+    const timer = setTimeout(() => {
+      router.refresh();
+    }, 750);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [waitingForPaddle, version, router]);
   // The squad board's row universe. A conductor keeps every franchise; a bidder
   // gets their own — see `viewer.canSeeAllSquads`.
   const boardTeams = view.viewer.canSeeAllSquads
@@ -930,11 +959,24 @@ export function LivePanel({
           {view.viewer.canConduct && !finished ? (
             <Card data-testid="conduct-panel" className="live-card">
               <h2>Conduct</h2>
+              {/* THE GAVEL DOES NOT SWING ON A MEMORY. Bidding has always been
+                    disabled while the feed is stale; conducting was not, and
+                    only here — the cockpit guards every one of these. A
+                    conductor on this screen could hold the gavel over a frozen
+                    snapshot and the engine would sell to whoever was ACTUALLY
+                    leading, which the screen could not show them. Recover stays
+                    available: it reads nothing on this page. */}
+              {readOnly ? (
+                <p className="competitions-hint" role="status" data-testid="conduct-stale">
+                  Reconnecting — the controls come back when this screen is live again.
+                </p>
+              ) : null}
               <div className="conduct-row">
                 <Button
                   variant="secondary"
                   onClick={() => void send("queue", "QueueLots", {}, "Lots queued")}
                   loading={pending === "queue"}
+                  disabled={readOnly}
                   data-testid="conduct-queue"
                 >
                   Queue lots
@@ -949,7 +991,9 @@ export function LivePanel({
                     )
                   }
                   loading={pending === "open-lot"}
-                  disabled={(snapshot?.queue.length ?? 0) === 0 || lot !== null || notTakingBids}
+                  disabled={
+                    readOnly || (snapshot?.queue.length ?? 0) === 0 || lot !== null || notTakingBids
+                  }
                   data-testid="conduct-open-lot"
                 >
                   Open next lot{snapshot?.queue[0] ? ` (${snapshot.queue[0].lotNumber})` : ""}
@@ -963,7 +1007,7 @@ export function LivePanel({
                   onConfirm={() => {
                     void send("close-lot", "CloseLot", { lotId: lot?.lotId ?? "" }, "Lot closed");
                   }}
-                  disabled={lot === null || pending === "close-lot"}
+                  disabled={readOnly || lot === null || pending === "close-lot"}
                   testId="conduct-close-lot"
                   describedBy="live-gavel-hint"
                   resetKey={gavelResetKey(lot)}
@@ -978,6 +1022,7 @@ export function LivePanel({
                     variant="ghost"
                     onClick={() => void send("pause", "PauseAuction", {}, "Paused")}
                     loading={pending === "pause"}
+                    disabled={readOnly}
                     data-testid="conduct-pause"
                   >
                     Pause
@@ -988,6 +1033,7 @@ export function LivePanel({
                     variant="ghost"
                     onClick={() => void send("resume", "ResumeAuction", {}, "Resumed")}
                     loading={pending === "resume"}
+                    disabled={readOnly}
                     data-testid="conduct-resume"
                   >
                     Resume
@@ -1000,6 +1046,7 @@ export function LivePanel({
                   onClick={() => {
                     setCompleteOpen(true);
                   }}
+                  disabled={readOnly}
                   data-testid="conduct-complete"
                 >
                   Close auction

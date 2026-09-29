@@ -1062,11 +1062,14 @@ function OwnerInvite({
         {ownerName !== null ? `Owner · ${ownerName}` : "This team has no owner yet."}
       </p>
       {/* Stated where the organizer is about to act, not only in the help
-          centre: there is no RevokeOwnerInvite command anywhere in the product
-          (see the cockpit's Owners & paddles panel for the full note). */}
+          centre. This used to say the link "cannot be withdrawn once sent",
+          which stopped being true when RevokeOwnerInvite shipped — and told an
+          organizer who had mis-sent a bearer link that nothing could be done,
+          at the one moment something could. */}
       <p className="teams-notice" data-testid="teams-owner-irrevocable">
-        An owner link works once, expires in 7 days, and{" "}
-        <strong>cannot be withdrawn once sent</strong> — anyone holding it can accept it.
+        An owner link works once and expires in 7 days.{" "}
+        <strong>Anyone holding it can accept it</strong> — if it reaches the wrong person, withdraw
+        it from the auction&rsquo;s Owners &amp; paddles panel before they do.
       </p>
       <Button
         variant="secondary"

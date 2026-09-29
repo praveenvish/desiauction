@@ -747,7 +747,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
             text: "Anyone holding the link can use it, so don't forward it. It is not tied to your phone number.",
           },
           {
-            text: "An owner link cannot be withdrawn once it has been sent. If it goes astray, tell your organizer straight away.",
+            text: "If the link goes astray, tell your organizer straight away. They can withdraw it for as long as nobody has accepted it, and send a new one.",
           },
         ],
       },
@@ -827,7 +827,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "callout",
         tone: "warning",
-        text: "An owner invitation cannot be withdrawn once you've sent it. There is no revoke control for owner links today: anyone holding the link can accept it, and a link sent to the wrong number stays usable until it expires 7 days later. Check the number before you send.",
+        text: "Anyone holding an owner link can accept it, so check the number before you send. If one goes to the wrong person, withdraw it at once: on the auction's Owners & paddles panel, press Withdraw link beside the invitation, then create a new one. A link can be withdrawn only until somebody accepts it — after that the person is an owner, and removing them is a different step.",
       },
       { kind: "heading", level: 2, text: "Lots" },
       {

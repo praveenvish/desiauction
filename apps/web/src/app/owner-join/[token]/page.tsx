@@ -195,8 +195,7 @@ function ValidOwnerInvite({ preview, token }: { preview: OwnerJoinPreview; token
           <Link href="/home" data-testid="owner-join-decline">
             This isn&apos;t for me
           </Link>{" "}
-          — leaving does nothing to the link. Tell the organizer: an owner link cannot be withdrawn
-          once sent.
+          — leaving does nothing to the link. Tell the organizer, so they can withdraw it.
         </p>
       </Card>
     </>

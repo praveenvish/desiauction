@@ -7,6 +7,7 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/packages/db/src/schema.ts",
         "$TURBO_ROOT$/apps/web/src/**",
+        "$TURBO_ROOT$/apps/engine/src/**",
         "$TURBO_ROOT$/packages/auction/src/**",
         "$TURBO_ROOT$/packages/settlement/src/**",
         "$TURBO_ROOT$/packages/financial-operations/src/**",

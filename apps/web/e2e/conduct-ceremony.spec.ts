@@ -419,7 +419,12 @@ test("conduct & ceremony: owner workflow, cockpit, undo, ledger, replay, recover
     timeout: 30_000,
   });
   for (const lot of ["L002", "L003"]) {
+    // Withdraw asks first: it is the one lot command with no way back, so the
+    // press opens a dialog that names the player, and only its answer sends.
     await organizer.getByTestId(`withdraw-${lot}`).click();
+    await expect(organizer.getByTestId("withdraw-summary")).toContainText(lot);
+    await expect(organizer.getByTestId(`queue-${lot}`)).toHaveCount(1);
+    await organizer.getByTestId("confirm-withdraw").click();
     await expect(organizer.getByTestId(`queue-${lot}`)).toHaveCount(0, { timeout: 20_000 });
   }
   // One helper for the two-act dialog (see complete-auction.ts): confirm,
