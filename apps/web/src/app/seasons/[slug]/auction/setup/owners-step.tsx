@@ -115,16 +115,18 @@ export function OwnersStep({
         }
       }
     } finally {
-      // Whether or not every request came back: a link that WAS made is still
-      // announced below, and the screen is never left busy (lib/release).
+      // Whether or not every request came back: the screen is never left busy
+      // (lib/release), and the links that WERE made are announced and shown —
+      // a request lost on the third team must not hide the first two. The
+      // failure itself carries on to whoever is listening for it.
       setPending(null);
-    }
-    if (made > 0) {
-      toast({
-        title: `${String(made)} link${made === 1 ? "" : "s"} ready — send each to its team's owner.`,
-        tone: "success",
-      });
-      router.refresh();
+      if (made > 0) {
+        toast({
+          title: `${String(made)} link${made === 1 ? "" : "s"} ready — send each to its team's owner.`,
+          tone: "success",
+        });
+        router.refresh();
+      }
     }
   };
 

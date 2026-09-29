@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { lostRequest, type LostRequest } from "../lib/lost-request";
 
@@ -18,6 +19,16 @@ import { lostRequest, type LostRequest } from "../lib/lost-request";
  * it happens. It names no action ("your bid", "your save") because it cannot
  * know which; it says what is known and what to do.
  *
+ * IT GOES AWAY BY ITSELF when it has stopped being true. A dropped connection
+ * is about one moment: the notice leaves after a while, and when the person
+ * moves to another screen — otherwise it would still be saying "that didn't go
+ * through" over the retry that did. A stale page stays stale on every screen
+ * until it is reloaded, so that one waits to be answered.
+ *
+ * AT THE TOP, not the bottom: the bottom of a phone is where the live room
+ * keeps its bid buttons, and a notice about one lost request must never sit
+ * on top of the next bid.
+ *
  * Self-contained on purpose — literal colours, inline styles, native buttons —
  * because it is mounted above every page's own providers and must not depend
  * on any of them having arrived.
@@ -27,25 +38,66 @@ const COPY: Record<Exclude<LostRequest, null>, string> = {
   "stale-page": "This page is out of date. Reload it, then try again.",
 };
 
+/** How long a dropped-connection notice stays before it leaves by itself. */
+const NETWORK_NOTICE_MS = 15_000;
+
 export function ActionFailureNotice() {
   const [kind, setKind] = useState<LostRequest>(null);
+  // The screen the request was lost ON, so that the notice can stay behind
+  // when the person moves to another one.
+  const [lostOn, setLostOn] = useState<string | null>(null);
+  const pathname = usePathname();
+  // A page that is being LEFT aborts whatever it had in flight, and Safari
+  // words an aborted request exactly like a lost one. Nothing said while the
+  // page is on its way out would be true, or seen.
+  const leaving = useRef(false);
 
   useEffect(() => {
     const onRejection = (event: PromiseRejectionEvent) => {
+      if (leaving.current) {
+        return;
+      }
       const lost = lostRequest(event.reason);
       if (lost !== null) {
         // A stale page outranks a dropped connection: it is the one a retry
         // cannot fix.
         setKind((current) => (current === "stale-page" ? current : lost));
+        setLostOn(window.location.pathname);
       }
     };
+    const onLeave = () => {
+      leaving.current = true;
+    };
+    const onReturn = () => {
+      // Restored from the back/forward cache: the same page, alive again.
+      leaving.current = false;
+    };
     window.addEventListener("unhandledrejection", onRejection);
+    window.addEventListener("beforeunload", onLeave);
+    window.addEventListener("pagehide", onLeave);
+    window.addEventListener("pageshow", onReturn);
     return () => {
       window.removeEventListener("unhandledrejection", onRejection);
+      window.removeEventListener("beforeunload", onLeave);
+      window.removeEventListener("pagehide", onLeave);
+      window.removeEventListener("pageshow", onReturn);
     };
   }, []);
 
-  if (kind === null) {
+  useEffect(() => {
+    if (kind !== "network") {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setKind((current) => (current === "network" ? null : current));
+    }, NETWORK_NOTICE_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [kind]);
+
+  // Another screen: a dropped request on the last one is not news here.
+  if (kind === null || (kind === "network" && lostOn !== pathname)) {
     return null;
   }
   const button = {
@@ -65,7 +117,7 @@ export function ActionFailureNotice() {
         position: "fixed",
         left: "50%",
         transform: "translateX(-50%)",
-        bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
+        top: "calc(12px + env(safe-area-inset-top, 0px))",
         zIndex: 2147483000,
         width: "min(560px, calc(100vw - 32px))",
         display: "flex",
