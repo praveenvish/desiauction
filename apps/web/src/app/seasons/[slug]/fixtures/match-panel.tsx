@@ -250,6 +250,66 @@ export function MatchPanel({
       ? `${fixture.groundName}${fixture.venueName !== null ? ` · ${fixture.venueName}` : ""}`
       : `${terms.ground} to be set`;
 
+  /* LINEUPS — who took the field. A lobby's squads are its lineup. The
+     organizer gets both sides; a team's owner gets their own side only (the
+     server sends nothing else) and picks it here (founder, 2026-09-29). */
+  const lineupsSection =
+    !lobby && sides !== undefined && sides.length > 0 ? (
+      <section className="mx-section" aria-labelledby={`lineups-${fixture.id}`}>
+        <h3 className="mx-label" id={`lineups-${fixture.id}`}>
+          {canManage ? "Lineups" : "Your lineup"}
+        </h3>
+        <ul className="mx-lineups">
+          {sides.map((side) => {
+            const named = side.players.filter((player) => player.played).length;
+            const open = editing === side.teamId;
+            return (
+              <li key={side.teamId} data-testid={`lineup-side-${side.teamId}`}>
+                <div className="mx-lineup-row">
+                  <TeamCrest name={side.teamName} color={side.teamColor} />
+                  <span className="mx-lineup-name">{side.teamName}</span>
+                  <span className="mx-lineup-state" data-set={side.recorded ? "true" : undefined}>
+                    {side.recorded ? (
+                      <>
+                        <IconCheck size={14} aria-hidden />
+                        {named} named
+                      </>
+                    ) : (
+                      "Not set"
+                    )}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant={open ? "ghost" : "secondary"}
+                    aria-expanded={open}
+                    onClick={() => {
+                      setEditing(open ? null : side.teamId);
+                    }}
+                    data-testid={`edit-lineup-${side.teamId}`}
+                  >
+                    {open ? "Done" : side.recorded ? "Edit" : "Set"}
+                  </Button>
+                </div>
+                {open ? (
+                  <div className="mx-lineup-editor">
+                    <LineupSideEditor
+                      slug={slug}
+                      fixtureId={fixture.id}
+                      side={side}
+                      announce={announce?.[side.teamId]}
+                      onSaved={() => {
+                        router.refresh();
+                      }}
+                    />
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    ) : null;
+
   return (
     <MatchSheet
       id={fixture.id}
@@ -305,6 +365,8 @@ export function MatchPanel({
         </section>
       ) : null}
 
+      {canManage ? null : lineupsSection}
+
       {canManage ? (
         <>
           {step !== undefined ? (
@@ -327,65 +389,7 @@ export function MatchPanel({
             </section>
           ) : null}
 
-          {/* LINEUPS — who took the field. A lobby's squads are its lineup. */}
-          {!lobby && sides !== undefined && sides.length > 0 ? (
-            <section className="mx-section" aria-labelledby={`lineups-${fixture.id}`}>
-              <h3 className="mx-label" id={`lineups-${fixture.id}`}>
-                Lineups
-              </h3>
-              <ul className="mx-lineups">
-                {sides.map((side) => {
-                  const named = side.players.filter((player) => player.played).length;
-                  const open = editing === side.teamId;
-                  return (
-                    <li key={side.teamId} data-testid={`lineup-side-${side.teamId}`}>
-                      <div className="mx-lineup-row">
-                        <TeamCrest name={side.teamName} color={side.teamColor} />
-                        <span className="mx-lineup-name">{side.teamName}</span>
-                        <span
-                          className="mx-lineup-state"
-                          data-set={side.recorded ? "true" : undefined}
-                        >
-                          {side.recorded ? (
-                            <>
-                              <IconCheck size={14} aria-hidden />
-                              {named} named
-                            </>
-                          ) : (
-                            "Not set"
-                          )}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant={open ? "ghost" : "secondary"}
-                          aria-expanded={open}
-                          onClick={() => {
-                            setEditing(open ? null : side.teamId);
-                          }}
-                          data-testid={`edit-lineup-${side.teamId}`}
-                        >
-                          {open ? "Done" : side.recorded ? "Edit" : "Set"}
-                        </Button>
-                      </div>
-                      {open ? (
-                        <div className="mx-lineup-editor">
-                          <LineupSideEditor
-                            slug={slug}
-                            fixtureId={fixture.id}
-                            side={side}
-                            announce={announce?.[side.teamId]}
-                            onSaved={() => {
-                              router.refresh();
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ) : null}
+          {lineupsSection}
 
           {/* THE SCORE — only once the match is under way. */}
           {played ? (

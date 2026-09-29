@@ -313,6 +313,22 @@
   color: var(--text-secondary);
 }
 
+.ow-next-go {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  color: var(--accent-ink);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ow-next-go:hover {
+  text-decoration: underline;
+}
+
 .ow-season-figs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));

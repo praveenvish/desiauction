@@ -89,6 +89,7 @@ import { scheduleSnapshot, serializeScheduleCsv } from "./schedule-snapshot";
 import { DAYS_SHOWN, focusStart, weekStrip, type WeekStrip } from "./schedule-week";
 import { formOf, nextOf, type FormLetter, type TeamNext } from "./standings-form";
 import { lineupFixtures, lineupSides, type LineupSide } from "./lineups";
+import { ownedTeamIdsOn } from "./team-ownership";
 import { lineupAnnounceStates, type LineupAnnounceState } from "./lineup-announce";
 import {
   activeGroundsOf,
@@ -828,7 +829,10 @@ export interface ScheduleView {
   lineups?: Record<string, { home: number | null; away: number | null }>;
   selected: {
     fixture: FixtureSnapshot;
-    /** Manage only, two-sided matches only. */
+    /**
+     * Two-sided matches only: both sides for the organizer, the viewer's own
+     * side for a team owner, absent for anyone else.
+     */
     sides?: LineupSide[];
     announce?: Record<string, LineupAnnounceState>;
   } | null;
@@ -854,6 +858,9 @@ export async function scheduleView(
   const search = (params.q ?? "").trim();
   return inCompetitionOrg(session.personId, competition, async (db) => {
     const canManage = await canCompetition(db, session.personId, scope, "fixture.manage");
+    // An owner picks their own side's lineup (founder, 2026-09-29) — and sees
+    // that side only: a rival's squad stays theirs (canSeeRoster).
+    const ownedTeams = canManage ? [] : await ownedTeamIdsOn(db, session.personId, competition.id);
     const visible = canManage ? undefined : PUBLIC_FIXTURE_STATUSES;
     const narrow = {
       ...(visible !== undefined ? { visible } : {}),
@@ -909,7 +916,9 @@ export async function scheduleView(
             pageSize: ROWS_SHOWN,
           })
         : Promise.resolve(null),
-      canManage ? lineupFixtures(db, competition.id) : Promise.resolve(null),
+      canManage || ownedTeams.length > 0
+        ? lineupFixtures(db, competition.id)
+        : Promise.resolve(null),
       params.match !== undefined && params.match !== ""
         ? fixtureOfCompetition(db, competition.id, params.match, visible)
         : Promise.resolve(null),
@@ -931,14 +940,23 @@ export async function scheduleView(
     let selected: ScheduleView["selected"] = null;
     if (picked !== null) {
       const lineupFixture = lineupList?.find((entry) => entry.id === picked.id);
-      if (canManage && lineupFixture !== undefined && picked.status !== "cancelled") {
-        const sides = (await lineupSides(db, competition.id, lineupFixture)).map((side) => ({
-          ...side,
-          players: side.players.map((player) => ({
-            ...player,
-            role: player.role === null ? null : roleLabelIn(pack, player.role),
-          })),
-        }));
+      const ownsASide =
+        lineupFixture !== undefined &&
+        (ownedTeams.includes(lineupFixture.home.id) || ownedTeams.includes(lineupFixture.away.id));
+      if (
+        (canManage || ownsASide) &&
+        lineupFixture !== undefined &&
+        picked.status !== "cancelled"
+      ) {
+        const sides = (await lineupSides(db, competition.id, lineupFixture))
+          .filter((side) => canManage || ownedTeams.includes(side.teamId))
+          .map((side) => ({
+            ...side,
+            players: side.players.map((player) => ({
+              ...player,
+              role: player.role === null ? null : roleLabelIn(pack, player.role),
+            })),
+          }));
         selected = {
           fixture: picked,
           sides,
@@ -977,7 +995,7 @@ export async function scheduleView(
         ]),
       ),
       ...(outstanding !== undefined ? { outstanding } : {}),
-      ...(lineupList !== null
+      ...(lineupList !== null && canManage
         ? {
             lineups: Object.fromEntries(
               lineupList.map((entry) => [entry.id, entry.recorded] as const),

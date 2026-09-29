@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { currentSession } from "../auth/actions";
 import { dbHandle } from "../db";
 import { saveLineup } from "./lineups";
+import { ownTeamsIn } from "./team-ownership";
 import { announceLineup } from "./lineup-announce";
 import { resolveMemberCompetition } from "./resolve";
 import { personCanCompetition } from "../request-cache";
@@ -16,8 +17,13 @@ import { personCanCompetition } from "../request-cache";
  * that records a result. Squads are rosters, and a roster is not something a
  * plain member or a rival owner reads (teams tab, canSeeRoster). They are read
  * with the Matches screen (`scheduleView`) and written here.
+ *
+ * A TEAM'S OWNER PICKS THEIR OWN SIDE (founder, 2026-09-29): the owner of the
+ * team — by paddle or accepted owner invite, `ownTeamsIn`, the same test the
+ * posters use — may save and announce that team's lineup, and only that
+ * team's. The organizer keeps both sides.
  */
-async function gate(slug: string) {
+async function gate(slug: string, teamId: string) {
   const session = await currentSession();
   if (session === null) {
     redirect(`/login?next=/seasons/${slug}/fixtures`);
@@ -27,8 +33,11 @@ async function gate(slug: string) {
     return null;
   }
   const scope = { orgId: competition.orgId, competitionId: competition.id };
-  const allowed = await personCanCompetition(session.personId, scope, "fixture.manage");
-  return allowed ? { personId: session.personId, competition } : null;
+  if (await personCanCompetition(session.personId, scope, "fixture.manage")) {
+    return { personId: session.personId, competition };
+  }
+  const owned = await ownTeamsIn(session.personId, competition);
+  return owned.includes(teamId) ? { personId: session.personId, competition } : null;
 }
 
 const MAX_LINEUP = 60;
@@ -39,9 +48,9 @@ export async function saveLineupAction(
   teamId: string,
   registrationIds: string[],
 ): Promise<{ ok: true; played: number } | { ok: false; error: string }> {
-  const gated = await gate(slug);
+  const gated = await gate(slug, teamId);
   if (gated === null) {
-    return { ok: false, error: "You can't record lineups for this season." };
+    return { ok: false, error: "You can't record this team's lineup." };
   }
   // A squad is tens of players, never hundreds. The list comes from the client,
   // and each id is checked in one IN (...) query — an unbounded array made that
@@ -74,17 +83,17 @@ export async function saveLineupAction(
 
 /**
  * Tell the players in one side's SAVED lineup that they are in it — only for a
- * match still to come, only those not told before. Same key as recording it
- * (`fixture.manage`): whoever picks the lineup announces it.
+ * match still to come, only those not told before. Same gate as recording it:
+ * whoever picks the lineup — the organizer, or that team's owner — announces it.
  */
 export async function announceLineupAction(
   slug: string,
   fixtureId: string,
   teamId: string,
 ): Promise<{ ok: true; told: number } | { ok: false; error: string }> {
-  const gated = await gate(slug);
+  const gated = await gate(slug, teamId);
   if (gated === null) {
-    return { ok: false, error: "You can't announce lineups for this season." };
+    return { ok: false, error: "You can't announce this team's lineup." };
   }
   const { personId, competition } = gated;
   const result = await withTenantDb(dbHandle, { personId, orgId: competition.orgId }, (db) =>
