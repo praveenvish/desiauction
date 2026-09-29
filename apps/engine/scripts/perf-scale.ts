@@ -53,6 +53,8 @@ const SECRET = "perf-scale-secret";
 const LOT_SCALES = [100, 250, 500, 1000, 2500];
 const SPECTATOR_SCALES = [50, 100, 250, 500, 1000];
 const TEAMS = 10;
+/** How long one bid may take to reach every spectator before the run fails. */
+const CONVERGE_TIMEOUT_MS = 15_000;
 
 // No expiry mid-run: the timer authority is measured in perf-live, not here.
 const CONFIG: AuctionConfig = {
@@ -173,10 +175,29 @@ async function seed(lotCount: number): Promise<Seeded> {
   }
   record(lotCount, "createAuction (pool → lots + events)", createMs, createMs, 1);
 
-  return { orgId, ownerId, compId, auctionId: created.auctionId, teamIds, bidderIds, personIds };
+  const seeded: Seeded = {
+    orgId,
+    ownerId,
+    compId,
+    auctionId: created.auctionId,
+    teamIds,
+    bidderIds,
+    personIds,
+  };
+  uncleaned.add(seeded);
+  return seeded;
 }
 
+/**
+ * What has been seeded and not yet removed. A run that throws used to leave its
+ * league behind — a LIVE auction in the database, which is what the deploy
+ * freeze and the admin live board both look for — so a failure here cleans up
+ * after itself before it exits (see `main`).
+ */
+const uncleaned = new Set<Seeded>();
+
 async function cleanup(s: Seeded): Promise<void> {
+  uncleaned.delete(s);
   await db.delete(auctionEvents).where(eq(auctionEvents.orgId, s.orgId));
   await db.delete(bids).where(eq(bids.orgId, s.orgId));
   await db.delete(lots).where(eq(lots.orgId, s.orgId));
@@ -416,6 +437,12 @@ async function runSpectatorScale(): Promise<void> {
     engine,
     engineSecret: SECRET,
     nodeEnv: "test",
+    // Every simulated spectator connects from 127.0.0.1, so the per-address
+    // cap (50 by default) refused the 51st socket and this phase died with
+    // "socket hang up" before the 100-spectator row — the harness reported
+    // nothing past 50 and exited 1. perf-live carries the same override; this
+    // measures fan-out, and the cap has its own tests (server.test.ts).
+    maxSocketsPerIp: 10_000,
   });
   hubRef = hub;
   await server.listen({ host: "127.0.0.1", port: 0 });
@@ -437,6 +464,16 @@ async function runSpectatorScale(): Promise<void> {
     });
 
   await engine.ensureAuction(s.auctionId);
+  // Every ack is asserted here too. This phase used to ignore them, and its
+  // invite tokens were the fixed strings `spec-0`…`spec-9` against a globally
+  // unique column — so ONE run that died before its cleanup made every later
+  // run's invites collide, no paddle was ever issued, the auction never
+  // opened, and the harness waited for ever on a bid nobody could place.
+  const must = (ack: { accepted: boolean; reason?: string }, what: string): void => {
+    if (!ack.accepted) {
+      throw new Error(`${what} failed: ${ack.reason ?? "?"}`);
+    }
+  };
   for (let i = 0; i < TEAMS; i++) {
     const bidder = s.bidderIds[i] as string;
     const invited = await command(
@@ -444,25 +481,29 @@ async function runSpectatorScale(): Promise<void> {
       s.ownerId,
       {
         teamId: s.teamIds[i] as string,
-        tokenHash: `spec-${String(i)}`,
+        tokenHash: newId(), // unique per run: the hash column is globally unique
         expiresAtMs: Date.now() + 3_600_000,
       },
       true,
     );
+    must(invited, "InviteOwner");
     const inviteId = (invited.reason ?? "").replace("invite:", "");
-    await command("AcceptOwnerInvite", bidder, { inviteId });
-    await command(
+    must(await command("AcceptOwnerInvite", bidder, { inviteId }), "AcceptOwnerInvite");
+    must(
+      await command(
+        "GrantPaddle",
+        s.ownerId,
+        { teamId: s.teamIds[i] as string, personId: bidder },
+        true,
+      ),
       "GrantPaddle",
-      s.ownerId,
-      { teamId: s.teamIds[i] as string, personId: bidder },
-      true,
     );
-    await command("ClaimPaddle", bidder, { teamId: s.teamIds[i] as string });
+    must(await command("ClaimPaddle", bidder, { teamId: s.teamIds[i] as string }), "ClaimPaddle");
   }
-  await command("QueueLots", s.ownerId, {}, true);
-  await command("OpenAuction", s.ownerId, {}, true);
+  must(await command("QueueLots", s.ownerId, {}, true), "QueueLots");
+  must(await command("OpenAuction", s.ownerId, {}, true), "OpenAuction");
   const lotId = engine.snapshotOf(s.auctionId)?.snapshot?.queue[0]?.lotId ?? "";
-  await command("OpenLot", s.ownerId, { lotId }, true);
+  must(await command("OpenLot", s.ownerId, { lotId }, true), "OpenLot");
   const paddleRows = await db
     .select({ id: paddles.id, personId: paddles.personId })
     .from(paddles)
@@ -501,8 +542,21 @@ async function runSpectatorScale(): Promise<void> {
       const target = engine.snapshotOf(s.auctionId)?.version ?? 0;
       const arrivals: number[] = [];
       const start = performance.now();
-      const converged = new Promise<void>((resolve) => {
+      const converged = new Promise<void>((resolve, reject) => {
         let seen = 0;
+        // A spectator that never converges used to hang the harness for ever
+        // with nothing printed. Say which round, and how many were missing.
+        const deadline = setTimeout(() => {
+          reject(
+            new Error(
+              `fan-out did not converge: ${String(seen)}/${String(sockets.length)} spectators ` +
+                `saw a version above ${String(target)} within ${String(CONVERGE_TIMEOUT_MS)}ms ` +
+                `(round ${String(round)}, open sockets ${String(
+                  sockets.filter((ws) => ws.readyState === WebSocket.OPEN).length,
+                )})`,
+            ),
+          );
+        }, CONVERGE_TIMEOUT_MS);
         for (const ws of sockets) {
           const onMessage = (raw: WebSocket.RawData): void => {
             const frame = JSON.parse(String(raw)) as { kind: string; version: number };
@@ -511,6 +565,7 @@ async function runSpectatorScale(): Promise<void> {
               ws.off("message", onMessage);
               seen += 1;
               if (seen === sockets.length) {
+                clearTimeout(deadline);
                 resolve();
               }
             }
@@ -519,11 +574,14 @@ async function runSpectatorScale(): Promise<void> {
         }
       });
       const amount = engine.snapshotOf(s.auctionId)?.snapshot?.currentLot?.nextMinimumBid ?? 0;
-      await command("PlaceBid", bidder, {
-        lotId,
-        paddleId: paddleOf.get(bidder),
-        amountRaw: amount,
-      });
+      must(
+        await command("PlaceBid", bidder, {
+          lotId,
+          paddleId: paddleOf.get(bidder),
+          amountRaw: amount,
+        }),
+        "PlaceBid",
+      );
       await converged;
       fanout.push(Math.max(...arrivals));
     }
@@ -547,8 +605,12 @@ async function main(): Promise<void> {
     `|${"-".repeat(7)}|${"-".repeat(44)}|${"-".repeat(11)}|${"-".repeat(10)}|${"-".repeat(6)}|`,
   );
 
-  for (const lotCount of LOT_SCALES) {
-    await runLotScale(lotCount);
+  // PERF_SCALE_ONLY=spectators skips the lot scales (several minutes of
+  // seeding) when only the fan-out is being looked at.
+  if (process.env["PERF_SCALE_ONLY"] !== "spectators") {
+    for (const lotCount of LOT_SCALES) {
+      await runLotScale(lotCount);
+    }
   }
   console.log("\n--- BROADCAST FAN-OUT (250-lot auction, real WebSockets) ---\n");
   await runSpectatorScale();
@@ -557,7 +619,12 @@ async function main(): Promise<void> {
   await sql.end();
 }
 
-main().catch((error: unknown) => {
+main().catch(async (error: unknown) => {
   console.error(error);
+  for (const seeded of [...uncleaned]) {
+    await cleanup(seeded).catch((cleanupError: unknown) => {
+      console.error("cleanup after failure also failed:", cleanupError);
+    });
+  }
   process.exit(1);
 });
