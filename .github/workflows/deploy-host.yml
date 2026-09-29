@@ -136,10 +136,21 @@ jobs:
           # itself changes. Restarting Postgres on every deploy is a small
           # outage nobody asked for.
           DB_TAG="$(cat ops/deploy/db/Dockerfile ops/deploy/db/initdb/* | shasum -a 256 | cut -c1-12)"
-          docker buildx build \
-            --file ops/deploy/db/Dockerfile \
-            --tag "${REG}/db:${DB_TAG}" \
-            --push ops/deploy/db
+          # BUILD IT ONCE PER CONTENT, NEVER AGAIN. A rebuild is not
+          # byte-identical (layer timestamps), so pushing the same content tag
+          # every deploy moved it to a NEW digest: the host's `compose pull`
+          # fetched it and `up -d` recreated Postgres (and the backup sidecar)
+          # on every release — a restart that cut the old engine's connection
+          # mid-write ("Cannot read properties of null (reading 'write')",
+          # a fatal alert) on the 2026-09-29 deploy. If the tag exists, reuse it.
+          if docker buildx imagetools inspect "${REG}/db:${DB_TAG}" >/dev/null 2>&1; then
+            echo "db:${DB_TAG} already in the registry — not rebuilt, Postgres stays up"
+          else
+            docker buildx build \
+              --file ops/deploy/db/Dockerfile \
+              --tag "${REG}/db:${DB_TAG}" \
+              --push ops/deploy/db
+          fi
 
           echo "REGISTRY=${REG}" >> "$GITHUB_ENV"
           echo "TAG=${TAG}" >> "$GITHUB_ENV"
