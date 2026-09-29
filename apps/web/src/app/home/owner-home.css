@@ -370,20 +370,6 @@
   color: var(--text-muted);
 }
 
-.ow-match-next {
-  font-size: var(--text-xs-size);
-  font-weight: var(--font-weight-bold, 700);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-accent);
-}
-
-/* A past match with no result: someone owes a score, which is not "next". */
-.ow-match-next[data-state="due"] {
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
 .ow-result {
   display: inline-flex;
   align-items: center;
