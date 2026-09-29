@@ -7,6 +7,13 @@
 -- back at the end, takes no lock stronger than the one a SELECT takes, and
 -- changes nothing. Safe while an auction is running.
 --
+-- NOT DURING A DEPLOY. A SELECT's lock is held until this transaction ends,
+-- and a migration that alters one of these tables has to wait for it — with
+-- every query on that table then waiting behind the migration. The migrator
+-- gives up after five seconds rather than queue (packages/db/scripts/
+-- migrate.mjs), so the cost would be a failed deploy, not a frozen auction;
+-- run this between deploys all the same. It stops itself after two minutes.
+--
 -- WHY IT EXISTS (PRR 2026-09-29). Two kinds of rule are still application
 -- discipline only:
 --
@@ -21,6 +28,11 @@
 -- a row somebody has to look at before anything is enforced.
 \set ON_ERROR_STOP on
 begin transaction read only;
+-- Bounded: a count that has not finished in two minutes is a table too large
+-- to scan in one go, and this must never be the long-running reader that a
+-- deploy finds in its way.
+set local statement_timeout = '120s';
+set local lock_timeout = '5s';
 
 \echo
 \echo '== 1. Foreign keys that exist but were never validated (NOT VALID) =='

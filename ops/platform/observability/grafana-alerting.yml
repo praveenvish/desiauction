@@ -297,6 +297,10 @@ groups:
       # A full disk stops Postgres, Loki and Docker together, and takes the alerting
       # with it — so it is said at 85, while there is still room to act. The sidecar
       # writes the larger of space and inodes every five minutes.
+      #
+      # `__error__=""` twice, on purpose: a line in that stream that is not JSON
+      # (the shell complaining on stderr) or has no number in the field fails the
+      # WHOLE query otherwise, and a failed query on a `page` rule pages.
       - uid: da-disk-filling
         title: "Disk is filling"
         condition: C
@@ -307,7 +311,7 @@ groups:
             model:
               refId: A
               queryType: instant
-              expr: 'max(max_over_time({project="platform", service="disk-watch"} | json | unwrap worstPct [15m]))'
+              expr: 'max(max_over_time({project="platform", service="disk-watch"} |= "worstPct" | json | __error__="" | unwrap worstPct | __error__="" [15m]))'
           - refId: B
             datasourceUid: __expr__
             model:
