@@ -151,6 +151,8 @@ function poolHint(stats: RegistrationStats): string {
 interface Filters {
   search: string;
   status: string;
+  /** After the auction: sold, presigned or unsold ("" for all). */
+  outcome: string;
   fee: string;
   team: string;
   role: string;
@@ -444,6 +446,7 @@ export function RegistrationDashboardPanel({
   const filtersApplied =
     filters.search !== "" ||
     filters.status !== "" ||
+    filters.outcome !== "" ||
     filters.fee !== "" ||
     filters.team !== "" ||
     filters.role !== "" ||
@@ -471,6 +474,7 @@ export function RegistrationDashboardPanel({
     const result = await selectAllMatchingAction(slug, {
       ...(filters.search !== "" ? { search: filters.search } : {}),
       ...(filters.status !== "" ? { status: filters.status } : {}),
+      ...(filters.outcome !== "" ? { outcome: filters.outcome } : {}),
       ...(filters.fee !== "" ? { fee: filters.fee } : {}),
       ...(filters.team !== "" ? { teamId: filters.team } : {}),
       ...(filters.role !== "" ? { role: filters.role } : {}),
@@ -847,7 +851,13 @@ export function RegistrationDashboardPanel({
         </div>
       ) : null}
 
-      {stats.total > 0 ? <PoolStrip stats={stats} roles={desk.roles} /> : null}
+      {stats.total > 0 ? (
+        desk.auctionDone ? (
+          <OutcomeStrip stats={stats} />
+        ) : (
+          <PoolStrip stats={stats} roles={desk.roles} />
+        )
+      ) : null}
 
       <SectionCard flush className="rd-card" title="Players" hideHeader>
         {/* ROW 1 — the status tabs. The
@@ -861,33 +871,51 @@ export function RegistrationDashboardPanel({
                 key: "all",
                 label: "All",
                 count: <span className="stat-value">{stats.total}</span>,
-                active: filters.status === "" && filters.fee === "",
+                active: filters.status === "" && filters.fee === "" && filters.outcome === "",
                 testId: "stat-total",
                 onSelect: () => {
-                  changeFilter({ status: "", fee: "" });
+                  changeFilter({ status: "", fee: "", outcome: "" });
                 },
               },
-              {
-                key: "submitted",
-                label: "To review",
-                count: <span className="stat-value">{stats.submitted}</span>,
-                attention: stats.submitted > 0,
-                active: filters.status === "submitted",
-                testId: "stat-submitted",
-                onSelect: () => {
-                  changeFilter({ status: "submitted" });
-                },
-              },
-              {
-                key: "approved",
-                label: "Approved",
-                count: <span className="stat-value">{stats.approved}</span>,
-                active: filters.status === "approved",
-                testId: "stat-approved",
-                onSelect: () => {
-                  changeFilter({ status: "approved" });
-                },
-              },
+              // AFTER THE NIGHT the question is no longer "reviewed?" — every
+              // row was "Approved" — but what the auction did (census 17).
+              ...(desk.auctionDone
+                ? OUTCOME_TABS.map((tab) => ({
+                    key: tab.key,
+                    label: tab.label,
+                    count: <span className="stat-value">{stats.outcomes[tab.key]}</span>,
+                    active: filters.outcome === tab.key,
+                    testId: `stat-${tab.key}`,
+                    onSelect: () => {
+                      changeFilter({ outcome: tab.key, status: "" });
+                    },
+                  }))
+                : []),
+              ...(!desk.auctionDone || stats.submitted > 0 || filters.status === "submitted"
+                ? [
+                    {
+                      key: "submitted",
+                      label: "To review",
+                      count: <span className="stat-value">{stats.submitted}</span>,
+                      attention: stats.submitted > 0,
+                      active: filters.status === "submitted",
+                      testId: "stat-submitted",
+                      onSelect: () => {
+                        changeFilter({ status: "submitted", outcome: "" });
+                      },
+                    },
+                    {
+                      key: "approved",
+                      label: "Approved",
+                      count: <span className="stat-value">{stats.approved}</span>,
+                      active: filters.status === "approved",
+                      testId: "stat-approved",
+                      onSelect: () => {
+                        changeFilter({ status: "approved", outcome: "" });
+                      },
+                    },
+                  ]
+                : []),
               // A state nobody is in is not a filter worth a tab (it read
               // "Waitlisted 0 · Declined 0 · Withdrawn 0" on every season).
               ...(stats.waitlisted > 0 || filters.status === "waitlisted"
@@ -899,7 +927,7 @@ export function RegistrationDashboardPanel({
                       active: filters.status === "waitlisted",
                       testId: "stat-waitlisted",
                       onSelect: () => {
-                        changeFilter({ status: "waitlisted" });
+                        changeFilter({ status: "waitlisted", outcome: "" });
                       },
                     },
                   ]
@@ -913,7 +941,7 @@ export function RegistrationDashboardPanel({
                       active: filters.status === "rejected",
                       testId: "stat-rejected",
                       onSelect: () => {
-                        changeFilter({ status: "rejected" });
+                        changeFilter({ status: "rejected", outcome: "" });
                       },
                     },
                   ]
@@ -927,7 +955,7 @@ export function RegistrationDashboardPanel({
                       active: filters.status === "withdrawn",
                       testId: "stat-withdrawn",
                       onSelect: () => {
-                        changeFilter({ status: "withdrawn" });
+                        changeFilter({ status: "withdrawn", outcome: "" });
                       },
                     },
                   ]
@@ -1416,6 +1444,7 @@ export function RegistrationDashboardPanel({
               view: {
                 ...(filters.search !== "" ? { search: filters.search } : {}),
                 ...(filters.status !== "" ? { status: filters.status } : {}),
+                ...(filters.outcome !== "" ? { outcome: filters.outcome } : {}),
                 ...(filters.fee !== "" ? { fee: filters.fee } : {}),
                 ...(filters.team !== "" ? { teamId: filters.team } : {}),
                 ...(filters.role !== "" ? { role: filters.role } : {}),
@@ -1639,6 +1668,66 @@ function NextStep({
         <p className="pd-next-why">{why}</p>
       </div>
       {action}
+    </section>
+  );
+}
+
+/* --- After the auction, what it did ----------------------------------------- */
+
+const OUTCOME_TABS = [
+  { key: "sold", label: "Sold" },
+  { key: "presigned", label: "Pre-signed" },
+  { key: "unsold", label: "Unsold" },
+] as const;
+
+/**
+ * THE NIGHT'S RESULT, OVER THE LIST (census 17). After the auction the strip
+ * still said "Auction pool 37 of 43" — a question the night had answered. It
+ * now says what the auction did with everyone approved: bought, signed before
+ * it, or left without a team — the same split as the tabs below and the
+ * status column.
+ */
+function OutcomeStrip({ stats }: { stats: RegistrationStats }) {
+  const { sold, presigned, unsold } = stats.outcomes;
+  const total = sold + presigned + unsold;
+  const parts = [
+    { key: "sold", count: sold, label: "sold on the night" },
+    { key: "presigned", count: presigned, label: "pre-signed" },
+    { key: "unsold", count: unsold, label: "unsold" },
+  ].filter((part) => part.count > 0);
+  return (
+    <section className="pd-pool" aria-label="After the auction" data-testid="stat-outcomes">
+      <div className="pd-pool-figure">
+        <span className="pd-pool-eyebrow">
+          <IconGavel size={14} weight="duotone" aria-hidden /> After the auction
+        </span>
+        <span className="pd-pool-value">
+          <span className="stat-value">{total - unsold}</span>
+          <span className="pd-pool-of"> of {total} in a squad</span>
+        </span>
+        <span className="pd-pool-hint">
+          {unsold === 0
+            ? "Every approved player has a team."
+            : `${String(unsold)} without a team — add them to a squad from their row.`}
+        </span>
+      </div>
+      {parts.length > 0 ? (
+        <div className="pd-pool-roles">
+          <span className="pd-pool-bar" aria-hidden>
+            {parts.map((part) => (
+              <span key={part.key} data-outcome={part.key} style={{ flexGrow: part.count }} />
+            ))}
+          </span>
+          <ul className="pd-pool-legend">
+            {parts.map((part) => (
+              <li key={part.key}>
+                <span className="pd-pool-dot" data-outcome={part.key} aria-hidden />
+                <strong>{part.count}</strong> {part.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }
