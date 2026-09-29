@@ -190,7 +190,7 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
           </Pill>
         </header>
 
-        {seasonOn !== null ? <NextStrip season={seasonOn} today={today} /> : null}
+        {seasonOn !== null ? <NextStrip season={seasonOn} today={today} base={base} /> : null}
 
         {seasonOn !== null ? (
           <dl className="ow-season-figs" data-testid="home-owner-figures">
@@ -536,7 +536,16 @@ function whenLabel(kickoffAt: string | null, today: string): string {
 }
 
 /** The next match, as a strip inside the team hero. */
-function NextStrip({ season, today }: { season: TeamSeason; today: string }) {
+function NextStrip({
+  season,
+  today,
+  base,
+}: {
+  season: TeamSeason;
+  today: string;
+  /** The season's URL — the lineup is picked in the match's panel there. */
+  base: string;
+}) {
   const next = season.upcoming[0];
   if (next === undefined) {
     return (
@@ -567,6 +576,18 @@ function NextStrip({ season, today }: { season: TeamSeason; today: string }) {
           .filter((part): part is string => part !== null && part !== "")
           .join(" · ")}
       </span>
+      {/* THE OWNER PICKS THEIR SIDE (founder, 2026-09-29): the door to it,
+          in the match's panel on the schedule. */}
+      {next.live ? null : (
+        <Link
+          href={`${base}/fixtures?match=${next.fixtureId}`}
+          className="ow-next-go"
+          data-testid="home-owner-pick-lineup"
+        >
+          {next.lineup.saved > 0 ? "Your lineup" : "Pick your lineup"}
+          <IconArrowRight size={14} aria-hidden />
+        </Link>
+      )}
     </p>
   );
 }
