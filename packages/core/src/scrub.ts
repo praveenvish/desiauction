@@ -40,6 +40,12 @@ export const REDACTED = "[redacted]";
  * money removed is not much of an error report.
  */
 const PATTERNS: readonly { readonly re: RegExp; readonly label: string }[] = [
+  // A URL that carries its own login: `postgres://user:password@host/db`. A
+  // driver that fails to connect is fond of quoting the address it was given.
+  // FIRST, so that the pattern for addresses below never sees `password@host`
+  // — and by shape, not by host: `@db` and `@10.0.0.5` are not addresses, and
+  // the looser address pattern only ever caught these by accident.
+  { re: /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, label: "$1[credentials]@" },
   // E.164 India, the shape every phone in this product takes.
   { re: /\+91\d{10}/g, label: "[phone]" },
   // The last label must be LETTERS: `name@host.tld` is an address, and

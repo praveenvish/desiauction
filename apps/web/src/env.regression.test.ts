@@ -165,6 +165,15 @@ describe("web env — production refuses every dev-only default", () => {
   it.each(CASES)("refuses to serve production with %s", (_name, override, message) => {
     expect(() => parseEnv(raw({ ...PROD_OK, ...override }))).toThrow(message);
   });
+
+  it("reads a blank AUTH_CODE_SECRET as not set — the way preflight does", () => {
+    // `AUTH_CODE_SECRET=` in an env file passed preflight (a warning) and then
+    // stopped the server from booting ("at least 32 characters").
+    for (const blank of ["", "   "]) {
+      const env = parseEnv(raw({ ...PROD_OK, AUTH_CODE_SECRET: blank }));
+      expect(env.AUTH_CODE_SECRET).toBeUndefined();
+    }
+  });
 });
 
 describe("web env — WhatsApp as the launch text channel", () => {

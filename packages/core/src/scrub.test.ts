@@ -144,3 +144,33 @@ describe("an address is redacted; a package version is not", () => {
     );
   });
 });
+
+describe("a URL that carries its own login", () => {
+  it("loses the login and keeps the host, whatever the host looks like", () => {
+    for (const [given, kept] of [
+      [
+        "postgres://desiauction:s3cr3t-value@db:5432/desiauction",
+        "postgres://[credentials]@db:5432/desiauction",
+      ],
+      [
+        "connect failed: postgres://app:pw@10.0.0.5:5432/x",
+        "connect failed: postgres://[credentials]@10.0.0.5:5432/x",
+      ],
+      ["https://key:secret@api.example.com/v1", "https://[credentials]@api.example.com/v1"],
+      ["redis://default:p%40ss@cache.internal:6379", "redis://[credentials]@cache.internal:6379"],
+    ] as const) {
+      expect(scrubText(given)).toBe(kept);
+    }
+  });
+
+  it("leaves alone what only looks a little like one", () => {
+    for (const text of [
+      "https://example.com/a:b@c",
+      "file:///srv/app/node_modules/.pnpm/next@15.5.25/node_modules/next/dist/server.js:12:3",
+      "at handler (webpack-internal:///(rsc)/./src/server/auth/actions.ts:41:9)",
+      "ratio 3:2@home",
+    ]) {
+      expect(scrubText(text)).toBe(text);
+    }
+  });
+});

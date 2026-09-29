@@ -57,7 +57,13 @@ const envSchema = z.object({
    * Setting it is a planned act (SECRET_ROTATION.md): the codes in flight at
    * that moment — a few minutes' worth — stop matching, and people ask again.
    */
-  AUTH_CODE_SECRET: z.string().min(32).optional(),
+  AUTH_CODE_SECRET: z.preprocess(
+    // `AUTH_CODE_SECRET=` with nothing after it is how an env file spells
+    // "not set yet". Preflight reads it that way; so must the boot, or a blank
+    // line passes the gate and then stops the server from starting.
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().min(32).optional(),
+  ),
   // OTP delivery (PX-3): "dev" writes to /dev/inbox; "msg91" sends real SMS.
   // Production deploys MUST set msg91 + credentials (beta checklist §B) —
   // the dev sender is structurally invisible outside development.
