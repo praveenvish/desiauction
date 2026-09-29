@@ -1,0 +1,110 @@
+# DESIAUCTION'S HOSTNAMES ON THE SHARED EDGE (ops/platform/Caddyfile).
+#
+# A TEMPLATE. deploy-host.yml renders it per environment into
+# /srv/platform/sites/<stack>.caddy, replacing:
+#
+#   __STACK__          the Compose project: da-prod | da-staging
+#   __PUBLIC_DOMAIN__  / __ENGINE_DOMAIN__ / __S3_DOMAIN__   from the stack's .env
+#   __WEB_EXTRA__      staging: a noindex header; production: nothing
+#
+# Lines between `# prod-only:start` and `# prod-only:end` are removed for any
+# stack but da-prod: a hostname without DNS would have Caddy retrying ACME for
+# it forever.
+#
+# Upstreams are the stack-qualified aliases on the stack's own
+# `__STACK__-public` network (`__STACK__-web`, …), so staging and production
+# can never route to each other's containers. The global log filter lives in the platform
+# Caddyfile and applies here too.
+
+__PUBLIC_DOMAIN__ {
+	encode zstd gzip
+	__WEB_EXTRA__
+	# No legitimate request to the web tier is large: server actions stop at
+	# Next's 1 MB, photos go straight to object storage on a presigned URL, and
+	# webhooks are a few KB. Without a ceiling, a chunked POST to an
+	# unauthenticated route streams until the container runs out of memory.
+	request_body {
+		max_size 10MB
+	}
+
+	# AN ACCESS LOG FOR THE WEBHOOK ROUTES, AND ONLY THOSE (ALERTS.md 5).
+	#
+	# Those routes fail closed and quietly by design, so a rotated provider
+	# secret was invisible until money stopped arriving; this line is the
+	# signal the webhook alerts count. Everything else is skipped on purpose: a
+	# log of every page view is a log of every visitor's IP and every
+	# token-bearing URL. From what IS logged, headers (provider signatures),
+	# client addresses and the query string (Meta's `hub.verify_token`) are
+	# removed before the line is written.
+	@not_webhook not path /api/webhooks/*
+	log_skip @not_webhook
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>uri regexp "\?.*$" "?[redacted]"
+				resp_headers delete
+			}
+		}
+	}
+
+	reverse_proxy __STACK__-web:3000
+}
+
+# prod-only:start
+# www is a courtesy, never a second copy of the site: one canonical origin is
+# what RP_ID, cookies and search engines all assume.
+www.__PUBLIC_DOMAIN__ {
+	redir https://__PUBLIC_DOMAIN__{uri} permanent
+}
+# prod-only:end
+
+# The engine on its own hostname, because ENGINE_ALLOWED_ORIGINS and the
+# browser's WebSocket origin check both key on it. wss:// is what the browser
+# gets, which is why this must be a real certificate and not a self-signed one.
+__ENGINE_DOMAIN__ {
+	encode zstd gzip
+	reverse_proxy __STACK__-engine:4000
+}
+
+# Object storage, on its own hostname.
+#
+# PUBLIC ON PURPOSE, and only as far as it has to be: the browser both uploads
+# a photo (to a presigned URL whose AWS v4 signature covers this Host) and
+# reads it (path-style, /<bucket>/<key>). What stops this from being an open
+# door is the bucket policy set by `minio-init`, not this file: anonymous
+# GetObject on the media bucket, nothing on the finops bucket, writes signed.
+__S3_DOMAIN__ {
+	# Photos and registers are already-compressed blobs and can be large; the
+	# app's own allow-list is what actually bounds a file.
+	request_body {
+		max_size 25MB
+	}
+
+	# PHOTOS ARE CACHED BY THE BROWSER FOR A DAY.
+	#
+	# Silo sends no Cache-Control, so every page view re-downloaded every face
+	# on it. Every upload is written under a FRESH key (media/ingest.ts — a new
+	# token per upload, never an overwrite), so a cached photo can never be a
+	# stale version of itself. The ceiling is a day and not a year because a
+	# photo is also deleted for a take-down or an erasure, and a device should
+	# stop showing it within a day. The finops bucket is never cached: it is
+	# reached only through short-lived signed URLs.
+	@media_read {
+		method GET HEAD
+		path /desiauction-media/*
+	}
+	handle @media_read {
+		reverse_proxy __STACK__-minio:9000 {
+			header_down Cache-Control "public, max-age=86400"
+		}
+	}
+	handle {
+		reverse_proxy __STACK__-minio:9000
+	}
+}

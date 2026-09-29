@@ -1,0 +1,35 @@
+# THE EDGE — every project's hostnames, one process, automatic TLS.
+#
+# Caddy provisions and renews Let's Encrypt certificates and redirects
+# http→https on its own. Each project environment drops ONE file into
+# /srv/platform/sites/ (rendered from its own site template at deploy time,
+# e.g. ops/deploy/site.caddy → da-prod.caddy) and reloads this process. A
+# reload that fails to parse is refused and the running config stays, so one
+# project's typo cannot take another project's sites down.
+
+# CADDY'S OWN LOG, FILTERED.
+#
+# Caddy writes an `http.log.error` line for every failed upstream request —
+# a 502 while a web container restarts, say — and that line carries the FULL
+# request: every header and the query string. Measured before this block
+# existed: a webhook arriving during a restart put its `X-Razorpay-Signature`
+# into the container log verbatim, and Alloy ships container logs to Loki for
+# thirty days. No Caddy line, access or error, may carry a header, a client
+# address or a query string.
+{
+	log default {
+		output stderr
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				request>uri regexp "\?.*$" "?[redacted]"
+			}
+		}
+	}
+}
+
+import /etc/caddy/sites/*.caddy

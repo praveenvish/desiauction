@@ -5,10 +5,9 @@
 // unreadable, which is the same as not having it during the ten minutes it
 // matters.
 
-// EVERY container on the host, not just this stack — which is right for a box
-// dedicated to this deployment, and worth knowing before you put anything else
-// on it. Verified in the probe: a second project's containers appeared in the
-// `service` dropdown immediately.
+// EVERY container on the host, from every project. The `project` label (the
+// Compose project: da-prod, da-staging, platform, …) is what keeps one
+// project's logs — and alerts — apart from another's on a shared host.
 discovery.docker "containers" {
   host             = "unix:///var/run/docker.sock"
   refresh_interval = "15s"
@@ -22,6 +21,12 @@ discovery.relabel "containers" {
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
     target_label  = "service"
+  }
+
+  // da-prod, da-staging, platform — the Compose project name.
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "project"
   }
 
   // Kept so a crash loop is visible as the SAME service restarting rather than

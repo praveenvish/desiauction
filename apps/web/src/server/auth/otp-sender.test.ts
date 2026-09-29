@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createOtpSenderFromEnv,
   Msg91OtpSender,
   OtpSendError,
+  PhoneCodesDisabledSender,
   WhatsAppCloudOtpSender,
   type SmsTransport,
 } from "./otp-sender";
@@ -231,5 +233,23 @@ describe("WhatsAppCloudOtpSender", () => {
     // Meta matches the locale EXACTLY; "en" and "en_US" are different templates
     // and the wrong one is a 132001 rejection.
     expect(body.template.language.code).toBe("en_US");
+  });
+});
+
+describe("OTP_PROVIDER=none (email-only sign-in)", () => {
+  it("builds a sender that refuses honestly instead of pretending to send", async () => {
+    // The db is never touched in this mode — a dev-inbox write would be the
+    // exact silent failure `none` exists to avoid.
+    const db = new Proxy(
+      {},
+      {
+        get: () => {
+          throw new Error("db touched");
+        },
+      },
+    );
+    const s = createOtpSenderFromEnv({ OTP_PROVIDER: "none" }, db as never);
+    expect(s).toBeInstanceOf(PhoneCodesDisabledSender);
+    await expect(s.send("+919999000001", "123456")).rejects.toBeInstanceOf(OtpSendError);
   });
 });

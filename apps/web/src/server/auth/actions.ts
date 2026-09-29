@@ -236,6 +236,17 @@ export async function requestOtpAction(
   formData: FormData,
 ): Promise<AuthFormState> {
   const phone = formString(formData, "phone");
+  // EMAIL-ONLY SIGN-IN (OTP_PROVIDER=none): no code can be sent to a phone, so
+  // say so plainly instead of minting a code nobody receives. The login page
+  // does not open this door in that mode; this answers a stale link or a bot.
+  if (env.OTP_PROVIDER === "none") {
+    return {
+      step: "phone",
+      phone,
+      ...(_previous.next !== undefined ? { next: _previous.next } : {}),
+      error: "Sign-in by phone isn't available yet. Use your email address instead.",
+    };
+  }
   let result: Awaited<ReturnType<typeof requestOtp>>;
   try {
     result = await requestOtp(
