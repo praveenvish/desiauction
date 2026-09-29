@@ -195,9 +195,20 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   demo reminders and the feedback/retention sweep (2026-09-23). ☐F the three job
   secrets in `web.env`.
 - ☐E finops writer-role credential + `finops_events` grant narrowing (freeze §8.2)
-- ☐E PITR drill against the OFF-BOX repo on the production stanza, timed and
-  recorded ([RESTORE_RUNBOOK](RESTORE_RUNBOOK.md) "Point-in-time restore"), then
-  quarterly on staging
+- ☐F **Escrow the backup passphrase and the env files OFF the host**, and open
+  the copy once on another machine to prove it
+  ([SECRET_ROTATION](SECRET_ROTATION.md#escrow-the-two-things-that-cannot-be-regenerated)).
+  They are generated on the host; until this is done the only copy of the key
+  to the backups is on the machine the backups exist to survive. Date done: ____
+- ☐E Restore drill on the PRODUCTION stanza from the off-box repo:
+  `sudo bash ops/deploy/restore-drill-production.sh production` — it restores
+  into a scratch volume with archiving off and never names the live database.
+  Record the RTO and newest-row age it prints in
+  [RESTORE_RUNBOOK](RESTORE_RUNBOOK.md) "Rehearsal record", then quarterly.
+- ☐F `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`) in the
+  production environment's GitHub secrets. Without it every deploy renames
+  every server action, and a page that was open across the deploy must be
+  reloaded before its forms and bids work (the deploy warns when it is absent).
 - ☑ TLS/certificates: Caddy provisions and renews Let's Encrypt automatically
   for all three hostnames — ☐E confirm renewal once in production
 

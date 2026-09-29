@@ -119,7 +119,9 @@ by the SIGTERM boot-smoke (2026-07-16).
 
 ### Host or region loss
 Provision a new host (any provider — the stack is one compose file), copy the
-env files from the founder's secret store, point the three DNS records at it,
+env files from the escrow ([SECRET_ROTATION](SECRET_ROTATION.md#escrow-the-two-things-that-cannot-be-regenerated)
+— without the backup passphrase held there, the off-box backups cannot be
+read), point the three DNS records at it,
 restore Postgres from the OFF-BOX pgBackRest repo (RESTORE_RUNBOOK
 "Point-in-time restore"), `mc mirror` the two buckets back from the off-box copy
 into the new MinIO, then run `deploy-host.yml` for the last good commit.
