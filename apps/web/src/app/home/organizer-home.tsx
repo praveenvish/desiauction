@@ -41,7 +41,8 @@ import { competitionsView, seasonOverviewView } from "../../server/competition/a
 import { competitionAllows } from "../../server/competition/authz";
 import { appointmentsPanelView } from "../../server/competition/appointment-actions";
 import { awaitsResult } from "../seasons/[slug]/_tabs/fixture-status";
-import { organizerScheduleView } from "../../server/competition/fixture-actions";
+import { organizerScheduleView, standingsView } from "../../server/competition/fixture-actions";
+import { OrganizerToday } from "./organizer-today";
 import { homeDashboard } from "../../server/home/dashboard";
 import { grantsOfPerson } from "../../server/request-cache";
 import { rolesOf } from "../../server/roles/roles";
@@ -686,6 +687,35 @@ export async function OrganizerHome({
       ) : null}
     </SectionCard>
   );
+
+  /*
+   * MATCH DAY (census 13): once the focus season's auction is done and its
+   * matches are on the books, home is "Today" — what is waiting, what is
+   * next, where the table stands — not the setup page it was built as.
+   */
+  const seasonOnFocus =
+    !laddering &&
+    liveRow === null &&
+    focus !== undefined &&
+    focusOverview !== null &&
+    (focusOverview.auctionStatus === "completed" || focusOverview.auctionStatus === "reconciled") &&
+    focusOverview.fixtureCount > 0;
+  if (seasonOnFocus) {
+    const table = await standingsView(focus.slug);
+    return (
+      <OrganizerToday
+        overview={focusOverview}
+        fixtures={schedule}
+        // Owed results are listed match by match in Today itself.
+        jobs={attention.filter((row) => !row.key.startsWith("results-"))}
+        table={table}
+        otherSeasons={managedSeasons
+          .filter((season) => season.slug !== focus.slug)
+          .map((season) => ({ slug: season.slug, name: season.name }))}
+        today={today}
+      />
+    );
+  }
 
   return (
     <>
