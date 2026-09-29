@@ -490,7 +490,12 @@ export function SchedulePanel({
                 className="mx-owed-link"
                 data-testid={`owed-${fixture.number}`}
               >
-                {owedLabel(fixture)}
+                {/* Long on a laptop, short on a phone — the long form wrapped every
+                    link onto two lines at 390px (census 12). */}
+                <span className="mx-owed-long">{owedLabel(fixture)}</span>
+                <span className="mx-owed-short" aria-hidden>
+                  {owedShort(fixture)}
+                </span>
               </Link>
             ))}
           </span>
@@ -844,6 +849,16 @@ function owedLabel(fixture: Row): string {
   return isLobby(fixture)
     ? `${when} · lobby of ${String(fixture.squadCount)}`
     : `${when} · ${fixture.homeTeamName ?? "TBA"} v ${fixture.awayTeamName ?? "TBA"}`;
+}
+
+/** "Sun 27 · TT v PP" — the phone's form of `owedLabel`. */
+function owedShort(fixture: Row): string {
+  const day = fixture.kickoffAt?.slice(0, 10) ?? null;
+  const when =
+    day === null ? "Undated" : `${wallDay(day).weekday} ${String(Number(day.slice(8, 10)))}`;
+  return isLobby(fixture)
+    ? `${when} · lobby`
+    : `${when} · ${shortOf(fixture.homeTeamName, fixture.homeTeamShort)} v ${shortOf(fixture.awayTeamName, fixture.awayTeamShort)}`;
 }
 
 function describe(fixture: Row): string {
