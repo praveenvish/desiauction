@@ -674,6 +674,15 @@ on the hero's glass ---- */
   font-variant-numeric: tabular-nums;
 }
 
+.ov-now-tag {
+  display: block;
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
 .ov-now-row[data-state="live"] .ov-now-when {
   color: var(--danger-strong);
 }
