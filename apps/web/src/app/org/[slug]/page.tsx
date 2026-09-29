@@ -578,8 +578,17 @@ export default async function OrgHomePage({ params }: { params: Promise<{ slug: 
                   href="#notifications"
                   icon={<IconBell size={18} aria-hidden />}
                   title="Notifications"
-                  fact="Club messages"
-                  sub="What players and owners hear from the club, and on which channel"
+                  // A live fact, not the tile's name again (census 18): how many
+                  // of the club's messages are on, and which are off.
+                  fact={`${String(messaging.topics.filter((topic) => topic.enabled).length)} of ${String(messaging.topics.length)} messages on`}
+                  sub={
+                    messaging.topics.every((topic) => topic.enabled)
+                      ? "Players and owners hear every club message"
+                      : `Off: ${messaging.topics
+                          .filter((topic) => !topic.enabled)
+                          .map((topic) => topic.label)
+                          .join(" · ")}`
+                  }
                 />
               ) : null}
             </ul>
