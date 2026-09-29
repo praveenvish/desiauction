@@ -8,7 +8,9 @@ import { useFilterQuery } from "../../../../../lib/use-filter-query";
 const OPTIONS: readonly { value: LedgerFilter; label: string }[] = [
   { value: "players", label: "Players" },
   { value: "results", label: "Results" },
-  { value: "bids", label: "Bids" },
+  // Every bid event — accepted, refused and voided — so it is not the
+  // header's "289 bids" (accepted) beside "8 refused or voided" (census 15).
+  { value: "bids", label: "Bid events" },
   { value: "all", label: "Everything" },
 ];
 

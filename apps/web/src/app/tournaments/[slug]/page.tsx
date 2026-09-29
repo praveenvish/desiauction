@@ -632,6 +632,17 @@ function SoFar({ slug, view, today }: { slug: string; view: SeasonSoFarView; tod
                 </li>
               );
             })}
+            {/* The table counts every result; the list shows the latest two,
+                and says there are more (census 15: 2 listed, 3 counted). */}
+            {play.played > results.length ? (
+              <li data-state="more">
+                <Link href={`/seasons/${slug}/fixtures`} className="tx-more">
+                  {String(play.played - results.length)} more{" "}
+                  {play.played - results.length === 1 ? "result" : "results"}
+                  <IconArrowRight size={14} aria-hidden />
+                </Link>
+              </li>
+            ) : null}
           </ul>
         ) : (
           <p className="tx-sofar-empty">No matches to come.</p>

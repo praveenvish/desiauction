@@ -818,7 +818,16 @@ function Form({ results }: { results: FormResult[] }) {
 }
 
 /** The next published fixture, as a ticket. */
-function NextTicket({ match, live = false }: { match: UpcomingMatch; live?: boolean }) {
+function NextTicket({
+  match,
+  live = false,
+  extra = null,
+}: {
+  match: UpcomingMatch;
+  live?: boolean;
+  /** One more fact for the ticket's foot line (an owner's lineup state). */
+  extra?: string | null;
+}) {
   return (
     <div className="mp-ticket" data-theme="floodlight" data-testid="me-upcoming">
       <span className="mp-ticket-when">
@@ -837,8 +846,8 @@ function NextTicket({ match, live = false }: { match: UpcomingMatch; live?: bool
         </span>
       </span>
       <span className="mp-ticket-where">
-        {[match.competitionName, match.groundName]
-          .filter((part): part is string => part !== null)
+        {[match.competitionName, match.groundName, extra]
+          .filter((part): part is string => part !== null && part !== "")
           .join(" · ")}
       </span>
     </div>
@@ -1104,12 +1113,10 @@ async function OwnerSeason({ team, season }: { team: OwnedTeam; season: TeamSeas
             announcedIn: false,
           }}
           live={next.live}
+          // Inside the ticket, as the owner home strip says it — it floated
+          // between the ticket and the list as a sentence (census 15).
+          extra={next.live ? null : lineupWords(next.lineup)}
         />
-      )}
-      {next === undefined || next.live ? null : (
-        <p className="mp-match-foot" data-testid="me-owner-lineup">
-          Next match: {lineupWords(next.lineup)}.
-        </p>
       )}
       {results.length + due.length === 0 ? null : (
         <ul className="mp-matches">

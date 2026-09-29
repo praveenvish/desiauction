@@ -701,6 +701,7 @@ export function SchedulePanel({
       href={matchHref(fixture.id)}
       pending={pendingRow === fixture.id}
       onLifecycle={(action) => void lifecycle(fixture, action)}
+      showNumber={view.mode === "search"}
     />
   );
 
@@ -882,8 +883,11 @@ function MatchRow({
   href,
   pending,
   onLifecycle,
+  showNumber = false,
 }: {
   fixture: Row;
+  /** Searching by match number: the code is what the organizer is matching. */
+  showNumber?: boolean;
   result: ScheduleView["results"][string] | undefined;
   withDate: boolean;
   canManage: boolean;
@@ -981,7 +985,10 @@ function MatchRow({
             <span className="st-sr">{terms.ground}: </span>
             {fixture.groundName ?? `No ${terms.ground.toLowerCase()} yet`}
           </span>
-          <span className="mx-num">{fixture.number}</span>
+          {/* The match code is for finding a match ("Match no." search), not
+              for reading the day: shown when searching, said to a screen
+              reader otherwise (census 15). */}
+          <span className={showNumber ? "mx-num" : "mx-num st-sr"}>{fixture.number}</span>
         </span>
         <span className="mx-sides">
           {lobby ? (
