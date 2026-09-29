@@ -407,6 +407,28 @@ jobs:
             rm -f "${SITE}.prev"
 
             docker image prune -f
+            # `prune -f` removes only UNTAGGED images, and every release is
+            # tagged — so each deploy left four more images on the disk for
+            # ever, on a host whose disk nothing was watching. Keep this
+            # release and the one before it (the rollback), drop the rest.
+            # Only this project's repositories: the host is shared. An image a
+            # container still uses is refused by Docker, which is the right
+            # answer, and nothing here can fail a deploy that has succeeded.
+            prune_old_releases() {
+              local registry ref
+              registry="$(envval REGISTRY)"
+              [ -n "$registry" ] || return 0
+              for repo in web engine finops-runner migrator; do
+                docker image ls --format '{{.Repository}}:{{.Tag}}' "${registry}/${repo}" \
+                  | while read -r ref; do
+                      case "$ref" in
+                        *":${NEW_TAG}" | *":${PREV_TAG}" | *":<none>") ;;
+                        *) docker image rm "$ref" >/dev/null 2>&1 || true ;;
+                      esac
+                    done
+              done
+            }
+            prune_old_releases || echo "WARNING: old release images were not pruned"
             docker logout ghcr.io >/dev/null
             trap - ERR
             echo "deployed ${NEW_TAG} (previous: ${PREV_TAG})"

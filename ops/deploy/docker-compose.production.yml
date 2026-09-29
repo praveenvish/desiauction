@@ -116,6 +116,10 @@ services:
   runner:
     image: ${REGISTRY}/finops-runner:${TAG}
     <<: *logs
+    # The runner finishes the tick in hand before it exits (a receipt half
+    # rendered is reclaimed, but finishing it is better). Docker's default ten
+    # seconds is shorter than one slow tick; thirty is longer than any seen.
+    stop_grace_period: 30s
     deploy:
       resources:
         limits: { memory: "${RUNNER_MEM:-512m}", cpus: "${RUNNER_CPUS:-1.0}" }

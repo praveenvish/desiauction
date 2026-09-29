@@ -14,6 +14,7 @@ import * as Sentry from "@sentry/node";
 import { runnerDelivery } from "./delivery";
 import { env } from "./env";
 import { logger } from "./logger";
+import { createPause } from "./pause";
 
 /**
  * THE FINOPS RUNNER (IP-6_ARCHITECTURE §15, ADR-4) — the first new process
@@ -122,6 +123,8 @@ async function tick(): Promise<void> {
   }
 }
 
+const pause = createPause();
+
 async function main(): Promise<void> {
   logger.info(
     {
@@ -134,7 +137,7 @@ async function main(): Promise<void> {
   );
   while (!stopping) {
     await tick();
-    await new Promise((resolve) => setTimeout(resolve, env.RUNNER_TICK_MS));
+    await pause.wait(env.RUNNER_TICK_MS);
   }
   await handle.sql.end({ timeout: 5 });
   await Sentry.flush(2000).catch(() => undefined);
@@ -144,6 +147,8 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     stopping = true;
     logger.info({ signal }, "finops-runner stopping");
+    // The tick in hand finishes; the wait after it does not (pause.ts).
+    pause.close();
   });
 }
 
