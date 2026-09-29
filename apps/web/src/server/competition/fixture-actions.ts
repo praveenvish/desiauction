@@ -75,6 +75,7 @@ import {
   nowWallClock,
   organizerSchedule,
   queryFixtures,
+  upcomingFixtures,
   PUBLIC_FIXTURE_STATUSES,
   type FixturePage,
   type FixtureSnapshot,
@@ -802,6 +803,11 @@ export interface ScheduleView {
   orgSlug: string;
   stats: FixtureStats;
   next: NextFixture | null;
+  /**
+   * The season's next match to come, even beyond the week — `next` prefers a
+   * match in progress, so a stale one hid Sunday's (census 16).
+   */
+  upcoming: FixtureSnapshot | null;
   teams: TeamSummary[];
   grounds?: GroundOption[];
   conflicts?: LabelledConflict[];
@@ -870,6 +876,7 @@ export async function scheduleView(
       completedPage,
       lineupList,
       picked,
+      [upcoming = null],
     ] = await Promise.all([
       orgSlugOf(db, competition.orgId),
       fixtureStats(db, competition.id, visible),
@@ -906,6 +913,7 @@ export async function scheduleView(
       params.match !== undefined && params.match !== ""
         ? fixtureOfCompetition(db, competition.id, params.match, visible)
         : Promise.resolve(null),
+      upcomingFixtures(db, competition.id, now, visible, 1),
     ]);
     const pack = sportPackFor(competition.sport);
     /*
@@ -945,6 +953,7 @@ export async function scheduleView(
       orgSlug,
       stats,
       next,
+      upcoming,
       teams: teamList,
       ...(groundList !== undefined ? { grounds: groundList } : {}),
       ...(conflicts !== undefined ? { conflicts } : {}),

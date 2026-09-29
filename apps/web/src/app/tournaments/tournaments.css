@@ -1974,3 +1974,10 @@ a.tx-desk:hover strong {
   font-weight: var(--font-weight-semibold);
   color: var(--text-heading);
 }
+
+/* "N more results": the list's foot, across both columns on one line. */
+.tx-lines li[data-state="more"] > .tx-more {
+  grid-column: 1 / -1;
+  justify-self: start;
+  white-space: nowrap;
+}

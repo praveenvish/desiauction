@@ -102,7 +102,10 @@ export default async function LedgerPage({
                 {players.soldOnReRun > 0
                   ? ` · ${String(players.soldOnReRun)} sold on a second pass`
                   : ""}{" "}
-                · {players.bids.toLocaleString("en-IN")} bids
+                · {players.bids.toLocaleString("en-IN")}{" "}
+                {/* "accepted" when some were not — "289 bids" beside a
+                    "Bid events 297" tab still read as a mismatch (census 16). */}
+                {view.readingCounts.bids > players.bids ? "accepted bids" : "bids"}
                 {/* The Bids tab counts every bid event; this line counts the
                     ones that stood. Said, so the two numbers agree (census:
                     "289 bids" over a "Bids 297" tab). */}
