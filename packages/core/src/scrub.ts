@@ -95,3 +95,45 @@ export function scrub(value: unknown, depth = 0, seen = new WeakSet<object>()): 
   }
   return out;
 }
+
+/**
+ * An error, made safe for a LOG LINE — and still useful in one.
+ *
+ * Two things were wrong with how the services logged errors, and they pulled in
+ * opposite directions (PRR 2026-09-29, reproduced against the engine's logger):
+ *
+ *  1. The web tier and the engine redacted by key path only, so a constraint
+ *     violation wrote the person's number into the log in free text —
+ *     `"detail":"Key (phone)=(+9198…) already exists."` — and from there to the
+ *     log store, for thirty days.
+ *  2. All three redact the key `code` (it is what a one-time code is called),
+ *     and an error's `code` is the ONE field that says what went wrong: 23505,
+ *     40P01, ECONNREFUSED. Every error line read `"code":"[redacted]"`.
+ *
+ * So: the whole serialized error goes through `scrub`, and the error's own code
+ * is carried across under `errorCode` — but only when it has the shape of one
+ * (a SQLSTATE or a Node/system error name), because `code` on an arbitrary
+ * object could be anything, including the thing the redaction exists for.
+ *
+ * Takes the ALREADY SERIALIZED error (pino's `stdSerializers.err`), so this
+ * package does not need to know what a logger is.
+ */
+const ERROR_CODE_SHAPE = /^(?:[0-9A-Z]{5}|E[A-Z0-9_]{2,40}|ERR_[A-Z0-9_]{2,60})$/;
+
+export function scrubError(serialized: unknown): unknown {
+  const scrubbed = scrub(serialized);
+  if (
+    serialized === null ||
+    typeof serialized !== "object" ||
+    scrubbed === null ||
+    typeof scrubbed !== "object" ||
+    Array.isArray(scrubbed)
+  ) {
+    return scrubbed;
+  }
+  const code = (serialized as { code?: unknown }).code;
+  if (typeof code !== "string" || !ERROR_CODE_SHAPE.test(code)) {
+    return scrubbed;
+  }
+  return { ...(scrubbed as Record<string, unknown>), errorCode: code };
+}

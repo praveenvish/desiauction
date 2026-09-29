@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { REDACTED, scrub, scrubText } from "./scrub";
+import { REDACTED, scrub, scrubError, scrubText } from "./scrub";
 
 describe("scrub", () => {
   it("redacts a phone number inside an error message", () => {
@@ -73,5 +73,46 @@ describe("scrub", () => {
     const a: Record<string, unknown> = { name: "a" };
     a["self"] = a;
     expect(() => scrub(a)).not.toThrow();
+  });
+});
+
+describe("scrubError — an error made safe for a log line, and still useful in one", () => {
+  // What pino's stdSerializers.err produces for a postgres unique violation.
+  const serialized = {
+    type: "PostgresError",
+    message: 'duplicate key value violates unique constraint "people_phone_unique"',
+    stack: "PostgresError: duplicate key value\n    at handle (connection.js:1:1)",
+    code: "23505",
+    detail: "Key (phone)=(+919876543210) already exists.",
+    table_name: "people",
+  };
+
+  it("removes the phone number the database wrote into the detail", () => {
+    const out = JSON.stringify(scrubError(serialized));
+    expect(out).not.toContain("9876543210");
+    expect(out).toContain("[phone]");
+    expect(out).toContain("people_phone_unique");
+  });
+
+  it("keeps the error's own code, under a key the redaction does not censor", () => {
+    expect(scrubError(serialized)).toMatchObject({ errorCode: "23505", code: "[redacted]" });
+    expect(scrubError({ type: "Error", message: "x", code: "ECONNREFUSED" })).toMatchObject({
+      errorCode: "ECONNREFUSED",
+    });
+    expect(scrubError({ type: "Error", message: "x", code: "ERR_SOCKET_CLOSED" })).toMatchObject({
+      errorCode: "ERR_SOCKET_CLOSED",
+    });
+  });
+
+  it("does not carry across a code that is not shaped like an error code", () => {
+    // A one-time code, or anything else that happens to be called `code`.
+    for (const code of ["482913", "hunter2", "ab", 23505, undefined]) {
+      expect(scrubError({ message: "x", code })).not.toHaveProperty("errorCode");
+    }
+  });
+
+  it("passes through what is not an object", () => {
+    expect(scrubError("call +919876543210")).toBe("call [phone]");
+    expect(scrubError(null)).toBeNull();
   });
 });

@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 
-import { pino, type Logger } from "pino";
+import { scrubError } from "@desiauction/core";
+import { pino, stdSerializers, type Logger } from "pino";
 
 import { env } from "../env";
 
@@ -78,6 +79,13 @@ const base: Logger =
     level: env.LOG_LEVEL,
     base: { app: "web", env: env.NODE_ENV, version: env.APP_VERSION },
     redact: { paths: redactPaths, censor: "[redacted]" },
+    serializers: {
+      // Path redaction does nothing for an error's free text, and a constraint
+      // violation spells the value out (`Key (phone)=(+91…)`). `errorCode`
+      // survives, because `*.code` above censors the one field that says what
+      // actually failed (core/scrub.ts).
+      err: (error: Error) => scrubError(stdSerializers.err(error)),
+    },
     ...(env.NODE_ENV === "development"
       ? { transport: { target: "pino-pretty", options: { colorize: true } } }
       : {}),

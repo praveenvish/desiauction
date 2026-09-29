@@ -1,4 +1,4 @@
-import { scrub } from "@desiauction/core";
+import { scrubError } from "@desiauction/core";
 import { pino, stdSerializers } from "pino";
 
 import { env } from "./env";
@@ -38,8 +38,10 @@ export const logger = pino({
     // Path redaction does nothing for an error MESSAGE, and a constraint
     // violation spells the offending value out in free text
     // (`Key (phone)=(+91…)`). `scrub` is the same pass Sentry's beforeSend
-    // runs, so the log and the error tracker cannot disagree.
-    err: (error: Error) => scrub(stdSerializers.err(error)),
+    // runs, so the log and the error tracker cannot disagree. `scrubError`
+    // also carries the error's own code across as `errorCode`: the redaction
+    // above censors the key `code`, which on an error is the diagnosis.
+    err: (error: Error) => scrubError(stdSerializers.err(error)),
   },
   ...(env.NODE_ENV === "development"
     ? { transport: { target: "pino-pretty", options: { colorize: true } } }
