@@ -493,7 +493,7 @@ function SoldDuo({
                       .join(" · ")}
                   </span>
                 </span>
-                <span className="pm-match-next">Next</span>
+                <Pill tone="gold">Next</Pill>
               </li>
             ))}
             {/* Owed a result: said, between what is next and what was played. */}
@@ -504,9 +504,8 @@ function SoldDuo({
                   <span className="hd-name">vs {match.opponentName}</span>
                   <span className="hd-meta">{match.groundName ?? match.competitionName}</span>
                 </span>
-                <span className="pm-match-next" data-state="due">
-                  Result due
-                </span>
+                {/* The pill every other surface uses for an owed result (census 18). */}
+                <Pill tone="amber">Result due</Pill>
               </li>
             ))}
             {results.slice(0, mine.length + owed.length > 0 ? 2 : 4).map((match) => (
