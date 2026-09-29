@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 import {
   auctionEvents,
   auctions,
@@ -46,13 +48,26 @@ const sent: OutgoingMail[] = [];
 const orgIds: string[] = [];
 const personIds: string[] = [];
 
+// Random digits, never repeated within the run. Kept only the DIGITS of a
+// ULID's tail and filled the rest with "7" before — usually exactly
+// +919877777777, the same trap season.regression.test.ts fell into on CI.
+const issuedPhones = new Set<string>();
+function uniquePhone(): string {
+  let phone: string;
+  do {
+    phone = `+9198${String(randomInt(0, 100_000_000)).padStart(8, "0")}`;
+  } while (issuedPhones.has(phone));
+  issuedPhones.add(phone);
+  return phone;
+}
+
 async function person(opts: { email?: boolean; dateOfBirth?: string } = {}): Promise<string> {
   const id = newId();
   await db.insert(people).values({
     id,
     name: `${MARK} ${id.slice(-4)}`,
     email: opts.email === false ? null : `fr1p3-${id.toLowerCase()}@example.test`,
-    phone: opts.email === false ? `+9198${id.slice(-8).replace(/\D/g, "7").padEnd(8, "7")}` : null,
+    phone: opts.email === false ? uniquePhone() : null,
   });
   if (opts.dateOfBirth !== undefined) {
     await db
