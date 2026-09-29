@@ -40,6 +40,7 @@ import {
 } from "../../server/player/career";
 import { hasPlayerProfile, profileCompletenessFor } from "../../server/player/profile";
 import { STAGE_STEPS, matchRecord } from "../me/me-model";
+import { matchDayFigures } from "./match-day-figures";
 import { verdictOf } from "../me/registration-card";
 import { currentSeason, heroKind, type CurrentSeason, type HeroKind } from "./player-home-model";
 import "./home-duo.css";
@@ -298,23 +299,34 @@ function aOrAn(word: string): string {
 function MatchHero({
   registration,
   next,
+  last,
   record,
-  toCome,
-  squad,
 }: {
   registration: MyRegistration;
   next: UpcomingMatch | undefined;
+  /** The latest played match of this season, from this person's side. */
+  last: CareerMatch | undefined;
   record: { played: number; won: number; lost: number };
-  toCome: number;
-  squad: number | null;
 }) {
   const base = `/seasons/${registration.competitionSlug}`;
-  const price =
-    registration.auction?.kind === "sold"
-      ? moneyFormat(registration.auctionUnit).ledger(registration.auction.soldPrice)
-      : null;
   const day = next?.kickoffAt?.slice(0, 10) ?? null;
   const today = istCalendarDate();
+  const figures = matchDayFigures({
+    next:
+      next === undefined
+        ? undefined
+        : {
+            kickoffAt: next.kickoffAt,
+            announcedIn: next.announcedIn,
+            time: timeLabel(next.kickoffAt),
+          },
+    last:
+      last === undefined || last.result === null
+        ? undefined
+        : { result: last.result, opponentName: last.opponentName },
+    record,
+    today,
+  });
   const when =
     next === undefined
       ? null
@@ -368,14 +380,6 @@ function MatchHero({
           <p className="pm-stage-line">
             {when ?? "No more matches on the schedule yet — the club publishes them."}
           </p>
-          {/* The organizer announced it (and they are still in it): the one
-              line a player opens the app for before a match. */}
-          {next?.announcedIn === true ? (
-            <p className="pm-lineup" data-testid="home-in-lineup">
-              <IconCheckCircle size={16} aria-hidden />
-              You&apos;re in the lineup
-            </p>
-          ) : null}
         </div>
         {registration.posterReady ? (
           <ButtonLink href={`${base}/posters`} size="lg" variant="secondary">
@@ -384,30 +388,23 @@ function MatchHero({
           </ButtonLink>
         ) : null}
       </div>
-      <dl className="pm-figs">
-        <div>
-          <dt>won – lost</dt>
-          <dd>
-            {record.won} – {record.lost}
-          </dd>
-        </div>
-        <div>
-          <dt>{toCome === 1 ? "match to come" : "matches to come"}</dt>
-          <dd>{toCome}</dd>
-        </div>
-        {price !== null ? (
-          <div>
-            <dt>your price</dt>
-            <dd>{price}</dd>
-          </div>
-        ) : null}
-        {squad !== null ? (
-          <div>
-            <dt>in the squad</dt>
-            <dd>{squad}</dd>
-          </div>
-        ) : null}
-      </dl>
+      {/* Match-day figures, not season totals: they change between
+          visits, and the price and squad already have their cards below. */}
+      {figures.length > 0 ? (
+        <dl className="pm-figs" data-testid="home-match-figures">
+          {figures.map((figure) => (
+            <div key={figure.key} data-tone={figure.tone} data-testid={`home-fig-${figure.key}`}>
+              <dt>{figure.label}</dt>
+              <dd>
+                {figure.key === "lineup" && figure.tone === "good" ? (
+                  <IconCheckCircle size={20} aria-hidden />
+                ) : null}
+                {figure.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
     </section>
   );
 }
@@ -646,11 +643,14 @@ export async function PlayerHome({
           publicTeam(moment.competitionSlug, teamSlugOf(moment.teamName)),
           publicTopBuys(moment.competitionSlug, 3),
         ]);
-  const record = matchRecord(
+  const leadMatches =
     lead === undefined
       ? []
-      : matches.filter((match) => match.registrationId === lead.registrationId),
-  );
+      : matches.filter((match) => match.registrationId === lead.registrationId);
+  const record = matchRecord(leadMatches);
+  const leadLast = leadMatches
+    .filter((match) => match.result !== null)
+    .sort((a, b) => (b.kickoffAt ?? "").localeCompare(a.kickoffAt ?? ""))[0];
 
   return (
     <>
@@ -658,13 +658,7 @@ export async function PlayerHome({
         kind === "sold" ? (
           <SoldMoment registration={lead} />
         ) : kind === "match" ? (
-          <MatchHero
-            registration={lead}
-            next={leadUpcoming[0]}
-            record={record}
-            toCome={leadUpcoming.length}
-            squad={team === null ? null : team.members.length}
-          />
+          <MatchHero registration={lead} next={leadUpcoming[0]} last={leadLast} record={record} />
         ) : (
           <StageHero registration={lead} kind={kind} at={current.stage.at} />
         )
