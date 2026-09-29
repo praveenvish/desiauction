@@ -5,7 +5,6 @@ import {
   auctions,
   auditLog,
   competitions,
-  fixtures,
   grants,
   newId,
   organizations,
@@ -17,7 +16,6 @@ import {
 import { isFinopsCapabilitySet } from "@desiauction/financial-operations";
 import { isSettlementCapabilitySet } from "@desiauction/settlement";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 
 import { foldMatchSaves, isMatchAction } from "../../lib/event-names";
 import { personLabel } from "../../lib/person-label";
@@ -36,6 +34,7 @@ import { canFinops } from "../financial-operations/authz";
 import { canSettlement } from "../settlement/authz";
 import { logger } from "../logger";
 import { ForbiddenError, can, requireCapability } from "./authz";
+import { matchNames } from "../competition/match-names";
 import { notifyClubCreated, notifyMemberJoined } from "./organizer-notify";
 import {
   acceptInvite,
@@ -487,24 +486,8 @@ export async function orgOverview(slug: string): Promise<OrgOverview | null> {
         .map((row) => row.subject ?? ""),
     ),
   ];
-  if (matchIds.length > 0) {
-    const home = alias(teams, "activity_home");
-    const away = alias(teams, "activity_away");
-    const matchRows = await systemDb
-      .select({
-        id: fixtures.id,
-        home: sql<string | null>`coalesce(${home.shortName}, ${home.name})`,
-        away: sql<string | null>`coalesce(${away.shortName}, ${away.name})`,
-      })
-      .from(fixtures)
-      .leftJoin(home, eq(home.id, fixtures.homeTeamId))
-      .leftJoin(away, eq(away.id, fixtures.awayTeamId))
-      .where(and(eq(fixtures.orgId, org.id), inArray(fixtures.id, matchIds)));
-    for (const row of matchRows) {
-      if (row.home !== null && row.away !== null) {
-        named.set(row.id, `${row.home} v ${row.away}`);
-      }
-    }
+  for (const [id, name] of await matchNames(systemDb, matchIds, org.id)) {
+    named.set(id, name);
   }
   // createdAt is a Date column; the guard only covers a missing org row (which
   // resolveTenant has already ruled out — belt and braces).

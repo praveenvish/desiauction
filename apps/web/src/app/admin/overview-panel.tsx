@@ -145,6 +145,7 @@ export function OverviewPanel({
                       <RelativeTime at={row.at} />
                       <span className="adm-feed-action" title={row.action}>
                         {humanAction(row.action)}
+                        {row.subjectLabel != null ? ` · ${row.subjectLabel}` : null}
                       </span>
                       <span className="adm-feed-actor">{actorLabel(row.actor, row.actorName)}</span>
                     </li>
