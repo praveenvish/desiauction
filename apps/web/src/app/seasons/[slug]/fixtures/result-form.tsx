@@ -65,7 +65,13 @@ function asTyped(key: string, value: number): string {
   return String(value);
 }
 
-function useFinish(slug: string) {
+/** The next match owed a result, to open once this one is saved (census 11). */
+export interface NextOwed {
+  href: string;
+  label: string;
+}
+
+function useFinish(slug: string, next: NextOwed | null = null) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -97,6 +103,14 @@ function useFinish(slug: string) {
         router.refresh();
         return;
       }
+      // THE RESULTS DESK MOVES ON: with results owed, the next one opens,
+      // so three owed matches are three saves, not three trips back to the
+      // list (census 11).
+      if (next !== null) {
+        toast({ tone: "success", title: `${saidAs.recorded} · next: ${next.label}` });
+        router.push(next.href, { scroll: false });
+        return;
+      }
       toast({ tone: "success", title: `${saidAs.recorded} · match finished` });
     } else {
       setBusy(false);
@@ -112,11 +126,14 @@ export function DuelResultForm({
   fixture,
   result,
   scoreFields,
+  next = null,
 }: {
   slug: string;
   fixture: Fixture;
   result: ModelResult | undefined;
   scoreFields: ScoreFields;
+  /** Opened after "save and finish" when more results are owed. */
+  next?: NextOwed | null;
 }) {
   const homeName = fixture.homeTeamName ?? "Home";
   const awayName = fixture.awayTeamName ?? "Away";
@@ -130,7 +147,7 @@ export function DuelResultForm({
   // Once the scorer picks the outcome themselves, the score stops suggesting it.
   const [outcomeTouched, setOutcomeTouched] = useState(result !== undefined);
   const [method, setMethod] = useState("");
-  const { run, busy } = useFinish(slug);
+  const { run, busy } = useFinish(slug, next);
   const primary = scoreFields[0]?.key ?? "";
   const live = fixture.status === "in_progress";
 
@@ -277,16 +294,18 @@ export function LobbyResultForm({
   slug,
   fixture,
   scoreFields,
+  next = null,
 }: {
   slug: string;
   fixture: Fixture;
   scoreFields: ScoreFields;
+  next?: NextOwed | null;
 }) {
   const [squads, setSquads] = useState<readonly LobbyParticipantRow[] | null>(null);
   const [places, setPlaces] = useState<
     Record<string, { placement: string; score: Record<string, string> }>
   >({});
-  const { run, busy } = useFinish(slug);
+  const { run, busy } = useFinish(slug, next);
   const live = fixture.status === "in_progress";
 
   useEffect(() => {

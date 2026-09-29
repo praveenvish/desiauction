@@ -804,6 +804,13 @@ export function SchedulePanel({
               grounds={grounds}
               canManage={canManage}
               closeHref={closeHref}
+              today={today}
+              nextOwed={(() => {
+                const after = owedRows.find((row) => row.id !== selected.fixture.id);
+                return after === undefined
+                  ? null
+                  : { href: matchHref(after.id), label: owedLabel(after) };
+              })()}
             />
           ) : null}
         </div>
