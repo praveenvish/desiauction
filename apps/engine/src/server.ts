@@ -38,34 +38,51 @@ export interface ServerDeps {
 }
 
 /**
- * Spectator tickets: HMAC over (auctionId · time-window) — minted by the web
- * tier with the same secret. Windowing gives the ticket a BOUNDED lifetime (a
- * leaked ticket stops working within two windows) with no wire-format change —
- * the URL still carries a single hex string. MIN-2 remediation.
- */
-/**
  * HOW SNAPSHOT FRAMES ARE COMPRESSED, WHEN THEY ARE (WS_COMPRESSION=on).
  *
- * NO CONTEXT TAKEOVER, both ways: each frame is compressed on its own, so a
- * socket owns no zlib window between frames. Keeping one would compress a
- * little better and cost about 300 KB of memory per spectator for as long as
- * they watch — the fragmentation `ws` warns about, multiplied by the room.
+ * A SMALL WINDOW, BECAUSE EVERY SPECTATOR OWNS ONE. `ws` keeps a deflate
+ * stream per socket for as long as the socket lives — "no context takeover"
+ * resets it between frames, it does not free it — and at zlib's defaults that
+ * stream is about 270 KB of memory outside the JavaScript heap. A thousand
+ * spectators would be a quarter of a gigabyte the engine's memory limit never
+ * budgeted for. A 4 KiB window and a small hash table bring it to about
+ * 32 KB each; the server is allowed to choose this by itself
+ * (`server_max_window_bits`), so no browser has to agree to anything.
+ *
+ * These numbers were CHOSEN BY MEASURING six combinations on the same
+ * 250-spectator room. Smaller than this (window 10, memLevel 1) compressed
+ * worse AND cost twice the CPU, because zlib then cuts the frame into
+ * hundreds of tiny blocks; zlib's defaults cost more memory and more CPU for
+ * the same bytes. This is the point where both curves are flat.
+ *
+ * NO CONTEXT TAKEOVER, both ways: each frame stands alone, so a frame lost to
+ * a slow consumer never corrupts the next.
  *
  * LEVEL 1. A snapshot is repetitive JSON: the fastest level already takes
  * most of what there is to take, and the engine has one thread to do the
  * rest of its work on. Heartbeats (under the threshold) go out as they are.
+ *
+ * What this costs and saves is MEASURED, not estimated: see
+ * scripts/perf-scale.ts with PERF_WS_COMPRESSION=on.
  */
 const FRAME_COMPRESSION = {
   serverNoContextTakeover: true,
   clientNoContextTakeover: true,
+  serverMaxWindowBits: 12,
   threshold: 1024,
-  zlibDeflateOptions: { level: 1 },
+  zlibDeflateOptions: { level: 1, memLevel: 5 },
   concurrencyLimit: 8,
 } as const;
 
 /** How long live sockets get to say goodbye on shutdown before they are cut. */
 const CLOSE_GRACE_MS = 2_000;
 
+/**
+ * Spectator tickets: HMAC over (auctionId · time-window) — minted by the web
+ * tier with the same secret. Windowing gives the ticket a BOUNDED lifetime (a
+ * leaked ticket stops working within two windows) with no wire-format change —
+ * the URL still carries a single hex string. MIN-2 remediation.
+ */
 export const TICKET_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**

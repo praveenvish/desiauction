@@ -429,6 +429,18 @@ Full report: `docs/audits/PRR-2026-09-29/REPORT.md`.
 
   Every line should read `ok` / `0`. Only then write the migration that
   validates or adds the constraints. Measured on the test database only.
+- ☐E **Prove the gateway's refund and dispute deliveries in test mode** before
+  the first gateway payment is taken. The handler now binds every event to the
+  order and provider payment it belongs to, reads a refund's anchor from the
+  payment it refunds, and answers 200 to genuine events it does not act on.
+  All of it is tested against the provider's DOCUMENTED payloads, none of it
+  against a real delivery. In Razorpay test mode: capture one order, refund
+  part of it from the dashboard, raise a dispute; each must answer 200 and
+  appear on the payment. Every refusal is logged as
+  `webhook.razorpay_refused` with the check that refused it.
+- ☐E **Turn on frame compression in staging first** (`WS_COMPRESSION=on`,
+  engine). Off by default. Measured locally: six times fewer bytes per bid,
+  about a quarter more delivery time at 250 spectators.
 - ☑ **The engine's migration set is frozen.** It shares the platform's
   bookkeeping table, so anything added there would be skipped everywhere.
   `packages/db/scripts/check-journal.mjs` now fails CI if it grows.

@@ -51,11 +51,16 @@ const logger = pino({ level: "silent" });
 const SECRET = "perf-scale-secret";
 
 const LOT_SCALES = [100, 250, 500, 1000, 2500];
-const SPECTATOR_SCALES = [50, 100, 250, 500, 1000];
+// PERF_SPECTATOR_SCALES=250,1000 measures only those rooms.
+const SPECTATOR_SCALES = (process.env["PERF_SPECTATOR_SCALES"] ?? "50,100,250,500,1000")
+  .split(",")
+  .map((scale) => Number(scale.trim()))
+  .filter((scale) => Number.isInteger(scale) && scale > 0);
 const TEAMS = 10;
 /** How long one bid may take to reach every spectator before the run fails. */
 const CONVERGE_TIMEOUT_MS = 15_000;
 const COMPRESS = process.env["PERF_WS_COMPRESSION"] === "on";
+const BURST_BIDS = 40;
 
 // No expiry mid-run: the timer authority is measured in perf-live, not here.
 const CONFIG: AuctionConfig = {
@@ -620,6 +625,74 @@ async function runSpectatorScale(): Promise<void> {
     record(spectators, "wire KiB per spectator per bid", wire.median, wire.p95, 5);
     const cpu = stats(cpuSamples);
     record(spectators, "process CPU ms per bid (engine + clients)", cpu.median, cpu.p95, 5);
+    // Memory the process holds with this many spectators attached — the
+    // number that decides whether compression fits inside the engine's limit.
+    // Resident, not heap: a deflate stream lives outside the JavaScript heap.
+    // It includes the simulated clients, so compare the two modes.
+    const rssMb = process.memoryUsage().rss / (1024 * 1024);
+    record(spectators, "process memory, resident (MiB)", rssMb, rssMb, 1);
+
+    // A BURST: bids back to back, nobody waiting for the room to catch up —
+    // an owner's script, or two owners trading raises. Every frame still
+    // queued at a socket counts against the slow-consumer ceiling, so what is
+    // asserted is that the room SURVIVES it: every spectator still attached,
+    // every one of them on the final version.
+    const burstStart = performance.now();
+    const openBefore = sockets.filter((ws) => ws.readyState === WebSocket.OPEN).length;
+    for (let shot = 0; shot < BURST_BIDS; shot++) {
+      const bidder = s.bidderIds[shot % TEAMS] as string;
+      const amount = engine.snapshotOf(s.auctionId)?.snapshot?.currentLot?.nextMinimumBid ?? 0;
+      must(
+        await command("PlaceBid", bidder, {
+          lotId,
+          paddleId: paddleOf.get(bidder),
+          amountRaw: amount,
+        }),
+        "PlaceBid (burst)",
+      );
+    }
+    const finalVersion = engine.snapshotOf(s.auctionId)?.version ?? 0;
+    await new Promise<void>((resolve, reject) => {
+      const lastSeen = new Map<WebSocket, number>();
+      const deadline = setTimeout(() => {
+        const caughtUp = [...lastSeen.values()].filter((v) => v >= finalVersion).length;
+        reject(
+          new Error(
+            `burst did not settle: ${String(caughtUp)}/${String(sockets.length)} spectators reached ` +
+              `version ${String(finalVersion)}; open sockets ${String(
+                sockets.filter((ws) => ws.readyState === WebSocket.OPEN).length,
+              )} of ${String(openBefore)}`,
+          ),
+        );
+      }, CONVERGE_TIMEOUT_MS * 2);
+      let done = 0;
+      for (const ws of sockets) {
+        const onMessage = (raw: WebSocket.RawData): void => {
+          const frame = JSON.parse(String(raw)) as { kind: string; version: number };
+          lastSeen.set(ws, frame.version);
+          if (frame.version >= finalVersion) {
+            ws.off("message", onMessage);
+            done += 1;
+            if (done === sockets.length) {
+              clearTimeout(deadline);
+              resolve();
+            }
+          }
+        };
+        ws.on("message", onMessage);
+      }
+      // The heartbeat carries the version too, so a spectator that already
+      // holds the final frame is counted at the next one.
+      hub.heartbeat();
+    });
+    const openAfter = sockets.filter((ws) => ws.readyState === WebSocket.OPEN).length;
+    if (openAfter !== openBefore) {
+      throw new Error(
+        `burst cost the room ${String(openBefore - openAfter)} of ${String(openBefore)} spectators`,
+      );
+    }
+    const burstMs = performance.now() - burstStart;
+    record(spectators, `burst of ${String(BURST_BIDS)} bids → room settled`, burstMs, burstMs, 1);
   }
 
   for (const ws of sockets) {
