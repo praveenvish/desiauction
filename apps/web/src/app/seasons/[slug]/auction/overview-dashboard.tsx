@@ -33,6 +33,7 @@ import { formatTime } from "../../../../lib/format-date";
 import { lotSeed } from "../../../../lib/player-seed";
 import { roleLabeller } from "../../../../lib/role-label";
 import { LotStatusPill, PaddleChip, eventLabel } from "./auction-bits";
+import { TeamCrest } from "../_tabs/team-crest";
 import { BroadcastLinks } from "./broadcast-links";
 import { ConnectionCheck, RulesCard } from "./live-experience";
 import { useMoney } from "../../../../components/money-unit";
@@ -781,7 +782,10 @@ export function OverviewDashboard({
                   : null;
               return (
                 <li key={paddle.paddleNumber}>
-                  <PaddleChip number={paddle.paddleNumber} color={paddle.color} />
+                  {/* After the night a paddle number means nothing to the
+                      organizer; the team's crest is what every other screen
+                      shows (census 19). The live room keeps its paddles. */}
+                  <TeamCrest name={paddle.teamName} color={paddle.color} />
                   <span className="dash-team-main">
                     <span className="dash-team-name">
                       <strong>{paddle.teamName}</strong>

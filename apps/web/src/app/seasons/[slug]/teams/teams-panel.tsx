@@ -371,7 +371,12 @@ function TeamGridCard({
           {started ? (
             <span className="tm-card-owner">
               {own ? <span className="tm-card-yours">Your team · </span> : null}
-              {team.ownerName !== null ? `Owner · ${team.ownerName}` : "No owner"}
+              {/* "Your team" already says whose — the name alone fits (census 19). */}
+              {team.ownerName !== null
+                ? own
+                  ? team.ownerName
+                  : `Owner · ${team.ownerName}`
+                : "No owner"}
             </span>
           ) : (
             <span className="tm-card-state" data-done={stillToSet.length === 0 ? "" : undefined}>
