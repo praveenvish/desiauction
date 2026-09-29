@@ -1,7 +1,8 @@
 #!/bin/sh
 # One entrypoint, one step per call, so the deploy log says which step failed.
 #
-#   migrator live-window   refuse (exit 1/2) while any auction is live or paused
+#   migrator live-window   refuse (exit 1/2) while any auction is live or paused,
+#                          or announced to start within the freeze window
 #   migrator migrate       apply the web and engine migration sets, in order
 #   migrator roles         create/refresh the four runtime roles and their grants
 #   migrator grants        assert the four runtime roles still match the manifest
@@ -48,7 +49,11 @@ case "${1:-}" in
     SYSTEM_PW="$(role_pw /env/web.env SYSTEM_DATABASE_URL desiauction_system)"
     ENGINE_PW="$(role_pw /env/engine.env DATABASE_URL desiauction_engine)"
     RUNNER_PW="$(role_pw /env/runner.env DATABASE_URL desiauction_runner)"
-    exec psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 \
+    # --single-transaction: the script GRANTS broadly and then REVOKES what
+    # must not be held (append-only tables, personal content). Statement by
+    # statement, a failure between the two left the wide grants standing until
+    # the next successful deploy. As one transaction it is all or nothing.
+    exec psql "$DATABASE_URL" -q --single-transaction -v ON_ERROR_STOP=1 \
       -v app_password="$APP_PW" -v system_password="$SYSTEM_PW" \
       -v engine_password="$ENGINE_PW" -v runner_password="$RUNNER_PW" \
       -f /repo/ops/db/create-app-role.sql
