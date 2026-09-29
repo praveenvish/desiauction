@@ -45,6 +45,8 @@ import {
   type SQL,
 } from "drizzle-orm";
 
+import { isMatchAction } from "../../lib/event-names";
+import { matchNames } from "../competition/match-names";
 import { SMS_TEMPLATES } from "../messaging/templates";
 import { ADMIN_ACCESS_ACTION } from "./capabilities";
 import { countNoun, waitedFor } from "./format";
@@ -146,6 +148,8 @@ export interface ActivityRow {
   readonly scopeId: string;
   readonly subject: string | null;
   readonly at: Date;
+  /** The match a match row is about ("TT v PP"); absent for anything else. */
+  readonly subjectLabel?: string | null;
 }
 
 export interface AttentionRow {
@@ -482,7 +486,11 @@ export async function recentActivity(
     )
     .orderBy(desc(auditLog.at))
     .limit(limit);
-  return rows;
+  const names = await matchNames(
+    db,
+    rows.filter((row) => isMatchAction(row.action)).map((row) => row.subject ?? ""),
+  );
+  return rows.map((row) => ({ ...row, subjectLabel: names.get(row.subject ?? "") ?? null }));
 }
 
 /**

@@ -46,6 +46,7 @@ export function SeasonNow({
   if (rows.length === 0 && table.length === 0) {
     return null;
   }
+  const firstNext = rows.find((row) => row.state === "next")?.fixture.id;
   const lobby = schedule?.fixtureShape === "lobby";
   const teamOf = new Map((standings?.teams ?? []).map((team) => [team.id, team]));
   const today = now.slice(0, 10);
@@ -99,7 +100,14 @@ export function SeasonNow({
                       : undefined
                   }
                 >
-                  <span className="ov-now-when">{when}</span>
+                  <span className="ov-now-when">
+                    {/* The next match is marked, not just first: dated like
+                        the rows under it, it read as one more (census 17). */}
+                    {state === "next" && fixture.id === firstNext ? (
+                      <b className="ov-now-tag">Next</b>
+                    ) : null}
+                    {when}
+                  </span>
                   <Link
                     href={`/seasons/${slug}/fixtures?match=${fixture.id}`}
                     className="ov-now-teams"
