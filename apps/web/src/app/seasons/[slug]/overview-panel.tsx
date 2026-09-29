@@ -135,6 +135,8 @@ function nextDestination(
   canSettle: boolean,
   points: boolean,
   fixtureCount: number,
+  /** Matches whose day passed with no result (census 9). */
+  dueMatches = 0,
 ): Onward | { locked: true } {
   if (auctionStatus === null) {
     return {
@@ -169,6 +171,21 @@ function nextDestination(
       { href: `/seasons/${slug}/teams`, label: "Send squad sheets", testId: "next-squad-sheets" },
       { href: `/seasons/${slug}/posters`, label: "Make posters", testId: "next-posters" },
     ];
+    // A result owed from an earlier day is the season's first job: home and
+    // the tournaments page said "3 matches need a result" while this page led
+    // with "Open the schedule" (census 9).
+    if (dueMatches > 0) {
+      return {
+        href: `/seasons/${slug}/fixtures`,
+        label: "Enter results",
+        title: `${String(dueMatches)} ${dueMatches === 1 ? "match needs" : "matches need"} a result.`,
+        body:
+          dueMatches === 1
+            ? "Its day has passed and nobody has entered the score yet."
+            : "Their days have passed and nobody has entered the scores yet.",
+        also,
+      };
+    }
     return fixtureCount === 0
       ? {
           href: `/seasons/${slug}/fixtures`,
@@ -411,12 +428,15 @@ export function OverviewPanel({
   mineTeamIds = [],
   yours,
   liveMatches = 0,
+  dueMatches = 0,
 }: {
   view: SeasonOverviewView;
   /** The owner's own team this season, drawn by the page (owners only). */
   yours?: ReactNode;
-  /** Matches being played right now. */
+  /** Matches being played right now (today's — never one left open from an earlier day). */
   liveMatches?: number;
+  /** Matches whose day passed with no result. */
+  dueMatches?: number;
   slug: string;
   /** Name the champion, once every match is done (champion-card.tsx), drawn by the page. */
   finale?: ReactNode;
@@ -458,6 +478,7 @@ export function OverviewPanel({
     view.viewer.canSettle,
     points,
     view.fixtureCount,
+    dueMatches,
   );
   const locked = "locked" in onward;
   const cleared = clearedRungs(view);
@@ -1025,7 +1046,10 @@ export function OverviewPanel({
             </SectionCard>
 
             <SectionCard
-              title="Pool by role"
+              // Every approved player, pre-signed ones included — so not the
+              // auction "pool" (the registrations desk's 37 of 43), which the
+              // two cards disagreed about (census 8).
+              title="Players by role"
               data-testid="pool-card"
               {...(view.viewer.canReview && view.poolByRole.length > 0
                 ? {

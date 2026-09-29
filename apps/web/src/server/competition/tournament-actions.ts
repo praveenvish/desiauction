@@ -19,6 +19,7 @@ import { dbHandle } from "../db";
 import { ForbiddenError } from "../orgs/authz";
 import { orgsFor } from "../orgs/orgs";
 import { acrossOrgs } from "../tenant";
+import { istCalendarDate } from "../../lib/format-date";
 import { competitionsView } from "./actions";
 import { canCompetition, competitionAllows, requireCompetitionCapability } from "./authz";
 import {
@@ -77,6 +78,12 @@ export interface SeasonCounts {
   approved?: number;
   /** Matches being played right now — the most urgent thing a season can hold. */
   live?: number;
+  /**
+   * Matches whose day has passed with no result — never started, or started
+   * and left open (census 8: a match open two days counted as "being played
+   * now"). Not in `live`.
+   */
+  due?: number;
   /** Matches played to the end. */
   played?: number;
   /**
@@ -94,6 +101,7 @@ const NO_COUNTS: SeasonCounts = {
   pending: 0,
   approved: 0,
   live: 0,
+  due: 0,
   played: 0,
 };
 
@@ -270,6 +278,9 @@ async function countsFor(
     return counts;
   }
   const tally = sql<number>`count(*)::int`;
+  // Kickoffs are local wall-clock text, so "before today" is a string compare
+  // against today's IST date (the same rule as `awaitsResult`).
+  const todayStart = `${istCalendarDate()}T00:00`;
   // Grouped by season, and every season belongs to exactly one club, so the
   // per-club results concatenate without double-counting anything.
   const slices = await acrossOrgs(personId, orgIds, async (db) => ({
@@ -282,7 +293,8 @@ async function countsFor(
       .select({
         competitionId: fixtures.competitionId,
         count: tally,
-        live: sql<number>`(count(*) filter (where ${fixtures.status} = 'in_progress'))::int`,
+        live: sql<number>`(count(*) filter (where ${fixtures.status} = 'in_progress' and (${fixtures.kickoffAt} is null or ${fixtures.kickoffAt} >= ${todayStart})))::int`,
+        due: sql<number>`(count(*) filter (where ${fixtures.status} in ('published', 'in_progress') and ${fixtures.kickoffAt} < ${todayStart}))::int`,
         played: sql<number>`(count(*) filter (where ${fixtures.status} = 'completed'))::int`,
       })
       .from(fixtures)
@@ -332,6 +344,7 @@ async function countsFor(
     const entry = read(row.competitionId);
     entry.matches = row.count;
     entry.live = row.live;
+    entry.due = row.due;
     entry.played = row.played;
   }
   for (const row of pendingRows) {

@@ -40,8 +40,16 @@ export interface SeasonPlay {
   played: number;
   live: number;
   toCome: number;
-  /** Being played now. */
+  /**
+   * Matches whose day passed with no result — never started, or left open
+   * (census 9: the public page called one "live" two days on and dropped the
+   * rest). Neither live nor to come.
+   */
+  awaiting: number;
+  /** Being played now — today's only. */
   liveMatches: SeasonMatchLine[];
+  /** Owed a result, oldest first. */
+  awaitingMatches: SeasonMatchLine[];
   /** The latest results, newest first. */
   recent: SeasonMatchLine[];
   /** The next published matches from today, soonest first. */
@@ -57,7 +65,7 @@ export async function seasonPlayIn(
 ): Promise<SeasonPlay> {
   const shape = sportPackFor(competition.sport).fixtureShape === "lobby" ? "lobby" : "duel";
   const [stats, timeline, results, standings, teamRows] = await Promise.all([
-    fixtureStats(db, competition.id, PUBLIC_FIXTURE_STATUSES),
+    fixtureStats(db, competition.id, PUBLIC_FIXTURE_STATUSES, today),
     competitionTimeline(db, competition.id, PUBLIC_FIXTURE_STATUSES),
     resultsOf(db, competition.id),
     shape === "duel" ? standingsOf(db, competition.id) : Promise.resolve(null),
@@ -72,12 +80,23 @@ export async function seasonPlayIn(
     groundName: fixture.groundName,
   });
   const color = new Map(teamRows.map((team) => [team.id, team.primaryColor]));
+  const pastDay = (fixture: { kickoffAt: string | null }) =>
+    fixture.kickoffAt !== null && fixture.kickoffAt.slice(0, 10) < today;
+  const owed = timeline.filter(
+    (fixture) =>
+      (fixture.status === "in_progress" || fixture.status === "published") && pastDay(fixture),
+  );
   return {
     shape,
     played: stats.completed,
-    live: stats.inProgress,
-    toCome: stats.published,
-    liveMatches: timeline.filter((fixture) => fixture.status === "in_progress").map(line),
+    live: stats.liveNow,
+    toCome: timeline.filter((fixture) => fixture.status === "published" && !pastDay(fixture))
+      .length,
+    awaiting: owed.length,
+    liveMatches: timeline
+      .filter((fixture) => fixture.status === "in_progress" && !pastDay(fixture))
+      .map(line),
+    awaitingMatches: owed.map(line),
     recent: timeline
       .filter((fixture) => fixture.status === "completed")
       .slice(-3)

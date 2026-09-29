@@ -81,7 +81,7 @@ export function seasonJourney(
       done: auctionDone,
     },
     input.auctionUnit === "points"
-      ? { key: "fixtures" as const, label: "Fixtures", done: (input.fixtures ?? 0) > 0 }
+      ? { key: "fixtures" as const, label: "Matches", done: (input.fixtures ?? 0) > 0 }
       : { key: "settlement" as const, label: "Settlement", done: settlementDone },
   ];
   const current = facts.findIndex((fact) => !fact.done);

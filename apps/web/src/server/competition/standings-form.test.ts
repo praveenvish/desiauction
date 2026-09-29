@@ -76,11 +76,26 @@ describe("nextOf", () => {
       live: true,
     });
     expect(next.get("pp")?.fixtureId).toBe("live");
+    // mm's match on the 26th was never played: it is owed before Monday's
+    // (census 9 — it used to be skipped as if it never existed).
     expect(next.get("mm")).toEqual({
-      fixtureId: "mon",
-      opponent: "TT",
-      kickoffAt: "2026-09-28T09:30",
+      fixtureId: "past",
+      opponent: "PP",
+      kickoffAt: "2026-09-26T09:30",
       live: false,
+      due: true,
+    });
+  });
+
+  it("a match left in progress past its day is due, not playing now", () => {
+    const fixtures = [
+      fixture("stale", "tt", "pp", "2026-09-27T14:30", "in_progress"),
+      fixture("next", "tt", "mm", "2026-10-04T15:00", "published"),
+    ];
+    expect(nextOf(fixtures, "2026-09-29T10:00").get("tt")).toMatchObject({
+      fixtureId: "stale",
+      live: false,
+      due: true,
     });
   });
 
@@ -92,6 +107,16 @@ describe("nextOf", () => {
       fixture("nextweek", "mm", "pp", "2026-10-04T15:00", "published"),
       fixture("yesterday", "mm", "pp", "2026-09-27T09:30", "published"),
     ];
-    expect(nextOf(fixtures, "2026-09-28T18:00").get("mm")?.fixtureId).toBe("morning");
+    // Yesterday's unplayed match is owed first; this morning's is next after it.
+    expect(nextOf(fixtures, "2026-09-28T18:00").get("mm")).toMatchObject({
+      fixtureId: "yesterday",
+      due: true,
+    });
+    expect(
+      nextOf(
+        fixtures.filter((row) => row.id !== "yesterday"),
+        "2026-09-28T18:00",
+      ).get("mm")?.fixtureId,
+    ).toBe("morning");
   });
 });

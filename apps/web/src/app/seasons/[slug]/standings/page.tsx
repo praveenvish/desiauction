@@ -52,7 +52,18 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             from (RN-1), so this is how an organizer reaches them. */}
         <div className="st-head">
           <ScheduleViews slug={slug} active="table" />
-          {standings.live > 0 ? (
+          {standings.awaiting > 0 ? (
+            <p className="st-head-lede" data-testid="standings-awaiting">
+              <strong>
+                {standings.awaiting} match{standings.awaiting === 1 ? "" : "es"}{" "}
+                {standings.awaiting === 1 ? "needs" : "need"} a result
+              </strong>{" "}
+              —{" "}
+              {standings.awaiting === 1
+                ? "its day has passed; the table counts it once the score is in."
+                : "their days have passed; the table counts them once the scores are in."}
+            </p>
+          ) : standings.live > 0 ? (
             <p className="st-head-lede">
               <span className="sd-live">
                 {standings.live} match{standings.live === 1 ? "" : "es"} playing now
@@ -68,7 +79,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
           description={
             standings.playable === 0
               ? "No match has been played yet — the table fills as results come in."
-              : `Built from ${String(standings.recorded)} recorded result${standings.recorded === 1 ? "" : "s"}, on every read.`
+              : `From ${String(standings.recorded)} recorded result${standings.recorded === 1 ? "" : "s"} — it updates the moment a score is entered.`
           }
           action={
             /* Said whenever it is not the whole story. A table built from three
@@ -79,7 +90,9 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
               dot
               testId="standings-completeness"
             >
-              {standings.recorded} of {standings.playable} results in
+              {standings.awaiting > 0
+                ? `${String(standings.recorded)} results in · ${String(standings.awaiting)} ${standings.awaiting === 1 ? "needs" : "need"} a result`
+                : `${String(standings.recorded)} of ${String(standings.playable)} results in`}
             </Pill>
           }
           flush={standings.rows.length > 0}
@@ -93,7 +106,9 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
             />
           ) : (
             <>
-              <div className="st-table-wrap">
+              {/* It scrolls sideways on a phone, so a keyboard must be able to
+                  reach it (axe: scrollable-region-focusable). */}
+              <div className="st-table-wrap" tabIndex={0} role="region" aria-label="League table">
                 <table className="st-table sd-table" data-testid="standings-table">
                   <caption>
                     The table, best first: played, won, lost, tied, no result, points
@@ -248,6 +263,13 @@ export default async function StandingsPage({ params }: { params: Promise<{ slug
                               return <span className="st-muted">—</span>;
                             }
                             const opponent = next.opponent !== null ? ` v ${next.opponent}` : "";
+                            if (next.due === true) {
+                              return (
+                                <span className="sd-next" data-due="true">
+                                  Result due{opponent}
+                                </span>
+                              );
+                            }
                             if (next.live) {
                               return (
                                 <span className="sd-next" data-live="true">

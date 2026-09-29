@@ -1,7 +1,8 @@
 import { ButtonLink, IconArrowRight, IconCheckCircle, IconPin } from "@desiauction/ui";
 import Link from "next/link";
 
-import { formatWallTime } from "../../lib/format-date";
+import { formatWallTime, istCalendarDate } from "../../lib/format-date";
+import { awaitsResult } from "../seasons/[slug]/_tabs/fixture-status";
 import { formatCount } from "../../lib/plural";
 import type { OrganizerFixture } from "../../server/competition/fixtures";
 import type { SeasonRow } from "../../server/competition/tournament-actions";
@@ -141,9 +142,14 @@ function NowCard({ season, parent, today }: { season: SeasonRow; parent: string;
 }
 
 function ComingUp({ fixtures }: { fixtures: readonly OrganizerFixture[] }) {
+  const today = istCalendarDate();
   return (
     <aside className="tx-coming" aria-labelledby="tx-coming-title">
-      <h3 id="tx-coming-title">Coming up</h3>
+      {/* The list keeps matches whose day passed with no result (they lead,
+          oldest first), so it is not only "coming up" then. */}
+      <h3 id="tx-coming-title">
+        {fixtures.some((fixture) => awaitsResult(fixture, today)) ? "Matches" : "Coming up"}
+      </h3>
       <ul>
         {fixtures.map((fixture) => {
           const tile = fixture.kickoffAt === null ? null : dayTile(fixture.kickoffAt);
@@ -162,11 +168,13 @@ function ComingUp({ fixtures }: { fixtures: readonly OrganizerFixture[] }) {
                   {teams}
                 </Link>
                 <span>
-                  {fixture.status === "in_progress"
-                    ? "Live now"
-                    : fixture.kickoffAt !== null
-                      ? formatWallTime(fixture.kickoffAt)
-                      : "Time to be set"}
+                  {awaitsResult(fixture, today)
+                    ? "Result due"
+                    : fixture.status === "in_progress"
+                      ? "Live now"
+                      : fixture.kickoffAt !== null
+                        ? formatWallTime(fixture.kickoffAt)
+                        : "Time to be set"}
                   {fixture.groundName !== null ? (
                     <>
                       {" · "}

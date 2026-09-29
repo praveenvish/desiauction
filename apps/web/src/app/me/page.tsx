@@ -63,6 +63,7 @@ import { verdictOf } from "./registration-card";
 import "./me.css";
 import { formatDate, formatDayDate, formatWallTime, istCalendarDate } from "../../lib/format-date";
 import { formatCount } from "../../lib/plural";
+import { lineupWords } from "../../lib/lineup-words";
 
 export const metadata = { title: "My profile · DesiAuction" };
 
@@ -197,7 +198,9 @@ export default async function MyProfilePage({
       ),
     );
     const seasonsOn = seasons.map((season) =>
-      season !== null && season.upcoming.length + season.results.length > 0 ? season : null,
+      season !== null && season.upcoming.length + season.awaiting.length + season.results.length > 0
+        ? season
+        : null,
     );
     const lead = owns[0];
     const leadSeason = seasonsOn[0] ?? null;
@@ -1067,6 +1070,8 @@ async function OwnerSeason({ team, season }: { team: OwnedTeam; season: TeamSeas
             : `top buy ${bought[0].playerName ?? "a player"} ${money.ledger(bought[0].soldPrice ?? 0)}`,
         ].filter((part): part is string => part !== null);
   const next = season.upcoming[0];
+  // A past match with no result is listed, not dropped: someone owes a score.
+  const due = season.awaiting.slice(0, 3);
   const results = season.results.slice(0, 3);
   const base = `/seasons/${team.competitionSlug}`;
   return (
@@ -1095,12 +1100,29 @@ async function OwnerSeason({ team, season }: { team: OwnedTeam; season: TeamSeas
             opponentName: next.opponentName,
             opponentColor: next.opponentColor,
             groundName: next.groundName,
+            // An owner's ticket: lineups are the players' news, not this card's.
+            announcedIn: false,
           }}
           live={next.live}
         />
       )}
-      {results.length === 0 ? null : (
+      {next === undefined || next.live ? null : (
+        <p className="mp-match-foot" data-testid="me-owner-lineup">
+          Next match: {lineupWords(next.lineup)}.
+        </p>
+      )}
+      {results.length + due.length === 0 ? null : (
         <ul className="mp-matches">
+          {due.map((match) => (
+            <li key={match.fixtureId} data-testid="me-owner-due">
+              <span className="mp-match-date">{matchDate(match.kickoffAt)}</span>
+              <span className="mp-match-body">
+                <strong>vs {match.opponentName}</strong>
+                {match.groundName === null ? null : <span>{match.groundName}</span>}
+              </span>
+              <Pill tone="neutral">Result due</Pill>
+            </li>
+          ))}
           {results.map((match) => (
             <li key={match.fixtureId}>
               <span className="mp-match-date">{matchDate(match.kickoffAt)}</span>
@@ -1129,6 +1151,7 @@ async function OwnerSeason({ team, season }: { team: OwnedTeam; season: TeamSeas
         )}
         <strong>{formatCount(season.record.played)}</strong> played ·{" "}
         <strong className="mp-won">{formatCount(season.record.won)} won</strong>
+        {season.awaiting.length > 0 ? ` · ${String(season.awaiting.length)} awaiting a result` : ""}
         {season.upcoming.length > 0 ? ` · ${String(season.upcoming.length)} to come` : ""}
       </p>
       {night === null ? null : (

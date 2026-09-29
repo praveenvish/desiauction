@@ -10,6 +10,7 @@ import {
 } from "@desiauction/ui";
 import Link from "next/link";
 
+import { lineupWords } from "../../lib/lineup-words";
 import { moneyFormat } from "../../lib/money";
 import { planView } from "../../server/auction/owner-plan-actions";
 import { publicTeam, teamSlugOf } from "../../server/competition/public";
@@ -116,7 +117,9 @@ export async function OwnerSection({ team }: { team: OwnedTeam }) {
   ]);
   /** The season is on once the club has published a match for this team. */
   const seasonOn =
-    season !== null && season.upcoming.length + season.results.length > 0 ? season : null;
+    season !== null && season.upcoming.length + season.awaiting.length + season.results.length > 0
+      ? season
+      : null;
   // The purse counts in the season's own unit — rupees or points (0091).
   const money = moneyFormat(unit);
   const base = `/seasons/${team.competitionSlug}`;
@@ -555,7 +558,12 @@ function NextStrip({ season, today }: { season: TeamSeason; today: string }) {
         {next.opponentName}
       </span>
       <span className="ow-next-meta">
-        {[next.groundName, rest > 0 ? `${String(rest)} more to come` : null]
+        {[
+          next.groundName,
+          next.live ? null : lineupWords(next.lineup),
+          rest > 0 ? `${String(rest)} more to come` : null,
+          season.awaiting.length > 0 ? `${String(season.awaiting.length)} awaiting a result` : null,
+        ]
           .filter((part): part is string => part !== null && part !== "")
           .join(" · ")}
       </span>
@@ -577,9 +585,12 @@ function OurMatches({
   href: string;
   today: string;
 }) {
+  // Past matches with no result come first: they are the ones someone owes
+  // a score for, and they used to vanish from this card.
+  const due = season.awaiting.slice(0, 2);
   const next = season.upcoming.slice(0, 2);
-  const done = season.results.slice(0, next.length > 0 ? 2 : 4);
-  const row = (match: TeamSeasonMatch, upcoming: boolean) => {
+  const done = season.results.slice(0, next.length + due.length > 0 ? 2 : 4);
+  const row = (match: TeamSeasonMatch, upcoming: boolean, overdue = false) => {
     const day = match.kickoffAt?.slice(0, 10) ?? null;
     const tile = day !== null && /^\d{4}-\d{2}-\d{2}$/.test(day) ? dateTile(day) : null;
     return (
@@ -597,7 +608,11 @@ function OurMatches({
               : (match.groundName ?? "Played")}
           </span>
         </span>
-        {upcoming || match.result === null ? (
+        {overdue ? (
+          <span className="ow-match-next" data-state="due">
+            Result due
+          </span>
+        ) : upcoming || match.result === null ? (
           <span className="ow-match-next">{match.live ? "Live" : "Next"}</span>
         ) : (
           <span className="ow-result" data-result={match.result}>
@@ -639,6 +654,7 @@ function OurMatches({
       </div>
       <ol className="ow-matches">
         {next.map((match) => row(match, true))}
+        {due.map((match) => row(match, false, true))}
         {done.map((match) => row(match, false))}
       </ol>
     </section>

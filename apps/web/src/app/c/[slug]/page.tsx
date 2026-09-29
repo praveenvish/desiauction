@@ -153,15 +153,23 @@ export default async function PublicCompetitionPage({
    * played the page is about the season — the table and the matches lead.
    */
   const play = view.play;
-  const matchesAll = play.played + play.live + play.toCome;
-  const finished = play.played > 0 && play.live === 0 && play.toCome === 0;
-  const seasonOn = !finished && play.played + play.live > 0;
+  const matchesAll = play.played + play.live + play.toCome + play.awaiting;
+  const finished = play.played > 0 && play.live === 0 && play.toCome === 0 && play.awaiting === 0;
+  const seasonOn = !finished && play.played + play.live + play.awaiting > 0;
   const seasonPhase = seasonOn || finished;
   // Once the season card lists the next matches, the full schedule below is
   // only worth its section when it holds more than the card already shows.
+  // Under "Matches to come", only matches still to come: a published match
+  // whose day has passed unplayed is not one (census 8 — Mon 28 Sep was
+  // listed on the 29th).
+  const scheduleRows = seasonPhase
+    ? view.fixtures.filter(
+        (fixture) => fixture.kickoffAt === null || fixture.kickoffAt.slice(0, 10) >= today,
+      )
+    : view.fixtures;
   const scheduleShown = seasonPhase
-    ? view.fixtures.length > play.upcoming.length
-    : view.fixtures.length > 0;
+    ? scheduleRows.length > play.upcoming.length
+    : scheduleRows.length > 0;
   /**
    * THE COUNTS, SAID ONCE.
    *
@@ -457,6 +465,7 @@ export default async function PublicCompetitionPage({
                   <span>
                     {play.played} played
                     {play.live > 0 ? ` · ${String(play.live)} live` : ""}
+                    {play.awaiting > 0 ? ` · ${String(play.awaiting)} awaiting a result` : ""}
                     {play.toCome > 0 ? ` · ${String(play.toCome)} to come` : ""}
                   </span>
                 </h3>
@@ -477,6 +486,24 @@ export default async function PublicCompetitionPage({
                         <span className="public-match-meta">
                           {match.groundName ?? "Being played now"}
                         </span>
+                      </span>
+                    </li>
+                  ))}
+                  {/* Played days with no result yet: said, not dropped (census 9). */}
+                  {play.awaitingMatches.map((match) => (
+                    <li key={match.fixtureId} data-state="due">
+                      <span className="public-match-when">{dayWord(match.kickoffAt, today)}</span>
+                      <span className="public-match-body">
+                        <span>
+                          <strong>{match.homeName ?? "Lobby"}</strong>
+                          {match.awayName !== null ? (
+                            <>
+                              {" "}
+                              vs <strong>{match.awayName}</strong>
+                            </>
+                          ) : null}
+                        </span>
+                        <span className="public-match-meta">Result to come</span>
                       </span>
                     </li>
                   ))}
@@ -639,7 +666,7 @@ export default async function PublicCompetitionPage({
             title={seasonPhase ? "Matches to come" : "Published schedule"}
           >
             <ul className="public-fixture-list" data-testid="public-schedule">
-              {view.fixtures.map((fixture) => (
+              {scheduleRows.map((fixture) => (
                 <li key={fixture.number} className="public-fixture">
                   <span className="public-fixture-teams">
                     {/* A lobby has no home and no away, so "vs" is not a

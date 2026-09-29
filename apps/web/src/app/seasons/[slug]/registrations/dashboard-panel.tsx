@@ -37,6 +37,8 @@ import {
   VisuallyHidden,
 } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
+
+import { useMoney } from "../../../../components/money-unit";
 import {
   useCallback,
   useEffect,
@@ -138,7 +140,12 @@ function poolHint(stats: RegistrationStats): string {
   }
   return terms.length === 0
     ? "Approved players who go to the block"
-    : `${String(stats.approved)} approved − ${terms.join(" − ")}`;
+    : // In words: "43 approved − 3 icons − 3 captains" read as dashes (census 8).
+      `${String(stats.approved)} approved, less ${
+        terms.length === 1
+          ? (terms[0] ?? "")
+          : `${terms.slice(0, -1).join(", ")} and ${terms.at(-1) ?? ""}`
+      }`;
 }
 
 interface Filters {
@@ -1751,6 +1758,7 @@ function PlayerRow({
   onDecline: () => void;
 }) {
   const triage = canTriage(row);
+  const money = useMoney();
   const name = row.name ?? "Unnamed";
   return (
     <tr
@@ -1882,9 +1890,7 @@ function PlayerRow({
           {row.teamName !== null ? (
             <TeamChip color={teamColor}>{row.teamName}</TeamChip>
           ) : (
-            <span className="pd-quiet">
-              {auctionDone && row.status === "approved" ? "Unsold" : "—"}
-            </span>
+            <span className="pd-quiet">—</span>
           )}
         </span>
         {(row.isIcon || row.isCaptain || row.isRetained) && row.teamId === null ? (
@@ -1894,7 +1900,20 @@ function PlayerRow({
       <td className="pd-col-status">
         {/* Approved is the normal state after triage — said quietly. The states
             that need a person keep their colour. */}
-        {row.status === "approved" ? (
+        {/* After the night "Approved" was true of all 43 rows and said nothing
+            (census 11): the column now carries what the auction did — sold,
+            signed before it, or unsold. Before the night it is the triage word. */}
+        {row.status === "approved" && auctionDone ? (
+          <span className="pd-status-quiet" data-testid={`outcome-${row.personId}`}>
+            {row.teamId === null
+              ? "Unsold"
+              : row.isIcon || row.isCaptain || row.isRetained
+                ? "Pre-signed"
+                : row.soldPrice !== null
+                  ? `Sold · ${money.ledger(row.soldPrice)}`
+                  : "Sold"}
+          </span>
+        ) : row.status === "approved" ? (
           <span className="pd-status-quiet">{STATUS_WORD.approved}</span>
         ) : (
           <span className="pd-status">

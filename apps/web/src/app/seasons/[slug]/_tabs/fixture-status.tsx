@@ -15,8 +15,38 @@ export const FIXTURE_TONE: Record<FixtureStatus, KitTone> = {
   cancelled: "neutral",
 };
 
+/**
+ * Whether a match's day has passed with no result: published and never
+ * started, or started and left open. It is not "published" (waiting to be
+ * played) nor "in progress" (being played) any more — someone owes a result.
+ */
+export function awaitsResult(
+  fixture: { status: string; kickoffAt: string | null },
+  today: string,
+): boolean {
+  return (
+    (fixture.status === "published" || fixture.status === "in_progress") &&
+    fixture.kickoffAt !== null &&
+    fixture.kickoffAt.slice(0, 10) < today.slice(0, 10)
+  );
+}
+
 /** The status word itself — "in progress" — as the suites and readers see it. */
-export function FixtureStatusPill({ status }: { status: FixtureStatus }) {
+export function FixtureStatusPill({
+  status,
+  overdue = false,
+}: {
+  status: FixtureStatus;
+  /** Its day has passed with no result (see `awaitsResult`). */
+  overdue?: boolean;
+}) {
+  if (overdue) {
+    return (
+      <span className="fx-status" data-due="true">
+        <Pill tone="amber">Result due</Pill>
+      </span>
+    );
+  }
   return (
     <span className="fx-status">
       <Pill tone={FIXTURE_TONE[status]} dot={status === "in_progress"}>

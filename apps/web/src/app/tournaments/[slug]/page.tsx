@@ -472,7 +472,12 @@ async function LatestEdition({
 function SoFar({ slug, view, today }: { slug: string; view: SeasonSoFarView; today: string }) {
   const { play, form } = view;
   const results = play.recent.slice(0, 2);
-  const upcoming = play.upcoming.slice(0, Math.max(2, 4 - results.length));
+  // Owed results lead (census 9: the list showed two results and nothing of
+  // the three matches whose day passed unscored).
+  // Every owed match, up to three — "3 matches need a result" sat over a list
+  // that showed two (census 10).
+  const due = play.awaitingMatches.slice(0, 3);
+  const upcoming = play.upcoming.slice(0, Math.max(1, 4 - results.length - due.length));
   return (
     <div className="tx-sofar" data-testid="tournament-so-far">
       {play.table !== null ? (
@@ -559,8 +564,28 @@ function SoFar({ slug, view, today }: { slug: string; view: SeasonSoFarView; tod
             <IconArrowRight size={14} aria-hidden />
           </Link>
         </header>
-        {upcoming.length + results.length > 0 ? (
+        {upcoming.length + results.length + due.length > 0 ? (
           <ul className="tx-lines">
+            {due.map((match) => (
+              <li key={match.fixtureId} data-state="due">
+                <span className="tx-line-when">{dayWord(match.kickoffAt, today)}</span>
+                <Link
+                  href={`/seasons/${slug}/fixtures?match=${match.fixtureId}`}
+                  className="tx-line-body"
+                >
+                  <span>
+                    <strong>{match.homeName ?? "Lobby"}</strong>
+                    {match.awayName !== null ? (
+                      <>
+                        {" "}
+                        v <strong>{match.awayName}</strong>
+                      </>
+                    ) : null}
+                  </span>
+                  <span className="tx-line-meta">Result due</span>
+                </Link>
+              </li>
+            ))}
             {upcoming.map((match) => (
               <li key={match.fixtureId} data-state="next">
                 <span className="tx-line-when">{dayWord(match.kickoffAt, today)}</span>

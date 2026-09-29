@@ -31,6 +31,9 @@ import "./auctions.css";
 import { formatCount } from "../../lib/plural";
 import { formatDate } from "../../lib/format-date";
 import { dateTile, doorLabel, nightSections, waitingLine } from "./auctions-model";
+import { SetupSteps } from "../home/auctioneer-home";
+import { currentSession } from "../../server/auth/actions";
+import { rolesOf, type ConductedSeason } from "../../server/roles/roles";
 
 export const metadata = { title: "Auctions · DesiAuction" };
 
@@ -156,7 +159,14 @@ function LiveNight({ card }: { card: AuctionCardView }) {
 }
 
 /** A night still to come: its date, and the one thing it is waiting for. */
-function UpcomingNight({ card }: { card: AuctionCardView }) {
+function UpcomingNight({
+  card,
+  conducted = null,
+}: {
+  card: AuctionCardView;
+  /** This reader's own conduct grant for the season, when that is why they see it. */
+  conducted?: ConductedSeason | null;
+}) {
   const status = STATUS[card.facts.status];
   const tile = dateTile(card.startsOn);
   const dates = dateRange(card.startsOn, card.endsOn);
@@ -207,6 +217,11 @@ function UpcomingNight({ card }: { card: AuctionCardView }) {
           {card.facts.teams === 1 ? "1 team" : `${count(card.facts.teams)} teams`}
         </li>
       </ul>
+      {/* The auctioneer waits on the organizer: the wait, counted (the same
+          steps their home shows), not only "waiting on the organizer". */}
+      {conducted !== null && card.facts.status === "none" ? (
+        <SetupSteps season={conducted} />
+      ) : null}
       <div className="ax-next">
         <p>
           <strong>{line.lead}</strong>
@@ -280,7 +295,10 @@ function FinishedNight({ card }: { card: AuctionCardView }) {
  * sight (conduct or manage); see `server/console/auctions-index.ts`.
  */
 export default async function AuctionsPage() {
-  const view = await auctionsIndexView();
+  const [view, session] = await Promise.all([auctionsIndexView(), currentSession()]);
+  // The seasons this reader was appointed to conduct, from their own grants.
+  const conducts = session === null ? [] : (await rolesOf(session.personId)).conducts;
+  const conductedBySlug = new Map(conducts.map((season) => [season.competitionSlug, season]));
   const { totals } = view;
   const sections = nightSections(view.cards);
   /*
@@ -424,7 +442,15 @@ export default async function AuctionsPage() {
             </h2>
             <div className="ax-grid">
               {sections.upcoming.map((card) => (
-                <UpcomingNight key={card.slug} card={card} />
+                <UpcomingNight
+                  key={card.slug}
+                  card={card}
+                  conducted={
+                    card.roleLabel === "Auctioneer"
+                      ? (conductedBySlug.get(card.slug) ?? null)
+                      : null
+                  }
+                />
               ))}
             </div>
           </section>

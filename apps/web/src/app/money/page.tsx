@@ -99,6 +99,19 @@ export default async function MoneyPage() {
     roles.owns.length > 0 &&
     roles.owns.every((team) => unitBySlug.get(team.competitionSlug) === "points");
   const receiptsColumn = teams.length > 0 || roles.owns.length > 0 || clubs.length === 0;
+  /*
+   * NO RUPEES MOVE (2026-09-29). An organizer whose every season plays for
+   * points opened on a heading and one row — a books page with no money on it
+   * and no word on why. Said once, at the top: what this page would hold, why
+   * it holds nothing, and what would change that.
+   */
+  const clubSeasons = view.competitions.filter((season) =>
+    clubs.some((club) => club.orgId === season.orgId),
+  );
+  const allPoints =
+    !receiptsColumn &&
+    clubSeasons.length > 0 &&
+    clubSeasons.every((season) => season.auctionUnit === "points");
 
   return (
     <main
@@ -140,6 +153,7 @@ export default async function MoneyPage() {
           )}
         </div>
       ) : null}
+      {allPoints ? <NoRupees seasons={clubSeasons} /> : null}
       {clubs.length > 0 ? <ClubBooks clubs={clubs} /> : null}
     </main>
   );
@@ -343,6 +357,33 @@ function NothingToPay({ team }: { team: OwnedTeam | undefined }) {
   );
 }
 
+/** Every season in the reader's clubs plays for points: say so once, and what would change it. */
+function NoRupees({ seasons }: { seasons: readonly { name: string; slug: string }[] }) {
+  const first = seasons[0];
+  if (first === undefined) return null;
+  const named =
+    seasons.length === 1 ? `${first.name} plays` : `All ${String(seasons.length)} seasons play`;
+  return (
+    <section className="mm-points" data-testid="money-no-rupees">
+      <span className="mm-points-mark" aria-hidden>
+        <IconWallet size={20} />
+      </span>
+      <div className="mm-points-body">
+        <h2>No rupees move in your clubs yet</h2>
+        <p>
+          {named} for points — no invoices, no receipts, nothing to settle. Money lands here when a
+          season charges a registration fee or runs its auction in rupees.
+        </p>
+      </div>
+      {seasons.length === 1 ? (
+        <ButtonLink href={`/seasons/${first.slug}/money`} size="sm" variant="secondary">
+          Season money
+        </ButtonLink>
+      ) : null}
+    </section>
+  );
+}
+
 /** Nothing issued to you yet: say what will land here, and point at your team. */
 function NoReceipts({ owns, books }: { owns: readonly OwnedTeam[]; books: boolean }) {
   const team = owns[0];
@@ -520,6 +561,21 @@ function clubBooks(
   return clubs;
 }
 
+/**
+ * A club's mark: the first letters of its first two words ("Thane Sports
+ * Club" → "TS"), as every other surface draws it. `initialsFor` is the
+ * person-name rule (first and last), which made this one page say "TC".
+ */
+function clubMark(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return (
+    words
+      .slice(0, 2)
+      .map((word) => String.fromCodePoint(word.codePointAt(0) ?? 63).toUpperCase())
+      .join("") || "?"
+  );
+}
+
 function ClubBooks({ clubs }: { clubs: ClubRow[] }) {
   return (
     <section className="mm-books" aria-labelledby="my-money-books-title">
@@ -530,7 +586,7 @@ function ClubBooks({ clubs }: { clubs: ClubRow[] }) {
         <article key={club.orgId} className="mm-club" aria-labelledby={`mm-club-${club.orgId}`}>
           <div className="mm-club-top">
             <span className="mm-club-mark" aria-hidden>
-              {initialsFor(club.name).initials ?? "?"}
+              {clubMark(club.name)}
             </span>
             <div className="mm-team-name">
               <h3 id={`mm-club-${club.orgId}`}>{club.name}</h3>

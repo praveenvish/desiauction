@@ -2,7 +2,9 @@ import {
   auctions,
   competitions,
   createDb,
+  fixtureLineups,
   fixtures,
+  messageOutbox,
   lots,
   newId,
   organizations,
@@ -13,7 +15,7 @@ import {
   tournaments,
   type DbHandle,
 } from "@desiauction/db";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
@@ -304,11 +306,56 @@ describe("playerCareer (PI-1)", () => {
     expect(await playerUpcomingMatches(newId(), "2026-01-01")).toEqual([]);
   });
 
+  it("says a player is in the lineup only once the organizer announced it", async () => {
+    const next = async () =>
+      (await playerUpcomingMatches(personId, "2026-01-01")).find(
+        (match) => match.fixtureId === fixtureIds[0],
+      );
+    expect((await next())?.announcedIn).toBe(false);
+    // Saved, not announced: a lineup is often the record of who played.
+    await db.insert(fixtureLineups).values({
+      fixtureId: fixtureIds[0],
+      registrationId: regSold,
+      teamId,
+      orgId,
+      competitionId: soldCompId,
+      recordedBy: personId,
+    });
+    expect((await next())?.announcedIn).toBe(false);
+    const key = `lineup.announced:${fixtureIds[0]}:${regSold}`;
+    await db.insert(messageOutbox).values({
+      id: newId(),
+      personId,
+      orgId,
+      kind: "lineup.announced",
+      channel: "email",
+      dedupeKey: key,
+      subject: "",
+      bodyText: "",
+      bodyHtml: "",
+      status: "suppressed",
+    });
+    expect((await next())?.announcedIn).toBe(true);
+    // Taken out after being told: nothing is said (the founder's rule).
+    await db
+      .delete(fixtureLineups)
+      .where(
+        and(
+          eq(fixtureLineups.fixtureId, fixtureIds[0]),
+          eq(fixtureLineups.registrationId, regSold),
+        ),
+      );
+    expect((await next())?.announcedIn).toBe(false);
+    await db.delete(messageOutbox).where(eq(messageOutbox.dedupeKey, key));
+  });
+
   it("reads a team's season for its owner — public, upcoming, from the team's side", async () => {
     const season = await teamSeason(teamId, "2026-01-01");
-    // The 2099 published match is to come; the 2020 one is past, the draft is
-    // the organizer's working copy, and the completed one has no result yet.
+    // The 2099 published match is to come; the 2020 one is past with no result,
+    // so it awaits one (it used to vanish); the draft is the organizer's
+    // working copy, and the completed one has no result yet.
     expect(season?.upcoming.map((match) => match.fixtureId)).toEqual([fixtureIds[0]]);
+    expect(season?.awaiting.map((match) => match.fixtureId)).toEqual([fixtureIds[1]]);
     expect(season?.upcoming[0]).toMatchObject({ opponentName: "Career Rivals", live: false });
     expect(season?.results).toEqual([]);
     expect(season?.record).toEqual({ played: 0, won: 0, lost: 0, tied: 0 });

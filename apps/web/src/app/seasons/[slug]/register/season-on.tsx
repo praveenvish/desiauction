@@ -42,6 +42,8 @@ export interface SeasonOnView {
   results: SeasonOnMatch[];
   record: { played: number; won: number };
   toCome: number;
+  /** Past matches with no result yet, kickoff order — listed, never dropped. */
+  awaiting: SeasonOnMatch[];
 }
 
 const RESULT_MARK = { won: "W", lost: "L", tied: "T", no_result: "NR" } as const;
@@ -93,6 +95,7 @@ export function SeasonOn({
   const summary = [
     `${String(view.record.played)} played`,
     `${String(view.record.won)} won`,
+    view.awaiting.length > 0 ? `${String(view.awaiting.length)} awaiting a result` : null,
     view.toCome > 0 ? `${String(view.toCome)} to come` : null,
   ].filter((part): part is string => part !== null);
 
@@ -187,8 +190,15 @@ export function SeasonOn({
             </span>
           </div>
         ) : null}
-        {view.results.length > 0 ? (
+        {view.results.length + view.awaiting.length > 0 ? (
           <ol className="reg-season-results">
+            {[...view.awaiting].reverse().map((match) => (
+              <li key={match.fixtureId} data-testid="my-match-due">
+                <span className="reg-season-day">{match.dayLabel}</span>
+                <span className="reg-season-vs">vs {match.opponentName}</span>
+                <span className="reg-season-due">Result due</span>
+              </li>
+            ))}
             {view.results.map((match) => (
               <li key={match.fixtureId}>
                 <span className="reg-season-day">{match.dayLabel}</span>

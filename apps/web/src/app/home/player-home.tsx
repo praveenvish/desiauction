@@ -3,6 +3,7 @@ import {
   ButtonLink,
   IconArrowRight,
   IconCalendar,
+  IconCheckCircle,
   IconFileCheck,
   IconTrophy,
   IconUser,
@@ -31,6 +32,7 @@ import {
 } from "../../server/competition/public";
 import {
   playerCareer,
+  playerAwaitingMatches,
   playerMatches,
   playerUpcomingMatches,
   type CareerMatch,
@@ -366,6 +368,14 @@ function MatchHero({
           <p className="pm-stage-line">
             {when ?? "No more matches on the schedule yet — the club publishes them."}
           </p>
+          {/* The organizer announced it (and they are still in it): the one
+              line a player opens the app for before a match. */}
+          {next?.announcedIn === true ? (
+            <p className="pm-lineup" data-testid="home-in-lineup">
+              <IconCheckCircle size={16} aria-hidden />
+              You&apos;re in the lineup
+            </p>
+          ) : null}
         </div>
         {registration.posterReady ? (
           <ButtonLink href={`${base}/posters`} size="lg" variant="secondary">
@@ -382,7 +392,7 @@ function MatchHero({
           </dd>
         </div>
         <div>
-          <dt>matches to come</dt>
+          <dt>{toCome === 1 ? "match to come" : "matches to come"}</dt>
           <dd>{toCome}</dd>
         </div>
         {price !== null ? (
@@ -418,18 +428,22 @@ function SoldDuo({
   registration,
   team,
   upcoming,
+  awaiting = [],
   matches,
   topBuys,
 }: {
   registration: MyRegistration;
   team: PublicTeam | null;
   upcoming: UpcomingMatch[];
+  /** Matches whose day passed with no result (census 9). */
+  awaiting?: UpcomingMatch[];
   matches: CareerMatch[];
   topBuys: PublicTopBuy[];
 }) {
   const money = moneyFormat(registration.auctionUnit);
   const mine = upcoming.filter((match) => match.registrationId === registration.registrationId);
   const next = mine[0];
+  const owed = awaiting.filter((match) => match.registrationId === registration.registrationId);
   const results = matches.filter(
     (match) => match.registrationId === registration.registrationId && match.result !== null,
   );
@@ -453,7 +467,7 @@ function SoldDuo({
         />
       ) : null}
 
-      {next !== undefined || results.length > 0 ? (
+      {next !== undefined || results.length > 0 || owed.length > 0 ? (
         <section className="hd-card" aria-labelledby="hd-next-title" data-testid="home-matches">
           <div className="hd-head">
             <h2 id="hd-next-title" className="hd-title">
@@ -485,7 +499,20 @@ function SoldDuo({
                 <span className="pm-match-next">Next</span>
               </li>
             ))}
-            {results.slice(0, mine.length > 0 ? 2 : 4).map((match) => (
+            {/* Owed a result: said, between what is next and what was played. */}
+            {owed.slice(-2).map((match) => (
+              <li key={match.fixtureId} className="pm-match" data-state="due">
+                <span className="pm-match-when">{dayLabel(match.kickoffAt)}</span>
+                <span className="hd-who">
+                  <span className="hd-name">vs {match.opponentName}</span>
+                  <span className="hd-meta">{match.groundName ?? match.competitionName}</span>
+                </span>
+                <span className="pm-match-next" data-state="due">
+                  Result due
+                </span>
+              </li>
+            ))}
+            {results.slice(0, mine.length + owed.length > 0 ? 2 : 4).map((match) => (
               <li key={match.fixtureId} className="pm-match">
                 <span className="pm-match-when">{dayLabel(match.kickoffAt)}</span>
                 <span className="hd-who">
@@ -561,14 +588,16 @@ export async function PlayerHome({
 }) {
   // Today in IST — fixture kickoffs and season dates are local wall-clock text.
   const today = istCalendarDate();
-  const [registrations, hasProfile, completeness, career, matches, upcoming] = await Promise.all([
-    myRegistrations(personId),
-    hasPlayerProfile(personId),
-    profileCompletenessFor(personId),
-    playerCareer(personId),
-    playerMatches(personId),
-    playerUpcomingMatches(personId, today),
-  ]);
+  const [registrations, hasProfile, completeness, career, matches, upcoming, awaiting] =
+    await Promise.all([
+      myRegistrations(personId),
+      hasPlayerProfile(personId),
+      profileCompletenessFor(personId),
+      playerCareer(personId),
+      playerMatches(personId),
+      playerUpcomingMatches(personId, today),
+      playerAwaitingMatches(personId, today),
+    ]);
 
   // Nudge only somebody the platform can SEE is a player (an entry or a
   // profile row) — a pure organizer's home never asks for a bowling style.
@@ -645,6 +674,7 @@ export async function PlayerHome({
           registration={moment}
           team={team}
           upcoming={upcoming}
+          awaiting={awaiting}
           matches={matches}
           topBuys={topBuys}
         />

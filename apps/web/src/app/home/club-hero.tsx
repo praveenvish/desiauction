@@ -56,6 +56,17 @@ export function ClubHero({
     overview.auctionStatus === "completed" || overview.auctionStatus === "reconciled",
   );
   const live = overview.auctionLive;
+  /*
+   * After the night the season is its matches: "AUCTION DONE" sat on the hero
+   * of a season three matches in with one being played (census 8). Once the
+   * club has put matches on the books the badge follows them.
+   */
+  const label =
+    badge.label === "Auction done" && overview.fixtureCount > 0
+      ? overview.fixturesOpen === 0
+        ? "Season finished"
+        : "Season on"
+      : badge.label;
   return (
     <div className="home-hero">
       <HeroBanner
@@ -76,9 +87,9 @@ export function ClubHero({
         eyebrow={
           <HeroStatus
             live={live}
-            done={badge.label === "Settled" || badge.label === "Auction done"}
+            done={label === "Settled" || label === "Auction done" || label === "Season finished"}
           >
-            {live ? "Auction live" : badge.label}
+            {live ? "Auction live" : label}
           </HeroStatus>
         }
         title={

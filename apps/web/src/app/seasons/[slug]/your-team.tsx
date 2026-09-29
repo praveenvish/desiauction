@@ -1,6 +1,7 @@
 import { ButtonLink, IconArrowRight } from "@desiauction/ui";
 
 import { formatWallTime } from "../../../lib/format-date";
+import { lineupWords } from "../../../lib/lineup-words";
 import type { TeamSeason } from "../../../server/player/career";
 import { TeamCrest } from "./_tabs/team-crest";
 import { relativeDay, wallDay } from "./fixtures/schedule-model";
@@ -25,6 +26,7 @@ export function YourTeam({
   const place = season?.place ?? null;
   const record = season?.record;
   const next = season?.upcoming[0];
+  const owed = season?.awaiting.length ?? 0;
   const standing = [
     place !== null ? `${ordinal(place.position)} of ${String(place.of)}` : null,
     place !== null ? `${String(place.points)} ${place.points === 1 ? "pt" : "pts"}` : null,
@@ -50,6 +52,13 @@ export function YourTeam({
               {next.live ? "" : `${whenOf(next.kickoffAt, today)} `}vs {next.opponentName}
             </strong>
             {next.groundName !== null ? ` · ${next.groundName}` : ""}
+            {next.live ? "" : ` · ${lineupWords(next.lineup)}`}
+            {/* Said here as on owner home and /me (census 12). */}
+            {owed > 0 ? ` · ${String(owed)} awaiting a result` : ""}
+          </p>
+        ) : owed > 0 ? (
+          <p className="ov-yours-next">
+            {String(owed)} {owed === 1 ? "match is" : "matches are"} awaiting a result
           </p>
         ) : null}
       </div>

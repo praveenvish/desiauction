@@ -66,7 +66,12 @@ export function SeasonNow({
                   ? "Now"
                   : kickoff === null || day === null
                     ? "Time to be set"
-                    : `${day === today ? "Today" : wallDay(day).weekday} ${formatWallTime(kickoff)}`;
+                    : day === today
+                      ? `Today ${formatWallTime(kickoff)}`
+                      : state === "next"
+                        ? `${wallDay(day).weekday} ${formatWallTime(kickoff)}`
+                        : // A past day names its date: "Sun 9:30 am" read as next Sunday.
+                          `${wallDay(day).weekday} ${wallDay(day).date}`;
               const result = schedule?.results[fixture.id];
               const sides =
                 fixture.homeTeamId === null ? `Lobby · ${String(fixture.squadCount)} squads` : null;
@@ -98,6 +103,8 @@ export function SeasonNow({
                     <Pill tone="red" dot>
                       Live
                     </Pill>
+                  ) : state === "due" ? (
+                    <Pill tone="neutral">Result due</Pill>
                   ) : state === "result" && result !== undefined ? (
                     <span className="ov-now-result">
                       {resultWords(result.outcome, fixture.homeTeamName, fixture.awayTeamName)}

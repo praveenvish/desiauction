@@ -33,10 +33,12 @@ export default async function HomeAction() {
     <FormDialog
       title="New tournament"
       triggerLabel="+ New tournament"
-      // `touch` is the 44px rung the product standardised on. This is the
-      // page's ONE primary action and it used to be 32px, at the width where 44
-      // matters most.
+      // `touch` is the 44px rung the product standardised on (it used to be
+      // 32px, at the width where 44 matters most). Secondary: home's body
+      // always carries its own primary — the next step, or "Enter score" on a
+      // match day — and a gold "+ New tournament" competed with it (census 14).
       size="touch"
+      variant="secondary"
       triggerTestId="home-new-tournament"
     >
       <CreateTournamentForm orgs={creatable} />

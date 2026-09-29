@@ -10,7 +10,8 @@ import {
   type Db,
 } from "@desiauction/db";
 import { alias } from "drizzle-orm/pg-core";
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { istCalendarDate } from "../../lib/format-date";
+import { and, asc, desc, eq, gte, ilike, inArray, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { containsPattern } from "../../lib/like-pattern";
 
 // FIXTURE SNAPSHOTS (M-IP3-3, CTO addition 2). The immutable projection every
@@ -174,18 +175,33 @@ export interface FixtureStats {
    */
   venues: number;
   grounds: number;
+  /**
+   * Matches whose day has passed with no result — published and never
+   * started, or started and left open (census 8/9). They are neither "to
+   * come" nor being played; readers show them as owed.
+   */
+  awaiting: number;
+  /**
+   * Being played NOW: in progress on today (or undated). `inProgress` still
+   * counts every open match, the lifecycle's own number; a match left open
+   * from an earlier day is `awaiting`, not live.
+   */
+  liveNow: number;
 }
 
 export async function fixtureStats(
   db: Db,
   competitionId: string,
   visible?: readonly FixtureStatus[],
+  today: string = istCalendarDate(),
 ): Promise<FixtureStats> {
+  // Kickoffs are local wall-clock text: "before today" is a string compare.
+  const todayStart = `${today.slice(0, 10)}T00:00`;
   const scope = and(
     eq(fixtures.competitionId, competitionId),
     ...(visible === undefined ? [] : [inArray(fixtures.status, [...visible])]),
   );
-  const [rows, [roundRow], [placeRow]] = await Promise.all([
+  const [rows, [roundRow], [placeRow], [owedRow]] = await Promise.all([
     db
       .select({ status: fixtures.status, count: sql<number>`count(*)::int` })
       .from(fixtures)
@@ -203,6 +219,13 @@ export async function fixtureStats(
       .from(fixtures)
       .innerJoin(grounds, eq(grounds.id, fixtures.groundId))
       .where(and(scope, sql`${fixtures.status} <> 'cancelled'`)),
+    db
+      .select({
+        awaiting: sql<number>`(count(*) filter (where ${fixtures.status} in ('published', 'in_progress') and ${fixtures.kickoffAt} < ${todayStart}))::int`,
+        staleLive: sql<number>`(count(*) filter (where ${fixtures.status} = 'in_progress' and ${fixtures.kickoffAt} < ${todayStart}))::int`,
+      })
+      .from(fixtures)
+      .where(scope),
   ]);
   const stats: FixtureStats = {
     total: 0,
@@ -215,8 +238,13 @@ export async function fixtureStats(
     rounds: roundRow?.max ?? 0,
     venues: placeRow?.venues ?? 0,
     grounds: placeRow?.grounds ?? 0,
+    awaiting: owedRow?.awaiting ?? 0,
+    liveNow: 0,
   };
-  const keys: Record<FixtureStatus, Exclude<keyof FixtureStats, "venues" | "grounds">> = {
+  const keys: Record<
+    FixtureStatus,
+    Exclude<keyof FixtureStats, "venues" | "grounds" | "awaiting" | "liveNow">
+  > = {
     draft: "draft",
     scheduled: "scheduled",
     published: "published",
@@ -228,6 +256,7 @@ export async function fixtureStats(
     stats[keys[row.status]] = row.count;
     stats.total += row.count;
   }
+  stats.liveNow = Math.max(0, stats.inProgress - (owedRow?.staleLive ?? 0));
   return stats;
 }
 
@@ -606,8 +635,14 @@ export async function organizerSchedule(
       // the strip compared kickoff with this minute, so a match on today at
       // 9:30 vanished at 9:31 and a live match (kicked off earlier) never
       // showed at all (census 2026-09-28).
+      // …and every published match whose day passed unplayed: it awaits a
+      // result, and dropping it hid the one thing the organizer owed (census 8).
       or(
         eq(fixtures.status, "in_progress"),
+        and(
+          eq(fixtures.status, "published"),
+          lt(fixtures.kickoffAt, `${fromKickoff.slice(0, 10)}T00:00`),
+        ),
         and(
           gte(fixtures.kickoffAt, `${fromKickoff.slice(0, 10)}T00:00`),
           sql`${fixtures.status} not in ('cancelled', 'completed')`,

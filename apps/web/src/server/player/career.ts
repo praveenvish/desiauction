@@ -3,6 +3,7 @@ import {
   competitions,
   fixtureLineups,
   fixtureResults,
+  messageOutbox,
   fixtures,
   grounds,
   lots,
@@ -12,7 +13,7 @@ import {
   tournaments,
 } from "@desiauction/db";
 import { sportPackFor, type MoneyUnit } from "@desiauction/core";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
@@ -374,6 +375,13 @@ export interface UpcomingMatch {
   opponentColor: string | null;
   /** Where it is played, when the club named a ground. */
   groundName: string | null;
+  /**
+   * The organizer announced this player's place in the lineup, and they are
+   * still in it. Only the announcement is the player's to know: a saved
+   * lineup that was never announced (or a place taken away after it — the
+   * founder's rule is that nobody is told that) says nothing.
+   */
+  announcedIn: boolean;
 }
 
 export const UPCOMING_LIMIT = 5;
@@ -381,6 +389,39 @@ export const UPCOMING_LIMIT = 5;
 export async function playerUpcomingMatches(
   personId: string,
   today: string,
+): Promise<UpcomingMatch[]> {
+  return playerOpenMatches(
+    personId,
+    and(
+      eq(fixtures.status, "published"),
+      or(isNull(fixtures.kickoffAt), gte(fixtures.kickoffAt, today)),
+    ),
+  );
+}
+
+/**
+ * This person's matches whose day passed with no result — published and
+ * never started, or started and left open (census 9: player home listed the
+ * next match and the results, and the two owed in between vanished). Oldest
+ * first; same subject rules as `playerUpcomingMatches`.
+ */
+export async function playerAwaitingMatches(
+  personId: string,
+  today: string,
+): Promise<UpcomingMatch[]> {
+  return playerOpenMatches(
+    personId,
+    and(
+      inArray(fixtures.status, ["published", "in_progress"]),
+      isNotNull(fixtures.kickoffAt),
+      lt(fixtures.kickoffAt, `${today.slice(0, 10)}T00:00`),
+    ),
+  );
+}
+
+async function playerOpenMatches(
+  personId: string,
+  when: ReturnType<typeof and>,
 ): Promise<UpcomingMatch[]> {
   const home = alias(teams, "home_team");
   const away = alias(teams, "away_team");
@@ -394,6 +435,17 @@ export async function playerUpcomingMatches(
       registrationId: registrations.id,
       teamId: registrations.teamId,
       groundName: grounds.name,
+      announcedIn: sql<boolean>`(
+        exists (
+          select 1 from ${fixtureLineups}
+          where ${fixtureLineups.fixtureId} = ${fixtures.id}
+            and ${fixtureLineups.registrationId} = ${registrations.id}
+        )
+        and exists (
+          select 1 from ${messageOutbox}
+          where ${messageOutbox.dedupeKey} = 'lineup.announced:' || ${fixtures.id} || ':' || ${registrations.id}
+        )
+      )`,
       homeTeamId: fixtures.homeTeamId,
       homeName: home.name,
       homeColor: home.primaryColor,
@@ -415,14 +467,7 @@ export async function playerUpcomingMatches(
     .innerJoin(home, eq(home.id, fixtures.homeTeamId))
     .innerJoin(away, eq(away.id, fixtures.awayTeamId))
     .leftJoin(grounds, eq(grounds.id, fixtures.groundId))
-    .where(
-      and(
-        eq(registrations.personId, personId),
-        isNotNull(registrations.teamId),
-        eq(fixtures.status, "published"),
-        or(isNull(fixtures.kickoffAt), gte(fixtures.kickoffAt, today)),
-      ),
-    )
+    .where(and(eq(registrations.personId, personId), isNotNull(registrations.teamId), when))
     .orderBy(asc(fixtures.kickoffAt), asc(fixtures.seq))
     .limit(UPCOMING_LIMIT);
   return rows.map((row) => {
@@ -439,6 +484,7 @@ export async function playerUpcomingMatches(
       opponentName: isHome ? row.awayName : row.homeName,
       opponentColor: isHome ? row.awayColor : row.homeColor,
       groundName: row.groundName,
+      announcedIn: row.announcedIn,
     };
   });
 }
@@ -464,11 +510,24 @@ export interface TeamSeasonMatch {
   live: boolean;
   /** From this team's side; null while it is being played or still to come. */
   result: "won" | "lost" | "tied" | "no_result" | null;
+  /**
+   * This team's side of the lineup: how many players are saved, and whether
+   * the organizer has announced it to them. For the owner — whose team it is
+   * — so they know whether their players have heard (census 12).
+   */
+  lineup: { saved: number; announced: boolean };
 }
 
 export interface TeamSeason {
-  /** Published matches still to come (or live), kickoff order. */
+  /** Published matches still to come (or live today), kickoff order. */
   upcoming: TeamSeasonMatch[];
+  /**
+   * Matches whose day has passed with no result — never started, or started
+   * and left open. They used to fall between "upcoming" (kickoff before
+   * today) and "results" (no result) and vanish: an owner read "1 to come"
+   * with three matches unaccounted for. Kickoff order.
+   */
+  awaiting: TeamSeasonMatch[];
   /** Results, newest first. */
   results: TeamSeasonMatch[];
   record: { played: number; won: number; lost: number; tied: number };
@@ -498,6 +557,18 @@ export async function teamSeason(teamId: string, today: string): Promise<TeamSea
       awayColor: away.primaryColor,
       groundName: grounds.name,
       outcome: fixtureResults.outcome,
+      lineupSaved: sql<number>`(
+        select count(*)::int from ${fixtureLineups}
+        where ${fixtureLineups.fixtureId} = ${fixtures.id}
+          and ${fixtureLineups.teamId} = ${teamId}
+      )`,
+      lineupAnnounced: sql<boolean>`exists (
+        select 1 from ${fixtureLineups}
+        inner join ${messageOutbox}
+          on ${messageOutbox.dedupeKey} = 'lineup.announced:' || ${fixtureLineups.fixtureId} || ':' || ${fixtureLineups.registrationId}
+        where ${fixtureLineups.fixtureId} = ${fixtures.id}
+          and ${fixtureLineups.teamId} = ${teamId}
+      )`,
     })
     .from(fixtures)
     .innerJoin(home, eq(home.id, fixtures.homeTeamId))
@@ -535,16 +606,19 @@ export async function teamSeason(teamId: string, today: string): Promise<TeamSea
         groundName: row.groundName,
         live: row.status === "in_progress",
         result,
+        lineup: { saved: row.lineupSaved, announced: row.lineupAnnounced },
       },
     };
   });
-  const upcoming = matches
-    .filter(
-      ({ status, match }) =>
-        status === "in_progress" ||
-        (status === "published" && (match.kickoffAt === null || match.kickoffAt >= today)),
-    )
-    .map(({ match }) => match);
+  // A match on a day before today with no result is awaiting one, whether it
+  // was never started or started and left open — not "next", and not "live".
+  const pastDay = (kickoffAt: string | null) =>
+    kickoffAt !== null && kickoffAt.slice(0, 10) < today.slice(0, 10);
+  const open = matches.filter(({ status }) => status === "in_progress" || status === "published");
+  const awaiting = open
+    .filter(({ match }) => pastDay(match.kickoffAt))
+    .map(({ match }) => ({ ...match, live: false }));
+  const upcoming = open.filter(({ match }) => !pastDay(match.kickoffAt)).map(({ match }) => match);
   const results = matches
     .filter(({ status, match }) => status === "completed" && match.result !== null)
     .map(({ match }) => match)
@@ -564,5 +638,5 @@ export async function teamSeason(teamId: string, today: string): Promise<TeamSea
       place = { position: index + 1, of: standings.rows.length, points: row.points };
     }
   }
-  return { upcoming, results, record, place };
+  return { upcoming, awaiting, results, record, place };
 }

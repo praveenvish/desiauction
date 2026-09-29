@@ -37,7 +37,7 @@ import {
   scheduleAllAction,
   type ScheduleView,
 } from "../../../../server/competition/fixture-actions";
-import { FixtureStatusPill } from "../_tabs/fixture-status";
+import { FixtureStatusPill, awaitsResult } from "../_tabs/fixture-status";
 import { RoundRobinPreview } from "../_tabs/round-robin-preview";
 import { TeamCrest, teamInitials } from "../_tabs/team-crest";
 import { ScheduleViews } from "../sibling-link";
@@ -106,6 +106,20 @@ export function SchedulePanel({
   const lobbySeason = fixtureShape === "lobby";
   const grounds = view.grounds ?? [];
   const outstanding = view.outstanding ?? [];
+  // What is owed a result, oldest first: played-and-unscored, then the week's
+  // matches whose day passed with none.
+  const owedRows = [
+    ...outstanding,
+    ...view.rows.filter(
+      (row) => awaitsResult(row, today) && !outstanding.some((owed) => owed.id === row.id),
+    ),
+  ].sort((a, b) => (a.kickoffAt ?? "").localeCompare(b.kickoffAt ?? ""));
+  // Being played NOW: a match left open from an earlier day awaits a result.
+  const liveNow = Math.max(
+    0,
+    stats.inProgress -
+      view.rows.filter((row) => row.status === "in_progress" && awaitsResult(row, today)).length,
+  );
   const noun = lobbySeason ? "lobby" : "match";
   const nouns = lobbySeason ? "lobbies" : "matches";
   const total = stats.total - stats.cancelled;
@@ -186,9 +200,7 @@ export function SchedulePanel({
         {total} {total === 1 ? noun : nouns}
       </strong>
       {` · ${String(stats.completed)} played`}
-      {stats.inProgress > 0 ? (
-        <span className="mx-live-word"> · {stats.inProgress} playing now</span>
-      ) : null}
+      {liveNow > 0 ? <span className="mx-live-word"> · {liveNow} playing now</span> : null}
       {next !== null && next.state === "upcoming" && next.fixture.kickoffAt !== null
         ? ` · next ${wallDay(next.fixture.kickoffAt.slice(0, 10)).label}, ${formatWallTime(next.fixture.kickoffAt)}`
         : ""}
@@ -342,6 +354,15 @@ export function SchedulePanel({
 
   /* ---- Publishing: what is still private, and the one step that fixes it ---- */
   const played = stats.inProgress + stats.completed;
+  /*
+   * What still needs a result: played-and-unscored, plus the week's matches
+   * whose day passed with none. "All played matches scored" was green beside
+   * a match left in progress two days (census 8) — it is said only when true.
+   */
+  const needResult = new Set([
+    ...outstanding.map((fixture) => fixture.id),
+    ...view.rows.filter((row) => awaitsResult(row, today)).map((row) => row.id),
+  ]).size;
   const pipeline =
     canManage && !empty ? (
       <section
@@ -403,15 +424,11 @@ export function SchedulePanel({
               Publish schedule
             </Button>
           ) : null}
-          {played > 0 ? (
-            <Pill
-              tone={outstanding.length === 0 ? "green" : "amber"}
-              dot
-              testId="results-outstanding"
-            >
-              {outstanding.length === 0
-                ? "All played matches scored"
-                : `${String(outstanding.length)} still to score`}
+          {/* Only the all-clear: when results are owed, the notice below says
+              so with the matches to open — the pill repeated it (census 11). */}
+          {played > 0 && needResult === 0 && liveNow === 0 ? (
+            <Pill tone="green" dot testId="results-outstanding">
+              All played matches scored
             </Pill>
           ) : null}
         </div>
@@ -448,16 +465,24 @@ export function SchedulePanel({
             : "Start it, move it or cancel it."}
         </Notice>
       ) : null}
-      {canManage && outstanding.length > 0 ? (
+      {/*
+        THE RESULTS DESK (census 10). Every "Enter results" button in the
+        product lands here, and the page opened on a week strip — the owed
+        matches sat in their day groups, two of them offering "Start". The
+        owed ones now lead: played-and-unscored plus every match whose day
+        passed with no result, each a door to its score.
+      */}
+      {canManage && owedRows.length > 0 ? (
         <Notice
           tone="warning"
           icon={<IconAlert size={20} />}
-          title={`${String(outstanding.length)} played ${outstanding.length === 1 ? noun : nouns} still ${outstanding.length === 1 ? "needs" : "need"} a score`}
+          title={`${String(owedRows.length)} ${owedRows.length === 1 ? noun : nouns} ${owedRows.length === 1 ? "needs" : "need"} a result`}
           testId="results-owed"
         >
           <span className="mx-owed">
-            The table is built from results, so these are not in it yet.{" "}
-            {outstanding.slice(0, 6).map((fixture) => (
+            The table is built from results, so {owedRows.length === 1 ? "it is" : "these are"} not
+            in it yet.{" "}
+            {owedRows.slice(0, 6).map((fixture) => (
               <Link
                 key={fixture.id}
                 href={matchHref(fixture.id)}
@@ -465,7 +490,12 @@ export function SchedulePanel({
                 className="mx-owed-link"
                 data-testid={`owed-${fixture.number}`}
               >
-                {describe(fixture)}
+                {/* Long on a laptop, short on a phone — the long form wrapped every
+                    link onto two lines at 390px (census 12). */}
+                <span className="mx-owed-long">{owedLabel(fixture)}</span>
+                <span className="mx-owed-short" aria-hidden>
+                  {owedShort(fixture)}
+                </span>
               </Link>
             ))}
           </span>
@@ -594,12 +624,15 @@ export function SchedulePanel({
           const dateLine = parts.date;
           const count =
             day.count === 0 ? "—" : `${String(day.count)} ${day.count === 1 ? noun : nouns}`;
+          const liveHere = day.date < today ? 0 : day.live;
           const body = (
             <>
               <span className="mx-day-name">{label}</span>
               <span className="mx-day-date">{dateLine}</span>
-              <span className="mx-day-count" data-live={day.live > 0 ? "true" : undefined}>
-                {day.live > 0 ? `${String(day.live)} live` : count}
+              {/* A past day is never "live": a match left open there awaits a
+                  result (its row says so), it is not being played. */}
+              <span className="mx-day-count" data-live={liveHere > 0 ? "true" : undefined}>
+                {liveHere > 0 ? `${String(liveHere)} live` : count}
               </span>
             </>
           );
@@ -706,7 +739,9 @@ export function SchedulePanel({
           day.date,
           view.mode === "search" || day.date.slice(0, 4) !== today.slice(0, 4),
         ).label;
-        const liveCount = day.rows.filter((row) => row.status === "in_progress").length;
+        // A past day's open match awaits a result; it is not being played.
+        const liveCount =
+          day.date < today ? 0 : day.rows.filter((row) => row.status === "in_progress").length;
         return (
           <section
             key={day.date}
@@ -774,6 +809,13 @@ export function SchedulePanel({
               grounds={grounds}
               canManage={canManage}
               closeHref={closeHref}
+              today={today}
+              nextOwed={(() => {
+                const after = owedRows.find((row) => row.id !== selected.fixture.id);
+                return after === undefined
+                  ? null
+                  : { href: matchHref(after.id), label: owedLabel(after) };
+              })()}
             />
           ) : null}
         </div>
@@ -800,6 +842,25 @@ export function SchedulePanel({
 }
 
 /** "F004 · Thane Tuskers v Pune Panthers" — a match named in a sentence. */
+/** "Mon 28 Sep · Mumbai Mavericks v Thane Tuskers" — the day, not the match code. */
+function owedLabel(fixture: Row): string {
+  const day = fixture.kickoffAt?.slice(0, 10) ?? null;
+  const when = day === null ? "Undated" : `${wallDay(day).weekday} ${wallDay(day).date}`;
+  return isLobby(fixture)
+    ? `${when} · lobby of ${String(fixture.squadCount)}`
+    : `${when} · ${fixture.homeTeamName ?? "TBA"} v ${fixture.awayTeamName ?? "TBA"}`;
+}
+
+/** "Sun 27 · TT v PP" — the phone's form of `owedLabel`. */
+function owedShort(fixture: Row): string {
+  const day = fixture.kickoffAt?.slice(0, 10) ?? null;
+  const when =
+    day === null ? "Undated" : `${wallDay(day).weekday} ${String(Number(day.slice(8, 10)))}`;
+  return isLobby(fixture)
+    ? `${when} · lobby`
+    : `${when} · ${shortOf(fixture.homeTeamName, fixture.homeTeamShort)} v ${shortOf(fixture.awayTeamName, fixture.awayTeamShort)}`;
+}
+
 function describe(fixture: Row): string {
   return isLobby(fixture)
     ? `${fixture.number} · lobby of ${String(fixture.squadCount)}`
@@ -878,6 +939,10 @@ function MatchRow({
       <span className="mx-sub" data-tone="result">
         {resultSentence(result.outcome, fixture.homeTeamName, fixture.awayTeamName)}
       </span>
+    ) : awaitsResult(fixture, today) ? (
+      <span className="mx-sub" data-tone="due">
+        Its day has passed — enter the score
+      </span>
     ) : canManage && lineups !== undefined && fixture.status !== "completed" ? (
       <span className="mx-sub">
         {lineupSummary(
@@ -937,14 +1002,16 @@ function MatchRow({
         </span>
       </Link>
       <span className="mx-state">
-        <FixtureStatusPill status={fixture.status} />
+        <FixtureStatusPill status={fixture.status} overdue={awaitsResult(fixture, today)} />
       </span>
       {canManage ? (
         <span className="mx-act">
           {step === null ? null : step.kind === "lifecycle" ? (
             <Button
               size="sm"
-              variant="secondary"
+              // An owed score is the row's urgent act, as "Enter score" on a
+              // match in progress already is.
+              variant={awaitsResult(fixture, today) ? "primary" : "secondary"}
               loading={pending}
               onClick={() => {
                 onLifecycle(step.action);

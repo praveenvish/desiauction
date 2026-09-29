@@ -6,12 +6,13 @@ import {
   IconCheckCircle,
   IconDownload,
   IconLock,
-  type KitTone,
   Notice,
+  Pill,
   PlayerImage,
   Toolbar,
   ToolbarSpacer,
   VisuallyHidden,
+  type KitTone,
 } from "@desiauction/ui";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
@@ -190,7 +191,7 @@ export default async function ReportsPage({
     1,
   );
   const play = view.play;
-  const matchesAll = play === null ? 0 : play.played + play.live + play.toCome;
+  const matchesAll = play === null ? 0 : play.played + play.live + play.toCome + play.awaiting;
 
   const stages = [
     {
@@ -520,6 +521,7 @@ export default async function ReportsPage({
               : [
                   `${count(play.played)} of ${count(matchesAll)} matches played`,
                   play.live > 0 ? `${count(play.live)} live` : null,
+                  play.awaiting > 0 ? `${count(play.awaiting)} awaiting a result` : null,
                   leader !== undefined && leader.played > 0
                     ? `${leader.name} lead on ${count(leader.points)} pts`
                     : null,
@@ -623,8 +625,14 @@ export default async function ReportsPage({
                 Matches
                 {matchesAll > 0 ? (
                   <span>
-                    {count(play.played)} played · {count(play.live)} live · {count(play.toCome)} to
-                    come
+                    {[
+                      `${count(play.played)} played`,
+                      play.live > 0 ? `${count(play.live)} live` : null,
+                      play.awaiting > 0 ? `${count(play.awaiting)} awaiting a result` : null,
+                      `${count(play.toCome)} to come`,
+                    ]
+                      .filter((part): part is string => part !== null)
+                      .join(" · ")}
                   </span>
                 ) : null}
               </h3>
@@ -637,6 +645,12 @@ export default async function ReportsPage({
                     parts={[
                       { key: "played", value: play.played, label: "played", tone: "green" },
                       { key: "live", value: play.live, label: "live", tone: "gold" },
+                      {
+                        key: "due",
+                        value: play.awaiting,
+                        label: "awaiting a result",
+                        tone: "amber",
+                      },
                       { key: "next", value: play.toCome, label: "to come", tone: "neutral" },
                     ]}
                     legend={false}
@@ -647,6 +661,19 @@ export default async function ReportsPage({
                       <li key={match.fixtureId} data-live="">
                         <span className="rp-match-when">Live</span>
                         <span>{resultSentence(match).rest}</span>
+                      </li>
+                    ))}
+                    {/* Owed a result: listed, as the count above says (census 12). */}
+                    {play.awaitingMatches.map((match) => (
+                      <li key={match.fixtureId} data-due="">
+                        <span className="rp-match-when">
+                          {match.kickoffAt === null ? "—" : shortDate(match.kickoffAt)}
+                        </span>
+                        <span>
+                          {match.homeName ?? "Lobby"}
+                          {match.awayName !== null ? ` v ${match.awayName}` : ""}
+                        </span>
+                        <Pill tone="amber">Result due</Pill>
                       </li>
                     ))}
                     {play.recent.map((match) => {
@@ -672,8 +699,8 @@ export default async function ReportsPage({
       ) : null}
 
       <p className="rp-foot">
-        <IconCheckCircle size={16} aria-hidden /> Read live from the season&rsquo;s own desks — the
-        same numbers its Players, Teams, Auction and Schedule tabs show.
+        <IconCheckCircle size={16} aria-hidden /> Live — the same numbers the season&rsquo;s
+        Players, Teams, Auction and Schedule tabs show.
       </p>
     </main>
   );

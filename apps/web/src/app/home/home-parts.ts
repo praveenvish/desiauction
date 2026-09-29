@@ -71,6 +71,8 @@ export function seasonBadge(row: {
    * read "Reg closed" here while its overview said the auction was done.
    */
   auctionDone?: boolean;
+  /** Matches on the books: after the night the badge says "Season on" (census 10). */
+  fixtures?: number;
 }): {
   label: string;
   tone: Tone;
@@ -82,7 +84,9 @@ export function seasonBadge(row: {
     return { label: "Settling", tone: "amber" };
   }
   if (row.auctionDone === true) {
-    return { label: "Auction done", tone: "green" };
+    return (row.fixtures ?? 0) > 0
+      ? { label: "Season on", tone: "green" }
+      : { label: "Auction done", tone: "green" };
   }
   return { label: statusLabel(row.status), tone: statusTone(row.status) };
 }
