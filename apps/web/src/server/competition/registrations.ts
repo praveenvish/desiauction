@@ -28,7 +28,20 @@ import {
   writeSurvivingConstraint,
   type Db,
 } from "@desiauction/db";
-import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  not,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import { storage } from "../media";
 import { resolveExportColumns, type ExportRows } from "../../lib/export-columns";
@@ -626,6 +639,11 @@ export interface RegistrationStats {
    * poster, the showcase and the career page. Both now read both marks.
    */
   auctionPool: number;
+  /**
+   * After the auction, what it did with every approved player — the same
+   * reading as the desk's status column and the `outcome` filter.
+   */
+  outcomes: Record<RegistrationOutcome, number>;
   /** Approved icons — pre-signed, never on the block. */
   icons: number;
   /** Approved captains who are not also icons — picked before the night, never on the block. */
@@ -711,6 +729,7 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
     waitlisted: 0,
     withdrawn: 0,
     auctionPool: 0,
+    outcomes: { sold: 0, presigned: 0, unsold: 0 },
     icons: 0,
     captains: 0,
     retained: 0,
@@ -738,6 +757,13 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
       }
     }
     if (row.status === "approved") {
+      const outcome: RegistrationOutcome =
+        row.isIcon || row.isCaptain || row.isRetained
+          ? "presigned"
+          : row.hasTeam
+            ? "sold"
+            : "unsold";
+      stats.outcomes[outcome] += row.count;
       // Icon, then Captain, then Retained where a player carries more than one
       // (`preSignedKind`) — the precedence `outcomeOf` and the
       // orphan warning already use — one row must not be counted twice, and
@@ -771,9 +797,23 @@ export async function registrationStats(db: Db, competitionId: string): Promise<
 
 export type RegistrationSort = "recent" | "oldest" | "name" | "number" | "status";
 
+/**
+ * What the auction did with an approved player: bought on the night, signed
+ * before it (icon, captain, retained), or left without a team.
+ */
+export type RegistrationOutcome = "sold" | "presigned" | "unsold";
+
+export const REGISTRATION_OUTCOMES: readonly RegistrationOutcome[] = [
+  "sold",
+  "presigned",
+  "unsold",
+];
+
 export interface RegistrationQuery {
   search?: string;
   status?: RegistrationStatus;
+  /** After the auction: sold, pre-signed or unsold (implies approved). */
+  outcome?: RegistrationOutcome;
   /** Narrow to one fee state — the desk's own question, "who has not paid?". */
   fee?: FeeStatus;
   teamId?: string;
@@ -816,6 +856,23 @@ function registrationFilters(
   }
   if (query.fee !== undefined) {
     filters.push(eq(registrations.feeStatus, query.fee));
+  }
+  if (query.outcome !== undefined) {
+    // The desk's own reading of a row (dashboard-panel's status column):
+    // pre-signed wins over a team, a team without a mark was bought.
+    const preSigned = or(
+      eq(registrations.isIcon, true),
+      eq(registrations.isCaptain, true),
+      eq(registrations.isRetained, true),
+    );
+    filters.push(eq(registrations.status, "approved"));
+    filters.push(
+      query.outcome === "presigned"
+        ? (preSigned ?? sql`false`)
+        : query.outcome === "sold"
+          ? (and(isNotNull(registrations.teamId), not(preSigned ?? sql`false`)) ?? sql`false`)
+          : (and(isNull(registrations.teamId), not(preSigned ?? sql`false`)) ?? sql`false`),
+    );
   }
   if (query.teamId !== undefined && query.teamId !== "") {
     filters.push(eq(registrations.teamId, query.teamId));
