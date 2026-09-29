@@ -21,6 +21,7 @@ import { exactINR } from "../../lib/inr";
 import { cardAmount, moneyFormat } from "../../lib/money";
 import type { ReportTable } from "../../server/console/reports";
 import { reportsView } from "../../server/console/views";
+import { ChapterBody } from "./chapter-body";
 import { SeasonPicker } from "./season-picker";
 import { NavButton } from "../players/nav-button";
 import "../players/players.css";
@@ -220,6 +221,9 @@ export default async function ReportsPage({
         ]),
   ];
   const stateOf = (key: string) => stages.find((stage) => stage.key === key);
+  // While a stage is under way, the finished ones fold on a phone.
+  const underWay = stages.some((stage) => stage.tone === "now");
+  const foldable = (key: string) => underWay && stateOf(key)?.tone === "done";
   const avgSale =
     auction.moneyMoved !== undefined && auction.sold > 0
       ? Math.round(auction.moneyMoved / auction.sold)
@@ -282,6 +286,7 @@ export default async function ReportsPage({
         n={1}
         title="Registration"
         stage={stateOf("registration")}
+        foldable={foldable("registration")}
         summary={`${count(regs.total)} registered · ${count(regs.auctionPool)} in the pool · ${count(regs.preSigned)} pre-signed${regs.submitted > 0 ? ` · ${count(regs.submitted)} to review` : ""}`}
         actions={
           <>
@@ -362,6 +367,7 @@ export default async function ReportsPage({
         n={2}
         title="Auction"
         stage={stateOf("auction")}
+        foldable={foldable("auction")}
         summary={
           auction.status === null
             ? "No auction yet — the purse and rules create it."
@@ -515,6 +521,7 @@ export default async function ReportsPage({
           n={3}
           title="Season"
           stage={stateOf("season")}
+          foldable={foldable("season")}
           summary={
             matchesAll === 0
               ? "No fixtures published yet."
@@ -723,6 +730,7 @@ function Chapter({
   left,
   right,
   testId,
+  foldable = false,
 }: {
   id: string;
   n: number;
@@ -733,6 +741,8 @@ function Chapter({
   left: ReactNode;
   right: ReactNode;
   testId: string;
+  /** A finished stage while another is under way — folded on a phone. */
+  foldable?: boolean;
 }) {
   return (
     <section id={id} className="rp-chapter" aria-labelledby={`${id}-title`} data-testid={testId}>
@@ -753,10 +763,10 @@ function Chapter({
         </span>
         <span className="rp-chapter-actions">{actions}</span>
       </header>
-      <div className="rp-chapter-body" data-single={right === null ? "" : undefined}>
+      <ChapterBody foldable={foldable} title={title} single={right === null}>
         <div className="rp-col">{left}</div>
         {right === null ? null : <div className="rp-col">{right}</div>}
-      </div>
+      </ChapterBody>
     </section>
   );
 }

@@ -746,3 +746,41 @@
   grid-template-columns: 4rem minmax(0, 1fr) auto;
   align-items: center;
 }
+
+/* A finished stage, folded on a phone: the header stays, one tap shows the
+   detail. A laptop never folds, so the toggle is phone-only. */
+.rp-fold {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .rp-fold {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-4);
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+    background: none;
+    color: var(--text-accent);
+    font: inherit;
+    font-size: var(--text-sm-size);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+  }
+
+  .rp-fold[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+
+  .rp-fold:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
+
+  .rp-chapter-body[data-folded] {
+    display: none;
+  }
+}
