@@ -57,6 +57,20 @@ function sides(fixture: OrganizerFixture): string {
     : `${fixture.homeTeamName ?? "TBA"} v ${fixture.awayTeamName ?? "TBA"}`;
 }
 
+/**
+ * Each side's lineup, in words: "Lineups set", "Lineups not set", or which
+ * side is missing. Null for a lobby, which picks no two sides.
+ */
+function lineupLine(fixture: OrganizerFixture): { words: string; ready: boolean } | null {
+  if (fixture.homeTeamId === null || fixture.awayTeamId === null) return null;
+  const home = fixture.lineups.home > 0;
+  const away = fixture.lineups.away > 0;
+  if (home && away) return { words: "Lineups set", ready: true };
+  if (!home && !away) return { words: "Lineups not set", ready: false };
+  const missing = home ? fixture.awayTeamName : fixture.homeTeamName;
+  return { words: `${missing ?? "One side"}'s lineup not set`, ready: false };
+}
+
 export function OrganizerToday({
   overview,
   fixtures,
@@ -180,24 +194,33 @@ export function OrganizerToday({
                 </ButtonLink>
               </li>
             ))}
-            {todays.map((fixture) => (
-              <li key={fixture.id} data-kind="today">
-                <span className="ot-job-text">
-                  <strong>{sides(fixture)}</strong>
-                  <span>
-                    {when(fixture.kickoffAt, today)}
-                    {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
+            {todays.map((fixture) => {
+              // Today's match with a side still unpicked: picking it is the job
+              // (and "You're in the lineup" only reaches players once it is
+              // announced from there).
+              const lineup = lineupLine(fixture);
+              const pick = lineup !== null && !lineup.ready;
+              return (
+                <li key={fixture.id} data-kind="today">
+                  <span className="ot-job-text">
+                    <strong>{sides(fixture)}</strong>
+                    <span>
+                      {when(fixture.kickoffAt, today)}
+                      {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
+                      {lineup !== null ? ` · ${lineup.words}` : ""}
+                    </span>
                   </span>
-                </span>
-                <ButtonLink
-                  href={`${base}/fixtures?match=${fixture.id}`}
-                  size="sm"
-                  variant="secondary"
-                >
-                  Open
-                </ButtonLink>
-              </li>
-            ))}
+                  <ButtonLink
+                    href={`${base}/fixtures?match=${fixture.id}`}
+                    size="sm"
+                    variant={pick ? "primary" : "secondary"}
+                    data-testid={`today-open-${fixture.id}`}
+                  >
+                    {pick ? "Set lineups" : "Open"}
+                  </ButtonLink>
+                </li>
+              );
+            })}
             {jobs.map((job) => (
               <li key={job.key} data-kind="job">
                 <span className="ot-job-text">
@@ -234,6 +257,7 @@ export function OrganizerToday({
               {upcoming.slice(0, 3).map((fixture) => {
                 const tile =
                   fixture.kickoffAt === null ? null : dateTile(fixture.kickoffAt.slice(0, 10));
+                const lineup = lineupLine(fixture);
                 return (
                   <li key={fixture.id}>
                     <span className="home-date" aria-hidden>
@@ -246,7 +270,21 @@ export function OrganizerToday({
                         {when(fixture.kickoffAt, today)}
                         {fixture.groundName !== null ? ` · ${fixture.groundName}` : ""}
                       </span>
+                      {lineup !== null ? (
+                        <span data-ready={lineup.ready ? "true" : undefined} className="ot-lineup">
+                          {lineup.words}
+                        </span>
+                      ) : null}
                     </span>
+                    {lineup !== null && !lineup.ready ? (
+                      <Link
+                        href={`${base}/fixtures?match=${fixture.id}`}
+                        className="ot-set"
+                        data-testid={`next-lineups-${fixture.id}`}
+                      >
+                        Set lineups
+                      </Link>
+                    ) : null}
                   </li>
                 );
               })}
