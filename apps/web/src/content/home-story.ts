@@ -1,4 +1,14 @@
+import { PLAYER_ROLES, roleLabel } from "@desiauction/core";
+
 import { compactFloorINR, exactINR } from "../lib/inr";
+
+/* Role words come from the cricket pack (sport-vocabulary.test.ts): a label
+   typed here is a second spelling that drifts. */
+const [batter, bowler, allRounder, keeper] = PLAYER_ROLES;
+const BATTER = roleLabel(batter);
+const BOWLER = roleLabel(bowler);
+const ALL_ROUNDER = roleLabel(allRounder);
+const KEEPER = roleLabel(keeper);
 
 /**
  * THE HOME PAGE'S ONE EXAMPLE AUCTION.
@@ -40,6 +50,7 @@ export const TEAMS: readonly StoryTeam[] = [
 export interface StoryPlayer {
   initials: string;
   name: string;
+  /** The role, as the cricket pack names it. */
   role: string;
   /** Base price in rupees. */
   base: number;
@@ -52,44 +63,44 @@ export const POOL: readonly StoryPlayer[] = [
   {
     initials: "AS",
     name: "Aniket Sawant",
-    role: "All-rounder",
+    role: ALL_ROUNDER,
     base: 20000,
     face: "/marketing/faces/aniket.webp",
   },
   {
     initials: "RM",
     name: "Riya Mehta",
-    role: "Batter",
+    role: BATTER,
     base: 20000,
     face: "/marketing/faces/riya.webp",
   },
   {
     initials: "NK",
     name: "Neel Kapoor",
-    role: "Batter",
+    role: BATTER,
     base: 15000,
     face: "/marketing/faces/neel.webp",
   },
   {
     initials: "PJ",
     name: "Pooja Joshi",
-    role: "Bowler",
+    role: BOWLER,
     base: 15000,
     face: "/marketing/faces/pooja.webp",
   },
-  { initials: "OM", name: "Om Mishra", role: "Keeper", base: 15000 },
-  { initials: "KS", name: "Kiran Shah", role: "Bowler", base: 10000 },
-  { initials: "VD", name: "Vikram Desai", role: "All-rounder", base: 15000 },
-  { initials: "AB", name: "Arjun Bhat", role: "Batter", base: 10000 },
-  { initials: "MT", name: "Meera Thakur", role: "All-rounder", base: 15000 },
-  { initials: "RS", name: "Rohan Singh", role: "Bowler", base: 10000 },
-  { initials: "YP", name: "Yash Patil", role: "Batter", base: 10000 },
-  { initials: "HG", name: "Harsh Gupta", role: "Keeper", base: 10000 },
-  { initials: "SK", name: "Sana Khan", role: "Bowler", base: 10000 },
-  { initials: "DV", name: "Dev Verma", role: "Batter", base: 10000 },
-  { initials: "JN", name: "Jai Nair", role: "All-rounder", base: 10000 },
-  { initials: "TR", name: "Tara Reddy", role: "Bowler", base: 10000 },
-  { initials: "LC", name: "Lakshya Chawla", role: "Batter", base: 10000 },
+  { initials: "OM", name: "Om Mishra", role: KEEPER, base: 15000 },
+  { initials: "KS", name: "Kiran Shah", role: BOWLER, base: 10000 },
+  { initials: "VD", name: "Vikram Desai", role: ALL_ROUNDER, base: 15000 },
+  { initials: "AB", name: "Arjun Bhat", role: BATTER, base: 10000 },
+  { initials: "MT", name: "Meera Thakur", role: ALL_ROUNDER, base: 15000 },
+  { initials: "RS", name: "Rohan Singh", role: BOWLER, base: 10000 },
+  { initials: "YP", name: "Yash Patil", role: BATTER, base: 10000 },
+  { initials: "HG", name: "Harsh Gupta", role: KEEPER, base: 10000 },
+  { initials: "SK", name: "Sana Khan", role: BOWLER, base: 10000 },
+  { initials: "DV", name: "Dev Verma", role: BATTER, base: 10000 },
+  { initials: "JN", name: "Jai Nair", role: ALL_ROUNDER, base: 10000 },
+  { initials: "TR", name: "Tara Reddy", role: BOWLER, base: 10000 },
+  { initials: "LC", name: "Lakshya Chawla", role: BATTER, base: 10000 },
 ];
 
 const byName = (name: string): StoryPlayer => {

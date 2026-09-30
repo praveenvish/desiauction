@@ -1,7 +1,9 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 
-import { STAR_LOT, TEAMS, price } from "../../../content/home-story";
+import { POOL, STAR_LOT, TEAMS, price } from "../../../content/home-story";
+
+const roleOf = (name: string) => POOL.find((player) => player.name === name)?.role ?? "";
 import styles from "../../../app/home.module.css";
 import { Glyph, type GlyphName } from "./glyphs";
 
@@ -99,15 +101,22 @@ export function Season() {
               <span className={styles.chip} style={{ background: "var(--gold)", color: "#141008" }}>
                 C
               </span>
-              Neel Kapoor<span style={{ marginLeft: "auto", color: "var(--muted)" }}>Batter</span>
+              Neel Kapoor
+              <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
+                {roleOf("Neel Kapoor")}
+              </span>
             </div>
             <div className={styles.row}>
               <span className={styles.chip}>WK</span>Om Mishra
-              <span style={{ marginLeft: "auto", color: "var(--muted)" }}>Keeper</span>
+              <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
+                {roleOf("Om Mishra")}
+              </span>
             </div>
             <div className={styles.row}>
               <span className={styles.chip}>7</span>Pooja Joshi
-              <span style={{ marginLeft: "auto", color: "var(--muted)" }}>Bowler</span>
+              <span style={{ marginLeft: "auto", color: "var(--muted)" }}>
+                {roleOf("Pooja Joshi")}
+              </span>
             </div>
             <div className={styles.row} style={{ color: "var(--muted)" }}>
               + 8 more
