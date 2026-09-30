@@ -38,11 +38,14 @@ export function compactINR(paise: number): string {
  */
 export function compactFloorINR(paise: number): string {
   const rupees = paise / 100;
+  // Floor in whole hundredths of a crore / lakh straight from the paise, never
+  // `(rupees / unit) * 100`: 4.85 * 100 is 484.99999… in floating point, so a
+  // ₹4,85,000 purse used to read "₹4.84 L" — ₹1,000 less than it was.
   if (rupees >= 10_000_000) {
-    return `₹${String(Math.floor((rupees / 10_000_000) * 100) / 100)} Cr`;
+    return `₹${String(Math.floor(paise / 10_000_000) / 100)} Cr`;
   }
   if (rupees >= 100_000) {
-    return `₹${String(Math.floor((rupees / 100_000) * 100) / 100)} L`;
+    return `₹${String(Math.floor(paise / 100_000) / 100)} L`;
   }
   return `₹${Math.floor(rupees).toLocaleString("en-IN")}`;
 }
