@@ -1,0 +1,26 @@
+# WHAT NEVER ENTERS AN IMAGE BUILD (PRR 2026-09-29, OPS-12).
+#
+# The Dockerfiles copy whole directories (packages, apps/web, ...). On the CI
+# runner that is a clean checkout; on a laptop it is also every node_modules,
+# every build output and every .env file in those directories — hundreds of
+# megabytes sent to the daemon, and secrets one COPY away from a layer.
+# Mirrors .gitignore: a build starts from what is committed, nothing else.
+.git
+**/node_modules
+**/dist
+**/.next
+**/.next-*
+**/.turbo
+**/coverage
+**/test-results
+**/test-results-sim
+**/playwright-report
+**/.mail-gallery
+**/.local
+**/*.log
+**/*.tsbuildinfo
+.env
+.env.*
+!.env.example
+apps/web/public/_media
+apps/web/next-env.d.ts

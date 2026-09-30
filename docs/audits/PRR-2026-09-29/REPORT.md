@@ -101,8 +101,8 @@ T6 was left as it is: a session-expiry redirect now re-enables the button for an
 | FE-11 | **An approved player could flip back to "waiting", and the review walk then jumped back instead of finishing.** A page asked for before an approval and arriving after it was believed over the approval. This is the `player-desk` e2e test that fails about one run in four. Present on main; not caused by this branch | MEDIUM | **FIXED**. A confirmed change is kept against a page that disagrees, three times at most. Measured on a test that delivers every page late: 6 failures in 20 before, 0 in 20 after. A first attempt (stamping when each page was asked for) was measured, failed 2 in 10, and was discarded |
 | API-7 | A signed, fresh gateway event the product does not act on (`order.paid`) was answered 400. A provider that sees a day of failed deliveries switches the webhook off | MEDIUM | **FIXED**. Answered 200 |
 | API-8 | A refund raised from the provider's dashboard carries no anchor of its own, so every such refund was refused as malformed | MEDIUM | **FIXED against the documented payload**: the anchor is read from the payment the refund names, in the same signed body. NOT VERIFIED against a real delivery |
-| SEC-16 | `code-digest.ts` held two raw NUL bytes. git treated the file as binary and text search skipped it in silence | LOW | **FIXED**. Written as escapes; a known-answer test proves stored codes still match |
-| SEC-17 | A connection URL's login (`postgres://user:password@host`) was scrubbed from error text only by accident, and not when the host was an IP or a bare name | LOW | **FIXED**, by shape |
+| SEC-19 | `code-digest.ts` held two raw NUL bytes. git treated the file as binary and text search skipped it in silence | LOW | **FIXED**. Written as escapes; a known-answer test proves stored codes still match |
+| SEC-20 | A connection URL's login (`postgres://user:password@host`) was scrubbed from error text only by accident, and not when the host was an IP or a bare name | LOW | **FIXED**, by shape |
 
 ### Frame compression, measured
 
@@ -520,7 +520,7 @@ VERIFIED in code: the bid ribbon is a polite live region with the countdown hidd
 | OPS-9 | MEDIUM | The role script ran statement by statement, so a failure left wide grants standing | **FIXED**, single transaction |
 | OPS-10 | MEDIUM | Old images are never pruned. Disk growth is unbounded and unwatched | **FIXED** for images. A disk alert is still open |
 | OPS-11 | MEDIUM | The scale harness could not measure past 50 spectators and left a live auction in the database when it failed | **FIXED** |
-| OPS-12 | LOW | Base images pinned by tag not digest, no `.dockerignore`, no read-only root filesystem | OPEN |
+| OPS-12 | LOW | Base images pinned by tag not digest, no `.dockerignore`, no read-only root filesystem | **`.dockerignore` ADDED** (mirrors `.gitignore`; all four images rebuilt with it, context 137 kB, env files absent). Digest pins and a read-only root are OPEN: pinning freezes security patches unless somebody bumps them, a decision rather than a patch |
 
 VERIFIED in code: non-root distroless images, no host ports on database, storage or engine, CI-green gate before deploy, migrations under an advisory lock with a 5 second lock timeout, rollback instructions per stage.
 
