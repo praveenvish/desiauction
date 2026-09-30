@@ -20,6 +20,7 @@ const PUBLIC = [
   "/help",
   "/c",
   "/schedule-demo",
+  "/sports/cricket",
   "/legal/privacy",
   "/newsletter/unsubscribe",
   "/login",

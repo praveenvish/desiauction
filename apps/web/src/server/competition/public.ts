@@ -1268,10 +1268,19 @@ export async function publicCompetitionsDirectory(params: {
   page?: number;
   filter?: DirectoryFilter;
   sort?: DirectorySort;
+  /**
+   * One sport pack's key (SEO-1 Phase 4: the "tournaments in this sport"
+   * strip on `/sports/[slug]`). Folded into the base predicate, so the facet
+   * counts and the rows describe the same set.
+   */
+  sport?: string;
 }): Promise<DirectoryPage> {
   const filter = params.filter ?? "all";
   const sort = params.sort ?? "opportunity";
-  const published = eq(competitions.visibility, "public");
+  const published =
+    params.sport === undefined
+      ? eq(competitions.visibility, "public")
+      : and(eq(competitions.visibility, "public"), eq(competitions.sport, params.sport));
   const term = params.q?.trim();
   const search =
     term === undefined || term === ""

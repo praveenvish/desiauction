@@ -3,6 +3,7 @@ import type { MetadataRoute } from "next";
 import { env } from "../env";
 import { HELP_ARTICLES, HELP_CATEGORIES } from "../content/help";
 import { LEGAL_DOCUMENTS } from "../content/legal";
+import { SPORT_PAGES } from "../content/sports";
 import { publicCompetitionSlugs } from "../server/competition/public";
 import { INDEXABLE_PAGES, isoCalendarDate } from "../server/seo/routes";
 
@@ -61,6 +62,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...HELP_ARTICLES.map((article) => ({
       url: `${base}/help/${article.slug}`,
       lastModified: article.updatedOn,
+      changeFrequency: "monthly" as const,
+    })),
+    ...SPORT_PAGES.map((page) => ({
+      url: `${base}/sports/${page.slug}`,
+      lastModified: page.updatedOn,
       changeFrequency: "monthly" as const,
     })),
     ...LEGAL_DOCUMENTS.map((doc) => ({

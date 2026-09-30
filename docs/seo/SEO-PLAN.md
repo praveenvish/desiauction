@@ -142,7 +142,7 @@ Also run **Lighthouse CI** (SEO category must score 100; performance budgets fro
 
 ---
 
-### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1)
+### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1) — **4a BUILT 2026-09-30** (see §11); 4b–4d to do
 
 This is where the traffic comes from. Build pages from the **sport pack registry** in `packages/core/src/sports`, but write the copy by hand. Pages are templated for layout only.
 
@@ -436,3 +436,61 @@ Each check was shown to fail first:
 3. **`/c`'s raw HTML carries two identical `<h1>`s:** the streamed loading skeleton keeps its own. That is **kept on purpose**. Removing it failed the axe scan (`page-has-heading-one`), because during a client-side navigation the skeleton is the whole page. The SEO spec's rule is therefore "at least one `<h1>`, and they all say the same thing".
 
 **Baseline for Phase 8:** LCP is 3.6–3.9s on the reference mobile profile (budget 2.5s). Accessibility and best practices are 100; CLS and TBT are negligible.
+
+---
+
+## 11. Phase 4a delivery log (2026-09-30)
+
+**Built on `feat/seo-sport-pages`, stacked on Phase 3 (#175). Its PR targets `main`.** Founder decisions: **publish on merge** (no draft stage), and **all twelve sports** rather than the first four.
+
+**What shipped:**
+- `/sports/[slug]` for all 12 sport packs, plus a `/sports` hub.
+- A footer link (Product › Sports).
+- Pages are in the route registry and the sitemap, with a real `lastmod` from `updatedOn`.
+
+| URL | Sport |
+|---|---|
+| `/sports/cricket` | Cricket (IPL-style) |
+| `/sports/box-cricket` | Box cricket |
+| `/sports/football` | Football |
+| `/sports/kabaddi` | Kabaddi |
+| `/sports/volleyball` | Volleyball |
+| `/sports/hockey` | Hockey |
+| `/sports/basketball` | Basketball |
+| `/sports/esports` | Esports (team titles) |
+| `/sports/badminton` | Badminton (team ties) |
+| `/sports/table-tennis` | Table tennis (team ties) |
+| `/sports/pickleball` | Pickleball (team ties) |
+| `/sports/battle-royale` | BGMI / battle royale (lobbies) |
+
+**Written vs derived:**
+- `content/sports.ts` holds only the words a person writes: title, headline, a 50–160 character description, lede, three angles specific to the sport, and 3–4 FAQs specific to the sport.
+- Everything factual renders from the sport pack in `@desiauction/core`: roles, player attributes and their options, points per result, tiebreakers in words, what is entered after a match (entry labels, so cricket says "overs"), and lobby placement scoring. A page cannot contradict the engine.
+
+**Honesty checks made while writing:** every claim was verified in code before shipping.
+- The squad maximum and the reserve rule (`auction.ts:520–527`), base prices, points auctions, captains signed before the auction, icons kept out of the pool, and the purse board.
+- One claim was found **untrue** and removed: an owner-facing count of players "left in each role" doesn't exist. Twelve angles were rewritten to say what is actually shown: the role on the auction card, and each team's remaining purse.
+
+**Structured data:** `FAQPage` (the rendered questions) and `BreadcrumbList` (Home › Sports › Sport). The hub has `BreadcrumbList`.
+
+**Tests:**
+- `content/sports.test.ts`:
+  - one page per pack, and every page a real pack
+  - unique slugs, titles, headlines and descriptions
+  - descriptions of 50–160 characters
+  - every tiebreaker key has words
+  - **no paragraph repeated across pages** (caught a pickleball FAQ copied from table tennis)
+  - real dates
+- `e2e/sport-pages.spec.ts`:
+  - hub has 12 links
+  - cricket, basketball and battle royale render their pack's own rule sentences
+  - axe clean in both themes
+  - unknown sport → 404
+  - no overflow at 360px
+- `/sports/cricket` added to the CSP spec's public list. `seo.spec.ts` now also covers all 13 new URLs through the sitemap.
+
+**Follow-ups:**
+- The "auction night" screenshots are from a *cricket* practice auction on every sport page. The caption is honest, but `scripts/capture-marketing-screens.ts` could capture one per sport.
+- "Book a demo" can't pre-select the sport: `/schedule-demo` takes only a validated `from` source. Adding `sport` there means touching its closed list and the operator console.
+- Real keyword volumes (Phase 0) should re-rank which pages get deeper content first.
+- **4b–4d** are still to do: use-case pages (`/for/…`), comparison pages, and free tools.

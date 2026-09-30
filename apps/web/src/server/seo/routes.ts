@@ -40,8 +40,9 @@ export interface IndexablePage {
 
 /**
  * Standalone marketing and hub pages that belong in search. Help articles,
- * legal documents and public seasons are added by the sitemap from their own
- * registries (`content/help.ts`, `content/legal.ts`, the database), so they
+ * legal documents, sport pages and public seasons are added by the sitemap from
+ * their own registries (`content/help.ts`, `content/legal.ts`,
+ * `content/sports.ts`, the database), so they
  * can never be listed here and missing there.
  */
 export const INDEXABLE_PAGES: readonly IndexablePage[] = [
@@ -58,6 +59,7 @@ export const INDEXABLE_PAGES: readonly IndexablePage[] = [
   { path: "/help", updatedOn: "2026-09-26", changeFrequency: "monthly" },
   { path: "/help/faq", updatedOn: "2026-09-26", changeFrequency: "monthly" },
   { path: "/legal", updatedOn: "2026-09-26", changeFrequency: "monthly" },
+  { path: "/sports", updatedOn: "2026-09-30", changeFrequency: "monthly" },
 ];
 
 /**
@@ -79,7 +81,14 @@ const PUBLIC_UNLISTED = [
  * Whole public subtrees. `/c/…` holds seasons, squads and player cards; the
  * last two set their own `noindex` because they are for sharing, not search.
  */
-const PUBLIC_SUBTREES = ["/c", "/help", "/legal", "/schedule-demo", "/newsletter"] as const;
+const PUBLIC_SUBTREES = [
+  "/c",
+  "/help",
+  "/legal",
+  "/schedule-demo",
+  "/newsletter",
+  "/sports",
+] as const;
 
 /** Next's file-based metadata routes. These are fetched by crawlers and share scrapers. */
 const METADATA_FILES = ["/sitemap.xml", "/robots.txt", "/manifest.webmanifest"] as const;

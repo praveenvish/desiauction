@@ -799,6 +799,7 @@ export function ProductShell({
             label: "Product",
             links: [
               { label: "Features", href: "/features" },
+              { label: "Sports", href: "/sports" },
               { label: "Pricing", href: "/pricing" },
               { label: "Book a demo", href: "/schedule-demo" },
             ],
