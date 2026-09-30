@@ -50,6 +50,16 @@
   color: color-mix(in srgb, currentColor 64%, transparent);
 }
 
+/* ---- bar: the console's top bar on a phone, beside four 44px controls. The
+   word only — at this size the tagline would be 6px of noise. ---- */
+.da-wordmark--bar {
+  font-size: 17px;
+  color: var(--text-heading);
+}
+.da-wordmark--bar .da-wordmark-tagline {
+  display: none;
+}
+
 /* ---- live: the dark strip over the live room, cockpit and spectate ---- */
 .da-wordmark--live {
   font-size: 18px;
