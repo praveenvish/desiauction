@@ -2,8 +2,11 @@
   /* One source for the sticky stack: the tab strip parks exactly under the top
      bar off this, instead of guessing a height it then disagreed with. Kept as
      tight as two lines of type allow — the bar is on every screen of every
-     session, so every pixel of it is charged to the work below. */
-  --shell-topbar-h: 56px;
+     session, so every pixel of it is charged to the work below.
+     Under 720px it is two rows — the brand and the utilities, then the title —
+     so the phone value is the sum of them; ≥720px overrides it below. */
+  --shell-topbar-brandrow-h: 52px;
+  --shell-topbar-h: calc(var(--shell-topbar-brandrow-h) + 44px);
 
   min-height: 100dvh;
   background: var(--surface);
@@ -117,44 +120,40 @@ a.wordmark:hover .wordmark-glyph {
   min-width: 0;
 }
 
-/* Under 720px the rail is gone, so the brand rides the top bar. Two axes meet
-   in this one rule, and the version it replaces weighed only the first.
+/* Under 720px the rail is gone, so the brand rides the top bar — mark AND
+   name, the same lockup the public header carries, on its own row beside the
+   utilities (the title has the row below). The name used to be clipped to a
+   screen-reader-only span here, which left the console on a phone as a gold
+   square with nothing to say whose product it was.
 
-   WIDTH — brand wordmark + title + actions do not fit a 390px bar, so the eight
-   characters nobody navigates by have to give up their pixels. Unchanged.
-
-   NAME — `display: none` surrendered those characters from the ACCESSIBILITY
-   TREE as well, and the glyph beside them is aria-hidden because it is
-   decorative. That left a link in the tab order with no accessible name at all:
-   axe `link-name`, serious, on every authenticated page under 720px — the only
-   violation anywhere in the product. Clipping drops exactly the same pixels
-   while keeping the words, so the link is still announced "DesiAuction".
-
-   The mark stays decorative on purpose. Giving the glyph alt text would name
-   the link after the LOGO; what a reader needs to hear is where the link goes,
-   and the wordmark already says it. Same clip pattern as VisuallyHidden
-   (src/live/visually-hidden.module.css) — reused rather than re-invented, and
-   inlined here because a CSS module cannot compose across packages by class. */
-.topbar-brand .wordmark-text {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* The brand is a tap target too, and on this side of 720px it is a touch one.
-   Height is free — the bar is already 56px — so it takes the full 44px rung.
-   Width deliberately stays with the 32px glyph: the extra 12px would come
-   straight out of the title beside it, which is the scarcest space in the
-   product, and this link has a same-destination twin one tab stop away in the
-   bottom tab bar ("Home") that is 98px wide and 64px tall. */
+   Below 360px the bar cannot hold the name and four 44px controls, so the name
+   is clipped again — not `display: none`, which would take it out of the
+   accessibility tree too and leave the link (whose glyph is decorative) with
+   no accessible name: axe `link-name`, serious. Same clip pattern as
+   VisuallyHidden (src/live/visually-hidden.module.css), inlined because a CSS
+   module cannot compose across packages by class. */
 .topbar-brand .wordmark {
   min-height: 44px;
+  min-width: 0;
+}
+
+.topbar-brand .wordmark-text {
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 359px) {
+  .topbar-brand .wordmark-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
 }
 
 /* ---- the top bar's left: where you are (club, season, status) ---- */
@@ -266,19 +265,13 @@ a.wordmark:hover .wordmark-glyph {
     line-height: var(--text-xl-line);
   }
 
-  /* One line was too few on a phone: "Good afternoon, Arjun" and most season
-     names read "Good afternoon, A…". Two lines, still capped. */
+  /* The title has the whole second row now (it used to share one row with
+     the brand and four controls, ~130px at 390, and needed two lines to say
+     "Good afternoon, Arjun"). One line of the full width holds more than those
+     two did, and keeps the row a fixed height the sticky stack can count on. */
   .topbar .page-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    white-space: normal;
-    /* Two lines of 18px at 1.25 plus the trail ran past the 64px bar and sat
-       on its hairline ("Thane Premier / League", round 2). A step smaller and
-       tighter, two lines and the trail fit inside it. */
     font-size: var(--text-md-size);
-    line-height: 1.15;
+    line-height: 1.25;
   }
 
   /* In the page head the action gets its own full-width row. */
@@ -292,15 +285,53 @@ a.wordmark:hover .wordmark-glyph {
     justify-content: center;
   }
 
-  /* In the top bar it used to take a full-width 60px band under the bar
-     ("+ New tournament"). It is now a 44px "+" square beside the utilities:
-     the label is still the button's accessible name (font-size 0 hides the
-     glyphs, not the text node), and the button's own icon carries the eye. */
-  .topbar-inner {
-    height: auto;
-    min-height: var(--shell-topbar-h);
+  /* TWO ROWS. Row one is who and where-to — the brand lockup on the left, the
+     utilities (search, theme, alerts, menu) on the right. Row two is what —
+     the page's title and trail, with its "+" action at the end. The `::after`
+     is a zero-height, full-width flex item: the line break between them, so
+     neither row depends on its neighbours' widths to wrap. */
+  .topbar {
+    padding: 0 var(--space-3);
   }
 
+  .topbar-inner {
+    flex-wrap: wrap;
+    align-content: flex-start;
+    column-gap: var(--space-3);
+    row-gap: 0;
+  }
+
+  .topbar-inner::after {
+    content: "";
+    order: 3;
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .topbar-brand {
+    order: 1;
+    flex: 1 1 auto;
+    height: var(--shell-topbar-brandrow-h);
+    align-items: center;
+  }
+
+  .topbar .identity {
+    order: 4;
+    flex: 1 1 0;
+    height: calc(var(--shell-topbar-h) - var(--shell-topbar-brandrow-h));
+    justify-content: center;
+    padding-bottom: var(--space-1);
+    box-sizing: border-box;
+  }
+
+  .topbar .identity:empty {
+    display: none;
+  }
+
+  /* In the top bar it used to take a full-width 60px band under the bar
+     ("+ New tournament"). It is a 44px "+" square at the end of the title's
+     row: the label is still the button's accessible name (font-size 0 hides
+     the glyphs, not the text node), and the button's own icon carries the eye. */
   .topbar .page-action {
     flex: none;
     order: 5;
@@ -332,7 +363,8 @@ a.wordmark:hover .wordmark-glyph {
   }
 
   .top-actions {
-    order: 6;
+    order: 2;
+    height: var(--shell-topbar-brandrow-h);
   }
 
   .topbar .identity-lede {

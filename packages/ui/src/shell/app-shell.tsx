@@ -66,6 +66,12 @@ export interface AppShellProps {
   /** Injected link renderer (e.g. next/link). Defaults to <a>. */
   linkComponent?: ElementType;
   wordmark: ReactNode;
+  /**
+   * The wordmark as the phone's top bar sets it, where the rail's lockup (a
+   * 20px word over a tracked tagline) is too big for a bar that also carries
+   * four controls. Defaults to `wordmark`.
+   */
+  barWordmark?: ReactNode;
   wordmarkHref?: string;
   /** The mark rendered in the wordmark chip. Defaults to the built-in glyph so
       packages/ui carries no asset of its own; the app passes the real logo. */
@@ -108,6 +114,7 @@ export function AppShell({
   navGroups,
   linkComponent: Link = "a",
   wordmark,
+  barWordmark = wordmark,
   wordmarkHref = "/",
   glyph = <BrandGlyph />,
   tagline,
@@ -127,7 +134,7 @@ export function AppShell({
       <span className={styles["wordmark-glyph"]} aria-hidden>
         {glyph}
       </span>
-      <span className={styles["wordmark-text"]}>{wordmark}</span>
+      <span className={styles["wordmark-text"]}>{barWordmark}</span>
     </Link>
   );
   /**
@@ -187,7 +194,8 @@ export function AppShell({
       <div className={styles["body"]}>
         <header className={styles["topbar"]}>
           <div className={styles["topbar-inner"]}>
-            {/* The brand rides the top bar only on mobile, where the rail is hidden. */}
+            {/* The brand rides the top bar only on mobile, where the rail is
+                hidden — its own row, with the utilities, above the title. */}
             <div className={styles["topbar-brand"]}>{brand}</div>
             {/* Title first, trail under it: the name is what you came to read,
                 and the path is the smaller print that qualifies it. */}
