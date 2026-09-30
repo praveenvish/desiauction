@@ -2469,6 +2469,12 @@ export interface ImportPreview {
    */
   unplaced: UnplacedValue[];
   /**
+   * How many of the valid players carry a Google Drive photo link — what the
+   * photo step will be able to fetch by itself after the import. Zero when the
+   * file has no photo column (or the column holds no links).
+   */
+  photoLinks?: number;
+  /**
    * What committing would actually DO, against what is already stored. Absent
    * only when the file could not be read at all.
    *
@@ -2613,7 +2619,9 @@ export async function importInspectAction(slug: string, csv: string): Promise<Im
     ok: true,
     headers,
     sample: sampleRow(records),
-    detected: detectMapping(headers),
+    // The rows too: a photo question the header table does not know is still
+    // found by its Drive-link answers.
+    detected: detectMapping(headers, records),
     signature,
     bands: [...(await bandsFor(gate.personId, gate.competition))],
     ...(saved !== null ? { saved } : {}),
@@ -2816,6 +2824,7 @@ export async function importPreviewAction(
     validCount: result.rows.length,
     errors: result.errors,
     unplaced,
+    photoLinks: result.rows.filter((row) => row.photoDriveId !== null).length,
     diff: {
       counts: diff.counts,
       // Capped for the screen; the counts above are the whole truth and the

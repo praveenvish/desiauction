@@ -7,6 +7,8 @@ import {
   normalizeHeader,
   sampleRow,
   signatureOf,
+  photoColumnByValues,
+  withDetectedPhoto,
 } from "./import-mapping";
 import { driveFileIdOf, editCsvRow, parseRegistrationRecords } from "./registration-csv";
 import { tokenizeCsv } from "./registration-csv";
@@ -409,5 +411,138 @@ describe("photo_link — the Drive id a Form wrote for an upload", () => {
   it("never reads a non-Google link as a Drive file", () => {
     expect(driveFileIdOf("https://evil.example/open?id=1ESy6C82DCx_Mpjw")).toBeNull();
     expect(driveFileIdOf("")).toBeNull();
+  });
+});
+
+describe("the photo column, found by its answers", () => {
+  const link = (n: number) => `https://drive.google.com/open?id=1PhotoFileId000${String(n)}`;
+  /** A Form export: header row, then rows built per column. */
+  const file = (
+    headers: string[],
+    cell: (header: string, row: number) => string,
+    rows = 4,
+  ): string[][] => [
+    headers,
+    ...Array.from({ length: rows }, (_, row) => headers.map((header) => cell(header, row))),
+  ];
+  const base = ["Timestamp", "Player Name", "Mobile Number", "Role"];
+  const answer = (header: string, row: number): string => {
+    if (header === "Player Name") return `Player ${String(row)}`;
+    if (header === "Mobile Number") return `98765432${String(10 + row)}`;
+    if (header === "Role") return "Batsman";
+    if (header === "Timestamp") return "2026/09/24 10:00:00";
+    return link(row);
+  };
+  const photoHeader = (headers: string[], records?: string[][]) =>
+    detectMapping(headers, records).columns.find((column) => column.field === "photo_link")
+      ?.header ?? null;
+
+  it.each([
+    "Upload your recent photo",
+    "Please upload your photo",
+    "Photo for auction",
+    "Upload your passport size photo",
+    "Recent Photograph",
+    "Upload a clear photo of yourself",
+    "Player Image",
+    "Profile Picture",
+    "File upload",
+  ])("maps %s by its Drive links", (question) => {
+    const headers = [...base, question];
+    expect(photoHeader(headers, file(headers, answer))).toBe(question);
+  });
+
+  it("leaves the header-only guess unchanged without the records", () => {
+    expect(photoHeader([...base, "Upload a clear photo of yourself"])).toBeNull();
+  });
+
+  it("never takes a payment screenshot or an ID card for the photo", () => {
+    for (const question of [
+      "Upload payment screenshot",
+      "Upload Aadhaar card",
+      "Aadhar / ID proof",
+      "Birth certificate",
+      "Transaction receipt",
+    ]) {
+      const headers = [...base, question];
+      expect(photoHeader(headers, file(headers, answer)), question).toBeNull();
+    }
+  });
+
+  it("prefers the photo-worded upload beside a document upload", () => {
+    const headers = [...base, "Upload payment screenshot", "Upload your recent photo"];
+    const detected = detectMapping(headers, file(headers, answer));
+    expect(photoHeader(headers, file(headers, answer))).toBe("Upload your recent photo");
+    expect(detected.conflicts).toEqual([]);
+  });
+
+  it("asks rather than guesses when two uploads both look like the photo", () => {
+    const headers = [...base, "Front photo", "Side photo"];
+    const detected = detectMapping(headers, file(headers, answer));
+    expect(detected.columns.some((column) => column.field === "photo_link")).toBe(false);
+    expect(detected.conflicts).toEqual([
+      { field: "photo_link", headers: ["Front photo", "Side photo"] },
+    ]);
+  });
+
+  it("does not claim a column that is mostly not Drive links", () => {
+    const headers = [...base, "Anything else?"];
+    const records = file(headers, (header, row) =>
+      header === "Anything else?" ? (row === 0 ? link(0) : "no") : answer(header, row),
+    );
+    expect(photoHeaderOf(detectMapping(headers, records))).toBeNull();
+  });
+
+  it("counts a column where some players skipped the optional upload", () => {
+    const headers = [...base, "Upload a clear photo of yourself"];
+    const records = file(headers, (header, row) =>
+      header.startsWith("Upload") ? (row < 2 ? link(row) : "") : answer(header, row),
+    );
+    expect(photoHeaderOf(detectMapping(headers, records))).toBe("Upload a clear photo of yourself");
+  });
+
+  it("keeps the header match when one exists", () => {
+    const headers = [...base, "Player Photo", "Upload a clear photo of yourself"];
+    const detected = detectMapping(headers, file(headers, answer));
+    expect(photoHeaderOf(detected)).toBe("Player Photo");
+    expect(detected.conflicts).toEqual([]);
+  });
+
+  it("returns every candidate from photoColumnByValues", () => {
+    const headers = [...base, "File upload", "Another file"];
+    const detected = detectMapping(headers);
+    expect(photoColumnByValues(detected.columns, file(headers, answer))).toEqual([4, 5]);
+  });
+
+  function photoHeaderOf(detected: ReturnType<typeof detectMapping>): string | null {
+    return detected.columns.find((column) => column.field === "photo_link")?.header ?? null;
+  }
+});
+
+describe("withDetectedPhoto", () => {
+  const headers = ["Player Name", "Mobile Number", "Role", "Upload your recent photo"];
+  const records = [
+    headers,
+    ["Rohit", "9876543210", "Batsman", "https://drive.google.com/open?id=1PhotoFileId0001"],
+  ];
+  const detected = detectMapping(headers, records);
+
+  it("adds the detected photo column to a mapping saved without one", () => {
+    expect(withDetectedPhoto({ name: 0, phone: 1, role: 2 }, detected)).toEqual({
+      name: 0,
+      phone: 1,
+      role: 2,
+      photo_link: 3,
+    });
+  });
+
+  it("never moves a column the saved mapping already uses", () => {
+    const saved = { name: 0, phone: 1, role: 2, note: 3 };
+    expect(withDetectedPhoto(saved, detected)).toBe(saved);
+  });
+
+  it("keeps a saved photo choice", () => {
+    const saved = { name: 0, phone: 1, role: 2, photo_link: 2 };
+    expect(withDetectedPhoto(saved, detected)).toBe(saved);
   });
 });

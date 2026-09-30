@@ -905,6 +905,34 @@ p + .date-row {
   color: var(--text-primary);
 }
 
+/* What the photos will do, in the import preview. */
+.import-photos {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm-size);
+  color: var(--text-secondary);
+}
+
+.import-photos svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent-ink);
+}
+
+.import-photos strong {
+  color: var(--text-primary);
+}
+
+/* The drop zone's label when a Google Drive route sits above it. */
+.photo-other-ways {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
 .import-errors li {
   display: flex;
   flex-direction: column;
