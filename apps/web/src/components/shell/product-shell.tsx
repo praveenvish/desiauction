@@ -977,6 +977,7 @@ export function ProductShell({
           ]}
           linkComponent={Link}
           wordmark={<BrandWordmark tone="rail" />}
+          barWordmark={<BrandWordmark tone="bar" />}
           wordmarkHref="/home"
           glyph={<BrandMark size={32} />}
           {...(title !== null ? { pageTitle: titleNode } : {})}
@@ -1014,9 +1015,11 @@ export function ProductShell({
                   router.push(href);
                 }}
               />
-              <span className="shell-desktop-only">
-                <ThemeToggle />
-              </span>
+              {/* Every width: on a phone it used to live in the menu drawer,
+                  two taps from a switch people reach for by the light they
+                  are standing in. The title moved to its own row, which is
+                  what paid for the room. */}
+              <ThemeToggle />
               <BellLink unreadCount={unreadCount} pathname={pathname} />
               {/* Switchers live with the other controls now — one cluster, in the
                 same place, whether you are switching season or organization. */}
@@ -1192,13 +1195,6 @@ export function ProductShell({
                 >
                   Report a problem
                 </button>
-              </li>
-
-              {/* The theme switch rides here under 720px: the bar has room for the
-                title or a fourth icon, and the title is what people navigate by. */}
-              <li className="shell-drawer-row">
-                <span>Theme</span>
-                <ThemeToggle />
               </li>
               <li>
                 <button

@@ -109,16 +109,34 @@ describe("AppShell", () => {
    * the property — and it is the one that would have caught the original bug,
    * because the markup was never wrong.
    */
-  it("hides the top bar's wordmark by clipping it, never by removing it", () => {
+  it("shows the top bar's wordmark, and narrows it by clipping, never by removing it", () => {
     const css = readFileSync(join(__dirname, "app-shell.module.css"), "utf8");
-    const rule = /\.topbar-brand \.wordmark-text \{([^}]*)\}/.exec(css);
-    expect(rule, ".topbar-brand .wordmark-text rule not found").not.toBeNull();
-    const body = rule?.[1] ?? "";
+    const bodies = [...css.matchAll(/\.topbar-brand \.wordmark-text \{([^}]*)\}/g)].map(
+      (match) => match[1] ?? "",
+    );
+    expect(bodies.length, ".topbar-brand .wordmark-text rules not found").toBeGreaterThan(0);
     // `display: none` and `visibility: hidden` both take the words out of the
     // accessibility tree; the clip pattern takes only the pixels.
-    expect(body).not.toMatch(/display:\s*none/);
-    expect(body).not.toMatch(/visibility:\s*hidden/);
-    expect(body).toMatch(/clip-path:\s*inset\(50%\)/);
+    for (const body of bodies) {
+      expect(body).not.toMatch(/display:\s*none/);
+      expect(body).not.toMatch(/visibility:\s*hidden/);
+    }
+    // Visible by default (the phone bar names the product); clipped only where
+    // the bar is too narrow for it.
+    expect(bodies[0]).not.toMatch(/clip-path/);
+    const narrow =
+      /@media \(max-width: 359px\) \{\s*\.topbar-brand \.wordmark-text \{([^}]*)\}/.exec(css);
+    expect(narrow?.[1] ?? "").toMatch(/clip-path:\s*inset\(50%\)/);
+  });
+
+  it("sets the top bar's lockup from barWordmark when given", () => {
+    render(
+      <AppShell nav={NAV} wordmark="Rail word" barWordmark="Bar word">
+        <p>x</p>
+      </AppShell>,
+    );
+    expect(screen.getByRole("link", { name: "Bar word" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Rail word" })).toBeInTheDocument();
   });
 
   it("injects the link component", () => {
