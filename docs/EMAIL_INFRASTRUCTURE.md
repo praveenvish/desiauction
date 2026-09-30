@@ -21,6 +21,13 @@ authorises the send against each *recipient's* identity too, so verified test
 recipients need their own statement; once production access is granted they do
 not, and the policy must go.
 
+**2026-09-30 — SES production access refused twice** (case 179062209600529,
+template answer, no reason given; most likely the account's age). ZeptoMail
+(now "Zoho CPaaS") was added as a third provider: `EMAIL_PROVIDER=zeptomail`.
+SES stays fully configured — a later, fresh request can still move back. See
+"ZeptoMail (Zoho CPaaS)" below. Also sandbox-only, delete at production
+access: `ses-sandbox-verified-recipients-TEMP` on `desiauction-mailer-prod`.
+
 ## Architecture
 
 ```
@@ -78,7 +85,7 @@ Names only — values live in `.env.local` (dev) and `web.env` + `runner.env`
 
 | Name | Tiers | Notes |
 |---|---|---|
-| `EMAIL_PROVIDER` | web, runner | `ses` \| `resend` \| `auto` \| `dev` (`http` = `resend`). **The rollback switch.** |
+| `EMAIL_PROVIDER` | web, runner | `zeptomail` \| `ses` \| `resend` \| `auto` \| `dev` (`http` = `resend`; `auto` never picks ZeptoMail). **The rollback switch.** |
 | `EMAIL_FROM` | web, runner | `DesiAuction <no-reply@mail.desiauction.in>` — shared by both providers |
 | `EMAIL_REPLY_TO` | web | `support@desiauction.in` |
 | `SES_REGION` | web, runner | `ap-south-1` |
@@ -88,9 +95,12 @@ Names only — values live in `.env.local` (dev) and `web.env` + `runner.env`
 | `SES_FEEDBACK_ADDRESS` | web, runner | `bounces@desiauction.in` (verified in SES) |
 | `SES_SNS_TOPIC_ARN` | web | `arn:aws:sns:ap-south-1:561965250144:desiauction-ses-events` — unset closes `/api/webhooks/ses` (404) |
 | `EMAIL_API_ENDPOINT` / `EMAIL_API_KEY` | web, runner | Resend — keep until cleanup |
+| `ZEPTOMAIL_API_KEY` | web, runner | the Mail Agent's Send Mail token, **without** the `Zoho-enczapikey ` prefix |
+| `ZEPTOMAIL_ENDPOINT` | web, runner | optional; unset = India, `https://cpaas.zoho.in/v1.1/email` |
+| `ZEPTOMAIL_WEBHOOK_KEY` | web | the webhook's authentication key — unset closes `/api/webhooks/zeptomail` (404) |
 
 A production process **refuses to boot** without a configured mailer, and a
-named provider (`ses`/`resend`) that is half-configured is refused rather than
+named provider (`ses`/`resend`/`zeptomail`) that is half-configured is refused rather than
 quietly falling back. `pnpm preflight:production` checks both tiers agree.
 
 ## AWS resources
@@ -327,6 +337,57 @@ list only for real recipients, not the simulator).
 
 Zoho must be unaffected: send to and from `praveen@desiauction.in` after the DNS
 change.
+
+## ZeptoMail (Zoho CPaaS)
+
+Why: SES refused production access twice (2026-09-30). ZeptoMail is
+transactional-only, pay-as-you-go (1 credit = 10,000 emails, ≈ $2.50 / ₹208,
+first credit free, credits expire after 6 months), and hosts India accounts in
+India. At ~5–10k emails a month it costs well under ₹250.
+
+**Code:** `createZeptomailProvider` in `packages/messaging/src/mail-provider.ts`
+(POST `v1.1/email`, `Authorization: Zoho-enczapikey <token>`, From split into
+address + name, `mime_headers` carries List-Unsubscribe, the dispatch id rides
+as `client_reference`, open/click tracking **off**). No idempotency header
+exists — a retry after a lost response can send twice, as with SES.
+
+**Account setup (Zoho CPaaS, India data centre `zoho.in`):**
+
+1. Sign up with the Zoho organisation that owns desiauction.in mail.
+2. Add the domain `mail.desiauction.in`; publish the **DKIM TXT** and the
+   **bounce CNAME** it shows at Hostinger. They sit under their own names and
+   do not touch the SES, Resend or Zoho Mail records.
+3. Submit the account review (transactional use case — reuse the SES text).
+4. Create a Mail Agent → copy its **Send Mail token** → `ZEPTOMAIL_API_KEY`.
+5. Mail Agent → Webhooks: URL `https://desiauction.in/api/webhooks/zeptomail`,
+   events **hard bounce, soft bounce, feedback loop**, set an authentication
+   key → `ZEPTOMAIL_WEBHOOK_KEY`.
+
+**Webhook:** `apps/web/src/server/messaging/zeptomail-webhook.ts`. Each POST is
+proved by `producer-signature: ts=…;s=<base64>;s-algorithm=HmacSHA256` —
+HMAC-SHA256 over the event, keyed with the webhook key; signatures older than
+24 h are refused. A hard bounce or a feedback-loop complaint suppresses the
+address (`suppressEmailAddress`) and, when `client_reference` is present,
+reports it against the dispatch; soft bounces, opens and clicks are ignored.
+
+**Check the DNS:**
+
+```bash
+pnpm --filter @desiauction/web mail:deliverability --provider=zeptomail --dkim=<selector> --ns=ns1.dns-parking.com
+```
+
+(`--bounce=<name>` if the console shows a bounce CNAME other than
+`bounce-zem.mail.desiauction.in`.)
+
+**Cutover:** in **both** `web.env` and `runner.env` set
+`EMAIL_PROVIDER=zeptomail` and `ZEPTOMAIL_API_KEY` (web also
+`ZEPTOMAIL_WEBHOOK_KEY`), keep `EMAIL_FROM` and every `SES_*` line, run
+`pnpm preflight:production`, restart web + runner (the runner logs
+`emailDelivery: "zeptomail"`), then `mail:test` and a real sign-in to an
+address that was never verified in SES.
+
+**Rollback:** `EMAIL_PROVIDER=ses` (sandbox: verified recipients only) or
+`resend`, restart. No deploy, no DNS change.
 
 ## Production cutover
 

@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   createResendProvider,
   createSesProvider,
+  createZeptomailProvider,
   mailProviderFromEnv,
   selectedProvider,
+  zeptomailAddress,
+  ZEPTOMAIL_DEFAULT_ENDPOINT,
   type MailEnv,
+  type MailProviderName,
   type MailTransport,
 } from "./mail-provider";
 import type { ProviderResponse } from "./provider-fetch";
@@ -259,7 +263,9 @@ describe("selectedProvider — which one the settings name", () => {
     EMAIL_FROM: "f@x",
   };
 
-  it.each<[string, MailEnv, "resend" | "ses" | null]>([
+  const zeptomail: MailEnv = { ZEPTOMAIL_API_KEY: "wSsVR61x", EMAIL_FROM: "f@x" };
+
+  it.each<[string, MailEnv, MailProviderName | null]>([
     ["auto, nothing set", {}, null],
     ["auto, Resend set", resend, "resend"],
     ["auto, SES set", ses, "ses"],
@@ -271,8 +277,161 @@ describe("selectedProvider — which one the settings name", () => {
     ["dev beats live credentials", { ...resend, ...ses, EMAIL_PROVIDER: "dev" }, null],
     ["ses without a From", { ...ses, EMAIL_FROM: undefined, EMAIL_PROVIDER: "ses" }, null],
     ["empty strings are not settings", { ...ses, SES_SECRET_ACCESS_KEY: "" }, null],
+    [
+      "zeptomail, all three set",
+      { ...resend, ...ses, ...zeptomail, EMAIL_PROVIDER: "zeptomail" },
+      "zeptomail",
+    ],
+    [
+      "zeptomail without its token — not silently SES",
+      { ...ses, EMAIL_PROVIDER: "zeptomail" },
+      null,
+    ],
+    ["auto never picks zeptomail on its own", zeptomail, null],
+    ["auto with SES and a ZeptoMail token stays SES", { ...ses, ...zeptomail }, "ses"],
+    ["dev beats a ZeptoMail token", { ...zeptomail, EMAIL_PROVIDER: "dev" }, null],
   ])("%s", (_label, env, expected) => {
     expect(selectedProvider(env)).toBe(expected);
     expect(mailProviderFromEnv(env)?.name ?? null).toBe(expected);
+  });
+});
+
+describe("createZeptomailProvider — the Zoho CPaaS v1.1/email call", () => {
+  const FROM = "DesiAuction <no-reply@mail.desiauction.in>";
+  const accepted: ProviderResponse = {
+    status: 201,
+    body: '{"data":[{"code":"EM_104","message":"Email request received"}],"message":"OK","request_id":"2d6f.1"}',
+  };
+
+  it("posts to the India endpoint with the Send Mail token and split addresses", async () => {
+    const { transport, calls } = recording(accepted);
+    const result = await createZeptomailProvider({
+      apiKey: "wSsVR61x",
+      from: FROM,
+      transport,
+    }).send({
+      to: "player@example.com",
+      subject: "आपका कोड",
+      text: "code 123456",
+      html: "<p>code 123456</p>",
+      replyTo: "support@desiauction.in",
+    });
+    expect(result).toEqual({ ok: true, messageId: "2d6f.1" });
+    const [call] = calls;
+    expect(call?.url).toBe(ZEPTOMAIL_DEFAULT_ENDPOINT);
+    expect(call?.url).toBe("https://cpaas.zoho.in/v1.1/email");
+    expect(call?.headers["authorization"]).toBe("Zoho-enczapikey wSsVR61x");
+    expect(call?.body).toEqual({
+      from: { address: "no-reply@mail.desiauction.in", name: "DesiAuction" },
+      to: [{ email_address: { address: "player@example.com" } }],
+      subject: "आपका कोड",
+      textbody: "code 123456",
+      htmlbody: "<p>code 123456</p>",
+      reply_to: [{ address: "support@desiauction.in" }],
+      track_opens: false,
+      track_clicks: false,
+    });
+  });
+
+  it("carries the attachment, the unsubscribe headers and the dispatch as client_reference", async () => {
+    const { transport, calls } = recording(accepted);
+    await createZeptomailProvider({
+      apiKey: "k",
+      from: FROM,
+      endpoint: "https://cpaas.zoho.com/v1.1/email",
+      transport,
+    }).send({
+      to: "a@example.com",
+      subject: "s",
+      text: "t",
+      attachment: {
+        filename: "receipt.pdf",
+        contentType: "application/pdf",
+        contentBase64: "JVBE",
+      },
+      headers: {
+        "List-Unsubscribe": "<https://desiauction.in/u/x>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+      tags: { dispatch: "01J9XYZ", kind: "receipt" },
+      idempotencyKey: "never-sent-to-zeptomail",
+    });
+    const [call] = calls;
+    expect(call?.url).toBe("https://cpaas.zoho.com/v1.1/email");
+    expect(call?.headers["idempotency-key"]).toBeUndefined();
+    const body = call?.body as Record<string, unknown>;
+    expect(body["attachments"]).toEqual([
+      { name: "receipt.pdf", mime_type: "application/pdf", content: "JVBE" },
+    ]);
+    expect(body["mime_headers"]).toEqual({
+      "List-Unsubscribe": "<https://desiauction.in/u/x>",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    });
+    expect(body["client_reference"]).toBe("01J9XYZ");
+  });
+
+  it("reads both error shapes and retries only the provider's own trouble", async () => {
+    const cases: [ProviderResponse, boolean, string][] = [
+      [
+        {
+          status: 401,
+          body: '{"error":{"code":"TM_4001","details":[{"code":"SERR_157","message":"Invalid API Token found"}],"message":"Access Denied","request_id":"r"}}',
+        },
+        false,
+        "TM_4001: Access Denied: Invalid API Token found",
+      ],
+      [
+        {
+          status: 400,
+          body: '{"data":{"error_code":"TM_3004","message":"Invalid request"},"message":"error"}',
+        },
+        false,
+        "TM_3004: Invalid request",
+      ],
+      [
+        { status: 429, body: '{"error":{"code":"TM_5001","message":"Too many requests"}}' },
+        true,
+        "TM_5001: Too many requests",
+      ],
+      [{ status: 503, body: "upstream down" }, true, "upstream down"],
+    ];
+    for (const [answer, retryable, detail] of cases) {
+      const { transport } = recording(answer);
+      const result = await createZeptomailProvider({ apiKey: "k", from: FROM, transport }).send({
+        to: "a@example.com",
+        subject: "s",
+        text: "t",
+      });
+      expect(result).toEqual({ ok: false, status: answer.status, retryable, detail });
+    }
+  });
+
+  it.each<[string, { address: string; name?: string }]>([
+    [
+      "DesiAuction <no-reply@mail.desiauction.in>",
+      { address: "no-reply@mail.desiauction.in", name: "DesiAuction" },
+    ],
+    ['"Desi Auction" <a@b.in>', { address: "a@b.in", name: "Desi Auction" }],
+    ["<a@b.in>", { address: "a@b.in" }],
+    [" a@b.in ", { address: "a@b.in" }],
+  ])("splits the mailbox %j", (mailbox, expected) => {
+    expect(zeptomailAddress(mailbox)).toEqual(expected);
+  });
+
+  it("is what EMAIL_PROVIDER=zeptomail builds, endpoint override included", async () => {
+    const { transport, calls } = recording(accepted);
+    const provider = mailProviderFromEnv(
+      {
+        EMAIL_PROVIDER: "zeptomail",
+        ZEPTOMAIL_API_KEY: "tok",
+        ZEPTOMAIL_ENDPOINT: "https://cpaas.zoho.eu/v1.1/email",
+        EMAIL_FROM: FROM,
+      },
+      { transport },
+    );
+    expect(provider?.name).toBe("zeptomail");
+    await provider?.send({ to: "a@example.com", subject: "s", text: "t" });
+    expect(calls[0]?.url).toBe("https://cpaas.zoho.eu/v1.1/email");
+    expect(calls[0]?.headers["authorization"]).toBe("Zoho-enczapikey tok");
   });
 });

@@ -23,9 +23,11 @@ import { previewOptions } from "../src/server/messaging/template-preview.js";
  *
  *   pnpm --filter @desiauction/web mail:deliverability
  *       [--domain=mail.desiauction.in]   the From domain (default: EMAIL_FROM's)
- *       [--dkim=sel1,sel2,sel3]          DKIM selectors to look up (SES gives three)
+ *       [--dkim=sel1,sel2,sel3]          DKIM selectors to look up (SES gives three,
+ *                                        ZeptoMail one)
+ *       [--bounce=bounce-zem.mail...]    ZeptoMail's bounce CNAME, if not the default
  *       [--ns=ns1.dns-parking.com]       ask the authoritative server, not a cache
- *       [--provider=ses|resend]          whose records (default: the configured one)
+ *       [--provider=ses|resend|zeptomail] whose records (default: the configured one)
  *       [--offline]                      skip DNS; audit the designs only
  *       [--report=path.md]               also write the findings as Markdown
  *
@@ -74,7 +76,9 @@ async function authentication(): Promise<Finding[]> {
     (await answer(() => resolver.resolveTxt(name))).map((chunks) => chunks.join(""));
   const chosen = flag("provider");
   const provider =
-    chosen === "ses" || chosen === "resend" ? chosen : (selectedProvider(env) ?? "ses");
+    chosen === "ses" || chosen === "resend" || chosen === "zeptomail"
+      ? chosen
+      : (selectedProvider(env) ?? "ses");
   const findings: Finding[] = [];
 
   if (provider === "ses") {
@@ -104,6 +108,44 @@ async function authentication(): Promise<Finding[]> {
         checkDkimCname(name, await answer(() => resolver.resolveCname(name)), "dkim.amazonses.com"),
       );
     }
+  } else if (provider === "zeptomail") {
+    // ZeptoMail: a DKIM key as a TXT under the selector its console shows, and
+    // a bounce CNAME to its servers (the return path, which carries the SPF).
+    const selectors = (flag("dkim") ?? "").split(",").filter((s) => s !== "");
+    if (selectors.length === 0) {
+      findings.push({
+        check: "DKIM",
+        verdict: "warn",
+        detail: "no selector given — nothing looked up",
+        fix: "Pass --dkim=<the selector ZeptoMail shows> (docs/EMAIL_INFRASTRUCTURE.md → ZeptoMail).",
+      });
+    }
+    for (const selector of selectors) {
+      const name = `${selector}._domainkey.${domain}`;
+      const key = await txt(name);
+      findings.push(
+        key.some((record) => record.includes("p="))
+          ? { check: `DKIM ${name}`, verdict: "pass", detail: "key published" }
+          : {
+              check: `DKIM ${name}`,
+              verdict: "fail",
+              detail: "no DKIM key",
+              fix: "Publish ZeptoMail's DKIM TXT exactly as its domain page shows it.",
+            },
+      );
+    }
+    const bounce = flag("bounce") ?? `bounce-zem.${domain}`;
+    const target = await answer(() => resolver.resolveCname(bounce));
+    findings.push(
+      target.some((host) => host.includes("zeptomail") || host.includes("zoho"))
+        ? { check: `Bounce ${bounce}`, verdict: "pass", detail: target.join(", ") }
+        : {
+            check: `Bounce ${bounce}`,
+            verdict: "fail",
+            detail: target.length === 0 ? "no CNAME" : `points at ${target.join(", ")}`,
+            fix: "Publish ZeptoMail's bounce CNAME (pass --bounce=<name> if its console shows another).",
+          },
+    );
   } else {
     // Resend: its return path (send.<domain>) is a CNAME/MX to Resend's own
     // servers, which carry the SPF; what is ours to publish is the DKIM key.

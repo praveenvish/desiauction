@@ -91,6 +91,22 @@ describe("the runner's production boot refuses the file adapter", () => {
     expect(config !== null && "provider" in config ? config.provider.name : null).toBe("ses");
   });
 
+  it("boots on ZeptoMail with no Resend settings, and wires the real mailer", () => {
+    const env = parseEnv({
+      ...without("EMAIL_API_ENDPOINT", "EMAIL_API_KEY"),
+      EMAIL_PROVIDER: "zeptomail",
+      ZEPTOMAIL_API_KEY: "wSsVR61x-send-mail-token",
+    });
+    const config = mailConfigFor(env);
+    expect(config !== null && "provider" in config ? config.provider.name : null).toBe("zeptomail");
+  });
+
+  it("refuses EMAIL_PROVIDER=zeptomail without its token anywhere", () => {
+    expect(() =>
+      parseEnv({ DATABASE_URL: PROD["DATABASE_URL"], EMAIL_PROVIDER: "zeptomail" }),
+    ).toThrow(/EMAIL_PROVIDER=zeptomail needs/);
+  });
+
   it("refuses EMAIL_PROVIDER=ses without its settings anywhere", () => {
     expect(() => parseEnv({ DATABASE_URL: PROD["DATABASE_URL"], EMAIL_PROVIDER: "ses" })).toThrow(
       /EMAIL_PROVIDER=ses needs/,

@@ -510,8 +510,9 @@ warn(
 // boot, and this says so before the deploy rather than at it.
 //
 // Mirrors packages/messaging/src/mail-provider-config.ts (this file is plain
-// JS and cannot import it): ses needs SES_*, resend/http need EMAIL_API_*,
-// auto takes whichever is complete (Resend first), dev is never a mailer.
+// JS and cannot import it): ses needs SES_*, zeptomail needs ZEPTOMAIL_API_KEY,
+// resend/http need EMAIL_API_*, auto takes Resend or SES (Resend first) but
+// never ZeptoMail, and dev is never a mailer.
 function mailerOf(e) {
   const has = (name) => Boolean(e[name]);
   const resend = has("EMAIL_API_ENDPOINT") && has("EMAIL_API_KEY") && has("EMAIL_FROM");
@@ -520,11 +521,14 @@ function mailerOf(e) {
     has("SES_ACCESS_KEY_ID") &&
     has("SES_SECRET_ACCESS_KEY") &&
     has("EMAIL_FROM");
+  const zeptomail = has("ZEPTOMAIL_API_KEY") && has("EMAIL_FROM");
   switch (e.EMAIL_PROVIDER ?? "auto") {
     case "dev":
       return null;
     case "ses":
       return ses ? "ses" : null;
+    case "zeptomail":
+      return zeptomail ? "zeptomail" : null;
     case "resend":
     case "http":
       return resend ? "resend" : null;
@@ -537,7 +541,7 @@ check(
   "EMAIL_MAILER",
   webMailer !== null,
   "email sign-in codes and receipts need a real mailer",
-  "set EMAIL_PROVIDER=ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM (or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM)",
+  "set EMAIL_PROVIDER=zeptomail with ZEPTOMAIL_API_KEY and EMAIL_FROM (or ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM, or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM)",
 );
 if (webMailer === "ses") {
   check(
@@ -545,6 +549,16 @@ if (webMailer === "ses") {
     Boolean(env.SES_FEEDBACK_ADDRESS),
     "SES bounce and complaint reports reach a mailbox a person reads",
     "set SES_FEEDBACK_ADDRESS to the verified Zoho alias (bounces@desiauction.in)",
+  );
+}
+if (webMailer === "zeptomail") {
+  // Without the key /api/webhooks/zeptomail answers 404: bounces and spam
+  // complaints are never suppressed, and ZeptoMail keeps mailing dead addresses.
+  check(
+    "EMAIL_ZEPTOMAIL_WEBHOOK",
+    Boolean(env.ZEPTOMAIL_WEBHOOK_KEY),
+    "ZeptoMail bounce and complaint events reach the suppression list",
+    "set ZEPTOMAIL_WEBHOOK_KEY to the Mail Agent webhook's authentication key",
   );
 }
 
@@ -560,7 +574,7 @@ if (runnerFile !== undefined) {
     "EMAIL_MAILER-runner",
     runnerMailer !== null,
     "the runner emails every financial document — without a mailer it writes them to its own disk",
-    "set the same EMAIL_PROVIDER, EMAIL_FROM and SES_* (or EMAIL_API_*) in runner.env as in web.env",
+    "set the same EMAIL_PROVIDER, EMAIL_FROM and SES_* (or ZEPTOMAIL_* or EMAIL_API_*) in runner.env as in web.env",
   );
   check(
     "EMAIL_MAILER-runner-matches-web",
@@ -568,9 +582,11 @@ if (runnerFile !== undefined) {
       runnerEnv.EMAIL_FROM === env.EMAIL_FROM &&
       (webMailer === "ses"
         ? runnerEnv.SES_REGION === env.SES_REGION
-        : runnerEnv.EMAIL_API_ENDPOINT === env.EMAIL_API_ENDPOINT),
+        : webMailer === "zeptomail"
+          ? runnerEnv.ZEPTOMAIL_ENDPOINT === env.ZEPTOMAIL_ENDPOINT
+          : runnerEnv.EMAIL_API_ENDPOINT === env.EMAIL_API_ENDPOINT),
     "the runner and the web tier send through the same provider and From address",
-    "copy EMAIL_PROVIDER, EMAIL_FROM and SES_REGION (or EMAIL_API_ENDPOINT) from web.env into runner.env",
+    "copy EMAIL_PROVIDER, EMAIL_FROM and SES_REGION (or ZEPTOMAIL_ENDPOINT, or EMAIL_API_ENDPOINT) from web.env into runner.env",
   );
 }
 

@@ -125,6 +125,31 @@ describe("web env — production refuses every dev-only default", () => {
     });
   });
 
+  describe("ZeptoMail (Zoho CPaaS) as the production mailer", () => {
+    const ZEPTO_PROD: Raw = {
+      ...PROD_OK,
+      EMAIL_API_ENDPOINT: undefined,
+      EMAIL_API_KEY: undefined,
+      EMAIL_PROVIDER: "zeptomail",
+      ZEPTOMAIL_API_KEY: "wSsVR61x-send-mail-token",
+      ZEPTOMAIL_WEBHOOK_KEY: "zm-webhook-auth-key-0123456789",
+    };
+
+    it("boots with ZeptoMail alone — no Resend or SES settings needed", () => {
+      expect(() => parseEnv(raw(ZEPTO_PROD))).not.toThrow();
+    });
+
+    it("refuses EMAIL_PROVIDER=zeptomail without its token, rather than quietly using Resend", () => {
+      expect(() => parseEnv(raw({ ...PROD_OK, EMAIL_PROVIDER: "zeptomail" }))).toThrow(/EMAIL/);
+    });
+
+    it("refuses an endpoint that is not a URL", () => {
+      expect(() => parseEnv(raw({ ...ZEPTO_PROD, ZEPTOMAIL_ENDPOINT: "cpaas.zoho.in" }))).toThrow(
+        /ZEPTOMAIL_ENDPOINT/,
+      );
+    });
+  });
+
   const CASES: [string, Raw, RegExp][] = [
     ["OTP_PROVIDER", { OTP_PROVIDER: "dev" }, /OTP_PROVIDER=dev/],
     ["MEDIA_STORAGE", { MEDIA_STORAGE: "local" }, /MEDIA_STORAGE=local/],
