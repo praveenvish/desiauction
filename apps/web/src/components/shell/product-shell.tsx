@@ -68,6 +68,7 @@ import { useReportProblem } from "../report-problem/report-problem";
 import { ShellActionContext } from "./page-action";
 import { ShellStatusContext } from "./page-status";
 import { ShellTitleContext, type ShellTitleOverride } from "./page-title";
+import { SeasonChip, SeasonCrumb } from "./season-switch";
 import { ThemeToggle } from "./theme-toggle";
 import "./product-shell.css";
 import "./console.css";
@@ -908,11 +909,16 @@ export function ProductShell({
       });
       const activeTab = activeSeasonTab(pathname, slug, tabs);
       tabsNode = (
-        <SubNavTabs
-          label="Season sections"
-          linkComponent={Link}
-          tabs={tabs.map((tab) => ({ ...tab, active: tab.key === activeTab }))}
-        />
+        <div className="shell-seasonbar">
+          <span className="shell-mobile-only shell-seasonbar-chip">
+            <SeasonChip current={competition} seasons={competitions} />
+          </span>
+          <SubNavTabs
+            label="Season sections"
+            linkComponent={Link}
+            tabs={tabs.map((tab) => ({ ...tab, active: tab.key === activeTab }))}
+          />
+        </div>
       );
     }
   } else if (orgMatch !== null) {
@@ -946,6 +952,21 @@ export function ProductShell({
       );
     }
   }
+  const seasonNow =
+    seasonSwitcherFor !== null
+      ? competitions.find((entry) => entry.slug === seasonSwitcherFor)
+      : undefined;
+  const trailNode: ReactNode =
+    seasonNow !== undefined ? (
+      <Breadcrumb
+        trail
+        linkComponent={Link}
+        items={identity.crumbs.filter((crumb) => crumb.label !== seasonNow.name)}
+        trailing={<SeasonCrumb current={seasonNow} seasons={competitions} named={title !== null} />}
+      />
+    ) : identity.crumbs.length > 0 ? (
+      <Breadcrumb trail linkComponent={Link} items={identity.crumbs} />
+    ) : null;
   const initials =
     session.name !== null && session.name.trim() !== ""
       ? session.name
@@ -979,13 +1000,11 @@ export function ProductShell({
           wordmark={<BrandWordmark tone="rail" />}
           barWordmark={<BrandWordmark tone="bar" />}
           wordmarkHref="/home"
-          glyph={<BrandMark size={32} />}
+          glyph={<BrandMark size={36} />}
           {...(title !== null ? { pageTitle: titleNode } : {})}
           {...(titleTestId !== undefined ? { pageTitleAttrs: { "data-testid": titleTestId } } : {})}
-          {...(identity.crumbs.length > 0
-            ? {
-                breadcrumb: <Breadcrumb trail linkComponent={Link} items={identity.crumbs} />,
-              }
+          {...(trailNode !== null
+            ? { breadcrumb: trailNode }
             : subtitle !== undefined
               ? { subtitle }
               : {})}
@@ -1019,32 +1038,12 @@ export function ProductShell({
                   two taps from a switch people reach for by the light they
                   are standing in. The title moved to its own row, which is
                   what paid for the room. */}
-              <ThemeToggle />
+              <span className="shell-theme-slot">
+                <ThemeToggle />
+              </span>
               <BellLink unreadCount={unreadCount} pathname={pathname} />
-              {/* Switchers live with the other controls now — one cluster, in the
-                same place, whether you are switching season or organization. */}
-              {seasonSwitcherFor !== null && competitions.length > 1 ? (
-                <span className="shell-desktop-only">
-                  <PopoverMenu
-                    label="Switch season"
-                    trigger={
-                      <>
-                        <span className="shell-org-name">Switch</span>
-                        <IconChevronDown width={16} height={16} />
-                      </>
-                    }
-                    items={competitions
-                      .filter((entry) => entry.slug !== seasonSwitcherFor)
-                      .map((entry) => ({
-                        key: entry.slug,
-                        label: `${entry.name} — ${entry.orgName}`,
-                        onSelect: () => {
-                          router.push(`/seasons/${entry.slug}`);
-                        },
-                      }))}
-                  />
-                </span>
-              ) : null}
+              {/* The season switches from its own crumb now (SeasonCrumb); an
+                  organization still switches here. */}
               {seasonSwitcherFor === null && orgs.length > 1 ? (
                 <span className="shell-desktop-only">
                   <PopoverMenu
@@ -1182,6 +1181,10 @@ export function ProductShell({
                   </Link>
                 </li>
               ))}
+              {/* Under 360px the bar hands its theme switch to the menu. */}
+              <li className="shell-narrow-only">
+                <ThemeToggle variant="row" />
+              </li>
               <li>
                 <button
                   type="button"

@@ -67,9 +67,9 @@ export interface AppShellProps {
   linkComponent?: ElementType;
   wordmark: ReactNode;
   /**
-   * The wordmark as the phone's top bar sets it, where the rail's lockup (a
-   * 20px word over a tracked tagline) is too big for a bar that also carries
-   * four controls. Defaults to `wordmark`.
+   * The wordmark as the phone's top bar sets it. Since the header's 9.5 pass it
+   * is the same lockup as the rail's (word and tagline); the slot stays so the
+   * app can set its ink for the bar. Defaults to `wordmark`.
    */
   barWordmark?: ReactNode;
   wordmarkHref?: string;
@@ -191,7 +191,9 @@ export function AppShell({
           <div className={styles["rail-footer"]}>{railFooter}</div>
         ) : null}
       </NavigationRail>
-      <div className={styles["body"]}>
+      {/* `data-tabs`: with a section strip, the phone lets the active tab name
+          the page and keeps the title for assistive technology only. */}
+      <div className={styles["body"]} data-tabs={tabs !== undefined ? "" : undefined}>
         <header className={styles["topbar"]}>
           <div className={styles["topbar-inner"]}>
             {/* The brand rides the top bar only on mobile, where the rail is

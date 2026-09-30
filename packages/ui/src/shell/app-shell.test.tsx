@@ -109,7 +109,7 @@ describe("AppShell", () => {
    * the property — and it is the one that would have caught the original bug,
    * because the markup was never wrong.
    */
-  it("shows the top bar's wordmark, and narrows it by clipping, never by removing it", () => {
+  it("shows the top bar's wordmark at every width, never removing or clipping it", () => {
     const css = readFileSync(join(__dirname, "app-shell.module.css"), "utf8");
     const bodies = [...css.matchAll(/\.topbar-brand \.wordmark-text \{([^}]*)\}/g)].map(
       (match) => match[1] ?? "",
@@ -121,12 +121,12 @@ describe("AppShell", () => {
       expect(body).not.toMatch(/display:\s*none/);
       expect(body).not.toMatch(/visibility:\s*hidden/);
     }
-    // Visible by default (the phone bar names the product); clipped only where
-    // the bar is too narrow for it.
-    expect(bodies[0]).not.toMatch(/clip-path/);
-    const narrow =
-      /@media \(max-width: 359px\) \{\s*\.topbar-brand \.wordmark-text \{([^}]*)\}/.exec(css);
-    expect(narrow?.[1] ?? "").toMatch(/clip-path:\s*inset\(50%\)/);
+    // Header 9.5 (2026-09-30): the lockup is the one thing on the bar that
+    // says whose product this is, so it is never clipped either — under 360px
+    // the app moves its theme switch into the menu instead.
+    for (const body of bodies) {
+      expect(body).not.toMatch(/clip-path/);
+    }
   });
 
   it("sets the top bar's lockup from barWordmark when given", () => {

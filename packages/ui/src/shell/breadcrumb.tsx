@@ -1,4 +1,4 @@
-import type { ElementType } from "react";
+import type { ElementType, ReactNode } from "react";
 
 import styles from "./breadcrumb.module.css";
 
@@ -19,9 +19,20 @@ export interface BreadcrumbProps {
    * link, because in this mode it is somewhere you can still go.
    */
   trail?: boolean;
+  /**
+   * A last step that is a control rather than a link — the season's switcher
+   * (header 9.5). It is still a step of the trail, so it lives inside the nav
+   * and reads as one: "Thane Sports Club / TPL 2026 ▾".
+   */
+  trailing?: ReactNode;
 }
 
-export function Breadcrumb({ items, linkComponent: Link = "a", trail = false }: BreadcrumbProps) {
+export function Breadcrumb({
+  items,
+  linkComponent: Link = "a",
+  trail = false,
+  trailing,
+}: BreadcrumbProps) {
   const shown = items.slice(0, 3);
   return (
     <nav
@@ -30,7 +41,7 @@ export function Breadcrumb({ items, linkComponent: Link = "a", trail = false }: 
     >
       <ol className={styles["list"]}>
         {shown.map((item, index) => {
-          const last = index === shown.length - 1;
+          const last = index === shown.length - 1 && trailing === undefined;
           const asText = item.href === undefined || (last && !trail);
           return (
             <li key={`${item.label}-${String(index)}`} className={styles["item"]}>
@@ -54,6 +65,7 @@ export function Breadcrumb({ items, linkComponent: Link = "a", trail = false }: 
             </li>
           );
         })}
+        {trailing !== undefined ? <li className={styles["item"]}>{trailing}</li> : null}
       </ol>
     </nav>
   );

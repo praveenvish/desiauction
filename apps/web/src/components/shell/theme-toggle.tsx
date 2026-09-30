@@ -41,7 +41,11 @@ function subscribeTheme(onChange: () => void): () => void {
   };
 }
 
-export function ThemeToggle() {
+/**
+ * `row`: a labelled line in the phone menu, where the bar hands the switch
+ * under 360px (header 9.5); `icon` is the bar's own 40px button.
+ */
+export function ThemeToggle({ variant = "icon" }: { variant?: "icon" | "row" } = {}) {
   // The server cannot know the stored theme, so it (and the hydrating render)
   // sees null and draws the default icon; the client snapshot takes over after.
   const current = useSyncExternalStore(subscribeTheme, readTheme, () => null);
@@ -52,10 +56,14 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      className="shell-icon-button"
-      data-testid="theme-toggle"
-      aria-label={next === "floodlight" ? "Switch to dark theme" : "Switch to light theme"}
-      title={next === "floodlight" ? "Dark" : "Light"}
+      className={variant === "row" ? "shell-drawer-link shell-theme-row" : "shell-icon-button"}
+      data-testid={variant === "row" ? "theme-toggle-row" : "theme-toggle"}
+      {...(variant === "icon"
+        ? {
+            "aria-label": next === "floodlight" ? "Switch to dark theme" : "Switch to light theme",
+            title: next === "floodlight" ? "Dark" : "Light",
+          }
+        : {})}
       onClick={() => {
         document.documentElement.setAttribute("data-theme", next);
         try {
@@ -65,7 +73,8 @@ export function ThemeToggle() {
         }
       }}
     >
-      {current === "floodlight" ? <IconSun size={18} /> : <IconMoon size={18} />}
+      {current === "floodlight" ? <IconSun size={20} /> : <IconMoon size={20} />}
+      {variant === "row" ? (next === "floodlight" ? "Dark theme" : "Light theme") : null}
     </button>
   );
 }

@@ -188,8 +188,9 @@ test("search navigates; the identity bar names every surface consistently", asyn
   await page.getByRole("button", { name: "Create season" }).click();
   await expect(page).toHaveURL(/\/seasons\/shell-cup-b/);
 
-  // Season switcher: jump from Cup B back to the first cup.
-  await page.getByRole("button", { name: "Switch season" }).click();
+  // Season switcher: jump from Cup B back to the first cup. The season's own
+  // crumb is the switcher on a laptop (header 9.5); a phone's is the chip.
+  await page.getByRole("button", { name: /^Season: Shell Cup B .*Change season$/ }).click();
   await page.getByRole("menuitem", { name: new RegExp(`^Shell Cup ${STAMP}`) }).click();
   await expect(page).toHaveURL(/\/seasons\/shell-cup-(?!b)/);
 

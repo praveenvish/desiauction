@@ -19,6 +19,20 @@
   border-right: 1px solid var(--border-subtle);
 }
 
+/* A bottom sheet: full width, content height, rounded top — the phone's
+   season switcher (header 9.5). */
+.bottom {
+  inset: auto 0 0 0;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 85dvh;
+  border-left: none;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 20px 20px 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
 .drawer::backdrop {
   background: var(--scrim);
 }
