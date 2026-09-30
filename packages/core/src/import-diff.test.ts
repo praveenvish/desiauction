@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { planImport, planImportRow, type ExistingRegistration } from "./import-diff";
 import { parseRegistrationCsv, type CsvRegistrationRow } from "./registration-csv";
+import { FOOTBALL } from "./sports";
 
 const NOW = new Date("2026-08-30T00:00:00Z");
 
@@ -38,6 +39,7 @@ function stored(overrides: Partial<ExistingRegistration> = {}): ExistingRegistra
     isIcon: false,
     isCaptain: false,
     isRetained: false,
+    attributes: {},
     ...overrides,
   };
 }
@@ -234,6 +236,54 @@ describe("the squad marks under each policy", () => {
     expect(planImportRow(row, stored({ teamName: null }), "fill-blanks")).toEqual({
       kind: "changed",
       changes: [{ field: "teamName", label: "Team", from: null, to: "Andheri Arrows" }],
+    });
+  });
+});
+
+describe("a sport's attributes on a re-import", () => {
+  const footballRow = (foot: string): CsvRegistrationRow => {
+    const result = parseRegistrationCsv(
+      `name,phone,role,attr:preferred_foot\nSunil Chhetri,9876543210,forward,${foot}`,
+      undefined,
+      { now: NOW, pack: FOOTBALL },
+    );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(`fixture did not parse: ${JSON.stringify(result.errors)}`);
+    }
+    return row;
+  };
+
+  it("fills a blank attribute and names it the way the pack does", () => {
+    const plan = planImportRow(
+      footballRow("Left foot"),
+      stored({ role: "forward", attributes: {} }),
+      "fill-blanks",
+      FOOTBALL,
+    );
+    expect(plan).toEqual({
+      kind: "changed",
+      changes: [{ field: "attr:preferred_foot", label: "Preferred foot", from: null, to: "left" }],
+    });
+  });
+
+  it("leaves an attribute somebody set by hand unless the file wins", () => {
+    const existing = stored({ role: "forward", attributes: { preferred_foot: "right" } });
+    expect(planImportRow(footballRow("left"), existing, "fill-blanks", FOOTBALL)).toEqual({
+      kind: "unchanged",
+    });
+    expect(planImportRow(footballRow("left"), existing, "file-wins", FOOTBALL)).toEqual({
+      kind: "changed",
+      changes: [
+        { field: "attr:preferred_foot", label: "Preferred foot", from: "right", to: "left" },
+      ],
+    });
+  });
+
+  it("has no opinion on an attribute the file left blank", () => {
+    const existing = stored({ role: "forward", attributes: { preferred_foot: "right" } });
+    expect(planImportRow(footballRow(""), existing, "file-wins", FOOTBALL)).toEqual({
+      kind: "unchanged",
     });
   });
 });

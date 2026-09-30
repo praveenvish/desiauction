@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  IMPORT_FIELDS,
   applyMapping,
   detectMapping,
+  importFieldLabel,
+  importFieldsFor,
   mappingOf,
+  type MappableField,
   normalizeHeader,
   sampleRow,
   signatureOf,
@@ -12,6 +16,8 @@ import {
 } from "./import-mapping";
 import { driveFileIdOf, editCsvRow, parseRegistrationRecords } from "./registration-csv";
 import { tokenizeCsv } from "./registration-csv";
+import { unplacedValues } from "./import-values";
+import { CRICKET, FOOTBALL, splitAttributeWrite, sportPackFor } from "./sports";
 
 /*
  * A Google Form response export, in the shape one actually arrives in: the
@@ -544,5 +550,185 @@ describe("withDetectedPhoto", () => {
   it("keeps a saved photo choice", () => {
     const saved = { name: 0, phone: 1, role: 2, photo_link: 2 };
     expect(withDetectedPhoto(saved, detected)).toBe(saved);
+  });
+});
+
+/*
+ * A FOOTBALL CLUB'S FORM.
+ *
+ * Before the mapping read the pack, "Preferred foot" came back unmapped on
+ * every football import: the pack declared `headerAliases` for it and nothing
+ * read them, so the column was dropped and the answers with it. SYNTHETIC, in
+ * the same Form-export shape as `FORM_CSV`.
+ */
+const FOOTBALL_FORM_CSV = [
+  "Timestamp,Email Address,Player Name,Mobile Number,Playing position,Preferred foot",
+  "15/03/2026 14:32:11,sunil@example.com,Sunil Chhetri,9876543210,Forward,Right foot",
+  "15/03/2026 14:35:02,gurpreet@example.com,Gurpreet Sandhu,9876543211,Goalkeeper,Righty",
+  "15/03/2026 14:41:19,anirudh@example.com,Anirudh Thapa,9876543212,Midfielder,Both feet",
+  "15/03/2026 14:44:40,sandesh@example.com,Sandesh Jhingan,9876543213,Defender,Left foot",
+  "15/03/2026 14:47:05,sahal@example.com,Sahal Samad,9876543214,Midfielder,N/A",
+].join("\n");
+
+describe("a sport's own attributes — found by the pack's headerAliases", () => {
+  const records = tokenizeCsv(FOOTBALL_FORM_CSV);
+  const headers = records[0] ?? [];
+
+  it("maps a football form's Preferred foot column to the pack's attribute", () => {
+    const detected = detectMapping(headers, records, FOOTBALL);
+    expect(detected.columns[5]?.field).toBe("attr:preferred_foot");
+    expect(detected.missing).toEqual([]);
+    expect(detected.conflicts).toEqual([]);
+  });
+
+  it("imports the attribute through the option aliases, canonical and 'not me' as blank", () => {
+    const mapped = applyMapping(records, mappingOf(detectMapping(headers, records, FOOTBALL)));
+    const result = parseRegistrationRecords(mapped, undefined, { now: NOW, pack: FOOTBALL });
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.attributes)).toEqual([
+      { preferred_foot: "right" },
+      { preferred_foot: "right" },
+      { preferred_foot: "both" },
+      { preferred_foot: "left" },
+      {},
+    ]);
+    // Cricket's columns are untouched by a football attribute.
+    expect(result.rows.every((row) => row.battingStyle === null)).toBe(true);
+  });
+
+  it("writes the parsed answers the way the registration form does", () => {
+    const mapped = applyMapping(records, mappingOf(detectMapping(headers, records, FOOTBALL)));
+    const [row] = parseRegistrationRecords(mapped, undefined, { now: NOW, pack: FOOTBALL }).rows;
+    expect(splitAttributeWrite(FOOTBALL, row?.attributes ?? {})).toEqual({
+      columns: {},
+      json: { preferred_foot: "right" },
+    });
+  });
+
+  it("refuses a value it cannot place, by column, and offers the pack's options", () => {
+    const odd = tokenizeCsv(
+      [
+        "Player Name,Mobile Number,Position,Strong foot",
+        "Sunil Chhetri,9876543210,Forward,Rightish",
+      ].join("\n"),
+    );
+    const mapping = mappingOf(detectMapping(odd[0] ?? [], odd, FOOTBALL));
+    expect(mapping["attr:preferred_foot"]).toBe(3);
+    const mapped = applyMapping(odd, mapping);
+    const result = parseRegistrationRecords(mapped, undefined, { now: NOW, pack: FOOTBALL });
+    expect(result.errors).toEqual([
+      {
+        line: 2,
+        name: "Sunil Chhetri",
+        message: 'unknown preferred foot "Rightish"',
+        fields: ["attr:preferred_foot"],
+      },
+    ]);
+    const unplaced = unplacedValues(mapped, { pack: FOOTBALL, bands: [], teams: [] });
+    expect(unplaced).toEqual([
+      {
+        field: "attr:preferred_foot",
+        fieldLabel: "Preferred foot",
+        value: "Rightish",
+        rows: 1,
+        options: [
+          { value: "right", label: "Right footed" },
+          { value: "left", label: "Left footed" },
+          { value: "both", label: "Both feet" },
+        ],
+      },
+    ]);
+    // The organizer's answer in the value mapper lets the row in.
+    const fixed = applyMapping(odd, mapping, { "attr:preferred_foot": { rightish: "right" } });
+    const retried = parseRegistrationRecords(fixed, undefined, { now: NOW, pack: FOOTBALL });
+    expect(retried.errors).toEqual([]);
+    expect(retried.rows[0]?.attributes).toEqual({ preferred_foot: "right" });
+  });
+
+  it("finds every racquet and court pack's attribute by its own wording", () => {
+    const cases: [string, string, string, string][] = [
+      ["volleyball", "Spiking hand", "Lefty", "attr:spiking_hand"],
+      ["table_tennis", "Grip style", "Penhold", "attr:grip"],
+      ["badminton", "Racket hand", "Left handed", "attr:playing_hand"],
+      ["pickleball", "Paddle hand", "Right handed", "attr:playing_hand"],
+    ];
+    for (const [sport, header, answer, field] of cases) {
+      const pack = sportPackFor(sport);
+      expect(pack.key).toBe(sport);
+      const role = pack.roles.values[0]?.label ?? "";
+      const file = tokenizeCsv(
+        `Player Name,Mobile Number,Position,${header}\nAsha Rao,9876543210,${role},${answer}`,
+      );
+      const mapping = mappingOf(detectMapping(file[0] ?? [], file, pack));
+      expect(mapping[field as MappableField], `${sport}: ${header}`).toBe(3);
+      const [row] = parseRegistrationRecords(applyMapping(file, mapping), undefined, { pack }).rows;
+      expect(Object.values(row?.attributes ?? {}), `${sport}: ${answer}`).toHaveLength(1);
+    }
+  });
+
+  it("offers the attribute on the mapping screen, labelled by the pack", () => {
+    const football = importFieldsFor(FOOTBALL);
+    expect(football.at(-1)).toEqual({
+      field: "attr:preferred_foot",
+      label: "Preferred foot",
+      required: false,
+    });
+    expect(importFieldLabel("attr:preferred_foot", FOOTBALL)).toBe("Preferred foot");
+  });
+
+  it("ignores an attribute column the season's pack does not declare", () => {
+    // A football season's saved mapping reused for a cricket one: nowhere to
+    // store the answer, so it is dropped rather than failing every row.
+    const mapped = applyMapping(records, mappingOf(detectMapping(headers, records, FOOTBALL)));
+    const result = parseRegistrationRecords(
+      mapped.map((record, index) =>
+        index === 0 ? record : [...record.slice(0, 2), "batter", ...record.slice(3)],
+      ),
+      undefined,
+      { now: NOW },
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.rows.every((row) => Object.keys(row.attributes).length === 0)).toBe(true);
+  });
+});
+
+describe("cricket imports exactly as it did", () => {
+  const records = tokenizeCsv(FORM_CSV);
+  const headers = records[0] ?? [];
+
+  it("detects the same mapping with the cricket pack as with none", () => {
+    expect(detectMapping(headers, records, CRICKET)).toEqual(detectMapping(headers, records));
+    expect(mappingOf(detectMapping(headers, records, CRICKET))).toEqual({
+      name: 2,
+      phone: 3,
+      role: 4,
+      date_of_birth: 5,
+      batting_style: 6,
+      bowling_style: 7,
+    });
+  });
+
+  it("adds no attribute fields — its styles are the fixed columns", () => {
+    expect(importFieldsFor(CRICKET).map((option) => option.field)).toEqual([...IMPORT_FIELDS]);
+    expect(importFieldsFor(sportPackFor("box_cricket")).map((option) => option.field)).toEqual([
+      ...IMPORT_FIELDS,
+    ]);
+  });
+
+  it("still leaves a football column unmapped in a cricket season", () => {
+    const file = tokenizeCsv(
+      "Player Name,Mobile Number,Role,Preferred foot\nA B C,9876543210,Batsman,Left",
+    );
+    expect(detectMapping(file[0] ?? [], file, CRICKET).columns[3]?.field).toBeNull();
+  });
+
+  it("parses styles into their columns and leaves attributes empty", () => {
+    const mapped = applyMapping(records, mappingOf(detectMapping(headers, records, CRICKET)));
+    const result = parseRegistrationRecords(mapped, undefined, { now: NOW, pack: CRICKET });
+    expect(result.rows.map((row) => [row.battingStyle, row.bowlingStyle, row.attributes])).toEqual([
+      ["right_hand", "off_break", {}],
+      ["right_hand", "right_arm_fast", {}],
+      ["left_hand", null, {}],
+    ]);
   });
 });

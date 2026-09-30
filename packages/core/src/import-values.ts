@@ -1,7 +1,9 @@
 import {
-  IMPORT_FIELD_LABELS,
+  attributeKeyOf,
+  importFieldLabel,
   normalizeHeader,
   type ImportField,
+  type MappableField,
   type ValueMaps,
 } from "./import-mapping";
 import { FEE_STATUSES, parseFeeStatus } from "./money";
@@ -39,7 +41,7 @@ export interface ValueOption {
 }
 
 export interface UnplacedValue {
-  field: ImportField;
+  field: MappableField;
   /** "Base price band" — the field's name on the mapping screen. */
   fieldLabel: string;
   /** The cell exactly as the file wrote it, which is what the organizer sees. */
@@ -151,8 +153,11 @@ export function unplacedValues(
   const header = (records[0] ?? []).map((cell) => cell.trim().toLowerCase());
   const found: UnplacedValue[] = [];
   header.forEach((name, column) => {
-    const field = name as ImportField;
-    const closed = CLOSED[field];
+    const field = name as MappableField;
+    // A pack attribute (`attr:preferred_foot`) is closed by its own options —
+    // the same rule `attribute()` gives cricket's two column-stored ones.
+    const key = attributeKeyOf(field);
+    const closed = key === null ? CLOSED[field as ImportField] : attribute(key);
     if (closed === undefined) {
       return;
     }
@@ -174,7 +179,7 @@ export function unplacedValues(
     for (const [value, rows] of counts) {
       found.push({
         field,
-        fieldLabel: IMPORT_FIELD_LABELS[field],
+        fieldLabel: importFieldLabel(field, vocab.pack),
         value,
         rows,
         options: closed.options(vocab),

@@ -16,10 +16,11 @@ import {
   slugifyName,
   tokenizeCsv,
   validateNewPlayer,
-  IMPORT_FIELDS,
+  importFieldsFor,
   isFeeStatus,
   type FeeStatus,
   type ColumnMapping,
+  type ImportFieldOption,
   type CsvRowError,
   type DateOrder,
   type DetectedMapping,
@@ -2578,6 +2579,12 @@ export interface ImportInspection {
   /** First row carrying data, aligned to `headers`. */
   sample: string[];
   detected?: DetectedMapping;
+  /**
+   * Every field a column can go to in THIS season: the fixed ones plus the
+   * sport's own attributes (a football season offers "Preferred foot"). Plain
+   * data, because the pack that decides it cannot cross into the client.
+   */
+  fields: ImportFieldOption[];
   /** Fingerprint of this file's layout, for recognising the form again. */
   signature: string;
   /** Bands this competition accepts — the value-mapping targets for a band. */
@@ -2593,11 +2600,27 @@ export interface ImportInspection {
 export async function importInspectAction(slug: string, csv: string): Promise<ImportInspection> {
   const gate = await reviewGate(slug);
   if (!gate.ok) {
-    return { ok: false, error: gate.error, headers: [], sample: [], signature: "", bands: [] };
+    return {
+      ok: false,
+      error: gate.error,
+      headers: [],
+      sample: [],
+      fields: [],
+      signature: "",
+      bands: [],
+    };
   }
   const tooBig = oversized(csv);
   if (tooBig !== null) {
-    return { ok: false, error: tooBig, headers: [], sample: [], signature: "", bands: [] };
+    return {
+      ok: false,
+      error: tooBig,
+      headers: [],
+      sample: [],
+      fields: [],
+      signature: "",
+      bands: [],
+    };
   }
   const records = tokenizeCsv(csv);
   const headers = [...(records[0] ?? [])];
@@ -2607,11 +2630,13 @@ export async function importInspectAction(slug: string, csv: string): Promise<Im
       error: "That file has no header row.",
       headers: [],
       sample: [],
+      fields: [],
       signature: "",
       bands: [],
     };
   }
   const signature = signatureOf(headers);
+  const pack = sportPackFor(gate.competition.sport);
   const saved = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
     savedMappingFor(db, gate.competition.orgId, gate.competition.id, signature),
   );
@@ -2620,8 +2645,10 @@ export async function importInspectAction(slug: string, csv: string): Promise<Im
     headers,
     sample: sampleRow(records),
     // The rows too: a photo question the header table does not know is still
-    // found by its Drive-link answers.
-    detected: detectMapping(headers, records),
+    // found by its Drive-link answers. The pack too: a football form's
+    // "Preferred foot" is found by the pack's own header aliases.
+    detected: detectMapping(headers, records, pack),
+    fields: importFieldsFor(pack),
     signature,
     bands: [...(await bandsFor(gate.personId, gate.competition))],
     ...(saved !== null ? { saved } : {}),
@@ -2725,6 +2752,8 @@ export interface ImportShape {
 function canonicalRecords(
   csv: string,
   shape: ImportShape | undefined,
+  /** The season's sport — its attribute columns are ours too. */
+  sport: string,
 ): readonly (readonly string[])[] {
   const records = tokenizeCsv(csv);
   const mapping = shape?.mapping;
@@ -2737,7 +2766,7 @@ function canonicalRecords(
   }
   const header = (records[0] ?? []).map((cell) => cell.trim().toLowerCase());
   const identity: ColumnMapping = {};
-  IMPORT_FIELDS.forEach((field) => {
+  importFieldsFor(sportPackFor(sport)).forEach(({ field }) => {
     const at = header.indexOf(field);
     if (at !== -1) {
       identity[field] = at;
@@ -2754,7 +2783,7 @@ function parseUnderShape(
   sport: string,
   shape: ImportShape | undefined,
 ): ReturnType<typeof parseRegistrationRecords> {
-  const source = canonicalRecords(csv, shape);
+  const source = canonicalRecords(csv, shape, sport);
   const parsed = parseRegistrationRecords(source, bands, {
     now: new Date(),
     knownTeams: teamNames,
@@ -2800,7 +2829,7 @@ export async function importPreviewAction(
    * against a season configured for A/B/C is 200 errors and one decision.
    */
   const unplaced = unplacedValues(
-    canonicalRecords(csv, shape),
+    canonicalRecords(csv, shape, gate.competition.sport),
     {
       pack: sportPackFor(gate.competition.sport),
       bands,
@@ -2818,7 +2847,7 @@ export async function importPreviewAction(
       gate.competition.id,
       result.rows.map((row) => row.phone),
     );
-    return planImport(result.rows, stored, policy);
+    return planImport(result.rows, stored, policy, sportPackFor(gate.competition.sport));
   });
   return {
     validCount: result.rows.length,
