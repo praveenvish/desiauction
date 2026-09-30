@@ -578,19 +578,6 @@
 }
 
 /* The laptop's trail: club / season ▾ — the last crumb is the switcher. */
-.shell-trail {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-family: var(--font-text);
-  font-size: 13px;
-}
-
-.shell-trail-sep {
-  color: var(--text-muted);
-}
-
 .shell-season-crumb {
   display: inline-flex;
   align-items: center;

@@ -958,17 +958,12 @@ export function ProductShell({
       : undefined;
   const trailNode: ReactNode =
     seasonNow !== undefined ? (
-      <span className="shell-trail">
-        <Breadcrumb
-          trail
-          linkComponent={Link}
-          items={identity.crumbs.filter((crumb) => crumb.label !== seasonNow.name)}
-        />
-        <span aria-hidden className="shell-trail-sep">
-          /
-        </span>
-        <SeasonCrumb current={seasonNow} seasons={competitions} />
-      </span>
+      <Breadcrumb
+        trail
+        linkComponent={Link}
+        items={identity.crumbs.filter((crumb) => crumb.label !== seasonNow.name)}
+        trailing={<SeasonCrumb current={seasonNow} seasons={competitions} named={title !== null} />}
+      />
     ) : identity.crumbs.length > 0 ? (
       <Breadcrumb trail linkComponent={Link} items={identity.crumbs} />
     ) : null;

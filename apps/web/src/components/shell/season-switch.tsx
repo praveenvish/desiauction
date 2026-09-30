@@ -127,8 +127,19 @@ export function SeasonChip({ current, seasons }: Props) {
   );
 }
 
-/** The laptop's last crumb: the season's name, and the way to another. */
-export function SeasonCrumb({ current, seasons }: Props) {
+/**
+ * The laptop's last crumb: the season's name, and the way to another. On the
+ * season's overview its name is already the page's h1 (the hero), and the
+ * trail never prints a name twice — there it reads "Switch season".
+ */
+export function SeasonCrumb({
+  current,
+  seasons,
+  named = true,
+}: Props & {
+  /** False where the page's own heading already names the season. */
+  named?: boolean;
+}) {
   const router = useRouter();
   const others = byClub(current, seasons)
     .flatMap((club) => club.seasons)
@@ -140,7 +151,7 @@ export function SeasonCrumb({ current, seasons }: Props) {
       triggerClassName="shell-season-crumb"
       trigger={
         <>
-          <span className="shell-season-crumb-name">{current.name}</span>
+          <span className="shell-season-crumb-name">{named ? current.name : "Switch season"}</span>
           <IconChevronDown size={14} aria-hidden />
         </>
       }
