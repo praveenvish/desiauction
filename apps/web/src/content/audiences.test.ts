@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { istCalendarDate } from "../lib/format-date";
+
 import { AUDIENCE_PAGES } from "./audiences";
 import { SPORT_PAGES } from "./sports";
 
@@ -67,7 +69,9 @@ describe("audience pages", () => {
   });
 
   it("dates every page with a real, past calendar date", () => {
-    const today = new Date().toISOString().slice(0, 10);
+    // The product's calendar is IST (lib/format-date): UTC would call a date
+    // written this morning in India "the future" until 05:30.
+    const today = istCalendarDate();
     for (const page of AUDIENCE_PAGES) {
       expect(page.updatedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(page.updatedOn <= today, page.slug).toBe(true);

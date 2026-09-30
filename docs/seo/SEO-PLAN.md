@@ -142,7 +142,7 @@ Also run **Lighthouse CI** (SEO category must score 100; performance budgets fro
 
 ---
 
-### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1) — **4a, 4b and 4c BUILT 2026-09-30** (see §11–§13); 4d to do
+### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1) — **4a–4d BUILT 2026-09-30/10-01** (see §11–§14)
 
 This is where the traffic comes from. Build pages from the **sport pack registry** in `packages/core/src/sports`, but write the copy by hand. Pages are templated for layout only.
 
@@ -579,3 +579,42 @@ Each page has:
   - at 360px: no page overflow, table hidden, and both sides of a card visible on screen (plus axe)
   - unknown → 404
 - E2E across all landing pages, seo, CSP, public pages and the shell: **38/38**.
+
+---
+
+## 14. Phase 4d delivery log (2026-10-01)
+
+**Built on `feat/seo-free-tools`, stacked on Phase 4c (#181). Its PR targets `main`.**
+
+**What shipped:**
+- `/tools` (hub) and three tools that need no sign-in, each with `FAQPage` + `BreadcrumbList` markup.
+- A footer link (Tournaments › Free tools), sitemap and route-registry entries.
+
+| Tool | Built on |
+|---|---|
+| `/tools/purse-calculator` | the auction's own `maxAffordableBid` (the reserve rule), `DEFAULT_AUCTION_CONFIG` / `pointsSlabs` (increments) and `validateAuctionConfig`, in rupees or points |
+| `/tools/registration-form` | the importer's own column labels (`IMPORT_FIELD_LABELS`) and each pack's roles. **`content/tools.test.ts` runs every sport's template through the real import** (`detectMapping` → `applyMapping` → `parseRegistrationRecords`) and expects zero errors. Rewording one heading fails 24 of 25 cases (checked). |
+| `/tools/snake-draft` | a pick order that reverses every round. It says plainly that DesiAuction runs auctions, not drafts. |
+
+**Found while building:**
+1. **Sport attributes other than cricket's are not imported.** Packs declare `headerAliases` for preferred foot, grip, playing hand and spiking hand, but `import-mapping.ts` never reads them.
+   - The Phase 4c FAQ claim ("matched to … the sport's attributes") was **narrowed** to name, phone, role, and batting/bowling style for cricket.
+   - The template lists only fields the import reads.
+   - Wiring the attributes into the import was flagged as its own engineering task.
+2. **`template.tsx` is a reserved Next.js file name** (a route template). A component file with that name broke `/tools/registration-form` with a 500 ("Element type is invalid … got: object"). It was renamed `form-template.tsx`.
+3. **Date tests compared UTC dates.** Between 00:00 and 05:30 IST, content dated "today" counted as the future and failed. All content-date tests now use `istCalendarDate()`, the product's calendar.
+4. **Calculator copy:**
+   - An unverified claim that organizers can set their own increment steps was removed. The steps are shown in the room; no setup screen edits them.
+   - The phone note no longer says the phone is "how a player signs in", because sign-in is email-first.
+5. axe `definition-list`: explanatory `<p>`s inside a `<dl>` became `<dd>`s. The build warning `align-items: end` became `flex-end`.
+
+**Tests:**
+- `content/tools.test.ts`: template through the importer for all 12 sports, plus tool entries.
+- `app/tools/snake-draft/draft.test.ts`.
+- `e2e/tools.spec.ts`:
+  - hub
+  - calculator: ₹80,000 first bid from the reserve rule, a purse-too-small warning, and a points ladder of +5 pts, with axe in both themes
+  - template switches sport
+  - draft reverses round 2
+  - no overflow at 360px
+- E2E across every landing page, seo, CSP, public pages and the shell: **43/43**.

@@ -812,6 +812,7 @@ export function ProductShell({
               { label: "Browse tournaments", href: "/c" },
               { label: "Try a mock auction", href: "/#playground" },
               { label: "Rules & guidelines", href: "/rules-guidelines" },
+              { label: "Free tools", href: "/tools" },
             ],
           },
           {

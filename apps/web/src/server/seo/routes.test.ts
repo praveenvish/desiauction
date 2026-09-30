@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { istCalendarDate } from "../../lib/format-date";
+
 import { HELP_ARTICLES } from "../../content/help";
 import { LEGAL_DOCUMENTS } from "../../content/legal";
 import {
@@ -93,7 +95,9 @@ describe("route registry", () => {
   });
 
   it("dates every indexable page and help article with a real, past calendar date", () => {
-    const today = new Date().toISOString().slice(0, 10);
+    // The product's calendar is IST (lib/format-date): UTC would call a date
+    // written this morning in India "the future" until 05:30.
+    const today = istCalendarDate();
     const dates = [
       ...INDEXABLE_PAGES.map((page) => [page.path, page.updatedOn] as const),
       ...HELP_ARTICLES.map((article) => [`/help/${article.slug}`, article.updatedOn] as const),

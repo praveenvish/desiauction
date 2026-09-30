@@ -63,6 +63,7 @@ export const INDEXABLE_PAGES: readonly IndexablePage[] = [
   { path: "/sports", updatedOn: "2026-09-30", changeFrequency: "monthly" },
   { path: "/for", updatedOn: "2026-09-30", changeFrequency: "monthly" },
   { path: "/compare", updatedOn: "2026-09-30", changeFrequency: "monthly" },
+  { path: "/tools", updatedOn: "2026-10-01", changeFrequency: "monthly" },
 ];
 
 /**
@@ -93,6 +94,7 @@ const PUBLIC_SUBTREES = [
   "/sports",
   "/for",
   "/compare",
+  "/tools",
 ] as const;
 
 /** Next's file-based metadata routes. These are fetched by crawlers and share scrapers. */
