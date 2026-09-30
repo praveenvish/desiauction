@@ -62,6 +62,8 @@ export function shellKind(pathname: string): ShellKind {
     // login page keeps the public header/footer (2026-07-25 founder call) so a
     // visitor at the gate can still reach the rest of the site.
     pathname.startsWith("/onboarding") ||
+    // A card framed inside another site (SEO-1 Phase 7): no header, no footer.
+    pathname.startsWith("/embed/") ||
     BARE_AUCTION_RE.test(pathname)
   ) {
     return "bare";

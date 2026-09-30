@@ -209,7 +209,7 @@ Every public season can rank for "‹league name› auction 2026", "‹league›
 
 ---
 
-### Phase 7 — Authority and backlinks (P1, founder + engineering)
+### Phase 7 — Authority and backlinks (P1, founder + engineering) — **engineering half BUILT 2026-10-01** (see §17)
 
 | Tactic | Owner | Detail |
 |---|---|---|
@@ -689,3 +689,23 @@ Each page has:
 - E2E across guides, seo, shell, public pages, CSP and all landing pages: **46/46**.
 
 **Still for the founder:** real bylines (a named author with experience earns more trust than "the team"), two new guides a month, and a quarterly refresh of the top five.
+
+---
+
+## 17. Phase 7 delivery log, engineering half (2026-10-01)
+
+**Built on `feat/seo-embed`, stacked on Phase 6.**
+
+**Season embed:** `/embed/[slug]` is a small read-only card of a **published** season (status, name, organizer, sport, place, dates, team count). It has a link out to `/c/[slug]` ("Register" / "Watch live" / "View the season") and "Powered by DesiAuction". It is bare (no site chrome), `noindex` (it would duplicate the season page), and shows no player names.
+- **Organizer:** "Embed on your website" on the season overview (public seasons, managers) copies an iframe **plus a plain `<a>` link to the season page**. The plain link is the actual backlink: a link inside an iframe belongs to us, not to the host page. The season name is HTML-escaped in the snippet.
+- **Framing is allowed on `/embed/*` only.** The global security-header rule now skips `/embed` (a negative-lookahead source), and `/embed/*` gets the same headers minus `X-Frame-Options`, with `frame-ancestors *`. An embed page has no form and no session-bound action, so framing gives a clickjacker nothing to click.
+- `embed` is classified in the route registry (noindex header, Disallow).
+- The e2e asserts the season page itself **still** sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`.
+
+**Already true, no change needed:** the board and the overlay carry the DesiAuction wordmark, and share cards carry the brand.
+
+**Founder half (not engineering):**
+- directory listings (Product Hunt, G2, Capterra/GetApp India, SaaSworthy, Techjockey, AlternativeTo)
+- a stream kit for organizers (YouTube description text with the season link)
+- local sports press, academy and turf associations, college fests
+- case studies from real seasons that agree to one

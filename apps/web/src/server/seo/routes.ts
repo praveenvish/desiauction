@@ -157,6 +157,9 @@ export const CONSOLE_SEGMENTS = [
   "email",
   "dev",
   "gallery",
+  // Framed cards for organizers' own websites (SEO-1 Phase 7): public data,
+  // but a duplicate of /c/[slug], so never indexed.
+  "embed",
 ] as const;
 
 /**

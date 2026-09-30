@@ -602,6 +602,27 @@ export function OverviewPanel({
     }
   };
 
+  // SEO-1 Phase 7: the embed snippet — the card in an iframe, and a plain link
+  // after it. The link is the backlink; a link inside the frame is ours.
+  const copyEmbedCode = async () => {
+    const origin = window.location.origin;
+    const name = view.competition.name
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    const code = [
+      `<iframe src="${origin}/embed/${slug}" title="${name} on DesiAuction" width="100%" height="210" style="border:0;max-width:480px" loading="lazy"></iframe>`,
+      `<p><a href="${origin}/c/${slug}">${name} — player auction on DesiAuction</a></p>`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(code);
+      toast({ title: "Embed code copied — paste it into your website", tone: "success" });
+    } catch {
+      toast({ title: "Couldn't copy the embed code.", tone: "danger" });
+    }
+  };
+
   const copyPublicLink = async () => {
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/c/${slug}`);
@@ -1322,6 +1343,31 @@ export function OverviewPanel({
                     onClick={() => void setSquadListing(!view.squadListing?.optedIn)}
                   >
                     {view.squadListing.optedIn ? "Turn off" : "Turn on"}
+                  </Button>
+                </span>
+              </li>
+            ) : null}
+            {isPublic && view.platformHold === null ? (
+              <li className="ov-look" data-testid="embed-row">
+                <span className="ov-look-thumb" aria-hidden>
+                  <IconGlobe size={18} />
+                </span>
+                <span className="ov-look-text">
+                  <strong>Embed on your website</strong>
+                  <span>
+                    A small card of this season for your club&apos;s own site, with a link back to
+                    the public page.
+                  </span>
+                </span>
+                <span className="ov-look-actions">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    data-testid="copy-embed-code"
+                    onClick={() => void copyEmbedCode()}
+                  >
+                    <IconCopy size={16} />
+                    Copy embed code
                   </Button>
                 </span>
               </li>

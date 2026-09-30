@@ -187,6 +187,26 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
     expect(await robots?.text()).toContain("sitemap.xml");
     const sitemap = await anon.goto("/sitemap.xml");
     expect(await sitemap?.text()).toContain(publicUrl);
+
+    // SEO-1 Phase 7: the embed card — the ONE framable page — for a published
+    // season only, never indexed, and the rest of the site still unframeable.
+    const embedUrl = publicUrl.replace("/c/", "/embed/");
+    const embed = await anon.goto(embedUrl);
+    expect(embed?.status()).toBe(200);
+    const embedHeaders = embed?.headers() ?? {};
+    expect(embedHeaders["x-frame-options"]).toBeUndefined();
+    expect(embedHeaders["content-security-policy"]).toContain("frame-ancestors *");
+    expect(embedHeaders["x-robots-tag"]).toContain("noindex");
+    await expect(anon.getByTestId("embed-card")).toContainText(`Monsoon Cup ${STAMP}`);
+    await expect(anon.getByRole("link", { name: "Register" })).toHaveAttribute(
+      "href",
+      new RegExp(`${publicUrl}$`),
+    );
+    const hiddenEmbed = await anon.goto(privateSlugUrl.replace("/c/", "/embed/"));
+    expect(hiddenEmbed?.status()).toBe(404);
+    const page = await anon.goto(publicUrl);
+    expect(page?.headers()["x-frame-options"]).toBe("DENY");
+    expect(page?.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
   });
 });
 
