@@ -35,6 +35,8 @@ Bid validate+append < 20ms p99 server-side; snapshot build < 150ms for a 400-lot
     - **Performance is reported, not gated**: LCP ≤ 2.5s, CLS ≤ 0.05 and TBT ≤ 300ms are warnings.
     - First baseline (local, simulated): LCP **3.6–3.9s** on all four pages. CLS ≤ 0.004, TBT ≤ 16ms, accessibility and best practices 100.
     - LCP is over budget, which is SEO-1 Phase 8's work. The warning becomes an error once CI has a stable baseline, then it ratchets down.
+  - **Phase 8 finding (2026-10-01):** that lab LCP is Lighthouse's *simulation* (Lantern). In the unthrottled trace, the largest paint **is** the first paint on all four pages (72–231 ms observed). The simulation counts every request made before LCP, including all JavaScript. Inlining the CSS (`experimental.inlineCss`) was measured and rejected: FCP improved about 150ms, LCP didn't move, and every page would carry 50–70 KB more HTML.
+  - **Field measurement exists now.** One page load in ten reports LCP, INP, CLS, FCP and TTFB (`components/web-vitals-reporter.tsx`, via `sendBeacon`) to `/api/vitals`, which writes a `web_vitals` log line. The line has no user, session or query string, and long path segments are redacted. **The p75 budgets above are judged on those lines.** An `/admin/health` panel over them is a follow-up (it needs somewhere to aggregate beyond logs).
 - **RUM guards:** p75 regressions > 10% week-over-week open an automatic defect (56).
 - Budget changes are PRs against this file with justification — budgets are ratcheted (down) after wins, never quietly raised.
 

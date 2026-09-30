@@ -222,7 +222,7 @@ Every public season can rank for "‹league name› auction 2026", "‹league›
 
 ---
 
-### Phase 8 — Core Web Vitals in the field (P2, fixes G10)
+### Phase 8 — Core Web Vitals in the field (P2, fixes G10) — **BUILT 2026-10-01** (see §18)
 
 1. **RUM:** a `web-vitals` reporter sends LCP, INP and CLS to `/api/vitals` (sampled at 10%, no personal data), shown on `/admin/health`.
 2. **Back/forward cache on public pages (investigate first):** `no-store` is what Next itself emits for a dynamically rendered page, and the root layout's session read makes every page dynamic. Overriding the header needs a proof-of-concept first, to confirm Next doesn't overwrite it and that no signed-in HTML can be cached. Treat it as a UX win (instant back navigation), not a ranking factor.
@@ -709,3 +709,24 @@ Each page has:
 - a stream kit for organizers (YouTube description text with the season link)
 - local sports press, academy and turf associations, college fests
 - case studies from real seasons that agree to one
+
+---
+
+## 18. Phase 8 delivery log (2026-10-01)
+
+**Built on `feat/seo-speed`, stacked on Phase 7.**
+
+**Diagnosis first.** Lighthouse's 3.6–3.9s LCP on the public pages was examined before anything was changed:
+- The LCP phases were almost all "render delay" (2.9–3.4s), with TTFB of about 10–130ms.
+- **In the real, unthrottled trace, LCP equals first paint on every page (72–231ms).** The gap is Lantern's simulation, which charges every request made before LCP, JavaScript included. There is no late-appearing element to fix.
+- **Experiment, rejected:** `experimental.inlineCss`, which removes 13–16 render-blocking stylesheets per page. Measured: FCP improved about 150ms, LCP was unchanged or worse, and it would add 50–70 KB of HTML to every load and lose CSS caching. Not shipped.
+
+**Shipped: real-user monitoring**, so the budget in docs/57 is judged on real phones:
+- `WebVitalsReporter` (in the root layout, beside `ClientErrorListener`) uses Next's built-in `useReportWebVitals`. It samples one page load in ten and sends via `sendBeacon`. No new dependency.
+- `/api/vitals` mirrors `/api/client-error`: a 1 KB cap, only known fields (`lib/web-vitals-report.ts`, tested), a per-minute log cap, and 204 for everything. It writes a `web_vitals` log line with the metric, value, rating and redacted path, and no user, session or address.
+
+**Not done, and why:**
+- **The bfcache header change:** Next itself emits `no-store` for dynamic pages; the plan marked this "investigate first", and it isn't a ranking factor.
+- **An `/admin/health` panel over the vitals:** it needs aggregation beyond log lines. It's a follow-up once there's field data to show.
+
+**Tests:** `lib/web-vitals-report.test.ts` (10) and `e2e/web-vitals.spec.ts` (the endpoint's answers; the reporter loads without a policy violation).
