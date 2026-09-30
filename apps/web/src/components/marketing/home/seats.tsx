@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { LEAGUE, LIVE_LOT, STAR_LOT, price, purseLeft, PURSES } from "../../../content/home-story";
 import styles from "../../../app/home.module.css";
 import { Glyph, type GlyphName } from "./glyphs";
+import { SeatTabs } from "./swipe";
 
 /**
  * 4 · FOUR SEATS, ONE NIGHT. The same moment of the example night — Lot 6 on
@@ -11,6 +12,7 @@ import { Glyph, type GlyphName } from "./glyphs";
  * height so no card reads emptier than its neighbour.
  */
 function Seat({
+  index,
   glyph,
   label,
   color,
@@ -18,6 +20,8 @@ function Seat({
   text,
   children,
 }: {
+  /** Which tab shows this seat on a phone. */
+  index: number;
   glyph: GlyphName;
   label: string;
   color: string;
@@ -26,7 +30,10 @@ function Seat({
   children: ReactNode;
 }) {
   return (
-    <li className={[styles.card, styles.lift, styles.seat, styles.reveal].join(" ")}>
+    <li
+      className={[styles.card, styles.lift, styles.seat, styles.reveal].join(" ")}
+      data-seat={index}
+    >
       <div className={styles.cardHead}>
         <span className={styles.tile}>
           <Glyph name={glyph} />
@@ -57,14 +64,17 @@ export function Seats() {
             Built for everyone in the room.
           </h2>
         </div>
-        {/* A swipe row on a phone: focusable, so a keyboard can scroll it too. */}
+        {/* A phone shows one seat at a time, chosen by these tabs. */}
+        <SeatTabs listId="seat-list" labels={["Organizer", "Owner", "Player", "Fans"]} />
         <ul
+          id="seat-list"
           className={styles.seatGrid}
           style={{ listStyle: "none", padding: 0 }}
-          tabIndex={0}
+          data-active="0"
           aria-label="Four seats"
         >
           <Seat
+            index={0}
             glyph="gavel"
             label="The organizer"
             color="var(--gold-ink)"
@@ -124,6 +134,7 @@ export function Seats() {
             </div>
           </Seat>
           <Seat
+            index={1}
             glyph="phone"
             label="The owner"
             color="var(--blue)"
@@ -177,6 +188,7 @@ export function Seats() {
             </div>
           </Seat>
           <Seat
+            index={2}
             glyph="sold"
             label="The player"
             color="var(--coral)"
@@ -218,6 +230,7 @@ export function Seats() {
             </div>
           </Seat>
           <Seat
+            index={3}
             glyph="live"
             label="The fans"
             color="var(--violet)"

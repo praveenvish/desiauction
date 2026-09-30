@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { LEAGUE, LIVE_LOT, POOL, STAR_LOT, TEAMS, price } from "../../../content/home-story";
 import styles from "../../../app/home.module.css";
 import { Glyph } from "./glyphs";
+import { SwipeDots } from "./swipe";
 
 /**
  * 2 · ONE AUCTION NIGHT. Five moments of the example night, hour by hour.
@@ -254,6 +255,129 @@ export function Night() {
           />
         </div>
       </div>
+
+      {/* THE PHONE'S NIGHT: five cards, swiped sideways with the phone's own
+          momentum. The pinned big-screen stage above is a laptop's; at phone
+          width it was a miniature nobody could read, holding the page still
+          for five screens. (Shown instead of the stage below 761px.) */}
+      <div className={styles.nightPhone}>
+        <div className={styles.phoneHead}>
+          <p className={styles.kicker}>One auction night</p>
+          <h2 className={[styles.display, styles.title].join(" ")}>
+            6 pm to SOLD, in five swipes.
+          </h2>
+        </div>
+        <ol
+          id="night-rail"
+          className={styles.rail}
+          aria-label="One auction night, hour by hour"
+          tabIndex={0}
+        >
+          {MOMENTS.map((moment, index) => (
+            <li key={moment.state} className={[styles.card, styles.storyCard].join(" ")}>
+              <div className={styles.storyTop}>
+                <span className={[styles.display, styles.num].join(" ")}>{moment.time}</span>
+                <span className={styles.cap}>
+                  {index + 1} / {MOMENTS.length}
+                </span>
+              </div>
+              <h3 className={styles.storyTitle}>{moment.title}</h3>
+              <p className={styles.storyText}>{moment.text}</p>
+              <div className={styles.storyVisual} aria-hidden="true">
+                <StoryVisual state={moment.state} />
+              </div>
+            </li>
+          ))}
+        </ol>
+        <SwipeDots railId="night-rail" />
+      </div>
     </section>
+  );
+}
+
+/** Each moment's picture, drawn for a phone rather than shrunk from a screen. */
+function StoryVisual({ state }: { state: State }) {
+  const star = STAR_LOT.player;
+  if (state === "pool") {
+    const faces = POOL.filter((player) => player.face !== undefined).slice(0, 2);
+    return (
+      <div className={styles.storyPool}>
+        {faces.map((player) => (
+          <span key={player.name} data-star={player.name === star.name ? "" : undefined}>
+            {player.face === undefined ? null : (
+              <Image src={player.face} alt="" width={80} height={80} sizes="40px" />
+            )}
+            <b>{player.name.split(" ")[0]}</b>
+            <small>{player.role}</small>
+          </span>
+        ))}
+        <span className={styles.storyMore}>
+          <b>+{LEAGUE.lots - faces.length}</b>
+          <small>from the form</small>
+        </span>
+      </div>
+    );
+  }
+  if (state === "lot") {
+    return (
+      <div className={styles.storyLot}>
+        {star.face === undefined ? null : (
+          <Image src={star.face} alt="" width={128} height={128} sizes="64px" />
+        )}
+        <span>
+          <b>{star.name}</b>
+          <small>Base {price(star.base)} · paddles up</small>
+        </span>
+      </div>
+    );
+  }
+  if (state === "bidding") {
+    const bidders = STAR_LOT.bids.filter((bid) => bid.team !== null).slice(0, 3);
+    const top = bidders[bidders.length - 1];
+    return (
+      <div className={styles.storyBid}>
+        <b className={styles.num}>{price(top?.amount ?? star.base)}</b>
+        <span>
+          {bidders.map((bid, index) => {
+            const team = TEAMS.find((entry) => entry.name === bid.team);
+            return (
+              <i key={bid.amount} style={{ "--team": team?.color } as CSSProperties}>
+                {bid.team}
+                {index === bidders.length - 1 ? " ↑" : ""}
+              </i>
+            );
+          })}
+        </span>
+      </div>
+    );
+  }
+  if (state === "sold") {
+    return (
+      <div className={styles.storySold}>
+        <span>
+          <b>SOLD</b>
+          <small>
+            {STAR_LOT.soldTo.toUpperCase()} · {price(STAR_LOT.price)}
+          </small>
+        </span>
+        <Image
+          src="/marketing/product/owner-phone-sold-v2.webp"
+          alt=""
+          width={168}
+          height={280}
+          sizes="84px"
+        />
+      </div>
+    );
+  }
+  return (
+    <Image
+      className={styles.storyBoard}
+      src="/marketing/product/auction-board-v2.webp"
+      alt=""
+      width={640}
+      height={360}
+      sizes="300px"
+    />
   );
 }
