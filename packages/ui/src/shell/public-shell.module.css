@@ -274,6 +274,9 @@
   flex-direction: column;
 }
 .footer {
+  --footer-brand-w: 380px;
+  --footer-gap: 72px;
+
   position: relative;
   background: var(--surface-sunken);
   border-top: 1px solid var(--border-subtle);
@@ -288,27 +291,42 @@
   height: 2px;
   background: var(--accent);
 }
-/* A calm footer (wow pass, 2026-09-25): brand + subscribe on the left, three
-   short link columns on the right, one thin bottom bar. It was ~705px on a
-   laptop and ~1,300px on a phone; the target is <=300 / <=600. */
+/* THE SITE FOOTER (9.5, frozen 2026-09-30). Laptop: the brand column (lockup,
+   pitch, social) beside four link columns of three; the subscribe row as its
+   own band under both; one bottom bar. ~409px on a laptop, ~800 on a phone. */
 .footer-inner {
   max-width: 1280px;
   margin: auto;
-  padding: 40px 40px 20px;
+  padding: 48px 40px 24px;
   box-sizing: border-box;
 }
 .footer-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
-  gap: 32px 64px;
-  padding-bottom: 28px;
+  grid-template-columns: var(--footer-brand-w) minmax(0, 1fr);
+  grid-template-areas:
+    "brand links"
+    "news news";
+  column-gap: var(--footer-gap);
 }
 .footer-brand {
+  grid-area: brand;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 18px;
   min-width: 0;
+}
+/* The console lockup (36 / 20 / 8): the header's larger scale was built for
+   the header. */
+.footer-brand .wordmark {
+  gap: 9px;
+  min-height: 36px;
+}
+/* 36px at every width: the header's phone steps (32, 33) are the header's. */
+.footer-brand .wordmark .wordmark-glyph {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
 }
 .footer-heading {
   margin: 0;
@@ -319,25 +337,34 @@
 }
 .footer-tagline {
   margin: 0;
-  max-width: 36ch;
+  max-width: 330px;
   font-family: var(--font-text);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 22px;
   color: var(--text-secondary);
 }
 .footer-columns {
+  grid-area: links;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px;
   align-items: start;
+  /* The heads' cap tops sit on the mark's top edge. */
+  margin-top: -4px;
+}
+.footer-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 .footer-group-label {
-  margin: 0 0 10px;
+  margin: 0;
   font-family: var(--font-text);
   font-weight: 600;
-  font-size: 11px;
-  line-height: 1.5;
-  letter-spacing: 0.12em;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-heading);
 }
@@ -345,23 +372,20 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 2px;
 }
-/* Link rows are text-height on a mouse and 44px only under a finger: a 44px
-   min-height on every link on every device is what made each column ~260px. */
+/* 36px rows on a mouse, 44 under a finger. Long labels may wrap. */
 .footer-link {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 36px;
   font-family: var(--font-text);
-  font-size: 13px;
-  color: var(--text-secondary);
+  font-size: 14px;
+  color: var(--text-primary);
   text-decoration: none;
-  line-height: 1.5;
-  transition:
-    color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
+  text-underline-offset: 3px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  transition: color var(--duration-fast) var(--ease-out);
 }
 @media (pointer: coarse) {
   .footer-link {
@@ -370,19 +394,14 @@
 }
 .footer-link:hover {
   color: var(--text-accent);
+  text-decoration: underline;
 }
-.footer-group-list .footer-link:hover {
-  transform: translateX(2px);
-}
+/* The subscribe band: its own row, a hairline above it. */
 .footer-newsletter {
-  width: 100%;
-  max-width: 380px;
-}
-.footer-newsletter .footer-group-label {
-  margin-bottom: 8px;
-}
-.newsletter-content {
-  width: 100%;
+  grid-area: news;
+  margin-top: 36px;
+  padding: 20px 0;
+  border-top: 1px solid var(--border-strong);
 }
 .footer-links {
   display: flex;
@@ -390,34 +409,82 @@
   gap: 20px;
   margin-bottom: 24px;
 }
+/* The social row (the app renders a <ul class="shell-social">). Round,
+   borderless, filled monochrome marks. */
 .footer-social {
+  --footer-social-size: 40px;
+}
+.footer-social :global(.shell-social) {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.footer-social :global(.shell-social-link) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--footer-social-size);
+  height: var(--footer-social-size);
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-raised) 50%, var(--surface-overlay));
   color: var(--text-secondary);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.footer-social :global(.shell-social-link:hover) {
+  background: var(--surface-overlay);
+  color: var(--text-accent);
+}
+.footer-social :global(.shell-social-link:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.footer-social :global(.shell-social-link svg) {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+/* Instagram's mark is a ring and reads small at 18. */
+.footer-social :global(.shell-social-link[data-network="instagram"] svg) {
+  width: 20px;
+  height: 20px;
 }
 .footer-bottom {
   border-top: 1px solid var(--border-subtle);
-  padding-top: 14px;
+  padding-top: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 4px 24px;
 }
 .footer-note {
   margin: 0;
   color: var(--text-secondary);
   font-family: var(--font-text);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 18px;
 }
 .footer-bottom-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 20px;
+  justify-content: flex-end;
+  gap: 4px 20px;
 }
 .footer-bottom-links .footer-link {
-  font-size: 12px;
+  min-height: 32px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.footer-bottom-links .footer-link:hover {
+  color: var(--text-accent);
+}
+.footer-bottom-break {
+  display: none;
 }
 .footer-legal {
   margin-top: 10px;
@@ -449,12 +516,42 @@
     height: 60px;
     padding-inline: 32px;
   }
+  /* Tablet: brand beside the subscribe form, the four columns under both,
+     then the legal links over the copyright. */
   .footer-inner {
-    padding-inline: 32px;
+    padding: 44px 32px 24px;
   }
   .footer-grid {
-    grid-template-columns: 1fr;
-    gap: 28px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "brand news"
+      "links links";
+    gap: 32px 40px;
+    padding-bottom: 32px;
+    align-items: start;
+  }
+  .footer-brand {
+    gap: 16px;
+  }
+  .footer-newsletter {
+    margin-top: -4px;
+    padding: 0;
+    border: 0;
+  }
+  .footer-columns {
+    gap: 24px;
+    margin-top: 0;
+    padding-top: 28px;
+    border-top: 1px solid var(--border-strong);
+  }
+  .footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-top: 12px;
+  }
+  .footer-bottom-links {
+    order: -1;
+    justify-content: flex-start;
   }
 }
 @media (max-width: 599px) {
@@ -475,26 +572,50 @@
   .header-action {
     gap: 8px;
   }
+  /* Phone: lockup and social, the subscribe form, the links two by two,
+     then the legal links as two lines over the copyright on two lines. */
   .footer-inner {
-    padding: 32px 16px 20px;
+    padding: 28px 16px 20px;
   }
   .footer-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "brand"
+      "news"
+      "links";
     gap: 24px;
-    padding-bottom: 20px;
+    padding-bottom: 24px;
+  }
+  .footer-tagline {
+    display: none;
+  }
+  .footer-social {
+    --footer-social-size: 44px;
+  }
+  .footer-newsletter {
+    margin-top: 0;
   }
   .footer-columns {
-    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding-top: 20px;
   }
-  .footer-link {
-    font-size: 13px;
-  }
-  .footer-bottom {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+  .footer-link,
+  .footer-bottom-links .footer-link {
+    min-height: 44px;
   }
   .footer-bottom-links {
-    gap: 0 16px;
+    gap: 0 20px;
+  }
+  .footer-bottom-break {
+    display: block;
+    flex-basis: 100%;
+  }
+  .footer-note-line {
+    display: block;
+  }
+  .footer-note-sep {
+    display: none;
   }
 }
 @media (max-width: 359px) {
@@ -513,8 +634,8 @@
   .header-action {
     gap: 3px;
   }
-  .footer-inner {
-    padding-inline: 20px;
+  .footer-social :global(.shell-social) {
+    gap: 4px;
   }
   .mobile-panel > div:last-child {
     padding-inline: 16px;
@@ -523,11 +644,11 @@
 @media (prefers-reduced-motion: reduce) {
   .wordmark-glyph,
   .nav-link::after,
-  .footer-link {
+  .footer-link,
+  .footer-social :global(.shell-social-link) {
     transition: none;
   }
-  .wordmark:hover .wordmark-glyph,
-  .footer-group-list .footer-link:hover {
+  .wordmark:hover .wordmark-glyph {
     transform: none;
   }
 }

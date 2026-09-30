@@ -24,12 +24,13 @@ export const BRAND_TAGLINE = "THE GAME STARTS HERE";
  * - `header`: the public site header (inherits the header's size).
  * - `rail`: the console's navy/warm sidebar.
  * - `bar`: the console's top bar on a phone (the same lockup as the rail, in heading ink).
+ * - `footer`: the site footer — the console lockup's scale, in heading ink.
  * - `live`: the dark live-room strip (live, cockpit, spectate).
  * - `board`: the projected big screen — read from the back of a hall.
  * - `bug`: a small "powered by" corner on the broadcast overlay.
  * - `page`: a bare page with no shell (onboarding).
  */
-export type BrandTone = "header" | "rail" | "bar" | "live" | "board" | "bug" | "page";
+export type BrandTone = "header" | "rail" | "bar" | "footer" | "live" | "board" | "bug" | "page";
 
 /** The DA monogram. Vector artwork stays sharp at every shell size. */
 export function BrandMark({ size = 32 }: { size?: number }) {
