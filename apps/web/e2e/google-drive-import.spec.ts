@@ -197,3 +197,59 @@ test("a Form's Google Sheet syncs players, and their photos follow in the same s
   await expect(page.getByText("1 photo uploaded")).toBeVisible(COLD);
   await expect(page.getByTestId("stat-total")).toContainText("3");
 });
+
+/*
+ * THE DOWNLOADED FILE, WITH A PHOTO QUESTION NOBODY LISTED.
+ *
+ * Real forms word the photo question every way ("Upload a clear photo of
+ * yourself") and often carry a second upload — the payment screenshot — that is
+ * a Drive link too. The import must find the photo by its answers, leave the
+ * screenshot alone, say how many photos came, and continue to the Photos step
+ * rather than closing: from a file there is no Google sign-in yet, so the step
+ * offers one button instead of opening the picker by itself.
+ */
+test("a downloaded Form file finds its photo question by its Drive links and continues to photos", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const stamp = String(Date.now()).slice(-8);
+  await fakeGoogle(page, () => "");
+  await organizerWithOpenSeason(page, stamp);
+
+  const lines = [
+    "Timestamp,Player's Name,Mobile Number,Player Type,Upload payment screenshot,Upload a clear photo of yourself",
+  ];
+  for (let i = 1; i <= 2; i++) {
+    lines.push(
+      `2026/09/24 10:0${String(i)}:00,File Player ${String(i)},8${stamp}${String(i)},🏏 Batsman,https://drive.google.com/open?id=e2ePay${stamp}${String(i)},https://drive.google.com/open?id=e2eFace${stamp}${String(i)}`,
+    );
+  }
+
+  await page.getByTestId("open-import").click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByTestId("import-file").setInputFiles([
+    {
+      name: "Club responses.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(lines.join("\n")),
+    },
+  ]);
+  await expect(dialog.getByTestId("mapping-summary")).toContainText(
+    "Upload a clear photo of yourself → Photo (Google Drive link)",
+    COLD,
+  );
+  await expect(dialog.getByTestId("mapping-summary")).toContainText(
+    "Not imported: Timestamp · Upload payment screenshot",
+  );
+  await expect(dialog.getByTestId("import-photos")).toContainText("2 players uploaded a photo");
+
+  await dialog.getByTestId("import-commit").click();
+  // Not closed: the Photos step, with Drive offered in one click.
+  await expect(dialog.getByTestId("drive-photos")).toContainText("2 players", COLD);
+  await dialog.getByTestId("drive-photos-btn").click();
+  await expect(dialog.getByTestId("photo-match-table")).toBeVisible(COLD);
+  await expect(dialog.getByTestId("photo-match-table").getByText("by Drive link")).toHaveCount(2);
+  await expect(dialog.getByTestId("photo-match-table")).toContainText("File Player 1");
+  await dialog.getByTestId("photo-upload-all").click();
+  await expect(page.getByText("2 photos uploaded")).toBeVisible(COLD);
+});

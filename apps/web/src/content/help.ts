@@ -539,7 +539,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
             text: "Check the line that says which columns matched (for example Player's Name → Player name, Photo → Photo (Google Drive link)). If one is wrong, press Change column matching and fix it — we remember your choice for next time.",
           },
           {
-            text: "Read the preview: how many players are ready, and anything that needs fixing. Nothing is saved until you press Import.",
+            text: "Read the preview: how many players are ready, how many uploaded a photo in your form, and anything that needs fixing. We find the photo question by its Google Drive links, whatever you called it — a payment screenshot or ID card upload is never taken for the photo. Nothing is saved until you press Import.",
           },
           {
             text: "Press Import. Google's photo picker then opens by itself, showing only your players' photos: select them all and press Select.",
@@ -586,7 +586,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       { kind: "heading", level: 2, text: "Prefer downloading?" },
       {
         kind: "paragraph",
-        text: "In Google Forms, open Responses → ⋮ → Download responses (.csv) and drop the .zip into Import players — no need to unzip it. For photos, use Get photos from Google Drive on the Photos tab, or drop the zip Google Drive gives you for the form's photo folder; anything we can't match, you pick the player for.",
+        text: "In Google Forms, open Responses → ⋮ → Download responses (.csv) and drop the .zip into Import players — no need to unzip it. If the form had a photo question, the Photos step opens right after the import: press Get photos from Google Drive and select them all. Only if your photos aren't in the form, drop them (or a .zip of them) on the Photos step instead; anything we can't match, you pick the player for.",
       },
       {
         kind: "callout",

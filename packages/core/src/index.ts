@@ -102,8 +102,10 @@ export {
   detectMapping,
   mappingOf,
   normalizeHeader,
+  photoColumnByValues,
   sampleRow,
   signatureOf,
+  withDetectedPhoto,
 } from "./import-mapping";
 export type {
   ColumnMapping,
