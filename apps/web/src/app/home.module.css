@@ -2220,6 +2220,7 @@
 }
 
 .stickyCta .primary {
+  box-sizing: border-box;
   width: 100%;
   justify-content: center;
 }
@@ -2240,7 +2241,7 @@
    for less motion. Everything above is the complete page without it.
    ========================================================================== */
 @supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
+  @media (prefers-reduced-motion: no-preference) and (min-height: 560px) {
     .reveal {
       animation: reveal linear both;
       animation-timeline: view();
@@ -2558,25 +2559,30 @@
       animation-name: climb;
     }
 
+    /* Each bid holds, then snaps to the next: a scroll that stops mid-way
+       never leaves the price half-rolled between two figures. */
     @keyframes climb {
       0%,
-      41% {
+      42% {
         transform: translateY(0);
       }
 
-      45% {
+      43%,
+      45.5% {
         transform: translateY(-20%);
       }
 
+      46.5%,
       49% {
         transform: translateY(-40%);
       }
 
-      53% {
+      50%,
+      52.5% {
         transform: translateY(-60%);
       }
 
-      56%,
+      53.5%,
       100% {
         transform: translateY(-80%);
       }
@@ -3068,7 +3074,7 @@
 
 @container (max-width: 760px) {
   @supports (animation-timeline: view()) {
-    @media (prefers-reduced-motion: no-preference) {
+    @media (prefers-reduced-motion: no-preference) and (min-height: 560px) {
       .stage {
         gap: 22px;
         padding-top: 18px;
