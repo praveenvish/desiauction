@@ -24,8 +24,10 @@ import styles from "./home.module.css";
 import "./marketing.css";
 import { START_CLUB_LOGIN } from "../lib/start-intent";
 
+// At most 160 characters: past that, search results cut it off mid-sentence
+// (the SEO suite holds every public page to 50–160).
 const description =
-  "Run a live player auction for your league: owners bid from their phones while the room watches the big screen. Registration, squads, fixtures and receipts in one place. Free during beta.";
+  "Run your league's player auction live: owners bid from their phones while the room watches the big screen. Registration to receipts in one place. Free in beta.";
 const title = "DesiAuction — Live player auctions for your league";
 export const metadata: Metadata = {
   title: { absolute: title },

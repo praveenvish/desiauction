@@ -19,7 +19,8 @@ import "../content.css";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "What DesiAuction is, and why we built it.",
+  description:
+    "What DesiAuction is, who it is for, and why we built a live player auction platform for local leagues and tournaments.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/about` },
 };
 

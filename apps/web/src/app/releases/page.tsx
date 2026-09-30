@@ -8,7 +8,8 @@ import "../content.css";
 
 export const metadata: Metadata = {
   title: "Release notes",
-  description: "What each update to DesiAuction delivered.",
+  description:
+    "Release notes for DesiAuction: what each update changed for organizers, team owners and players, newest first.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/releases` },
 };
 

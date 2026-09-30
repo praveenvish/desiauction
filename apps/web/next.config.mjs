@@ -58,6 +58,22 @@ export default {
   // design reviews. Dev-only either way; production never shows it.
   devIndicators: false,
   poweredByHeader: false,
+  /*
+   * TITLES AND DESCRIPTIONS GO IN <head>, FOR EVERY VISITOR (SEO-1 Phase 3).
+   *
+   * Next 15 streams metadata: a visitor it does not recognise as an HTML-only
+   * bot gets <title> and <meta name="description"> late, in the <body>, for
+   * JavaScript to hoist. Its default list of HTML-only bots omits the AI
+   * crawlers (GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot), which run no
+   * JavaScript, and Googlebot is deliberately left out of it. Lighthouse,
+   * emulating a phone, reported "no meta description" on every public page
+   * that had one.
+   *
+   * Matching every user agent turns streaming off. It costs nothing here: the
+   * root layout already awaits the session and shell reads before the first
+   * byte, so the head was never flushed early anyway.
+   */
+  htmlLimitedBots: /.*/,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],
   /*
    * BARREL IMPORTS, RESOLVED TO THE MODULE THAT WAS ASKED FOR.

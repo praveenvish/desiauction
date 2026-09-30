@@ -12,7 +12,8 @@ import { IconArrowRight, IconClock, IconMail } from "@desiauction/ui";
 
 export const metadata: Metadata = {
   title: "Support",
-  description: "Get help, report a bug, and see what's new.",
+  description:
+    "Get help from a person at DesiAuction, report a bug, or find a quick fix. We answer within a day, and faster on auction night.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/support` },
 };
 

@@ -43,12 +43,14 @@ export const HELP_CATEGORIES: readonly HelpCategory[] = [
   {
     slug: "player",
     title: "Player & owner guide",
-    description: "Register, join a team, and bid on auction night.",
+    description:
+      "Register for a season, join a team, and, as a team owner, bid for players on auction night.",
   },
   {
     slug: "auction",
     title: "Auction guide",
-    description: "Prepare the room and conduct the live auction.",
+    description:
+      "Prepare the room, conduct the live auction, and put the right screen in front of everyone watching.",
   },
   {
     // Was two single-article sections — "Settlement guide" and "Financial

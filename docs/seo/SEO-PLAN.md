@@ -120,7 +120,7 @@ Add builders to `server/seo/json-ld.ts`. All output goes through `serializeJsonL
 
 ---
 
-### Phase 3 — `test(seo): guardrail suite in CI` (P1, fixes G12)
+### Phase 3 — `test(seo): guardrail suite in CI` (P1, fixes G12) — **BUILT 2026-09-30** (see §10)
 
 A Playwright spec (`e2e/seo.spec.ts`) plus a unit test run against the registry. It runs in the existing precompiled e2e job.
 
@@ -399,3 +399,40 @@ Every factual claim was re-checked against the code, the live site and current s
 - e2e: `public-registration` (breadcrumb, and no event without a venue) and `content-security-policy` (nonce on JSON-LD).
 
 **After deploy:** run Google's Rich Results Test on `/`, `/pricing`, `/help/faq`, a help article, and a season with a venue address. Search Console › Enhancements should then list Breadcrumbs (and Events, once a season has a venue).
+
+---
+
+## 10. Phase 3 delivery log (2026-09-30)
+
+**Built on `feat/seo-guardrails`, stacked on Phase 2 (#174). Its PR targets `main`.**
+
+**`apps/web/e2e/seo.spec.ts`** runs in the existing precompiled e2e job and reads the route registry, not a list of its own. It checks:
+- robots.txt names the **runtime** sitemap (never `build.invalid`) and disallows every console segment.
+- The sitemap lists every `INDEXABLE_PAGES` entry.
+- Every static sitemap URL, plus a sample of 3 public seasons, as a phone would fetch it:
+  - status 200, and no noindex header or meta
+  - exactly one `<title>` with the suffix once, unique across the set
+  - description of 50–160 characters
+  - absolute self-canonical
+  - exactly one `<h1>`
+  - no `<img>` without `alt`
+  - every JSON-LD block parses with `@context`/`@type`
+  - title, description and canonical **inside `<head>`**
+- Head placement as a phone, Googlebot, GPTBot, ClaudeBot, PerplexityBot and facebookexternalhit.
+- Consoles return `x-robots-tag: noindex, nofollow`. `/login`, `/login?next=…`, `/blog` and directory searches say `noindex, follow`, and `/login?next=…` canonicalises to `/login`.
+
+Each check was shown to fail first:
+- Tightening the description floor named the short pages.
+- Disabling the head fix named every visitor type.
+
+**Lighthouse CI** (`apps/web/lighthouserc.json`, CI e2e job, reports uploaded as the `lighthouse` artifact):
+- SEO = 100 is enforced. Performance, accessibility and best practices are warnings (docs/57 updated to say so).
+
+**Found and fixed:**
+1. **Next 15 streamed `<title>`, description and canonical into `<body>` for phones, Googlebot and the AI crawlers.** Next's list of crawlers that get metadata in `<head>` omits GPTBot, OAI-SearchBot, ClaudeBot and PerplexityBot. Google only honours a canonical in `<head>`. Fixed with `htmlLimitedBots: /.*/` in `next.config.mjs`. This costs nothing here, because the root layout already awaits its reads before the first byte.
+2. **Descriptions:**
+   - The home page's was 186 characters, cut off in results. It's now 159.
+   - Nine pages were under 50: About, Support, Releases, two help categories and three legal summaries. Each was rewritten from the page's own content. The help and legal ones also show as card copy.
+3. **`/c`'s raw HTML carries two identical `<h1>`s:** the streamed loading skeleton keeps its own. That is **kept on purpose**. Removing it failed the axe scan (`page-has-heading-one`), because during a client-side navigation the skeleton is the whole page. The SEO spec's rule is therefore "at least one `<h1>`, and they all say the same thing".
+
+**Baseline for Phase 8:** LCP is 3.6–3.9s on the reference mobile profile (budget 2.5s). Accessibility and best practices are 100; CLS and TBT are negligible.

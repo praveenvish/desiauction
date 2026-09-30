@@ -30,6 +30,11 @@ Bid validate+append < 20ms p99 server-side; snapshot build < 150ms for a 400-lot
 ## Enforcement
 
 - **CI gates (59):** bundle-size limits per app entry (fails the build), Lighthouse CI on the four public surfaces against the reference profile, size-limit report on every PR touching `apps/*`.
+  - **Lighthouse as it actually runs (SEO-1 Phase 3, 2026-09-30).** Until then this line described a gate that did not exist. `apps/web/lighthouserc.json` now runs in the CI e2e job on `/`, `/pricing`, `/c` and `/help/getting-started`, with Lighthouse's default mobile emulation (slow 4G, 4× CPU).
+    - The **SEO category is enforced** (score 100).
+    - **Performance is reported, not gated**: LCP ≤ 2.5s, CLS ≤ 0.05 and TBT ≤ 300ms are warnings.
+    - First baseline (local, simulated): LCP **3.6–3.9s** on all four pages. CLS ≤ 0.004, TBT ≤ 16ms, accessibility and best practices 100.
+    - LCP is over budget, which is SEO-1 Phase 8's work. The warning becomes an error once CI has a stable baseline, then it ratchets down.
 - **RUM guards:** p75 regressions > 10% week-over-week open an automatic defect (56).
 - Budget changes are PRs against this file with justification — budgets are ratcheted (down) after wins, never quietly raised.
 
