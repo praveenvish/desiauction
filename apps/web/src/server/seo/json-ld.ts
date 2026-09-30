@@ -249,3 +249,31 @@ export function sportsEventJsonLd(input: {
       : {}),
   };
 }
+
+/**
+ * A guide (SEO-1 Phase 6): an `Article` with the date it was first published
+ * and the date its words last changed, written and published by the
+ * organization — the byline is the team, never a person who did not write it.
+ */
+export function articleJsonLd(input: {
+  base: string;
+  path: string;
+  headline: string;
+  description: string;
+  datePublished: string;
+  dateModified: string;
+}): JsonLdObject {
+  return {
+    "@context": CONTEXT,
+    "@type": "Article",
+    headline: input.headline,
+    description: input.description,
+    url: `${input.base}${input.path}`,
+    mainEntityOfPage: `${input.base}${input.path}`,
+    datePublished: input.datePublished,
+    dateModified: input.dateModified,
+    inLanguage: "en-IN",
+    author: { "@id": organizationId(input.base) },
+    publisher: { "@id": organizationId(input.base) },
+  };
+}

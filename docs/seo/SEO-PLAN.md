@@ -189,7 +189,7 @@ Every public season can rank for "‹league name› auction 2026", "‹league›
 
 ---
 
-### Phase 6 — `feat(content): guides that answer the question` (P1, ongoing)
+### Phase 6 — `feat(content): guides that answer the question` (P1, ongoing) — **FIRST 10 BUILT 2026-10-01** (see §16)
 
 1. Turn the `/blog` placeholder into `/guides` (keep `/blog` as a 301). It stays `noindex` **until at least 6 real articles exist**.
 2. **The first 10 articles** target how-to searches organizers already make:
@@ -653,3 +653,39 @@ Each page has:
 - `server/competition/season-search.regression.test.ts`, against the database: the trigger (a real change moves it, the same values don't), the rule over real registrations (off → blocked by an unknown DOB → listed → a minor takes it back out), the sitemap, and the audit.
 - The `public-registration` e2e now drives the toggle.
 - E2E 24/24; unit and regression 211.
+
+---
+
+## 16. Phase 6 delivery log (2026-10-01)
+
+**Built on `feat/seo-guides`, stacked on Phase 5.**
+
+**What shipped:**
+- `/guides` (index, newest first) and `/guides/[slug]`: the plan's first ten, each with `Article` (+ `datePublished`/`dateModified`) and `BreadcrumbList` markup.
+- They are bylined "By the DesiAuction team". A guide is not attributed to a person who didn't write it.
+- `/blog` and `/blog/*` now **308 to `/guides`**; the placeholder page is deleted.
+- Links: footer (Help › Guides), the Resources menu, the sitemap and the route registry.
+
+| Guide | Links into |
+|---|---|
+| How to run an IPL-style player auction for your local cricket tournament | form template, purse calculator, help, `/sports/cricket` |
+| How much purse and base price to set | purse calculator (worked reserve-rule example) |
+| Player auction rules: a template for your league | purse guide |
+| What to ask on a player registration form | form template |
+| Snake draft or auction | snake-draft tool |
+| How to run a society premier league | fees guide, `/for/housing-societies` |
+| Collecting entry fees and team dues | help › money |
+| Box cricket league with a player auction | calculator, `/sports/box-cricket` |
+| Kabaddi league auction | `/sports/kabaddi` |
+| A live auction on a projector or TV | help › screens for the room |
+
+**Accuracy:** product statements were checked against code and the help centre (config locked at creation, owner links sent by the organizer, paddles granted separately, board and overlay public on a published season, undo needs an owner-level grant, and more). One receipt claim was narrowed to "every receipt can be checked against the original record".
+
+**Found and fixed: a bug from Phase 4.** A **signed-in** visitor opening `/sports`, `/for`, `/compare` or `/tools` got them framed in the **organizer console**, because `nav.ts`'s `shellKind` decides chrome from its own prefix list, and those prefixes were never added. The e2e runs were all signed out. They are now listed (with `/guides`), and `routes.test.ts` holds **every indexable route in the SEO registry to the public shell**. Removing `/sports` from the list fails it (checked).
+
+**Tests:**
+- `content/guides.test.ts`: at least six guides, unique fields, 50–160 character summaries, **every internal link resolves to a real page**, and sane dates.
+- `e2e/guides.spec.ts`: index, a guide in both themes (axe), and `/blog` → 308 `/guides`.
+- E2E across guides, seo, shell, public pages, CSP and all landing pages: **46/46**.
+
+**Still for the founder:** real bylines (a named author with experience earns more trust than "the team"), two new guides a month, and a quarterly refresh of the top five.

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { istCalendarDate } from "../../lib/format-date";
 
+import { shellKind } from "../../components/shell/nav";
 import { HELP_ARTICLES } from "../../content/help";
 import { LEGAL_DOCUMENTS } from "../../content/legal";
 import {
@@ -117,6 +118,24 @@ describe("route registry", () => {
   });
 });
 
+describe("public routes wear the public shell", () => {
+  it("frames every indexable page, signed in or not, as a public page", () => {
+    // A signed-in visitor on /sports was shown the organizer console's chrome
+    // (SEO-1 Phase 6 found it): the shell is decided by nav.ts, the indexing by
+    // this registry, and nothing held the two together.
+    const wrong = INDEXABLE_PAGES.map((page) => page.path)
+      .concat([
+        "/sports/cricket",
+        "/for/corporate-leagues",
+        "/compare/manual-auction",
+        "/tools/snake-draft",
+        "/guides/how-to-run-a-cricket-player-auction",
+      ])
+      .filter((path) => shellKind(path) !== "public");
+    expect(wrong).toEqual([]);
+  });
+});
+
 describe("isPublicPath", () => {
   it.each([
     "/",
@@ -131,7 +150,7 @@ describe("isPublicPath", () => {
     "/help/category/getting-started",
     "/legal/privacy",
     "/login",
-    "/blog",
+    "/guides",
     "/newsletter/unsubscribe",
     "/sitemap.xml",
     "/robots.txt",

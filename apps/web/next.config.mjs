@@ -135,6 +135,10 @@ export default {
       // rule below must keep targeting /seasons/:path*, because those ARE the
       // real pages.
       { source: "/competitions", destination: "/tournaments?view=seasons", permanent: true },
+      // SEO-1 Phase 6: the /blog placeholder became /guides, with real
+      // articles. Permanent, so anything that linked to /blog lands there.
+      { source: "/blog", destination: "/guides", permanent: true },
+      { source: "/blog/:path*", destination: "/guides", permanent: true },
       { source: "/competitions/:path*", destination: "/seasons/:path*", permanent: true },
       // /admin/messaging (2026-09-28) was a second copy of Notifications — its
       // templates, delivery and suppression cards each had a tab there — and it

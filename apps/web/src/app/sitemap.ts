@@ -6,6 +6,7 @@ import { LEGAL_DOCUMENTS } from "../content/legal";
 import { AUDIENCE_PAGES } from "../content/audiences";
 import { COMPARISON_PAGES } from "../content/comparisons";
 import { TOOL_PAGES } from "../content/tools";
+import { GUIDES } from "../content/guides";
 import { SPORT_PAGES } from "../content/sports";
 import { publicSeasonSitemap } from "../server/competition/public";
 import { INDEXABLE_PAGES, isoCalendarDate } from "../server/seo/routes";
@@ -87,6 +88,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...TOOL_PAGES.map((page) => ({
       url: `${base}/tools/${page.slug}`,
       lastModified: page.updatedOn,
+      changeFrequency: "monthly" as const,
+    })),
+    ...GUIDES.map((entry) => ({
+      url: `${base}/guides/${entry.slug}`,
+      lastModified: entry.updatedOn,
       changeFrequency: "monthly" as const,
     })),
     ...LEGAL_DOCUMENTS.map((doc) => ({

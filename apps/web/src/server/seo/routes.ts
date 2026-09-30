@@ -64,6 +64,7 @@ export const INDEXABLE_PAGES: readonly IndexablePage[] = [
   { path: "/for", updatedOn: "2026-09-30", changeFrequency: "monthly" },
   { path: "/compare", updatedOn: "2026-09-30", changeFrequency: "monthly" },
   { path: "/tools", updatedOn: "2026-10-01", changeFrequency: "monthly" },
+  { path: "/guides", updatedOn: "2026-10-01", changeFrequency: "weekly" },
 ];
 
 /**
@@ -72,14 +73,7 @@ export const INDEXABLE_PAGES: readonly IndexablePage[] = [
  * listed. They are exempt from the header so their own metadata is what a
  * crawler reads.
  */
-const PUBLIC_UNLISTED = [
-  "/login",
-  "/contact",
-  "/blog",
-  "/careers",
-  "/case-studies",
-  "/api-docs",
-] as const;
+const PUBLIC_UNLISTED = ["/login", "/contact", "/careers", "/case-studies", "/api-docs"] as const;
 
 /**
  * Whole public subtrees. `/c/…` holds seasons, squads and player cards; the
@@ -95,6 +89,7 @@ const PUBLIC_SUBTREES = [
   "/for",
   "/compare",
   "/tools",
+  "/guides",
 ] as const;
 
 /** Next's file-based metadata routes. These are fetched by crawlers and share scrapers. */
