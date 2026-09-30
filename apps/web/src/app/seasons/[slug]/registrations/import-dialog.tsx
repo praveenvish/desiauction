@@ -891,6 +891,7 @@ export function ImportDialog({
                         errors={preview.errors}
                         text={checkedText}
                         mapping={mapping}
+                        fields={inspection?.fields ?? []}
                         onFix={applyFix}
                       />
                     ) : null}
