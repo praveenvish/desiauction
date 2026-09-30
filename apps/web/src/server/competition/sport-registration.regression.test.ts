@@ -20,7 +20,15 @@
  * This file is the proof that each route is open, and still shut to a role the
  * season's sport does not have.
  */
-import { parseRegistrationCsv, sportPackFor } from "@desiauction/core";
+import {
+  applyMapping,
+  detectMapping,
+  mappingOf,
+  parseRegistrationCsv,
+  parseRegistrationRecords,
+  sportPackFor,
+  tokenizeCsv,
+} from "@desiauction/core";
 import {
   auditLog,
   competitions as competitionsTable,
@@ -280,5 +288,73 @@ describe("SPORT DOORS — a player can enter a season that is not cricket", () =
     seededPersonIds.push(...stored.map((row) => row.id));
     // The alias landed as the pack's key, not as the spelling the file used.
     expect(stored.map((row) => row.role)).toContain("defender");
+  });
+
+  it("a football Form's Preferred foot column reaches the registration", async () => {
+    /*
+     * The pack declared `headerAliases` for preferred foot and nothing read
+     * them: the column came back unmapped, and every answer was dropped while
+     * cricket's batting and bowling style — fixed import fields — came through.
+     * This walks the organizer's route: detect, map, parse, commit.
+     */
+    const pack = sportPackFor("football");
+    const form = (rows: string[]): readonly (readonly string[])[] =>
+      tokenizeCsv(
+        ["Timestamp,Player Name,Mobile Number,Position,Preferred foot", ...rows].join("\n"),
+      );
+    const read = (records: readonly (readonly string[])[]) => {
+      const mapping = mappingOf(detectMapping(records[0] ?? [], records, pack));
+      expect(mapping["attr:preferred_foot"]).toBe(4);
+      return parseRegistrationRecords(applyMapping(records, mapping), undefined, { pack });
+    };
+    const lefty = `93${RUN}1`;
+    const blank = `93${RUN}2`;
+
+    const first = read(
+      form([
+        `01/03/2026,Left Back Lal,${lefty},LB,Left foot`,
+        `01/03/2026,Unsure Uday,${blank},CM,`,
+      ]),
+    );
+    expect(first.errors).toEqual([]);
+    expect(await commitRegistrationImport(db, football, org.id, owner, first.rows)).toMatchObject({
+      imported: 2,
+    });
+    const storedFeet = async (): Promise<Map<string, unknown>> => {
+      const rows = await db
+        .select({ id: people.id, phone: people.phone, attributes: registrationsTable.attributes })
+        .from(registrationsTable)
+        .innerJoin(people, eq(people.id, registrationsTable.personId))
+        .where(inArray(people.phone, [`+91${lefty}`, `+91${blank}`]));
+      seededPersonIds.push(...rows.map((row) => row.id));
+      return new Map(rows.map((row) => [row.phone ?? "", row.attributes]));
+    };
+    // Stored as the pack's option key, in the JSON column the form writes to.
+    expect(await storedFeet()).toEqual(
+      new Map<string, unknown>([
+        [`+91${lefty}`, { preferred_foot: "left" }],
+        [`+91${blank}`, {}],
+      ]),
+    );
+
+    // The corrected sheet: the blank is filled, and the hand-set answer is not
+    // reverted by a stale one under the default policy.
+    const second = read(
+      form([
+        `02/03/2026,Left Back Lal,${lefty},LB,Right foot`,
+        `02/03/2026,Unsure Uday,${blank},CM,Both feet`,
+      ]),
+    );
+    expect(await commitRegistrationImport(db, football, org.id, owner, second.rows)).toMatchObject({
+      imported: 0,
+      updated: 1,
+      unchanged: 1,
+    });
+    expect(await storedFeet()).toEqual(
+      new Map<string, unknown>([
+        [`+91${lefty}`, { preferred_foot: "left" }],
+        [`+91${blank}`, { preferred_foot: "both" }],
+      ]),
+    );
   });
 });

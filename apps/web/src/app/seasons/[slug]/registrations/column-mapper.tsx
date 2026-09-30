@@ -1,15 +1,32 @@
 "use client";
 
 import {
-  IMPORT_FIELDS,
   IMPORT_FIELD_LABELS,
   REQUIRED_IMPORT_FIELDS,
   type ColumnMapping,
-  type ImportField,
+  type ImportFieldOption,
+  type MappableField,
 } from "@desiauction/core";
 import { Badge, Button } from "@desiauction/ui";
 
 import type { ImportInspection } from "../../../../server/competition/actions";
+
+/**
+ * What a field is called in this season — the inspection's list knows the
+ * sport's own attributes; the fixed labels cover a field it does not list.
+ */
+export function fieldLabel(field: MappableField, fields: readonly ImportFieldOption[]): string {
+  return (
+    fields.find((option) => option.field === field)?.label ??
+    (IMPORT_FIELD_LABELS as Record<string, string>)[field] ??
+    field
+  );
+}
+
+/** The fields a mapping sends somewhere, in the order the screen lists them. */
+function mappedIn(mapping: ColumnMapping): MappableField[] {
+  return (Object.keys(mapping) as MappableField[]).filter((field) => mapping[field] !== undefined);
+}
 
 /**
  * THE STEP THAT MAKES A MAPPING CHECKABLE.
@@ -34,18 +51,19 @@ export function ColumnMapper({
   mapping: ColumnMapping;
   onChange: (next: ColumnMapping) => void;
 }) {
-  const fieldAt = (index: number): ImportField | "" => {
-    const hit = IMPORT_FIELDS.find((field) => mapping[field] === index);
+  const fields = inspection.fields;
+  const fieldAt = (index: number): MappableField | "" => {
+    const hit = mappedIn(mapping).find((field) => mapping[field] === index);
     return hit ?? "";
   };
 
-  const assign = (index: number, field: ImportField | ""): void => {
+  const assign = (index: number, field: MappableField | ""): void => {
     // A column holds at most one field, and a field at most one column — so
     // taking a field away from whoever held it is part of assigning it. Built
     // by filtering rather than deleting: the entries that survive are stated,
     // which is easier to read than a copy with holes punched in it.
     const next: ColumnMapping = {};
-    for (const key of IMPORT_FIELDS) {
+    for (const key of mappedIn(mapping)) {
       const at = mapping[key];
       if (at !== undefined && at !== index) {
         next[key] = at;
@@ -68,14 +86,14 @@ export function ColumnMapper({
 
       {missing.length > 0 ? (
         <p role="alert" className="reg-warning" data-testid="mapping-missing">
-          Still needed: {missing.map((field) => IMPORT_FIELD_LABELS[field]).join(", ")}.
+          Still needed: {missing.map((field) => fieldLabel(field, fields)).join(", ")}.
         </p>
       ) : null}
 
       {(inspection.detected?.conflicts ?? []).map((conflict) => (
         <p role="alert" className="reg-warning" key={conflict.field} data-testid="mapping-conflict">
           {conflict.headers.join(" and ")} both look like{" "}
-          {IMPORT_FIELD_LABELS[conflict.field].toLowerCase()} — pick the one to use.
+          {fieldLabel(conflict.field, fields).toLowerCase()} — pick the one to use.
         </p>
       ))}
 
@@ -113,14 +131,14 @@ export function ColumnMapper({
                       data-testid={`mapping-select-${String(index)}`}
                       value={current}
                       onChange={(event) => {
-                        assign(index, event.target.value as ImportField | "");
+                        assign(index, event.target.value as MappableField | "");
                       }}
                     >
                       <option value="">Don&apos;t import</option>
-                      {IMPORT_FIELDS.map((field) => (
-                        <option key={field} value={field}>
-                          {IMPORT_FIELD_LABELS[field]}
-                          {REQUIRED_IMPORT_FIELDS.includes(field) ? " (required)" : ""}
+                      {fields.map((option) => (
+                        <option key={option.field} value={option.field}>
+                          {option.label}
+                          {option.required ? " (required)" : ""}
                         </option>
                       ))}
                     </select>
@@ -169,10 +187,12 @@ export function MappingSummary({
   mapping: ColumnMapping;
   onReview: () => void;
 }) {
-  const matched = IMPORT_FIELDS.filter((field) => mapping[field] !== undefined).map((field) => ({
-    field,
-    header: inspection.headers[mapping[field] ?? -1] ?? "",
-  }));
+  const matched = inspection.fields
+    .filter((option) => mapping[option.field] !== undefined)
+    .map(({ field }) => ({
+      field,
+      header: inspection.headers[mapping[field] ?? -1] ?? "",
+    }));
   const used = new Set(matched.map((entry) => mapping[entry.field]));
   const skipped = inspection.headers.filter(
     (header, index) => !used.has(index) && header.trim() !== "",
@@ -187,7 +207,7 @@ export function MappingSummary({
         {matched.map((entry, index) => (
           <span key={entry.field}>
             {index > 0 ? " · " : ""}
-            {entry.header} → {IMPORT_FIELD_LABELS[entry.field]}
+            {entry.header} → {fieldLabel(entry.field, inspection.fields)}
           </span>
         ))}
       </p>
