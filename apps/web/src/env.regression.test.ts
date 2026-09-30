@@ -1,3 +1,4 @@
+import { LOCAL_FINOPS_STORAGE_DIR } from "@desiauction/messaging/finops-storage";
 import { describe, expect, it } from "vitest";
 
 import { parseEnv } from "./env";
@@ -76,6 +77,9 @@ describe("web env — development stays effortless", () => {
     expect(env.NODE_ENV).toBe("development");
     expect(env.OTP_PROVIDER).toBe("dev");
     expect(env.MEDIA_STORAGE).toBe("local");
+    // The literal resolveFinopsStorageDir recognises as "not configured" — if
+    // the two drift, a worktree's web tier stops sharing the seed's artifacts.
+    expect(env.FINOPS_STORAGE_DIR).toBe(LOCAL_FINOPS_STORAGE_DIR);
   });
 
   it("still refuses a missing DATABASE_URL", () => {

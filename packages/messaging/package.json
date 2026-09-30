@@ -11,6 +11,7 @@
     "./email-template-defaults": "./src/email-template-defaults.ts",
     "./email-templates": "./src/email-templates.ts",
     "./finance-delivery": "./src/finance-delivery.ts",
+    "./finops-storage": "./src/finops-storage.ts",
     "./gate": "./src/gate.ts",
     "./in-app-adapter": "./src/in-app-adapter.ts",
     "./language": "./src/language.ts",
