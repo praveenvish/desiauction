@@ -95,6 +95,24 @@ test("every page carries a nonce policy, and every script it runs carries the no
   );
 });
 
+test("structured data carries the nonce too, on every page that has it", async ({ page }) => {
+  // SEO-1 Phase 2: JSON-LD blocks are <script> elements. The check above only
+  // ever looked at `/`, so the season page's block shipped without one unnoticed.
+  for (const path of ["/pricing", "/help/faq", "/help/signing-in", "/legal/privacy"]) {
+    await page.goto(path);
+    const blocks = await page.evaluate(() =>
+      [...document.querySelectorAll('script[type="application/ld+json"]')].map(
+        (script) => (script as HTMLScriptElement).nonce,
+      ),
+    );
+    expect(blocks.length, `${path} carries structured data`).toBeGreaterThan(0);
+    expect(
+      blocks.filter((nonce) => nonce === ""),
+      `${path}: a JSON-LD block without the nonce`,
+    ).toEqual([]);
+  }
+});
+
 test("public surfaces raise no policy violations", async ({ page }) => {
   const violations = watchViolations(page);
   for (const path of PUBLIC) {

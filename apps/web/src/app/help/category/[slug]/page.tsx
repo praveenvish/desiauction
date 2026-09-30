@@ -12,6 +12,8 @@ import {
   SideCard,
 } from "../../../../components/public/public-kit";
 import { env } from "../../../../env";
+import { JsonLd } from "../../../../components/seo/json-ld";
+import { breadcrumbJsonLd } from "../../../../server/seo/json-ld";
 import { HELP_CATEGORIES, helpArticlesIn, helpCategory } from "../../../../content/help";
 import "../../../content.css";
 
@@ -46,6 +48,12 @@ export default async function HelpCategoryPage({ params }: { params: Promise<{ s
   const articles = helpArticlesIn(slug);
   return (
     <main className="content-page">
+      <JsonLd
+        data={breadcrumbJsonLd(env.PUBLIC_BASE_URL, [
+          { name: "Help", path: "/help" },
+          { name: category.title, path: `/help/category/${category.slug}` },
+        ])}
+      />
       <PageHero
         size="compact"
         eyebrow={

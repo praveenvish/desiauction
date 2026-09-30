@@ -28,7 +28,7 @@ import { storage } from "../media";
 import { systemDb } from "../db";
 import { seasonPlayIn, type SeasonPlay } from "./season-play";
 import { teamsOf, type TeamSummary } from "./competitions";
-import { publishedSchedule, type FixtureSnapshot } from "./fixtures";
+import { publishedSchedule, seasonVenueOf, type FixtureSnapshot } from "./fixtures";
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
 import { marksOf, outcomeOf } from "./poster-outcome";
@@ -133,6 +133,11 @@ export interface PublicCompetitionView {
    * completed), and only for a season that passed the visibility gate above.
    */
   play: SeasonPlay;
+  /**
+   * The one venue every public match is played at, with its address, or null
+   * (`seasonVenueOf`). Shown on the page and stated in its event markup.
+   */
+  venue: { name: string; address: string | null; city: string | null } | null;
 }
 
 /**
@@ -205,7 +210,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     return null;
   }
   const open = row.status === "registration_open";
-  const [auctionRows, teams, fixtures, play] = await Promise.all([
+  const [auctionRows, teams, fixtures, play, venue] = await Promise.all([
     systemDb
       .select({ status: auctions.status, config: auctions.config })
       .from(auctions)
@@ -214,6 +219,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     teamsOf(systemDb, row.id),
     publishedSchedule(systemDb, row.id),
     seasonPlayIn(systemDb, { id: row.id, sport: row.sport }),
+    seasonVenueOf(systemDb, row.id),
   ]);
   return {
     name: row.name,
@@ -241,6 +247,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     // truncated list under a heading that claims to be the whole schedule.
     fixtureTotal: fixtures.total,
     play,
+    venue,
   };
 }
 

@@ -101,7 +101,7 @@ apps/web/src/server/seo/
 
 ---
 
-### Phase 2 — `feat(seo): structured data for the brand and the season` (P0/P1, fixes G2 G8)
+### Phase 2 — `feat(seo): structured data for the brand and the season` (P0/P1, fixes G2 G8) — **BUILT 2026-09-30** (see §9)
 
 Add builders to `server/seo/json-ld.ts`. All output goes through `serializeJsonLd`, and nothing is inlined.
 
@@ -356,3 +356,46 @@ Every factual claim was re-checked against the code, the live site and current s
 1. `sudo set-secret production INDEXNOW_KEY web.env` (any 32 hex characters, e.g. `openssl rand -hex 16`), then restart web. Check that `https://desiauction.in/indexnow-key.txt` returns it.
 2. The Caddy change ships with the next host deploy. Check it with `curl -sI https://engine.desiauction.in | grep -i x-robots`.
 3. Resubmit the sitemap in Search Console and Bing, now that robots.txt names the real one.
+
+---
+
+## 9. Phase 2 delivery log (2026-09-30)
+
+**Built on `feat/seo-structured-data`, stacked on Phase 1. Open its PR only after #173 merges, and against `main`.**
+
+| Page | Markup |
+|---|---|
+| `/` | `Organization` (logo, support contact, `sameAs` only for real profile URLs), `WebSite`, `SoftwareApplication` (free, `operatingSystem: Web`, no ratings) |
+| `/pricing` | `SoftwareApplication`, `FAQPage` (the 4 rendered questions), `BreadcrumbList` |
+| `/help/faq` | `FAQPage` (the 7 rendered questions), `BreadcrumbList` |
+| `/help/[slug]` | `TechArticle` (`dateModified` = `updatedOn`), `BreadcrumbList` (Home › Help › Category › Article) |
+| `/help/category/[slug]`, `/legal/[slug]` | `BreadcrumbList` |
+| `/c/[slug]` | `BreadcrumbList` always. `SportsEvent` **only** when the season has a start date and a single venue with an address or city. |
+
+**How it works:**
+- Builders are pure functions in `server/seo/json-ld.ts`.
+- `<JsonLd>` (`components/seo/json-ld.tsx`) is the only renderer. It serializes XSS-safely and carries the request's CSP nonce.
+- A builder returns `null` when a required field can't be filled honestly.
+
+**Season venue:**
+- `seasonVenueOf` (`server/competition/fixtures.ts`) returns the one venue that every public, uncancelled match is played at. It returns null for none, or for more than one.
+- The venue (name, address, city, each part once) now shows in the season hero. The markup states nothing the page doesn't show.
+- **Behaviour change:** a season with no matches at a venue loses the old address-less `SportsEvent`, which Google treated as invalid anyway. It keeps its breadcrumb.
+- Organizers get event rich results by putting their matches on a venue that has an address.
+
+**Found while building:**
+- Every `<script>` must carry the CSP nonce, JSON-LD included. The old season-page block never had one; the CSP spec only checked `/`, so nobody noticed.
+- The spec now also checks `/pricing`, `/help/faq`, a help article and a legal page.
+
+**Not done, and why:**
+- **`offers` on events:** there is no season-level entry fee (fees are per registration).
+- **`organizer.url`:** a club has no public page.
+- **`SearchAction`:** `/search` isn't a public results page.
+- **LIVE badge:** livestream markup applies only to `VideoObject`.
+
+**Tests:**
+- `server/seo/schema.test.ts` (15 cases): no placeholder social profiles, no ratings, FAQ markup matches the rendered questions, and no event without an address.
+- `fixture-ops.regression.test.ts`: `SEASON VENUE`, covering one venue, then two (in a rolled-back transaction).
+- e2e: `public-registration` (breadcrumb, and no event without a venue) and `content-security-policy` (nonce on JSON-LD).
+
+**After deploy:** run Google's Rich Results Test on `/`, `/pricing`, `/help/faq`, a help article, and a season with a venue address. Search Console › Enhancements should then list Breadcrumbs (and Events, once a season has a venue).

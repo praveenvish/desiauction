@@ -60,6 +60,7 @@ import {
   matchDay,
   publishedSchedule,
   queryFixtures,
+  seasonVenueOf,
   PUBLIC_SCHEDULE_LIMIT,
   upcomingFixtures,
   organizerSchedule,
@@ -639,6 +640,46 @@ describe("FIXTURE OPS REGRESSION — lifecycle, conflicts, protection", () => {
       throw new Error("create failed");
     }
     expect((await scheduleFixture(db, comp, replacement.fixtureId, owner)).ok).toBe(true);
+  });
+
+  it("SEASON VENUE: the one venue every public match is at, and none when there are two", async () => {
+    /*
+     * SEO-1 Phase 2. The public page's event markup may state an address only
+     * when the season has a single answer to "where is it played?". The
+     * published matches here are all on Azad Maidan's two grounds.
+     */
+    expect(await seasonVenueOf(db, comp.id)).toEqual({
+      name: "Azad Maidan",
+      address: "Mahapalika Marg",
+      city: "Mumbai",
+    });
+
+    // Move one published match to a second venue, look, and roll back so the
+    // tests after this one see the schedule unchanged.
+    const Rollback = new Error("rollback");
+    await expect(
+      db.transaction(async (tx) => {
+        const txDb = tx as unknown as typeof db;
+        const other = await createVenue(txDb, org.id, owner, "Oval Maidan", undefined, "Mumbai");
+        if (!other.ok) throw new Error("venue");
+        const ground = await createGround(txDb, org.id, other.venue.id, owner, { name: "North" });
+        if (!ground.ok) throw new Error("ground");
+        const [moved] = await tx
+          .select({ id: fixturesTable.id })
+          .from(fixturesTable)
+          .where(
+            and(eq(fixturesTable.competitionId, comp.id), eq(fixturesTable.status, "published")),
+          )
+          .limit(1);
+        await tx
+          .update(fixturesTable)
+          .set({ groundId: ground.ground.id })
+          .where(eq(fixturesTable.id, must(moved, "a published fixture").id));
+        expect(await seasonVenueOf(txDb, comp.id), "two venues: no single address").toBeNull();
+        throw Rollback;
+      }),
+    ).rejects.toBe(Rollback);
+    expect((await seasonVenueOf(db, comp.id))?.name).toBe("Azad Maidan");
   });
 
   it("ROLLBACK SAFETY: a mid-transaction failure leaves NO partial state", async () => {

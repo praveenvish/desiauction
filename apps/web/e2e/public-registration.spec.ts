@@ -138,9 +138,15 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
       `Monsoon Cup ${STAMP}`,
     );
     await expect(anon.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/c\//);
-    const jsonLd = await anon.locator('script[type="application/ld+json"]').textContent();
-    expect(jsonLd).toContain('"@type":"SportsEvent"');
+    // SEO-1 Phase 2: the breadcrumb always; the SportsEvent only once a venue
+    // with an address is known (Google requires one). This season has no
+    // matches yet, so no venue, so no event markup rather than an invalid one.
+    const jsonLd = (
+      await anon.locator('script[type="application/ld+json"]').allTextContents()
+    ).join("\n");
+    expect(jsonLd).toContain('"@type":"BreadcrumbList"');
     expect(jsonLd).toContain(`Monsoon Cup ${STAMP}`);
+    expect(jsonLd).not.toContain('"@type":"SportsEvent"');
 
     // Share-card metadata (INV-1): the file-convention OG/Twitter image is injected
     // into the head, and the route itself serves a real PNG.

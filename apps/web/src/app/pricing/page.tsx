@@ -3,6 +3,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { env } from "../../env";
+import { JsonLd } from "../../components/seo/json-ld";
+import {
+  breadcrumbJsonLd,
+  faqPageJsonLd,
+  softwareApplicationJsonLd,
+} from "../../server/seo/json-ld";
 import { PRICING } from "../../content/marketing";
 import {
   IconArrowRight,
@@ -91,6 +97,14 @@ function launchNote(cadence: string): string {
 export default function PricingPage() {
   return (
     <main className="mk mk-pricing-page">
+      {/* The FAQ below is rendered in full, so it may be marked up. */}
+      <JsonLd
+        data={[
+          softwareApplicationJsonLd({ base: env.PUBLIC_BASE_URL, description: PRICING.sub }),
+          faqPageJsonLd(PRICING.faqs),
+          breadcrumbJsonLd(env.PUBLIC_BASE_URL, [{ name: "Pricing", path: "/pricing" }]),
+        ]}
+      />
       <section className="mk-band">
         <div className="mk-container">
           <div className="mk-band-head mk-band-head--center mk-center">
