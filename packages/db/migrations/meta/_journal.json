@@ -687,6 +687,13 @@
       "when": 1792166400000,
       "tag": "0098_service_roles_identity_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792252800000,
+      "tag": "0099_season_search_listing",
+      "breakpoints": true
     }
   ]
 }

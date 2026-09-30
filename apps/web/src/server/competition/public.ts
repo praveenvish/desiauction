@@ -22,7 +22,7 @@ import {
   registrations,
   teams,
 } from "@desiauction/db";
-import { and, asc, desc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 
 import { storage } from "../media";
 import { systemDb } from "../db";
@@ -32,6 +32,7 @@ import { publishedSchedule, seasonVenueOf, type FixtureSnapshot } from "./fixtur
 import { isPreSigned, preSignedKind, type PreSignedKind } from "../../lib/pre-signed";
 import { preSignedSql } from "./pre-signed";
 import { marksOf, outcomeOf } from "./poster-outcome";
+import { squadListingDecision, type SquadListing } from "../seo/squads";
 import { shownName, shownPhotoConsentAt, shownPhotoKey } from "./shown-name";
 import { containsPattern } from "../../lib/like-pattern";
 
@@ -974,6 +975,11 @@ export interface PublicTeam {
   spentPaise: number;
   /** The season's published purse per team, when the auction states one. */
   pursePaise: number | null;
+  /**
+   * May this squad page be indexed? The organizer's opt-in AND every approved
+   * player a known adult (server/seo/squads.ts). Shared by link either way.
+   */
+  squadListing: SquadListing;
   /** What the season's auction counts in (0091): "₹…" or "… pts". */
   unit: MoneyUnit;
   auctionStatus: string | null;
@@ -993,6 +999,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
       visibility: competitions.visibility,
       logoKey: competitions.logoUrl,
       unit: competitions.auctionUnit,
+      listSquadsInSearch: competitions.listSquadsInSearch,
     })
     .from(competitions)
     .where(eq(competitions.slug, slug))
@@ -1123,6 +1130,7 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
     pursePaise: publicAuctionRules(auction?.config).pursePerTeam,
     unit: comp.unit,
     auctionStatus: auction?.status ?? null,
+    squadListing: await publicSquadListing(comp.id, comp.listSquadsInSearch),
   };
 }
 
@@ -1557,13 +1565,121 @@ export const myRegistrations = cache(async function myRegistrations(
   }));
 });
 
-/** PX-6 fix: the sitemap carries EVERY published competition, not one page. */
-export async function publicCompetitionSlugs(limit = 5000): Promise<string[]> {
+/**
+ * EVERY PUBLISHED SEASON, WITH WHEN ITS PUBLIC PAGE LAST CHANGED (SEO-1 Phase 5).
+ *
+ * PX-6 put every published season in the sitemap; this adds the one field a
+ * crawler reads — lastmod — and each season's squad pages when they may be
+ * indexed (`squadListingDecision`).
+ *
+ * A season's page changes when any of these do, so lastmod is the latest of:
+ *   · the season's own row (0099's trigger-kept `updated_at`),
+ *   · its public fixtures being published, completed or cancelled,
+ *   · a result being recorded or amended,
+ *   · the last event of its auction (the night that fills every squad).
+ * Postgres GREATEST ignores NULLs, so a season with no fixtures or no auction
+ * still has the row's own date.
+ */
+export interface SeasonSitemapEntry {
+  slug: string;
+  lastModified: Date;
+  /** Team slugs whose squad pages may be indexed; empty when they may not. */
+  squadSlugs: string[];
+}
+
+export async function publicSeasonSitemap(limit = 5000): Promise<SeasonSitemapEntry[]> {
   const rows = await systemDb
-    .select({ slug: competitions.slug })
+    .select({
+      id: competitions.id,
+      slug: competitions.slug,
+      optedIn: competitions.listSquadsInSearch,
+      // Fully qualified and aliased: drizzle renders a single-table select's
+      // columns unqualified, and a bare "id" inside these subqueries is
+      // ambiguous against each subquery's own table (caught by
+      // season-search.regression.test.ts). A constant — no input reaches it.
+      lastModified: sql<Date>`${sql.raw(`greatest(
+        "competitions"."updated_at",
+        (select max(greatest(f.published_at, f.completed_at, f.cancelled_at))
+           from fixtures f
+          where f.competition_id = "competitions"."id"
+            and f.status in ('published', 'in_progress', 'completed', 'cancelled')),
+        (select max(fr.updated_at) from fixture_results fr
+          where fr.competition_id = "competitions"."id"),
+        (select max(e.created_at) from auction_events e
+           join auctions a on a.id = e.auction_id
+          where a.competition_id = "competitions"."id")
+      )`)}`.mapWith((value: string | Date) => new Date(value)),
+    })
     .from(competitions)
     .where(eq(competitions.visibility, "public"))
     .orderBy(asc(competitions.id))
     .limit(limit);
-  return rows.map((row) => row.slug);
+  const optedIn = rows.filter((row) => row.optedIn).map((row) => row.id);
+  const squads = await indexableSquadSlugs(optedIn);
+  return rows.map((row) => ({
+    slug: row.slug,
+    lastModified: row.lastModified,
+    squadSlugs: squads.get(row.id) ?? [],
+  }));
+}
+
+/** The approved players' dates of birth for each season (the squad-listing input). */
+async function approvedBirthDates(
+  competitionIds: readonly string[],
+): Promise<Map<string, (string | null)[]>> {
+  const byCompetition = new Map<string, (string | null)[]>();
+  if (competitionIds.length === 0) return byCompetition;
+  const rows = await systemDb
+    .select({ competitionId: registrations.competitionId, dateOfBirth: registrations.dateOfBirth })
+    .from(registrations)
+    .where(
+      and(
+        inArray(registrations.competitionId, [...competitionIds]),
+        eq(registrations.status, "approved"),
+      ),
+    );
+  for (const row of rows) {
+    byCompetition.set(row.competitionId, [
+      ...(byCompetition.get(row.competitionId) ?? []),
+      row.dateOfBirth,
+    ]);
+  }
+  return byCompetition;
+}
+
+/** For each opted-in season whose squads may be indexed, its team slugs. */
+async function indexableSquadSlugs(
+  competitionIds: readonly string[],
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>();
+  if (competitionIds.length === 0) return result;
+  const births = await approvedBirthDates(competitionIds);
+  const now = new Date();
+  const allowed = competitionIds.filter(
+    (id) =>
+      squadListingDecision({ optedIn: true, birthDates: births.get(id) ?? [], now }).indexable,
+  );
+  if (allowed.length === 0) return result;
+  const rows = await systemDb
+    .select({ competitionId: teams.competitionId, name: teams.name })
+    .from(teams)
+    .where(inArray(teams.competitionId, allowed));
+  for (const row of rows) {
+    result.set(row.competitionId, [...(result.get(row.competitionId) ?? []), teamSlugOf(row.name)]);
+  }
+  return result;
+}
+
+/** Whether one published season's squad pages may be indexed, and if not, why. */
+export async function publicSquadListing(
+  competitionId: string,
+  optedIn: boolean,
+): Promise<SquadListing> {
+  if (!optedIn) return squadListingDecision({ optedIn, birthDates: [], now: new Date() });
+  const births = await approvedBirthDates([competitionId]);
+  return squadListingDecision({
+    optedIn,
+    birthDates: births.get(competitionId) ?? [],
+    now: new Date(),
+  });
 }

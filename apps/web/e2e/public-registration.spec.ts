@@ -112,6 +112,17 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   await page.getByTestId("confirm-publish").click();
   await expect(page.getByTestId("visibility-row")).toContainText("Live");
 
+  // SEO-1 Phase 5: once public, the organizer may let squads into search. On,
+  // it still lists nothing until players are approved and all are known adults.
+  const squads = page.getByTestId("squad-listing-row");
+  await expect(squads).toContainText("Not listed");
+  await expect(page.getByTestId("squad-listing-status")).toContainText("shared by link only");
+  await page.getByTestId("toggle-squad-listing").click();
+  await expect(page.getByTestId("squad-listing-status")).toContainText(
+    "Squads are listed once players are approved",
+  );
+  await expect(squads).toContainText("Not listed");
+
   // A second, never-published draft competition stays structurally absent.
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();

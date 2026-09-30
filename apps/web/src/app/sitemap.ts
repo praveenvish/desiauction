@@ -7,7 +7,7 @@ import { AUDIENCE_PAGES } from "../content/audiences";
 import { COMPARISON_PAGES } from "../content/comparisons";
 import { TOOL_PAGES } from "../content/tools";
 import { SPORT_PAGES } from "../content/sports";
-import { publicCompetitionSlugs } from "../server/competition/public";
+import { publicSeasonSitemap } from "../server/competition/public";
 import { INDEXABLE_PAGES, isoCalendarDate } from "../server/seo/routes";
 
 // PX-5/PX-6 SEO: the sitemap carries the public shell plus EVERY published
@@ -19,8 +19,10 @@ import { INDEXABLE_PAGES, isoCalendarDate } from "../server/seo/routes";
 //
 // `lastModified` is the one sitemap field Google reads (it ignores `priority`
 // and `changeFrequency`), so every date here is a real content date and never
-// the deploy time. Seasons carry none: `competitions` has no updated-at
-// column, and a guessed date is worse than an absent one.
+// the deploy time. A season's date is the latest of its row (0099's trigger),
+// its public fixtures, its results and its auction's last event
+// (publicSeasonSitemap). Its squad pages are listed only when the organizer
+// opted in AND every approved player is a known adult (server/seo/squads.ts).
 /**
  * REVALIDATED, NOT FROZEN AT BUILD TIME.
  *
@@ -93,10 +95,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly" as const,
     })),
   ];
-  const slugs = await publicCompetitionSlugs();
-  const competitionEntries: MetadataRoute.Sitemap = slugs.map((slug) => ({
-    url: `${base}/c/${slug}`,
-    changeFrequency: "daily" as const,
-  }));
+  const seasons = await publicSeasonSitemap();
+  const competitionEntries: MetadataRoute.Sitemap = seasons.flatMap((season) => [
+    {
+      url: `${base}/c/${season.slug}`,
+      lastModified: season.lastModified,
+      changeFrequency: "daily" as const,
+    },
+    ...season.squadSlugs.map((team) => ({
+      url: `${base}/c/${season.slug}/t/${team}`,
+      lastModified: season.lastModified,
+      changeFrequency: "weekly" as const,
+    })),
+  ]);
   return [...staticEntries, ...competitionEntries];
 }

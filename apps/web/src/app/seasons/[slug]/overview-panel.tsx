@@ -50,6 +50,7 @@ import {
   advanceCompetitionAction,
   cloneCompetitionAction,
   setCompetitionVisibilityAction,
+  setSquadListingAction,
   updateCompetitionDetailsAction,
   type DetailsField,
   type SeasonOverviewView,
@@ -578,6 +579,24 @@ export function OverviewPanel({
       });
       router.refresh();
       pendingFocusRef.current = "publish";
+    } else {
+      toast({ title: result.error ?? "Could not update.", tone: "danger" });
+    }
+  };
+
+  // SEO-1 Phase 5: the organizer's "list squads in search" switch.
+  const [squadBusy, setSquadBusy] = useState(false);
+  const setSquadListing = async (listed: boolean) => {
+    setSquadBusy(true);
+    const result = await release(setSquadListingAction(slug, listed), () => {
+      setSquadBusy(false);
+    });
+    if (result.ok) {
+      toast({
+        title: listed ? "Squads can be listed in search" : "Squads taken out of search",
+        tone: "success",
+      });
+      router.refresh();
     } else {
       toast({ title: result.error ?? "Could not update.", tone: "danger" });
     }
@@ -1265,6 +1284,48 @@ export function OverviewPanel({
                 </Button>
               </span>
             </li>
+            {isPublic && view.platformHold === null && view.squadListing !== null ? (
+              <li
+                className="ov-look"
+                data-set={view.squadListing.decision.indexable ? "" : undefined}
+                data-testid="squad-listing-row"
+              >
+                <span className="ov-look-thumb" aria-hidden>
+                  <IconUsers size={18} />
+                </span>
+                <span className="ov-look-text">
+                  <strong>
+                    Squads in search{" "}
+                    <Pill
+                      tone={view.squadListing.decision.indexable ? "green" : "neutral"}
+                      dot={view.squadListing.decision.indexable}
+                    >
+                      {view.squadListing.decision.indexable ? "Listed" : "Not listed"}
+                    </Pill>
+                  </strong>
+                  <span data-testid="squad-listing-status">
+                    {view.squadListing.decision.indexable
+                      ? "Search engines can find each team’s squad page, with its players’ names."
+                      : view.squadListing.decision.reason === "off"
+                        ? "Squad pages are shared by link only. Turn this on to let search engines list them."
+                        : view.squadListing.decision.reason === "no_players"
+                          ? "On. Squads are listed once players are approved and every one of them is a known adult."
+                          : `On, but not listed: ${String(view.squadListing.decision.blocking)} approved ${view.squadListing.decision.blocking === 1 ? "player has" : "players have"} no date of birth or ${view.squadListing.decision.blocking === 1 ? "is" : "are"} under 18. Squads are listed only when every player is a known adult.`}
+                  </span>
+                </span>
+                <span className="ov-look-actions">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={squadBusy}
+                    data-testid="toggle-squad-listing"
+                    onClick={() => void setSquadListing(!view.squadListing?.optedIn)}
+                  >
+                    {view.squadListing.optedIn ? "Turn off" : "Turn on"}
+                  </Button>
+                </span>
+              </li>
+            ) : null}
           </ul>
           {pass}
         </SectionCard>

@@ -176,7 +176,7 @@ Each page contains:
 
 ---
 
-### Phase 5 — `feat(seo): public seasons as the long-tail engine` (P1)
+### Phase 5 — `feat(seo): public seasons as the long-tail engine` (P1) — **BUILT 2026-10-01** (see §15)
 
 Every public season can rank for "‹league name› auction 2026", "‹league› squads" and "‹league› points table", which are low-competition, high-intent searches.
 
@@ -618,3 +618,38 @@ Each page has:
   - draft reverses round 2
   - no overflow at 360px
 - E2E across every landing page, seo, CSP, public pages and the shell: **43/43**.
+
+---
+
+## 15. Phase 5 delivery log (2026-10-01)
+
+**Built on `feat/seo-season-pages`, stacked on Phase 4d (#182).** Founder decision D3: **organizer opt-in for squad pages, never with minors.**
+
+**Migration `0099_season_search_listing`** (hand-authored; journal `when` = previous + 1 day, per the known skip trap; verified with `\d competitions`):
+- `competitions.list_squads_in_search boolean not null default false`: the organizer's opt-in.
+- `competitions.updated_at timestamptz not null default now()`, backfilled from `created_at` and kept by a `BEFORE UPDATE` trigger. It fires only when a value actually changes (`OLD.* IS DISTINCT FROM NEW.*`). This is the repo's first trigger, chosen because seasons are written from many places and a column a writer forgot to touch would lie.
+
+**Squad pages in search:**
+- The rule (`server/seo/squads.ts`, pure and tested) requires the opt-in **and** every *approved* registration in the season to have a date of birth that proves 18+.
+- It fails closed like `mayPublishPhoto`: an unknown or unparseable date blocks. It's season-wide, so approving one minor takes every squad back out.
+- The team page's `robots` follows the rule, and the sitemap lists squad URLs only for eligible seasons.
+- The organizer switch "Squads in search" sits under "Public page" on the season overview (managers only). It explains exactly why squads aren't listed ("2 approved players have no date of birth or are under 18"). `setSquadListingAction` is gated by `competition.manage` and audited as `competition.squad_listing_changed`.
+
+**Season titles and descriptions** (`server/seo/season-copy.ts`, pure and tested):
+- Titles follow the season: "‹Name› ‹year› — player registration & auction" before the auction, and "‹Name› ‹year› auction — teams, squads & results" after. The year and "auction" are added only if the name lacks them.
+- Descriptions are built from facts the page shows (organizer, sport, place, dates, team count, and the top buy's **team and price**, never a player's name). They use whole sentences and stay at 160 characters or fewer.
+
+**Sitemap freshness:** each season's `lastmod` is the latest of its row, its public fixtures (published/completed/cancelled), its results and its auction's last event (`publicSeasonSitemap`).
+
+**Found while building:** Drizzle renders a single-table select's columns unqualified, so `competitions.id` inside the lastmod subqueries became an ambiguous bare `"id"`. The typechecker accepted it; `season-search.regression.test.ts` caught it. The expression is now fully qualified.
+
+**Not done, deliberately:**
+- **Clean slugs:** the ranking gain is small and they need a reserved-slug list. Existing slugs are printed on QR codes.
+- **City facets:** `location` is free text, and no city has 3 public seasons yet.
+- **Sport facets:** the `/sports/[sport]` pages already list each sport's tournaments.
+
+**Tests:**
+- `server/seo/squads.test.ts` and `server/seo/season-copy.test.ts`.
+- `server/competition/season-search.regression.test.ts`, against the database: the trigger (a real change moves it, the same values don't), the rule over real registrations (off → blocked by an unknown DOB → listed → a minor takes it back out), the sitemap, and the audit.
+- The `public-registration` e2e now drives the toggle.
+- E2E 24/24; unit and regression 211.

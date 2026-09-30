@@ -26,6 +26,7 @@ import {
 import { currentSession } from "../../../server/auth/actions";
 import { TopBuysPodium } from "../top-buys";
 import { breadcrumbJsonLd, sportsEventJsonLd } from "../../../server/seo/json-ld";
+import { seasonDescription, seasonTitle } from "../../../server/seo/season-copy";
 import { JsonLd } from "../../../components/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
 import {
@@ -68,10 +69,33 @@ export async function generateMetadata({
   if (view === null) {
     return { title: "Season" };
   }
-  const description = `${view.orgName}${view.location !== null ? ` · ${view.location}` : ""} · ${formatDateRange(view.startsOn, view.endsOn)}. ${view.open ? "Registration is open — join as a player." : "Run on DesiAuction."}`;
+  // SEO-1 Phase 5: written for how people search a league, from facts the
+  // page shows (server/seo/season-copy.ts). The top buy is a team and a price,
+  // never a player's name.
+  const auctionDone = view.auctionStatus === "completed" || view.auctionStatus === "reconciled";
+  const [topBuy] = auctionDone ? await publicTopBuys(view.slug, 1) : [];
+  const copy = {
+    name: view.name,
+    orgName: view.orgName,
+    sport: sportPackFor(view.sport).label,
+    location: view.location,
+    startsOn: view.startsOn,
+    dates: formatDateRange(view.startsOn, view.endsOn),
+    open: view.open,
+    auctionDone,
+    teamCount: view.teams.length,
+    topBuy:
+      topBuy === undefined || topBuy.teamName === null
+        ? null
+        : {
+            teamName: topBuy.teamName,
+            price: formatAmount(paise(topBuy.pricePaise), view.auctionUnit),
+          },
+  };
+  const description = seasonDescription(copy);
   const url = `${env.PUBLIC_BASE_URL}/c/${view.slug}`;
   return {
-    title: view.name,
+    title: seasonTitle(copy),
     description,
     alternates: { canonical: url },
     // This view only exists for a published competition, so `listed` is always
