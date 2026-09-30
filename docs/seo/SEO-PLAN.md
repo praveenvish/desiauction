@@ -1,0 +1,358 @@
+# SEO-1 — Search visibility programme
+
+**Status:** Plan · 2026-09-30 · audited against `main` @ 2646461a and live https://desiauction.in · **re-validated 2026-09-30** (see §7)
+**Goal:** An organizer anywhere in India who searches for a way to run a player auction finds DesiAuction, and every public season we host becomes a page that search engines can find.
+
+---
+
+## 0. Where we stand (audit)
+
+The foundations are better than most products at this stage. The gaps are about **what we offer searchers**, **how the setup holds up as routes are added**, and **measurement**. The basic plumbing is mostly in place.
+
+### Already right — keep it
+
+| Area | Evidence |
+|---|---|
+| robots.txt | `app/robots.ts` — consoles disallowed, spectate share cards deliberately opened |
+| Live sitemap | `app/sitemap.ts` — `force-dynamic`, derived from the help/legal registries and public seasons (41 URLs live) |
+| Canonicals | Present on almost every public page; directory slices carry `noindex` + canonical `/c` |
+| Share cards | File-based OG/Twitter images for home, pricing, directory, season, team, player, spectate |
+| Structured data | `SportsEvent` on `/c/[slug]`, XSS-safe via `server/seo/json-ld.ts` (PX-11 F2) |
+| Host hygiene | `www` → apex 301 (`ops/deploy/site.caddy`); `/contact` → `/support` 308; real 404 with `noindex` |
+| Privacy-correct noindex | Player and team pages are `noindex` (minors' data, DPDP); coming-soon pages are `noindex, follow` |
+| Speed | Production TTFB 5–70 ms (page-load audit, 2026-09-24) |
+
+### Gaps found
+
+| # | Gap | Severity | Where |
+|---|---|---|---|
+| G1 | **No content that matches what people search for.** Nothing targets "cricket auction app", "IPL-style player auction software", "kabaddi auction", "box cricket auction" and similar queries. There are 12 sport packs and none has its own page. | **P0** | none exist |
+| G2 | **No site-level structured data.** Home has no `Organization`, `WebSite` or `SoftwareApplication`, so Google has no entity to build a knowledge panel or sitelinks from. | **P0** | `app/page.tsx` |
+| G3 | **No Search Console or Bing Webmaster Tools, and no search analytics.** We can't tell whether anything is indexed, ranked or clicked. | **P0** | none |
+| G4 | **Indexing rules are a hand-kept denylist.** `/tournaments`, `/players`, `/auctions`, `/reports` and `/me` are missing from robots.txt. They only stay out of the index because each one redirects. The next console route will leak. | P1 | `app/robots.ts` |
+| G5 | `/login` is indexable with no canonical, and every `?next=…` redirect creates another crawlable login URL | P1 | `app/login/page.tsx` |
+| G6 | Sitemap has **no `lastModified`**, the only freshness signal Google uses (it ignores `changefreq` and `priority`). `/about`, `/security`, `/rules-guidelines` and `/schedule-demo` are indexable live but missing from the sitemap. | P1 | `app/sitemap.ts` |
+| G7 | No title template: every page hand-writes `· DesiAuction`. `/help/faq` has no canonical. The 404 title is bare. | P2 | per page |
+| G8 | `SportsEvent` is thin (no `eventStatus`, `image`, `sport`, `offers`, or organizer `url`), so it doesn't qualify for event rich results | P1 | `app/c/[slug]/page.tsx` |
+| G9 | The engine and media subdomains send no `X-Robots-Tag`. Uploaded player photos (which can include minors) can end up in Google Images. | P1 | `ops/deploy/site.caddy` |
+| G10 | Every page is `Cache-Control: no-store`, which rules out the back/forward cache on public pages. We have no field data on Core Web Vitals. | P2 | root layout reads the session |
+| G11 | No backlink plan. `/overlay`, `/board` and share cards appear in public streams and WhatsApp with no link back. | P1 | broadcast surfaces |
+| G12 | No automated guardrail. A missing canonical, a duplicate title or a stray `noindex` would ship without anyone noticing. | P1 | CI |
+
+---
+
+## 1. Founder decisions needed (before Phase 2)
+
+| Decision | Recommendation | Why |
+|---|---|---|
+| D1 Analytics tool | **Self-hosted Umami or Plausible** (no cookies) plus Search Console | Avoids a DPDP consent banner and keeps data on our side. GA4 would need a consent banner. |
+| D2 AI crawlers | **Allow** the search/answer crawlers (OAI-SearchBot, PerplexityBot, Claude-SearchBot) on public pages only. Decide separately on the *training* controls (`GPTBot`, `ClaudeBot`, and the `Google-Extended` token, which is not a crawler but controls Gemini's use of pages Googlebot already fetched). | Queries like "best app for cricket auction" are moving to AI answers, and being cited there is free distribution. Opting out of training doesn't affect Google Search ranking. |
+| D3 Team squad pages | Keep `noindex` by default, and add an **organizer opt-in** "List squads in search" that is ignored when a season has registered minors. `date_of_birth` is nullable free text, so an **unknown age counts as a minor** (fail closed). | Squad pages match "‹league› squads" searches. Minors' data wins over traffic. |
+| D4 Who writes guides | Founder (or a contracted writer) writes; engineering provides the page system | Real knowledge of running auctions is the advantage. AI-generated filler hurts rankings. |
+| D5 Hindi | **Defer** until English pages are ranking. Then serve `/hi/...` with `hreflang`. | Twice the pages to maintain is only worth it once there's demand to match |
+
+---
+
+## 2. Phases
+
+Each phase is **one PR** against `main`, with a conventional-commit title. Phases 1–3 are engineering-only and can ship now. Phases 4–6 need content.
+
+### Phase 0 — Measure first (founder, ~1 hour, no code)
+
+1. Verify **Google Search Console** as a *Domain property* using a DNS TXT record at **Hostinger** (DNS lives there, not Cloudflare).
+2. Verify **Bing Webmaster Tools** by importing from Search Console. Bing's index also feeds DuckDuckGo and Yahoo, and is widely reported to feed some AI search products.
+3. Submit `https://desiauction.in/sitemap.xml` to both.
+4. Record the baseline: indexed pages, impressions, clicks, and the top 20 queries (probably all brand queries today).
+5. **Google Business Profile: only if eligible.** Google requires in-person contact with customers at an address or within a service area. Online-only businesses aren't eligible, and a listing made anyway risks suspension. Skip it unless you meet organizers in person.
+
+**Done when:** both consoles show the sitemap as "Success" and the baseline is saved in `docs/seo/baseline-2026-10.md`.
+
+---
+
+### Phase 1 — `feat(seo): one route registry for indexability` (P1, fixes G4 G5 G6 G7 G9) — **BUILT 2026-09-30** (see §8)
+
+**The structural fix.** Today robots.txt, the sitemap and page metadata each keep their own list of public URLs. Replace these with a single registry and derive everything else from it, the same approach as `demand-sports.ts` ("declared once").
+
+```
+apps/web/src/server/seo/
+  routes.ts        PUBLIC_ROUTES: { path, indexable, sitemap, lastModified?, changeFrequency? }
+  metadata.ts      pageMetadata({ title, description, path, image?, noindex? }) → Metadata
+  json-ld.ts       (exists) serializeJsonLd + new schema builders (Phase 2)
+```
+
+1. **Indexable by allowlist, not denylist.** In `middleware.ts`, send `X-Robots-Tag: noindex, nofollow` on every response whose path doesn't match `PUBLIC_ROUTES`. New console routes then start out non-indexable without anyone remembering to add them. Keep robots.txt `Disallow` for crawl budget, but generate it from the same registry.
+   - The middleware matcher already skips `api/`, `brand/`, `marketing/` and `_media/`. However, the file-based metadata routes (`sitemap.xml`, `robots.txt`, `manifest.webmanifest`, `*/opengraph-image`, `*/twitter-image`) **do** pass through it, so they must be in the allowlist.
+   - Google can't see a `noindex` on a URL that robots.txt disallows. If a console URL is ever found in the index, **remove its `Disallow` temporarily** so the header is seen, then put the `Disallow` back.
+2. **Title template.** In the root `metadata`, set `title: { default: "DesiAuction", template: "%s · DesiAuction" }`, then remove the hand-written suffix from every page. Otherwise every title becomes `X · DesiAuction · DesiAuction`. The home page sets `title: { absolute: "DesiAuction — Live player auctions for your league" }` so it never depends on how the template applies to the root segment.
+3. **`pageMetadata()` helper.** One call sets an absolute canonical, `openGraph.url`, the Twitter card, and a description length check (70–160 characters, asserted in tests). Move every public page onto it.
+4. **`/login`:** add `robots: { index: false, follow: true }` and canonical `/login`, so `?next=` variants collapse into one URL.
+5. **`/help/faq`:** add a canonical. **404:** use the title "Page not found · DesiAuction".
+6. **Sitemap:**
+   - Build it from the registry.
+   - Add `/about`, `/security`, `/rules-guidelines` and `/schedule-demo`.
+   - Add `lastModified`: marketing pages from a per-entry `updatedOn` in the registry (**not** the latest release date, which would mark every page as changed on every deploy and teach Google to ignore our lastmod values), help/legal from an `updatedOn` field added to each content entry, and seasons carry **no** lastmod: `competitions` has no updated-at column (the §7 claim that it exists was wrong; see §8).
+   - Remove `priority`, and keep `changeFrequency` only where it's accurate.
+7. **Subdomains** (`site.caddy`):
+   - `__ENGINE_DOMAIN__`: add `header X-Robots-Tag "noindex, nofollow"`.
+   - `__S3_DOMAIN__`: add `header X-Robots-Tag "noindex, noimageindex"`, so photos only reach search through pages that are allowed to show them.
+8. **IndexNow.** When a season is published or unpublished, ping `api.indexnow.org` (key file at `/‹key›.txt`) so Bing and Yandex recrawl within minutes. Send it from the existing publish action via `after()`, and make sure a failure can never block publishing.
+
+**Acceptance:** Every console path returns `X-Robots-Tag: noindex`. Every sitemap URL returns 200, has no `noindex`, and has a self-referencing canonical. No page title contains `· DesiAuction · DesiAuction`.
+
+---
+
+### Phase 2 — `feat(seo): structured data for the brand and the season` (P0/P1, fixes G2 G8)
+
+Add builders to `server/seo/json-ld.ts`. All output goes through `serializeJsonLd`, and nothing is inlined.
+
+| Page | Schema | Notes |
+|---|---|---|
+| `/` | `Organization` (name, url, logo `/brand/icon-512.png`, `sameAs` social profiles, `contactPoint` with support email) + `WebSite` | Gives Google an entity for knowledge panels and sitelinks. Add `SearchAction` only if `/c?q=` becomes a real public search. |
+| `/`, `/pricing` | `SoftwareApplication` (`applicationCategory: "SportsApplication"`, `operatingSystem: "Web"`, since there's no native app to claim, `offers: { price: 0, priceCurrency: "INR" }`) | Helps Google and AI engines understand what the product is. **Won't earn a rich result yet:** Google's software-app rich result *requires* `aggregateRating` or `review`. Add those only once real reviews (FR-1) are shown on the page. Invented ratings are a manual-action offence. |
+| `/c/[slug]` | Richer `SportsEvent`: `eventStatus`, `eventAttendanceMode`, `image` (the OG card), `sport`, `organizer.url`, `location` as a `Place` **with a `PostalAddress`**, `offers` (registration fee, `validThrough` = registration close), `competitor` (teams, names only) | Google event rich results *require* `location.address`. Today `location` is a free-text name, so fill the address from the season's **venue** (the club venues tab) and emit the event markup only when a real address exists. |
+| `/help/[slug]` | `TechArticle` + `BreadcrumbList` | |
+| `/help/faq`, `/pricing` FAQ | `FAQPage` | Google now shows FAQ rich results mainly for government and health sites, but AI answer engines read this markup heavily. It's cheap and does no harm. |
+| `/help/*`, `/legal/*`, `/c/[slug]` | `BreadcrumbList` | Shows breadcrumb paths in search results |
+
+**Not planned: a LIVE badge for the spectate room.** Google's livestream markup (`BroadcastEvent` + `isLiveBroadcast`) only applies to a `VideoObject`, and the spectate room isn't a video. Revisit this only if a season embeds a YouTube stream.
+
+**Acceptance:** The Schema.org validator shows zero errors on home, one season, one help article and the FAQ. Google's Rich Results Test shows valid Breadcrumb markup, plus Event markup on a season that has a venue address.
+
+---
+
+### Phase 3 — `test(seo): guardrail suite in CI` (P1, fixes G12)
+
+A Playwright spec (`e2e/seo.spec.ts`) plus a unit test run against the registry. It runs in the existing precompiled e2e job.
+
+- For every `PUBLIC_ROUTES` entry that is `indexable`, check:
+  - status 200
+  - exactly one `<title>`, unique across the set
+  - description 70–160 characters
+  - absolute self-canonical
+  - no `noindex` meta or header
+  - exactly one `<h1>`
+  - every `<img>` has `alt`
+  - every `ld+json` block parses and has an `@type`
+- For a sample of console routes, check they return `X-Robots-Tag: noindex`.
+- `sitemap.xml`: parses, every `<loc>` is in the registry or is a public season, and each one passes the checks above.
+- `robots.txt` matches the snapshot built from the registry.
+- A **unit test** that fails if a new `page.tsx` under `app/` is neither in `PUBLIC_ROUTES` nor under a known console prefix. This forces a deliberate decision on every new route.
+
+Also run **Lighthouse CI** (SEO category must score 100; performance budgets from `docs/57-performance-budgets.md`) on `/`, `/pricing`, `/c`, one season and one help article.
+
+---
+
+### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1)
+
+This is where the traffic comes from. Build pages from the **sport pack registry** in `packages/core/src/sports`, but write the copy by hand. Pages are templated for layout only.
+
+**4a. Sport pages** at `/sports/[sport]`, starting with the six most requested sports according to `demo_requests.sport`:
+
+| URL | Primary query cluster (to confirm in Phase 0 keyword research) |
+|---|---|
+| `/sports/cricket` | cricket player auction app · IPL style auction for local tournament · cricket auction software |
+| `/sports/box-cricket` | box cricket auction · turf cricket league auction |
+| `/sports/football` | football player auction · 5-a-side league auction |
+| `/sports/kabaddi` | kabaddi player auction · pro kabaddi style auction |
+| `/sports/badminton`, `/sports/volleyball`, `/sports/esports` (BGMI) | "‹sport› league auction", "‹sport› team auction" |
+
+Each page contains:
+- an H1 built on the query ("Run a cricket player auction, IPL-style")
+- the roles the pack actually uses (batter, bowler, all-rounder…), taken from the pack
+- a 60-second walkthrough using the real screens from `scripts/capture-marketing-screens.ts`
+- a "Seasons running now" strip of public seasons in that sport (live internal links to `/c/…`)
+- 5–8 FAQs specific to the sport
+- a call to action for sign-up or `/schedule-demo?sport=…`
+
+**Only ship a sport page when it has real, sport-specific content.** Thin copies of one template hurt the whole domain.
+
+**4b. Use-case pages** at `/for/[audience]`: corporate leagues, housing-society / RWA premier leagues, college fests, village and district tournaments, turf and academy owners. Each one covers the audience's real constraints, such as WhatsApp registration, a projector in a hall, or collecting the purse in cash.
+
+**4c. Comparison pages** where people are actually searching: `/compare/spreadsheet-vs-desiauction` (the main alternative is a WhatsApp group plus Excel) and `/compare/‹named competitor›` **only once each claim is checked and dated**.
+
+**4d. Free tools** (link magnets, no login): purse and base-price calculator, team-balance / snake-draft helper, and a Google Form registration template that imports cleanly (this reuses the import-mapping work). Every tool leads into the product.
+
+**Internal linking:** add the sport pages to the footer (`PublicShell footerGroups`), link them from `/features` and relevant help articles, and have every sport page link to its help guides.
+
+---
+
+### Phase 5 — `feat(seo): public seasons as the long-tail engine` (P1)
+
+Every public season can rank for "‹league name› auction 2026", "‹league› squads" and "‹league› points table", which are low-competition, high-intent searches.
+
+1. **Title pattern:** `‹Season› auction ‹year› — teams, squads & results`. The description comes from real facts: organizer, location, number of teams, top buy.
+2. **Content that stays useful after the auction:** a result summary (teams, total spend, top buys), a points table and results once fixtures are played, and a replay link. The page should grow with the season instead of going stale.
+3. **Squad pages** (`/c/[slug]/t/[team]`) become indexable only under D3 (organizer opt-in, and never when minors are present).
+4. **Clean slugs:** today every slug is `name-‹last 4 of the id›` (`server/competition/competitions.ts:53`). That suffix is also what guarantees uniqueness, and what stops a season from ever taking the slug `sport` or `city`. To drop it for new seasons (`vpl-2026`), add a uniqueness check that falls back to the suffix on a clash, and a **reserved-slug list** (`sport`, `city`, and every static segment under `/c`). Existing slugs stay as they are, because they're printed on QR codes. The ranking gain is small, so this is optional.
+5. **Directory `/c`** gets crawlable facet pages *only* for sport and city (`/c/sport/cricket`, `/c/city/jaipur`), each with unique intro copy. Ship a city page only once it has at least 3 public seasons. Search and filter combinations stay `noindex` as they are now.
+6. **Unpublishing** keeps returning 404 (Google treats 404 and 410 nearly the same, and a 410 would need a route handler outside Next's `notFound()`). IndexNow reports the removal.
+
+---
+
+### Phase 6 — `feat(content): guides that answer the question` (P1, ongoing)
+
+1. Turn the `/blog` placeholder into `/guides` (keep `/blog` as a 301). It stays `noindex` **until at least 6 real articles exist**.
+2. **The first 10 articles** target how-to searches organizers already make:
+   - How to run an IPL-style auction for your local cricket tournament
+   - How much purse and base price to set, with worked numbers
+   - Auction rules template (RTM, icon players, captains, retained players)
+   - Player registration form for a cricket tournament, with a free template
+   - How to project a live auction on a big screen
+   - Snake draft vs auction: which one suits your league
+   - Running a society premier league, start to finish
+   - Collecting auction money without chaos
+   - Box cricket league: format, rules, auction
+   - Kabaddi league auction: roles and budgets
+3. Each guide has an author byline (a real person, which counts for E-E-A-T), a date, `Article` schema, screenshots from real auctions, and links into the product and the matching sport page.
+4. Publish **2 guides a month**, and refresh the top 5 every quarter (update `dateModified` only when the content really changes).
+5. The 17 help articles and 5 help categories are indexable already. Improve their titles to match the question an organizer would type.
+
+---
+
+### Phase 7 — Authority and backlinks (P1, founder + engineering)
+
+| Tactic | Owner | Detail |
+|---|---|---|
+| "Powered by DesiAuction" | Eng | A clickable link on public season pages and embeds (real backlinks). On `/overlay`, `/board` and share cards it's a visible wordmark: it builds the brand in streams and WhatsApp, but a video overlay can't pass link value. |
+| Organizer embed | Eng | `<iframe>` or script snippet for live auction or squad widgets that organizers put on their own sites, with a link back |
+| Stream kit | Founder | Suggested YouTube description text with a link to the season page, handed over when an organizer goes live |
+| Directories | Founder | Product Hunt launch, G2, Capterra/GetApp India, SaaSworthy, Techjockey, AlternativeTo |
+| Communities and PR | Founder | Local sports journalists (a city league's auction is a story), cricket academy and turf-owner associations, college fest sponsorships |
+| Case studies | Founder | Each real season that agrees to it becomes a `/case-studies/‹league›` page (turning off that placeholder's `noindex`) |
+
+---
+
+### Phase 8 — Core Web Vitals in the field (P2, fixes G10)
+
+1. **RUM:** a `web-vitals` reporter sends LCP, INP and CLS to `/api/vitals` (sampled at 10%, no personal data), shown on `/admin/health`.
+2. **Back/forward cache on public pages (investigate first):** `no-store` is what Next itself emits for a dynamically rendered page, and the root layout's session read makes every page dynamic. Overriding the header needs a proof-of-concept first, to confirm Next doesn't overwrite it and that no signed-in HTML can be cached. Treat it as a UX win (instant back navigation), not a ranking factor.
+3. Audit the LCP element per public page: hero image `priority`, font `display: swap`, no layout shift from the shell.
+4. **Targets (p75, mobile, 4G India):** LCP < 2.0 s, INP < 200 ms, CLS < 0.05.
+
+---
+
+## 3. Keyword map (to confirm in Phase 0)
+
+Use Search Console, Google Keyword Planner (India, English + Hindi), and "People also ask" / autocomplete. Assign **one primary cluster per URL**, and never target the same cluster from two pages.
+
+| Intent | Example queries | Target URL |
+|---|---|---|
+| Commercial, generic | player auction app · online auction for tournament · IPL auction software | `/` |
+| Commercial, by sport | cricket / kabaddi / football auction app | `/sports/[sport]` |
+| Commercial, by audience | corporate cricket league app · society premier league auction | `/for/[audience]` |
+| Pricing | free cricket auction app · auction software price | `/pricing` |
+| Informational | how to conduct a player auction · auction rules for local tournament | `/guides/*` |
+| Tools | purse calculator · cricket registration form template | `/tools/*` |
+| Navigational, long tail | ‹league› auction 2026 · ‹league› squad | `/c/[slug]` |
+| Brand | desiauction · desi auction login | `/`, `/login` (noindex, brand sitelink) |
+
+---
+
+## 4. KPIs and cadence
+
+**The targets below are placeholders.** Reset them from the Phase 0 baseline and the real keyword volumes; don't hold anyone to them before then.
+
+| Metric (Search Console, unless noted) | Baseline | 90 days | 180 days |
+|---|---|---|---|
+| Indexed pages (valid) | ~41 | 100+ | 250+ (seasons + content) |
+| Non-brand impressions / month | ≈0 | 20k | 100k |
+| Non-brand clicks / month | ≈0 | 500 | 3,000 |
+| Queries ranking top 10 | brand only | 30 | 150 |
+| Sign-ups from organic search / month (analytics) | unknown | 20 | 100 |
+| Valid structured data (Search Console enhancements) | SportsEvent only, no address | Breadcrumb + Event (seasons with a venue), 0 errors | + Article on guides, 0 errors |
+| CWV "Good" URLs (field) | unknown | ≥ 90% | ≥ 95% |
+
+**Cadence:**
+- **Weekly:** check Search Console for coverage errors and failed rich results (15 min).
+- **Monthly:** query review, including which new queries need a page and which pages have lost clicks.
+- **Quarterly:** content refresh and a backlink audit.
+
+---
+
+## 5. Guardrails (non-negotiable)
+
+1. **Privacy beats traffic.** Player pages stay `noindex`. Minors' squads are never indexed. Uploaded photos are `noimageindex`. Phone numbers never appear in any public HTML or JSON-LD. This follows the rule "gate the data, not the button".
+2. **No invented signals.** No fake ratings, fake reviews, invented case studies or placeholder pages kept indexable. This matches the existing "honest placeholder" rule.
+3. **No thin programmatic pages.** A sport, city or use-case page ships only with content unique to it.
+4. **URLs that already exist never break.** Any rename uses a single-hop 301. `/c/[slug]` stays as it is.
+5. **Every new route states its indexability.** The Phase 3 test enforces this.
+
+---
+
+## 6. Delivery order
+
+| Order | PR | Size | Blocks on |
+|---|---|---|---|
+| 1 | Phase 0 (no PR) | 1 hr founder | — |
+| 2 | Phase 1 — route registry + indexability | M | — |
+| 3 | Phase 2 — structured data | S–M | Phase 1 helpers |
+| 4 | Phase 3 — SEO guardrail suite + Lighthouse CI | M | Phase 1 registry |
+| 5 | Phase 4a — cricket, box-cricket, football, kabaddi pages | L (content-heavy) | D4, keyword research |
+| 6 | Phase 5 — season long-tail + facets | M | D3 |
+| 7 | Phase 4b/4c/4d — use-case, comparison, tools | L | content |
+| 8 | Phase 6 — guides (ongoing) | ongoing | D4 |
+| 9 | Phase 7 — powered-by links + embed | S–M | — |
+| 10 | Phase 8 — RUM + bfcache | S | — |
+
+Phases 1–3 are pure engineering, roughly one focused week. Most of the ranking gains come from Phases 4–6, and those depend on content.
+
+---
+
+## 7. Validation log (2026-09-30)
+
+Every factual claim was re-checked against the code, the live site and current search-engine documentation.
+
+**Confirmed:**
+- The robots.txt denylist is missing `/tournaments`, `/players`, `/auctions`, `/reports` and `/me`. Live, they 307 to `/login?next=…`.
+- `/login` is live without `noindex` or a canonical. Its only metadata is `title: "Continue to DesiAuction"`.
+- `/help/faq` has no canonical. The 404 title is a bare "DesiAuction".
+- The live sitemap has 41 URLs and 0 `<lastmod>` entries.
+- The home page has 0 `ld+json` blocks.
+- `/about`, `/security`, `/rules-guidelines` and `/schedule-demo` are indexable but missing from the sitemap.
+- The engine and media Caddy blocks send no `X-Robots-Tag`.
+- `server/seo/json-ld.ts`, `src/middleware.ts`, `scripts/capture-marketing-screens.ts`, `/admin/health` and `PublicShell footerGroups` all exist. (`competitions.updated_at` does **not**. The match was a neighbouring table. Corrected in §8.)
+
+**Corrected in this revision:**
+1. `/schedule-demo` added to the sitemap gap (G6).
+2. Help content is 17 articles + 5 categories, not 26.
+3. `SoftwareApplication` markup alone can't earn a rich result, because Google requires ratings or reviews.
+4. Event rich results require a postal address. Our `location` is free text, so event markup now depends on a venue address.
+5. The livestream LIVE badge is removed: it applies only to `VideoObject`.
+6. `Google-Extended` is a training-control token, not a crawler (D2).
+7. Google Business Profile isn't available to online-only businesses.
+8. Returning 410 on unpublish was dropped. 404 is equivalent for Google and native to Next.
+9. The back/forward-cache header change fights Next's own `no-store`. It's now "investigate first" and not claimed as a ranking factor.
+10. Readable slugs need a uniqueness fallback and a reserved list, because the id suffix is what currently prevents clashes.
+11. `lastModified` must not be derived from release dates.
+12. Overlay "powered by" is branding, not a backlink. The middleware allowlist must include file-based metadata routes. `noindex` is invisible on disallowed URLs. Unknown DOB counts as a minor. KPIs are placeholders until the baseline exists.
+
+---
+
+## 8. Phase 1 delivery log (2026-09-30)
+
+**Shipped on `feat/seo-route-registry`:**
+
+| Item | Where |
+|---|---|
+| Route registry: `INDEXABLE_PAGES`, public subtrees and patterns, `CONSOLE_SEGMENTS`, `isPublicPath` | `apps/web/src/server/seo/routes.ts` |
+| `X-Robots-Tag: noindex, nofollow` on every page the registry doesn't claim | `apps/web/src/middleware.ts` |
+| robots.txt generated from the registry, rendered per request | `apps/web/src/app/robots.ts` |
+| Sitemap from the registry. Real `lastmod` on 44 URLs: pages, help categories, articles, legal. | `apps/web/src/app/sitemap.ts` |
+| Help articles carry `updatedOn`, dated from `git blame` of each article's own lines | `apps/web/src/content/help.ts` |
+| Title template `%s · DesiAuction`. The hand-written suffix removed from 101 titles in 93 files (AST edit; `openGraph`/`twitter` titles untouched). | root `layout.tsx` + pages |
+| `/login`: `noindex, follow` + canonical `/login` (collapses `?next=` variants) | `app/login/page.tsx` |
+| `/help/faq` canonical + real description. 404 title "Page not found". | `help/[slug]`, `not-found.tsx` |
+| IndexNow ping on publish/unpublish (in `after()`, never throws, off without `INDEXNOW_KEY`), key served at `/indexnow-key.txt` | `server/seo/indexnow.ts`, `app/indexnow-key.txt/route.ts` |
+| `INDEXNOW_KEY` generated for production only | `ops/deploy/init-env.sh`, `.env.example`, `env.ts` |
+| `X-Robots-Tag` on the engine host (`noindex, nofollow`) and the media host (`noindex, noimageindex`) | `ops/deploy/site.caddy` |
+| Tests:<br>• every top-level `app/` segment classified exactly once<br>• no Disallow prefix swallows a public page<br>• indexable pages exist and have valid dates<br>• robots and sitemap stay dynamic<br>• public/private path matrix<br>• IndexNow behaviour | `server/seo/routes.test.ts`, `server/seo/indexnow.test.ts` |
+
+**Found while building:**
+1. **Production bug:** live `robots.txt` announced `Sitemap: https://build.invalid/sitemap.xml`. `robots.ts` was prerendered during the image build, when the base URL is a placeholder. It's now `force-dynamic`, with a test to keep it that way.
+2. `/seasons/[slug]/register` is a public, widely shared page whose own metadata says `noindex, follow`. It's now public in the registry (so the header can't add `nofollow`) and allowed in robots.txt, like the spectate room, so Twitterbot can read its card.
+3. `competitions` has no updated-at column, so season URLs have no `lastmod`. Adding one is a Phase 5 item (a migration plus writers).
+
+**Founder, after merge and deploy:**
+1. `sudo set-secret production INDEXNOW_KEY web.env` (any 32 hex characters, e.g. `openssl rand -hex 16`), then restart web. Check that `https://desiauction.in/indexnow-key.txt` returns it.
+2. The Caddy change ships with the next host deploy. Check it with `curl -sI https://engine.desiauction.in | grep -i x-robots`.
+3. Resubmit the sitemap in Search Console and Bing, now that robots.txt names the real one.

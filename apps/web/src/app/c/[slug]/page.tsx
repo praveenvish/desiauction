@@ -65,12 +65,12 @@ export async function generateMetadata({
   const { slug } = await params;
   const view = await competitionView(slug);
   if (view === null) {
-    return { title: "Season · DesiAuction" };
+    return { title: "Season" };
   }
   const description = `${view.orgName}${view.location !== null ? ` · ${view.location}` : ""} · ${formatDateRange(view.startsOn, view.endsOn)}. ${view.open ? "Registration is open — join as a player." : "Run on DesiAuction."}`;
   const url = `${env.PUBLIC_BASE_URL}/c/${view.slug}`;
   return {
-    title: `${view.name} · DesiAuction`,
+    title: view.name,
     description,
     alternates: { canonical: url },
     // This view only exists for a published competition, so `listed` is always

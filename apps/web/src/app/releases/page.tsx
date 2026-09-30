@@ -7,7 +7,7 @@ import { ContentPage } from "../../components/public/content-page";
 import "../content.css";
 
 export const metadata: Metadata = {
-  title: "Release notes · DesiAuction",
+  title: "Release notes",
   description: "What each update to DesiAuction delivered.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/releases` },
 };

@@ -10,7 +10,7 @@ import "../../content.css";
 import "./review.css";
 
 export const metadata: Metadata = {
-  title: "Your review · DesiAuction",
+  title: "Your review",
   robots: { index: false, follow: false },
 };
 

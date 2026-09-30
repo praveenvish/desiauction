@@ -4,7 +4,7 @@ import { env } from "../../env";
 import { ComingSoon } from "../../components/public/coming-soon";
 
 export const metadata: Metadata = {
-  title: "Blog · DesiAuction",
+  title: "Blog",
   description: "Notes from the DesiAuction team — nothing published yet.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/blog` },
   // Not in search results and not in the sitemap: a page whose whole content

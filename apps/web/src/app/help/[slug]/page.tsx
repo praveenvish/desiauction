@@ -21,14 +21,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   if (slug === "faq") {
-    return { title: "FAQ · Help · DesiAuction", description: "Frequently asked questions." };
+    return {
+      title: "FAQ · Help",
+      description: "Frequently asked questions about running a player auction on DesiAuction.",
+      alternates: { canonical: `${env.PUBLIC_BASE_URL}/help/faq` },
+    };
   }
   const article = helpArticle(slug);
   if (article === undefined) {
-    return { title: "Help · DesiAuction" };
+    return { title: "Help" };
   }
   return {
-    title: `${article.title} · Help · DesiAuction`,
+    title: `${article.title} · Help`,
     description: article.summary,
     alternates: { canonical: `${env.PUBLIC_BASE_URL}/help/${slug}` },
   };

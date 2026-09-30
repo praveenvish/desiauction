@@ -8,7 +8,7 @@ import { OrgDetailPanel } from "./org-detail-panel";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 
-export const metadata = { title: "Organization · Platform admin · DesiAuction" };
+export const metadata = { title: "Organization · Platform admin" };
 
 /**
  * PX-9 §2 — organization drill-down: lifecycle, competitions, members, grants,

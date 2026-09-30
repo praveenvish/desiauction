@@ -10,7 +10,7 @@ import "../../seasons/seasons.css";
 import "../admin.css";
 import "./notifications.css";
 
-export const metadata = { title: "Notifications · Platform admin · DesiAuction" };
+export const metadata = { title: "Notifications · Platform admin" };
 
 /**
  * THE NOTIFICATION CONTROL CENTER — "Messages" (redesign stage 1, 2026-09-27).

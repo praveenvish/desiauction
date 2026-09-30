@@ -11,7 +11,7 @@ import "../../../../seasons/seasons.css";
 import "../../../../seasons/[slug]/money/money.css";
 import "../finance.css";
 
-export const metadata = { title: "Reconciliation · DesiAuction" };
+export const metadata = { title: "Reconciliation" };
 
 /**
  * PX-8 §3 — the Reconciliation workspace.

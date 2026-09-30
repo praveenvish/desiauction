@@ -23,10 +23,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const doc = legalDocument(slug);
   if (doc === undefined) {
-    return { title: "Legal · DesiAuction" };
+    return { title: "Legal" };
   }
   return {
-    title: `${doc.title} · DesiAuction`,
+    title: doc.title,
     description: doc.summary,
     alternates: { canonical: `${env.PUBLIC_BASE_URL}/legal/${slug}` },
   };

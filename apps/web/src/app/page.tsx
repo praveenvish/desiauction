@@ -20,7 +20,7 @@ const description =
   "Run a live player auction for your league: owners bid from their phones while the room watches the big screen. Registration, squads, fixtures and receipts in one place. Free during beta.";
 const title = "DesiAuction — Live player auctions for your league";
 export const metadata: Metadata = {
-  title,
+  title: { absolute: title },
   description,
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/` },
   openGraph: {

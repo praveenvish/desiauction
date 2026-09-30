@@ -29,6 +29,13 @@ const envSchema = z.object({
   // way by whatever aggregates them.
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   SENTRY_DSN: z.url().optional(),
+  // SEO-1: IndexNow's shared key (server/seo/indexnow.ts). Public by design,
+  // since the protocol serves it at /indexnow-key.txt. Production only: unset,
+  // nothing is ever announced, which is right for dev, e2e and staging.
+  INDEXNOW_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9-]{8,128}$/, "IndexNow keys are 8-128 letters, digits or dashes")
+    .optional(),
   // WebAuthn relying party (M-IP2-2). Defaults serve local dev + e2e; deployed
   // environments set real values (rpID must suffix-match the browser host).
   RP_ID: z.string().min(1).default("localhost"),

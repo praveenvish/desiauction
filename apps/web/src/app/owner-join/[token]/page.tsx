@@ -13,7 +13,7 @@ import {
 import "../../orgs/orgs.css";
 import "../../join/join.css";
 
-export const metadata = { title: "Team owner invitation · DesiAuction" };
+export const metadata = { title: "Team owner invitation" };
 
 // THE OWNER INVITATION LANDING (M-IP4-3).
 //

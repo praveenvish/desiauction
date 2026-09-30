@@ -109,6 +109,11 @@ SES_REGION=ap-south-1
 SES_CONFIGURATION_SET=desiauction-transactional
 SES_FEEDBACK_ADDRESS=bounces@desiauction.in"
 
+# IndexNow's key (SEO-1): public by design, and production only, so staging
+# never announces its URLs to search engines.
+INDEXNOW=""
+[ "$ENV_NAME" = production ] && INDEXNOW="INDEXNOW_KEY=$(secret 16)"
+
 write web.env <<EOF
 NODE_ENV=production
 LOG_LEVEL=info
@@ -131,6 +136,7 @@ SETTLEMENT_JOB_SECRET=$(secret)
 DEMO_JOB_SECRET=$(secret)
 DEMO_TOKEN_SECRET=$(secret 32)
 REVIEW_TOKEN_SECRET=$(secret 32)
+$INDEXNOW
 
 # ---- FOUNDER: values only you hold (.env.example explains each) ----
 # SENTRY_DSN=

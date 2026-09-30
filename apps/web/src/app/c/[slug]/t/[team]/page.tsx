@@ -44,7 +44,7 @@ export async function generateMetadata({
   const { slug, team: teamSlug } = await params;
   const team = await teamView(slug, teamSlug);
   if (team === null) {
-    return { title: "Team · DesiAuction" };
+    return { title: "Team" };
   }
   const facts = teamFacts(team);
   const url = `${env.PUBLIC_BASE_URL}/c/${slug}/t/${teamSlug}`;

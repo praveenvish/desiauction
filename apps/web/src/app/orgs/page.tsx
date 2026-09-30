@@ -21,7 +21,7 @@ import { CreateOrgForm } from "./create-org-form";
 import "../tournaments/tournaments.css";
 import "./orgs.css";
 
-export const metadata = { title: "Clubs · DesiAuction" };
+export const metadata = { title: "Clubs" };
 
 /**
  * "Malad Cricket Club" → "MC". Two initials max.

@@ -11,7 +11,7 @@ import "../content.css";
 import { IconArrowRight, IconClock, IconMail } from "@desiauction/ui";
 
 export const metadata: Metadata = {
-  title: "Support · DesiAuction",
+  title: "Support",
   description: "Get help, report a bug, and see what's new.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/support` },
 };

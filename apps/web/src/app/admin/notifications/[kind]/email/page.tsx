@@ -26,7 +26,7 @@ import "../../../admin.css";
 import "../../notifications.css";
 import "./template-editor.css";
 
-export const metadata = { title: "Email wording · Notifications · Platform admin · DesiAuction" };
+export const metadata = { title: "Email wording · Notifications · Platform admin" };
 
 /**
  * THE EMAIL WORDING EDITOR (Notification Control Center, Phase 2).

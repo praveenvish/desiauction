@@ -6,7 +6,7 @@ import { AuctionWatchView } from "./auction-watch";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 
-export const metadata = { title: "Auction · Platform admin · DesiAuction" };
+export const metadata = { title: "Auction · Platform admin" };
 
 /**
  * ONE AUCTION, WATCHED — live while it runs, its report once it has closed.

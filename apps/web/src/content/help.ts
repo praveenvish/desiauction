@@ -20,6 +20,12 @@ export interface HelpArticle {
   readonly summary: string;
   readonly category: string;
   readonly readMinutes: number;
+  /**
+   * When the article's WORDS last changed (ISO date). The sitemap's `lastmod`
+   * reads it, so bump it only for a real content change: a date that moves on
+   * every deploy teaches search engines to ignore it.
+   */
+  readonly updatedOn: string;
   readonly blocks: readonly Block[];
 }
 
@@ -90,6 +96,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "What the platform does, how it's organized, and where to go next.",
     category: "getting-started",
     readMinutes: 4,
+    updatedOn: "2026-09-20",
     blocks: [
       {
         kind: "paragraph",
@@ -166,6 +173,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       "Email or mobile number + one-time code, then add a passkey — and keeping your account secure.",
     category: "getting-started",
     readMinutes: 3,
+    updatedOn: "2026-09-25",
     blocks: [
       { kind: "heading", level: 2, text: "Signing in with a one-time code" },
       {
@@ -212,6 +220,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "The whole journey, end to end: from creating a season to closing the books.",
     category: "getting-started",
     readMinutes: 8,
+    updatedOn: "2026-08-03",
     blocks: [
       {
         kind: "paragraph",
@@ -290,6 +299,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Exactly what a stranger with a link can see — and what nobody can.",
     category: "getting-started",
     readMinutes: 4,
+    updatedOn: "2026-08-03",
     blocks: [
       {
         kind: "paragraph",
@@ -352,6 +362,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "The four separate keys — organization, auction, settlement and finance.",
     category: "getting-started",
     readMinutes: 5,
+    updatedOn: "2026-08-03",
     blocks: [
       {
         kind: "paragraph",
@@ -419,6 +430,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Create a season, add teams, and open the registration door.",
     category: "organizer",
     readMinutes: 5,
+    updatedOn: "2026-08-03",
     blocks: [
       { kind: "heading", level: 2, text: "Create the season" },
       {
@@ -463,6 +475,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Work through applications, run a waitlist, and import a roster from CSV.",
     category: "organizer",
     readMinutes: 5,
+    updatedOn: "2026-09-24",
     blocks: [
       { kind: "heading", level: 2, text: "Working through applications" },
       {
@@ -508,6 +521,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
       "Connect your form's Google Sheet once, then bring in new players — and their photos — with one click.",
     category: "organizer",
     readMinutes: 4,
+    updatedOn: "2026-09-30",
     blocks: [
       {
         kind: "paragraph",
@@ -610,6 +624,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Pre-sign your marquee players, mark the captains, and name each team's coach.",
     category: "organizer",
     readMinutes: 4,
+    updatedOn: "2026-08-03",
     blocks: [
       {
         kind: "paragraph",
@@ -644,6 +659,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Turn venues and dates into a conflict-free schedule, then publish it.",
     category: "organizer",
     readMinutes: 5,
+    updatedOn: "2026-08-03",
     blocks: [
       { kind: "heading", level: 2, text: "Venues first" },
       {
@@ -691,6 +707,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "How to sign up as a player, and what happens next.",
     category: "player",
     readMinutes: 3,
+    updatedOn: "2026-07-23",
     blocks: [
       { kind: "heading", level: 2, text: "Signing up" },
       {
@@ -721,6 +738,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Accept your invite, get your paddle granted, and understand your dues.",
     category: "player",
     readMinutes: 6,
+    updatedOn: "2026-09-29",
     blocks: [
       { kind: "heading", level: 2, text: "Joining your team" },
       {
@@ -797,6 +815,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Everything that must be in place before you can go live.",
     category: "auction",
     readMinutes: 6,
+    updatedOn: "2026-09-29",
     blocks: [
       { kind: "heading", level: 2, text: "Build the auction" },
       {
@@ -848,6 +867,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Run the room with confidence — including when something goes wrong.",
     category: "auction",
     readMinutes: 7,
+    updatedOn: "2026-08-03",
     blocks: [
       { kind: "heading", level: 2, text: "The cockpit" },
       {
@@ -901,6 +921,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Put the auction on a projector, and into your stream, with two chrome-free screens.",
     category: "auction",
     readMinutes: 3,
+    updatedOn: "2026-08-03",
     blocks: [
       {
         kind: "paragraph",
@@ -937,6 +958,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "The settlement desk — recording money in, adjusting, and closing.",
     category: "money",
     readMinutes: 6,
+    updatedOn: "2026-09-03",
     blocks: [
       { kind: "heading", level: 2, text: "The case opens itself" },
       {
@@ -988,6 +1010,7 @@ export const HELP_ARTICLES: readonly HelpArticle[] = [
     summary: "Issue receipts, keep a sealed record, and check that it still reproduces.",
     category: "money",
     readMinutes: 4,
+    updatedOn: "2026-09-03",
     blocks: [
       { kind: "heading", level: 2, text: "Declare your profile first" },
       {

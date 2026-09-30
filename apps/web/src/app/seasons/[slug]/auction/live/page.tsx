@@ -7,7 +7,7 @@ import "../../../seasons.css";
 import "../auction.css";
 import "../plan/plan.css";
 
-export const metadata = { title: "Live auction · DesiAuction" };
+export const metadata = { title: "Live auction" };
 
 export default async function LiveAuctionPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

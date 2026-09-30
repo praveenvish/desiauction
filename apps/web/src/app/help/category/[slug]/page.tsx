@@ -27,10 +27,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const category = helpCategory(slug);
   if (category === undefined) {
-    return { title: "Help · DesiAuction" };
+    return { title: "Help" };
   }
   return {
-    title: `${category.title} · Help · DesiAuction`,
+    title: `${category.title} · Help`,
     description: category.description,
     alternates: { canonical: `${env.PUBLIC_BASE_URL}/help/category/${slug}` },
   };

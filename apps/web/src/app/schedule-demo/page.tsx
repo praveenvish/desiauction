@@ -13,7 +13,7 @@ import "../content.css";
 import "./demo.css";
 
 export const metadata: Metadata = {
-  title: "Book a demo · DesiAuction",
+  title: "Book a demo",
   description:
     "See a real auction run end to end — squads, bidding, the gavel and the money afterwards. Tell us about your tournament and we'll walk you through it live.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/schedule-demo` },

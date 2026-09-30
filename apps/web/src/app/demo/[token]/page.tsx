@@ -10,7 +10,7 @@ import "../../content.css";
 import "../../schedule-demo/demo.css";
 
 export const metadata: Metadata = {
-  title: "Your demo · DesiAuction",
+  title: "Your demo",
   robots: { index: false, follow: false },
 };
 

@@ -9,12 +9,22 @@ import { RETURNING_COOKIE } from "../../server/auth/sessions";
 import { safeNext } from "../../server/auth/redirect";
 import { SportMontage } from "../../components/public/public-kit";
 import { LoginPanel } from "./login-form";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import type { LoginMethod } from "./login-shared";
 import "./login.css";
 
-export const metadata = { title: "Continue to DesiAuction" };
+/**
+ * NOT FOR SEARCH. Every signed-out console visit lands here as
+ * `/login?next=/somewhere`, so an indexable login page is an unbounded family
+ * of duplicate URLs. `follow` stays on: the page links to the public site.
+ */
+export const metadata: Metadata = {
+  title: { absolute: "Continue to DesiAuction" },
+  robots: { index: false, follow: true },
+  alternates: { canonical: `${env.PUBLIC_BASE_URL}/login` },
+};
 
 /**
  * The trust argument, in one place. It used to exist only inside the

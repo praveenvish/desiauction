@@ -7,7 +7,7 @@ import { SettlementPanel } from "./settlement-panel";
 import "../../../seasons/seasons.css";
 import "../../../seasons/[slug]/money/money.css";
 
-export const metadata = { title: "Settlement · DesiAuction" };
+export const metadata = { title: "Settlement" };
 
 /**
  * PX-7 §5 — the org's Settlement dashboard.

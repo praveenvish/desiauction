@@ -52,7 +52,7 @@ import "../../orgs/orgs.css";
 import "../../tournaments/tournaments.css";
 import "./org-detail.css";
 
-export const metadata = { title: "Organization · DesiAuction" };
+export const metadata = { title: "Organization" };
 
 /** "Malad Cricket Club" → "MC". First code point of up to two words. */
 function monogram(name: string): string {

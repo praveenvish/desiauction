@@ -18,7 +18,7 @@ import { SideCard } from "../../components/public/public-kit";
 import "../content.css";
 
 export const metadata: Metadata = {
-  title: "About · DesiAuction",
+  title: "About",
   description: "What DesiAuction is, and why we built it.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/about` },
 };

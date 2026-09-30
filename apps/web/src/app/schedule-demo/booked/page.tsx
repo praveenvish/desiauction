@@ -5,7 +5,7 @@ import "../../content.css";
 import "../demo.css";
 
 export const metadata: Metadata = {
-  title: "Demo booked · DesiAuction",
+  title: "Demo booked",
   robots: { index: false, follow: false },
 };
 

@@ -11,7 +11,7 @@ import "../_tabs/tabs.css";
 import "./readiness.css";
 import { readinessSteps, readinessTitle, shortfallSentence } from "./readiness-model";
 
-export const metadata = { title: "Readiness · DesiAuction" };
+export const metadata = { title: "Readiness" };
 
 // PX-4 Readiness Center: ONE unified view that SURFACES existing validation.
 // The only pass/fail authority here is the platform's own AuctionReady

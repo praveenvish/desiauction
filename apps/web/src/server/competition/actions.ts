@@ -57,6 +57,7 @@ import { setMessageLanguage } from "@desiauction/messaging/language";
 import { recordConsent } from "../messaging/consent";
 import { env } from "../../env";
 import { logger } from "../logger";
+import { notifyIndexNow } from "../seo/indexnow";
 
 import { currentSession } from "../auth/actions";
 import {
@@ -648,6 +649,10 @@ export async function setCompetitionVisibilityAction(
   await inCompetitionOrg(session.personId, competition, (db) =>
     setCompetitionVisibility(db, competition, session.personId, visibility),
   );
+  // SEO-1: the page and the directory listing it just appeared in (or left)
+  // are recrawled in minutes rather than days. After the response, and never
+  // able to fail the publish.
+  after(() => notifyIndexNow([`/c/${competition.slug}`, "/c"]));
   return { ok: true };
 }
 

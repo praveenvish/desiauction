@@ -37,7 +37,11 @@ export const metadata: Metadata = {
   // build warning. The share card is the one asset whose whole job is to be
   // fetched by somebody else's server, so the origin has to be real.
   metadataBase: new URL(env.PUBLIC_BASE_URL),
-  title: "DesiAuction",
+  // ONE SUFFIX, OWNED HERE. Every page used to hand-write "· DesiAuction" onto
+  // its own title, which is 100 chances to forget it or double it. Pages now
+  // state only their own name; `absolute` is for the rare page whose title
+  // already carries the brand (the landing page, the login gate).
+  title: { default: "DesiAuction", template: "%s · DesiAuction" },
   description: "Tournament auctions, taken seriously.",
   // Defaults, inherited by every route that does not state its own. Pages with
   // a richer card (a competition, a player, pricing) still win — a file lower

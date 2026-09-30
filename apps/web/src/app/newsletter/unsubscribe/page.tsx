@@ -7,7 +7,7 @@ import "../../content.css";
 import "../../marketing.css";
 
 export const metadata: Metadata = {
-  title: "Unsubscribe · DesiAuction",
+  title: "Unsubscribe",
   description: "Take your address off the DesiAuction product-news list.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/newsletter/unsubscribe` },
   // A utility page with nothing to find; it should not compete in search.

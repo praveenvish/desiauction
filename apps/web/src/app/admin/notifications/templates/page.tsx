@@ -39,7 +39,7 @@ import "../notifications.css";
 import "./templates.css";
 
 export const metadata = {
-  title: "WhatsApp and SMS templates · Notifications · Platform admin · DesiAuction",
+  title: "WhatsApp and SMS templates · Notifications · Platform admin",
 };
 
 /**

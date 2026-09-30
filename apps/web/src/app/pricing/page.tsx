@@ -25,7 +25,7 @@ import "../marketing.css";
  * second one.
  */
 export const metadata: Metadata = {
-  title: "Pricing · DesiAuction",
+  title: "Pricing",
   description: PRICING.sub,
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/pricing` },
   openGraph: {

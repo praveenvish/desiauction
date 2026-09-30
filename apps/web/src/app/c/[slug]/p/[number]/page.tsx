@@ -86,7 +86,7 @@ export async function generateMetadata({
   const { slug, number } = await params;
   const player = await playerView(slug, number);
   if (player === null) {
-    return { title: "Player · DesiAuction" };
+    return { title: "Player" };
   }
   const url = `${env.PUBLIC_BASE_URL}/c/${slug}/p/${number}`;
   // The image route's own `alt` export must be a static string, so every player
