@@ -28,6 +28,8 @@
  * the rest of this import already follows: place it, or say you could not.
  */
 
+import { driveFileIdOf } from "./registration-csv";
+
 /** The columns `parseRegistrationRecords` understands. */
 export const IMPORT_FIELDS = [
   "name",
@@ -318,6 +320,23 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "profile photo",
     "photograph",
     "picture",
+    // The wordings real forms use, which the exact table above missed (8 of 13
+    // in a sample of club forms). The column is ALSO found by its answers —
+    // see `photoColumnByValues` — so this list is a first try, not the net.
+    "recent photo",
+    "your recent photo",
+    "upload your recent photo",
+    "upload recent photo",
+    "please upload your photo",
+    "photo for auction",
+    "upload your passport size photo",
+    "passport size photograph",
+    "recent photograph",
+    "your photograph",
+    "upload your photograph",
+    "player image",
+    "player picture",
+    "profile picture",
   ],
 };
 
@@ -412,7 +431,15 @@ export interface DetectedMapping {
  * working choice and states plainly that a decision is outstanding, rather than
  * silently preferring a column the organizer never looked at.
  */
-export function detectMapping(headers: readonly string[]): DetectedMapping {
+export function detectMapping(
+  headers: readonly string[],
+  /**
+   * The whole file, header row first. When given, a photo column the header
+   * table missed is found by its ANSWERS (`photoColumnByValues`). Optional so
+   * a caller holding only a header row still gets the header-only guess.
+   */
+  records?: readonly (readonly string[])[],
+): DetectedMapping {
   const claimed = new Map<ImportField, string[]>();
   const columns: MappedColumn[] = headers.map((header, index) => {
     const key = normalizeHeader(header);
@@ -431,8 +458,111 @@ export function detectMapping(headers: readonly string[]): DetectedMapping {
   const conflicts: MappingConflict[] = [...claimed.entries()]
     .filter(([, hs]) => hs.length > 1)
     .map(([field, hs]) => ({ field, headers: hs }));
+  if (records !== undefined && !claimed.has("photo_link")) {
+    const found = photoColumnByValues(columns, records);
+    if (found.length === 1) {
+      const only = columns[found[0] ?? -1];
+      if (only !== undefined) {
+        only.field = "photo_link";
+        only.noise = false;
+      }
+    } else if (found.length > 1) {
+      conflicts.push({
+        field: "photo_link",
+        headers: found.map((index) => columns[index]?.header ?? ""),
+      });
+    }
+  }
   const missing = REQUIRED_IMPORT_FIELDS.filter((field) => !claimed.has(field));
   return { columns, missing, conflicts };
+}
+
+/**
+ * A header that names a document, not a face. Indian registration forms very
+ * often carry a second upload — the payment screenshot, the Aadhaar card, a
+ * birth certificate — and those are Drive links too. Content alone cannot tell
+ * them from the photo, and an ID card on the auction screen is a privacy
+ * incident, so a column worded like one is never taken for the photo.
+ */
+const DOCUMENT_WORDS =
+  /\b(aadh?aa?r|adhar|id|identity|proof|card|pan|certificate|document|birth|dob|payment|paid|screenshot|receipt|signature|transaction|upi|fee|fees|bank)\b/;
+const PHOTO_WORDS = /\b(photo|photos|photograph|picture|pic|image|selfie)\b/;
+
+/**
+ * The unplaced columns whose ANSWERS are Google Drive upload links — a Google
+ * Form's file-upload question, whatever it was called.
+ *
+ * The header table can only know the wordings someone thought to list, and a
+ * missed photo column is silent: the import still succeeds, the links are
+ * dropped, and the photo step later has nothing to fetch. The answers are the
+ * reliable signal — a Form writes `https://drive.google.com/open?id=…` for
+ * every upload.
+ *
+ * Returns column indexes. One means "this is the photo"; several means the
+ * organizer must choose (reported as a conflict, never guessed); none means the
+ * file has no photo upload we can use.
+ *
+ *   - A column counts when at least half of its non-empty answers are Drive
+ *     links (a few players skip an optional upload; a few paste something odd).
+ *   - Document-worded columns (`DOCUMENT_WORDS`) never count.
+ *   - Among the rest, photo-worded headers are preferred: "Upload photo" beside
+ *     a neutrally-named "File upload" is the photo.
+ */
+export function photoColumnByValues(
+  columns: readonly MappedColumn[],
+  records: readonly (readonly string[])[],
+): number[] {
+  const rows = records.slice(1);
+  const candidates = columns.filter((column) => {
+    if (column.field !== null) {
+      return false;
+    }
+    const key = normalizeHeader(column.header);
+    if (DOCUMENT_WORDS.test(key)) {
+      return false;
+    }
+    let answered = 0;
+    let links = 0;
+    for (const row of rows) {
+      const cell = (row[column.index] ?? "").trim();
+      if (cell === "") {
+        continue;
+      }
+      answered += 1;
+      if (driveFileIdOf(cell) !== null) {
+        links += 1;
+      }
+    }
+    return links > 0 && links * 2 >= answered;
+  });
+  const photoWorded = candidates.filter((column) =>
+    PHOTO_WORDS.test(normalizeHeader(column.header)),
+  );
+  return (photoWorded.length > 0 ? photoWorded : candidates).map((column) => column.index);
+}
+
+/**
+ * A saved mapping, plus the photo column the file's answers point at when the
+ * saved one has none.
+ *
+ * A club that imported before photo detection existed saved a mapping with
+ * the photo column set to "Don't import" — by omission, not by choice, because
+ * the screen never offered it. Reusing that mapping as-is would keep the Drive
+ * option switched off for that club forever. The column is added only when it
+ * is free: a column the saved mapping already sends somewhere stays there.
+ */
+export function withDetectedPhoto(
+  mapping: ColumnMapping,
+  detected?: DetectedMapping,
+): ColumnMapping {
+  if (mapping.photo_link !== undefined || detected === undefined) {
+    return mapping;
+  }
+  const photo = detected.columns.find((column) => column.field === "photo_link");
+  if (photo === undefined || Object.values(mapping).includes(photo.index)) {
+    return mapping;
+  }
+  return { ...mapping, photo_link: photo.index };
 }
 
 /** field → source column index. The confirmed answer the organizer approved. */

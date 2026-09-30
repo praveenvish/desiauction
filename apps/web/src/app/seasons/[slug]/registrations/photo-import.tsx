@@ -81,6 +81,7 @@ export function PhotoImportPanel({
   slug,
   onDone,
   onStepAside,
+  onGoToPlayers,
   autoStart = false,
 }: {
   slug: string;
@@ -95,6 +96,8 @@ export function PhotoImportPanel({
    * pop-up the person didn't click for is one the browser blocks.
    */
   autoStart?: boolean;
+  /** Back to the Players step, where the form's responses are imported again. */
+  onGoToPlayers?: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -110,6 +113,12 @@ export function PhotoImportPanel({
      configured AND the season has players whose Form row linked a photo. */
   const [drive, setDrive] = useState<DrivePickerConfig | null>(null);
   const [linked, setLinked] = useState<PhotoTarget[]>([]);
+  /**
+   * Where the season's photos stand, so the step can say what to do next
+   * instead of offering only a drop zone: who still needs one, and whether any
+   * player came with a Drive link at all.
+   */
+  const [roster, setRoster] = useState<{ missing: number; withLinks: number } | null>(null);
   const [driveStep, setDriveStep] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -125,6 +134,10 @@ export function PhotoImportPanel({
           (target) => (target.driveId ?? null) !== null && !target.hasPhoto,
         );
         setLinked(withLinks);
+        setRoster({
+          missing: found.filter((target) => !target.hasPhoto).length,
+          withLinks: found.filter((target) => (target.driveId ?? null) !== null).length,
+        });
         if (config !== null && withLinks.length > 0) {
           preloadGoogle();
         }
@@ -455,6 +468,41 @@ export function PhotoImportPanel({
               "Sign in with the Google account that owns the form (or one it's shared with), select all the photos Google shows, and press Select. We only see the photos you select."}
           </p>
         </div>
+      ) : drive !== null && roster !== null && roster.missing > 0 ? (
+        /* No Drive photos to fetch — say why, and what would change that. The
+           step used to show only the drop zone here, which left an organizer
+           whose form HAD a photo question with a ZIP as the only visible way. */
+        <div className="drive-photos" data-testid="drive-photos-none">
+          {roster.withLinks > 0 ? (
+            <p>
+              <strong>Everyone who uploaded a photo in your form has it.</strong> {roster.missing}{" "}
+              player{roster.missing === 1 ? "" : "s"} didn&apos;t upload one — add theirs below, or
+              from the player&apos;s own page.
+            </p>
+          ) : (
+            <>
+              <p>
+                <strong>Photos from your Google Form can come in by themselves.</strong> None of
+                your players has a photo link from a form yet. If your form asked for a photo,
+                import its responses again — nobody is added twice — and we&apos;ll pick the links
+                up.
+              </p>
+              {onGoToPlayers !== undefined ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onGoToPlayers}
+                  data-testid="drive-photos-reimport"
+                >
+                  Import from your form again
+                </Button>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
+      {drive !== null && (linked.length > 0 || (roster?.missing ?? 0) > 0) ? (
+        <p className="photo-other-ways">Or add photos from your computer</p>
       ) : null}
       <label
         htmlFor="photo-files"

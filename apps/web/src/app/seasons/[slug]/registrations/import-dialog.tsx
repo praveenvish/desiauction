@@ -4,12 +4,13 @@ import {
   REQUIRED_IMPORT_FIELDS,
   mappingOf,
   tokenizeCsv,
+  withDetectedPhoto,
   type ColumnMapping,
   type DateOrder,
   type UnplacedValue,
   type ValueMaps,
 } from "@desiauction/core";
-import { Button, Dialog, Tabs, useToast } from "@desiauction/ui";
+import { Button, Dialog, IconCamera, Tabs, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -200,7 +201,9 @@ export function ImportDialog({
       return;
     }
     if (read.saved !== undefined) {
-      setMapping(read.saved.mapping);
+      // Plus the photo column, when the saved mapping predates its detection:
+      // see withDetectedPhoto.
+      setMapping(withDetectedPhoto(read.saved.mapping, read.detected));
       setDateOrder(read.saved.dateOrder);
       // The saved VALUES too, which is the half that made saving worth it:
       // a club whose bands are "Category 1/2/3" answers once, not once per
@@ -422,6 +425,8 @@ export function ImportDialog({
    */
   const commitImport = async (skipInvalid = false) => {
     const text = csvRef.current?.value ?? "";
+    // Read before the reset below clears the preview it comes from.
+    const carriedPhotos = (preview?.photoLinks ?? 0) > 0;
     setBusy(true);
     const result = await importCommitAction(slug, text, {
       skipInvalid,
@@ -476,16 +481,21 @@ export function ImportDialog({
         csvRef.current.value = "";
       }
       setPhotosKey((key) => key + 1);
+      const landed = (result.imported ?? 0) + (result.updated ?? 0) > 0;
       if (fromSheet) {
-        // "Last synced" moves, and new players' photos are one step away: go
-        // straight to it rather than closing on the organizer mid-routine.
         setFromSheet(false);
         void importSheetAction(slug).then(setSheet);
-        if ((result.imported ?? 0) > 0) {
-          setPhotosAutoStart(true);
-          setTab("photos");
-          return;
-        }
+      }
+      // The players' photos are one step away: go straight to it rather than
+      // closing on the organizer mid-routine. From a Sheet the picker opens by
+      // itself (Google's sign-in is still fresh from the sync); from a file the
+      // step offers one button, because a sign-in pop-up must open inside a
+      // click. A file with no photo links closes as before — an empty photo
+      // step is a detour, not a next step.
+      if (landed && carriedPhotos) {
+        setPhotosAutoStart(fromSheet);
+        setTab("photos");
+        return;
       }
       close();
     } else {
@@ -781,6 +791,41 @@ export function ImportDialog({
                         ? ` · ${String(preview.errors.length)} need${preview.errors.length === 1 ? "s" : ""} fixing`
                         : ""}
                     </p>
+                    {/* PHOTOS, SAID OUT LOUD. The photo column used to be one
+                          name in a grey "Not imported" list, and nothing said
+                          that leaving it there switched the Drive photo step
+                          off. Now the preview states what the photos will do. */}
+                    {preview.validCount > 0 ? (
+                      <p className="import-photos" data-testid="import-photos">
+                        <IconCamera size={18} aria-hidden />
+                        <span>
+                          {(preview.photoLinks ?? 0) > 0 ? (
+                            <>
+                              <strong>
+                                {preview.photoLinks} player
+                                {preview.photoLinks === 1 ? "" : "s"} uploaded a photo
+                              </strong>{" "}
+                              in your form.{" "}
+                              {drive !== null
+                                ? "After importing, you'll pick them from Google Drive in one go."
+                                : "After importing, add them on the Photos step."}
+                            </>
+                          ) : mapping.photo_link === undefined ? (
+                            <>
+                              <strong>No photo column found.</strong> If your form asked for a
+                              photo, press Change column matching and set that column to Photo
+                              (Google Drive link). Otherwise, add photos on the Photos tab after
+                              importing.
+                            </>
+                          ) : (
+                            <>
+                              <strong>No photo links in this file.</strong> Add photos on the Photos
+                              tab after importing.
+                            </>
+                          )}
+                        </span>
+                      </p>
+                    ) : null}
                     {/* WHAT COMMITTING WOULD ACTUALLY DO. "197 valid rows" said
                           the same thing whether they were all new or all already
                           here — and the commit then silently did nothing with the
@@ -897,6 +942,9 @@ export function ImportDialog({
                 key={photosKey}
                 slug={slug}
                 autoStart={photosAutoStart}
+                onGoToPlayers={() => {
+                  setTab("csv");
+                }}
                 onStepAside={stepAside}
                 onDone={() => {
                   close();
