@@ -1,0 +1,3118 @@
+/* ==========================================================================
+   THE HOME PAGE — "Your league, on air" (founder-approved 2026-09-30; canvas
+   "Home page to 10", board Broadcast). One example auction (content/
+   home-story.ts) told as a TV broadcast, a scroll-clock and a season.
+
+   PERFORMANCE RULES, all of them load-bearing:
+   - Motion is transform-only. Nothing fades: axe samples contrast mid-frame,
+     and a transform runs on the compositor with no layout or paint.
+   - Scroll motion is CSS scroll-driven animation, no scroll listeners. It is a
+     PROGRESSIVE ENHANCEMENT: without `animation-timeline` support, or with
+     reduced motion asked for, every section is a complete static layout
+     (the pinned night becomes a timeline, the season track a swipe row).
+   - The only blur is the shell's header. Backdrop filters under moving layers
+     are what made the prototype hitch.
+   - The big screen sizes its contents in container units, so it scales with
+     its own width instead of a transform that clipped at 320px.
+   ========================================================================== */
+
+@property --pool-count {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 17;
+}
+
+.home {
+  --gold: #e6b24a;
+  --gold-ink: #f3d078;
+  --gold-hi: #f0c35e;
+  --ink: #e8eef9;
+  --text: #c9d4e8;
+  --soft: #9fb0cc;
+  --muted: #8193b2;
+  --line: #1f2a3d;
+  --line-2: #2c3a52;
+  --bg: #05070b;
+  --bg-2: #070a10;
+  --card: #0c111b;
+  --raised: #101623;
+  --red: #ff5a4a;
+  --coral: #ff7a66;
+  --blue: #6fa8ff;
+  --violet: #b69cff;
+  --green: #7fd1a8;
+  --hdr: 64px;
+
+  container-type: inline-size;
+  background: var(--bg);
+  color: var(--text);
+  overflow: clip;
+  font-family: var(--font-text);
+}
+
+@media (max-width: 1099px) {
+  .home {
+    --hdr: 60px;
+  }
+}
+
+@media (max-width: 599px) {
+  .home {
+    --hdr: 56px;
+  }
+}
+
+.wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+
+.display {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.kicker {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-ink);
+}
+
+/* The section label's mark: a short gold rule, unless it carries its own dot. */
+.kicker:not(:has(.dot))::before {
+  content: "";
+  flex: none;
+  width: 20px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 58px;
+  line-height: 62px;
+}
+
+.lead {
+  margin: 0;
+  font-size: 17px;
+  line-height: 27px;
+  color: var(--soft);
+}
+
+.cap {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: ping var(--duration-shimmer) infinite;
+}
+
+.dotGreen {
+  background: var(--green);
+  animation: none;
+}
+
+@keyframes ping {
+  from {
+    box-shadow: 0 0 0 0 rgb(255 90 74 / 55%);
+  }
+
+  to {
+    box-shadow: 0 0 0 10px rgb(255 90 74 / 0%);
+  }
+}
+
+/* ---- the one interaction system -------------------------------------------
+   Hover lifts use the `translate` property, not `transform`, so they compose
+   with the scroll reveals (which own `transform`) instead of fighting them. */
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 0 24px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    translate var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out),
+    color var(--duration-base) var(--ease-out);
+}
+
+.primary {
+  border: 0;
+  background: linear-gradient(180deg, #f3c75f, #e2a93c);
+  color: #141008;
+  box-shadow:
+    0 4px 0 #9c7427,
+    0 18px 40px rgb(230 178 74 / 25%);
+}
+
+.primary:hover {
+  color: #141008;
+  translate: 0 -2px;
+  box-shadow:
+    0 6px 0 #9c7427,
+    0 24px 50px rgb(230 178 74 / 35%);
+}
+
+.primary:active {
+  translate: 0 3px;
+  box-shadow:
+    0 1px 0 #9c7427,
+    0 8px 20px rgb(230 178 74 / 20%);
+}
+
+.secondary {
+  border: 1px solid var(--line-2);
+  background: rgb(7 10 15 / 72%);
+  color: var(--ink);
+}
+
+.secondary:hover {
+  translate: 0 -2px;
+  border-color: var(--gold);
+  background-color: rgb(230 178 74 / 10%);
+  color: var(--gold-ink);
+}
+
+.secondary:active {
+  translate: 0 1px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  transition:
+    translate var(--duration-slow) var(--ease-out),
+    border-color var(--duration-slow) var(--ease-out),
+    box-shadow var(--duration-slow) var(--ease-out);
+}
+
+.lift:hover {
+  translate: 0 -4px;
+  border-color: #34445f;
+  box-shadow:
+    0 26px 60px rgb(0 0 0 / 45%),
+    0 0 0 1px rgb(230 178 74 / 10%);
+}
+
+.textLink {
+  color: var(--gold-ink);
+  font-weight: 600;
+  text-decoration: none;
+  background: linear-gradient(currentcolor, currentcolor) 0 100% / 0 1.5px no-repeat;
+  transition:
+    background-size var(--duration-slow) var(--ease-out),
+    color var(--duration-base) var(--ease-out);
+}
+
+.textLink:hover {
+  color: #ffe2a0;
+  background-size: 100% 1.5px;
+}
+
+.home :focus-visible {
+  outline: 2px solid var(--gold-ink);
+  outline-offset: 3px;
+}
+
+.tile {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--raised);
+  border: 1px solid var(--line-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--line);
+  color: var(--text);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #121a28;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+/* ==========================================================================
+   1 · HERO — your league, on air
+   ========================================================================== */
+.hero {
+  position: relative;
+  min-height: min(820px, max(640px, calc(100svh - var(--hdr))));
+  display: flex;
+  overflow: hidden;
+}
+
+.heroPhoto {
+  position: absolute;
+  inset: 0;
+}
+
+.heroImage {
+  object-fit: cover;
+  object-position: 62% 18%;
+}
+
+.heroFrame {
+  position: absolute;
+  top: 0;
+  right: -60px;
+  bottom: 0;
+  width: min(1160px, 82%);
+}
+
+.heroShade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      var(--bg) 30%,
+      rgb(5 7 11 / 85%) 42%,
+      rgb(5 7 11 / 20%) 62%,
+      rgb(5 7 11 / 0%) 80%
+    ),
+    linear-gradient(0deg, var(--bg) 0%, rgb(5 7 11 / 0%) 38%);
+}
+
+.heroIn {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  padding-top: 88px;
+  padding-bottom: 72px;
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.h1 {
+  font-size: 80px;
+  line-height: 80px;
+}
+
+.h1 .word {
+  display: inline-block;
+  animation: rise var(--duration-dramatic) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+.gold {
+  color: var(--gold-hi);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(55%) rotate(3deg);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+.heroLead {
+  margin: 0;
+  max-width: 520px;
+  font-size: 20px;
+  line-height: 31px;
+  color: var(--text);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.fine {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--soft);
+}
+
+.fine .tick {
+  color: var(--green);
+}
+
+.bug {
+  position: absolute;
+  top: 28px;
+  right: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: rgb(5 7 11 / 86%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+}
+
+.bug .muted {
+  color: var(--soft);
+}
+
+/* The lower third: a TV auction's name-and-price bar, bidding on a loop. */
+.lower {
+  position: absolute;
+  right: 40px;
+  bottom: 64px;
+  width: 600px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgb(7 10 15 / 94%);
+  border: 1px solid rgb(255 255 255 / 9%);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 60%);
+}
+
+.lowerTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: linear-gradient(90deg, rgb(230 178 74 / 18%), rgb(230 178 74 / 0%));
+  border-bottom: 1px solid rgb(255 255 255 / 6%);
+}
+
+.lowerMain {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 16px 20px 14px;
+}
+
+.lotName {
+  font-size: 34px;
+  line-height: 36px;
+  letter-spacing: -0.02em;
+}
+
+.odo {
+  height: 64px;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 60px;
+  line-height: 64px;
+  color: var(--ink);
+  text-align: right;
+}
+
+.odoCol {
+  display: flex;
+  flex-direction: column;
+  animation: odo 10s infinite;
+}
+
+.leader {
+  height: 22px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 22px;
+  text-align: right;
+  color: var(--soft);
+}
+
+.leader .odoCol {
+  animation-name: odoLead;
+}
+
+@keyframes odo {
+  0%,
+  10% {
+    transform: translateY(0);
+  }
+
+  12%,
+  25% {
+    transform: translateY(-20%);
+  }
+
+  27%,
+  40% {
+    transform: translateY(-40%);
+  }
+
+  42%,
+  53% {
+    transform: translateY(-60%);
+  }
+
+  55%,
+  96% {
+    transform: translateY(-80%);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes odoLead {
+  0%,
+  10% {
+    transform: translateY(0);
+  }
+
+  12%,
+  25% {
+    transform: translateY(-20%);
+  }
+
+  27%,
+  40% {
+    transform: translateY(-40%);
+  }
+
+  42%,
+  53% {
+    transform: translateY(-60%);
+  }
+
+  55%,
+  96% {
+    transform: translateY(-80%);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.paddles {
+  display: flex;
+  gap: 10px;
+}
+
+.pad {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--bg);
+  background: var(--team);
+}
+
+.pad[data-bids="Voyagers"] {
+  animation: padV 10s infinite;
+}
+
+.pad[data-bids="Falcons"] {
+  animation: padF 10s infinite;
+}
+
+.pad[data-bids="Titans"] {
+  animation: padT 10s infinite;
+}
+
+@keyframes padV {
+  0%,
+  10%,
+  25%,
+  100% {
+    transform: none;
+  }
+
+  12%,
+  22% {
+    transform: translateY(-10px) scale(1.12);
+  }
+}
+
+@keyframes padF {
+  0%,
+  25%,
+  40%,
+  53%,
+  66%,
+  100% {
+    transform: none;
+  }
+
+  27%,
+  37%,
+  55%,
+  63% {
+    transform: translateY(-10px) scale(1.12);
+  }
+}
+
+@keyframes padT {
+  0%,
+  40%,
+  53%,
+  100% {
+    transform: none;
+  }
+
+  42%,
+  50% {
+    transform: translateY(-10px) scale(1.12);
+  }
+}
+
+.timer {
+  height: 4px;
+  background: #1b2536;
+}
+
+.timer i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--coral));
+  transform-origin: left;
+  animation: countdown 10s infinite;
+}
+
+@keyframes countdown {
+  0% {
+    transform: scaleX(1);
+  }
+
+  10% {
+    transform: scaleX(0.35);
+  }
+
+  12% {
+    transform: scaleX(1);
+  }
+
+  25% {
+    transform: scaleX(0.4);
+  }
+
+  27% {
+    transform: scaleX(1);
+  }
+
+  40% {
+    transform: scaleX(0.4);
+  }
+
+  42% {
+    transform: scaleX(1);
+  }
+
+  53% {
+    transform: scaleX(0.4);
+  }
+
+  55% {
+    transform: scaleX(1);
+  }
+
+  66%,
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+.purses {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid rgb(255 255 255 / 6%);
+}
+
+.purse {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 14px;
+  border-left: 1px solid rgb(255 255 255 / 6%);
+}
+
+.purse:first-child {
+  border-left: 0;
+}
+
+.purseName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--soft);
+}
+
+.purseName i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--team);
+}
+
+.purseLeft {
+  height: 18px;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--ink);
+}
+
+.purseRoll {
+  display: flex;
+  flex-direction: column;
+  animation: purseDrop 10s infinite;
+}
+
+@keyframes purseDrop {
+  0%,
+  68% {
+    transform: translateY(0);
+  }
+
+  71%,
+  96% {
+    transform: translateY(-50%);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.wipe {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 26px;
+  background: linear-gradient(100deg, var(--gold) 0%, #f7d27a 55%, var(--gold) 100%);
+  color: #141008;
+  transform: translateX(-102%);
+  animation: wipe 10s infinite;
+}
+
+.wipe b {
+  font-family: var(--font-display);
+  font-size: 58px;
+  line-height: 60px;
+  letter-spacing: -0.02em;
+}
+
+.wipeTo {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.wipePrice {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+}
+
+@keyframes wipe {
+  0%,
+  66% {
+    transform: translateX(-102%);
+  }
+
+  70%,
+  92% {
+    transform: translateX(0);
+  }
+
+  96%,
+  100% {
+    transform: translateX(102%);
+  }
+}
+
+.cue {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--soft);
+  text-decoration: none;
+}
+
+.cue i {
+  display: block;
+  width: 1px;
+  height: 26px;
+  background: linear-gradient(var(--gold-ink), transparent);
+  transform-origin: top;
+  animation: drip var(--duration-shimmer) infinite;
+}
+
+@keyframes drip {
+  from {
+    transform: scaleY(0);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* ==========================================================================
+   2 · TICKER
+   ========================================================================== */
+.ticker {
+  background: var(--gold);
+  color: #141008;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.tickRun {
+  display: inline-flex;
+  gap: 40px;
+  padding: 14px 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  animation: marquee 44s linear infinite;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ==========================================================================
+   3 · ONE AUCTION NIGHT — static timeline by default; pinned scroll-clock
+   where scroll-driven animation runs (enhancement at the end of the file).
+   ========================================================================== */
+.story {
+  position: relative;
+  background:
+    radial-gradient(60% 50% at 70% 40%, rgb(230 178 74 / 7%), rgb(5 7 11 / 0%)), var(--bg);
+}
+
+.stage {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 104px 40px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 64px;
+  align-items: center;
+}
+
+.clockBox {
+  display: none;
+  height: 84px;
+  overflow: hidden;
+}
+
+.clock {
+  display: flex;
+  flex-direction: column;
+}
+
+.clock span {
+  height: 84px;
+  font-family: var(--font-display);
+  font-size: 76px;
+  font-weight: 600;
+  line-height: 84px;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.captions {
+  position: relative;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.caption {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.caption h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 34px;
+  color: var(--gold-ink);
+}
+
+.captionTime {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.sold {
+  color: var(--coral);
+}
+
+.steps {
+  display: none;
+  gap: 6px;
+  margin-top: 22px;
+}
+
+.steps i {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.steps b {
+  position: absolute;
+  inset: 0;
+  background: var(--gold);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+.room {
+  position: relative;
+  padding-bottom: 34px;
+}
+
+.bezel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 10px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: #0b0f17;
+  border: 1px solid var(--line-2);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 60%),
+    0 40px 120px rgb(230 178 74 / 12%),
+    0 60px 120px rgb(0 0 0 / 70%);
+}
+
+/* Everything on the big screen is sized in `cqi` — a share of the screen's
+   own width — so it is the same picture at 1440 and at 320. */
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-2);
+  container-type: inline-size;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 4cqi 5cqi;
+  backface-visibility: hidden;
+}
+
+/* Without the scroll-clock, the screen holds its most telling frame. */
+.layer[data-state="sold"] {
+  display: grid;
+}
+
+.scap {
+  font-size: 1.4cqi;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.poolHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.poolGrid {
+  flex: 1;
+  margin: 2cqi 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 0.9cqi;
+}
+
+.poolCard {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6cqi;
+  padding: 0.8cqi 0.6cqi;
+  border-radius: 1.1cqi;
+  background: #0e1420;
+  border: 1px solid var(--line);
+  text-align: center;
+}
+
+.poolCard[data-star] {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgb(230 178 74 / 12%), rgb(230 178 74 / 2%)), #0e1420;
+  box-shadow: 0 0 0 0.35cqi rgb(230 178 74 / 12%);
+}
+
+.poolAvatar {
+  flex: none;
+  width: 4.3cqi;
+  height: 4.3cqi;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35cqi;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--tint);
+  border: 1px solid rgb(255 255 255 / 12%);
+}
+
+.poolAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.poolName {
+  max-width: 100%;
+  font-size: 1.42cqi;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poolMeta {
+  max-width: 100%;
+  font-size: 1.25cqi;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poolSource {
+  background: rgb(127 209 168 / 6%);
+  border: 1px dashed rgb(127 209 168 / 35%);
+  color: var(--green);
+}
+
+.poolFoot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2cqi;
+}
+
+.poolCount {
+  font-family: var(--font-display);
+  font-size: 6.8cqi;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.poolCount::after {
+  counter-reset: pool var(--pool-count);
+  content: counter(pool);
+}
+
+.lotUp {
+  justify-content: center;
+  align-items: center;
+  gap: 2.4cqi;
+  text-align: center;
+}
+
+.lotFace {
+  width: 17cqi;
+  height: 17cqi;
+  border-radius: 4.4cqi;
+  object-fit: cover;
+  border: 2px solid var(--gold);
+  box-shadow:
+    0 0 0 0.7cqi rgb(230 178 74 / 12%),
+    0 2cqi 5cqi rgb(0 0 0 / 50%);
+}
+
+.lotTitle {
+  font-family: var(--font-display);
+  font-size: 5.9cqi;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.bidding {
+  justify-content: center;
+  gap: 2cqi;
+}
+
+.climb {
+  height: 1.1em;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.climb > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.bigPrice {
+  font-size: 13.6cqi;
+}
+
+.bidder {
+  font-size: 3cqi;
+}
+
+.soldLayer {
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr) 30%;
+  align-items: center;
+  background: linear-gradient(100deg, var(--gold), #f7d27a 55%, var(--gold));
+  color: #141008;
+}
+
+.soldLayer > div {
+  padding: 0 8%;
+}
+
+.soldWord {
+  font-family: var(--font-display);
+  font-size: 14.8cqi;
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
+.soldLine {
+  margin-top: 1.4cqi;
+  font-size: 2cqi;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.soldPhone {
+  width: 80%;
+  height: auto;
+  border-radius: 2.5cqi;
+  border: 0.55cqi solid #141008;
+  transform: rotate(6deg);
+}
+
+.boardLayer {
+  padding: 0;
+}
+
+.boardLayer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.crowd {
+  position: absolute;
+  left: -3%;
+  bottom: -30px;
+  width: 106%;
+  height: 86px;
+  pointer-events: none;
+}
+
+.glow {
+  position: absolute;
+  width: 10px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--gold-ink);
+  box-shadow: 0 0 18px 4px rgb(243 208 120 / 45%);
+}
+
+/* ==========================================================================
+   4 · THE SEASON — a swipe row by default; a pinned horizontal track where
+   scroll-driven animation runs.
+   ========================================================================== */
+.season {
+  position: relative;
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+}
+
+.seasonStage {
+  padding: 104px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  overflow: hidden;
+}
+
+.track {
+  display: flex;
+  gap: 22px;
+  padding: 0 40px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 40px;
+}
+
+.seasonIntro {
+  flex: none;
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  scroll-snap-align: start;
+}
+
+.seasonCard {
+  flex: none;
+  width: 420px;
+  min-height: 460px;
+  box-sizing: border-box;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-snap-align: start;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 34px;
+  color: var(--ink);
+}
+
+.cardText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--soft);
+}
+
+.mock {
+  margin-top: auto;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.form i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 3px;
+  border-radius: 50%;
+}
+
+.bubble {
+  align-self: flex-start;
+  max-width: 88%;
+  padding: 10px 12px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--raised);
+  color: var(--ink);
+  line-height: 20px;
+}
+
+.progress {
+  display: none;
+  margin: 0 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progress b {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--coral));
+  transform-origin: left;
+}
+
+/* ==========================================================================
+   5 · FOUR SEATS
+   ========================================================================== */
+.seats {
+  padding: 128px 0;
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+}
+
+.seatGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 56px;
+}
+
+.seat {
+  position: relative;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.seatTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 34px;
+  color: var(--ink);
+}
+
+.seatText {
+  margin: 0;
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--soft);
+}
+
+.seatVisual {
+  margin-top: auto;
+  height: 376px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.desk {
+  box-sizing: border-box;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.deskButtons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.deskButtons span {
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.deskButtons span:first-child {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #141008;
+}
+
+.bar {
+  height: 4px;
+  border-radius: 2px;
+  background: #1b2536;
+}
+
+.bar i {
+  display: block;
+  width: 62%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--gold);
+}
+
+.phone {
+  align-self: center;
+  position: relative;
+  width: 200px;
+  height: 370px;
+  box-sizing: border-box;
+  border-radius: 32px;
+  border: 6px solid var(--line);
+  background: var(--bg-2);
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgb(0 0 0 / 55%);
+}
+
+.phoneScreen {
+  position: absolute;
+  inset: 0;
+  padding: 22px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phoneLot {
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+
+.phoneBid {
+  margin-top: auto;
+  height: 54px;
+  border-radius: 14px;
+  background: var(--blue);
+  color: var(--bg);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.phoneChips {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.phoneChips span {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.phoneChips span:last-child {
+  border-color: rgb(230 178 74 / 50%);
+  color: var(--gold-ink);
+}
+
+.status {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+}
+
+.status i {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 30%);
+}
+
+.status i:first-child {
+  background: #fff;
+}
+
+.share {
+  position: absolute;
+  inset: 34px 14px 14px;
+  border-radius: 18px;
+  background: radial-gradient(120% 70% at 50% 0%, #5a4212, #0b0f17 70%);
+  border: 1px solid rgb(243 208 120 / 45%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.shareFace {
+  width: 78px;
+  height: 78px;
+  border-radius: 22px;
+  object-fit: cover;
+  border: 2px solid var(--gold);
+}
+
+.soldTag {
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--gold);
+  color: #141008;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.stream {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+}
+
+.streamLive {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: #c62218;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+}
+
+.streamBug {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgb(5 7 11 / 85%);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.streamBar {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgb(5 7 11 / 90%);
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ==========================================================================
+   6 · YOUR TURN (the playable demo)
+   ========================================================================== */
+.turn {
+  padding: 128px 0;
+  background: radial-gradient(70% 60% at 50% 0%, rgb(230 178 74 / 9%), rgb(5 7 11 / 0%)), var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.sportRow {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 48px;
+  padding-top: 26px;
+}
+
+.sport {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform var(--duration-slow) var(--ease-out);
+}
+
+.plate {
+  width: 66px;
+  height: 66px;
+  border-radius: 18px;
+  background: var(--raised);
+  border: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  transition:
+    background-color var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-slow) var(--ease-out);
+}
+
+.stick {
+  width: 4px;
+  height: 26px;
+  border-radius: 0 0 2px 2px;
+  background: var(--line-2);
+}
+
+.sport small {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sport:hover {
+  transform: translateY(-6px);
+}
+
+.sport:hover .plate {
+  border-color: var(--gold);
+}
+
+.sport[aria-pressed="true"] {
+  transform: translateY(-22px);
+}
+
+.sport[aria-pressed="true"] .plate {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #141008;
+  box-shadow: 0 16px 40px rgb(230 178 74 / 35%);
+}
+
+.sport[aria-pressed="true"] .stick {
+  background: var(--gold);
+}
+
+.sport[aria-pressed="true"] small {
+  color: var(--gold-ink);
+}
+
+.demo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 540px minmax(0, 1fr);
+  gap: 34px;
+  align-items: center;
+  margin-top: 40px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.side strong {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sideLeft {
+  text-align: right;
+}
+
+.board {
+  position: relative;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  box-shadow: 0 34px 90px rgb(0 0 0 / 55%);
+}
+
+.boardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.boardTop > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.units {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+.units button {
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-base) var(--ease-out),
+    color var(--duration-base) var(--ease-out);
+}
+
+.units button:hover {
+  color: var(--ink);
+}
+
+.units button[aria-pressed="true"] {
+  background: var(--gold);
+  color: #141008;
+}
+
+.lot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lotBadge {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold-hi);
+}
+
+.lot h3 {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.lot p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.bidZone {
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: #03050a;
+  border: 1px solid var(--line);
+}
+
+.bidZone strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 50px;
+  font-weight: 600;
+  line-height: 58px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.bidZone p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--gold-ink);
+}
+
+.teams {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.teams > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  font-weight: 600;
+  color: var(--ink);
+  transition: border-color var(--duration-base) var(--ease-out);
+}
+
+.teams > div[data-leading="true"] {
+  border-color: var(--gold);
+}
+
+.teams small {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.bidButton {
+  width: 100%;
+  height: 60px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: linear-gradient(180deg, #f3c75f, #e2a93c);
+  color: #141008;
+  font-size: 17px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #9c7427;
+  transition:
+    translate var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.bidButton > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bidButton:hover:not([aria-disabled="true"]) {
+  color: #141008;
+  translate: 0 -2px;
+}
+
+.bidButton:active:not([aria-disabled="true"]) {
+  translate: 0 3px;
+  box-shadow: 0 1px 0 #9c7427;
+}
+
+.bidButton[aria-disabled="true"] {
+  background: var(--line);
+  color: var(--soft);
+  box-shadow: none;
+  cursor: default;
+}
+
+.again {
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.soldActions {
+  display: grid;
+  gap: 10px;
+}
+
+.demoProgress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.demoProgress > div {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+}
+
+.demoProgress i {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+}
+
+.demoProgress i[data-complete="true"] {
+  background: var(--gold);
+}
+
+.soldSweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 22px;
+  background: linear-gradient(100deg, var(--gold), #f7d27a 55%, var(--gold));
+  color: #141008;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  animation: sweep var(--duration-emphatic) var(--ease-out) both;
+}
+
+.soldSweep b {
+  font-family: var(--font-display);
+  font-size: 84px;
+  line-height: 84px;
+  letter-spacing: -0.04em;
+}
+
+.soldSweep span {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+/* The sweep lands, holds, and slides away to show the next step. */
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  18%,
+  72% {
+    transform: none;
+  }
+
+  100% {
+    transform: translateX(102%);
+  }
+}
+
+.disclaimer {
+  margin: 26px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   7 · REAL, AND BUILT TO HOLD
+   ========================================================================== */
+.proof {
+  padding: 128px 0;
+}
+
+.proofIn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px;
+}
+
+.featured {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) auto;
+  align-items: center;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+}
+
+.featuredArt {
+  position: relative;
+  height: 100%;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #4a3610, #0b1018 70%);
+}
+
+.featuredLogo {
+  width: 110px;
+  height: 110px;
+  border-radius: 28px;
+  background: var(--raised);
+  border: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 600;
+  color: var(--gold-hi);
+}
+
+.featuredLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.featuredBody {
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.featuredStats {
+  padding: 28px 36px;
+  display: flex;
+  gap: 40px;
+}
+
+.featuredStats strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 60px;
+  color: var(--ink);
+}
+
+.others {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.other {
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.trust {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.fact {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fact strong {
+  font-family: var(--font-text);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 25px;
+  color: var(--ink);
+}
+
+.fact p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--soft);
+}
+
+/* ==========================================================================
+   8 · THE LAST TAP
+   ========================================================================== */
+.close {
+  position: relative;
+  padding: 144px 0 152px;
+  text-align: center;
+  overflow: hidden;
+  background: radial-gradient(55% 80% at 50% 100%, rgb(230 178 74 / 16%), rgb(5 7 11 / 0%));
+}
+
+.closeIn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.closeTitle {
+  max-width: 1000px;
+  font-size: 92px;
+  line-height: 92px;
+}
+
+.ring {
+  position: absolute;
+  top: 170px;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  margin-left: -110px;
+  border-radius: 50%;
+  border: 1.5px solid rgb(230 178 74 / 22%);
+  transform: scale(0.3);
+}
+
+.gavel {
+  color: var(--gold-ink);
+  transform-origin: 25% 80%;
+}
+
+.reassure {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  font-size: 14px;
+  color: var(--soft);
+}
+
+/* The sticky phone CTA (StickyCta): hidden until the hero has scrolled away. */
+.stickyCta {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: none;
+  transform: translateY(140%);
+  transition: transform var(--duration-slow) var(--ease-out);
+}
+
+.stickyCta .primary {
+  width: 100%;
+  justify-content: center;
+}
+
+.stickyCta[data-visible="true"] {
+  transform: none;
+}
+
+@media (max-width: 760px) {
+  .stickyCta {
+    display: block;
+  }
+}
+
+/* ==========================================================================
+   SCROLL-DRIVEN ENHANCEMENT
+   Only where the browser runs scroll timelines AND the visitor has not asked
+   for less motion. Everything above is the complete page without it.
+   ========================================================================== */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 80%;
+    }
+
+    @keyframes reveal {
+      from {
+        transform: translateY(70px) scale(0.97);
+      }
+
+      to {
+        transform: none;
+      }
+    }
+
+    /* ---- the night: pinned, the scroll is the clock ---- */
+    .story {
+      height: 520vh;
+      view-timeline: --night block;
+    }
+
+    .stage {
+      position: sticky;
+      top: var(--hdr);
+      height: calc(100svh - var(--hdr));
+      min-height: 600px;
+      padding: 0 40px;
+    }
+
+    .clockBox {
+      display: block;
+    }
+
+    .steps {
+      display: flex;
+    }
+
+    .captionTime {
+      display: none;
+    }
+
+    .captions {
+      display: block;
+      height: 230px;
+      margin-top: 14px;
+      overflow: hidden;
+    }
+
+    .caption {
+      position: absolute;
+      inset: 0;
+      transform: translateY(110%);
+    }
+
+    .layer,
+    .layer[data-state="sold"] {
+      display: flex;
+      transform: translateY(100%);
+    }
+
+    .layer[data-state="sold"] {
+      display: grid;
+    }
+
+    .caption,
+    .layer,
+    .clock,
+    .steps b,
+    .climb > span,
+    .poolCount {
+      will-change: transform;
+      animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+      animation-fill-mode: both;
+      animation-timeline: --night;
+      animation-range: contain 0% contain 100%;
+    }
+
+    .caption[data-state="pool"],
+    .layer[data-state="pool"] {
+      transform: none;
+      animation-name: state1;
+    }
+
+    .caption[data-state="lot"],
+    .layer[data-state="lot"] {
+      animation-name: state2;
+    }
+
+    .caption[data-state="bidding"],
+    .layer[data-state="bidding"] {
+      animation-name: state3;
+    }
+
+    .caption[data-state="sold"] {
+      animation-name: state4;
+    }
+
+    .layer[data-state="sold"] {
+      animation-name: stateSold;
+    }
+
+    .caption[data-state="board"],
+    .layer[data-state="board"] {
+      animation-name: state5;
+    }
+
+    @keyframes state1 {
+      0%,
+      16% {
+        transform: none;
+      }
+
+      20%,
+      100% {
+        transform: translateY(-110%);
+      }
+    }
+
+    @keyframes state2 {
+      0%,
+      16% {
+        transform: translateY(110%);
+      }
+
+      20%,
+      36% {
+        transform: none;
+      }
+
+      40%,
+      100% {
+        transform: translateY(-110%);
+      }
+    }
+
+    @keyframes state3 {
+      0%,
+      36% {
+        transform: translateY(110%);
+      }
+
+      40%,
+      56% {
+        transform: none;
+      }
+
+      60%,
+      100% {
+        transform: translateY(-110%);
+      }
+    }
+
+    @keyframes state4 {
+      0%,
+      56% {
+        transform: translateY(110%);
+      }
+
+      60%,
+      76% {
+        transform: none;
+      }
+
+      80%,
+      100% {
+        transform: translateY(-110%);
+      }
+    }
+
+    @keyframes stateSold {
+      0%,
+      57% {
+        transform: translateY(110%);
+      }
+
+      58% {
+        transform: scale(1.35);
+      }
+
+      61%,
+      76% {
+        transform: none;
+      }
+
+      80%,
+      100% {
+        transform: translateY(-110%);
+      }
+    }
+
+    @keyframes state5 {
+      0%,
+      76% {
+        transform: translateY(110%);
+      }
+
+      80%,
+      100% {
+        transform: none;
+      }
+    }
+
+    .clock {
+      animation-name: clock;
+    }
+
+    @keyframes clock {
+      0%,
+      16% {
+        transform: translateY(0);
+      }
+
+      20%,
+      36% {
+        transform: translateY(-20%);
+      }
+
+      40%,
+      56% {
+        transform: translateY(-40%);
+      }
+
+      60%,
+      76% {
+        transform: translateY(-60%);
+      }
+
+      80%,
+      100% {
+        transform: translateY(-80%);
+      }
+    }
+
+    .steps i:nth-child(1) b {
+      animation-name: step1;
+    }
+
+    .steps i:nth-child(2) b {
+      animation-name: step2;
+    }
+
+    .steps i:nth-child(3) b {
+      animation-name: step3;
+    }
+
+    .steps i:nth-child(4) b {
+      animation-name: step4;
+    }
+
+    .steps i:nth-child(5) b {
+      animation-name: step5;
+    }
+
+    @keyframes step1 {
+      0% {
+        transform: scaleX(0);
+      }
+
+      20%,
+      100% {
+        transform: scaleX(1);
+      }
+    }
+
+    @keyframes step2 {
+      0%,
+      20% {
+        transform: scaleX(0);
+      }
+
+      40%,
+      100% {
+        transform: scaleX(1);
+      }
+    }
+
+    @keyframes step3 {
+      0%,
+      40% {
+        transform: scaleX(0);
+      }
+
+      60%,
+      100% {
+        transform: scaleX(1);
+      }
+    }
+
+    @keyframes step4 {
+      0%,
+      60% {
+        transform: scaleX(0);
+      }
+
+      80%,
+      100% {
+        transform: scaleX(1);
+      }
+    }
+
+    @keyframes step5 {
+      0%,
+      80% {
+        transform: scaleX(0);
+      }
+
+      100% {
+        transform: scaleX(1);
+      }
+    }
+
+    /* The scroll bids: the price climbs while "going, going" is on screen. */
+    .climb > span {
+      animation-name: climb;
+    }
+
+    @keyframes climb {
+      0%,
+      41% {
+        transform: translateY(0);
+      }
+
+      45% {
+        transform: translateY(-20%);
+      }
+
+      49% {
+        transform: translateY(-40%);
+      }
+
+      53% {
+        transform: translateY(-60%);
+      }
+
+      56%,
+      100% {
+        transform: translateY(-80%);
+      }
+    }
+
+    .poolCount {
+      animation-name: poolCount;
+      animation-range: contain 0% contain 14%;
+    }
+
+    @keyframes poolCount {
+      from {
+        --pool-count: 0;
+      }
+
+      to {
+        --pool-count: 17;
+      }
+    }
+
+    /* ---- the season: a horizontal track the scroll pulls through ---- */
+    .season {
+      height: 380vh;
+      view-timeline: --season block;
+    }
+
+    .seasonStage {
+      position: sticky;
+      top: var(--hdr);
+      height: calc(100svh - var(--hdr));
+      min-height: 600px;
+      padding: 0;
+    }
+
+    .track {
+      width: max-content;
+      overflow: visible;
+      will-change: transform;
+      animation: track linear both;
+      animation-timeline: --season;
+      animation-range: contain 0% contain 100%;
+    }
+
+    @keyframes track {
+      from {
+        transform: translateX(0);
+      }
+
+      to {
+        transform: translateX(calc(-100% + 100cqi));
+      }
+    }
+
+    .progress {
+      display: block;
+    }
+
+    .progress b {
+      animation: progress linear both;
+      animation-timeline: --season;
+      animation-range: contain 0% contain 100%;
+    }
+
+    @keyframes progress {
+      from {
+        transform: scaleX(0.02);
+      }
+
+      to {
+        transform: scaleX(1);
+      }
+    }
+
+    /* ---- the last tap ---- */
+    .gavel {
+      animation: strike linear both;
+      animation-timeline: view();
+      animation-range: entry 30% cover 45%;
+    }
+
+    @keyframes strike {
+      0% {
+        transform: rotate(-50deg);
+      }
+
+      80% {
+        transform: rotate(6deg);
+      }
+
+      100% {
+        transform: rotate(0);
+      }
+    }
+
+    .ring {
+      animation: ring linear both;
+      animation-timeline: view();
+      animation-range: cover 30% cover 60%;
+    }
+
+    .ring + .ring {
+      animation-range: cover 36% cover 70%;
+    }
+
+    @keyframes ring {
+      from {
+        transform: scale(0.3);
+      }
+
+      to {
+        transform: scale(3.2);
+      }
+    }
+  }
+}
+
+/* Reduced motion: every loop rests on its final, readable frame. */
+@media (prefers-reduced-motion: reduce) {
+  .home *,
+  .home *::before,
+  .home *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .odoCol,
+  .leader .odoCol {
+    transform: translateY(-80%);
+  }
+
+  .purseRoll {
+    transform: translateY(-50%);
+  }
+
+  .timer i {
+    transform: scaleX(0);
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE — container tiers (the page answers to its own width)
+   ========================================================================== */
+@media (max-height: 780px) and (min-width: 1061px) {
+  .heroIn {
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .h1 {
+    font-size: 68px;
+    line-height: 68px;
+  }
+
+  .lower {
+    bottom: 40px;
+  }
+
+  .cue {
+    bottom: 12px;
+  }
+}
+
+@container (max-width: 1180px) {
+  .seatGrid,
+  .trust {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .seatVisual {
+    height: 356px;
+  }
+}
+
+@container (max-width: 1060px) {
+  .hero {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .heroPhoto {
+    position: relative;
+    height: 540px;
+  }
+
+  .heroFrame {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+
+  .heroImage {
+    object-position: 50% 14%;
+  }
+
+  .heroShade {
+    background: linear-gradient(0deg, var(--bg) 0%, rgb(5 7 11 / 0%) 42%);
+  }
+
+  .bug {
+    top: 24px;
+    right: 32px;
+  }
+
+  .lower {
+    left: 32px;
+    right: 32px;
+    bottom: 28px;
+    width: auto;
+  }
+
+  .heroIn {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 40px;
+    padding-bottom: 72px;
+  }
+
+  .h1 {
+    font-size: 64px;
+    line-height: 66px;
+  }
+
+  .cue {
+    display: none;
+  }
+
+  .seats,
+  .turn,
+  .proof {
+    padding: 96px 0;
+  }
+
+  .close {
+    padding: 112px 0 120px;
+  }
+
+  .title {
+    font-size: 46px;
+    line-height: 50px;
+  }
+
+  .closeTitle {
+    font-size: 68px;
+    line-height: 70px;
+  }
+
+  .sportRow {
+    justify-content: flex-start;
+    overflow-x: auto;
+    margin: 22px -40px 0;
+    padding: 26px 40px 10px;
+  }
+
+  .demo {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .side {
+    display: none;
+  }
+
+  .featured {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .featuredStats {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@container (max-width: 900px) {
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    align-content: center;
+  }
+
+  .crowd,
+  .glow {
+    display: none;
+  }
+}
+
+@container (max-width: 760px) {
+  .wrap {
+    padding: 0 20px;
+  }
+
+  .seats,
+  .turn,
+  .proof {
+    padding: 72px 0;
+  }
+
+  .close {
+    padding: 96px 0 104px;
+  }
+
+  .title {
+    font-size: 36px;
+    line-height: 40px;
+  }
+
+  .closeTitle {
+    font-size: 50px;
+    line-height: 52px;
+  }
+
+  .tile {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+  }
+
+  /* hero: the photo on top, the broadcast bar UNDER it (never over faces) */
+  .heroPhoto {
+    height: 300px;
+  }
+
+  .heroImage {
+    object-position: 60% 12%;
+  }
+
+  .heroShade {
+    background: linear-gradient(0deg, var(--bg) 0%, rgb(5 7 11 / 0%) 45%);
+  }
+
+  .bug {
+    top: 16px;
+    left: 16px;
+    right: auto;
+  }
+
+  .lower {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: auto;
+    margin: -36px 16px 0;
+  }
+
+  .lowerMain {
+    padding: 12px 14px 10px;
+  }
+
+  .odo {
+    height: 44px;
+    font-size: 40px;
+    line-height: 44px;
+  }
+
+  .wipe b {
+    font-size: 36px;
+    line-height: 40px;
+  }
+
+  .wipePrice {
+    font-size: 26px;
+  }
+
+  .purse {
+    padding: 8px;
+  }
+
+  .purseName {
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .purseLeft {
+    font-size: 13px;
+  }
+
+  .paddles {
+    display: none;
+  }
+
+  .heroIn {
+    padding-top: 22px;
+    padding-bottom: 40px;
+  }
+
+  .heroCopy {
+    gap: 16px;
+  }
+
+  .heroCopy > .kicker {
+    display: none;
+  }
+
+  .h1 {
+    font-size: 42px;
+    line-height: 44px;
+  }
+
+  .stage {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .clockBox {
+    height: 52px;
+  }
+
+  .clock span {
+    height: 52px;
+    font-size: 46px;
+    line-height: 52px;
+  }
+
+  .caption h3 {
+    font-size: 22px;
+    line-height: 26px;
+  }
+
+  .caption .lead {
+    font-size: 15px;
+    line-height: 22px;
+  }
+
+  .track {
+    gap: 14px;
+    padding-left: 20px;
+    padding-right: 20px;
+    scroll-padding: 0 20px;
+  }
+
+  .seasonIntro {
+    width: 300px;
+  }
+
+  .seasonCard {
+    width: 300px;
+    min-height: 430px;
+    padding: 22px;
+  }
+
+  .cardTitle {
+    font-size: 24px;
+    line-height: 28px;
+  }
+
+  .progress {
+    margin: 0 20px;
+  }
+
+  .seatGrid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 12px;
+    margin: 36px -20px 0;
+    padding: 0 20px 8px;
+    scroll-padding: 0 20px;
+  }
+
+  .seat {
+    flex: none;
+    width: 82%;
+    scroll-snap-align: start;
+  }
+
+  .sportRow {
+    margin: 10px -20px 0;
+    padding: 26px 20px 10px;
+  }
+
+  .featured {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .featuredArt {
+    min-height: 150px;
+  }
+
+  .others {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fact strong {
+    font-size: 17px;
+    line-height: 21px;
+  }
+}
+
+@container (max-width: 760px) {
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .stage {
+        gap: 22px;
+        padding-top: 18px;
+        padding-bottom: 18px;
+      }
+
+      .captions {
+        height: 150px;
+        margin-top: 6px;
+      }
+
+      .steps {
+        margin-top: 6px;
+      }
+    }
+  }
+}
+
+@container (max-width: 420px) {
+  .bugLong,
+  .lotBase {
+    display: none;
+  }
+
+  .lowerTop {
+    padding: 10px 14px;
+  }
+
+  .lowerTop .cap {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+
+  .lowerMain {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .odo,
+  .leader {
+    text-align: left;
+  }
+
+  .trust {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

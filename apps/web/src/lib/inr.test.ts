@@ -22,6 +22,13 @@ describe("compactFloorINR — money that is left never rounds up", () => {
     expect(compactFloorINR(2_000_000_000)).toBe("₹2 Cr");
     expect(compactFloorINR(4_999_999)).toBe("₹49,999");
   });
+
+  it("never loses a rupee to floating point (₹4,85,000 is ₹4.85 L, not ₹4.84 L)", () => {
+    expect(compactFloorINR(48_500_000)).toBe("₹4.85 L");
+    expect(compactFloorINR(47_000_000)).toBe("₹4.7 L");
+    expect(compactFloorINR(1_160_000_000)).toBe("₹1.16 Cr");
+    expect(compactFloorINR(48_499_900)).toBe("₹4.84 L");
+  });
 });
 
 describe("ledgerINR — books show the recorded figure", () => {

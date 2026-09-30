@@ -11,7 +11,7 @@ import { formatMonthYear } from "../../lib/format-date";
  * must be true of every quote under it.
  *
  * The landing page's second database read, guarded exactly like the first
- * (<LiveTournaments/>): `unstable_rethrow` so Next's control flow passes, a log
+ * (<LiveProof/>): `unstable_rethrow` so Next's control flow passes, a log
  * so an outage is visible, and NOTHING rendered on failure — `GET /` must be a
  * 200 with Postgres stopped. Renders nothing, too, until there is a quote to
  * show: a heading over an empty space would be the page claiming voices it
@@ -27,7 +27,7 @@ async function voices(): Promise<readonly LandingVoice[]> {
     return await landingVoices();
   } catch (error) {
     unstable_rethrow(error);
-    // The same deliberate exception LiveTournaments makes: the visitor sees
+    // The same deliberate exception LiveProof makes: the visitor sees
     // nothing, so stderr is the only place the failure can surface.
     // eslint-disable-next-line no-console
     console.error("[landing] review quotes unavailable; hiding the section", error);
