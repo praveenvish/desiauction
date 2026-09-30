@@ -92,8 +92,19 @@ export function ReportProblemProvider({
     track("support.report_opened");
   }, []);
 
+  // The control that opened the dialog gets focus back when it closes: the
+  // dialog is unmounted, not closed, so the browser has nothing to restore.
+  const returnFocus = useRef<HTMLElement | null>(null);
+
   const close = useCallback(() => {
     setSnapshot(null);
+    const target = returnFocus.current;
+    returnFocus.current = null;
+    if (target?.isConnected === true) {
+      queueMicrotask(() => {
+        target.focus();
+      });
+    }
   }, []);
 
   // Plain links to #report-a-problem open the dialog rather than navigate.
@@ -106,9 +117,13 @@ export function ReportProblemProvider({
       if (anchor === null || anchor === undefined) {
         return;
       }
+      // Any link whose hash is the report's — "#report-a-problem" on this
+      // page, or "/support#report-a-problem", the footer's, which still works
+      // without script by landing on /support and opening there.
       const href = anchor.getAttribute("href") ?? "";
-      if (href === REPORT_PROBLEM_HASH || href.endsWith(`/${REPORT_PROBLEM_HASH}`)) {
+      if (href.endsWith(REPORT_PROBLEM_HASH)) {
         event.preventDefault();
+        returnFocus.current = anchor instanceof HTMLElement ? anchor : null;
         open();
       }
     };

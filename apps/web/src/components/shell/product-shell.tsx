@@ -47,6 +47,7 @@ import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
 import { track } from "../../lib/telemetry";
 import { BrandMark, BrandWordmark } from "./brand";
+import { SocialLinks } from "./social-links";
 import {
   adminSectionsFor,
   PUBLIC_DESTINATIONS,
@@ -64,7 +65,7 @@ import {
   type NavRoles,
   type SeasonRole,
 } from "./nav";
-import { useReportProblem } from "../report-problem/report-problem";
+import { REPORT_PROBLEM_HASH, useReportProblem } from "../report-problem/report-problem";
 import { ShellActionContext } from "./page-action";
 import { ShellStatusContext } from "./page-status";
 import { ShellTitleContext, type ShellTitleOverride } from "./page-title";
@@ -711,6 +712,7 @@ export function ProductShell({
       navRoles !== null &&
       (navRoles.organizes || navRoles.conducts.length > 0 || navRoles.platform.length > 0);
     const homeLabel = runsSomething ? "Open console" : "My home";
+    const footerCompact = atGate || QUIET_FOOTER_PATHS.has(pathname);
     return (
       <PublicShell
         // The brand lockup is ONE component with a tone (brand.tsx), not markup
@@ -776,24 +778,22 @@ export function ProductShell({
         }
         // The four unadvertised "not yet" pages hold one centred message; a
         // sitemap footer under them was taller than the page itself.
-        footerCompact={atGate || QUIET_FOOTER_PATHS.has(pathname)}
+        footerCompact={footerCompact}
         contentFill={atLoginGate}
-        // The public footer (PX-1 01 §3; calmed in the 2026-09-25 wow pass).
-        // Nine links in three short columns, the subscribe row, one bottom bar.
-        // Every link is a real route with something on it: /blog,
+        // THE SITE FOOTER (9.5, frozen 2026-09-30; canvas "Site footer
+        // design — FROZEN"). Twelve links in four columns of three, each a
+        // real route with something on it; the pitch and the social row under
+        // the lockup; the subscribe band; one bottom bar. /blog,
         // /case-studies, /api-docs and /careers are placeholders and are not
         // advertised anywhere until they have content.
         //
-        // What went, and where it lives now: FAQ is inside Help; search is the
-        // header's (and the phone menu's); Security is linked from /features
-        // and /support; Release notes from /support and /help; Rules from the
-        // Resources menu; Code of Conduct and Refunds from /legal; "Create a
-        // tournament" duplicated the header's "Start free".
-        //
-        // THE OPERATOR IDENTITY left the footer. It is published — as the
+        // THE OPERATOR IDENTITY is not in the footer. It is published — as the
         // e-commerce and IT rules require — on /legal, /support and
         // /legal/grievances (`OperatorIdentityCard`), and every page's bottom
         // bar links to Grievances, so it is always one click away.
+        footerWordmark={<BrandWordmark tone="footer" />}
+        footerTagline="Run your league’s auction, squads and season in one place — from auction night to the final."
+        footerSocial={<SocialLinks />}
         footerGroups={[
           {
             label: "Product",
@@ -806,45 +806,52 @@ export function ProductShell({
           {
             label: "Tournaments",
             links: [
-              // Two words at most: the three columns share 358px on a phone,
-              // and "Browse / tournaments" and "Try a mock / auction" wrapped.
-              { label: "Browse all", href: "/c" },
-              { label: "Mock auction", href: "/#playground" },
+              { label: "Browse tournaments", href: "/c" },
+              { label: "Try a mock auction", href: "/#playground" },
+              { label: "Rules & guidelines", href: "/rules-guidelines" },
+            ],
+          },
+          {
+            label: "Help",
+            links: [
               { label: "Help centre", href: "/help" },
+              { label: "Contact support", href: "/support" },
+              { label: "Security", href: "/security" },
             ],
           },
           {
             label: "Company",
             links: [
               { label: "About us", href: "/about" },
-              { label: "Contact support", href: "/support" },
-              { label: "Legal centre", href: "/legal" },
+              { label: "Release notes", href: "/releases" },
+              { label: "All policies", href: "/legal" },
             ],
           },
         ]}
         footerNewsletter={<NewsletterForm />}
         // The copyright belongs to the entity, not the product name.
-        footerNote={`© 2026 ${LEGAL_IDENTITY.tradingName ?? "DesiAuction"} · a product of ${
-          LEGAL_IDENTITY.legalName ?? "our team"
-        }`}
-        footerBottomLinks={
-          atGate
-            ? [
-                { label: "Privacy", href: "/legal/privacy" },
-                { label: "Terms", href: "/legal/terms" },
-                { label: "Support", href: "/support" },
-              ]
-            : [
-                { label: "Privacy", href: "/legal/privacy" },
-                { label: "Terms", href: "/legal/terms" },
-                { label: "Grievances", href: "/legal/grievances" },
-                // Opens the report dialog over THIS page (the provider
-                // intercepts the hash), so the screenshot is of what they were
-                // looking at. Signed-out visitors have no account menu; this is
-                // their way in.
-                { label: "Report a problem", href: "#report-a-problem" },
-              ]
-        }
+        footerNote={[
+          `© 2026 ${LEGAL_IDENTITY.tradingName ?? "DesiAuction"}`,
+          `a product of ${LEGAL_IDENTITY.legalName ?? "our team"}`,
+        ]}
+        footerBottomLinks={[
+          { label: "Privacy", href: "/legal/privacy" },
+          { label: "Terms", href: "/legal/terms" },
+          { label: "Refunds", href: "/legal/refunds" },
+          { label: "Grievances", href: "/legal/grievances" },
+          footerCompact
+            ? { label: "Contact support", href: "/support" }
+            : // Opens the report dialog over THIS page (the provider
+              // intercepts the hash), so the screenshot is of what they were
+              // looking at; without script it lands on /support and opens
+              // there. Signed-out visitors have no account menu; this is
+              // their way in.
+              {
+                label: "Report a problem",
+                href: `/support${REPORT_PROBLEM_HASH}`,
+                popup: "dialog",
+              },
+        ]}
         linkComponent={Link}
       >
         {children}

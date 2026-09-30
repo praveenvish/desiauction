@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { BrandGlyph, IconChevronDown } from "./icons";
 import { PopoverMenu } from "./popover-menu";
@@ -36,6 +36,7 @@ export function PublicShell({
   mobileSearchHref,
   footerLinks = [],
   footerGroups = [],
+  footerWordmark,
   footerTagline,
   footerHeading,
   footerSocial,
@@ -125,15 +126,14 @@ export function PublicShell({
       >
         <div className={styles["footer-inner"]}>
           {footerCompact ? null : footerGroups.length > 0 ? (
+            // One DOM for every width: brand, subscribe, links. A laptop lays
+            // the subscribe row out as its own band under the other two; a
+            // tablet puts it beside the brand; a phone stacks all three.
             <div className={styles["footer-grid"]}>
-              {/* The brand column is the lockup and, when the app supplies one,
-                  the subscribe row — nothing else. The display headline and
-                  the paragraph of tagline that used to sit here duplicated the
-                  page's own closing band and cost ~250px on every page. */}
               <div className={styles["footer-brand"]}>
                 <Link href={wordmarkHref} className={styles["wordmark"]}>
                   <WordmarkGlyph glyph={glyph} />
-                  {wordmark}
+                  {footerWordmark ?? wordmark}
                 </Link>
                 {footerHeading !== undefined ? (
                   <p className={styles["footer-heading"]}>{footerHeading}</p>
@@ -141,18 +141,13 @@ export function PublicShell({
                 {footerTagline !== undefined ? (
                   <p className={styles["footer-tagline"]}>{footerTagline}</p>
                 ) : null}
-                {footerNewsletter !== undefined ? (
-                  <div className={styles["footer-newsletter"]}>
-                    <h2 className={styles["footer-group-label"]}>Stay in the game</h2>
-                    <div className={styles["newsletter-content"]}>{footerNewsletter}</div>
-                  </div>
-                ) : null}
                 {footerSocial !== undefined ? (
-                  <div className={styles["footer-social"]} aria-hidden="true">
-                    {footerSocial}
-                  </div>
+                  <div className={styles["footer-social"]}>{footerSocial}</div>
                 ) : null}
               </div>
+              {footerNewsletter !== undefined ? (
+                <div className={styles["footer-newsletter"]}>{footerNewsletter}</div>
+              ) : null}
               <nav aria-label="Footer" className={styles["footer-columns"]}>
                 {footerGroups.map((group) => (
                   <div key={group.label} className={styles["footer-group"]}>
@@ -182,14 +177,38 @@ export function PublicShell({
           {footerNote !== undefined || footerBottomLinks.length > 0 ? (
             <div className={styles["footer-bottom"]}>
               {footerNote !== undefined ? (
-                <p className={styles["footer-note"]}>{footerNote}</p>
+                <p className={styles["footer-note"]}>
+                  {Array.isArray(footerNote)
+                    ? (footerNote as readonly string[]).map((line, index) => (
+                        <span key={line} className={styles["footer-note-line"]}>
+                          {index > 0 ? (
+                            <span className={styles["footer-note-sep"]} aria-hidden>
+                              {" · "}
+                            </span>
+                          ) : null}
+                          {line}
+                        </span>
+                      ))
+                    : footerNote}
+                </p>
               ) : null}
               {footerBottomLinks.length > 0 ? (
                 <nav aria-label="Legal" className={styles["footer-bottom-links"]}>
-                  {footerBottomLinks.map((link) => (
-                    <Link key={link.href} href={link.href} className={styles["footer-link"]}>
-                      {link.label}
-                    </Link>
+                  {footerBottomLinks.map((link, index) => (
+                    <Fragment key={link.href}>
+                      {/* A phone sets the links as two balanced lines (3 + 2)
+                          so the longest never wraps onto a line of its own. */}
+                      {index === Math.ceil(footerBottomLinks.length / 2) ? (
+                        <span className={styles["footer-bottom-break"]} aria-hidden />
+                      ) : null}
+                      <Link
+                        href={link.href}
+                        className={styles["footer-link"]}
+                        aria-haspopup={link.popup}
+                      >
+                        {link.label}
+                      </Link>
+                    </Fragment>
                   ))}
                 </nav>
               ) : null}

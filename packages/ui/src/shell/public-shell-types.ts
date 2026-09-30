@@ -16,6 +16,9 @@ export interface PublicShellLink {
       shell cannot work this out for itself — it never sees the route — so the
       app marks it. */
   active?: boolean;
+  /** The link opens a dialog over the page rather than navigating (the app
+      enhances it); renders `aria-haspopup`. */
+  popup?: "dialog";
 }
 
 export interface PublicShellFooterGroup {
@@ -41,14 +44,20 @@ export interface PublicShellProps {
   footerLinks?: PublicShellLink[];
   /** Columned footer (preferred). When present, `footerLinks` is ignored. */
   footerGroups?: PublicShellFooterGroup[];
-  /** Short brand line rendered beside the footer wordmark. */
+  /** The footer's lockup words, when the footer sets the brand at another
+      scale than the header. Defaults to `wordmark`. */
+  footerWordmark?: ReactNode;
+  /** Short brand line rendered under the footer wordmark (hidden on a phone). */
   footerTagline?: ReactNode;
   footerHeading?: ReactNode;
-  /** Decorative row rendered under the footer tagline (e.g. social glyphs). */
+  /** Rendered under the footer tagline: the social links. Real links, so it
+      is NOT hidden from assistive technology. */
   footerSocial?: ReactNode;
   /** Subscription form, displayed in its own band below the link groups. */
   footerNewsletter?: ReactNode;
-  footerNote?: ReactNode;
+  /** The copyright line. Given as lines, it reads "a · b" on one line and
+      breaks into the lines on a phone. */
+  footerNote?: ReactNode | readonly string[];
   /**
    * The operator's own identity — legal name, registration, registered address
    * — as fine print below the bottom bar. Content, so the app supplies it: this
