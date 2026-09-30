@@ -2241,7 +2241,7 @@
    for less motion. Everything above is the complete page without it.
    ========================================================================== */
 @supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) and (min-height: 560px) {
+  @media (prefers-reduced-motion: no-preference) and (min-height: 560px) and (min-width: 761px) {
     .reveal {
       animation: reveal linear both;
       animation-timeline: view();
@@ -2786,11 +2786,20 @@
     right: 32px;
   }
 
+  /* The bar is a sibling of the photo now: pulled up over the photo's
+     lower edge by its own height plus the 28px it used to float above it. */
   .lower {
-    left: 32px;
-    right: 32px;
-    bottom: 28px;
+    position: relative;
+    order: 1;
+    right: auto;
+    bottom: auto;
+    left: auto;
     width: auto;
+    margin: calc(-1 * var(--lower-h, 216px) - 28px) 32px 0;
+  }
+
+  .heroIn {
+    order: 2;
   }
 
   .heroIn {
@@ -3074,7 +3083,7 @@
 
 @container (max-width: 760px) {
   @supports (animation-timeline: view()) {
-    @media (prefers-reduced-motion: no-preference) and (min-height: 560px) {
+    @media (prefers-reduced-motion: no-preference) and (min-height: 560px) and (min-width: 761px) {
       .stage {
         gap: 22px;
         padding-top: 18px;
@@ -3094,31 +3103,628 @@
 }
 
 @container (max-width: 420px) {
-  .bugLong,
-  .lotBase {
+  .bugLong {
+    display: none;
+  }
+}
+
+/* A tablet's pinned night stacks the captions over the big screen; sized to
+   the screen's height so the stack never overflows the stage (it used to push
+   its own label up over the ticker). */
+@container (max-width: 900px) {
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) and (min-height: 560px) and (min-width: 761px) {
+      .stage {
+        align-content: start;
+        padding-top: 28px;
+      }
+
+      .room {
+        width: 100%;
+        max-width: calc((100svh - var(--hdr) - 380px) * 16 / 9);
+        margin: 0 auto;
+      }
+    }
+  }
+}
+
+/* ==========================================================================
+   THE PHONE (≤760px) — founder-approved 2026-09-30, canvas "Home page —
+   mobile". Faces first; a short page (≈4.5 screens, was 16); nothing tied to
+   scroll; everything that moves sideways is a native swipe row with momentum,
+   snap, a peek of the next card and dots. The laptop's pinned cinema is off
+   here (the enhancement above requires min-width: 761px).
+   ========================================================================== */
+.nightPhone,
+.phoneHead,
+.seatTabs,
+.lotThumb,
+.swipeHint {
+  display: none;
+}
+
+.rail {
+  margin: 0;
+  padding: 4px 20px 6px;
+  list-style: none;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 20px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-2);
+  transition:
+    width var(--duration-slow) var(--ease-out),
+    background-color var(--duration-slow) var(--ease-out);
+}
+
+.dots i[data-on] {
+  width: 20px;
+  background: var(--gold);
+}
+
+@container (max-width: 760px) {
+  /* ---- rhythm: one gap between every section ---- */
+  .seats,
+  .turn,
+  .proof {
+    padding: 52px 0 0;
+  }
+
+  .close {
+    margin-top: 52px;
+    padding: 56px 0 64px;
+  }
+
+  .title {
+    font-size: 30px;
+    line-height: 34px;
+    text-wrap: balance;
+  }
+
+  .closeTitle {
+    font-size: 38px;
+    line-height: 40px;
+    text-wrap: balance;
+  }
+
+  .phoneHead {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 20px;
+  }
+
+  .swipeHint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  /* ---- hero: the photo first, faces and crests in frame ---- */
+  .heroPhoto {
+    height: 380px;
+    overflow: hidden;
+  }
+
+  .heroFrame {
+    top: -4px;
+    bottom: auto;
+    left: -238px;
+    right: auto;
+    width: 820px;
+    height: 547px;
+  }
+
+  .heroImage {
+    object-position: 50% 0;
+  }
+
+  .heroShade {
+    background: linear-gradient(0deg, var(--bg) 4%, rgb(5 7 11 / 55%) 30%, rgb(5 7 11 / 0%) 55%);
+  }
+
+  .bug {
+    top: 14px;
+    left: 16px;
+    height: 30px;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+
+  /* the words ride the photo's bottom edge */
+  .heroIn {
+    position: relative;
+    margin-top: -118px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .heroCopy {
+    gap: 14px;
+  }
+
+  .h1 {
+    font-size: 40px;
+    line-height: 42px;
+  }
+
+  .heroLead {
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .actions .primary,
+  .actions .secondary {
+    justify-content: center;
+    height: 54px;
+  }
+
+  /* the broadcast bar: its own card, under the buttons */
+  .lower {
+    position: relative;
+    order: 3;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: auto;
+    margin: 22px 16px 0;
+    border-radius: 16px;
+    box-shadow: none;
+  }
+
+  .lowerTop,
+  .paddles,
+  .timer {
     display: none;
   }
 
-  .lowerTop {
-    padding: 10px 14px;
-  }
-
-  .lowerTop .cap {
-    font-size: 11px;
-    letter-spacing: 0.06em;
-  }
-
   .lowerMain {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .lotThumb {
+    display: block;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 1px solid var(--gold);
+  }
+
+  .lotName {
+    font-family: var(--font-text);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 20px;
+    letter-spacing: 0;
+  }
+
+  .odo {
+    height: 28px;
+    font-size: 24px;
+    line-height: 28px;
+  }
+
+  .leader {
+    height: 18px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .wipe b {
+    font-size: 40px;
+    line-height: 44px;
+  }
+
+  .wipePrice {
+    font-size: 26px;
+  }
+
+  /* ---- the night: five story cards ---- */
+  .stage {
+    display: none;
+  }
+
+  .nightPhone {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 52px 0 0;
+  }
+
+  .storyCard {
+    flex: none;
+    width: min(322px, calc(100cqi - 68px));
+    box-sizing: border-box;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-snap-align: start;
+  }
+
+  .storyTop {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .storyTop > span:first-child {
+    font-size: 30px;
+    line-height: 34px;
+  }
+
+  .storyTitle {
+    margin: 0;
+    font-family: var(--font-text);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 24px;
+    letter-spacing: -0.01em;
+    color: var(--gold-ink);
+  }
+
+  .storyText {
+    margin: 0;
+    font-size: 14px;
+    line-height: 21px;
+    color: var(--soft);
+  }
+
+  .storyVisual {
+    margin-top: auto;
+    padding-top: 4px;
+  }
+
+  .storyPool {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .storyPool > span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 6px;
+    border-radius: 12px;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    text-align: center;
+  }
+
+  .storyPool > span[data-star] {
+    border-color: var(--gold);
+  }
+
+  .storyPool img {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 4px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .storyPool b {
+    font-size: 12px;
+    color: var(--ink);
+  }
+
+  .storyPool small {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .storyPool > .storyMore {
+    justify-content: center;
+    background: rgb(127 209 168 / 6%);
+    border: 1px dashed rgb(127 209 168 / 40%);
+  }
+
+  .storyMore b {
+    font-size: 22px;
+    color: var(--green);
+  }
+
+  .storyMore small {
+    color: var(--green);
+  }
+
+  .storyLot,
+  .storyBid {
+    padding: 16px;
+    border-radius: 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+  }
+
+  .storyLot {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .storyLot img {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    object-fit: cover;
+    border: 2px solid var(--gold);
+  }
+
+  .storyLot b {
+    display: block;
+    font-size: 18px;
+    color: var(--ink);
+  }
+
+  .storyLot small {
+    font-size: 13px;
+    color: var(--soft);
+  }
+
+  .storyBid > b {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 44px;
+    line-height: 48px;
+    color: var(--ink);
+  }
+
+  .storyBid > span {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .storyBid i {
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--team) 16%, transparent);
+    color: var(--team);
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  .storySold {
+    height: 132px;
+    overflow: hidden;
+    border-radius: 14px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    align-items: center;
+    background: linear-gradient(100deg, var(--gold), #f7d27a 55%, var(--gold));
+    color: #141008;
+  }
+
+  .storySold > span {
+    padding: 0 16px;
+  }
+
+  .storySold b {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 44px;
+    line-height: 44px;
+  }
+
+  .storySold small {
+    display: block;
+    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+  }
+
+  .storySold img {
+    width: 80px;
+    height: auto;
+    border-radius: 12px;
+    border: 3px solid #141008;
+    transform: rotate(6deg);
+  }
+
+  .storyBoard {
+    display: block;
+    width: 100%;
+    height: 132px;
+    object-fit: cover;
+    object-position: top left;
+    border-radius: 12px;
+    border: 1px solid var(--line-2);
+  }
+
+  /* ---- the season: a native carousel ---- */
+  .seasonStage {
+    padding: 52px 0 0;
+    gap: 14px;
+  }
+
+  .seasonIntro,
+  .progress {
+    display: none;
+  }
+
+  .track {
+    padding: 4px 20px 6px;
+    gap: 12px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .seasonCard {
+    width: min(272px, calc(100cqi - 88px));
+    min-height: 0;
+    padding: 18px;
+    gap: 8px;
+  }
+
+  .cardHead .tile {
+    display: none;
+  }
+
+  .cardTitle {
+    font-size: 20px;
+    line-height: 24px;
+  }
+
+  .cardText {
+    font-size: 13px;
+    line-height: 19px;
+  }
+
+  .mock {
+    padding: 10px 12px;
+  }
+
+  .mock .row {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .mock .row .cap {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ---- four seats: one card, four tabs ---- */
+  .seatTabs {
+    display: flex;
+    gap: 4px;
+    margin-top: 14px;
+    padding: 4px;
+    border-radius: 14px;
+    background: #0a0e16;
+    border: 1px solid var(--line);
+  }
+
+  .seatTabs button {
+    flex: 1;
+    height: 40px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--soft);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      background-color var(--duration-base) var(--ease-out),
+      color var(--duration-base) var(--ease-out);
+  }
+
+  .seatTabs button[aria-pressed="true"] {
+    background: var(--gold);
+    color: #141008;
+  }
+
+  .seatGrid {
+    display: block;
+    margin: 12px 0 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .seat {
+    display: none;
+    width: auto;
+    height: 560px;
+    box-sizing: border-box;
+  }
+
+  .seatGrid[data-active="0"] .seat[data-seat="0"],
+  .seatGrid[data-active="1"] .seat[data-seat="1"],
+  .seatGrid[data-active="2"] .seat[data-seat="2"],
+  .seatGrid[data-active="3"] .seat[data-seat="3"] {
+    display: flex;
+  }
+
+  .seatTitle {
+    font-size: 24px;
+    line-height: 28px;
+  }
+
+  .seatText {
+    font-size: 14px;
+    line-height: 21px;
+  }
+
+  /* ---- real, and built to hold: the facts two by two ---- */
+  .trust {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .fact {
+    padding: 14px;
     gap: 6px;
   }
 
-  .odo,
-  .leader {
-    text-align: left;
+  .fact .tile {
+    display: none;
   }
 
-  .trust {
-    grid-template-columns: minmax(0, 1fr);
+  .fact strong {
+    font-size: 14px;
+    line-height: 18px;
+  }
+
+  .fact p {
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  .featuredStats strong {
+    font-size: 40px;
+    line-height: 44px;
+  }
+
+  /* ---- the sticky CTA clears the phone's home bar ---- */
+  .stickyCta {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(0deg, rgb(5 7 11 / 96%) 60%, rgb(5 7 11 / 0%));
   }
 }

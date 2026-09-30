@@ -6,6 +6,7 @@ import { POOL, STAR_LOT, TEAMS, price } from "../../../content/home-story";
 const roleOf = (name: string) => POOL.find((player) => player.name === name)?.role ?? "";
 import styles from "../../../app/home.module.css";
 import { Glyph, type GlyphName } from "./glyphs";
+import { SwipeDots } from "./swipe";
 
 /**
  * 3 · THE SEASON. After the gavel, everything that follows the auction — each
@@ -62,9 +63,16 @@ export function Season() {
   return (
     <section className={styles.season} aria-labelledby="season-title">
       <div className={styles.seasonStage}>
+        {/* A phone's heading: the laptop's sits inside the track as its first
+            card, which a phone's swipe row does not show. */}
+        <div className={styles.phoneHead}>
+          <p className={styles.kicker}>After the gavel</p>
+          <h2 className={[styles.display, styles.title].join(" ")}>The season runs here too.</h2>
+        </div>
         {/* A swipe row where the scroll track does not run: focusable, so a
             keyboard can scroll it too. */}
         <ul
+          id="season-rail"
           className={styles.track}
           style={{ listStyle: "none", margin: 0 }}
           tabIndex={0}
@@ -291,6 +299,7 @@ export function Season() {
             </div>
           </SeasonCard>
         </ul>
+        <SwipeDots railId="season-rail" />
         <div className={styles.progress} aria-hidden="true">
           <b />
         </div>
