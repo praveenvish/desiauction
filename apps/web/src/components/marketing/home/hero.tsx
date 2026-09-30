@@ -54,113 +54,6 @@ export function Hero({
           LIVE ·<span className={styles.bugLong}> {LEAGUE.name.toUpperCase()} ·</span>{" "}
           <span className={styles.muted}>EXAMPLE</span>
         </span>
-        <div
-          className={styles.lower}
-          role="img"
-          aria-label={`Example: Lot ${String(STAR_LOT.lot)}, ${star.name}, bid up from ${price(star.base)} and sold to ${STAR_LOT.soldTo} for ${price(STAR_LOT.price)}.`}
-        >
-          <div className={styles.lowerTop} aria-hidden="true">
-            <span className={styles.cap} style={{ color: "var(--gold-ink)" }}>
-              Lot {STAR_LOT.lot} of {LEAGUE.lots} · {star.role} · {LEAGUE.sport}
-            </span>
-            <span className={[styles.cap, styles.lotBase].join(" ")}>Base {price(star.base)}</span>
-          </div>
-          <div className={styles.lowerMain} aria-hidden="true">
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <span className={[styles.display, styles.lotName].join(" ")}>{star.name}</span>
-              <span className={styles.paddles}>
-                {TEAMS.map((team) => {
-                  const bids = STAR_LOT.bids.some((bid) => bid.team === team.name);
-                  return (
-                    <span
-                      key={team.name}
-                      className={styles.pad}
-                      data-bids={bids ? team.name : undefined}
-                      style={{ "--team": team.color } as CSSProperties}
-                    >
-                      {team.initial}
-                    </span>
-                  );
-                })}
-              </span>
-            </div>
-            <div>
-              <div className={[styles.odo, styles.num].join(" ")}>
-                <div className={styles.odoCol}>
-                  {STAR_LOT.bids.map((bid, index) => (
-                    <span
-                      key={bid.amount}
-                      style={
-                        index === STAR_LOT.bids.length - 1
-                          ? { color: "var(--gold-ink)" }
-                          : undefined
-                      }
-                    >
-                      {price(bid.amount)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className={styles.leader}>
-                <div className={styles.odoCol}>
-                  {STAR_LOT.bids.map((bid, index) => {
-                    const team = TEAMS.find((entry) => entry.name === bid.team);
-                    const last = index === STAR_LOT.bids.length - 1;
-                    return (
-                      <span key={bid.amount}>
-                        {team === undefined ? (
-                          "Opening bid"
-                        ) : (
-                          <>
-                            <b style={{ color: team.color }}>{team.name}</b>
-                            {last ? " · going, going…" : " lead"}
-                          </>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className={styles.timer} aria-hidden="true">
-            <i />
-          </div>
-          <div className={styles.purses} aria-hidden="true">
-            {TEAMS.map((team) => {
-              const purse = PURSES[team.name];
-              return (
-                <span
-                  key={team.name}
-                  className={styles.purse}
-                  style={{ "--team": team.color } as CSSProperties}
-                >
-                  <span className={styles.purseName}>
-                    <i />
-                    {team.name}
-                  </span>
-                  <span className={[styles.purseLeft, styles.num].join(" ")}>
-                    {purse?.after === undefined ? (
-                      purseLeft(purse?.before ?? LEAGUE.purse)
-                    ) : (
-                      <span className={styles.purseRoll}>
-                        <span>{purseLeft(purse.before)}</span>
-                        <span style={{ color: "var(--gold-ink)" }}>{purseLeft(purse.after)}</span>
-                      </span>
-                    )}
-                  </span>
-                </span>
-              );
-            })}
-          </div>
-          <div className={styles.wipe} aria-hidden="true">
-            <b>SOLD</b>
-            <span style={{ textAlign: "right" }}>
-              <span className={styles.wipeTo}>TO {STAR_LOT.soldTo.toUpperCase()}</span>
-              <span className={styles.wipePrice}>{price(STAR_LOT.price)}</span>
-            </span>
-          </div>
-        </div>
       </div>
       <div className={[styles.wrap, styles.heroIn].join(" ")}>
         <div className={styles.heroCopy}>
@@ -213,6 +106,127 @@ export function Hero({
               Find your tournament →
             </Link>
           </p>
+        </div>
+      </div>
+      {/* THE BROADCAST BAR. A sibling of the photo, not a child: on a laptop it
+          floats over the photo's lower right; on a phone it is a card of its
+          own under the buttons, so it can never cover a face (2026-09-30: on a
+          phone it sat over all four). */}
+      <div
+        className={styles.lower}
+        role="img"
+        aria-label={`Example: Lot ${String(STAR_LOT.lot)}, ${star.name}, bid up from ${price(star.base)} and sold to ${STAR_LOT.soldTo} for ${price(STAR_LOT.price)}.`}
+      >
+        <div className={styles.lowerTop} aria-hidden="true">
+          <span className={styles.cap} style={{ color: "var(--gold-ink)" }}>
+            Lot {STAR_LOT.lot} of {LEAGUE.lots} · {star.role} · {LEAGUE.sport}
+          </span>
+          <span className={[styles.cap, styles.lotBase].join(" ")}>Base {price(star.base)}</span>
+        </div>
+        <div className={styles.lowerMain} aria-hidden="true">
+          {/* The lot's face: a phone shows the bar as a card of its own, under
+            the buttons, and the face is what makes it a person. */}
+          {star.face === undefined ? null : (
+            <Image
+              className={styles.lotThumb}
+              src={star.face}
+              alt=""
+              width={92}
+              height={92}
+              sizes="46px"
+            />
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <span className={[styles.display, styles.lotName].join(" ")}>{star.name}</span>
+            <span className={styles.paddles}>
+              {TEAMS.map((team) => {
+                const bids = STAR_LOT.bids.some((bid) => bid.team === team.name);
+                return (
+                  <span
+                    key={team.name}
+                    className={styles.pad}
+                    data-bids={bids ? team.name : undefined}
+                    style={{ "--team": team.color } as CSSProperties}
+                  >
+                    {team.initial}
+                  </span>
+                );
+              })}
+            </span>
+          </div>
+          <div>
+            <div className={[styles.odo, styles.num].join(" ")}>
+              <div className={styles.odoCol}>
+                {STAR_LOT.bids.map((bid, index) => (
+                  <span
+                    key={bid.amount}
+                    style={
+                      index === STAR_LOT.bids.length - 1 ? { color: "var(--gold-ink)" } : undefined
+                    }
+                  >
+                    {price(bid.amount)}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className={styles.leader}>
+              <div className={styles.odoCol}>
+                {STAR_LOT.bids.map((bid, index) => {
+                  const team = TEAMS.find((entry) => entry.name === bid.team);
+                  const last = index === STAR_LOT.bids.length - 1;
+                  return (
+                    <span key={bid.amount}>
+                      {team === undefined ? (
+                        "Opening bid"
+                      ) : (
+                        <>
+                          <b style={{ color: team.color }}>{team.name}</b>
+                          {last ? " · going, going…" : " lead"}
+                        </>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className={styles.timer} aria-hidden="true">
+          <i />
+        </div>
+        <div className={styles.purses} aria-hidden="true">
+          {TEAMS.map((team) => {
+            const purse = PURSES[team.name];
+            return (
+              <span
+                key={team.name}
+                className={styles.purse}
+                style={{ "--team": team.color } as CSSProperties}
+              >
+                <span className={styles.purseName}>
+                  <i />
+                  {team.name}
+                </span>
+                <span className={[styles.purseLeft, styles.num].join(" ")}>
+                  {purse?.after === undefined ? (
+                    purseLeft(purse?.before ?? LEAGUE.purse)
+                  ) : (
+                    <span className={styles.purseRoll}>
+                      <span>{purseLeft(purse.before)}</span>
+                      <span style={{ color: "var(--gold-ink)" }}>{purseLeft(purse.after)}</span>
+                    </span>
+                  )}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+        <div className={styles.wipe} aria-hidden="true">
+          <b>SOLD</b>
+          <span style={{ textAlign: "right" }}>
+            <span className={styles.wipeTo}>TO {STAR_LOT.soldTo.toUpperCase()}</span>
+            <span className={styles.wipePrice}>{price(STAR_LOT.price)}</span>
+          </span>
         </div>
       </div>
       <a className={styles.cue} href="#night">
