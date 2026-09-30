@@ -801,6 +801,7 @@ export function ProductShell({
               { label: "Features", href: "/features" },
               { label: "Sports", href: "/sports" },
               { label: "Who it's for", href: "/for" },
+              { label: "Compare", href: "/compare" },
               { label: "Pricing", href: "/pricing" },
               { label: "Book a demo", href: "/schedule-demo" },
             ],

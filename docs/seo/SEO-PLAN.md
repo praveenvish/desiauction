@@ -142,7 +142,7 @@ Also run **Lighthouse CI** (SEO category must score 100; performance budgets fro
 
 ---
 
-### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1) — **4a and 4b BUILT 2026-09-30** (see §11, §12); 4c–4d to do
+### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1) — **4a, 4b and 4c BUILT 2026-09-30** (see §11–§13); 4d to do
 
 This is where the traffic comes from. Build pages from the **sport pack registry** in `packages/core/src/sports`, but write the copy by hand. Pages are templated for layout only.
 
@@ -537,3 +537,45 @@ Each page has:
   - a sport card lands on its sport page
   - unknown → 404
   - no overflow at 360px
+
+---
+
+## 13. Phase 4c delivery log (2026-09-30)
+
+**Built on `feat/seo-compare-pages`, stacked on Phase 4b (#179). Its PR targets `main`.** Founder decision: **generic comparisons only**, with no named competitor. Nothing about anyone else's product needs verifying or can go stale.
+
+**What shipped:**
+- `/compare` (hub), `/compare/spreadsheet-and-whatsapp` and `/compare/manual-auction`.
+- A footer link (Product › Compare), sitemap and route-registry entries, and `FAQPage` + `BreadcrumbList` markup.
+
+**How the pages are built:**
+- A real `<table>` (caption, column and row headers) on wide screens. On a phone the same rows render as **cards with both sides stacked**: at 360px the table's DesiAuction column had sat off-screen, so a phone visitor saw only the old way. Whichever form doesn't fit is `display: none`, so a screen reader meets exactly one.
+- **Fair to the old way:** every page has a "When … is enough" section, saying plainly when a sheet and a group, or a manual auction, is the right tool.
+- **Every "with DesiAuction" claim was checked in code:**
+  - the bid checks in `auction.ts` (base, current, increment, purse, reserve)
+  - one registration per player per season (unique index)
+  - round-robin fixtures, with double-booking refused
+  - undo as a recorded reopening
+  - the night's replay
+  - CSV exports for players and the schedule
+- One over-strong claim was narrowed: squads get their own public team pages, not "on the season page as the gavel falls".
+
+**Found while testing:**
+- **Titles that already name the brand** ("… vs DesiAuction") had the suffix added a second time. The SEO guardrail caught it; these pages now use absolute titles.
+- **Two landmarks shared one name** (the section and the table's scroll region). axe `landmark-unique` caught it, and the region now has its own label.
+- **Lowercased names** produced "spreadsheet + whatsapp group". Each page now carries a written in-sentence name (`inSentence`) and its own `enoughTitle`.
+
+**Tests:**
+- `content/comparisons.test.ts`:
+  - unique fields
+  - 50–160 character descriptions
+  - ≥ 5 rows filled on both sides
+  - a substantive "enough" section
+  - no paragraph repeated from any other landing page
+- `e2e/compare-pages.spec.ts`:
+  - the hub
+  - the table's headers and the "enough" heading
+  - axe in both themes
+  - at 360px: no page overflow, table hidden, and both sides of a card visible on screen (plus axe)
+  - unknown → 404
+- E2E across all landing pages, seo, CSP, public pages and the shell: **38/38**.

@@ -4,6 +4,7 @@ import { env } from "../env";
 import { HELP_ARTICLES, HELP_CATEGORIES } from "../content/help";
 import { LEGAL_DOCUMENTS } from "../content/legal";
 import { AUDIENCE_PAGES } from "../content/audiences";
+import { COMPARISON_PAGES } from "../content/comparisons";
 import { SPORT_PAGES } from "../content/sports";
 import { publicCompetitionSlugs } from "../server/competition/public";
 import { INDEXABLE_PAGES, isoCalendarDate } from "../server/seo/routes";
@@ -72,6 +73,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     ...AUDIENCE_PAGES.map((page) => ({
       url: `${base}/for/${page.slug}`,
+      lastModified: page.updatedOn,
+      changeFrequency: "monthly" as const,
+    })),
+    ...COMPARISON_PAGES.map((page) => ({
+      url: `${base}/compare/${page.slug}`,
       lastModified: page.updatedOn,
       changeFrequency: "monthly" as const,
     })),

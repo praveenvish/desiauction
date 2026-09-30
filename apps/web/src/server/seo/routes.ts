@@ -42,7 +42,8 @@ export interface IndexablePage {
  * Standalone marketing and hub pages that belong in search. Help articles,
  * legal documents, sport pages and public seasons are added by the sitemap from
  * their own registries (`content/help.ts`, `content/legal.ts`,
- * `content/sports.ts`, `content/audiences.ts`, the database), so they
+ * `content/sports.ts`, `content/audiences.ts`, `content/comparisons.ts`, the
+ * database), so they
  * can never be listed here and missing there.
  */
 export const INDEXABLE_PAGES: readonly IndexablePage[] = [
@@ -61,6 +62,7 @@ export const INDEXABLE_PAGES: readonly IndexablePage[] = [
   { path: "/legal", updatedOn: "2026-09-26", changeFrequency: "monthly" },
   { path: "/sports", updatedOn: "2026-09-30", changeFrequency: "monthly" },
   { path: "/for", updatedOn: "2026-09-30", changeFrequency: "monthly" },
+  { path: "/compare", updatedOn: "2026-09-30", changeFrequency: "monthly" },
 ];
 
 /**
@@ -90,6 +92,7 @@ const PUBLIC_SUBTREES = [
   "/newsletter",
   "/sports",
   "/for",
+  "/compare",
 ] as const;
 
 /** Next's file-based metadata routes. These are fetched by crawlers and share scrapers. */
