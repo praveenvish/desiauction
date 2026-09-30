@@ -281,7 +281,8 @@ export const SPORT_PAGES: readonly SportPage[] = [
     faqs: [
       {
         question: "How is the hockey table sorted?",
-        answer: "By points (3 for a win, 1 for a draw), then goal difference, then goals scored.",
+        answer:
+          "Points come first — 3 for a win, 1 for a draw. Sides level on points are split by goal difference, and then by goals scored.",
       },
       {
         question: "Can captains skip the auction?",
@@ -446,7 +447,7 @@ export const SPORT_PAGES: readonly SportPage[] = [
       {
         question: "How is the table sorted?",
         answer:
-          "By points (2 for a won tie, 1 for a drawn one), then rubber difference, then game difference.",
+          "Won ties are worth 2 points and drawn ties 1. Teams level on points are ranked by rubber difference first, then by game difference.",
       },
       {
         question: "Do players need an app?",
@@ -489,7 +490,8 @@ export const SPORT_PAGES: readonly SportPage[] = [
       },
       {
         question: "Can we run the auction in points instead of money?",
-        answer: "Yes. A points auction gives each team a budget in points.",
+        answer:
+          "Yes. In a points auction every team spends from a budget in points, so nothing is owed or collected once the night is over.",
       },
     ],
     updatedOn: "2026-09-30",

@@ -800,6 +800,7 @@ export function ProductShell({
             links: [
               { label: "Features", href: "/features" },
               { label: "Sports", href: "/sports" },
+              { label: "Who it's for", href: "/for" },
               { label: "Pricing", href: "/pricing" },
               { label: "Book a demo", href: "/schedule-demo" },
             ],

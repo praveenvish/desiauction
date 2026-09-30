@@ -142,7 +142,7 @@ Also run **Lighthouse CI** (SEO category must score 100; performance budgets fro
 
 ---
 
-### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1) — **4a BUILT 2026-09-30** (see §11); 4b–4d to do
+### Phase 4 — `feat(marketing): sport and use-case landing pages` (P0, fixes G1) — **4a and 4b BUILT 2026-09-30** (see §11, §12); 4c–4d to do
 
 This is where the traffic comes from. Build pages from the **sport pack registry** in `packages/core/src/sports`, but write the copy by hand. Pages are templated for layout only.
 
@@ -494,3 +494,46 @@ Each check was shown to fail first:
 - "Book a demo" can't pre-select the sport: `/schedule-demo` takes only a validated `from` source. Adding `sport` there means touching its closed list and the operator console.
 - Real keyword volumes (Phase 0) should re-rank which pages get deeper content first.
 - **4b–4d** are still to do: use-case pages (`/for/…`), comparison pages, and free tools.
+
+---
+
+## 12. Phase 4b delivery log (2026-09-30)
+
+**Built on `feat/seo-audience-pages`, stacked on Phase 4a (#178). Its PR targets `main`.** Published on merge, as with 4a.
+
+**What shipped:**
+- `/for` (hub) and five audience pages: `/for/corporate-leagues`, `/for/housing-societies`, `/for/college-fests`, `/for/village-tournaments` and `/for/turfs-and-academies`.
+- A footer link (Product › Who it's for).
+- Pages are in the route registry and the sitemap. They carry `FAQPage` + `BreadcrumbList` markup.
+
+Each page has:
+- three points that belong to that audience, e.g. entry-fee tracking for societies, cash collections and numbered receipts for village tournaments, BGMI/esports and a streamable board for fests
+- the season in that audience's own steps
+- links to the sport pages that audience plays (internal links into 4a)
+- its own FAQs
+
+**Checked in code before being written:**
+- WhatsApp **share links** exist (registration, spectate, owner invites). Automated WhatsApp **messages** depend on provider credentials, so they are not claimed.
+- Other confirmed capabilities:
+  - per-player entry-fee status (pending/paid/waived/refunded)
+  - cash/UPI/bank collections and numbered receipts
+  - points auctions
+  - an appointed auctioneer (`server/auction/auctioneers.ts`)
+  - seasons that recur under one tournament
+  - open/men/women/mixed categories
+  - no phone numbers on public pages
+- One claim was narrowed: the category is said on the **public page** (confirmed), not "on the registration form" (not confirmed).
+
+**Tests:**
+- `content/audiences.test.ts`:
+  - unique slugs, names, titles, headlines and descriptions
+  - 50–160 character descriptions
+  - sport links resolve
+  - no paragraph repeated **across audience and sport pages**. It compares answers alone, which is stricter than the 4a test, and found three identical answers in the 4a sport pages (hockey/football, table tennis/badminton, pickleball/esports). All three were rewritten here.
+- `e2e/audience-pages.spec.ts`:
+  - hub has 5 links
+  - corporate and village pages show their own words and steps
+  - axe clean in both themes
+  - a sport card lands on its sport page
+  - unknown → 404
+  - no overflow at 360px
