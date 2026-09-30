@@ -9,6 +9,9 @@ vi.mock("../logger", () => ({ logger: () => ({ info: vi.fn(), warn: vi.fn() }) }
 
 import { notifyIndexNow } from "./indexnow";
 
+// Deliberately low-entropy: a realistic-looking key trips the secrets scan.
+const FAKE_KEY = "x".repeat(16);
+
 describe("notifyIndexNow", () => {
   const fetchMock = vi.fn<typeof fetch>();
 
@@ -27,7 +30,7 @@ describe("notifyIndexNow", () => {
   });
 
   it("posts absolute URLs on our own host with the key's location", async () => {
-    settings.INDEXNOW_KEY = "0123456789abcdef";
+    settings.INDEXNOW_KEY = FAKE_KEY;
     fetchMock.mockResolvedValue(new Response(null, { status: 202 }));
     await notifyIndexNow(["/c/vpl-1-513q", "/c"]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -35,14 +38,14 @@ describe("notifyIndexNow", () => {
     expect(url).toBe("https://api.indexnow.org/indexnow");
     expect(JSON.parse(init?.body as string)).toEqual({
       host: "desiauction.in",
-      key: "0123456789abcdef",
+      key: FAKE_KEY,
       keyLocation: "https://desiauction.in/indexnow-key.txt",
       urlList: ["https://desiauction.in/c/vpl-1-513q", "https://desiauction.in/c"],
     });
   });
 
   it("never throws when the search engine is down or refuses", async () => {
-    settings.INDEXNOW_KEY = "0123456789abcdef";
+    settings.INDEXNOW_KEY = FAKE_KEY;
     fetchMock.mockRejectedValueOnce(new Error("ECONNRESET"));
     await expect(notifyIndexNow(["/c"])).resolves.toBeUndefined();
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 422 }));
