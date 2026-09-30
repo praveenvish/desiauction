@@ -37,27 +37,35 @@
   }
 }
 
-/* ---- rail: the console sidebar. The rail's own ink (identity glyph on navy,
-   heading ink on the warm daylight rail) is inherited; the tagline is that ink
-   softened, so it follows the rail through both themes. ---- */
-.da-wordmark--rail {
+/* ---- rail + bar: THE CONSOLE LOCKUP (header 9.5, 2026-09-30). One size on
+   the laptop's rail and the phone's bar: the word at 20px and the tagline at
+   8px tracked 0.115em, which is exactly the word's width (112.8px, measured) —
+   so the two lines end together without a justification trick. The phone used
+   to drop the tagline and set the word at 17px, the rail 20/7.5 with the
+   tagline stopping short: three brands for one product. ---- */
+.da-wordmark--rail,
+.da-wordmark--bar {
   font-size: 20px;
+  line-height: 22px;
 }
+.da-wordmark--rail .da-wordmark-tagline,
+.da-wordmark--bar .da-wordmark-tagline {
+  margin-top: 3px;
+  font-size: 8px;
+  line-height: 9px;
+  font-weight: 600;
+  letter-spacing: 0.115em;
+}
+
+/* The rail's own ink (identity glyph on navy, heading ink on the warm daylight
+   rail) is inherited; the tagline is that ink softened, so it follows the rail
+   through both themes. */
 .da-wordmark--rail .da-wordmark-tagline {
-  margin-top: 5px;
-  font-size: 7.5px;
-  letter-spacing: 0.12em;
   color: color-mix(in srgb, currentColor 64%, transparent);
 }
 
-/* ---- bar: the console's top bar on a phone, beside four 44px controls. The
-   word only — at this size the tagline would be 6px of noise. ---- */
 .da-wordmark--bar {
-  font-size: 17px;
   color: var(--text-heading);
-}
-.da-wordmark--bar .da-wordmark-tagline {
-  display: none;
 }
 
 /* ---- live: the dark strip over the live room, cockpit and spectate ---- */

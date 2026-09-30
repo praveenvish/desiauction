@@ -9,7 +9,8 @@ export interface DrawerProps {
   open: boolean;
   onClose: () => void;
   title: string;
-  side?: "start" | "end";
+  /** `bottom`: a sheet rising from the foot of a phone screen. */
+  side?: "start" | "end" | "bottom";
   children: ReactNode;
   className?: string;
 }

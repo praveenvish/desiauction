@@ -20,11 +20,15 @@
   gap: var(--space-1);
 }
 
+/* 44px (header 9.5): the strip is a row of targets, and its height is the
+   same on every surface that carries one. */
 .tab {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
   color: var(--text-secondary);
   text-decoration: none;
   font-family: var(--font-text);
@@ -43,9 +47,12 @@
   outline-offset: -2px;
 }
 
+/* Where you are: heading ink, semibold, over a gold bar — on a phone the
+   active tab is also the page's name, so it reads as a title, not a link. */
 .active {
-  color: var(--text-accent);
-  border-bottom-color: var(--accent-line);
+  color: var(--text-heading);
+  font-weight: var(--font-weight-semibold);
+  border-bottom-color: var(--accent);
 }
 
 .dot {
@@ -92,6 +99,14 @@
   }
 
   .tab {
-    padding-inline: var(--space-2);
+    padding-inline: 10px;
+  }
+}
+
+/* On a laptop the first tab's WORD starts on the title's line above it, not
+   its padding. */
+@media (min-width: 720px) {
+  .list {
+    margin-inline-start: calc(-1 * var(--space-3));
   }
 }

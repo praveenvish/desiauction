@@ -1,13 +1,15 @@
+/* The bar's one button (header 9.5): 40px, the glyph in primary ink so the
+   four read as one crisp set beside the lockup. */
 .shell-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -382,11 +384,229 @@
   color: var(--text-secondary);
 }
 
-/* A phone's icon row leaves the title about 130px: "Good morning, Praveen"
-   clamped to "Good morning,…" and cut off the one word that was theirs.
-   Under 480px the lead goes and the name stays (still read in full above). */
-@media (max-width: 479px) {
+/* A phone opens the page with its greeting (header 9.5): the lead is a quiet
+   line of its own over the name, so the name keeps the whole width it used to
+   lose to "Good morning," clamped beside the icon row. */
+@media (max-width: 719px) {
   .shell-title-lead {
+    display: block;
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: var(--font-weight-regular);
+    letter-spacing: 0;
+    color: var(--text-secondary);
+  }
+}
+
+/* ==========================================================================
+   HEADER 9.5 (2026-09-30) — the theme slot, the season switcher, the trail.
+   ========================================================================== */
+
+/* The bar holds lockup + four 40px buttons down to 360px; below that the
+   theme switch moves into the menu (a labelled row there). */
+.shell-theme-slot {
+  display: contents;
+}
+
+.shell-narrow-only {
+  display: none;
+}
+
+@media (max-width: 359px) {
+  .shell-theme-slot {
     display: none;
   }
+
+  .shell-narrow-only {
+    display: list-item;
+  }
+}
+
+.shell-theme-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The season's tab row on a phone: the chip pinned, a hairline, the strip. */
+.shell-seasonbar {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+}
+
+.shell-seasonbar > nav {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.shell-seasonbar-chip {
+  flex: none;
+  align-items: center;
+}
+
+.shell-seasonbar-chip::after {
+  content: "";
+  width: 1px;
+  height: 20px;
+  margin-left: var(--space-1);
+  background: var(--border-subtle);
+}
+
+/* The whole 44px row is the target; the 36px pill is what is drawn. */
+.shell-season-chip {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shell-season-chip-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border-radius: 18px;
+  background: var(--accent-subtle);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text-accent);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.shell-season-chip-name {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-season-chip:focus-visible {
+  outline: none;
+}
+
+.shell-season-chip:focus-visible .shell-season-chip-pill {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The switcher sheet: each club named over its seasons. */
+.shell-season-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) var(--space-4);
+}
+
+.shell-season-club-name {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-3);
+  font-family: var(--font-text);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.shell-season-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shell-season-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-lg);
+  color: var(--text-heading);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-base-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.shell-season-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-season-row[aria-current] {
+  background: var(--accent-subtle);
+  color: var(--text-heading);
+}
+
+.shell-season-row[aria-current] svg {
+  color: var(--text-accent);
+}
+
+.shell-season-row:hover {
+  background: var(--surface-sunken);
+}
+
+.shell-season-row:focus-visible,
+.shell-season-all:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.shell-season-all {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-accent);
+  text-decoration: none;
+  font-family: var(--font-text);
+  font-size: var(--text-sm-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The laptop's trail: club / season ▾ — the last crumb is the switcher. */
+.shell-trail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+}
+
+.shell-trail-sep {
+  color: var(--text-muted);
+}
+
+.shell-season-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  margin-left: -2px;
+  padding: 0 6px;
+  border-radius: var(--radius-md);
+  color: var(--text-heading);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.shell-season-crumb-name {
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

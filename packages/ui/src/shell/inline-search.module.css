@@ -1,11 +1,13 @@
-/* The widget keeps a fixed 36px footprint whether open or closed: the field is
+/* The widget keeps a fixed 40px footprint whether open or closed: the field is
    absolutely positioned and grows LEFT out of the icon, so opening it never
    reflows the utility cluster it sits in. */
+/* 40px, the bar's one button size: at 36 the 40px trigger inside it hung
+   4px below every other icon in the bar (header 9.5, measured). */
 .root {
   position: relative;
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
 }
 
 /* The bar variant holds the field's own width, so the open field lays over
@@ -23,8 +25,8 @@
 
 @media (max-width: 999px) {
   .root[data-variant="bar"] {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -32,8 +34,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
@@ -90,7 +92,7 @@
 /* Under 1000px the field folds back to the glyph. */
 @media (max-width: 999px) {
   .trigger-bar {
-    width: 44px;
+    width: 40px;
     justify-content: center;
     padding: 0;
     border-color: transparent;
@@ -127,7 +129,7 @@
   align-items: center;
   gap: var(--space-2);
   width: var(--inline-search-w);
-  height: 36px;
+  height: 40px;
   padding: 0 var(--space-2) 0 var(--space-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
@@ -137,7 +139,7 @@
 
 @keyframes inline-search-open {
   from {
-    width: 36px;
+    width: 40px;
   }
 
   to {

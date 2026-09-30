@@ -3,9 +3,10 @@
   font-size: var(--text-sm-size);
 }
 
-/* Header trail: one quiet line above the title, never wrapping the bar taller. */
+/* Header trail: the path after the title (laptop) or under it (phone) — one
+   quiet line that never wraps the bar taller. */
 .as-trail {
-  font-size: var(--text-xs-size);
+  font-size: 13px;
   min-width: 0;
 }
 
@@ -13,11 +14,12 @@
   flex-wrap: nowrap;
 }
 
-/* Ancestors read as the links they are — accent, at the pinned AA-safe step. */
+/* Ancestors are quieter print than the title they qualify (header 9.5):
+   secondary ink, and the link shows itself on hover. */
 .as-trail .link,
 .as-trail .current {
-  color: var(--text-accent);
-  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-regular);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
