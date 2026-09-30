@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 /**
  * THE BOUNDARY BELOW THE ROOT LAYOUT'S FLOOR.
  *
@@ -22,6 +24,31 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // Reported by hand, with nothing imported: this page renders when the things
+  // a page imports could not be trusted to arrive. Never throws, never waits.
+  useEffect(() => {
+    try {
+      const body = JSON.stringify({
+        source: "root-boundary",
+        name: typeof error.name === "string" && error.name !== "" ? error.name : "Error",
+        message:
+          typeof error.message === "string" && error.message !== ""
+            ? error.message.slice(0, 500)
+            : "(no message)",
+        stack: typeof error.stack === "string" ? error.stack.slice(0, 2000) : null,
+        digest: error.digest ?? null,
+        path: window.location.pathname,
+      });
+      void fetch("/api/client-error", {
+        method: "POST",
+        body,
+        headers: { "content-type": "text/plain" },
+        keepalive: true,
+      }).catch(() => undefined);
+    } catch {
+      // Reporting a failure must not be a second one.
+    }
+  }, [error]);
   const link = {
     display: "inline-block",
     padding: "10px 18px",

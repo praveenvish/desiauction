@@ -24,6 +24,7 @@ import {
   type FinopsResult,
 } from "../../../../server/financial-operations/actions";
 import { DOC_KIND_LABEL, postureLabel } from "../../../../server/financial-operations/register";
+import { release } from "../../../../lib/release";
 
 /**
  * PX-8 completion — the lifecycle's ENTRANCE.
@@ -49,8 +50,9 @@ export function IssuancePanel({ slug, workspace }: { slug: string; workspace: Fi
 
   const act = async (run: () => Promise<FinopsResult>, done: string): Promise<boolean> => {
     setBusy(true);
-    const result = await run();
-    setBusy(false);
+    const result = await release(run(), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       toast({ title: done, tone: "success" });
       router.refresh();

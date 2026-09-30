@@ -8,6 +8,7 @@ import {
   sendSquadSheetsAction,
   type SquadSheetsPanelView,
 } from "../../../../server/competition/appointment-actions";
+import { release } from "../../../../lib/release";
 
 function people(count: number): string {
   return count === 1 ? "1 player" : `${String(count)} players`;
@@ -36,8 +37,9 @@ export function SquadSheetsPanel({
 
   const send = async () => {
     setBusy(true);
-    const result = await sendSquadSheetsAction(slug);
-    setBusy(false);
+    const result = await release(sendSquadSheetsAction(slug), () => {
+      setBusy(false);
+    });
     setConfirming(false);
     if (!result.ok) {
       toast({ title: result.error, tone: "danger" });

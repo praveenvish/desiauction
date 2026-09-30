@@ -11,6 +11,7 @@ import {
   type AddPlayerActionResult,
 } from "../../../../server/competition/actions";
 import { PlayerPhotoUploader } from "./player-photo-uploader";
+import { release } from "../../../../lib/release";
 
 /**
  * The blank form. `role` is filled from the SEASON's first role, not from a
@@ -105,8 +106,9 @@ export function AddPlayerDialog({
 
   const submit = async () => {
     setBusy(true);
-    const result = await addPlayerAction(slug, form);
-    setBusy(false);
+    const result = await release(addPlayerAction(slug, form), () => {
+      setBusy(false);
+    });
     if (!result.ok) {
       setFieldErrors(result.fieldErrors);
       toast({ title: result.error, tone: "danger" });

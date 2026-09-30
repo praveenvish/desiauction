@@ -26,6 +26,7 @@ import "../../../../../seasons/[slug]/money/money.css";
 import "../../finance.css";
 import { useHydrated } from "../../../../../../lib/use-hydrated";
 import { formatDateTime } from "../../../../../../lib/format-date";
+import { release } from "../../../../../../lib/release";
 
 /**
  * PX-8 §4 — Operations detail: one document, end to end.
@@ -83,8 +84,9 @@ export function DocumentPanel({ slug, workspace }: { slug: string; workspace: Do
 
   const act = async (run: () => Promise<FinopsResult>, done: string) => {
     setBusy(true);
-    const result = await run();
-    setBusy(false);
+    const result = await release(run(), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       toast({ title: done, tone: "success" });
       router.refresh();

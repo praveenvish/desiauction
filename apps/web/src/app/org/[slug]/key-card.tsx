@@ -16,6 +16,7 @@ import { useState, type ReactNode } from "react";
 
 import { personInitials, personLabel } from "../../../lib/person-label";
 import { formatDate } from "../../../lib/format-date";
+import { release } from "../../../lib/release";
 
 /**
  * ONE MONEY KEY, AS A CARD (2026-09-27).
@@ -112,8 +113,9 @@ export function KeyCard({
 
   const act = async (run: () => Promise<Result>, done: string): Promise<boolean> => {
     setBusy(true);
-    const result = await run();
-    setBusy(false);
+    const result = await release(run(), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       toast({ title: done, tone: "success" });
       router.refresh();

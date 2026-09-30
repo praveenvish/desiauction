@@ -120,6 +120,102 @@ describe("engine transport", () => {
   // and index.ts turns any uncaught exception into process.exit(1). One
   // unauthenticated line killed the live auction runtime. Every path out of the
   // upgrade handler must now be a socket.destroy(), never a throw.
+  it("private routes do not exist for a request that came through the proxy — right secret or not", async () => {
+    // Deployed behind one proxy, as production is.
+    built = buildServer({
+      logger: silentLogger,
+      version: "test",
+      checkDb: () => Promise.resolve(true),
+      engine: stubEngine(Date.now()),
+      engineSecret: "test-secret-123",
+      nodeEnv: "production",
+      trustedProxies: 1,
+    });
+    const command = {
+      commandId: VALID_ID,
+      auctionId: "a",
+      type: "PlaceBid",
+      actor: "01AAAAAAAAAAAAAAAAAAAAAAAA",
+      payload: {},
+    };
+    const secret = { "x-engine-secret": "test-secret-123" };
+    const forwarded = { "x-forwarded-for": "203.0.113.9" };
+
+    // From the internet, WITH the secret: the route is not there.
+    const stolen = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: { ...secret, ...forwarded },
+      payload: command,
+    });
+    expect(stolen.statusCode).toBe(404);
+    // …and without it the answer is the same, so nothing is learned either way.
+    const probing = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: forwarded,
+      payload: command,
+    });
+    expect(probing.statusCode).toBe(404);
+    // Spelled so that a guard comparing the URL's TEXT would not recognise it.
+    const disguised = await built.server.inject({
+      method: "POST",
+      url: "/%63ommand",
+      headers: { ...secret, ...forwarded },
+      payload: command,
+    });
+    expect(disguised.statusCode).toBe(404);
+    for (const url of ["/snapshot/a", "/diagnostics/a", "/snapshot/a?x=1", "/%73napshot/a"]) {
+      const read = await built.server.inject({
+        method: "GET",
+        url,
+        headers: { ...secret, ...forwarded },
+      });
+      expect(read.statusCode, url).toBe(404);
+    }
+    // The RFC 7239 spelling of the same fact.
+    const rfc = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: { ...secret, forwarded: "for=203.0.113.9" },
+      payload: command,
+    });
+    expect(rfc.statusCode).toBe(404);
+
+    // The web tier, on the private network, is served exactly as before.
+    const direct = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: secret,
+      payload: command,
+    });
+    expect(direct.statusCode).toBe(200);
+    // And what a browser needs through the proxy still answers.
+    const health = await built.server.inject({
+      method: "GET",
+      url: "/healthz",
+      headers: forwarded,
+    });
+    expect(health.statusCode).toBe(200);
+  });
+
+  it("with no proxy in front (local, tests) a forwarded header changes nothing", async () => {
+    built = makeServer(true, Date.now());
+    const response = await built.server.inject({
+      method: "POST",
+      url: "/command",
+      headers: { "x-engine-secret": "test-secret-123", "x-forwarded-for": "203.0.113.9" },
+      payload: {
+        commandId: VALID_ID,
+        auctionId: "a",
+        type: "PlaceBid",
+        actor: "01AAAAAAAAAAAAAAAAAAAAAAAA",
+        payload: {},
+      },
+    });
+    expect(response.statusCode).toBe(200);
+  });
+
   it("malformed upgrade targets are refused without taking the process down", async () => {
     built = makeServer(true);
     await built.server.listen({ port: 0, host: "127.0.0.1" });
@@ -200,6 +296,89 @@ describe("engine transport", () => {
     built = undefined;
     expect(closed).toBe("closed");
     expect(await closeCode).toBe(1001);
+  });
+
+  /**
+   * One spectator, one broadcast: what arrived, what was negotiated, and how
+   * many bytes the broadcast took on the TCP connection.
+   */
+  async function spectateOnce(
+    compressFrames: boolean | undefined,
+    clientOffers: boolean,
+    serialized: string,
+  ): Promise<{ extensions: string; frame: string; wireBytes: number }> {
+    built = buildServer({
+      logger: silentLogger,
+      version: "test",
+      checkDb: () => Promise.resolve(true),
+      engine: stubEngine(),
+      engineSecret: "test-secret-123",
+      nodeEnv: "test",
+      ...(compressFrames === undefined ? {} : { compressFrames }),
+    });
+    await built.server.listen({ port: 0, host: "127.0.0.1" });
+    const { port } = built.server.server.address() as AddressInfo;
+    const ws = new WebSocket(
+      `ws://127.0.0.1:${String(port)}/ws?auction=a1&ticket=${wsTicket("a1", "test-secret-123")}`,
+      { perMessageDeflate: clientOffers },
+    );
+    await new Promise<void>((resolve, reject) => {
+      ws.once("open", () => {
+        resolve();
+      });
+      ws.once("error", reject);
+    });
+    const tcp = (ws as unknown as { _socket: { bytesRead: number } })._socket;
+    const before = tcp.bytesRead;
+    const arrived = new Promise<string>((resolve) => {
+      ws.once("message", (raw: Buffer) => {
+        resolve(raw.toString("utf8"));
+      });
+    });
+    built.hub.broadcast("a1", serialized, 7);
+    const frame = await arrived;
+    const result = { extensions: ws.extensions, frame, wireBytes: tcp.bytesRead - before };
+    ws.terminate();
+    return result;
+  }
+
+  /** Shaped like a night's snapshot: long, and repetitive the way JSON is. */
+  const BIG_SNAPSHOT = JSON.stringify({
+    queue: Array.from({ length: 250 }, (_, i) => ({
+      lotId: `lot-${String(i).padStart(4, "0")}`,
+      name: `Player ${String(i)}`,
+      role: "batter",
+      basePrice: 2_000_000,
+      status: "queued",
+    })),
+  });
+
+  it("frames are NOT compressed unless the engine is told to (the default changes nothing)", async () => {
+    const plain = await spectateOnce(undefined, true, BIG_SNAPSHOT);
+    expect(plain.extensions).toBe("");
+    expect(plain.wireBytes).toBeGreaterThan(BIG_SNAPSHOT.length);
+    expect((JSON.parse(plain.frame) as { snapshot: unknown }).snapshot).toEqual(
+      JSON.parse(BIG_SNAPSHOT),
+    );
+  });
+
+  it("with compression on, the same frame arrives intact in a fraction of the bytes", async () => {
+    const packed = await spectateOnce(true, true, BIG_SNAPSHOT);
+    expect(packed.extensions).toContain("permessage-deflate");
+    const frame = JSON.parse(packed.frame) as { kind: string; version: number; snapshot: unknown };
+    expect(frame.kind).toBe("snapshot");
+    expect(frame.version).toBe(7);
+    expect(frame.snapshot).toEqual(JSON.parse(BIG_SNAPSHOT));
+    expect(packed.wireBytes).toBeLessThan(BIG_SNAPSHOT.length / 4);
+  });
+
+  it("with compression on, a client that never offered it is still served, uncompressed", async () => {
+    const plain = await spectateOnce(true, false, BIG_SNAPSHOT);
+    expect(plain.extensions).toBe("");
+    expect((JSON.parse(plain.frame) as { snapshot: unknown }).snapshot).toEqual(
+      JSON.parse(BIG_SNAPSHOT),
+    );
+    expect(plain.wireBytes).toBeGreaterThan(BIG_SNAPSHOT.length);
   });
 
   it("an unticketed /ws upgrade is refused", async () => {

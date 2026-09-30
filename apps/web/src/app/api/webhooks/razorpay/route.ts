@@ -5,7 +5,7 @@ import { env } from "../../../../env";
 import { dbHandle } from "../../../../server/db";
 import { settlementDeps } from "../../../../server/settlement/deps";
 import { handleRazorpayWebhook } from "../../../../server/settlement/webhook";
-import { withRequestId } from "../../../../server/logger";
+import { logger, withRequestId } from "../../../../server/logger";
 import { readCapped } from "../../../../lib/read-capped";
 
 /**
@@ -63,11 +63,32 @@ async function handle(request: Request): Promise<NextResponse> {
       ),
   );
 
+  if (!result.ok && result.status === 200) {
+    // Genuine, and not something we act on. Acknowledged so that the provider
+    // does not count it as a failed delivery; nothing was read or written.
+    return NextResponse.json({ ok: true, ignored: result.reason });
+  }
   if (!result.ok) {
     // The handler already decided what each failure is worth: 401 forged, 400
     // stale or unparseable, 404 unknown payment, 409 envelope mismatch, 503 no
     // gateway configured. The reason is a stable machine token, never a
     // sentence about our internals.
+    //
+    // And every refusal is WRITTEN DOWN. The provider is told only the coarse
+    // reason; the log says which check refused and for which payment, because
+    // a genuine event refused by a rule of ours is money waiting on a bug, and
+    // from the outside it looks exactly like a forgery. Nothing from the body
+    // is logged: the ids are ours, and a bad signature has no payment at all.
+    logger().warn(
+      {
+        reason: result.reason,
+        status: result.status,
+        check: result.check,
+        kind: result.kind,
+        paymentId: result.paymentId,
+      },
+      "webhook.razorpay_refused",
+    );
     return NextResponse.json({ error: result.reason }, { status: result.status });
   }
   // A refused command is still a 200: we received and understood the event, and

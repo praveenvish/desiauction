@@ -57,6 +57,15 @@ const envSchema = z
     /** Max concurrent spectate sockets from one client address (DoS ceiling). */
     WS_MAX_SOCKETS_PER_IP: z.coerce.number().int().positive().default(50),
     /**
+     * Compress snapshot frames on the wire (permessage-deflate). OFF unless
+     * set to "on": a snapshot is JSON and shrinks about tenfold, which is the
+     * difference between 40 MB and 4 MB of mobile data over a night — but it
+     * is paid for in engine CPU per socket per bid, so it is a decision made
+     * with the measurement in hand (apps/engine/scripts/perf-scale.ts), not a
+     * default. PRR 2026-09-29, PERF-1.
+     */
+    WS_COMPRESSION: z.enum(["off", "on"]).default("off"),
+    /**
      * Proxy hops in front of the engine (Caddy in production = 1). Without it
      * the per-client socket cap keys on the proxy's address — one cap for the
      * whole platform. Same meaning as the web tier's variable.

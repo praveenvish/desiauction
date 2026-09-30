@@ -155,6 +155,16 @@ function webhookBody(paymentId: string, event: string, entity: Record<string, un
   });
 }
 
+/** The order Lions' payment opened at the gateway, read from its own first event. */
+async function pinnedOrder(paymentId: string): Promise<string> {
+  const events = await deps.store.loadStream("payment", paymentId);
+  const orderRef = events.find((event) => event.type === "PaymentInitiated")?.payload["orderRef"];
+  if (typeof orderRef !== "string") {
+    throw new Error("the payment has no pinned order");
+  }
+  return orderRef;
+}
+
 async function login(phone: string): Promise<string> {
   await requestOtp(db, sender, phone);
   const [row] = await db
@@ -554,11 +564,56 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
     await expectBooksAgreeWithCase();
   });
 
+  it("REFUSES a genuine capture of a DIFFERENT order that names this payment — 409, untouched", async () => {
+    // Somebody paid their own order of the same amount, and put Lions' payment
+    // in the notes. The signature is real; the money was really captured.
+    const body = webhookBody(lionsPaymentId, "payment.captured", {
+      id: "pay_somebody_else",
+      order_id: "order_somebody_else",
+      amount: LIONS_DUE,
+    });
+    const before = await deps.store.loadStream("payment", lionsPaymentId);
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 409, reason: "envelope_mismatch" });
+    expect((await deps.store.loadPayment(lionsPaymentId))?.status).toBe("created");
+    expect(await deps.store.loadStream("payment", lionsPaymentId)).toHaveLength(before.length);
+  });
+
+  it("REFUSES a gateway event that names a CASH payment — 409", async () => {
+    const cashId = newId();
+    const paid = await createPayment(deps, actor, {
+      paymentId: cashId,
+      commandId: newId(),
+      caseId,
+      teamId: lions(),
+      method: "manual:cash",
+      amount: 100_00,
+    });
+    expect(paid.ok).toBe(true);
+    const body = webhookBody(cashId, "payment.captured", {
+      id: "pay_for_cash",
+      order_id: "order_for_cash",
+      amount: 100_00,
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 409, reason: "envelope_mismatch" });
+  });
+
   it("captures via a SIGNED webhook OUT OF ORDER → Overpaid Collection + refund liability", async () => {
     // A capture webhook with no prior authorize (provider truth, out of order).
     const body = webhookBody(lionsPaymentId, "payment.captured", {
       id: "pay_lions",
-      order_id: "order_lions",
+      order_id: await pinnedOrder(lionsPaymentId),
       amount: LIONS_DUE, // the pinned ₹25,000
     });
     const result = await handleRazorpayWebhook(
@@ -607,7 +662,7 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
   it("is idempotent on a DUPLICATE webhook (provider replay) — original ack, no double capture", async () => {
     const body = webhookBody(lionsPaymentId, "payment.captured", {
       id: "pay_lions",
-      order_id: "order_lions",
+      order_id: await pinnedOrder(lionsPaymentId),
       amount: LIONS_DUE,
     });
     const journalBefore = await deps.store.loadStream("journal", org.id);
@@ -671,6 +726,22 @@ describe("M-IP5-2 · Gateway collections, overpayment, refund (the raced waiver)
     const len = (await deps.store.loadStream("journal", org.id)).length;
     await runPaymentCoordination(deps, actor, lionsPaymentId);
     expect((await deps.store.loadStream("journal", org.id)).length).toBe(len);
+  });
+
+  it("REFUSES a refund of a DIFFERENT provider payment that names this one — 409", async () => {
+    const body = webhookBody(lionsPaymentId, "refund.processed", {
+      id: "rfnd_somebody_else",
+      payment_id: "pay_somebody_else",
+      amount: 500_000,
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 409, reason: "envelope_mismatch" });
+    expect((await deps.store.loadPayment(lionsPaymentId))?.refundedTotal).toBe(0);
   });
 
   it("refunds the ₹5,000 overpayment — liability-first, nothing reinstated", async () => {
@@ -796,6 +867,89 @@ describe("M-IP5-2 · Wallet projections & audit", () => {
     // The gateway capture was attributed to the webhook source, not a person.
     const captureAudit = rows.find((r) => r.action === "settlement.PaymentCaptured");
     expect((captureAudit?.meta as { source?: string }).source).toBe("webhook:razorpay");
+  });
+
+  it("ACKNOWLEDGES a genuine event it does not act on — 200, so the provider keeps delivering", async () => {
+    const body = JSON.stringify({
+      event: "order.paid",
+      created_at: Math.floor(NOW / 1000),
+      payload: {},
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toEqual({ ok: false, status: 200, reason: "unhandled_event" });
+    // Forged, the same body is still a 401: the kind is only looked at after
+    // the signature.
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: "0".repeat(64), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 401 });
+  });
+
+  // A dispute arrives as the provider's PAYMENT entity: its own id is the
+  // provider payment, and `order_id` is the order that payment paid. These two
+  // are the shape Razorpay sends — the first version of the order binding
+  // compared the wrong pair and refused every one of them.
+  it("REFUSES a dispute about a DIFFERENT provider payment that names this one — 409", async () => {
+    const body = webhookBody(lionsPaymentId, "payment.dispute.created", {
+      id: "pay_somebody_else",
+      order_id: await pinnedOrder(lionsPaymentId),
+      amount: 2_000_000,
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({
+      ok: false,
+      status: 409,
+      reason: "envelope_mismatch",
+      check: "provider_payment",
+    });
+  });
+
+  it("REFUSES a dispute on a DIFFERENT order that names this payment — 409", async () => {
+    const body = webhookBody(lionsPaymentId, "payment.dispute.created", {
+      id: "pay_lions",
+      order_id: "order_somebody_else",
+      amount: 2_000_000,
+    });
+    expect(
+      await handleRazorpayWebhook(
+        deps,
+        { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+        passThroughTenant,
+      ),
+    ).toMatchObject({ ok: false, status: 409, reason: "envelope_mismatch", check: "order" });
+  });
+
+  it("ACCEPTS a genuine dispute: the payment entity, its own order, its own provider id", async () => {
+    const before = (await deps.store.loadStream("payment", lionsPaymentId)).length;
+    const body = webhookBody(lionsPaymentId, "payment.dispute.created", {
+      id: "pay_lions",
+      order_id: await pinnedOrder(lionsPaymentId),
+      amount: 2_000_000,
+    });
+    const result = await handleRazorpayWebhook(
+      deps,
+      { rawBody: body, signature: sign(body), receivedAtMs: NOW },
+      passThroughTenant,
+    );
+    // Past every envelope check AND recorded: the chargeback is on the books.
+    expect(result).toMatchObject({ ok: true, ack: { ok: true } });
+    const after = await deps.store.loadStream("payment", lionsPaymentId);
+    expect(after.length).toBe(before + 1);
+    expect(after.at(-1)?.type).toBe("PaymentDisputed");
+    expect((await deps.store.loadPayment(lionsPaymentId))?.status).toBe("disputed");
   });
 
   it("RLS: the payments table blocks cross-tenant reads and writes", async () => {

@@ -67,8 +67,22 @@ function amzDates(now: number): { amzDate: string; dateStamp: string } {
   return { amzDate, dateStamp: amzDate.slice(0, 8) };
 }
 
+/**
+ * How long object storage gets to answer. The runner is ONE sequential loop
+ * with no health check of its own: a bare `fetch` on a socket the bucket had
+ * stopped answering would hold that loop for as long as the socket lived, and
+ * every receipt, export and dispatch on the platform waited behind it with
+ * nothing logged (PRR 2026-09-29). A timeout turns that into an ordinary job
+ * failure, which the runner already knows how to retry and dead-letter.
+ * Fifteen seconds, the media bucket's own figure (web storage-port).
+ */
+export const ARTIFACT_STORE_TIMEOUT_MS = 15_000;
+
 export function createBucketArtifactStore(config: BucketArtifactConfig): ArtifactStorePort {
-  const transport = config.transport ?? ((url, init) => fetch(url, init));
+  const transport =
+    config.transport ??
+    ((url, init) =>
+      fetch(url, { ...init, signal: AbortSignal.timeout(ARTIFACT_STORE_TIMEOUT_MS) }));
   const now = config.now ?? (() => Date.now());
   const origin = config.endpoint.replace(/\/+$/, "");
   const host = new URL(origin).host;

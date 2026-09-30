@@ -255,6 +255,9 @@ export const emailVerifications = pgTable(
     index("email_verifications_ip_idx").on(table.requestIp, table.createdAt),
     // The platform-wide send ceiling counts the last hour across every address.
     index("email_verifications_created_idx").on(table.createdAt),
+    // 0098: the default sign-in path filters by address on every request and
+    // every verification, and had no index that could serve it.
+    index("email_verifications_email_idx").on(table.email, table.createdAt),
   ],
 );
 

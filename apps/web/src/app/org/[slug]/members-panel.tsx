@@ -31,6 +31,7 @@ import {
 import type { MemberRow } from "../../../server/orgs/orgs";
 import { personContact, personInitials } from "../../../lib/person-label";
 import { formatDate, formatMonthYear } from "../../../lib/format-date";
+import { release } from "../../../lib/release";
 
 /**
  * A capability set → the pill the row shows.
@@ -132,8 +133,9 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
 
   const invite = async () => {
     setBusy(true);
-    const result = await createInviteAction(slug, inviteSet);
-    setBusy(false);
+    const result = await release(createInviteAction(slug, inviteSet), () => {
+      setBusy(false);
+    });
     if ("url" in result) {
       setCopied(false);
       setInviteReference(result.reference);
@@ -146,8 +148,9 @@ export function MembersPanel({ view, slug }: { view: OrgView; slug: string }) {
   const confirm = async () => {
     if (pending === null) return;
     setBusy(true);
-    const result = await pending.run();
-    setBusy(false);
+    const result = await release(pending.run(), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       setPending(null);
       router.refresh();

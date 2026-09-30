@@ -19,7 +19,7 @@ export {
 export type { Paise, DeductResult, ParsePaiseResult, FeeStatus, MoneyUnit } from "./money";
 export type { Clock } from "./clock";
 export { normalizePhone } from "./phone";
-export { scrub, scrubText, REDACTED } from "./scrub";
+export { scrub, scrubError, scrubText, REDACTED } from "./scrub";
 export type { NormalizedPhone, PhoneResult } from "./phone";
 export {
   capabilitiesOf,

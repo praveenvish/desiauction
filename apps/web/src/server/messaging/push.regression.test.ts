@@ -15,7 +15,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { env } from "../../env";
 import { setPreference } from "./consent";
-import { isPushable, pushInboxNotice, pushNoticeFor, savePushSubscription } from "./push";
+import {
+  MAX_DEVICES_PER_PERSON,
+  isPushable,
+  pushInboxNotice,
+  pushNoticeFor,
+  savePushSubscription,
+} from "./push";
 
 /**
  * WEB PUSH (email programme PR18), against a real database: the inbox notice
@@ -28,6 +34,7 @@ const db = handle.db;
 const RUN = String(Date.now()).slice(-7);
 
 const person = newId();
+const stranger = newId();
 const keys = { ...generateVapidKeys(), subject: "mailto:support@desiauction.in" };
 const browser = createECDH("prime256v1");
 browser.generateKeys();
@@ -45,7 +52,10 @@ function recording(status: number): { transport: PushTransport; calls: string[] 
 }
 
 beforeAll(async () => {
-  await db.insert(people).values({ id: person, phone: `+9192${RUN}1`, name: "Pushed" });
+  await db.insert(people).values([
+    { id: person, phone: `+9192${RUN}1`, name: "Pushed" },
+    { id: stranger, phone: `+9192${RUN}2`, name: "Stranger" },
+  ]);
   await savePushSubscription(db, person, {
     endpoint: ENDPOINT,
     p256dh: browser.getPublicKey().toString("base64url"),
@@ -55,10 +65,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.personId, person));
+  await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.personId, [person, stranger]));
   await db.delete(notificationPreferences).where(eq(notificationPreferences.personId, person));
   await db.delete(consentRecords).where(inArray(consentRecords.personId, [person]));
-  await db.delete(people).where(eq(people.id, person));
+  await db.delete(people).where(inArray(people.id, [person, stranger]));
   await handle.sql.end();
 });
 
@@ -134,5 +144,118 @@ describe("pushing a notice", () => {
       .from(pushSubscriptions)
       .where(eq(pushSubscriptions.personId, person));
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe("whose subscription it is", () => {
+  const p256dh = browser.getPublicKey().toString("base64url");
+  const auth = Buffer.from("0123456789abcdef").toString("base64url");
+  const endpoint = `https://fcm.googleapis.com/fcm/send/owned-${RUN}`;
+
+  const ownerOf = async (): Promise<string | undefined> => {
+    const [row] = await db
+      .select({ personId: pushSubscriptions.personId })
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, endpoint));
+    return row?.personId;
+  };
+
+  it("is not taken by naming its endpoint with keys of your own", async () => {
+    expect(
+      await savePushSubscription(db, person, { endpoint, p256dh, auth, userAgent: null }),
+    ).toBe(true);
+    const other = createECDH("prime256v1");
+    other.generateKeys();
+    expect(
+      await savePushSubscription(db, stranger, {
+        endpoint,
+        p256dh: other.getPublicKey().toString("base64url"),
+        auth: Buffer.from("fedcba9876543210").toString("base64url"),
+        userAgent: null,
+      }),
+    ).toBe(false);
+    expect(await ownerOf()).toBe(person);
+  });
+
+  it("moves with the browser: the same keys under a new sign-in re-home the row", async () => {
+    expect(
+      await savePushSubscription(db, stranger, { endpoint, p256dh, auth, userAgent: null }),
+    ).toBe(true);
+    expect(await ownerOf()).toBe(stranger);
+  });
+
+  it("keeps the newest devices and no more than the ceiling", async () => {
+    for (let i = 0; i < MAX_DEVICES_PER_PERSON + 3; i++) {
+      await savePushSubscription(db, person, {
+        endpoint: `https://fcm.googleapis.com/fcm/send/cap-${RUN}-${String(i)}`,
+        p256dh,
+        auth,
+        userAgent: null,
+      });
+    }
+    const rows = await db
+      .select({ endpoint: pushSubscriptions.endpoint })
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.personId, person));
+    expect(rows).toHaveLength(MAX_DEVICES_PER_PERSON);
+    expect(rows.map((row) => row.endpoint)).toContain(
+      `https://fcm.googleapis.com/fcm/send/cap-${RUN}-${String(MAX_DEVICES_PER_PERSON + 2)}`,
+    );
+  });
+
+  it("never calls a stored address that is not a push service, and keeps the row", async () => {
+    // A row from before the allow-list existed: written straight to the table.
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.personId, person));
+    await db.insert(pushSubscriptions).values({
+      id: newId(),
+      personId: person,
+      endpoint: `https://attacker.example/${RUN}`,
+      p256dh,
+      auth,
+    });
+    const { transport, calls } = recording(201);
+    expect(await pushInboxNotice(person, "auction.sold", null, { keys, transport, db })).toEqual({
+      sent: 0,
+      gone: 0,
+    });
+    expect(calls).toHaveLength(0);
+    const rows = await db
+      .select({ id: pushSubscriptions.id })
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.personId, person));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("a subscription that moves here survives the ceiling, however old it is", async () => {
+    await db
+      .delete(pushSubscriptions)
+      .where(inArray(pushSubscriptions.personId, [person, stranger]));
+    const moved = `https://fcm.googleapis.com/fcm/send/moved-${RUN}`;
+    // Made long ago, on somebody else's account.
+    await db.insert(pushSubscriptions).values({
+      id: newId(),
+      personId: stranger,
+      endpoint: moved,
+      p256dh,
+      auth,
+      createdAt: new Date("2020-01-01T00:00:00Z"),
+    });
+    for (let i = 0; i < MAX_DEVICES_PER_PERSON; i++) {
+      await savePushSubscription(db, person, {
+        endpoint: `https://fcm.googleapis.com/fcm/send/full-${RUN}-${String(i)}`,
+        p256dh,
+        auth,
+        userAgent: null,
+      });
+    }
+    expect(
+      await savePushSubscription(db, person, { endpoint: moved, p256dh, auth, userAgent: null }),
+    ).toBe(true);
+    const rows = await db
+      .select({ endpoint: pushSubscriptions.endpoint })
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.personId, person));
+    expect(rows).toHaveLength(MAX_DEVICES_PER_PERSON);
+    expect(rows.map((row) => row.endpoint)).toContain(moved);
   });
 });

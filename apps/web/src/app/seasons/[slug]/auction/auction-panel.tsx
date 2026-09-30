@@ -47,6 +47,7 @@ import { useHydrated } from "../../../../lib/use-hydrated";
 import "./hub.css";
 import "./dashboard.css";
 import { useMoney } from "../../../../components/money-unit";
+import { release } from "../../../../lib/release";
 
 /*
  * THE AUCTION DESK, ONE SECTION AT A TIME.
@@ -201,8 +202,9 @@ export function AuctionPanel({
 
   const act = async (fn: () => Promise<{ ok: boolean; error?: string }>, done?: string) => {
     setBusy(true);
-    const result = await fn();
-    setBusy(false);
+    const result = await release(fn(), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       if (done !== undefined) {
         toast({ title: done, tone: "success" });
@@ -215,8 +217,9 @@ export function AuctionPanel({
 
   const verify = async () => {
     setBusy(true);
-    const result = await verifyReplayAction(slug);
-    setBusy(false);
+    const result = await release(verifyReplayAction(slug), () => {
+      setBusy(false);
+    });
     if (result.ok && result.report !== undefined) {
       setReport(result.report);
       router.refresh();
@@ -594,8 +597,9 @@ export function AuctionPanel({
                   setOwnerPlansOn(next);
                   void (async () => {
                     setBusy(true);
-                    const result = await setAuctionFeatureAction(slug, next);
-                    setBusy(false);
+                    const result = await release(setAuctionFeatureAction(slug, next), () => {
+                      setBusy(false);
+                    });
                     if (result.ok) {
                       toast({
                         title: next ? "Owner plans on" : "Owner plans off",

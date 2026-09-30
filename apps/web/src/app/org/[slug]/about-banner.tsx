@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { updateOrgDescriptionAction } from "../../../server/orgs/actions";
+import { release } from "../../../lib/release";
 
 /**
  * The About banner — the club's own words, edited in place by an owner.
@@ -36,8 +37,9 @@ export function AboutBanner({
 
   const save = async () => {
     setBusy(true);
-    const result = await updateOrgDescriptionAction(slug, draft);
-    setBusy(false);
+    const result = await release(updateOrgDescriptionAction(slug, draft), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       toast({ title: "About updated.", tone: "success" });
       setOpen(false);

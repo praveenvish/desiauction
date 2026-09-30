@@ -26,6 +26,7 @@ import { AuctionTimeCard } from "./auction-time-card";
 import { OwnersStep } from "./owners-step";
 import { RulesStep } from "./rules-step";
 import "./setup.css";
+import { release } from "../../../../../lib/release";
 
 /**
  * AUCTION SETUP — ONE PAGE, FIVE STEPS, EACH SAYING WHAT IS LEFT.
@@ -70,8 +71,9 @@ export function AuctionSetupFlow({
     done: string,
   ) => {
     setBusy(key);
-    const result = await fn();
-    setBusy(null);
+    const result = await release(fn(), () => {
+      setBusy(null);
+    });
     if (result.ok) {
       toast({ title: done, tone: "success" });
       setPicked(null);

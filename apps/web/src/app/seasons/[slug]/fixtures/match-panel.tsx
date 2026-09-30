@@ -32,6 +32,7 @@ import { TeamCrest } from "../_tabs/team-crest";
 import { LineupSideEditor } from "../lineups/lineup-side-editor";
 import { DuelResultForm, LobbyResultForm, type NextOwed } from "./result-form";
 import { isLobby, primaryScore, resultSentence, type ModelResult } from "./schedule-model";
+import { release } from "../../../../lib/release";
 
 /**
  * ONE MATCH, OPEN — the side panel on a laptop, a bottom sheet on a phone.
@@ -215,8 +216,9 @@ export function MatchPanel({
 
   const lifecycle = async (action: "schedule" | "publish" | "start" | "complete" | "cancel") => {
     setBusy(true);
-    const outcome = await fixtureLifecycleAction(slug, fixture.id, action);
-    setBusy(false);
+    const outcome = await release(fixtureLifecycleAction(slug, fixture.id, action), () => {
+      setBusy(false);
+    });
     if (!outcome.ok) {
       toast({ tone: "danger", title: outcome.error ?? "That didn't work." });
       return;
@@ -227,11 +229,15 @@ export function MatchPanel({
 
   const move = async () => {
     setBusy(true);
-    const outcome = await rescheduleFixtureAction(slug, fixture.id, {
-      ...(moveKickoff !== "" ? { kickoffAt: moveKickoff } : {}),
-      ...(moveGround !== "" ? { groundId: moveGround } : {}),
-    });
-    setBusy(false);
+    const outcome = await release(
+      rescheduleFixtureAction(slug, fixture.id, {
+        ...(moveKickoff !== "" ? { kickoffAt: moveKickoff } : {}),
+        ...(moveGround !== "" ? { groundId: moveGround } : {}),
+      }),
+      () => {
+        setBusy(false);
+      },
+    );
     if (!outcome.ok) {
       toast({ tone: "danger", title: outcome.error ?? "That didn't work." });
       return;

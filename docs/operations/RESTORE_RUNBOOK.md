@@ -51,11 +51,23 @@ All commands run in `/srv/apps/desiauction/production` on the host (`/srv/apps/d
    this copy is the only undo:
 
    ```sh
-   docker run --rm -v desiauction_pgdata:/from -v /var/backups:/to alpine \
-     tar -C /from -czf /to/pgdata-before-restore-$(date +%F-%H%M).tgz .
+   # The volume is <compose project>_pgdata: da-prod_pgdata in production,
+   # da-staging_pgdata in staging. Read the project from .env, never type it.
+   VOLUME="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' .env)_pgdata"
+   docker volume inspect "$VOLUME" >/dev/null || { echo "no volume $VOLUME — STOP"; exit 1; }
+   COPY="/var/backups/pgdata-before-restore-$(date +%F-%H%M).tgz"
+   docker run --rm -v "$VOLUME":/from:ro -v /var/backups:/to alpine \
+     tar -C /from -czf "/to/$(basename "$COPY")" .
+   # A cluster is never small. An archive of a few kilobytes is an archive of
+   # an EMPTY volume, and the restore in step 3 would then destroy the only copy.
+   [ "$(stat -c %s "$COPY")" -gt 10000000 ] || { echo "$COPY is too small — STOP"; exit 1; }
+   ls -lh "$COPY"
    ```
 
-   (The volume is `<project>_pgdata`; `docker volume ls` names it.)
+   **Do not continue unless that printed a file of tens of megabytes or more.**
+   This step used to name the volume `desiauction_pgdata`, which does not exist
+   on the host: Docker creates a missing named volume on the spot, so the
+   command succeeded and archived nothing (corrected 2026-09-29).
 
 3. **Restore to the moment before the damage.** Times are the database's
    timezone unless given with an offset — give one.
@@ -183,7 +195,7 @@ target and start again from step 2.
 |------|-------------|--------|--------------------------|--------|----|
 | 2026-09-05 | 25 MB / 4,968 rows / 60 tables | local scratch DB, same cluster | 1.8 s | PASS — counts identical, and a full auction night ran on the restored copy through all four roles to two issued receipts | PA-1R Phase 8.4 |
 | 2026-09-18 | 108 MB / ~131,000 rows / 68 tables | local scratch DB, same cluster | 6.0 s (dump 0.9 s · restore 2.4 s · roles 0.2 s · night 1.9 s) | PASS — every row count identical; a whole auction night (51 steps) ran on the restored copy under the four roles to two numbered receipts, no owner connection on the write path | Final readiness audit, Phase 11 |
-| _pending — PITR from the OFF-BOX repo on the production stanza, before launch ([GO_LIVE_RUNBOOK](GO_LIVE_RUNBOOK.md) §B); record the RTO of steps 1–7 above_ | | | | | |
+| _pending — restore of the PRODUCTION stanza from the off-box repo. One command on the host, which never touches the live database: `sudo bash ops/deploy/restore-drill-production.sh production`. It prints the RTO and the age of the newest restored row; record both here_ | | | | | |
 
 **Read that 1.8 s correctly.** It is not a production RTO and must not be quoted
 as one: the database is 25 MB and the cluster is on the same machine. What the

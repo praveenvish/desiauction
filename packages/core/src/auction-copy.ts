@@ -56,6 +56,19 @@ const COMMAND_REFUSAL_COPY: Record<string, string> = {
   terminal_auction: "The auction has finished.",
   no_active_paddle: "You don't hold a paddle for that team.",
   no_grant: "You haven't been granted that team's paddle yet.",
+  // Returned by ClaimPaddle when another owner of the same team is already
+  // holding it. It had no sentence, so the second owner was told "That didn't
+  // go through. Try again." — and trying again is refused identically for as
+  // long as the first owner keeps the paddle.
+  paddle_held:
+    "Someone else is holding this team's paddle. Only one person can bid for a team at a time — ask them to release it, then claim it here.",
+  // The owner workflow's refusals. Each reaches a person through this same
+  // function, and each used to read as a transient failure when it is a fact.
+  not_an_owner: "Only someone who accepted this team's owner invitation can hold its paddle.",
+  owns_another_team: "That person already owns another team in this auction. One person, one team.",
+  already_accepted: "That invitation has already been accepted.",
+  unknown_invite: "That invitation can't be found — it may have been withdrawn.",
+  expired: "That invitation has expired. Ask the organizer for a new link.",
   // ENGINE HALTED. The single most serious state the runtime has — the ledger
   // and the projections disagreed, or a replay failed, so the engine STOPPED
   // rather than serve a state it cannot prove. Its ack reason is
@@ -107,6 +120,19 @@ function transportRefusal(reason: string): string | undefined {
 }
 
 /**
+ * `replay_failed:<why>` is what Recover answers when the record itself cannot
+ * be read back — a gap in the sequence, an event nobody recognises. It is the
+ * one refusal where "try again" is not just unhelpful but dangerous advice:
+ * Recover was the remedy, it has just failed, and pressing it again changes
+ * nothing. The auction stays stopped and needs a person with database access.
+ */
+function recoveryRefusal(reason: string): string | undefined {
+  return reason.startsWith("replay_failed")
+    ? "Recover could not rebuild this auction from its record, so it stays stopped. Do not keep retrying — contact DesiAuction support now and keep this screen open."
+    : undefined;
+}
+
+/**
  * One entry point for every ack the live surfaces render, so a bid rejection
  * and a lifecycle refusal read the same way.
  */
@@ -119,6 +145,7 @@ export function commandRefusalMessage(reason: string | null | undefined): string
     COMMAND_REFUSAL_COPY[reason] ??
     bids[reason] ??
     transportRefusal(reason) ??
+    recoveryRefusal(reason) ??
     "That didn't go through. Try again."
   );
 }

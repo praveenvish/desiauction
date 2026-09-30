@@ -26,6 +26,7 @@ import { env } from "../../env";
 import { db as appDb, systemDb } from "../db";
 import { logger } from "../logger";
 import { languageForMail, sendNotificationMail } from "../messaging/notify";
+import { claimInviteMailBudget, inviteMailRefusal } from "../messaging/invite-mail-budget";
 import { ownerInviteMail } from "../messaging/owner-mail";
 import { hashInviteToken, inviteTokenFrom, liveInviteByToken } from "./owner-invite-lookup";
 import { notifyOwnerJoined } from "../orgs/organizer-notify";
@@ -143,40 +144,58 @@ export async function emailOwnerInviteAction(
     .where(eq(people.id, gate.personId))
     .limit(1);
   const language = await languageForMail(appDb, { email: to });
-  const mail = await ownerInviteMail(
-    {
-      season: invite.season.trim(),
-      orgName: invite.orgName.trim(),
-      seasonSlug: invite.seasonSlug,
-      sport: invite.sport,
-      teamName: invite.teamName,
-      inviterName: inviter?.name?.trim() || invite.orgName.trim(),
-      acceptUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/owner-join/${token}`,
-      auctionAt: invite.auctionAt,
-    },
-    language,
-  );
-  const { outcome } = await sendNotificationMail(appDb, { kind: "owner.invite", to }, mail);
-  if (outcome !== "sent") {
-    return {
-      ok: false,
-      error:
-        outcome === "unconfigured"
-          ? "Email isn't set up here yet — copy the link or send it on WhatsApp."
-          : "We couldn't send that email just now — copy the link or send it on WhatsApp.",
-    };
-  }
-  // The address itself is not kept: the domain says enough for the timeline.
-  await systemDb.insert(auditLog).values({
-    id: newId(),
-    actor: gate.personId,
-    action: "auction.owner_invite_emailed",
-    scopeType: "org",
-    scopeId: gate.auction.orgId,
-    subject: invite.id,
-    meta: { teamId: invite.teamId, domain: to.slice(to.lastIndexOf("@") + 1) },
+  // The ceilings on invitation mail (invite-mail-budget.ts). The claim, the
+  // send and the audit row that the next claim counts share one transaction,
+  // so the lock inside the claim is held until that row can be seen.
+  return systemDb.transaction(async (raw): Promise<EmailOwnerInviteResult> => {
+    const tx = raw as unknown as typeof systemDb;
+    // Counted on THIS transaction, not on a second connection from the same
+    // pool: ten of these at once would each hold one connection and wait for
+    // another, and the pool is ten wide. The system role sees every club's
+    // rows either way.
+    const budget = await claimInviteMailBudget(tx, tx, {
+      actor: gate.personId,
+      orgId: gate.auction.orgId,
+      inviteId: invite.id,
+    });
+    if (budget !== "ok") {
+      return { ok: false, error: inviteMailRefusal(budget) };
+    }
+    const mail = await ownerInviteMail(
+      {
+        season: invite.season.trim(),
+        orgName: invite.orgName.trim(),
+        seasonSlug: invite.seasonSlug,
+        sport: invite.sport,
+        teamName: invite.teamName,
+        inviterName: inviter?.name?.trim() || invite.orgName.trim(),
+        acceptUrl: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/owner-join/${token}`,
+        auctionAt: invite.auctionAt,
+      },
+      language,
+    );
+    const { outcome } = await sendNotificationMail(appDb, { kind: "owner.invite", to }, mail);
+    if (outcome !== "sent") {
+      return {
+        ok: false,
+        error:
+          outcome === "unconfigured"
+            ? "Email isn't set up here yet — copy the link or send it on WhatsApp."
+            : "We couldn't send that email just now — copy the link or send it on WhatsApp.",
+      };
+    }
+    // The address itself is not kept: the domain says enough for the timeline.
+    await tx.insert(auditLog).values({
+      id: newId(),
+      actor: gate.personId,
+      action: "auction.owner_invite_emailed",
+      scopeType: "org",
+      scopeId: gate.auction.orgId,
+      subject: invite.id,
+      meta: { teamId: invite.teamId, domain: to.slice(to.lastIndexOf("@") + 1) },
+    });
+    return { ok: true, sentTo: maskEmail(to) };
   });
-  return { ok: true, sentTo: maskEmail(to) };
 }
 
 export async function revokeOwnerInviteAction(

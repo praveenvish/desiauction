@@ -310,9 +310,21 @@ export class AuctionEngine {
     const now = this.now();
     this.sweepBuckets(now);
     const bucket = this.buckets.get(actor) ?? { tokens: this.rateBurst, lastMs: now };
+    /*
+     * TIME THAT WENT BACKWARDS REFILLS NOTHING — AND TAKES NOTHING AWAY.
+     *
+     * The elapsed time was used as it came, and a wall clock can step back: an
+     * NTP correction, a VM resumed from a pause. A negative elapsed time made
+     * the "refill" a DEBIT of fifty tokens for every second of the step, so a
+     * four-second correction emptied a full bucket and every bidder in every
+     * room was refused `rate_limited` until it refilled — for having done
+     * nothing. Found by the integrity fuzz (invariants-fuzz), whose clock
+     * stepped back between lots and lost a third of its bids to the meter.
+     */
+    const elapsedMs = Math.max(0, now - bucket.lastMs);
     const refilled = Math.min(
       this.rateBurst,
-      bucket.tokens + ((now - bucket.lastMs) / 1000) * this.rateRefillPerSec,
+      bucket.tokens + (elapsedMs / 1000) * this.rateRefillPerSec,
     );
     bucket.lastMs = now;
     if (refilled < 1) {
@@ -352,7 +364,7 @@ export class AuctionEngine {
     }
     this.lastBucketSweepMs = nowMs;
     for (const [actor, bucket] of this.buckets) {
-      const idleMs = nowMs - bucket.lastMs;
+      const idleMs = Math.max(0, nowMs - bucket.lastMs);
       if (idleMs < BUCKET_IDLE_TTL_MS) {
         continue;
       }
@@ -765,6 +777,41 @@ export class AuctionEngine {
       );
     }
     const finalAck: CommandAck = { ...ack, version: state.version };
+    /*
+     * ONE LINE PER COMMAND, SO A NIGHT CAN BE RECONSTRUCTED (PRR 2026-09-29).
+     *
+     * The engine logged a command only when it THREW. A bid that was refused,
+     * a gavel that landed, a pause — none of them left a line, so "what did the
+     * engine do with my bid at 21:14?" had no answer outside the event table,
+     * and the id the browser and the web tier know a command by (`commandId`)
+     * appeared nowhere at all. `version` is the sequence of the last event this
+     * command produced, which is what joins this line to `auction_events` and
+     * to the audit row beside it.
+     *
+     * The engine's own timer commands are left out: `_ClosingSoon` is asked for
+     * on every tick inside the closing window and answered from the ack cache
+     * before it reaches here, but `_TimerClose` retries are not, and a line
+     * every 250 ms is noise that would bury the ones that matter.
+     */
+    if (envelope.actor !== ENGINE_ACTOR) {
+      this.deps.logger.info(
+        {
+          auctionId: envelope.auctionId,
+          commandId: envelope.commandId,
+          type: envelope.type,
+          actor: envelope.actor,
+          accepted: finalAck.accepted,
+          ...(finalAck.accepted ? {} : { reason: finalAck.reason }),
+          version: finalAck.version,
+          processMs: Math.round(elapsed),
+          queuedMs:
+            envelope.receivedAtMs === undefined
+              ? undefined
+              : Math.max(0, Math.round(this.now() - envelope.receivedAtMs - elapsed)),
+        },
+        "command",
+      );
+    }
     return this.remember(state, ackKey, finalAck);
   }
 

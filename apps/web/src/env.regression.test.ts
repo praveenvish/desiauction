@@ -60,6 +60,8 @@ const PROD_OK: Raw = {
   FINOPS_S3_SECRET_ACCESS_KEY: "secret",
   // PRR P1-6: error tracking is mandatory in production.
   SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
+  // One proxy in front (Caddy): the hop the client address is read from.
+  TRUSTED_PROXY_COUNT: "1",
   ENGINE_SECRET: "x".repeat(48),
   DEMO_TOKEN_SECRET: "d".repeat(48),
   REVIEW_TOKEN_SECRET: "r".repeat(48),
@@ -150,10 +152,27 @@ describe("web env — production refuses every dev-only default", () => {
     ],
     ["FINOPS bucket missing config", { FINOPS_S3_BUCKET: undefined }, /FINOPS_S3/],
     ["SENTRY_DSN unset", { SENTRY_DSN: undefined }, /SENTRY_DSN/],
+    ["no trusted proxy hop", { TRUSTED_PROXY_COUNT: undefined }, /TRUSTED_PROXY_COUNT/],
+    [
+      "a sign-in key that is the engine's secret under another name",
+      { AUTH_CODE_SECRET: "x".repeat(40), ENGINE_SECRET: "x".repeat(40) },
+      /AUTH_CODE_SECRET/,
+    ],
+    ["a sign-in key too short to be one", { AUTH_CODE_SECRET: "short" }, /AUTH_CODE_SECRET/],
+    ["zero trusted proxy hops", { TRUSTED_PROXY_COUNT: "0" }, /TRUSTED_PROXY_COUNT/],
   ];
 
   it.each(CASES)("refuses to serve production with %s", (_name, override, message) => {
     expect(() => parseEnv(raw({ ...PROD_OK, ...override }))).toThrow(message);
+  });
+
+  it("reads a blank AUTH_CODE_SECRET as not set — the way preflight does", () => {
+    // `AUTH_CODE_SECRET=` in an env file passed preflight (a warning) and then
+    // stopped the server from booting ("at least 32 characters").
+    for (const blank of ["", "   "]) {
+      const env = parseEnv(raw({ ...PROD_OK, AUTH_CODE_SECRET: blank }));
+      expect(env.AUTH_CODE_SECRET).toBeUndefined();
+    }
   });
 });
 

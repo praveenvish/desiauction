@@ -41,6 +41,29 @@ const envSchema = z.object({
   ENGINE_URL: z.url().default("http://localhost:4000"),
   ENGINE_PUBLIC_WS_URL: z.string().default("ws://localhost:4000/ws"),
   ENGINE_SECRET: z.string().min(8).default("dev-engine-secret"),
+  /**
+   * THE KEY FOR SIGN-IN CODES AND PASSKEY CHALLENGES, APART FROM THE ENGINE'S
+   * (PRR 2026-09-29).
+   *
+   * `ENGINE_SECRET` was one value doing four jobs: it authenticates commands
+   * to the engine, signs spectator socket tickets, keys the stored digest of
+   * every sign-in code, and seals the passkey challenge cookie. The first two
+   * belong to the engine. The last two have nothing to do with it — and the
+   * engine holds the secret, so a leak of the ENGINE's environment was also
+   * the key to every six-digit code in the database.
+   *
+   * Optional, and that is the point: unset, the two sign-in jobs keep using
+   * `ENGINE_SECRET` exactly as before, so deploying this changes nothing.
+   * Setting it is a planned act (SECRET_ROTATION.md): the codes in flight at
+   * that moment — a few minutes' worth — stop matching, and people ask again.
+   */
+  AUTH_CODE_SECRET: z.preprocess(
+    // `AUTH_CODE_SECRET=` with nothing after it is how an env file spells
+    // "not set yet". Preflight reads it that way; so must the boot, or a blank
+    // line passes the gate and then stops the server from starting.
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().min(32).optional(),
+  ),
   // OTP delivery (PX-3): "dev" writes to /dev/inbox; "msg91" sends real SMS.
   // Production deploys MUST set msg91 + credentials (beta checklist §B) —
   // the dev sender is structurally invisible outside development.
@@ -608,6 +631,11 @@ const productionSchema = envSchema
     message: "REVIEW_TOKEN_SECRET must be at least 32 characters in production",
     path: ["REVIEW_TOKEN_SECRET"],
   })
+  .refine((v) => v.AUTH_CODE_SECRET === undefined || v.AUTH_CODE_SECRET !== v.ENGINE_SECRET, {
+    message:
+      "AUTH_CODE_SECRET must not be the same value as ENGINE_SECRET — a second name for one secret separates nothing",
+    path: ["AUTH_CODE_SECRET"],
+  })
   .refine((v) => !serving(v) || v.ENGINE_SECRET.length >= 32, {
     message: "ENGINE_SECRET must be at least 32 characters in production",
     path: ["ENGINE_SECRET"],
@@ -696,6 +724,16 @@ const productionSchema = envSchema
     message:
       "SENTRY_DSN must be set in production so errors are captured (a missing DSN is silent)",
     path: ["SENTRY_DSN"],
+  })
+  // The engine has refused this since the go-live gate; the web tier only had
+  // preflight's word for it. At 0 no forwarded address is trusted, so there is
+  // no client address at all behind the proxy — and every per-address limit
+  // (sign-in codes above all) is skipped without a word, because the code that
+  // applies them reads "no address" as "nothing to limit".
+  .refine((v) => !serving(v) || v.TRUSTED_PROXY_COUNT >= 1, {
+    message:
+      "TRUSTED_PROXY_COUNT must be at least 1 in production — behind the proxy, 0 means no client address, and every per-address limit is silently skipped",
+    path: ["TRUSTED_PROXY_COUNT"],
   });
 
 export type Env = z.infer<typeof envSchema>;

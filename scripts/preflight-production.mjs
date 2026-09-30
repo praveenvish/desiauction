@@ -175,6 +175,27 @@ warn(
   `ENGINE_SECRET is ${String(secret.length)} chars`,
   "use >=32 random chars for the shared secret",
 );
+// The sign-in codes' own key (apps/web/src/env.ts AUTH_CODE_SECRET). A WARN,
+// never a blocker: unset, the web tier keys them with ENGINE_SECRET as it
+// always has, and a deploy must not be refused for a separation that is a
+// planned act. What IS refused is setting it to the engine's value.
+{
+  const authSecret = env.AUTH_CODE_SECRET ?? "";
+  warn(
+    "AUTH_CODE_SECRET-set",
+    authSecret !== "",
+    "sign-in codes and passkey challenges are keyed with ENGINE_SECRET, which the engine also holds",
+    "set AUTH_CODE_SECRET in web.env in a quiet window (openssl rand -hex 32) — SECRET_ROTATION.md",
+  );
+  if (authSecret !== "") {
+    check(
+      "AUTH_CODE_SECRET-separate",
+      authSecret !== secret && authSecret.length >= 32,
+      "AUTH_CODE_SECRET must be at least 32 characters and must not equal ENGINE_SECRET",
+      "generate a value of its own: openssl rand -hex 32",
+    );
+  }
+}
 check(
   "ENGINE_URL-remote",
   typeof env.ENGINE_URL === "string" &&
@@ -183,6 +204,28 @@ check(
   `ENGINE_URL=${env.ENGINE_URL ?? "(unset)"}`,
   "point ENGINE_URL at the deployed engine, not localhost",
 );
+// THE WEB TIER TALKS TO THE ENGINE ON THE PRIVATE NETWORK, NEVER THROUGH THE
+// PUBLIC HOSTNAME. The engine now refuses its private routes (/command,
+// /snapshot, /diagnostics) to any request that arrived through the proxy, so
+// an ENGINE_URL pointing at the public engine host would have every bid and
+// every gavel answered 404. Caught here, before anything is swapped.
+{
+  const hostOf = (value) => {
+    try {
+      return new URL(String(value)).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+  const internal = hostOf(env.ENGINE_URL);
+  const publicHost = hostOf(env.ENGINE_PUBLIC_WS_URL);
+  check(
+    "ENGINE_URL-private",
+    internal !== "" && internal !== publicHost,
+    `ENGINE_URL host is "${internal}", the public socket host is "${publicHost}"`,
+    "point ENGINE_URL at the engine on the private network (http://engine:4000 in the compose stack) — the public hostname is for browsers' sockets only",
+  );
+}
 check(
   "ENGINE_PUBLIC_WS_URL-wss",
   typeof env.ENGINE_PUBLIC_WS_URL === "string" && env.ENGINE_PUBLIC_WS_URL.startsWith("wss://"),

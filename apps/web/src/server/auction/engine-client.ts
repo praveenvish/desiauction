@@ -35,6 +35,17 @@ export async function sendEngineCommand(input: EngineCommandInput): Promise<Comm
       signal: AbortSignal.timeout(2_000),
     });
     if (!response.ok) {
+      // The status alone reached the conductor; the log had nothing. With the
+      // ids, this line meets the engine's own `command` line for the same id.
+      logger().error(
+        {
+          status: response.status,
+          type: envelope.type,
+          commandId: envelope.commandId,
+          auctionId: envelope.auctionId,
+        },
+        "engine.command_refused_by_transport",
+      );
       return {
         commandId: envelope.commandId,
         accepted: false,
@@ -47,7 +58,17 @@ export async function sendEngineCommand(input: EngineCommandInput): Promise<Comm
     // The engine is down: a deterministic rejection, never a silent failure —
     // and now not a silent one in the LOG either. The refusal reaching the
     // conductor says "engine unreachable"; this says which command, and why.
-    logger().error({ err: error, type: envelope.type }, "engine.command_unreachable");
+    // …and WHICH one: the command id is what the engine logs it under, so a
+    // timeout here can be matched to the line that says whether it landed.
+    logger().error(
+      {
+        err: error,
+        type: envelope.type,
+        commandId: envelope.commandId,
+        auctionId: envelope.auctionId,
+      },
+      "engine.command_unreachable",
+    );
     return {
       commandId: envelope.commandId,
       accepted: false,

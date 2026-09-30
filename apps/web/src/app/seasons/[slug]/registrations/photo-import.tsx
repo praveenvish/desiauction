@@ -21,6 +21,7 @@ import {
   photoTargetsAction,
   type DrivePickerConfig,
 } from "../../../../server/competition/actions";
+import { release } from "../../../../lib/release";
 
 // Client-side hints only — mirrors ImageUploader; the media actions re-validate.
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
@@ -172,8 +173,9 @@ export function PhotoImportPanel({
       });
       return;
     }
-    const found = await photoTargetsAction(slug);
-    setMatching(false);
+    const found = await release(photoTargetsAction(slug), () => {
+      setMatching(false);
+    });
     const matches = matchPhotoFiles(
       expanded.files.map((file) => file.name),
       found,

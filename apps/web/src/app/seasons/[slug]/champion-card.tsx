@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { announceChampionAction } from "../../../server/competition/fixture-actions";
 import type { FinaleState } from "../../../server/competition/season-finale";
+import { release } from "../../../lib/release";
 
 function people(count: number): string {
   return count === 1 ? "1 person" : `${String(count)} people`;
@@ -53,8 +54,9 @@ export function ChampionCard({ slug, state }: { slug: string; state: FinaleState
   const chosen = state.table.find((row) => row.teamId === teamId);
   const announce = async () => {
     setBusy(true);
-    const result = await announceChampionAction(slug, teamId);
-    setBusy(false);
+    const result = await release(announceChampionAction(slug, teamId), () => {
+      setBusy(false);
+    });
     setConfirming(false);
     if (!result.ok) {
       toast({ title: result.error ?? "Could not announce.", tone: "danger" });

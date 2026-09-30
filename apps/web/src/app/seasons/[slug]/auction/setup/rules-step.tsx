@@ -11,6 +11,7 @@ import {
   squadFeasibility,
   type AuctionSetupFieldErrors,
 } from "../../../../../server/auction/auction-setup";
+import { release } from "../../../../../lib/release";
 
 /**
  * The figure a money field holds, read back in its season's unit ("₹2,00,00,000
@@ -80,18 +81,22 @@ export function RulesStep({ slug, dashboard }: { slug: string; dashboard: Auctio
 
   const create = async () => {
     setBusy(true);
-    const result = await createAuctionAction(slug, {
-      pursePerTeam: purse,
-      squadMin,
-      squadMax,
-      timerSeconds: timer,
-      extensionSeconds: extension,
-      basePriceDefault: baseDefault,
-      // Off means "one price for everyone": no bands in the locked config.
-      bands: useBands ? bands : {},
-      acceptShortSquads,
-    });
-    setBusy(false);
+    const result = await release(
+      createAuctionAction(slug, {
+        pursePerTeam: purse,
+        squadMin,
+        squadMax,
+        timerSeconds: timer,
+        extensionSeconds: extension,
+        basePriceDefault: baseDefault,
+        // Off means "one price for everyone": no bands in the locked config.
+        bands: useBands ? bands : {},
+        acceptShortSquads,
+      }),
+      () => {
+        setBusy(false);
+      },
+    );
     setFieldErrors(result.fieldErrors ?? {});
     if (result.ok) {
       toast({ title: "Auction created — now bring in the team owners.", tone: "success" });

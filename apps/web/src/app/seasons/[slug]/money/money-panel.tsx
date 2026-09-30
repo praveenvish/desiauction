@@ -56,6 +56,7 @@ import { CASE_STATE, PAYMENT_STATE } from "./money-words";
 import "./money.css";
 import "./season-money.css";
 import { useHydrated } from "../../../../lib/use-hydrated";
+import { release } from "../../../../lib/release";
 
 /**
  * PX-7 E1 — the Settlement console.
@@ -247,8 +248,9 @@ export function MoneyPanel({ slug, console: view }: { slug: string; console: Con
    */
   const act: Act = async (run, done) => {
     setBusy(true);
-    const result = await run();
-    setBusy(false);
+    const result = await release(run(), () => {
+      setBusy(false);
+    });
     if (result.ok) {
       toast({ title: done, tone: "success" });
       report(done, true);

@@ -127,6 +127,29 @@ services:
       resources:
         limits: { memory: 64m, cpus: "0.25" }
 
+  # SAYS HOW FULL THE DISK IS, as a log line Loki can alert on (PRR 2026-09-29).
+  #
+  # Every alert on this host is read from logs and nothing logged the disk. A
+  # full one takes Postgres, Loki and Docker down together — and takes the
+  # alerting with it, so it has to be said BEFORE. The host's root is mounted
+  # read-only; the script measures and writes nothing (observability/
+  # disk-watch.sh). No network: it has nobody to talk to.
+  disk-watch:
+    image: alpine@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8 # 3.22
+    <<: *logs
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["/bin/sh", "/disk-watch.sh"]
+    volumes:
+      - ./observability/disk-watch.sh:/disk-watch.sh:ro
+      - /:/host:ro
+    deploy:
+      resources:
+        limits: { memory: 32m, cpus: "0.10" }
+
 volumes:
   loki_data:
   grafana_data:

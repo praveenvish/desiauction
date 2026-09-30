@@ -7,6 +7,7 @@ import { useState } from "react";
 import { formatDateTime } from "../../../../../lib/format-date";
 import { toIstLocal } from "../../../../../lib/ist-time";
 import { setAuctionStartAction } from "../../../../../server/competition/actions";
+import { release } from "../../../../../lib/release";
 
 /**
  * WHEN IS AUCTION NIGHT? (0095) — the one place the time is set.
@@ -40,8 +41,9 @@ export function AuctionTimeCard({
   async function save(next: string) {
     setBusy(true);
     setError(null);
-    const result = await setAuctionStartAction(slug, next);
-    setBusy(false);
+    const result = await release(setAuctionStartAction(slug, next), () => {
+      setBusy(false);
+    });
     if (!result.ok) {
       setError(result.error ?? "That didn't save. Try again.");
       return;

@@ -176,6 +176,26 @@ const PERSONAL_CONTENT_TABLES = [
   "whatsapp_inbound",
 ];
 
+/**
+ * IDENTITY IS THE WEB TIER'S, AND NOBODY ELSE'S (0098).
+ *
+ * Session hashes, sign-in code digests, passkeys, push keys and the mail
+ * ledger. Neither service writer names any of them, both are BYPASSRLS, and
+ * the engine holds the secret the code digests are keyed with — so the read
+ * they inherited by default was the most valuable thing either credential
+ * could leak. Pinned here so a recipe re-run, or the next table added beside
+ * these, cannot hand it back without this list being edited on purpose.
+ */
+const IDENTITY_TABLES = [
+  "sessions",
+  "otp_codes",
+  "otp_inbox",
+  "passkey_credentials",
+  "email_verifications",
+  "push_subscriptions",
+  "email_sends",
+];
+
 const APP_WRITES_UNPROTECTED = [
   "demo_requests",
   "demo_availability",
@@ -460,6 +480,17 @@ function expectations(allTables: string[]): Expectation[] {
         verb: "SELECT",
         allowed: false,
         why: "personal content is not auction or finops truth; no service writer folds it (0083)",
+      });
+    }
+  }
+  for (const table of IDENTITY_TABLES) {
+    for (const role of ["desiauction_engine", "desiauction_runner"]) {
+      out.push({
+        role,
+        table,
+        verb: "SELECT",
+        allowed: false,
+        why: "identity belongs to the web tier; no service writer reads a session or a sign-in code (0098)",
       });
     }
   }

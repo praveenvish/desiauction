@@ -302,10 +302,56 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     await send("undo-hold", "HoldLot", { lotId: target.lotId }, undefined);
   };
 
+  /**
+   * WITHDRAW ASKS FIRST (PRR 2026-09-29).
+   *
+   * It was one press, in the same row as "Open", and it is the one lot command
+   * with no way back: `withdrawn` is terminal in the lot machine and Undo
+   * reverses only a sale or a pass. A thumb landing one button to the right
+   * took a player out of the auction for good, on the night they had waited
+   * for. Abort, Complete and Undo have each always asked; this now does too,
+   * and names the player it is about to remove.
+   */
+  const [withdrawTarget, setWithdrawTarget] = useState<{
+    lotId: string;
+    lotNumber: string;
+    playerName: string | null;
+  } | null>(null);
+
+  const confirmWithdraw = async () => {
+    const target = withdrawTarget;
+    if (target === null) {
+      return;
+    }
+    await send(
+      `withdraw-${target.lotId}`,
+      "WithdrawLot",
+      { lotId: target.lotId },
+      `${target.lotNumber} withdrawn`,
+    );
+    setWithdrawTarget(null);
+  };
+
+  /*
+   * These three awaited their action between `setPending(x)` and
+   * `setPending(null)` with nothing to catch a rejection — so a request that
+   * never came back (a dropped connection, a redeploy) left `busy` true for
+   * the rest of the session: the spinner never stopped, and Space, O and P
+   * went dead with nothing said. `send` was repaired the same way.
+   */
+  const LOST = "Lost the connection before that was answered — check the list before trying again.";
+
   const invite = async () => {
     setPending("invite");
-    const result = await inviteOwnerAction(slug, inviteTeam);
-    setPending(null);
+    let result;
+    try {
+      result = await inviteOwnerAction(slug, inviteTeam);
+    } catch {
+      toast({ title: LOST, tone: "danger" });
+      return;
+    } finally {
+      setPending(null);
+    }
     if (result.ok) {
       setInviteCopied(false);
       setInviteUrl(`${window.location.origin}${result.joinPath}`);
@@ -318,8 +364,15 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
 
   const revokeInvite = async (inviteId: string) => {
     setPending(`revoke-${inviteId}`);
-    const result = await revokeOwnerInviteAction(slug, inviteId);
-    setPending(null);
+    let result;
+    try {
+      result = await revokeOwnerInviteAction(slug, inviteId);
+    } catch {
+      toast({ title: LOST, tone: "danger" });
+      return;
+    } finally {
+      setPending(null);
+    }
     if (result.ok) {
       toast({ title: "Link withdrawn — it no longer works.", tone: "success" });
       router.refresh();
@@ -352,8 +405,15 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
 
   const grant = async (teamId: string, personId: string) => {
     setPending(`grant-${teamId}`);
-    const result = await grantPaddleAction(slug, teamId, personId);
-    setPending(null);
+    let result;
+    try {
+      result = await grantPaddleAction(slug, teamId, personId);
+    } catch {
+      toast({ title: LOST, tone: "danger" });
+      return;
+    } finally {
+      setPending(null);
+    }
     if (result.ok) {
       toast({ title: "Paddle granted — the owner can claim now.", tone: "success" });
       router.refresh();
@@ -414,7 +474,9 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       status,
       hasOpenLot: lot !== null,
       hasQueue: queue.length > 0,
-      busy,
+      // A stale room ignores the keyboard exactly as it ignores the buttons:
+      // O and P used to get through, because only the BUTTONS read `stale`.
+      busy: busy || stale,
     };
     const describe = (target: EventTarget | null) => {
       const element = target as HTMLElement | null;
@@ -472,7 +534,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     // Re-subscribed whenever the room state the guards read changes. `send`
     // closes over only stable values (slug prop, router, toast, setPending), so it
     // cannot go stale between these re-subscriptions.
-  }, [status, lot, queue, busy, send]);
+  }, [status, lot, queue, busy, stale, send]);
   const grantable = view.owners.invites.filter(
     (entry) =>
       entry.acceptedBy !== null &&
@@ -766,14 +828,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() =>
-                            void send(
-                              `withdraw-${entry.lotId}`,
-                              "WithdrawLot",
-                              { lotId: entry.lotId },
-                              `${entry.lotNumber} withdrawn`,
-                            )
-                          }
+                          onClick={() => {
+                            setWithdrawTarget({
+                              lotId: entry.lotId,
+                              lotNumber: entry.lotNumber,
+                              playerName: entry.playerName,
+                            });
+                          }}
                           loading={pending === `withdraw-${entry.lotId}`}
                           disabled={stale}
                           data-testid={`withdraw-${entry.lotNumber}`}
@@ -865,14 +926,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() =>
-                                void send(
-                                  `withdraw-${entry.id}`,
-                                  "WithdrawLot",
-                                  { lotId: entry.id },
-                                  `${entry.lotNumber} withdrawn`,
-                                )
-                              }
+                              onClick={() => {
+                                setWithdrawTarget({
+                                  lotId: entry.id,
+                                  lotNumber: entry.lotNumber,
+                                  playerName: entry.playerName ?? null,
+                                });
+                              }}
                               loading={pending === `withdraw-${entry.id}`}
                               disabled={stale}
                               data-testid={`withdraw-frozen-${entry.lotNumber}`}
@@ -1000,8 +1060,8 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
                                 {inviteCopied ? "Copied" : "Copy link"}
                               </Button>
                               <span className="competitions-hint">
-                                Send it yourself — the platform sends nothing. It works once and
-                                cannot be withdrawn.
+                                Send it yourself — the platform sends nothing. It works once. Sent
+                                it to the wrong person? Withdraw it below before they accept.
                               </span>
                             </div>
                           </div>
@@ -1228,6 +1288,51 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
             </p>
           </>
         )}
+      </Dialog>
+
+      {/* WITHDRAW's confirmation — it names who is about to leave the auction. */}
+      <Dialog
+        open={withdrawTarget !== null}
+        onClose={() => {
+          setWithdrawTarget(null);
+        }}
+        title="Withdraw this player?"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setWithdrawTarget(null);
+              }}
+            >
+              Keep them in
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => void confirmWithdraw()}
+              loading={withdrawTarget !== null && pending === `withdraw-${withdrawTarget.lotId}`}
+              disabled={stale}
+              data-testid="confirm-withdraw"
+            >
+              Withdraw from the auction
+            </Button>
+          </>
+        }
+      >
+        <p data-testid="withdraw-summary">
+          This takes{" "}
+          <strong>
+            {withdrawTarget?.playerName ?? withdrawTarget?.lotNumber ?? "this player"}
+          </strong>
+          {withdrawTarget !== null && withdrawTarget.playerName !== null ? (
+            <> ({withdrawTarget.lotNumber})</>
+          ) : null}{" "}
+          out of tonight&rsquo;s auction. They will not go on the block and no team can buy them.
+        </p>
+        <p className="competitions-hint" data-testid="withdraw-final-note">
+          <strong>This cannot be undone.</strong> Undo reverses a sale or a pass; a withdrawal
+          stays. It is recorded on the ledger against your name.
+        </p>
       </Dialog>
 
       <Dialog

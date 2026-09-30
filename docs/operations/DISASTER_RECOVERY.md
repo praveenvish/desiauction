@@ -8,16 +8,26 @@ database, restart the processes, let replay rebuild everything derived.
 
 | Failure | RPO target | RTO target | Mechanism |
 |---|---|---|---|
-| Bad migration / bad write | seconds (last archived WAL segment) | 1 h | pgBackRest PITR to a timestamp ([RESTORE_RUNBOOK](RESTORE_RUNBOOK.md) "Point-in-time restore") |
-| Host lost, disk intact elsewhere | seconds–minutes (WAL in the off-box repo) | 4 h | new host + compose + PITR from the off-box repo |
+| Bad migration / bad write | ≤ 1 minute (`archive_timeout = 60`) | 1 h | pgBackRest PITR to a timestamp ([RESTORE_RUNBOOK](RESTORE_RUNBOOK.md) "Point-in-time restore") |
+| Host lost, disk intact elsewhere | ≤ 1 minute + archive lag (WAL in the off-box repo) | 4 h | new host + compose + PITR from the off-box repo |
 | Host AND on-box data lost | as above for Postgres; ≤ 1 h for photos and finops artifacts (mirror interval) | 4 h | off-box repo + `minio-mirror` copy |
 | Engine process only | none (event-sourced) | minutes | restart; replay |
 
 The WAL RPO holds only while archiving keeps up: a segment is pushed when it
-fills (16 MB) or on `archive_timeout`, which is unset, so on a quiet database
-the newest unarchived writes can be older than "seconds". Set
-`archive_timeout = 60` in `postgresql.conf.d` if a one-minute bound matters
-more than a few extra segments a day.
+fills (16 MB) or after `archive_timeout`, which is **60 seconds**
+(`ops/deploy/postgresql.conf.d/10-archive.conf`, since 2026-09-29; it was unset
+before, which on a database this small meant the newest writes could wait for
+the nightly backup). The deploy reloads Postgres so the setting is live without
+a restart. Confirm it on the host, and that nothing is failing to archive:
+
+```sh
+docker compose exec -T db psql -U postgres -Atc "show archive_timeout"
+docker compose exec -T db psql -U postgres -Atc \
+  "select archived_count, failed_count, last_archived_time, last_failed_time from pg_stat_archiver"
+```
+
+`failed_count` rising, or `last_archived_time` older than a few minutes on a
+night with activity, means the recovery point is older than this table says.
 
 **These are targets, not a measured posture.** What exists as of 2026-09-23:
 the archive, the nightly backups, the object-storage mirror and the alerts on
@@ -109,7 +119,9 @@ by the SIGTERM boot-smoke (2026-07-16).
 
 ### Host or region loss
 Provision a new host (any provider — the stack is one compose file), copy the
-env files from the founder's secret store, point the three DNS records at it,
+env files from the escrow ([SECRET_ROTATION](SECRET_ROTATION.md#escrow-the-two-things-that-cannot-be-regenerated)
+— without the backup passphrase held there, the off-box backups cannot be
+read), point the three DNS records at it,
 restore Postgres from the OFF-BOX pgBackRest repo (RESTORE_RUNBOOK
 "Point-in-time restore"), `mc mirror` the two buckets back from the off-box copy
 into the new MinIO, then run `deploy-host.yml` for the last good commit.

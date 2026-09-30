@@ -31,9 +31,51 @@ export interface ServerDeps {
   allowedOrigins?: string[];
   maxSocketsPerRoom?: number;
   maxSocketsPerIp?: number;
+  /** Offer permessage-deflate to clients. Default false (env WS_COMPRESSION). */
+  compressFrames?: boolean;
   /** Proxy hops in front (Caddy = 1); the per-client cap keys on the address they forwarded. */
   trustedProxies?: number;
 }
+
+/**
+ * HOW SNAPSHOT FRAMES ARE COMPRESSED, WHEN THEY ARE (WS_COMPRESSION=on).
+ *
+ * A SMALL WINDOW, BECAUSE EVERY SPECTATOR OWNS ONE. `ws` keeps a deflate
+ * stream per socket for as long as the socket lives — "no context takeover"
+ * resets it between frames, it does not free it — and at zlib's defaults that
+ * stream is about 270 KB of memory outside the JavaScript heap. A thousand
+ * spectators would be a quarter of a gigabyte the engine's memory limit never
+ * budgeted for. A 4 KiB window and a small hash table bring it to about
+ * 32 KB each; the server is allowed to choose this by itself
+ * (`server_max_window_bits`), so no browser has to agree to anything.
+ *
+ * These numbers were CHOSEN BY MEASURING six combinations on the same
+ * 250-spectator room. Smaller than this (window 10, memLevel 1) compressed
+ * worse AND cost twice the CPU, because zlib then cuts the frame into
+ * hundreds of tiny blocks; zlib's defaults cost more memory and more CPU for
+ * the same bytes. This is the point where both curves are flat.
+ *
+ * NO CONTEXT TAKEOVER, both ways: each frame stands alone, so a frame lost to
+ * a slow consumer never corrupts the next.
+ *
+ * LEVEL 1. A snapshot is repetitive JSON: the fastest level already takes
+ * most of what there is to take, and the engine has one thread to do the
+ * rest of its work on. Heartbeats (under the threshold) go out as they are.
+ *
+ * What this costs and saves is MEASURED, not estimated: see
+ * scripts/perf-scale.ts with PERF_WS_COMPRESSION=on.
+ */
+const FRAME_COMPRESSION = {
+  serverNoContextTakeover: true,
+  clientNoContextTakeover: true,
+  serverMaxWindowBits: 12,
+  threshold: 1024,
+  zlibDeflateOptions: { level: 1, memLevel: 5 },
+  concurrencyLimit: 8,
+} as const;
+
+/** How long live sockets get to say goodbye on shutdown before they are cut. */
+const CLOSE_GRACE_MS = 2_000;
 
 /**
  * Spectator tickets: HMAC over (auctionId · time-window) — minted by the web
@@ -41,9 +83,6 @@ export interface ServerDeps {
  * leaked ticket stops working within two windows) with no wire-format change —
  * the URL still carries a single hex string. MIN-2 remediation.
  */
-/** How long live sockets get to say goodbye on shutdown before they are cut. */
-const CLOSE_GRACE_MS = 2_000;
-
 export const TICKET_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -324,6 +363,53 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
     });
   });
 
+  /**
+   * THE PRIVATE HALF OF THIS SERVER IS PRIVATE BY ROUTE, NOT ONLY BY SECRET
+   * (PRR 2026-09-29).
+   *
+   * One listener serves two audiences. Browsers reach `/ws` and the health
+   * routes through the edge proxy, because a spectator has to. The web tier
+   * reaches `/command`, `/snapshot` and `/diagnostics` directly, on the
+   * private network, and nothing else ever should. But the proxy forwards the
+   * whole host, so those routes were on the public internet too, guarded by
+   * the shared secret alone — a secret that also keys the sign-in code
+   * digests, and whose leak would let anybody, from anywhere, place a bid as
+   * any person in any auction.
+   *
+   * A request that came through a proxy says so: the proxy adds
+   * `x-forwarded-for`, and no caller on the far side of it can take that
+   * header off. So when this engine is deployed behind one (TRUSTED_PROXY_COUNT
+   * ≥ 1, which production requires), a forwarded request to a private route is
+   * told the route does not exist — before the secret is even looked at, so a
+   * stranger cannot use the difference between 401 and 404 to learn anything.
+   *
+   * The web tier must therefore call the engine DIRECTLY (ENGINE_URL on the
+   * private network); `preflight:production` refuses a deploy where it would
+   * go through the public hostname instead.
+   */
+  const privateOnly = (deps.trustedProxies ?? 0) > 0;
+  const cameThroughProxy = (headers: Record<string, unknown>): boolean =>
+    privateOnly && (headers["x-forwarded-for"] !== undefined || headers["forwarded"] !== undefined);
+
+  // Matched on the ROUTE the router chose, not on the text of the URL: the
+  // router decodes a path before matching it, so `/%63ommand` IS `/command`,
+  // and a guard that compared strings would have waved it through.
+  const PRIVATE_ROUTES: ReadonlySet<string> = new Set([
+    "/command",
+    "/admin/reset",
+    "/snapshot/:auctionId",
+    "/diagnostics/:auctionId",
+  ]);
+  server.addHook("onRequest", (request, reply, done) => {
+    const route = request.routeOptions.url ?? "";
+    if (PRIVATE_ROUTES.has(route) && cameThroughProxy(request.headers)) {
+      deps.logger.warn({ route }, "private engine route asked for through the proxy — refused");
+      void reply.status(404).send({ error: "not_found" });
+      return;
+    }
+    done();
+  });
+
   // The command endpoint: web-tier only (shared secret). Every command gets a
   // deterministic Accepted/Rejected ack — no silent failures.
   server.post("/command", async (request, reply) => {
@@ -423,7 +509,11 @@ export function buildServer(deps: ServerDeps): { server: FastifyInstance; hub: W
   // the socket is receive-only. `ws` defaults to a 100 MiB ceiling, which it
   // buffers before telling anyone — that is a memory-exhaustion budget handed
   // to any holder of a ticket.
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 });
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: 4 * 1024,
+    perMessageDeflate: deps.compressFrames === true ? FRAME_COMPRESSION : false,
+  });
   const allowedOrigins = deps.allowedOrigins ?? [];
   const maxPerRoom = deps.maxSocketsPerRoom ?? 2_000;
   const maxPerIp = deps.maxSocketsPerIp ?? 50;

@@ -68,7 +68,7 @@ jobs:
           fi
 
       - name: Ask pgBackRest on the host
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -116,3 +116,21 @@ jobs:
             echo "**A backup that has never been restored is a hope, not a backup** — the"
             echo "restore drill and its measured RTO live in docs/operations/RESTORE_RUNBOOK.md."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # A red badge nobody is told about is how six failed nights went by
+      # (2026-09-23 to 2026-09-29, a wrong path on the host). `!success()`
+      # so a timeout, which is reported as cancelled, is said too.
+      - name: Say so when backups could not be verified
+        if: ${{ !success() }}
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "${ALERT_WEBHOOK_URL}" ]; then
+            curl -fsS -m 20 -X POST -H 'content-type: application/json' \
+              --data "{\"title\":\"DesiAuction backups could NOT be verified\",\"run\":\"${RUN_URL}\"}" \
+              "${ALERT_WEBHOOK_URL}" >/dev/null \
+              || echo "::warning::the alert webhook did not accept the report"
+          else
+            echo "::warning::ALERT_WEBHOOK_URL is not set as a repository secret — this failure was reported on the run page only"
+          fi

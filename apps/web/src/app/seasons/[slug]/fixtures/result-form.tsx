@@ -15,6 +15,7 @@ import type { LobbyParticipantRow } from "../../../../server/competition/results
 import { TeamCrest } from "../_tabs/team-crest";
 import { suggestedOutcome, type ModelResult } from "./schedule-model";
 import "./result-form.css";
+import { release, releaseIfLost } from "../../../../lib/release";
 
 /**
  * THE SCORE, WHERE THE MATCH IS. Recording a result used to be a worklist card
@@ -99,15 +100,20 @@ function useFinish(slug: string, next: NextOwed | null = null) {
     saidAs: { recorded: string; amended: string },
   ) => {
     setBusy(true);
-    const saved = await save();
+    // Two steps share one busy state, so it is let go here only if this step
+    // never came back; on an answer, the lines below decide as they always did.
+    const saved = await releaseIfLost(save(), () => {
+      setBusy(false);
+    });
     if (!saved.ok) {
       setBusy(false);
       toast({ tone: "danger", title: saved.error ?? "Refused." });
       return;
     }
     if (finish) {
-      const done = await fixtureLifecycleAction(slug, fixtureId, "complete");
-      setBusy(false);
+      const done = await release(fixtureLifecycleAction(slug, fixtureId, "complete"), () => {
+        setBusy(false);
+      });
       if (!done.ok) {
         toast({
           tone: "danger",

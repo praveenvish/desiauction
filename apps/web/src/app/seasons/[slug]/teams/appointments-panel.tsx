@@ -17,6 +17,7 @@ import {
   announceAppointmentsAction,
   type AppointmentsPanelView,
 } from "../../../../server/competition/appointment-actions";
+import { release } from "../../../../lib/release";
 
 /**
  * ANNOUNCE CAPTAINS & ICONS.
@@ -44,8 +45,9 @@ export function AppointmentsPanel({
 
   const announce = async () => {
     setBusy(true);
-    const result = await announceAppointmentsAction(slug);
-    setBusy(false);
+    const result = await release(announceAppointmentsAction(slug), () => {
+      setBusy(false);
+    });
     setConfirming(false);
     if (!result.ok) {
       toast({ title: result.error, tone: "danger" });

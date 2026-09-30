@@ -3,6 +3,13 @@
 import { deriveCeremony, type AuctionSnapshot, type CeremonyState } from "@desiauction/core";
 import { useEffect, useRef, useState } from "react";
 
+import {
+  FRAME_STALE_AFTER_MS,
+  mustReplaceSocket,
+  reconnectDelayMs,
+  ticketMayHaveExpired,
+} from "./socket-policy";
+
 // The shared live-socket hook (M-IP4-3). One implementation for the cockpit,
 // the bidder view and the spectator: connect, reconnect with backoff, reject
 // out-of-order frames by snapshot version, correct the clock from the
@@ -34,8 +41,13 @@ export type ConnectionState = "connecting" | "open" | "reconnecting";
  * heartbeats plus margin: long enough that a hiccup does not flash a warning
  * over a live sale, short enough that a dead feed is named while the room is
  * still looking at it.
+ *
+ * DETECTING IT WAS HALF THE JOB. For the blackholed socket the watchdog set a
+ * flag and nothing else: `onclose` never fires on a connection that was never
+ * closed, so the reconnect below never ran, and the room told the owner it was
+ * reconnecting while it sat on a dead socket until they reloaded the page. The
+ * watchdog now REPLACES a socket that has gone silent (socket-policy.ts).
  */
-const FRAME_STALE_AFTER_MS = 25_000;
 
 /** How often the watchdog re-checks. Cheap: one boolean, no snapshot work. */
 const WATCHDOG_TICK_MS = 1_000;
@@ -108,12 +120,27 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
   const [version, setVersion] = useState(0);
   const prevRef = useRef<AuctionSnapshot | null>(null);
 
+  /** Abandon the current socket and connect again; set by the connect effect. */
+  const replaceSocketRef = useRef<(reason: "silent" | "online") => void>(() => undefined);
+  /** The current socket's readyState, or null when there is none. */
+  const readyStateRef = useRef<() => number | null>(() => null);
+
   // --- the frame watchdog ---------------------------------------------------
   const lastFrameAtRef = useRef(Date.now());
   const [frameStale, setFrameStale] = useState(false);
   useEffect(() => {
     const interval = setInterval(() => {
-      setFrameStale(Date.now() - lastFrameAtRef.current > FRAME_STALE_AFTER_MS);
+      const nowMs = Date.now();
+      setFrameStale(nowMs - lastFrameAtRef.current > FRAME_STALE_AFTER_MS);
+      if (
+        mustReplaceSocket({
+          readyState: readyStateRef.current(),
+          lastFrameAtMs: lastFrameAtRef.current,
+          nowMs,
+        })
+      ) {
+        replaceSocketRef.current("silent");
+      }
     }, WATCHDOG_TICK_MS);
     return () => {
       clearInterval(interval);
@@ -151,11 +178,18 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
     const sync = () => {
       setOffline(!window.navigator.onLine);
     };
+    // The network came back: whatever socket survived the gap is suspect, and
+    // waiting out the rest of a backoff (or of the watchdog's window) is time
+    // the owner spends unable to bid. Connect now.
+    const back = () => {
+      sync();
+      replaceSocketRef.current("online");
+    };
     sync();
-    window.addEventListener("online", sync);
+    window.addEventListener("online", back);
     window.addEventListener("offline", sync);
     return () => {
-      window.removeEventListener("online", sync);
+      window.removeEventListener("online", back);
       window.removeEventListener("offline", sync);
     };
   }, []);
@@ -166,10 +200,63 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let socket: WebSocket | null = null;
 
+    // Failures since the last socket that actually OPENED.
+    let failures = 0;
+    const mountedAtMs = Date.now();
+    let renewing = false;
+
+    /**
+     * A page old enough for its ticket to have died, online, and getting
+     * nowhere: load it again for a new one — but only once the web tier has
+     * ANSWERED. Reloading into a server that is not there is how a tab ends up
+     * on the browser's error page (see `ticketMayHaveExpired`).
+     */
+    const renewTicketIfStale = () => {
+      // Inside a try, all of it: this runs on the reconnect path, and an
+      // exception here would stop the next attempt from ever being scheduled.
+      try {
+        if (
+          renewing ||
+          !ticketMayHaveExpired({
+            consecutiveFailures: failures,
+            pageAgeMs: Date.now() - mountedAtMs,
+            online: window.navigator.onLine,
+          })
+        ) {
+          return;
+        }
+        renewing = true;
+        void fetch("/healthz", { cache: "no-store" })
+          .then((response) => {
+            if (response.ok && !closed) {
+              window.location.reload();
+              return;
+            }
+            renewing = false;
+          })
+          .catch(() => {
+            renewing = false;
+          });
+      } catch {
+        renewing = false;
+      }
+    };
+
+    const retry = () => {
+      setConnection("reconnecting");
+      attempt += 1;
+      failures += 1;
+      renewTicketIfStale();
+      timer = setTimeout(connect, reconnectDelayMs(attempt));
+    };
+
     const connect = () => {
       socket = new WebSocket(wsUrl);
+      // A new socket gets a full window to speak before the watchdog judges it.
+      lastFrameAtRef.current = Date.now();
       socket.onopen = () => {
         attempt = 0;
+        failures = 0;
         setConnection("open");
         // A fresh socket has not been given a chance to speak yet; do not let
         // the watchdog inherit the outage that caused the reconnect.
@@ -205,8 +292,6 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
         if (closed) {
           return;
         }
-        setConnection("reconnecting");
-        attempt += 1;
         /*
          * BACKOFF WITH JITTER, BECAUSE EVERY CLIENT LOSES THE SOCKET AT ONCE.
          *
@@ -226,17 +311,62 @@ export function useAuctionSocket(wsUrl: string): AuctionSocket {
          * It costs one multiplication and it is the difference between a herd
          * and a queue. The floor keeps a fast reconnect fast.
          */
-        const ceiling = Math.min(5_000, 250 * 2 ** attempt);
-        const backoff = Math.max(100, Math.round(Math.random() * ceiling));
-        timer = setTimeout(connect, backoff);
+        retry();
       };
       socket.onerror = () => {
         socket?.close();
       };
     };
+
+    /**
+     * Let go of a socket WITHOUT waiting for it to agree. `close()` on a
+     * connection whose other end is unreachable starts a closing handshake
+     * nobody will answer, and `onclose` may not fire for a long time — so the
+     * handlers come off first, and the replacement is scheduled here rather
+     * than from an event that might never arrive.
+     */
+    const abandon = () => {
+      const old = socket;
+      socket = null;
+      if (old === null) {
+        return;
+      }
+      old.onopen = null;
+      old.onmessage = null;
+      old.onclose = null;
+      old.onerror = null;
+      try {
+        old.close();
+      } catch {
+        // Already gone.
+      }
+    };
+
+    readyStateRef.current = () => socket?.readyState ?? null;
+    replaceSocketRef.current = (reason) => {
+      if (closed) {
+        return;
+      }
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      abandon();
+      if (reason === "online") {
+        // The network is back this instant: no reason to wait out a backoff.
+        attempt = 0;
+        setConnection("reconnecting");
+        connect();
+        return;
+      }
+      retry();
+    };
+
     connect();
     return () => {
       closed = true;
+      readyStateRef.current = () => null;
+      replaceSocketRef.current = () => undefined;
       if (timer !== undefined) {
         clearTimeout(timer);
       }

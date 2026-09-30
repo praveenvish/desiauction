@@ -52,6 +52,41 @@ for (const orphan of files) {
   problems.push(`${orphan}.sql: on disk, but no journal entry — the migrator will never run it`);
 }
 
+// THE ENGINE'S OWN SET (PRR 2026-09-29, DB-7). apps/engine keeps a second
+// migration folder, and `migrator migrate` runs it after this one — against
+// the SAME bookkeeping table, since neither set names its own. So the rule
+// above applies across the two: the engine's one entry is older than every
+// platform migration, and is skipped on any database the platform has touched.
+// That is harmless for what is there (a table only the IP-0 spike ever used)
+// and a trap for whatever is added next: it would apply on nobody's database
+// and say so to no one. The engine's tables live in THIS folder; its own set
+// stays exactly as it is.
+const engineFolder = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+  "apps",
+  "engine",
+  "drizzle",
+  "migrations",
+);
+const engineJournal = JSON.parse(readFileSync(join(engineFolder, "meta", "_journal.json"), "utf8"));
+const engineTags = engineJournal.entries.map((entry) => entry.tag);
+const engineFiles = readdirSync(engineFolder)
+  .filter((f) => f.endsWith(".sql"))
+  .map((f) => f.slice(0, -4));
+const FROZEN_ENGINE_SET = ["0000_spike_ledger"];
+for (const tag of new Set([...engineTags, ...engineFiles])) {
+  if (!FROZEN_ENGINE_SET.includes(tag)) {
+    problems.push(
+      `apps/engine/drizzle/migrations/${tag}: the engine's migration set shares this ` +
+        "one's bookkeeping table, so a new entry there is SKIPPED on every database " +
+        "that has run a platform migration. Add it to packages/db/migrations instead.",
+    );
+  }
+}
+
 if (problems.length > 0) {
   console.error(`migration journal FAILED — ${String(problems.length)} problem(s):\n`);
   for (const problem of problems) {
@@ -62,5 +97,5 @@ if (problems.length > 0) {
 }
 console.log(
   `migration journal OK — ${String(journal.entries.length)} entries, idx sequential, ` +
-    "`when` strictly increasing, every entry has its file.",
+    "`when` strictly increasing, every entry has its file; the engine's set is unchanged.",
 );

@@ -1,4 +1,5 @@
-import { pino } from "pino";
+import { scrubError } from "@desiauction/core";
+import { pino, stdSerializers } from "pino";
 
 import { env } from "./env.js";
 
@@ -23,6 +24,14 @@ export const logger = pino({
   level: env.LOG_LEVEL,
   base: { app: "engine", env: env.NODE_ENV, version: env.APP_VERSION },
   redact: { paths: redactPaths, censor: "[redacted]" },
+  serializers: {
+    // Path redaction does nothing for an error's free text, and a constraint
+    // violation spells the value out (`Key (phone)=(+91…)`). The runner has
+    // scrubbed its errors since PA-1; this logger and the web tier's did not.
+    // `errorCode` survives, because `*.code` above censors the one field that
+    // says what actually failed (core/scrub.ts).
+    err: (error: Error) => scrubError(stdSerializers.err(error)),
+  },
   ...(env.NODE_ENV === "development"
     ? { transport: { target: "pino-pretty", options: { colorize: true } } }
     : {}),

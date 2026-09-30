@@ -1,7 +1,12 @@
 import { newId, pushSubscriptions, withTenantDb, type Db } from "@desiauction/db";
 import { NOTIFICATIONS } from "@desiauction/messaging/catalogue";
-import { sendWebPush, type PushTransport, type VapidKeys } from "@desiauction/messaging/web-push";
-import { and, eq } from "drizzle-orm";
+import {
+  sendWebPush,
+  type PushOutcome,
+  type PushTransport,
+  type VapidKeys,
+} from "@desiauction/messaging/web-push";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { env } from "../../env";
 import { detailOf, labelForEvent } from "../../lib/inbox-events";
@@ -61,7 +66,32 @@ export function pushNoticeFor(action: string, meta: Record<string, string> | nul
   };
 }
 
-/** Push one inbox notice to every device of this person. Never throws. */
+/**
+ * How many browsers one person may hold. A phone, a laptop, a tablet and the
+ * office desktop is four; ten is room to spare. It is a bound, not a product
+ * rule: every device is one outbound request per notice, so an unbounded list
+ * is an amplifier anybody signed in could build for themselves.
+ */
+export const MAX_DEVICES_PER_PERSON = 10;
+
+interface Device {
+  readonly id: string;
+  readonly endpoint: string;
+  readonly p256dh: string;
+  readonly auth: string;
+}
+
+/**
+ * Push one inbox notice to every device of this person. Never throws.
+ *
+ * THREE STEPS, AND THE NETWORK IS NOT INSIDE A TRANSACTION (PRR 2026-09-29).
+ * The devices were read, pushed to one after the other and stamped all inside
+ * one `withTenantDb` — so a push service that was slow to answer held a pooled
+ * database connection for its whole deadline, once per device, and the pool is
+ * ten connections wide. Now: read (database), send (network, all devices at
+ * once), record (database). No connection is held while anything waits on a
+ * third party.
+ */
 export async function pushInboxNotice(
   personId: string,
   action: string,
@@ -72,14 +102,16 @@ export async function pushInboxNotice(
   if (keys === null || !isPushable(action)) {
     return { sent: 0, gone: 0 };
   }
+  const inDb = <T>(run: (db: Db) => Promise<T>): Promise<T> =>
+    options.db === undefined ? withTenantDb(dbHandle, { personId }, run) : run(options.db);
   try {
-    const run = async (db: Db) => {
+    const devices = await inDb(async (db): Promise<Device[]> => {
       // The person's Inbox switch, and the platform's in-app switch, decide.
       const hidden = await hiddenInboxActions(db, personId);
       if (inboxExclusions(hidden).includes(action)) {
-        return { sent: 0, gone: 0 };
+        return [];
       }
-      const devices = await db
+      return db
         .select({
           id: pushSubscriptions.id,
           endpoint: pushSubscriptions.endpoint,
@@ -87,46 +119,65 @@ export async function pushInboxNotice(
           auth: pushSubscriptions.auth,
         })
         .from(pushSubscriptions)
-        .where(eq(pushSubscriptions.personId, personId));
-      if (devices.length === 0) {
-        return { sent: 0, gone: 0 };
-      }
-      const notice = pushNoticeFor(action, meta);
-      let sent = 0;
-      let gone = 0;
-      for (const device of devices) {
-        const outcome = await sendWebPush(device, notice, keys, {
+        .where(eq(pushSubscriptions.personId, personId))
+        .orderBy(asc(pushSubscriptions.createdAt))
+        .limit(MAX_DEVICES_PER_PERSON);
+    });
+    if (devices.length === 0) {
+      return { sent: 0, gone: 0 };
+    }
+    const notice = pushNoticeFor(action, meta);
+    // `sendWebPush` never rejects — a failure is an outcome — so this settles.
+    const outcomes: PushOutcome[] = await Promise.all(
+      devices.map((device) =>
+        sendWebPush(device, notice, keys, {
           ...(options.transport === undefined ? {} : { transport: options.transport }),
-        });
-        if (outcome === "sent") {
-          sent += 1;
+        }),
+      ),
+    );
+    const idsWith = (outcome: PushOutcome): string[] =>
+      devices.filter((_, index) => outcomes[index] === outcome).map((device) => device.id);
+    const sent = idsWith("sent");
+    const gone = idsWith("gone");
+    if (sent.length > 0 || gone.length > 0) {
+      await inDb(async (db) => {
+        if (sent.length > 0) {
           await db
             .update(pushSubscriptions)
             .set({ lastSentAt: new Date() })
-            .where(eq(pushSubscriptions.id, device.id));
-        } else if (outcome === "gone") {
-          gone += 1;
-          await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, device.id));
+            .where(inArray(pushSubscriptions.id, sent));
         }
-      }
-      return { sent, gone };
-    };
-    return options.db === undefined
-      ? await withTenantDb(dbHandle, { personId }, run)
-      : await run(options.db);
+        if (gone.length > 0) {
+          await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, gone));
+        }
+      });
+    }
+    return { sent: sent.length, gone: gone.length };
   } catch (error) {
     logger().warn({ err: error, action }, "push.failed");
     return { sent: 0, gone: 0 };
   }
 }
 
-/** Keep a browser's subscription — its endpoint is its identity, so a repeat updates. */
+/**
+ * Keep a browser's subscription — its endpoint is its identity, so a repeat
+ * updates. Answers whether the subscription is now this person's.
+ *
+ * A REPEAT MAY MOVE THE ROW TO ANOTHER PERSON ONLY WITH THE SAME KEYS. The
+ * legitimate case is one browser and two people: A signs out, B signs in and
+ * turns notifications on, and the browser hands over the subscription it
+ * already had — same endpoint, same keys — so the row must become B's, or A's
+ * notices keep arriving on B's screen. What must not work is naming somebody
+ * else's endpoint with keys of your own: that took the row (and with it their
+ * notifications) on the strength of knowing a URL. The keys are what the
+ * browser holds, so the keys are the proof.
+ */
 export async function savePushSubscription(
   db: Db,
   personId: string,
   subscription: { endpoint: string; p256dh: string; auth: string; userAgent: string | null },
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const saved = await db
     .insert(pushSubscriptions)
     .values({
       id: newId(),
@@ -144,7 +195,31 @@ export async function savePushSubscription(
         auth: subscription.auth,
         userAgent: subscription.userAgent,
       },
-    });
+      // Raw rather than `or(...)`: drizzle types `or` as possibly undefined,
+      // and an absent condition here would mean "always", which is the bug.
+      setWhere: sql`${pushSubscriptions.personId} = ${personId} or (${pushSubscriptions.p256dh} = ${subscription.p256dh} and ${pushSubscriptions.auth} = ${subscription.auth})`,
+    })
+    .returning({ id: pushSubscriptions.id });
+  if (saved.length === 0) {
+    return false;
+  }
+  // The browser that was just saved stays, whatever its age — a subscription
+  // that moved here from another person keeps the date it was first made, and
+  // ordering by date alone deleted it the moment it arrived. Beside it, the
+  // newest nine.
+  await db.delete(pushSubscriptions).where(
+    and(
+      eq(pushSubscriptions.personId, personId),
+      sql`${pushSubscriptions.endpoint} <> ${subscription.endpoint}`,
+      sql`${pushSubscriptions.id} not in (
+        select id from push_subscriptions
+        where person_id = ${personId} and endpoint <> ${subscription.endpoint}
+        order by created_at desc, id desc
+        limit ${MAX_DEVICES_PER_PERSON - 1}
+      )`,
+    ),
+  );
+  return true;
 }
 
 export async function removePushSubscription(

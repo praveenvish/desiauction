@@ -195,9 +195,20 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   demo reminders and the feedback/retention sweep (2026-09-23). ☐F the three job
   secrets in `web.env`.
 - ☐E finops writer-role credential + `finops_events` grant narrowing (freeze §8.2)
-- ☐E PITR drill against the OFF-BOX repo on the production stanza, timed and
-  recorded ([RESTORE_RUNBOOK](RESTORE_RUNBOOK.md) "Point-in-time restore"), then
-  quarterly on staging
+- ☐F **Escrow the backup passphrase and the env files OFF the host**, and open
+  the copy once on another machine to prove it
+  ([SECRET_ROTATION](SECRET_ROTATION.md#escrow-the-two-things-that-cannot-be-regenerated)).
+  They are generated on the host; until this is done the only copy of the key
+  to the backups is on the machine the backups exist to survive. Date done: ____
+- ☐E Restore drill on the PRODUCTION stanza from the off-box repo:
+  `sudo bash ops/deploy/restore-drill-production.sh production` — it restores
+  into a scratch volume with archiving off and never names the live database.
+  Record the RTO and newest-row age it prints in
+  [RESTORE_RUNBOOK](RESTORE_RUNBOOK.md) "Rehearsal record", then quarterly.
+- ☐F `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`) in the
+  production environment's GitHub secrets. Without it every deploy renames
+  every server action, and a page that was open across the deploy must be
+  reloaded before its forms and bids work (the deploy warns when it is absent).
 - ☑ TLS/certificates: Caddy provisions and renews Let's Encrypt automatically
   for all three hostnames — ☐E confirm renewal once in production
 
@@ -402,6 +413,37 @@ empty database.
   query **and a product decision on the expiry window** — `expirePayment` moves
   real payments to a terminal failed state, so a wrong threshold destroys valid
   records. Not shipped blind.
+
+## 12 · Production-readiness audit (2026-09-29)
+
+Full report: `docs/audits/PRR-2026-09-29/REPORT.md`.
+
+- ☐E **Count the rows that break the rules the database does not enforce yet.**
+  29 foreign keys are `NOT VALID` and about two dozen relationship columns have
+  none. Enforcing either refuses the deploy if one existing row disagrees, so
+  count first. Read-only, safe during an auction:
+
+  ```bash
+  docker compose exec -T db psql -U postgres -d desiauction -X -q -f - < ops/db/check-integrity.sql
+  ```
+
+  Every line should read `ok` / `0`. Only then write the migration that
+  validates or adds the constraints. Measured on the test database only.
+- ☐E **Prove the gateway's refund and dispute deliveries in test mode** before
+  the first gateway payment is taken. The handler now binds every event to the
+  order and provider payment it belongs to, reads a refund's anchor from the
+  payment it refunds, and answers 200 to genuine events it does not act on.
+  All of it is tested against the provider's DOCUMENTED payloads, none of it
+  against a real delivery. In Razorpay test mode: capture one order, refund
+  part of it from the dashboard, raise a dispute; each must answer 200 and
+  appear on the payment. Every refusal is logged as
+  `webhook.razorpay_refused` with the check that refused it.
+- ☐E **Turn on frame compression in staging first** (`WS_COMPRESSION=on`,
+  engine). Off by default. Measured locally: six times fewer bytes per bid,
+  about a quarter more delivery time at 250 spectators.
+- ☑ **The engine's migration set is frozen.** It shares the platform's
+  bookkeeping table, so anything added there would be skipped everywhere.
+  `packages/db/scripts/check-journal.mjs` now fails CI if it grows.
 
 ## Go-live gate
 

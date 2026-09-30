@@ -10,6 +10,7 @@ import {
   removePlayerPhoto,
   requestMediaUpload,
 } from "../../../../server/media/actions";
+import { release } from "../../../../lib/release";
 
 /**
  * Organizer player-photo upload (parity §3.1). Same three-step flow as the team
@@ -34,8 +35,9 @@ export function PlayerPhotoUploader({
 
   async function onRemove() {
     setRemoving(true);
-    const result = await removePlayerPhoto({ slug, registrationId });
-    setRemoving(false);
+    const result = await release(removePlayerPhoto({ slug, registrationId }), () => {
+      setRemoving(false);
+    });
     if (result.ok) {
       toast({ title: "Photo removed", tone: "success" });
       router.refresh();

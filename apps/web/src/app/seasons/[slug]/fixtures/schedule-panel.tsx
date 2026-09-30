@@ -54,6 +54,7 @@ import {
   rowStep,
   wallDay,
 } from "./schedule-model";
+import { release } from "../../../../lib/release";
 
 /**
  * THE MATCHES SCREEN (2026-09-27) — the Schedule tab's one screen, where List,
@@ -135,8 +136,9 @@ export function SchedulePanel({
 
   const lifecycle = async (fixture: Row, action: "schedule" | "publish" | "start") => {
     setPendingRow(fixture.id);
-    const outcome = await fixtureLifecycleAction(slug, fixture.id, action);
-    setPendingRow(null);
+    const outcome = await release(fixtureLifecycleAction(slug, fixture.id, action), () => {
+      setPendingRow(null);
+    });
     if (!outcome.ok) {
       toast({ tone: "danger", title: outcome.error ?? "That didn't work." });
       return;

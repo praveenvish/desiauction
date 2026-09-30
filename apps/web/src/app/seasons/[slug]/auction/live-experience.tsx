@@ -117,6 +117,94 @@ export interface FeedState extends LiveFeed {
   seenSeqs: ReadonlySet<number>;
   lastStatus: string | null;
   recoveries: number;
+  /**
+   * Lots whose row was written HERE, from a socket outcome, rather than read
+   * from the server. Such a row is thin — the snapshot carries no team id, no
+   * registration id and no squad marks — and `reconcileFeed` is what thickens
+   * it when the server's own row for the same result arrives.
+   */
+  optimistic: ReadonlySet<string>;
+  /**
+   * What the server rows last reconciled SAID, not which array they were. A
+   * caller that builds its list on every render hands over a new array each
+   * time; comparing arrays would then reconcile on every render, and a state
+   * update during every render is a loop.
+   */
+  seed: string;
+}
+
+/** The part of the server's rows a reconciliation can act on, as one string. */
+export function seedOf(rows: readonly ResolvedLot[]): string {
+  return rows
+    .map(
+      (row) =>
+        `${row.lotId}:${row.status}:${String(row.soldPrice)}:${row.teamId ?? ""}:${
+          row.registrationId ?? ""
+        }:${row.isCaptain ? "c" : ""}${row.isViceCaptain ? "v" : ""}`,
+    )
+    .join("|");
+}
+
+/** A feed with nothing folded into it yet, over the server's rows. */
+export function initialFeed(initial: readonly ResolvedLot[]): FeedState {
+  return {
+    resolved: [...initial],
+    events: [],
+    folded: null,
+    seenSeqs: new Set(),
+    lastStatus: null,
+    recoveries: 0,
+    optimistic: new Set(),
+    seed: seedOf(initial),
+  };
+}
+
+/**
+ * THE SERVER'S ROWS, MET WITH THE SOCKET'S (PRR 2026-09-29).
+ *
+ * `useLiveFeed` read the server's resolved lots exactly once, as the initial
+ * value of its state. Every sale after that was a row written from the
+ * snapshot, which knows the buyer's NAME and not their id — so anything that
+ * totals by team id never saw it. The auctioneer's end-of-night card read
+ * "4 of 15 · ₹0 spent" for every team whose buys all happened in that tab, and
+ * kept reading it however many times the page refreshed its data, because the
+ * refreshed rows were never looked at again.
+ *
+ * Now each new server read is folded in:
+ *
+ *   · the server's row REPLACES a thin one for the same lot when both describe
+ *     the same result (same status, same price) — that is the thickening;
+ *   · when they DISAGREE the thin row stays. The socket and a page render race
+ *     each other, and a render that started before the hammer must not take a
+ *     sale back off the board. The next read settles it;
+ *   · a row the server used to list and no longer does is dropped, unless the
+ *     socket wrote it: the server is the authority on its own rows.
+ */
+export function reconcileFeed(feed: FeedState, server: readonly ResolvedLot[]): FeedState {
+  const seed = seedOf(server);
+  if (seed === feed.seed) {
+    return feed;
+  }
+  const serverByLot = new Map(server.map((row) => [row.lotId, row]));
+  const optimistic = new Set(feed.optimistic);
+  const kept: ResolvedLot[] = [];
+  for (const row of feed.resolved) {
+    if (!feed.optimistic.has(row.lotId)) {
+      continue; // an older server row: the new read replaces the whole set
+    }
+    const fromServer = serverByLot.get(row.lotId);
+    if (
+      fromServer !== undefined &&
+      fromServer.status === row.status &&
+      fromServer.soldPrice === row.soldPrice
+    ) {
+      optimistic.delete(row.lotId); // confirmed: the server's row takes over
+      continue;
+    }
+    serverByLot.delete(row.lotId); // disagreement, or not there yet: ours stands
+    kept.push(row);
+  }
+  return { ...feed, resolved: [...serverByLot.values(), ...kept], optimistic, seed };
 }
 
 /**
@@ -131,12 +219,23 @@ export function foldSnapshot(
   snapshot: AuctionSnapshot,
   money: MoneyFormat,
 ): FeedState {
-  let { resolved, events, seenSeqs } = feed;
+  let { resolved, events, seenSeqs, optimistic } = feed;
   const outcome = snapshot.lastOutcome;
   if (outcome !== null && !feed.seenSeqs.has(outcome.atSeq)) {
     seenSeqs = new Set(feed.seenSeqs).add(outcome.atSeq);
     const kind = OUTCOME_KIND[outcome.kind.toLowerCase()] ?? "sold";
+    if (kind === "reopened" || kind === "held") {
+      // AN UNDONE RESULT IS NO LONGER A RESULT. The row stayed — a sale the
+      // auctioneer had just reversed went on counting in the buyer's squad and
+      // spend until the lot happened to resolve again.
+      if (resolved.some((entry) => entry.lotId === outcome.lotId)) {
+        resolved = resolved.filter((entry) => entry.lotId !== outcome.lotId);
+        optimistic = new Set(optimistic);
+        (optimistic as Set<string>).delete(outcome.lotId);
+      }
+    }
     if (kind === "sold" || kind === "unsold" || kind === "withdrawn") {
+      optimistic = new Set(optimistic).add(outcome.lotId);
       const rest = resolved.filter((entry) => entry.lotId !== outcome.lotId);
       resolved = [
         ...rest,
@@ -227,6 +326,8 @@ export function foldSnapshot(
     lastStatus: snapshot.auctionStatus,
     recoveries,
     folded: snapshot,
+    optimistic,
+    seed: feed.seed,
   };
 }
 
@@ -241,18 +342,17 @@ export function foldSnapshot(
  */
 export function useLiveFeed(initial: ResolvedLot[], snapshot: AuctionSnapshot | null): LiveFeed {
   const money = useMoney();
-  const [feed, setFeed] = useState<FeedState>(() => ({
-    resolved: initial,
-    events: [],
-    folded: null,
-    seenSeqs: new Set(),
-    lastStatus: null,
-    recoveries: 0,
-  }));
-  if (snapshot !== null && snapshot !== feed.folded) {
-    setFeed(foldSnapshot(feed, snapshot, money));
+  const [feed, setFeed] = useState<FeedState>(() => initialFeed(initial));
+  // Both during render, for the reason above — and in this order: the server's
+  // rows first, so an outcome folded in the same pass lands on top of them.
+  let next = reconcileFeed(feed, initial);
+  if (snapshot !== null && snapshot !== next.folded) {
+    next = foldSnapshot(next, snapshot, money);
   }
-  return { resolved: feed.resolved, events: feed.events };
+  if (next !== feed) {
+    setFeed(next);
+  }
+  return { resolved: next.resolved, events: next.events };
 }
 
 /**
