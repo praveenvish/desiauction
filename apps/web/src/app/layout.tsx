@@ -53,6 +53,11 @@ export const metadata: Metadata = {
     locale: "en_IN",
   },
   twitter: { card: "summary_large_image" },
+  // Lets Google show a LARGE image beside a result (mobile results, Discover)
+  // rather than a small one or none. It grants nothing on its own: indexing is
+  // still decided by the route registry's header, and a page that states its
+  // own `robots` (a squad page, a noindex page) replaces this whole object.
+  robots: { "max-image-preview": "large" },
 };
 
 // Console default is Daylight; live surfaces pin floodlight per C-4 (doc 18).
