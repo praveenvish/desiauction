@@ -25,7 +25,9 @@ const envSchema = z.object({
    * export artifacts the web tier VERIFIES, so both must resolve the SAME root
    * — `finopsDeps`'s own `os.tmpdir()` default silently gives them different
    * ones and the ops board then reports a permanent, false "exports failed".
-   * Deployments set an absolute path (S3-compatible store, IP-6 pre-deploy). */
+   * Deployments set an absolute path (S3-compatible store, IP-6 pre-deploy).
+   * The default resolves against the PRIMARY checkout, even from a worktree
+   * (resolveFinopsStorageDir, @desiauction/messaging; it matches this literal). */
   FINOPS_STORAGE_DIR: z.string().min(1).default("../../.local/finops-artifacts"),
   /**
    * The shared artifact store (PRR P1-4). The runner WRITES artifacts the web

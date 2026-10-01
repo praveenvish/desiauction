@@ -364,9 +364,10 @@ const envSchema = z.object({
   // default is `os.tmpdir()`, and a web tier reading a different root than the
   // runner wrote to reports a FALSE "exports failed" on the ops board forever.
   // Production replaces this with the S3-compatible store (IP-6 freeze §pre-deploy).
-  // The default is relative to the PROCESS cwd, and every local process (web,
-  // seed, runner) starts one directory deep — so all three land on the same
-  // repo-root `.local/finops-artifacts`. Deployments set an absolute path.
+  // Left at this default, all three land on the PRIMARY checkout's
+  // `.local/finops-artifacts`, even from a worktree, because every worktree
+  // shares the one local database (resolveFinopsStorageDir, @desiauction/messaging;
+  // it matches this literal). Deployments set an absolute path.
   FINOPS_STORAGE_DIR: z.string().min(1).default("../../.local/finops-artifacts"),
   /**
    * The finops artifact store (PRR P1-4). "filesystem" (default) writes to

@@ -149,9 +149,11 @@ test("founder demo: sign in → platform health → find an org → inspect → 
     await page.getByTestId("admin-health-clear").locator("summary").click();
   }
   await expect(orgHealth).toBeVisible();
-  await expect(orgHealth.getByText("Settlement ingest")).toBeVisible();
-  await expect(orgHealth.getByText("Dispatch channels")).toBeVisible();
-  await expect(orgHealth.getByText("Certification")).toBeVisible();
+  // The fact LABELS, matched whole: a troubled club's "What is wrong" cell says
+  // "Certification fail" too, and a substring match then finds two elements.
+  await expect(orgHealth.getByText("Settlement ingest", { exact: true })).toBeVisible();
+  await expect(orgHealth.getByText("Dispatch channels", { exact: true })).toBeVisible();
+  await expect(orgHealth.getByText("Certification", { exact: true })).toBeVisible();
   await axeClean(page, "/admin/health");
 
   // No card offers the finance console: `platform:admin` holds no finops
