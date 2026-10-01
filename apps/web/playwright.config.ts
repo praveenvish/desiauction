@@ -109,12 +109,15 @@ export default defineConfig({
     baseURL: "http://localhost:3050",
     // The precompiled server is a production build, and production registers
     // a service worker (public/sw.js). It is ALLOWED, so every spec runs the
-    // product the way a phone does, worker included. That is safe for mocks
-    // because the worker answers only two things, navigations and
-    // /_next/static files; a `page.route` on anything else (router fetches,
-    // the API, other origins) still sees its request. A spec that must mock a
-    // NAVIGATION or a build file has to block the worker for itself:
+    // product the way a phone does, worker included.
+    //
+    // A SPEC THAT FAKES RESPONSES WITH `page.route` MUST BLOCK THE WORKER:
     //   test.use({ serviceWorkers: "block" });
+    // In Chromium a page.route still sees requests the worker passes through,
+    // but on WebKit, once a worker controls the page, page-level routing sees
+    // none of its requests at all, and the fakes go silently unused (found by
+    // the first nightly ever to run on WebKit: lost-request and Google Drive
+    // import "failed" only because their mocks never fired).
     serviceWorkers: "allow",
   },
   /*

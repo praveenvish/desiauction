@@ -176,9 +176,13 @@ test.describe("server unreachable", () => {
     await page.getByRole("link", { name: "Try again" }).click();
     await expect(page.getByRole("heading", { name: /You.re offline/ })).toBeVisible();
 
+    // Back: the screen notices by itself (it asks /healthz on a timer) and
+    // opens the page. No click: on a slow machine the click raced that very
+    // reload and waited on a button that had just gone.
     await startServer();
-    await page.getByRole("link", { name: "Try again" }).click();
-    await expect(page.getByRole("heading", { name: /You.re offline/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /You.re offline/ })).toHaveCount(0, {
+      timeout: 45_000,
+    });
     await expect(page.locator("main").first()).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/pricing");
   });

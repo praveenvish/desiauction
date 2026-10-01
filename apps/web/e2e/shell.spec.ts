@@ -4,6 +4,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { formatPhone } from "../src/lib/format-phone";
 import { latestOtp } from "./otp";
 
+// This spec fakes network responses with `page.route`, so the service worker
+// is blocked for it: on WebKit, once a worker controls the page, page-level
+// routing never sees the page's requests (even ones the worker passes
+// through), and the fakes would go silently unused (playwright.config.ts).
+test.use({ serviceWorkers: "block" });
+
 // PX-2 Product Shell verification: authenticated landing, rail navigation,
 // breadcrumbs + competition tabs, command palette, user menu, mobile chrome,
 // route visibility. Permanent — every future milestone builds inside this.

@@ -2,6 +2,12 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { latestOtp } from "./otp";
 
+// This spec fakes network responses with `page.route`, so the service worker
+// is blocked for it: on WebKit, once a worker controls the page, page-level
+// routing never sees the page's requests (even ones the worker passes
+// through), and the fakes would go silently unused (playwright.config.ts).
+test.use({ serviceWorkers: "block" });
+
 /*
  * THE GOOGLE ROUTE, WITHOUT GOOGLE.
  *

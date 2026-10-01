@@ -133,7 +133,12 @@ async function settle(page: Page, path: string): Promise<void> {
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {
-        requestIdleCallback(() => resolve(), { timeout: 3_000 });
+        // Safari has no requestIdleCallback; there, a quiet second stands in.
+        if (typeof requestIdleCallback === "function") {
+          requestIdleCallback(() => resolve(), { timeout: 3_000 });
+        } else {
+          setTimeout(resolve, 1_000);
+        }
       }),
   );
 }
