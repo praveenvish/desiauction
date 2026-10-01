@@ -10,6 +10,7 @@ import { formatDateRange } from "../../app/c/format";
 import { thumbInitials } from "../public/tournament-card";
 import styles from "../../app/home.module.css";
 import { Glyph, type GlyphName } from "./home/glyphs";
+import { tickerItems } from "./ticker-items";
 
 /** How many real tournaments the landing names. Three, to match its trios. */
 const STRIP_SIZE = 3;
@@ -62,37 +63,39 @@ export const liveTournaments = cache(async (): Promise<DirectoryEntry[]> => {
 
 const sportName = (key: string): string => SPORTS.find((sport) => sport.key === key)?.label ?? key;
 
-/** The gold ticker under the hero: real leagues first, then what is always true. */
+/**
+ * The gold ticker under the hero: real leagues first, then what is always true
+ * (the words: ticker-items.ts).
+ *
+ * The run is drawn twice and slides by exactly half its width, so the loop has
+ * no seam. Each copy is its own group ending in a separator, and nothing sits
+ * BETWEEN the groups: with the gap on the run itself, half the width came out
+ * half a gap short, and the strip jumped 20px every time it looped.
+ */
 export async function LiveTicker({ sportCount }: { sportCount: number }) {
   const entries = await liveTournaments();
-  const items = [
-    ...entries.map(
-      (entry) =>
-        `${entry.name} · ${entry.location ?? entry.orgName} · ${String(entry.playerCount)} players · ${String(entry.teamCount)} teams`,
-    ),
-    `${String(sportCount)} sports`,
-    SPORTS.map((sport) => sport.label).join(" · "),
-    "Free during beta",
-    "No app to install",
-  ];
-  const run = (
-    <>
-      {entries.length > 0 ? <span>● Live on DesiAuction</span> : null}
+  const sports = SPORTS.map((sport) => sport.label);
+  const { lead, items } = tickerItems(entries, sports.slice(0, sportCount));
+  const group = (
+    <span className={styles.tickGroup}>
+      {lead !== null ? <span className={styles.tickLead}>{lead}</span> : null}
       {items.map((item) => (
-        <span key={item}>
-          {item.toUpperCase()}
-          <span aria-hidden="true"> ◆</span>
+        <span key={item} className={styles.tickItem}>
+          {item}
+          <span className={styles.tickSep}>◆</span>
         </span>
       ))}
-    </>
+    </span>
   );
   return (
     <div className={styles.ticker}>
-      <p className={styles.srOnly}>{items.join(". ")}.</p>
+      <p className={styles.srOnly}>
+        {[lead, ...items].filter((text) => text !== null).join(". ")}.
+      </p>
       {/* Twice, so the loop's seam never shows; the copy is for eyes only. */}
       <div className={styles.tickRun} aria-hidden="true">
-        {run}
-        {run}
+        {group}
+        {group}
       </div>
     </div>
   );
