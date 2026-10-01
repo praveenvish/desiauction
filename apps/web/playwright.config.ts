@@ -107,6 +107,12 @@ export default defineConfig({
   use: {
     // localhost (not 127.0.0.1): WebAuthn rpID must suffix-match the host.
     baseURL: "http://localhost:3050",
+    // The precompiled server is a production build, and production registers
+    // a service worker (public/sw.js). A worker answers navigations and build
+    // files itself, so `page.route` stops seeing them and a test's mocks go
+    // quietly unused. Blocked for every test; e2e/pwa.spec.ts opts back in to
+    // test the worker itself.
+    serviceWorkers: "block",
   },
   /*
    * TWO ENGINES, AND UNTIL NOW THERE WERE NONE DECLARED AT ALL.

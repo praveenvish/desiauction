@@ -1,0 +1,142 @@
+<!doctype html>
+<!--
+  THE OFFLINE SCREEN (public/sw.js). Shown in place of a page that could not be
+  reached, at that page's own address, so "Try again" and the automatic retry
+  both mean "load what you asked for".
+
+  SELF-CONTAINED ON PURPOSE: no stylesheet, font, image or script FILE. It is
+  stored once at install and must render from the device alone, after any
+  number of deploys have renamed every build file it could have linked.
+
+  The retry waits for the browser's `online` event rather than a timer: a
+  timed meta refresh moves a screen reader's focus mid-sentence (WCAG 2.2.1,
+  axe's meta-refresh rule), and polling a dead network only spends battery.
+  The one inline script is allowed because this file is served without the
+  per-request script policy (middleware.ts skips it); without the script the
+  page still works, and "Try again" is a plain link.
+
+  Editing this file changes its digest: update OFFLINE_REVISION in sw.js to the
+  value pwa.test.ts prints, or devices keep the old page.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>You're offline · DesiAuction</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --surface: #fbfaf7;
+        --raised: #ffffff;
+        --text: #2b2822;
+        --muted: #58534a;
+        --line: rgba(43, 40, 34, 0.14);
+        --gold: #f0b43c;
+        --on-gold: #070a0f;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --surface: #0b1018;
+          --raised: #101623;
+          --text: #c9d4e8;
+          --muted: #9fb0cc;
+          --line: rgba(201, 212, 232, 0.14);
+          --gold: #e6b24a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+        background: var(--surface);
+        color: var(--text);
+        font:
+          16px/1.5 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      main {
+        width: 100%;
+        max-width: 380px;
+        padding: 32px 24px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--raised);
+        text-align: center;
+      }
+      svg {
+        display: block;
+        margin: 0 auto 20px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.375rem;
+        line-height: 1.25;
+      }
+      p {
+        margin: 0 0 24px;
+        color: var(--muted);
+      }
+      a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 24px;
+        border-radius: 999px;
+        background: var(--gold);
+        color: var(--on-gold);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      a:focus-visible {
+        outline: 3px solid var(--text);
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg width="56" height="56" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="62" height="62" rx="17" fill="#E6B24A" />
+        <g transform="translate(-2.25 0)">
+          <path
+            d="M13 16h10c9 0 16 7 16 16s-7 16-16 16H13V16Zm7 7v18h3a9 9 0 0 0 0-18h-3Z"
+            fill="#0B1018"
+          />
+          <path d="M23 44h5v4h-5z" fill="#0B1018" />
+          <path
+            d="M30 48 43 16h7L37 48h-7Z"
+            fill="#E6B24A"
+            stroke="#E6B24A"
+            stroke-width="5"
+            stroke-linejoin="round"
+          />
+          <path d="M30 48 43 16h7L37 48h-7Z" fill="#0B1018" />
+          <path d="m46.5 24 9 24h-7l-2-6h-8l3-7h3l-1.5-4 3.5-7Z" fill="#0B1018" />
+        </g>
+      </svg>
+      <h1>You're offline</h1>
+      <p>
+        DesiAuction needs a connection to show this page. Check your mobile data or Wi-Fi — this
+        screen keeps trying and opens the page as soon as you're back.
+      </p>
+      <a href="">Try again</a>
+    </main>
+    <script>
+      addEventListener("online", () => location.reload());
+    </script>
+  </body>
+</html>

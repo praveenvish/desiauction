@@ -29,9 +29,11 @@ export const config = {
   matcher: [
     {
       // Pages and server actions. Not static assets, not images, not the API
-      // routes (webhooks and jobs set their own ids and render no scripts).
+      // routes (webhooks and jobs set their own ids and render no scripts),
+      // and not the installed app's files: the worker, its scriptless
+      // offline page, and the manifest.
       source:
-        "/((?!_next/static|_next/image|api/|favicon.ico|icon.png|apple-icon.png|sw.js|brand/|marketing/|_media/).*)",
+        "/((?!_next/static|_next/image|api/|favicon.ico|icon.png|apple-icon.png|sw.js|offline.html|manifest.webmanifest|brand/|marketing/|_media/).*)",
       // A router prefetch renders nothing a nonce could protect.
       missing: [
         { type: "header", key: "next-router-prefetch" },

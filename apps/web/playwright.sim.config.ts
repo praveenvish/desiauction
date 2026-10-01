@@ -18,6 +18,9 @@ export default defineConfig({
     actionTimeout: 20_000,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
+    // As in playwright.config.ts: a production build's service worker would
+    // answer requests the simulation means to watch.
+    serviceWorkers: "block",
   },
   expect: { timeout: 15_000 },
   outputDir: process.env["SIM_OUT"] ?? "test-results-sim",

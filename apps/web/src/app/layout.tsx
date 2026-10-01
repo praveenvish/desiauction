@@ -16,6 +16,7 @@ import { ReportProblemProvider } from "../components/report-problem/report-probl
 import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
 import { ActionFailureNotice } from "../components/action-failure-notice";
+import { AppInstall } from "../components/pwa/app-install";
 import { ClientErrorListener } from "../components/client-error-listener";
 import { WebVitalsReporter } from "../components/web-vitals-reporter";
 import { ProductShell } from "../components/shell/product-shell";
@@ -58,6 +59,11 @@ export const metadata: Metadata = {
   // still decided by the route registry's header, and a page that states its
   // own `robots` (a squad page, a noindex page) replaces this whole object.
   robots: { "max-image-preview": "large" },
+  // The installed app on an iPhone (Share → Add to Home Screen). iOS reads
+  // these tags, not the manifest's display mode: without `capable` it opens
+  // the site in a Safari frame. The status bar stays "default" (solid, above
+  // the page), because "black-translucent" would draw it over every header.
+  appleWebApp: { capable: true, title: "DesiAuction", statusBarStyle: "default" },
 };
 
 // Console default is Daylight; live surfaces pin floodlight per C-4 (doc 18).
@@ -302,6 +308,8 @@ export default async function RootLayout({
         <WebVitalsReporter />
         {/* …and said to the person, when what they asked for never came back. */}
         <ActionFailureNotice />
+        {/* …and installs as an app, and says so when it is offline (sw.js). */}
+        <AppInstall register={env.NODE_ENV === "production"} />
         <AppLinkProvider>
           <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
             <ProductShell

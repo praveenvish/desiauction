@@ -8,6 +8,7 @@ import {
   WHATSAPP_LANGUAGES,
   type WhatsAppLanguage,
 } from "../../lib/whatsapp-consent";
+import { registerServiceWorker } from "../../lib/pwa";
 import type { PersonChannelRow } from "../../server/messaging/catalogue";
 import {
   removePushSubscriptionAction,
@@ -297,7 +298,7 @@ export function PushDeviceSwitch({ publicKey }: { publicKey: string }) {
       setState(permission === "denied" ? "blocked" : "off");
       return;
     }
-    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    const registration = await registerServiceWorker();
     await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
