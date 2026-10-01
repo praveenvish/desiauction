@@ -1,6 +1,5 @@
-import { resolve } from "node:path";
-
 import type { Db } from "@desiauction/db";
+import { resolveFinopsStorageDir } from "@desiauction/messaging/finops-storage";
 import {
   bucketArtifactStoreFromEnv,
   finopsDeps,
@@ -30,8 +29,13 @@ import { logger } from "../logger";
  * This module is the fix: one env-configured root, shared by web, the seed and
  * the runner. Production replaces the filesystem store with the S3-compatible
  * one (IP-6 freeze, pre-deploy) — the port does not change, only the adapter.
+ * Left at its default, the root is the PRIMARY checkout's, because every
+ * worktree shares the one local database (see resolveFinopsStorageDir).
  */
-export const FINOPS_STORAGE_DIR: string = resolve(process.cwd(), env.FINOPS_STORAGE_DIR);
+export const FINOPS_STORAGE_DIR: string = resolveFinopsStorageDir(
+  env.FINOPS_STORAGE_DIR,
+  process.cwd(),
+);
 
 // Moved to packages/messaging with the adapters (the runner needs it too);
 // re-exported for the regression suite that drives it directly.

@@ -7,6 +7,8 @@ import { ContentLayout } from "../../../components/public/content-layout";
 import { OperatorIdentityCard } from "../../../components/public/operator-identity";
 import { PageBody, PageHero, SideCard } from "../../../components/public/public-kit";
 import { env } from "../../../env";
+import { JsonLd } from "../../../components/seo/json-ld";
+import { breadcrumbJsonLd } from "../../../server/seo/json-ld";
 import { Prose, tocOf } from "../../../content/blocks";
 import { LEGAL_DOCUMENTS, legalDocument } from "../../../content/legal";
 import "../../content.css";
@@ -23,10 +25,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const doc = legalDocument(slug);
   if (doc === undefined) {
-    return { title: "Legal · DesiAuction" };
+    return { title: "Legal" };
   }
   return {
-    title: `${doc.title} · DesiAuction`,
+    title: doc.title,
     description: doc.summary,
     alternates: { canonical: `${env.PUBLIC_BASE_URL}/legal/${slug}` },
   };
@@ -44,6 +46,12 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
   }
   return (
     <main className="content-page">
+      <JsonLd
+        data={breadcrumbJsonLd(env.PUBLIC_BASE_URL, [
+          { name: "Legal", path: "/legal" },
+          { name: doc.title, path: `/legal/${doc.slug}` },
+        ])}
+      />
       <PageHero
         size="compact"
         eyebrow={

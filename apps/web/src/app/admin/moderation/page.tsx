@@ -10,7 +10,7 @@ import "../../seasons/seasons.css";
 import "../admin.css";
 import "./moderation.css";
 
-export const metadata = { title: "Moderation · Platform admin · DesiAuction" };
+export const metadata = { title: "Moderation · Platform admin" };
 
 /**
  * THE MODERATION DESK (0072) — taking a public season page down.

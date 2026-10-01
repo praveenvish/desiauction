@@ -8,7 +8,7 @@ import { safeNext } from "../../server/auth/redirect";
 import { OnboardingPanel } from "./onboarding-steps";
 import "./onboarding.css";
 
-export const metadata = { title: "Welcome · DesiAuction" };
+export const metadata = { title: "Welcome" };
 
 // 2026-07-24 council collapse: onboarding is ONE question — your name (it goes
 // on team sheets, receipts and the auction stage, so the product genuinely

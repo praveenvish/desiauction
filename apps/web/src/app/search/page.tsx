@@ -8,7 +8,7 @@ import { LinkRow, LinkRows, PageBody, PageHero } from "../../components/public/p
 import "../content.css";
 
 export const metadata: Metadata = {
-  title: "Search · DesiAuction",
+  title: "Search",
   description: "Search help, legal, pricing and support.",
   // Search results are not content to index.
   robots: { index: false },

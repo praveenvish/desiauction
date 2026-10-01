@@ -7,7 +7,7 @@ import "../../../seasons.css";
 import "../auction.css";
 import "./plan.css";
 
-export const metadata = { title: "My plan · DesiAuction" };
+export const metadata = { title: "My plan" };
 
 /**
  * MY PLAN (WR-1): the owner's private list of the players they mean to bid

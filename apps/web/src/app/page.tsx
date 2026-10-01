@@ -3,6 +3,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { SPORTS } from "@desiauction/core";
 import { env } from "../env";
+import { JsonLd } from "../components/seo/json-ld";
+import { SOCIAL_ACCOUNTS } from "../content/social";
+import { SUPPORT_EMAIL } from "../content/support";
+import {
+  organizationJsonLd,
+  softwareApplicationJsonLd,
+  webSiteJsonLd,
+} from "../server/seo/json-ld";
 import { LANDING } from "../content/marketing";
 import { LiveProof, LiveTicker } from "../components/marketing/live-tournaments";
 import { LandingVoices } from "../components/marketing/landing-voices";
@@ -16,11 +24,13 @@ import styles from "./home.module.css";
 import "./marketing.css";
 import { START_CLUB_LOGIN } from "../lib/start-intent";
 
+// At most 160 characters: past that, search results cut it off mid-sentence
+// (the SEO suite holds every public page to 50–160).
 const description =
-  "Run a live player auction for your league: owners bid from their phones while the room watches the big screen. Registration, squads, fixtures and receipts in one place. Free during beta.";
+  "Run your league's player auction live: owners bid from their phones while the room watches the big screen. Registration to receipts in one place. Free in beta.";
 const title = "DesiAuction — Live player auctions for your league";
 export const metadata: Metadata = {
-  title,
+  title: { absolute: title },
   description,
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/` },
   openGraph: {
@@ -60,6 +70,18 @@ export default function LandingPage() {
   return (
     <HomeMotion>
       <main className={styles.home} data-theme="floodlight">
+        {/* SEO-1 Phase 2: who we are, what the site is called, and what the product is. */}
+        <JsonLd
+          data={[
+            organizationJsonLd({
+              base: env.PUBLIC_BASE_URL,
+              supportEmail: SUPPORT_EMAIL,
+              profiles: SOCIAL_ACCOUNTS.map((account) => account.href),
+            }),
+            webSiteJsonLd(env.PUBLIC_BASE_URL),
+            softwareApplicationJsonLd({ base: env.PUBLIC_BASE_URL, description }),
+          ]}
+        />
         <Hero signupHref={SIGNUP.href} signupLabel={SIGNUP.label} sportCount={sports.length} />
         <Suspense fallback={null}>
           <LiveTicker sportCount={sports.length} />

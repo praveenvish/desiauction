@@ -11,7 +11,7 @@ import "../../seasons/seasons.css";
 import "../admin.css";
 import "./demos.css";
 
-export const metadata = { title: "Demos · Platform admin · DesiAuction" };
+export const metadata = { title: "Demos · Platform admin" };
 
 /**
  * THE DEMO DESK — who asked to be shown the product, and what we did about it.

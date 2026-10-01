@@ -69,6 +69,9 @@ www.__PUBLIC_DOMAIN__ {
 # gets, which is why this must be a real certificate and not a self-signed one.
 __ENGINE_DOMAIN__ {
 	encode zstd gzip
+	# A websocket and JSON endpoint, never a page. It is said once here so no
+	# crawler that finds the hostname lists it (SEO-1).
+	header X-Robots-Tag "noindex, nofollow"
 	reverse_proxy __STACK__-engine:4000
 }
 
@@ -85,6 +88,14 @@ __S3_DOMAIN__ {
 	request_body {
 		max_size 25MB
 	}
+
+	# PHOTOS REACH SEARCH ONLY THROUGH A PAGE THAT MAY SHOW THEM (SEO-1).
+	#
+	# Player photos can be of minors, and a photo in an image index outlives
+	# the page it came from, the take-down and the erasure alike. `noimageindex`
+	# keeps the files themselves out of image search. The pages that embed them
+	# carry their own indexing rules.
+	header X-Robots-Tag "noindex, noimageindex"
 
 	# PHOTOS ARE CACHED BY THE BROWSER FOR A DAY.
 	#

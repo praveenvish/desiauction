@@ -25,7 +25,9 @@ import {
 } from "../../../server/competition/public";
 import { currentSession } from "../../../server/auth/actions";
 import { TopBuysPodium } from "../top-buys";
-import { serializeJsonLd } from "../../../server/seo/json-ld";
+import { breadcrumbJsonLd, sportsEventJsonLd } from "../../../server/seo/json-ld";
+import { seasonDescription, seasonTitle } from "../../../server/seo/season-copy";
+import { JsonLd } from "../../../components/seo/json-ld";
 import { IconCalendar, IconMapPin, IconUsers } from "../../../components/marketing/icons";
 import {
   HeroFact,
@@ -65,12 +67,35 @@ export async function generateMetadata({
   const { slug } = await params;
   const view = await competitionView(slug);
   if (view === null) {
-    return { title: "Season · DesiAuction" };
+    return { title: "Season" };
   }
-  const description = `${view.orgName}${view.location !== null ? ` · ${view.location}` : ""} · ${formatDateRange(view.startsOn, view.endsOn)}. ${view.open ? "Registration is open — join as a player." : "Run on DesiAuction."}`;
+  // SEO-1 Phase 5: written for how people search a league, from facts the
+  // page shows (server/seo/season-copy.ts). The top buy is a team and a price,
+  // never a player's name.
+  const auctionDone = view.auctionStatus === "completed" || view.auctionStatus === "reconciled";
+  const [topBuy] = auctionDone ? await publicTopBuys(view.slug, 1) : [];
+  const copy = {
+    name: view.name,
+    orgName: view.orgName,
+    sport: sportPackFor(view.sport).label,
+    location: view.location,
+    startsOn: view.startsOn,
+    dates: formatDateRange(view.startsOn, view.endsOn),
+    open: view.open,
+    auctionDone,
+    teamCount: view.teams.length,
+    topBuy:
+      topBuy === undefined || topBuy.teamName === null
+        ? null
+        : {
+            teamName: topBuy.teamName,
+            price: formatAmount(paise(topBuy.pricePaise), view.auctionUnit),
+          },
+  };
+  const description = seasonDescription(copy);
   const url = `${env.PUBLIC_BASE_URL}/c/${view.slug}`;
   return {
-    title: `${view.name} · DesiAuction`,
+    title: seasonTitle(copy),
     description,
     alternates: { canonical: url },
     // This view only exists for a published competition, so `listed` is always
@@ -224,26 +249,49 @@ export default async function PublicCompetitionPage({
       : []),
   ];
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "SportsEvent",
-    name: view.name,
-    ...(view.startsOn !== null ? { startDate: view.startsOn } : {}),
-    ...(view.endsOn !== null ? { endDate: view.endsOn } : {}),
-    ...(view.location !== null ? { location: { "@type": "Place", name: view.location } } : {}),
-    organizer: { "@type": "Organization", name: view.orgName },
-    url: `${env.PUBLIC_BASE_URL}/c/${view.slug}`,
-  };
+  /*
+   * WHERE, SAID ONCE. The venue every match is played at (with its address)
+   * beats the season's free-text location: it is what a player needs to find
+   * the ground, and it is the only address the event markup below may state.
+   */
+  const venueLine =
+    view.venue === null
+      ? null
+      : [view.venue.name, view.venue.address, view.venue.city]
+          .filter((part): part is string => part !== null)
+          // A club that typed the city as the venue's name reads "Mumbai, SSVG
+          // Stadium, Mumbai" otherwise. Each part once.
+          .filter(
+            (part, index, parts) =>
+              parts.findIndex((other) => other.toLowerCase() === part.toLowerCase()) === index,
+          )
+          .join(", ");
+  const base = env.PUBLIC_BASE_URL;
+  // SEO-1 Phase 2. The event markup exists only when Google's required fields
+  // (a start date and a venue address) can be filled honestly, and it states
+  // nothing the page does not show: name, dates, venue, organizer, teams.
+  const structuredData = [
+    sportsEventJsonLd({
+      base,
+      slug: view.slug,
+      name: view.name,
+      description: `${view.orgName} · ${formatDateRange(view.startsOn, view.endsOn)}`,
+      sport: sportPackFor(view.sport).label,
+      startsOn: view.startsOn,
+      endsOn: view.endsOn,
+      orgName: view.orgName,
+      image: `${base}/c/${view.slug}/opengraph-image`,
+      venue: view.venue,
+      teams: view.teams.map((team) => team.name),
+    }),
+    breadcrumbJsonLd(base, [
+      { name: "Tournaments", path: "/c" },
+      { name: view.name, path: `/c/${view.slug}` },
+    ]),
+  ];
   return (
     <main className="public-page mk">
-      <script
-        type="application/ld+json"
-        // Structured data for search engines (PX-5 SEO scope). PX-11 F2: the
-        // payload carries organizer-controlled names, so it is HTML-escaped for
-        // the <script> context (serializeJsonLd) — a raw JSON.stringify here is
-        // a stored-XSS breakout.
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-      />
+      <JsonLd data={structuredData} />
       <PageHero
         size="compact"
         cover={view.coverUrl === null ? null : { src: view.coverUrl }}
@@ -281,7 +329,11 @@ export default async function PublicCompetitionPage({
         lede={<span data-testid="public-org">A community event by {view.orgName}</span>}
         meta={
           <>
-            {view.location !== null ? (
+            {venueLine !== null ? (
+              <HeroFact icon={<IconMapPin />}>
+                <span data-testid="public-venue">{venueLine}</span>
+              </HeroFact>
+            ) : view.location !== null ? (
               <HeroFact icon={<IconMapPin />}>{view.location}</HeroFact>
             ) : null}
             <HeroFact icon={<IconCalendar />}>

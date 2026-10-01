@@ -29,6 +29,13 @@ const envSchema = z.object({
   // way by whatever aggregates them.
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   SENTRY_DSN: z.url().optional(),
+  // SEO-1: IndexNow's shared key (server/seo/indexnow.ts). Public by design,
+  // since the protocol serves it at /indexnow-key.txt. Production only: unset,
+  // nothing is ever announced, which is right for dev, e2e and staging.
+  INDEXNOW_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9-]{8,128}$/, "IndexNow keys are 8-128 letters, digits or dashes")
+    .optional(),
   // WebAuthn relying party (M-IP2-2). Defaults serve local dev + e2e; deployed
   // environments set real values (rpID must suffix-match the browser host).
   RP_ID: z.string().min(1).default("localhost"),
@@ -209,11 +216,12 @@ const envSchema = z.object({
    * `auto` keeps every existing caller's behaviour byte for byte: real mailer
    * when configured, dev inbox when not.
    *
-   * `ses` is Amazon SES (the SES_* settings below); `resend` is Resend over
-   * EMAIL_API_*; `http` is Resend's historical name and means the same. Which
+   * `ses` is Amazon SES (the SES_* settings below); `zeptomail` is ZeptoMail
+   * (Zoho CPaaS, ZEPTOMAIL_* below); `resend` is Resend over EMAIL_API_*;
+   * `http` is Resend's historical name and means the same. Which
    * one is a restart, not a deploy — the rollback path (mail-provider.ts).
    */
-  EMAIL_PROVIDER: z.enum(["auto", "dev", "http", "resend", "ses"]).default("auto"),
+  EMAIL_PROVIDER: z.enum(["auto", "dev", "http", "resend", "ses", "zeptomail"]).default("auto"),
   EMAIL_API_ENDPOINT: z.url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),
@@ -255,6 +263,20 @@ const envSchema = z.object({
     .string()
     .regex(/^arn:aws:sns:[a-z]{2}(-[a-z]+)+-\d:\d{12}:[A-Za-z0-9_-]{1,256}$/, "an SNS topic ARN")
     .optional(),
+  /**
+   * ZeptoMail (Zoho CPaaS, EMAIL_PROVIDER=zeptomail). The Mail Agent's Send
+   * Mail token, without its `Zoho-enczapikey` prefix; server-only. EMAIL_FROM
+   * is shared, so the From address does not change with the provider.
+   */
+  ZEPTOMAIL_API_KEY: z.string().min(16).optional(),
+  /** Another data centre's `.../v1.1/email`. Unset: India (cpaas.zoho.in). */
+  ZEPTOMAIL_ENDPOINT: z.url().optional(),
+  /**
+   * The Mail Agent webhook's authentication key — what signs each bounce and
+   * complaint event (`producer-signature`). Unset CLOSES
+   * /api/webhooks/zeptomail (404), the sibling webhooks' rule.
+   */
+  ZEPTOMAIL_WEBHOOK_KEY: z.string().min(16).optional(),
   /**
    * "Get photos from Google Drive" (Google Picker + drive.file). All three are
    * PUBLIC by design — they sit in the page, and the key is locked to our
@@ -357,9 +379,10 @@ const envSchema = z.object({
   // default is `os.tmpdir()`, and a web tier reading a different root than the
   // runner wrote to reports a FALSE "exports failed" on the ops board forever.
   // Production replaces this with the S3-compatible store (IP-6 freeze §pre-deploy).
-  // The default is relative to the PROCESS cwd, and every local process (web,
-  // seed, runner) starts one directory deep — so all three land on the same
-  // repo-root `.local/finops-artifacts`. Deployments set an absolute path.
+  // Left at this default, all three land on the PRIMARY checkout's
+  // `.local/finops-artifacts`, even from a worktree, because every worktree
+  // shares the one local database (resolveFinopsStorageDir, @desiauction/messaging;
+  // it matches this literal). Deployments set an absolute path.
   FINOPS_STORAGE_DIR: z.string().min(1).default("../../.local/finops-artifacts"),
   /**
    * The finops artifact store (PRR P1-4). "filesystem" (default) writes to
@@ -545,7 +568,7 @@ const productionSchema = envSchema
     // `auto` without credentials silently falls back to the dev inbox: email
     // sign-in codes land in plain text in otp_inbox and nobody receives them.
     message:
-      "email needs a configured mailer in production — EMAIL_PROVIDER=ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM (or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM), and not dev — otherwise sign-in codes go to a database table instead of a mailbox",
+      "email needs a configured mailer in production — EMAIL_PROVIDER=zeptomail with ZEPTOMAIL_API_KEY and EMAIL_FROM, ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM, or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM — and not dev, otherwise sign-in codes go to a database table instead of a mailbox",
     path: ["EMAIL_PROVIDER"],
   })
   .refine(

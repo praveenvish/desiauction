@@ -128,7 +128,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const view = await seasonView(slug);
   if (view === null) {
-    return { title: "Register · DesiAuction", robots: { index: false, follow: false } };
+    return { title: "Register", robots: { index: false, follow: false } };
   }
   const title = `Register for ${view.name}`;
   const description = view.open
@@ -136,7 +136,7 @@ export async function generateMetadata({
     : `${view.name} on DesiAuction.`;
   const card = `${env.PUBLIC_BASE_URL}/c/${view.slug}/opengraph-image`;
   return {
-    title: `${title} · DesiAuction`,
+    title: title,
     description,
     robots: { index: false, follow: true },
     alternates: { canonical: `${env.PUBLIC_BASE_URL}/c/${view.slug}` },

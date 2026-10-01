@@ -9,7 +9,7 @@ import { ErasureDeskPanel } from "./erasure-desk-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
 
-export const metadata = { title: "Erasure · Platform admin · DesiAuction" };
+export const metadata = { title: "Erasure · Platform admin" };
 
 /**
  * THE PRIVACY DESK — people who asked for their account to be deleted.

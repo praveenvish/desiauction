@@ -20,7 +20,7 @@ import "../content.css";
 import "../marketing.css";
 
 export const metadata: Metadata = {
-  title: "Features · DesiAuction",
+  title: "Features",
   description: "Everything DesiAuction does — registration, the live auction, and the money.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/features` },
 };

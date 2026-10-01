@@ -65,7 +65,7 @@ export async function generateMetadata({
   const slice = [term === "" ? "" : `“${term}”`, facet].filter((part) => part !== "").join(" · ");
   const isSlice = slice !== "";
   return {
-    title: isSlice ? `${slice} · Tournaments · DesiAuction` : "Tournaments · DesiAuction",
+    title: isSlice ? `${slice} · Tournaments` : "Tournaments",
     description: DIRECTORY_DESCRIPTION,
     alternates: { canonical: `${env.PUBLIC_BASE_URL}/c` },
     ...(isSlice ? { robots: { index: false, follow: true } } : {}),

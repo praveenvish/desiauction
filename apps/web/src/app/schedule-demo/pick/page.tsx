@@ -14,7 +14,7 @@ import "../demo.css";
 
 /** Never indexed: it is one person's booking flow, not a page with an audience. */
 export const metadata: Metadata = {
-  title: "Pick a time · DesiAuction",
+  title: "Pick a time",
   robots: { index: false, follow: false },
 };
 

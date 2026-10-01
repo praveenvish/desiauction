@@ -24,7 +24,7 @@ import "./ledger.css";
 import { LedgerFilters } from "./ledger-filters";
 import { LedgerPlayers } from "./ledger-players";
 
-export const metadata = { title: "Auction ledger · DesiAuction" };
+export const metadata = { title: "Auction ledger" };
 
 // THE AUCTION LEDGER (M-IP4-3): the human-readable operational history — a
 // pure projection of the immutable event store, regenerated on every read.

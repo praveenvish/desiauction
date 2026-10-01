@@ -10,7 +10,7 @@ import { OrgsPanel } from "./orgs-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
 
-export const metadata = { title: "Organizations · Platform admin · DesiAuction" };
+export const metadata = { title: "Organizations · Platform admin" };
 
 const FILTERS: readonly OrgFilter[] = ["all", "finance", "settling", "quiet"];
 

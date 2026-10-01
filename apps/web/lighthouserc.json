@@ -1,0 +1,34 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "node node_modules/next/dist/bin/next start --port 3060",
+      "startServerReadyPattern": "Ready",
+      "startServerReadyTimeout": 60000,
+      "url": [
+        "http://localhost:3060/",
+        "http://localhost:3060/pricing",
+        "http://localhost:3060/c",
+        "http://localhost:3060/help/getting-started"
+      ],
+      "numberOfRuns": 1,
+      "settings": {
+        "onlyCategories": ["seo", "performance", "accessibility", "best-practices"],
+        "chromeFlags": "--no-sandbox --headless=new"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:seo": ["error", { "minScore": 1 }],
+        "categories:accessibility": ["warn", { "minScore": 0.95 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "largest-contentful-paint": ["warn", { "maxNumericValue": 2500 }],
+        "cumulative-layout-shift": ["warn", { "maxNumericValue": 0.05 }],
+        "total-blocking-time": ["warn", { "maxNumericValue": 300 }]
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci"
+    }
+  }
+}

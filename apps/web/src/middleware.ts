@@ -2,9 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "./env";
 import { buildContentSecurityPolicy, mintNonce } from "./lib/csp";
+import { isPublicPath, NOINDEX_HEADER } from "./server/seo/routes";
 
 /**
- * TWO HEADERS PER PAGE REQUEST, AND NOTHING ELSE.
+ * THREE HEADERS PER PAGE REQUEST, AND NOTHING ELSE.
  *
  * This app had no middleware on purpose: authorization lives in each page and
  * action, where it cannot be skipped by a crafted header (the CVE-2025-29927
@@ -18,6 +19,10 @@ import { buildContentSecurityPolicy, mintNonce } from "./lib/csp";
  *   2. A REQUEST ID on every page and server-action request that arrives
  *      without one, so a server action's log lines can be joined up. Before
  *      this only the five API routes carried one.
+ *   3. `X-Robots-Tag: noindex` on every page the SEO route registry does not
+ *      claim as public (server/seo/routes.ts). The registry is an allowlist,
+ *      so a console route nobody remembered to list is still kept out of
+ *      search. This is an indexing hint, not an access decision.
  */
 export const config = {
   runtime: "nodejs",
@@ -63,5 +68,8 @@ export function middleware(request: NextRequest): NextResponse {
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(header, policy);
   response.headers.set("x-request-id", requestId);
+  if (!isPublicPath(request.nextUrl.pathname)) {
+    response.headers.set("x-robots-tag", NOINDEX_HEADER);
+  }
   return response;
 }

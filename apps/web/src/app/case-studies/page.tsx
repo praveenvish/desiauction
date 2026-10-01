@@ -4,7 +4,7 @@ import { env } from "../../env";
 import { ComingSoon } from "../../components/public/coming-soon";
 
 export const metadata: Metadata = {
-  title: "Case studies · DesiAuction",
+  title: "Case studies",
   description: "Real organizer stories — nothing published yet.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/case-studies` },
   // Not in search results and not in the sitemap: a page whose whole content

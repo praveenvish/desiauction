@@ -8,7 +8,7 @@ import "../../seasons.css";
 import "../_tabs/tabs.css";
 import "./reviews.css";
 
-export const metadata = { title: "Reviews · DesiAuction" };
+export const metadata = { title: "Reviews" };
 
 /**
  * A SEASON'S REVIEWS, IN THE CONSOLE (FR-1 Phase 4).

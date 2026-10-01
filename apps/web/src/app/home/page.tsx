@@ -20,7 +20,7 @@ import { OwnerHome } from "./owner-home";
 import { PlayerHome } from "./player-home";
 import "./home.css";
 
-export const metadata = { title: "Home · DesiAuction" };
+export const metadata = { title: "Home" };
 
 /**
  * /HOME IS A ROUTER (RN-1 Phase 3).

@@ -11,7 +11,7 @@ import { AcceptInviteButton } from "./accept-button";
 import "../../orgs/orgs.css";
 import "../join.css";
 
-export const metadata = { title: "Join · DesiAuction" };
+export const metadata = { title: "Join" };
 
 // THE INVITATION LANDING.
 //

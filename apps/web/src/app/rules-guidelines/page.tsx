@@ -9,7 +9,7 @@ import { SideCard } from "../../components/public/public-kit";
 import "../content.css";
 
 export const metadata: Metadata = {
-  title: "Rules & guidelines · DesiAuction",
+  title: "Rules & guidelines",
   description: "Ground rules for running a fair player auction on DesiAuction.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/rules-guidelines` },
 };

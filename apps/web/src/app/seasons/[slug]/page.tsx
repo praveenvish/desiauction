@@ -25,7 +25,7 @@ import "../seasons.css";
 import "./_tabs/tabs.css";
 import "./overview.css";
 
-export const metadata = { title: "Season · DesiAuction" };
+export const metadata = { title: "Season" };
 
 export default async function CompetitionHomePage({
   params,

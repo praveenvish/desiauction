@@ -1,0 +1,128 @@
+/* SEO-1 Phase 4: the sport pages (/sports, /sports/[slug]). */
+
+.sport-crumb {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sport-crumb:hover {
+  text-decoration: underline;
+}
+
+.sport-angles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+
+.sport-angle {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  padding: var(--space-4);
+}
+
+.sport-angle h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1.0625rem;
+}
+
+.sport-angle p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.sport-facts {
+  margin: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.sport-facts dt {
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.sport-facts dd {
+  margin: 0;
+}
+
+.sport-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.sport-chips li {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.875rem;
+}
+
+.sport-table-rules p {
+  margin: 0 0 var(--space-3);
+  max-width: 68ch;
+}
+
+.sport-night {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .sport-night {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sport-shot--phone {
+    max-width: 14rem;
+  }
+}
+
+.sport-shot {
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sport-shot img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-2);
+}
+
+.sport-shot figcaption,
+.sport-night-note,
+.sport-guides {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.sport-night-note {
+  margin: var(--space-3) 0 0;
+}
+
+.sport-guides {
+  margin: var(--space-4) 0 0;
+}
+
+/* SEO-1 Phase 4b: the audience pages reuse this sheet; their numbered season. */
+.audience-steps {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-3);
+  max-width: 68ch;
+}

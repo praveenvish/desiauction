@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { venuesView } from "../../../../server/competition/fixture-actions";
 
-export const metadata = { title: "Venues · DesiAuction" };
+export const metadata = { title: "Venues" };
 
 /**
  * Venues is a tab on the club page now (2026-09-27). This address stays, because

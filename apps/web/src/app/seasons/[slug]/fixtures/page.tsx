@@ -9,7 +9,7 @@ import "../_tabs/tabs.css";
 import "../lineups/lineups.css";
 import "./fixtures.css";
 
-export const metadata = { title: "Matches · DesiAuction" };
+export const metadata = { title: "Matches" };
 
 /**
  * THE SCHEDULE TAB — one screen of matches (see schedule-panel.tsx). The

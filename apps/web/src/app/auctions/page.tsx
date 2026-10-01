@@ -35,7 +35,7 @@ import { SetupSteps } from "../home/auctioneer-home";
 import { currentSession } from "../../server/auth/actions";
 import { rolesOf, type ConductedSeason } from "../../server/roles/roles";
 
-export const metadata = { title: "Auctions · DesiAuction" };
+export const metadata = { title: "Auctions" };
 
 const STATUS: Record<AuctionNightStatus, { label: string; tone: KitTone }> = {
   none: { label: "Not set up", tone: "neutral" },

@@ -9,7 +9,7 @@ import "../../seasons/seasons.css";
 import "../admin.css";
 import { AdminPageHead } from "../admin-ui";
 
-export const metadata = { title: "Health · Platform admin · DesiAuction" };
+export const metadata = { title: "Health · Platform admin" };
 
 /**
  * PX-9 §5 — Platform Health.

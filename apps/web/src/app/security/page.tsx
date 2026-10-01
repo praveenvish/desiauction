@@ -18,7 +18,7 @@ import { SideCard } from "../../components/public/public-kit";
 import "../content.css";
 
 export const metadata: Metadata = {
-  title: "Security · DesiAuction",
+  title: "Security",
   description: "How DesiAuction keeps the auction and the money trustworthy.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/security` },
 };

@@ -12,7 +12,7 @@ import "../_tabs/tabs.css";
 import "./money.css";
 import "./season-money.css";
 
-export const metadata = { title: "Money · DesiAuction" };
+export const metadata = { title: "Money" };
 
 /**
  * PX-7 E1 — the Settlement console.

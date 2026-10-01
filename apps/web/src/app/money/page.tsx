@@ -32,7 +32,7 @@ import { formatDate } from "../../lib/format-date";
 import { DOC_KIND_LABEL } from "../../server/financial-operations/register";
 import "./my-money.css";
 
-export const metadata = { title: "My money · DesiAuction" };
+export const metadata = { title: "My money" };
 
 /**
  * PX-2: the Money workspace ENTRY (shell scope §2).

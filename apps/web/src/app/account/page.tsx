@@ -57,7 +57,7 @@ import {
 } from "./sections";
 import "./account.css";
 
-export const metadata = { title: "Account · DesiAuction" };
+export const metadata = { title: "Account" };
 
 const SECTION_ICON: Record<AccountSection, ReactNode> = {
   profile: <IconUser />,

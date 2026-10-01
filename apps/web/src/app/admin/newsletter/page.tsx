@@ -17,7 +17,7 @@ import { AdminEmpty, AdminPageHead, KpiValue } from "../admin-ui";
 import "../../seasons/seasons.css";
 import "../admin.css";
 
-export const metadata = { title: "Newsletter · Platform admin · DesiAuction" };
+export const metadata = { title: "Newsletter · Platform admin" };
 
 /**
  * THE PRODUCT-NEWS LIST, WITH AN OWNER.

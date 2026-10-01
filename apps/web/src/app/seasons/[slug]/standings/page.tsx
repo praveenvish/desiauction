@@ -12,7 +12,7 @@ import "../../seasons.css";
 import "../_tabs/tabs.css";
 import "./standings.css";
 
-export const metadata = { title: "Table · DesiAuction" };
+export const metadata = { title: "Table" };
 
 /**
  * THE LEAGUE TABLE.

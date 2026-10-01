@@ -8,7 +8,7 @@ import "../../../seasons/seasons.css";
 import "../../../seasons/[slug]/money/money.css";
 import "./finance.css";
 
-export const metadata = { title: "Finance · DesiAuction" };
+export const metadata = { title: "Finance" };
 
 /**
  * PX-8 §1 — the Financial Operations dashboard (PX-1 F1).

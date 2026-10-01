@@ -62,6 +62,8 @@ export function shellKind(pathname: string): ShellKind {
     // login page keeps the public header/footer (2026-07-25 founder call) so a
     // visitor at the gate can still reach the rest of the site.
     pathname.startsWith("/onboarding") ||
+    // A card framed inside another site (SEO-1 Phase 7): no header, no footer.
+    pathname.startsWith("/embed/") ||
     BARE_AUCTION_RE.test(pathname)
   ) {
     return "bare";
@@ -98,6 +100,15 @@ export function shellKind(pathname: string): ShellKind {
     // Same for a review link (FR-1): it is read in a mail client's browser,
     // signed in or not, and is a public page either way.
     pathname.startsWith("/review/") ||
+    // SEO-1 landing pages (Phases 4 and 6). A signed-in visitor opening one
+    // got it framed in the organizer console until these were listed; the
+    // route-registry test in server/seo/routes.test.ts now holds every public
+    // route to this shell, so a new one cannot repeat that.
+    pathname.startsWith("/sports") ||
+    pathname.startsWith("/for") ||
+    pathname.startsWith("/compare") ||
+    pathname.startsWith("/tools") ||
+    pathname.startsWith("/guides") ||
     pathname.startsWith("/blog") ||
     pathname.startsWith("/careers") ||
     pathname.startsWith("/case-studies") ||

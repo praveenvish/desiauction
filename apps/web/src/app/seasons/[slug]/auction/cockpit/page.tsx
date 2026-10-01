@@ -10,7 +10,7 @@ import "../auction.css";
 import "../live/live.css";
 import "./desk.css";
 
-export const metadata = { title: "Auction cockpit · DesiAuction" };
+export const metadata = { title: "Auction cockpit" };
 
 export default async function CockpitPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

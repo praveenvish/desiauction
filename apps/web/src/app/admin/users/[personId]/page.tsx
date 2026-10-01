@@ -8,7 +8,7 @@ import { UserDetailPanel } from "./user-detail-panel";
 import "../../../seasons/seasons.css";
 import "../../admin.css";
 
-export const metadata = { title: "User · Platform admin · DesiAuction" };
+export const metadata = { title: "User · Platform admin" };
 
 /**
  * PX-9 §3 — the user inspector: grants, memberships, recent activity. Read-only.

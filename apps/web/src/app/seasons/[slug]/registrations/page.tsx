@@ -7,7 +7,7 @@ import { ShareRegistration } from "./share-registration";
 import "../../seasons.css";
 import "./registrations.css";
 
-export const metadata = { title: "Registrations · DesiAuction" };
+export const metadata = { title: "Registrations" };
 
 export default async function RegistrationsPage({
   params,
