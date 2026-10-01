@@ -853,14 +853,47 @@
   white-space: nowrap;
 }
 
+/* No gap on the run: each group carries its own trailing separator, so the
+   two copies are identical and -50% lands exactly on the seam. */
 .tickRun {
   display: inline-flex;
-  gap: 40px;
-  padding: 14px 0;
+  padding: 12px 0;
   font-size: 14px;
   font-weight: 700;
+  line-height: 22px;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
   animation: marquee 44s linear infinite;
+}
+
+.tickGroup {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.tickItem {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* One separator, centred in the space between items. */
+.tickSep {
+  margin: 0 18px;
+  font-size: 8px;
+  opacity: 0.55;
+}
+
+/* The lead: ink on gold, so the real seasons after it read as a list. */
+.tickLead {
+  margin: 0 16px 0 0;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #141008;
+  color: var(--gold);
+  font-size: 11px;
+  line-height: 22px;
+  letter-spacing: 0.08em;
 }
 
 @keyframes marquee {
