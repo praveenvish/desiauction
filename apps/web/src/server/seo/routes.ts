@@ -73,7 +73,7 @@ export const INDEXABLE_PAGES: readonly IndexablePage[] = [
  * listed. They are exempt from the header so their own metadata is what a
  * crawler reads.
  */
-const PUBLIC_UNLISTED = ["/login", "/contact", "/careers", "/case-studies", "/api-docs"] as const;
+const PUBLIC_UNLISTED = ["/login", "/contact", "/careers", "/api-docs"] as const;
 
 /**
  * Whole public subtrees. `/c/…` holds seasons, squads and player cards; the
@@ -90,6 +90,8 @@ const PUBLIC_SUBTREES = [
   "/compare",
   "/tools",
   "/guides",
+  // The hub sets its own noindex while content/case-studies.ts is empty.
+  "/case-studies",
 ] as const;
 
 /** Next's file-based metadata routes. These are fetched by crawlers and share scrapers. */

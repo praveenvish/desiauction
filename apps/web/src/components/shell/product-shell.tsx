@@ -41,6 +41,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { AdminSectionNav } from "../../app/admin/admin-section-nav";
 import { recordRecentCompetition } from "../../app/home/home-shortcuts";
+import { HAS_CASE_STUDIES } from "../../content/case-studies";
 import { LEGAL_IDENTITY } from "../../content/company";
 import { UNREAD_CAP } from "../../lib/inbox-cap";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
@@ -271,7 +272,8 @@ function toShellItem(item: NavItem): ShellNavItem {
 const QUIET_FOOTER_PATHS: ReadonlySet<string> = new Set([
   "/careers",
   "/blog",
-  "/case-studies",
+  // A placeholder only until the first real story (content/case-studies.ts).
+  ...(HAS_CASE_STUDIES ? [] : ["/case-studies"]),
   "/api-docs",
 ]);
 

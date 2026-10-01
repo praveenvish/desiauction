@@ -877,6 +877,63 @@ export async function myAuctionOutcome(
  * only what the team page and player card already publish: the name, the
  * number that addresses their page, the price and the buying team.
  */
+/**
+ * A CASE STUDY'S NUMBERS, FROM THE RECORD (content/case-studies.ts).
+ *
+ * A case study states figures about a real night, so they are read here rather
+ * than typed into the story: lots sold and unsold, the top price and the total
+ * spent, from the season's one non-abandoned auction. Behind the same gate as
+ * every public read (a published season), and with no player in it: a case
+ * study names nobody by default. Null when the season is not published or held
+ * no auction, so the page can say "no figures" rather than print zeros.
+ */
+export interface CaseStudyFigures {
+  teams: number;
+  sold: number;
+  unsold: number;
+  topPrice: Paise;
+  totalSpent: Paise;
+  unit: MoneyUnit;
+}
+
+export async function publicCaseStudyFigures(slug: string): Promise<CaseStudyFigures | null> {
+  const [comp] = await systemDb
+    .select({
+      id: competitions.id,
+      visibility: competitions.visibility,
+      unit: competitions.auctionUnit,
+    })
+    .from(competitions)
+    .where(eq(competitions.slug, slug))
+    .limit(1);
+  if (comp === undefined || comp.visibility !== "public") {
+    return null;
+  }
+  const [row] = await systemDb
+    .select({
+      auctions: sql<number>`count(distinct ${auctions.id})::int`,
+      sold: sql<number>`count(${lots.id}) filter (where ${lots.status} = 'sold')::int`,
+      unsold: sql<number>`count(${lots.id}) filter (where ${lots.status} = 'unsold')::int`,
+      top: sql<string | null>`max(${lots.soldPrice}) filter (where ${lots.status} = 'sold')`,
+      total: sql<string | null>`sum(${lots.soldPrice}) filter (where ${lots.status} = 'sold')`,
+    })
+    .from(auctions)
+    .leftJoin(lots, eq(lots.auctionId, auctions.id))
+    .where(and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned")));
+  if (row === undefined || row.auctions === 0) {
+    return null;
+  }
+  const teamCount = (await teamsOf(systemDb, comp.id)).length;
+  return {
+    teams: teamCount,
+    sold: row.sold,
+    unsold: row.unsold,
+    topPrice: paise(Number(row.top ?? 0)),
+    totalSpent: paise(Number(row.total ?? 0)),
+    unit: comp.unit,
+  };
+}
+
 export interface PublicTopBuy {
   registrationId: string;
   number: string;

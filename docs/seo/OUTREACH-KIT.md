@@ -273,13 +273,19 @@ before it, and never as a condition of using the product.
 5. Would you run the next one the same way? What would you change?
 6. One sentence we can quote.
 
-Figures (lots, top sale, duration) come **from the record**, not from memory.
-Engineering pulls them from the season's replay.
+Figures come **from the record**, not from memory: teams, players sold, the top
+price and the total spent are read from the season's auction every time the
+page renders. The season must stay **published** for them to show.
 
-**Engineering follow-up:** once the first one is agreed, I build
-`/case-studies/{league}` as a typed registry like the guides (one entry per
-story, figures read from the season), take `/case-studies` out of `noindex`, and
-add it to the sitemap (see §8).
+**Built:** `/case-studies/{slug}` reads from the registry in
+`apps/web/src/content/case-studies.ts`. Adding a story is one entry there:
+league, season slug, city, sport, title, summary, the organizer's name, role
+and approved quote, the story text, and the **consent record** (who agreed,
+when, how, and whether named players or photos were agreed). A test refuses an
+entry with no consent, no season, or a publish date before the consent date.
+While the registry is empty, `/case-studies` stays the "coming soon" page:
+noindex, out of the sitemap and search, with the quiet footer. The first entry
+switches all four on.
 
 ---
 
@@ -303,4 +309,4 @@ organic sign-ups. Review monthly.
 |---|---|---|
 | Swap `content/social.ts` placeholders for real profiles (feeds the footer and Organization `sameAs`) | Founder sends URLs (0.1) | Small |
 | ~~"Copy stream description" button, filling the §3 templates from the season~~ | **Built:** Broadcast overlay pane | Done |
-| `/case-studies/{league}` registry and pages; un-noindex `/case-studies`; sitemap entry | First agreed case study (§6) | Medium |
+| ~~`/case-studies/{slug}` registry and pages; un-noindex `/case-studies`; sitemap entry~~ | **Built:** switches on with the first registry entry | Done |
