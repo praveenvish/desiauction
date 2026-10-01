@@ -1,16 +1,18 @@
 "use client";
 
 import {
-  IMPORT_FIELD_LABELS,
   editCsvRow,
   tokenizeCsv,
   type ColumnMapping,
-  type ImportField,
+  type ImportFieldOption,
+  type MappableField,
 } from "@desiauction/core";
 import { Button } from "@desiauction/ui";
 import { useState } from "react";
 
 import type { ImportPreview } from "../../../../server/competition/actions";
+
+import { fieldLabel } from "./column-mapper";
 
 type RowError = ImportPreview["errors"][number];
 
@@ -32,12 +34,15 @@ export function ImportErrors({
   errors,
   text,
   mapping,
+  fields,
   onFix,
 }: {
   errors: RowError[];
   /** The file as it currently stands in the dialog. */
   text: string;
   mapping: ColumnMapping;
+  /** The season's fields, so a sport's own attribute is named in the fix box. */
+  fields: readonly ImportFieldOption[];
   /** Called with the corrected file. */
   onFix: (next: string) => void;
 }) {
@@ -52,7 +57,7 @@ export function ImportErrors({
    * sheet already in our column names.
    */
   const columnOf = (field: string): number | undefined => {
-    const mapped = mapping[field as ImportField];
+    const mapped = mapping[field as MappableField];
     if (Object.keys(mapping).length > 0) {
       return mapped;
     }
@@ -87,6 +92,7 @@ export function ImportErrors({
               {editing === error.line ? (
                 <RowFix
                   fields={editable}
+                  labels={editable.map((field) => fieldLabel(field as MappableField, fields))}
                   values={editable.map(
                     (field) => records[error.line - 1]?.[columnOf(field) ?? -1] ?? "",
                   )}
@@ -125,11 +131,13 @@ export function ImportErrors({
 
 function RowFix({
   fields,
+  labels,
   values,
   onCancel,
   onSave,
 }: {
   fields: string[];
+  labels: string[];
   values: string[];
   onCancel: () => void;
   onSave: (values: string[]) => void;
@@ -147,7 +155,7 @@ function RowFix({
         const id = `row-fix-${field}`;
         return (
           <label key={field} htmlFor={id} className="io-inline">
-            <span>{IMPORT_FIELD_LABELS[field as ImportField]}</span>
+            <span>{labels[index]}</span>
             <input
               id={id}
               className="import-row-fix-input"

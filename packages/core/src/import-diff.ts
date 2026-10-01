@@ -28,7 +28,9 @@
  *    here for the same reason it is applied on the public path.
  */
 
+import { attributeImportField } from "./import-attribute-field";
 import type { CsvRegistrationRow } from "./registration-csv";
+import { DEFAULT_SPORT, attributeSpec, type SportPack } from "./sports";
 
 /** How a re-import treats a value the file and the record disagree about. */
 export type ImportPolicy = "fill-blanks" | "file-wins";
@@ -64,6 +66,12 @@ export interface ExistingRegistration {
   isIcon: boolean;
   isCaptain: boolean;
   isRetained: boolean;
+  /**
+   * `registrations.attributes` as stored — the pack's JSON-stored detail. Read
+   * per key against the file's `attributes`, so a re-import that supplies a
+   * preferred foot is diffed like any other column.
+   */
+  attributes: Readonly<Record<string, unknown>> | null;
 }
 
 /** A stored flag, in the words the preview prints. */
@@ -232,6 +240,26 @@ const COMPARABLE: readonly Comparable[] = [
 ];
 
 /**
+ * The pack attributes this row supplied, as comparables — built per row
+ * because, unlike the table above, which attributes exist is the SPORT's
+ * decision. The field is the import field (`attr:preferred_foot`), which is
+ * how the commit tells an attribute change from a column change.
+ */
+function attributeComparables(row: CsvRegistrationRow, pack: SportPack): Comparable[] {
+  return Object.keys(row.attributes)
+    .sort()
+    .map((key) => ({
+      field: attributeImportField(key),
+      label: attributeSpec(pack, key)?.label ?? key.replace(/_/g, " "),
+      fromFile: (r) => r.attributes[key] ?? null,
+      fromRecord: (e) => {
+        const value = e.attributes?.[key];
+        return typeof value === "string" ? value : null;
+      },
+    }));
+}
+
+/**
  * Blank and absent are the same thing to a comparison.
  *
  * A type predicate, not a boolean: the narrowing is what lets `to` stay a
@@ -251,12 +279,14 @@ export function planImportRow(
   row: CsvRegistrationRow,
   existing: ExistingRegistration | null,
   policy: ImportPolicy,
+  /** The season's sport — it names the attributes in the preview. */
+  pack: SportPack = DEFAULT_SPORT,
 ): ImportRowPlan {
   if (existing === null) {
     return { kind: "new" };
   }
   const changes: FieldChange[] = [];
-  for (const entry of COMPARABLE) {
+  for (const entry of [...COMPARABLE, ...attributeComparables(row, pack)]) {
     const incoming = entry.fromFile(row);
     // Rule 1: the file did not supply this column, so it has no opinion on it.
     if (!supplied(incoming)) {
@@ -299,10 +329,11 @@ export function planImport(
   rows: readonly CsvRegistrationRow[],
   existingByPhone: ReadonlyMap<string, ExistingRegistration>,
   policy: ImportPolicy,
+  pack: SportPack = DEFAULT_SPORT,
 ): ImportDiff {
   const counts = { new: 0, changed: 0, unchanged: 0, reinstate: 0 };
   const planned = rows.map((row) => {
-    const plan = planImportRow(row, existingByPhone.get(row.phone) ?? null, policy);
+    const plan = planImportRow(row, existingByPhone.get(row.phone) ?? null, policy, pack);
     counts[plan.kind] += 1;
     return { line: row.line, name: row.name, phone: row.phone, plan };
   });

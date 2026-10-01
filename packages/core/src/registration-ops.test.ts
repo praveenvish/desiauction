@@ -131,6 +131,7 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
         isIcon: null,
         isCaptain: null,
         isRetained: null,
+        attributes: {},
       },
       {
         line: 3,
@@ -157,6 +158,7 @@ describe("parseRegistrationCsv — validate before writing, reject partial corru
         isIcon: null,
         isCaptain: null,
         isRetained: null,
+        attributes: {},
       },
     ]);
   });

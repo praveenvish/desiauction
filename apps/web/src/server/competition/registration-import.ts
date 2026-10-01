@@ -1,15 +1,27 @@
 import {
+  attributeKeyOf,
   isBattingStyle,
   isBowlingStyle,
   normalizeTeamName,
   planImport,
   registrationNumber,
+  splitAttributeWrite,
+  sportPackFor,
+  type SportPack,
   type CsvRegistrationRow,
   type ExistingRegistration,
   type FieldChange,
   type ImportPolicy,
 } from "@desiauction/core";
-import { auditLog, newId, people, registrations, teams, type Db } from "@desiauction/db";
+import {
+  auditLog,
+  competitions,
+  newId,
+  people,
+  registrations,
+  teams,
+  type Db,
+} from "@desiauction/db";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 
 import { captainLockRefusal } from "./captain-lock";
@@ -55,6 +67,13 @@ export interface ImportResult {
   named: number;
 }
 
+/** A stored registration as the re-import plan reads it, plus what the writer needs. */
+type StoredForImport = ExistingRegistration & {
+  id: string;
+  teamId: string | null;
+  attributes: Record<string, unknown>;
+};
+
 /**
  * What is already stored for these phones, in the shape the diff compares
  * against. One query for the whole file, not one per row.
@@ -63,7 +82,7 @@ export async function existingForImport(
   db: Db,
   competitionId: string,
   phones: readonly string[],
-): Promise<Map<string, ExistingRegistration & { id: string; teamId: string | null }>> {
+): Promise<Map<string, StoredForImport>> {
   if (phones.length === 0) {
     return new Map();
   }
@@ -96,6 +115,7 @@ export async function existingForImport(
       isIcon: registrations.isIcon,
       isCaptain: registrations.isCaptain,
       isRetained: registrations.isRetained,
+      attributes: registrations.attributes,
     })
     .from(registrations)
     .innerJoin(people, eq(people.id, registrations.personId))
@@ -115,7 +135,42 @@ export async function existingForImport(
   return new Map(
     rows
       .filter((row): row is typeof row & { phone: string } => row.phone !== null)
-      .map(({ phone, ...rest }) => [phone, rest]),
+      .map(({ phone, attributes, ...rest }) => [
+        phone,
+        { ...rest, attributes: (attributes ?? {}) as Record<string, unknown> },
+      ]),
+  );
+}
+
+/**
+ * The pack attributes a write should store, through the SAME validator the
+ * registration form uses (`splitAttributeWrite`) — so a value reaches the row
+ * only if the season's pack declares the attribute and lists the value.
+ *
+ * Merged over what is stored rather than replacing it: `attributes` is one
+ * JSON column holding every answer, and a file that supplies the preferred
+ * foot must not erase a detail it never mentioned (rule 1 of the diff).
+ */
+function attributeValues(
+  pack: SportPack,
+  stored: Readonly<Record<string, unknown>>,
+  answers: Readonly<Record<string, string>>,
+): Record<string, unknown> | null {
+  const write = splitAttributeWrite(pack, answers);
+  if (Object.keys(write.json).length === 0) {
+    return null;
+  }
+  return { ...stored, ...write.json };
+}
+
+/** The stored answers that are still plain strings — the shape a profile carries. */
+function storedAnswers(
+  stored: Readonly<Record<string, unknown>> | undefined,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(stored ?? {}).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
   );
 }
 
@@ -125,6 +180,8 @@ function changedValues(
   row: CsvRegistrationRow,
   /** The file's team name resolved to an id — the diff speaks names, the table ids. */
   teamId: string | null,
+  pack: SportPack,
+  storedAttributes: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
   const all: Record<string, unknown> = {
     role: row.role,
@@ -142,6 +199,19 @@ function changedValues(
   // ONLY the fields the plan named. The preview showed the organizer this exact
   // list; writing anything else would make the preview a lie.
   const out: Record<string, unknown> = {};
+  // A pack attribute's change names `attr:<key>`; they share one JSON column.
+  const answers: Record<string, string> = {};
+  for (const change of changes) {
+    const key = attributeKeyOf(change.field);
+    const value = key === null ? undefined : row.attributes[key];
+    if (key !== null && value !== undefined) {
+      answers[key] = value;
+    }
+  }
+  const attributes = attributeValues(pack, storedAttributes, answers);
+  if (attributes !== null) {
+    out["attributes"] = attributes;
+  }
   for (const change of changes) {
     if (change.field in all) {
       // The plan's field name is the diff's; the column is the table's, and
@@ -279,6 +349,18 @@ export async function commitRegistrationImport(
       row.teamName === null ? null : (teamByName.get(normalizeTeamName(row.teamName)) ?? null);
 
     /*
+     * The season's sport, read here rather than passed in: it decides which
+     * attributes a row may store, and the commit must judge that against the
+     * season as it stands, not against whatever a caller believed it was.
+     */
+    const [season] = await tx
+      .select({ sport: competitions.sport })
+      .from(competitions)
+      .where(eq(competitions.id, competitionId))
+      .limit(1);
+    const pack = sportPackFor(season?.sport);
+
+    /*
      * DA-04, at import scale: a team has exactly one captain, and
      * `registrations_team_captain_uq` makes two unrepresentable. The single-row
      * writer resolves that by DEMOTING the incumbent, because an organizer
@@ -388,7 +470,7 @@ export async function commitRegistrationImport(
      * file rather than against anything the browser sent back.
      */
     const stored = await existingForImport(tx, competitionId, phones);
-    const diff = planImport(rows, stored, policy);
+    const diff = planImport(rows, stored, policy, pack);
     const planByLine = new Map(diff.rows.map((entry) => [entry.line, entry.plan]));
 
     let imported = 0;
@@ -413,7 +495,7 @@ export async function commitRegistrationImport(
       // an approved player stays approved through a re-import (rule 3).
       if (plan?.kind === "changed" && record !== undefined) {
         const changedTeam = teamIdFor(row);
-        const values = changedValues(plan.changes, row, changedTeam);
+        const values = changedValues(plan.changes, row, changedTeam, pack, record.attributes);
         if (Object.keys(values).length > 0) {
           if (lockedAuctionId !== null && ("role" in values || "basePriceBand" in values)) {
             throw new RosterFieldImportRefused(row.name || row.phone);
@@ -486,6 +568,7 @@ export async function commitRegistrationImport(
       if (row.isCaptain === true && landingTeam !== null) {
         await demoteOthers(landingTeam, id);
       }
+      const freshAttributes = attributeValues(pack, {}, row.attributes);
       const inserted = await tx
         .insert(registrations)
         .values({
@@ -503,6 +586,9 @@ export async function commitRegistrationImport(
           ...(row.dateOfBirth !== null ? { dateOfBirth: row.dateOfBirth } : {}),
           ...(isBattingStyle(row.battingStyle ?? "") ? { battingStyle: row.battingStyle } : {}),
           ...(isBowlingStyle(row.bowlingStyle ?? "") ? { bowlingStyle: row.bowlingStyle } : {}),
+          // The sport's own detail (a footballer's preferred foot), through the
+          // registration form's writer. Spread only when the file carried one.
+          ...(freshAttributes !== null ? { attributes: freshAttributes } : {}),
           // Desk + kit (0034). Spread only when the file carried them, so an
           // import that maps none of these leaves the column defaults alone
           // rather than writing nulls over a value entered by hand.
@@ -561,7 +647,13 @@ export async function commitRegistrationImport(
           ...(row.dateOfBirth !== null ? { dateOfBirth: row.dateOfBirth } : {}),
           ...(row.battingStyle !== null ? { battingStyle: row.battingStyle } : {}),
           ...(row.bowlingStyle !== null ? { bowlingStyle: row.bowlingStyle } : {}),
+          // Over what the withdrawn entry already held — `validProfile`
+          // replaces the JSON column, and a file names only what it carries.
+          ...(Object.keys(row.attributes).length > 0
+            ? { attributes: { ...storedAnswers(record?.attributes), ...row.attributes } }
+            : {}),
         },
+        sport: pack.key,
       });
       if (restored === null) {
         // Live registration the plan did not mark changed — nothing to do.

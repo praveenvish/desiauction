@@ -28,7 +28,13 @@
  * the rest of this import already follows: place it, or say you could not.
  */
 
+import {
+  attributeImportField,
+  attributeKeyOf,
+  type AttributeImportField,
+} from "./import-attribute-field";
 import { driveFileIdOf } from "./registration-csv";
+import { DEFAULT_SPORT, attributeSpec, type AttributeSpec, type SportPack } from "./sports";
 
 /** The columns `parseRegistrationRecords` understands. */
 export const IMPORT_FIELDS = [
@@ -93,6 +99,56 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
   is_retained: "Retained?",
   photo_link: "Photo (Google Drive link)",
 };
+
+export {
+  ATTRIBUTE_FIELD_PREFIX,
+  attributeImportField,
+  attributeKeyOf,
+  type AttributeImportField,
+} from "./import-attribute-field";
+
+/** Anything a column can be mapped to: a fixed field or a pack's attribute. */
+export type MappableField = ImportField | AttributeImportField;
+
+/** The attributes a pack adds to the import — the JSON-stored ones. */
+function importedAttributes(pack: SportPack): readonly AttributeSpec[] {
+  return pack.attributes.filter((attribute) => attribute.storage.kind === "json");
+}
+
+/** A field the mapping screen offers, as plain data a client component can hold. */
+export interface ImportFieldOption {
+  field: MappableField;
+  label: string;
+  required: boolean;
+}
+
+/**
+ * Every field a column can go to in a season of this sport: the fixed ones,
+ * then the pack's own attributes in the order the pack declares them.
+ */
+export function importFieldsFor(pack: SportPack = DEFAULT_SPORT): ImportFieldOption[] {
+  return [
+    ...IMPORT_FIELDS.map((field) => ({
+      field,
+      label: IMPORT_FIELD_LABELS[field],
+      required: REQUIRED_IMPORT_FIELDS.includes(field),
+    })),
+    ...importedAttributes(pack).map((attribute) => ({
+      field: attributeImportField(attribute.key),
+      label: attribute.label,
+      required: false,
+    })),
+  ];
+}
+
+/** What a field is called on screen, in this sport. */
+export function importFieldLabel(field: MappableField, pack: SportPack = DEFAULT_SPORT): string {
+  const key = attributeKeyOf(field);
+  if (key === null) {
+    return IMPORT_FIELD_LABELS[field as ImportField];
+  }
+  return attributeSpec(pack, key)?.label ?? key.replace(/_/g, " ");
+}
 
 /**
  * Comparable form of a header cell.
@@ -170,6 +226,15 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
     "specialisation",
     "player specialization",
     "playing specialization",
+    // How every non-cricket form asks: football, hockey, volleyball and
+    // basketball clubs call a role a position, and the packs' role aliases
+    // ("CB", "setter", "point guard") already read the answers.
+    "position",
+    "playing position",
+    "your position",
+    "preferred position",
+    "player position",
+    "which position do you play",
   ],
   base_price_band: [
     "base price band",
@@ -377,12 +442,27 @@ export const IMPORT_ALIAS_CLAIMS: readonly (readonly [string, ImportField])[] =
     ...HEADER_ALIASES[field].map((alias) => [normalizeHeader(alias), field] as const),
   ]);
 
-const FIELD_BY_ALIAS: ReadonlyMap<string, ImportField> = new Map(
-  IMPORT_FIELDS.flatMap((field) => [
-    [normalizeHeader(field), field] as const,
-    ...HEADER_ALIASES[field].map((alias) => [normalizeHeader(alias), field] as const),
-  ]),
-);
+const FIELD_BY_ALIAS: ReadonlyMap<string, ImportField> = new Map(IMPORT_ALIAS_CLAIMS);
+
+/**
+ * The headers a pack's attributes answer to, and which attribute claims each —
+ * exported so a test can prove no pack's alias is shadowed by a fixed field or
+ * claimed by two of its own attributes.
+ *
+ * The attribute's key and label are claimed too, so "Preferred foot" and our
+ * own canonical `attr:preferred_foot` both place without the pack having to
+ * list them.
+ */
+export function attributeAliasClaims(
+  pack: SportPack,
+): readonly (readonly [string, AttributeImportField])[] {
+  return importedAttributes(pack).flatMap((attribute) => {
+    const field = attributeImportField(attribute.key);
+    return [field, attribute.key, attribute.label, ...attribute.headerAliases].map(
+      (alias) => [normalizeHeader(alias), field] as const,
+    );
+  });
+}
 
 /**
  * "player s name" -> "players name".
@@ -404,13 +484,13 @@ export interface MappedColumn {
   /** The header exactly as the file wrote it — shown back to the organizer. */
   header: string;
   /** Null = ignored: either known noise or nothing we could place. */
-  field: ImportField | null;
+  field: MappableField | null;
   /** True when the column was recognised as a form's own bookkeeping. */
   noise: boolean;
 }
 
 export interface MappingConflict {
-  field: ImportField;
+  field: MappableField;
   /** Every source header that claimed this field, in file order. */
   headers: string[];
 }
@@ -439,11 +519,20 @@ export function detectMapping(
    * a caller holding only a header row still gets the header-only guess.
    */
   records?: readonly (readonly string[])[],
+  /**
+   * The season's sport. Its attributes are detected by their `headerAliases`
+   * AFTER the fixed table, so a fixed field always wins a header both claim —
+   * the fixed table is what every existing saved mapping was built against.
+   */
+  pack: SportPack = DEFAULT_SPORT,
 ): DetectedMapping {
-  const claimed = new Map<ImportField, string[]>();
+  const byAttribute = new Map(attributeAliasClaims(pack));
+  const lookup = (key: string): MappableField | undefined =>
+    FIELD_BY_ALIAS.get(key) ?? byAttribute.get(key);
+  const claimed = new Map<MappableField, string[]>();
   const columns: MappedColumn[] = headers.map((header, index) => {
     const key = normalizeHeader(header);
-    const field = FIELD_BY_ALIAS.get(key) ?? FIELD_BY_ALIAS.get(joinPossessive(key));
+    const field = lookup(key) ?? lookup(joinPossessive(key));
     if (field === undefined) {
       return { index, header, field: null, noise: KNOWN_NOISE.includes(key) };
     }
@@ -566,10 +655,22 @@ export function withDetectedPhoto(
 }
 
 /** field → source column index. The confirmed answer the organizer approved. */
-export type ColumnMapping = Partial<Record<ImportField, number>>;
+export type ColumnMapping = Partial<Record<MappableField, number>>;
 
 /** field → { value as written: value we understand }. */
-export type ValueMaps = Partial<Record<ImportField, Record<string, string>>>;
+export type ValueMaps = Partial<Record<MappableField, Record<string, string>>>;
+
+/**
+ * The fields a mapping sends somewhere, fixed ones first in their fixed order,
+ * then attributes by key — so the canonical header row is stable however the
+ * mapping object happened to be built.
+ */
+export function mappedFields(mapping: ColumnMapping): MappableField[] {
+  const attributes = (Object.keys(mapping) as MappableField[])
+    .filter((field) => attributeKeyOf(field) !== null && mapping[field] !== undefined)
+    .sort();
+  return [...IMPORT_FIELDS.filter((field) => mapping[field] !== undefined), ...attributes];
+}
 
 /** The mapping a detection implies, before anybody edits it. */
 export function mappingOf(detected: DetectedMapping): ColumnMapping {
@@ -600,7 +701,7 @@ export function applyMapping(
   mapping: ColumnMapping,
   valueMaps?: ValueMaps,
 ): string[][] {
-  const fields = IMPORT_FIELDS.filter((field) => mapping[field] !== undefined);
+  const fields = mappedFields(mapping);
   const header = [...fields] as string[];
   const body = records.slice(1).map((record) =>
     fields.map((field) => {
