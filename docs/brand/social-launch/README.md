@@ -1,0 +1,152 @@
+# Social launch: Instagram and LinkedIn
+
+> 2026-10-01. Paste-ready copy and the files to upload. This builds on
+> [`docs/operations/SOCIAL_SETUP_SHEET.md`](../../operations/SOCIAL_SETUP_SHEET.md)
+> (19 Aug) and corrects it where the product has moved since:
+>
+> - **12 sports, not cricket only.** The site's hero now says "in any of 12 sports"
+>   (`apps/web/src/content/marketing.ts`), so the copy here does too. Cricket
+>   stays the lead example because it's what people search for.
+> - **The site and mail are live.** `desiauction.in` answers 200 and the domain
+>   has Zoho MX records, so the bio links and `hello@` work.
+> - **The hero line is the hook.** "SOLD, without the shouting." is the site's H1
+>   and the first post.
+
+Everything visual comes from the shipped brand kit (`docs/brand/kit/`) and the
+post templates (`docs/brand/templates/`). No stock photos and no AI imagery:
+the brand spec bans both.
+
+Re-render after any copy edit: `mise exec -- node docs/brand/social-launch/render.cjs`
+
+---
+
+## Instagram — `@desiauction`
+
+| Field | Value |
+|---|---|
+| Profile photo | `docs/brand/kit/social/avatar-1080.png` |
+| Name (searchable, 30 max; 2 changes per 14 days) | `DesiAuction · Player Auctions` |
+| Category | Sports & Recreation |
+| Account type | **Business** (not Creator, so it can join a Meta Business Portfolio later) |
+| Contact | `hello@desiauction.in` |
+
+**Bio** (127 / 150):
+```
+Live player auctions for your league, in 12 sports.
+Owners bid on their phones. The hall watches the big screen.
+Free in beta ↓
+```
+
+**Links** (website links are editable only in the mobile app):
+1. `https://desiauction.in/?utm_source=instagram&utm_medium=bio&utm_campaign=always_on`
+2. `https://desiauction.in/help/auction-night?utm_source=instagram&utm_medium=bio&utm_campaign=always_on`
+3. `https://desiauction.in/pricing?utm_source=instagram&utm_medium=bio&utm_campaign=always_on`
+
+### Launch row: three posts, published in this order
+
+Instagram shows the newest post first, so the profile's top row reads
+**03 · 02 · 01** from left to right: the promise, the proof, the problem. Pin all
+three after publishing.
+
+**01 — `instagram/posts/01-somewhere-tonight.png`**
+```
+Every local season has one night everybody remembers. It's usually the auction, and it's usually remembered for the argument.
+
+A bid called across the room. A number on a whiteboard. A purse someone swears had ₹20,000 left.
+
+We built DesiAuction so that night is remembered for the players instead.
+
+#playerauction #cricketauction #localcricket #tournament
+```
+
+**02 — `instagram/posts/02-ledger.png`**
+```
+This is what an auction looks like from the inside.
+
+Every bid is checked by the server before it counts, recorded in order, and shown on every screen in the room at the same moment: the projector, every owner's phone, every spectator's link.
+
+Once a bid is recorded, nobody can edit or delete it. Not the organiser, not an owner, not us.
+
+#playerauction #cricketauction #sportstech
+```
+
+**03 — `instagram/posts/03-sold-without-the-shouting.png`**
+```
+SOLD, without the shouting.
+
+DesiAuction runs your league's player auction live. Owners bid from their phones, the hall watches the big screen, and every sale lands on the record. Squads, spend and receipts are done before the lights go off.
+
+Cricket, football, kabaddi and nine more sports. Free during beta, and always free for up to 4 teams and 40 players.
+
+Link in bio.
+
+#playerauction #cricketauction #tournament #desiauction
+```
+
+### Story highlights
+
+Covers are in `instagram/highlights/` (1080×1920; Instagram crops to the
+centre circle). Highlights need at least one story each, and stories can only be
+posted from the phone app, so these are created on mobile:
+
+| Highlight | Cover | First story to put in it |
+|---|---|---|
+| START | `01-start.png` | `docs/brand/kit/motion/da-strike-story-1080x1920.mp4` |
+| AUCTION | `02-auction.png` | Post 03, shared to story |
+| PROOF | `03-proof.png` | Post 02, shared to story |
+| PRICING | `04-pricing.png` | A screenshot of desiauction.in/pricing |
+| NIGHTS | `05-nights.png` | The first real auction night (wait for one) |
+| PLAYERS | `06-players.png` | A screenshot of the player registration page |
+| ASK | `07-ask.png` | A question sticker: "Ask us anything about running an auction" |
+
+---
+
+## LinkedIn — company page
+
+| Field | Value |
+|---|---|
+| Page name | `DesiAuction` |
+| URL | `linkedin.com/company/desiauction` |
+| Logo | `docs/brand/kit/png/da-mark-512.png` |
+| Cover | `docs/brand/kit/social/linkedin-cover-1128x191.png` |
+| Website | `https://desiauction.in` |
+| Industry | Software Development |
+| Company size | 0–1 employees |
+| Type | Privately held |
+| Location | **REQUIRES INPUT**: the LinkedIn profile says Kolkata; the outreach kit says the company is registered in Jaipur |
+| Specialties | Sports Technology, Sports Management Software, Auction Software, Cricket, Community Sports, Event Technology, SaaS, India |
+
+**Tagline** (120 / 120):
+```
+Live player auctions for your league, in any of 12 sports. Owners bid from their phones, every sale lands on the record.
+```
+
+**About:**
+```
+DesiAuction runs player auctions for community sports leagues in India.
+
+Most local leagues still run their auction night on a spreadsheet, a WhatsApp group and whoever has the loudest voice. When lakhs of rupees of purse move in one evening, arguments are normal, and the organiser spends the next week defending the arithmetic.
+
+We think that's the wrong way to spend the best night of a local season.
+
+On DesiAuction:
+• Owners bid from their phones while the hall watches the big screen.
+• Every bid is checked by the server before it counts, and once recorded it can't be edited or deleted, by anyone, including us.
+• Every screen in the room shows the same number at the same moment.
+• When the last player is sold, squads, spend and receipts are already done.
+
+Built in India, for how Indian leagues actually run: UPI-first collections, rupee notation, Hindi-ready names and mobile-number sign-in. Cricket, football, kabaddi and nine more sports.
+
+Free during beta, and always free for up to 4 teams and 40 players.
+```
+
+**First page post** (with `docs/brand/kit/motion/da-strike-lockup-1920x1080.mp4`):
+```
+DesiAuction is live.
+
+We build player auctions for community sports leagues: owners bid from their phones, the hall watches the big screen, and every sale lands on a record nobody can edit.
+
+If you run a league, a corporate tournament or a society cup, we'd like to hear how your last auction night went. The good parts and the arguments.
+
+desiauction.in
+```
