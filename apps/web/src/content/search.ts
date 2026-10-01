@@ -2,6 +2,7 @@ import { plainTextOf } from "./blocks";
 import { FAQS, HELP_ARTICLES, HELP_CATEGORIES } from "./help";
 import { LEGAL_DOCUMENTS } from "./legal";
 import { FEATURE_GROUPS, PRICING } from "./marketing";
+import { CASE_STUDIES, HAS_CASE_STUDIES } from "./case-studies";
 import { RELEASES } from "./releases";
 
 /**
@@ -157,10 +158,22 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
     "Book a live walkthrough",
     "demo walkthrough call sales talk to us book booking time slot appointment",
   ),
-  // /careers, /blog, /case-studies and /api-docs are deliberately NOT here.
-  // The routes exist but have nothing on them yet, and a search result that
-  // lands on an empty page is worse than no result. Add each back the day it
-  // has something to read.
+  // /careers, /blog and /api-docs are deliberately NOT here. The routes exist
+  // but have nothing on them yet, and a search result that lands on an empty
+  // page is worse than no result. Add each back the day it has something to
+  // read. /case-studies does that by itself: it is offered once
+  // content/case-studies.ts holds a real story.
+  ...(HAS_CASE_STUDIES
+    ? [
+        doc(
+          "Case studies",
+          "/case-studies",
+          "Product",
+          "Leagues that ran their auction here",
+          `case study studies customer story league organizer results ${CASE_STUDIES.map((entry) => `${entry.league} ${entry.city} ${entry.sport}`).join(" ")}`,
+        ),
+      ]
+    : []),
   doc(
     "Legal centre",
     "/legal",
