@@ -143,6 +143,9 @@ $INDEXNOW
 # SES_ACCESS_KEY_ID=
 # SES_SECRET_ACCESS_KEY=
 # SES_SNS_TOPIC_ARN=
+# ZeptoMail instead of SES (EMAIL_PROVIDER=zeptomail, docs/EMAIL_INFRASTRUCTURE.md):
+# ZEPTOMAIL_API_KEY=
+# ZEPTOMAIL_WEBHOOK_KEY=
 # Login codes by text: whatsapp (launch channel) or msg91. Production refuses
 # to start without one — email-only login is not a supported production mode.
 # OTP_PROVIDER=
@@ -183,6 +186,7 @@ $MAIL
 # SENTRY_DSN=
 # SES_ACCESS_KEY_ID=
 # SES_SECRET_ACCESS_KEY=
+# ZEPTOMAIL_API_KEY=
 EOF
 
 write pgbackrest.env <<EOF

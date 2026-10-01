@@ -216,11 +216,12 @@ const envSchema = z.object({
    * `auto` keeps every existing caller's behaviour byte for byte: real mailer
    * when configured, dev inbox when not.
    *
-   * `ses` is Amazon SES (the SES_* settings below); `resend` is Resend over
-   * EMAIL_API_*; `http` is Resend's historical name and means the same. Which
+   * `ses` is Amazon SES (the SES_* settings below); `zeptomail` is ZeptoMail
+   * (Zoho CPaaS, ZEPTOMAIL_* below); `resend` is Resend over EMAIL_API_*;
+   * `http` is Resend's historical name and means the same. Which
    * one is a restart, not a deploy — the rollback path (mail-provider.ts).
    */
-  EMAIL_PROVIDER: z.enum(["auto", "dev", "http", "resend", "ses"]).default("auto"),
+  EMAIL_PROVIDER: z.enum(["auto", "dev", "http", "resend", "ses", "zeptomail"]).default("auto"),
   EMAIL_API_ENDPOINT: z.url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),
@@ -262,6 +263,20 @@ const envSchema = z.object({
     .string()
     .regex(/^arn:aws:sns:[a-z]{2}(-[a-z]+)+-\d:\d{12}:[A-Za-z0-9_-]{1,256}$/, "an SNS topic ARN")
     .optional(),
+  /**
+   * ZeptoMail (Zoho CPaaS, EMAIL_PROVIDER=zeptomail). The Mail Agent's Send
+   * Mail token, without its `Zoho-enczapikey` prefix; server-only. EMAIL_FROM
+   * is shared, so the From address does not change with the provider.
+   */
+  ZEPTOMAIL_API_KEY: z.string().min(16).optional(),
+  /** Another data centre's `.../v1.1/email`. Unset: India (cpaas.zoho.in). */
+  ZEPTOMAIL_ENDPOINT: z.url().optional(),
+  /**
+   * The Mail Agent webhook's authentication key — what signs each bounce and
+   * complaint event (`producer-signature`). Unset CLOSES
+   * /api/webhooks/zeptomail (404), the sibling webhooks' rule.
+   */
+  ZEPTOMAIL_WEBHOOK_KEY: z.string().min(16).optional(),
   /**
    * "Get photos from Google Drive" (Google Picker + drive.file). All three are
    * PUBLIC by design — they sit in the page, and the key is locked to our
@@ -553,7 +568,7 @@ const productionSchema = envSchema
     // `auto` without credentials silently falls back to the dev inbox: email
     // sign-in codes land in plain text in otp_inbox and nobody receives them.
     message:
-      "email needs a configured mailer in production — EMAIL_PROVIDER=ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM (or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM), and not dev — otherwise sign-in codes go to a database table instead of a mailbox",
+      "email needs a configured mailer in production — EMAIL_PROVIDER=zeptomail with ZEPTOMAIL_API_KEY and EMAIL_FROM, ses with SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM, or resend with EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM — and not dev, otherwise sign-in codes go to a database table instead of a mailbox",
     path: ["EMAIL_PROVIDER"],
   })
   .refine(
