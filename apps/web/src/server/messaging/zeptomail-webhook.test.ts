@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   handleZeptomailWebhook,
+  headerKeyMatches,
   parseProducerSignature,
   verifyZeptomailSignature,
   zeptomailEventActions,
@@ -184,11 +185,30 @@ describe("zeptomailEventActions — what one event asks of us", () => {
   });
 });
 
+/** Credentials for a signed call (the HMAC) and for a header-keyed one. */
+const signedBy = (header: string) => ({ signature: header, headerKey: null });
+const keyed = (headerKey: string | null) => ({ signature: null, headerKey });
+
+describe("headerKeyMatches — the key in an Authorization header", () => {
+  it("accepts the key itself, or as a Bearer token", () => {
+    expect(headerKeyMatches(KEY, KEY)).toBe(true);
+    expect(headerKeyMatches(`Bearer ${KEY}`, KEY)).toBe(true);
+    expect(headerKeyMatches(`  ${KEY}  `, KEY)).toBe(true);
+  });
+
+  it("refuses another key, a prefix of it, nothing, and an empty configured key", () => {
+    expect(headerKeyMatches("someone-elses-key-0123456789", KEY)).toBe(false);
+    expect(headerKeyMatches(KEY.slice(0, -1), KEY)).toBe(false);
+    expect(headerKeyMatches(null, KEY)).toBe(false);
+    expect(headerKeyMatches("", "")).toBe(false);
+  });
+});
+
 describe("handleZeptomailWebhook — one POST, start to finish", () => {
   it("suppresses, then reports, then answers 200", async () => {
     const d = deps();
     const { body, header } = formPost(event("hard bounce", { clientReference: "01J9XYZ" }));
-    const result = await handleZeptomailWebhook(body, header, d);
+    const result = await handleZeptomailWebhook(body, signedBy(header), d);
     expect(result).toEqual({ status: 200, body: { status: "suppressed" } });
     expect(d.suppress).toHaveBeenCalledWith(
       expect.objectContaining({ recipient: "Gone@Example.com", reason: "bounce" }),
@@ -199,25 +219,55 @@ describe("handleZeptomailWebhook — one POST, start to finish", () => {
     );
   });
 
-  it("answers 403 to a forgery without touching anything", async () => {
-    const d = deps();
-    const forged = formPost(event("hard bounce"), NOW, "someone-elses-key-0123456789");
-    expect(await handleZeptomailWebhook(forged.body, forged.header, d)).toEqual({
-      status: 403,
-      body: null,
-    });
-    expect(d.suppress).not.toHaveBeenCalled();
-    expect(d.report).not.toHaveBeenCalled();
+  it("acts on an event proved by the header key, as raw JSON or form-encoded", async () => {
+    for (const body of [
+      event("hard bounce"),
+      `event=${encodeURIComponent(event("hard bounce"))}`,
+    ]) {
+      const d = deps();
+      expect(await handleZeptomailWebhook(body, keyed(`Bearer ${KEY}`), d)).toEqual({
+        status: 200,
+        body: { status: "suppressed" },
+      });
+      expect(d.suppress).toHaveBeenCalledTimes(1);
+    }
   });
 
-  it("answers 200 'ignored' to a soft bounce, and 400 to a signed but unreadable body", async () => {
+  it("answers 200 to an unproved call — a forgery or Zoho's Verify — and touches nothing", async () => {
+    const forged = formPost(event("hard bounce"), NOW, "someone-elses-key-0123456789");
+    for (const [body, credentials] of [
+      [forged.body, signedBy(forged.header)],
+      [event("hard bounce"), keyed("someone-elses-key-0123456789")],
+      [event("hard bounce"), keyed(null)],
+      ["", keyed(null)],
+    ] as const) {
+      const d = deps();
+      expect(await handleZeptomailWebhook(body, credentials, d)).toEqual({
+        status: 200,
+        body: { status: "ignored" },
+      });
+      expect(d.suppress).not.toHaveBeenCalled();
+      expect(d.report).not.toHaveBeenCalled();
+      expect(d.log).toHaveBeenCalledWith(expect.anything(), "zeptomail_webhook.unproved");
+    }
+  });
+
+  it("answers 200 'ignored' to a soft bounce, and to a proved but unreadable body", async () => {
     const soft = formPost(event("soft bounce"));
-    expect(await handleZeptomailWebhook(soft.body, soft.header, deps())).toEqual({
+    expect(await handleZeptomailWebhook(soft.body, signedBy(soft.header), deps())).toEqual({
       status: 200,
       body: { status: "ignored" },
     });
     const junk = formPost("not json");
-    expect((await handleZeptomailWebhook(junk.body, junk.header, deps())).status).toBe(400);
+    expect(await handleZeptomailWebhook(junk.body, signedBy(junk.header), deps())).toEqual({
+      status: 200,
+      body: { status: "ignored" },
+    });
+    // Zoho's Verify, when it does carry the key: an empty ping.
+    expect(await handleZeptomailWebhook("", keyed(KEY), deps())).toEqual({
+      status: 200,
+      body: { status: "ignored" },
+    });
   });
 
   it("lets a database failure escape, for the route to answer 503", async () => {
@@ -226,6 +276,13 @@ describe("handleZeptomailWebhook — one POST, start to finish", () => {
       suppress: vi.fn(() => Promise.reject(new Error("db down"))),
     };
     const { body, header } = formPost(event("hard bounce"));
-    await expect(handleZeptomailWebhook(body, header, d)).rejects.toThrow("db down");
+    await expect(handleZeptomailWebhook(body, signedBy(header), d)).rejects.toThrow("db down");
+    const viaHeader: ZeptomailWebhookDeps = {
+      ...deps(),
+      suppress: vi.fn(() => Promise.reject(new Error("db down"))),
+    };
+    await expect(
+      handleZeptomailWebhook(event("hard bounce"), keyed(KEY), viaHeader),
+    ).rejects.toThrow("db down");
   });
 });

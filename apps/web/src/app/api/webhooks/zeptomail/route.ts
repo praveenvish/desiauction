@@ -4,7 +4,10 @@ import { env } from "../../../../env";
 import { readCapped } from "../../../../lib/read-capped";
 import { logger, withRequestId } from "../../../../server/logger";
 import { ingestEmailReport, suppressEmailAddress } from "../../../../server/messaging/email-events";
-import { handleZeptomailWebhook } from "../../../../server/messaging/zeptomail-webhook";
+import {
+  handleZeptomailWebhook,
+  ZEPTOMAIL_KEY_HEADER,
+} from "../../../../server/messaging/zeptomail-webhook";
 
 /**
  * ZEPTOMAIL (ZOHO CPAAS) EVENTS — hard bounces and spam complaints for every
@@ -31,15 +34,26 @@ async function handle(request: Request): Promise<NextResponse> {
     return new NextResponse(null, { status: 413 });
   }
   try {
-    const result = await handleZeptomailWebhook(raw, request.headers.get("producer-signature"), {
-      key,
-      now: () => Date.now(),
-      suppress: (action) => suppressEmailAddress(action),
-      report: (reportRaw) => ingestEmailReport(reportRaw),
-      log: (fields, message) => {
-        logger().info(fields, message);
+    const result = await handleZeptomailWebhook(
+      raw,
+      {
+        signature: request.headers.get("producer-signature"),
+        headerKey:
+          request.headers.get(ZEPTOMAIL_KEY_HEADER) ?? request.headers.get("authorization"),
       },
-    });
+      {
+        key,
+        now: () => Date.now(),
+        suppress: (action) => suppressEmailAddress(action),
+        report: (reportRaw) => ingestEmailReport(reportRaw),
+        log: (fields, message) => {
+          // Unproved is WARN: Zoho's keyless Verify is one, but a real event
+          // here means the key in Zoho and in web.env disagree.
+          if (message === "zeptomail_webhook.unproved") logger().warn(fields, message);
+          else logger().info(fields, message);
+        },
+      },
+    );
     return result.body === null
       ? new NextResponse(null, { status: result.status })
       : NextResponse.json(result.body, { status: result.status });
