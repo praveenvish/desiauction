@@ -26,7 +26,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
   if (page.url().includes("/onboarding")) {

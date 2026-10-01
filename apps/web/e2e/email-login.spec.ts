@@ -64,7 +64,8 @@ test("a verified email is a second way into the same account", async ({ page }) 
   await page.getByLabel("Mobile number").fill(PHONE);
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
-  await page.getByLabel("6-digit code").fill(await latestOtp(PHONE));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await latestOtp(PHONE));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
   if (page.url().includes("/onboarding")) {

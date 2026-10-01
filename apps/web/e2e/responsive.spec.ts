@@ -39,7 +39,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 15_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Viewport Tester");
@@ -126,7 +127,8 @@ test("the organizer's season list fits its card at every laptop width", async ({
     await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
       timeout: 15_000,
     });
-    await page.getByLabel("6-digit code").fill(await latestOtp(FOUNDER));
+    await page.getByLabel("6-digit code").clear();
+    await page.getByLabel("6-digit code").pressSequentially(await latestOtp(FOUNDER));
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await expect(page).not.toHaveURL(/\/login/);
   });
