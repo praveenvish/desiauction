@@ -17,6 +17,7 @@ import { LEGAL_DOCUMENTS, legalDocument } from "./legal";
 import { legalIdentityPublished, missingLegalIdentity, type LegalIdentity } from "./company";
 import { FEATURE_GROUPS, LANDING, PRICING } from "./marketing";
 import { RELEASES } from "./releases";
+import { HAS_CASE_STUDIES } from "./case-studies";
 import { SEARCH_INDEX, allContentLinks, searchContent } from "./search";
 import { SUPPORT } from "./support";
 
@@ -442,9 +443,11 @@ describe("PX-10 · Search (navigation only)", () => {
     // These routes render an empty placeholder. Offering them as answers sent
     // a searcher somewhere with nothing to read.
     const hrefs = new Set(SEARCH_INDEX.map((doc) => doc.href));
-    for (const href of ["/careers", "/blog", "/case-studies", "/api-docs"]) {
+    for (const href of ["/careers", "/blog", "/api-docs"]) {
       expect(hrefs, `search still offers ${href}`).not.toContain(href);
     }
+    // Case studies are offered exactly when there is a real story to read.
+    expect(hrefs.has("/case-studies")).toBe(HAS_CASE_STUDIES);
   });
 
   it("finds what people actually type", () => {
