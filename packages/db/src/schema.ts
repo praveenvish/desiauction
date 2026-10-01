@@ -1031,6 +1031,19 @@ export const competitions = pgTable(
       .references(() => people.id, { onDelete: "restrict" }),
     createdAt: ts("created_at").notNull().defaultNow(),
     /**
+     * When the season's own row last changed (0099) — the sitemap's lastmod.
+     * Kept by a database trigger, not by writers: every UPDATE that changes a
+     * value moves it, so no writer can forget.
+     */
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+    /**
+     * The organizer's opt-in to let search engines index this season's squad
+     * pages (0099, SEO-1 Phase 5). Necessary, never sufficient: squads are
+     * indexed only while every approved player is a known adult
+     * (apps/web/src/server/seo/squads.ts).
+     */
+    listSquadsInSearch: boolean("list_squads_in_search").notNull().default(false),
+    /**
      * THE PLATFORM HOLD (0072). Set by the moderation desk when a public season
      * page is taken down; cleared when the hold is lifted. While it is set the
      * season cannot be public — a CHECK, not a convention — so no publishing

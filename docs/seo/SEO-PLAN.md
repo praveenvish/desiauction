@@ -176,7 +176,7 @@ Each page contains:
 
 ---
 
-### Phase 5 — `feat(seo): public seasons as the long-tail engine` (P1)
+### Phase 5 — `feat(seo): public seasons as the long-tail engine` (P1) — **BUILT 2026-10-01** (see §15)
 
 Every public season can rank for "‹league name› auction 2026", "‹league› squads" and "‹league› points table", which are low-competition, high-intent searches.
 
@@ -189,7 +189,7 @@ Every public season can rank for "‹league name› auction 2026", "‹league›
 
 ---
 
-### Phase 6 — `feat(content): guides that answer the question` (P1, ongoing)
+### Phase 6 — `feat(content): guides that answer the question` (P1, ongoing) — **FIRST 10 BUILT 2026-10-01** (see §16)
 
 1. Turn the `/blog` placeholder into `/guides` (keep `/blog` as a 301). It stays `noindex` **until at least 6 real articles exist**.
 2. **The first 10 articles** target how-to searches organizers already make:
@@ -209,7 +209,7 @@ Every public season can rank for "‹league name› auction 2026", "‹league›
 
 ---
 
-### Phase 7 — Authority and backlinks (P1, founder + engineering)
+### Phase 7 — Authority and backlinks (P1, founder + engineering) — **engineering half BUILT 2026-10-01** (see §17)
 
 | Tactic | Owner | Detail |
 |---|---|---|
@@ -222,7 +222,7 @@ Every public season can rank for "‹league name› auction 2026", "‹league›
 
 ---
 
-### Phase 8 — Core Web Vitals in the field (P2, fixes G10)
+### Phase 8 — Core Web Vitals in the field (P2, fixes G10) — **BUILT 2026-10-01** (see §18)
 
 1. **RUM:** a `web-vitals` reporter sends LCP, INP and CLS to `/api/vitals` (sampled at 10%, no personal data), shown on `/admin/health`.
 2. **Back/forward cache on public pages (investigate first):** `no-store` is what Next itself emits for a dynamically rendered page, and the root layout's session read makes every page dynamic. Overriding the header needs a proof-of-concept first, to confirm Next doesn't overwrite it and that no signed-in HTML can be cached. Treat it as a UX win (instant back navigation), not a ranking factor.
@@ -618,3 +618,115 @@ Each page has:
   - draft reverses round 2
   - no overflow at 360px
 - E2E across every landing page, seo, CSP, public pages and the shell: **43/43**.
+
+---
+
+## 15. Phase 5 delivery log (2026-10-01)
+
+**Built on `feat/seo-season-pages`, stacked on Phase 4d (#182).** Founder decision D3: **organizer opt-in for squad pages, never with minors.**
+
+**Migration `0099_season_search_listing`** (hand-authored; journal `when` = previous + 1 day, per the known skip trap; verified with `\d competitions`):
+- `competitions.list_squads_in_search boolean not null default false`: the organizer's opt-in.
+- `competitions.updated_at timestamptz not null default now()`, backfilled from `created_at` and kept by a `BEFORE UPDATE` trigger. It fires only when a value actually changes (`OLD.* IS DISTINCT FROM NEW.*`). This is the repo's first trigger, chosen because seasons are written from many places and a column a writer forgot to touch would lie.
+
+**Squad pages in search:**
+- The rule (`server/seo/squads.ts`, pure and tested) requires the opt-in **and** every *approved* registration in the season to have a date of birth that proves 18+.
+- It fails closed like `mayPublishPhoto`: an unknown or unparseable date blocks. It's season-wide, so approving one minor takes every squad back out.
+- The team page's `robots` follows the rule, and the sitemap lists squad URLs only for eligible seasons.
+- The organizer switch "Squads in search" sits under "Public page" on the season overview (managers only). It explains exactly why squads aren't listed ("2 approved players have no date of birth or are under 18"). `setSquadListingAction` is gated by `competition.manage` and audited as `competition.squad_listing_changed`.
+
+**Season titles and descriptions** (`server/seo/season-copy.ts`, pure and tested):
+- Titles follow the season: "‹Name› ‹year› — player registration & auction" before the auction, and "‹Name› ‹year› auction — teams, squads & results" after. The year and "auction" are added only if the name lacks them.
+- Descriptions are built from facts the page shows (organizer, sport, place, dates, team count, and the top buy's **team and price**, never a player's name). They use whole sentences and stay at 160 characters or fewer.
+
+**Sitemap freshness:** each season's `lastmod` is the latest of its row, its public fixtures (published/completed/cancelled), its results and its auction's last event (`publicSeasonSitemap`).
+
+**Found while building:** Drizzle renders a single-table select's columns unqualified, so `competitions.id` inside the lastmod subqueries became an ambiguous bare `"id"`. The typechecker accepted it; `season-search.regression.test.ts` caught it. The expression is now fully qualified.
+
+**Not done, deliberately:**
+- **Clean slugs:** the ranking gain is small and they need a reserved-slug list. Existing slugs are printed on QR codes.
+- **City facets:** `location` is free text, and no city has 3 public seasons yet.
+- **Sport facets:** the `/sports/[sport]` pages already list each sport's tournaments.
+
+**Tests:**
+- `server/seo/squads.test.ts` and `server/seo/season-copy.test.ts`.
+- `server/competition/season-search.regression.test.ts`, against the database: the trigger (a real change moves it, the same values don't), the rule over real registrations (off → blocked by an unknown DOB → listed → a minor takes it back out), the sitemap, and the audit.
+- The `public-registration` e2e now drives the toggle.
+- E2E 24/24; unit and regression 211.
+
+---
+
+## 16. Phase 6 delivery log (2026-10-01)
+
+**Built on `feat/seo-guides`, stacked on Phase 5.**
+
+**What shipped:**
+- `/guides` (index, newest first) and `/guides/[slug]`: the plan's first ten, each with `Article` (+ `datePublished`/`dateModified`) and `BreadcrumbList` markup.
+- They are bylined "By the DesiAuction team". A guide is not attributed to a person who didn't write it.
+- `/blog` and `/blog/*` now **308 to `/guides`**; the placeholder page is deleted.
+- Links: footer (Help › Guides), the Resources menu, the sitemap and the route registry.
+
+| Guide | Links into |
+|---|---|
+| How to run an IPL-style player auction for your local cricket tournament | form template, purse calculator, help, `/sports/cricket` |
+| How much purse and base price to set | purse calculator (worked reserve-rule example) |
+| Player auction rules: a template for your league | purse guide |
+| What to ask on a player registration form | form template |
+| Snake draft or auction | snake-draft tool |
+| How to run a society premier league | fees guide, `/for/housing-societies` |
+| Collecting entry fees and team dues | help › money |
+| Box cricket league with a player auction | calculator, `/sports/box-cricket` |
+| Kabaddi league auction | `/sports/kabaddi` |
+| A live auction on a projector or TV | help › screens for the room |
+
+**Accuracy:** product statements were checked against code and the help centre (config locked at creation, owner links sent by the organizer, paddles granted separately, board and overlay public on a published season, undo needs an owner-level grant, and more). One receipt claim was narrowed to "every receipt can be checked against the original record".
+
+**Found and fixed: a bug from Phase 4.** A **signed-in** visitor opening `/sports`, `/for`, `/compare` or `/tools` got them framed in the **organizer console**, because `nav.ts`'s `shellKind` decides chrome from its own prefix list, and those prefixes were never added. The e2e runs were all signed out. They are now listed (with `/guides`), and `routes.test.ts` holds **every indexable route in the SEO registry to the public shell**. Removing `/sports` from the list fails it (checked).
+
+**Tests:**
+- `content/guides.test.ts`: at least six guides, unique fields, 50–160 character summaries, **every internal link resolves to a real page**, and sane dates.
+- `e2e/guides.spec.ts`: index, a guide in both themes (axe), and `/blog` → 308 `/guides`.
+- E2E across guides, seo, shell, public pages, CSP and all landing pages: **46/46**.
+
+**Still for the founder:** real bylines (a named author with experience earns more trust than "the team"), two new guides a month, and a quarterly refresh of the top five.
+
+---
+
+## 17. Phase 7 delivery log, engineering half (2026-10-01)
+
+**Built on `feat/seo-embed`, stacked on Phase 6.**
+
+**Season embed:** `/embed/[slug]` is a small read-only card of a **published** season (status, name, organizer, sport, place, dates, team count). It has a link out to `/c/[slug]` ("Register" / "Watch live" / "View the season") and "Powered by DesiAuction". It is bare (no site chrome), `noindex` (it would duplicate the season page), and shows no player names.
+- **Organizer:** "Embed on your website" on the season overview (public seasons, managers) copies an iframe **plus a plain `<a>` link to the season page**. The plain link is the actual backlink: a link inside an iframe belongs to us, not to the host page. The season name is HTML-escaped in the snippet.
+- **Framing is allowed on `/embed/*` only.** The global security-header rule now skips `/embed` (a negative-lookahead source), and `/embed/*` gets the same headers minus `X-Frame-Options`, with `frame-ancestors *`. An embed page has no form and no session-bound action, so framing gives a clickjacker nothing to click.
+- `embed` is classified in the route registry (noindex header, Disallow).
+- The e2e asserts the season page itself **still** sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`.
+
+**Already true, no change needed:** the board and the overlay carry the DesiAuction wordmark, and share cards carry the brand.
+
+**Founder half (not engineering):**
+- directory listings (Product Hunt, G2, Capterra/GetApp India, SaaSworthy, Techjockey, AlternativeTo)
+- a stream kit for organizers (YouTube description text with the season link)
+- local sports press, academy and turf associations, college fests
+- case studies from real seasons that agree to one
+
+---
+
+## 18. Phase 8 delivery log (2026-10-01)
+
+**Built on `feat/seo-speed`, stacked on Phase 7.**
+
+**Diagnosis first.** Lighthouse's 3.6–3.9s LCP on the public pages was examined before anything was changed:
+- The LCP phases were almost all "render delay" (2.9–3.4s), with TTFB of about 10–130ms.
+- **In the real, unthrottled trace, LCP equals first paint on every page (72–231ms).** The gap is Lantern's simulation, which charges every request made before LCP, JavaScript included. There is no late-appearing element to fix.
+- **Experiment, rejected:** `experimental.inlineCss`, which removes 13–16 render-blocking stylesheets per page. Measured: FCP improved about 150ms, LCP was unchanged or worse, and it would add 50–70 KB of HTML to every load and lose CSS caching. Not shipped.
+
+**Shipped: real-user monitoring**, so the budget in docs/57 is judged on real phones:
+- `WebVitalsReporter` (in the root layout, beside `ClientErrorListener`) uses Next's built-in `useReportWebVitals`. It samples one page load in ten and sends via `sendBeacon`. No new dependency.
+- `/api/vitals` mirrors `/api/client-error`: a 1 KB cap, only known fields (`lib/web-vitals-report.ts`, tested), a per-minute log cap, and 204 for everything. It writes a `web_vitals` log line with the metric, value, rating and redacted path, and no user, session or address.
+
+**Not done, and why:**
+- **The bfcache header change:** Next itself emits `no-store` for dynamic pages; the plan marked this "investigate first", and it isn't a ranking factor.
+- **An `/admin/health` panel over the vitals:** it needs aggregation beyond log lines. It's a follow-up once there's field data to show.
+
+**Tests:** `lib/web-vitals-report.test.ts` (10) and `e2e/web-vitals.spec.ts` (the endpoint's answers; the reporter loads without a policy violation).

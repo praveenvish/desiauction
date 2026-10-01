@@ -1,0 +1,50 @@
+/* SEO-1 Phase 7: the season card another site frames. Self-contained, small. */
+
+.embed-card {
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  max-width: 30rem;
+  font-size: 0.9375rem;
+}
+
+.embed-status {
+  margin: 0 0 var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.embed-title {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.25;
+}
+
+.embed-org,
+.embed-facts {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+}
+
+.embed-actions {
+  margin: var(--space-4) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.embed-cta {
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.embed-brand {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}

@@ -18,6 +18,7 @@ import {
   newId,
   organizations,
   orgMembers,
+  registrations,
   tournaments,
   teams,
   writeSurvivingConstraint,
@@ -26,6 +27,7 @@ import {
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import { storage } from "../media";
+import { squadListingDecision, type SquadListing } from "../seo/squads";
 
 // Competition + Tournament + Team persistence (IP-3 §4). All rules come from core;
 // this module fetches/writes and writes audit. Web actions are the only callers.
@@ -639,6 +641,62 @@ export async function setCompetitionVisibility(
     subject: competition.id,
     meta: { from: competition.visibility, to: visibility, slug: competition.slug },
   });
+}
+
+/**
+ * THE SQUAD-LISTING SWITCH (SEO-1 Phase 5, 0099). The organizer's opt-in to let
+ * search engines index this season's squad pages. Audited like publishing,
+ * because it decides whether players' names can be found by a stranger.
+ * Turning it on is never enough on its own — see `squadListingState`.
+ */
+export async function setCompetitionSquadListing(
+  db: Db,
+  competition: CompetitionSummary,
+  personId: string,
+  listed: boolean,
+): Promise<void> {
+  await db
+    .update(competitions)
+    .set({ listSquadsInSearch: listed })
+    .where(eq(competitions.id, competition.id));
+  await db.insert(auditLog).values({
+    id: newId(),
+    actor: personId,
+    action: "competition.squad_listing_changed",
+    scopeType: "org",
+    scopeId: competition.orgId,
+    subject: competition.id,
+    meta: { to: listed, slug: competition.slug },
+  });
+}
+
+/** Whether squads are listed, and what the rule decides right now, for the organizer. */
+export async function squadListingState(
+  db: Db,
+  competitionId: string,
+): Promise<{ optedIn: boolean; decision: SquadListing }> {
+  const [row] = await db
+    .select({ optedIn: competitions.listSquadsInSearch })
+    .from(competitions)
+    .where(eq(competitions.id, competitionId))
+    .limit(1);
+  const optedIn = row?.optedIn ?? false;
+  const births = optedIn
+    ? await db
+        .select({ dateOfBirth: registrations.dateOfBirth })
+        .from(registrations)
+        .where(
+          and(eq(registrations.competitionId, competitionId), eq(registrations.status, "approved")),
+        )
+    : [];
+  return {
+    optedIn,
+    decision: squadListingDecision({
+      optedIn,
+      birthDates: births.map((birth) => birth.dateOfBirth),
+      now: new Date(),
+    }),
+  };
 }
 
 /** The Google Sheet a season syncs registrations from (0093), if one is connected. */

@@ -19,10 +19,11 @@ describe("registration form template", () => {
   for (const pack of SPORTS) {
     it(`${pack.key}: every question heading is recognised by the importer`, () => {
       const questions = registrationTemplate(pack);
-      const headings = questions.map((question) => question.heading);
-      // With the season's pack, as the import screen reads it — a sport's own
-      // attribute is found only by its pack.
-      const detected = detectMapping(headings, undefined, pack);
+      const detected = detectMapping(
+        questions.map((question) => question.heading),
+        undefined,
+        pack,
+      );
       expect(detected.missing, "required fields no heading claimed").toEqual([]);
       expect(detected.conflicts).toEqual([]);
       for (const [index, question] of questions.entries()) {
@@ -60,13 +61,14 @@ describe("registration form template", () => {
       expect(parsed.rows).toHaveLength(1);
       // The first role choice comes back as the pack's first role.
       expect(parsed.rows[0]?.role).toBe(pack.roles.values[0]?.key);
-      // And every attribute question lands as the pack's first option.
-      const attributes = pack.attributes.filter((attribute) => attribute.storage.kind === "json");
-      expect(parsed.rows[0]?.attributes).toEqual(
-        Object.fromEntries(
-          attributes.map((attribute) => [attribute.key, attribute.options[0]?.key]),
-        ),
-      );
+      // Each of the sport's own details comes through as its first option's key.
+      for (const attribute of pack.attributes.filter(
+        (spec) => spec.key !== "batting_style" && spec.key !== "bowling_style",
+      )) {
+        expect(parsed.rows[0]?.attributes[attribute.key], attribute.key).toBe(
+          attribute.options[0]?.key,
+        );
+      }
     });
   }
 });

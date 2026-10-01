@@ -83,7 +83,9 @@ import {
   markImportSheetSynced,
   publishBlockers,
   setAuctionStart,
+  setCompetitionSquadListing,
   setCompetitionVisibility,
+  squadListingState,
   setImportSheet,
   setTeamCoach,
   updateTeamDetails,
@@ -380,6 +382,8 @@ export interface SeasonOverviewView extends SeasonOverview {
   publishBlockers: PublishBlocker[];
   /** Whether DesiAuction has taken the public page down (0072). Managers only. */
   platformHold: SeasonHold | null;
+  /** The squad-listing switch and what the rule decides now (SEO-1 Phase 5). Managers only. */
+  squadListing: Awaited<ReturnType<typeof squadListingState>> | null;
 }
 
 export async function competitionView(slug: string): Promise<CompetitionView | null> {
@@ -431,11 +435,13 @@ export async function seasonOverviewView(slug: string): Promise<SeasonOverviewVi
     // (`competition.manage`); the books are `settlement.view`. Neither one is
     // implied by mere membership, which is what the old payload assumed.
     const canSeeMoney = canManage || canSettle;
-    const [overview, hold] = await Promise.all([
+    const [overview, hold, squadListing] = await Promise.all([
       seasonOverview(db, competition, { money: canSeeMoney }),
       // The reason is addressed to the people who run the season, not to every
       // member — gate the data, not the button.
       canManage ? seasonHoldOf(db, competition.id) : Promise.resolve(null),
+      // Same audience: which players block listing is the organizer's business.
+      canManage ? squadListingState(db, competition.id) : Promise.resolve(null),
     ]);
     return {
       ...overview,
@@ -458,6 +464,7 @@ export async function seasonOverviewView(slug: string): Promise<SeasonOverviewVi
           ? publishBlockers(competition)
           : [holdBlocker(hold.reason), ...publishBlockers(competition)],
       platformHold: hold,
+      squadListing,
     };
   });
 }
@@ -654,6 +661,39 @@ export async function setCompetitionVisibilityAction(
   // are recrawled in minutes rather than days. After the response, and never
   // able to fail the publish.
   after(() => notifyIndexNow([`/c/${competition.slug}`, "/c"]));
+  return { ok: true };
+}
+
+/**
+ * SEO-1 Phase 5: the organizer's "list squads in search" switch. Gated and
+ * audited like publishing. Turning it on does not by itself index anything —
+ * the squad pages stay out of search while any approved player is not a known
+ * adult (server/seo/squads.ts).
+ */
+export async function setSquadListingAction(
+  slug: string,
+  listed: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSession();
+  const competition = await resolveCompetitionScoped(session.personId, slug);
+  if (competition === null) {
+    return { ok: false, error: "Not available." };
+  }
+  try {
+    await inCompetitionOrg(session.personId, competition, (db) =>
+      requireCompetitionCapability(
+        db,
+        session.personId,
+        { orgId: competition.orgId, competitionId: competition.id },
+        "competition.manage",
+      ),
+    );
+  } catch {
+    return { ok: false, error: "You can't manage this competition." };
+  }
+  await inCompetitionOrg(session.personId, competition, (db) =>
+    setCompetitionSquadListing(db, competition, session.personId, listed),
+  );
   return { ok: true };
 }
 

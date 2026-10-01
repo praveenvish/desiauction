@@ -25,7 +25,9 @@ const envSchema = z.object({
    * export artifacts the web tier VERIFIES, so both must resolve the SAME root
    * — `finopsDeps`'s own `os.tmpdir()` default silently gives them different
    * ones and the ops board then reports a permanent, false "exports failed".
-   * Deployments set an absolute path (S3-compatible store, IP-6 pre-deploy). */
+   * Deployments set an absolute path (S3-compatible store, IP-6 pre-deploy).
+   * The default resolves against the PRIMARY checkout, even from a worktree
+   * (resolveFinopsStorageDir, @desiauction/messaging; it matches this literal). */
   FINOPS_STORAGE_DIR: z.string().min(1).default("../../.local/finops-artifacts"),
   /**
    * The shared artifact store (PRR P1-4). The runner WRITES artifacts the web
@@ -48,6 +50,7 @@ const envSchema = z.object({
    *
    *   · auto — the real mailer when configured, the file outbox when not.
    *   · ses  — Amazon SES (SES_*), and boot is refused without its settings.
+   *   · zeptomail — ZeptoMail / Zoho CPaaS (ZEPTOMAIL_*), likewise.
    *   · resend / http — Resend (EMAIL_API_*), likewise refused half-set.
    *   · dev  — the file outbox even with credentials (a local suite whose
    *            .env.local carries live keys must not mail test addresses).
@@ -56,7 +59,7 @@ const envSchema = z.object({
    * must match the web tier's: its provider callback route confirms what this
    * process sent.
    */
-  EMAIL_PROVIDER: z.enum(["auto", "dev", "http", "resend", "ses"]).default("auto"),
+  EMAIL_PROVIDER: z.enum(["auto", "dev", "http", "resend", "ses", "zeptomail"]).default("auto"),
   EMAIL_API_ENDPOINT: z.url().optional(),
   EMAIL_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).optional(),
@@ -75,6 +78,9 @@ const envSchema = z.object({
   SES_SECRET_ACCESS_KEY: z.string().min(20).optional(),
   SES_CONFIGURATION_SET: z.string().min(1).optional(),
   SES_FEEDBACK_ADDRESS: z.email().optional(),
+  // ZeptoMail — the same values as web.env (docs/EMAIL_INFRASTRUCTURE.md).
+  ZEPTOMAIL_API_KEY: z.string().min(16).optional(),
+  ZEPTOMAIL_ENDPOINT: z.url().optional(),
 });
 
 /**
@@ -126,13 +132,17 @@ const productionSchema = envSchema
       "EMAIL_PROVIDER=ses needs SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY and EMAIL_FROM",
     path: ["EMAIL_PROVIDER"],
   })
+  .refine((v) => v.EMAIL_PROVIDER !== "zeptomail" || mailConfigured(v), {
+    message: "EMAIL_PROVIDER=zeptomail needs ZEPTOMAIL_API_KEY and EMAIL_FROM",
+    path: ["EMAIL_PROVIDER"],
+  })
   // THE FILE OUTBOX IS NOT A PRODUCTION CHANNEL. Without this a production
   // runner boots, drains every dispatch, records each as delivered and writes
   // it to its own disk — the defect this refinement exists to make impossible.
   // The rehearsal escape keeps serving() false, exactly as for SENTRY_DSN.
   .refine((v) => !serving(v) || mailConfigured(v), {
     message:
-      "receipts need a configured mailer in production (EMAIL_PROVIDER=ses with SES_*, or EMAIL_API_ENDPOINT, EMAIL_API_KEY and EMAIL_FROM; not dev) — otherwise every financial document is written to a file on the runner's disk instead of being emailed",
+      "receipts need a configured mailer in production (EMAIL_PROVIDER=zeptomail with ZEPTOMAIL_API_KEY, ses with SES_*, or resend with EMAIL_API_ENDPOINT and EMAIL_API_KEY — each with EMAIL_FROM; not dev) — otherwise every financial document is written to a file on the runner's disk instead of being emailed",
     path: ["EMAIL_PROVIDER"],
   });
 

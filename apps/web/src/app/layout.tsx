@@ -17,6 +17,7 @@ import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
 import { ActionFailureNotice } from "../components/action-failure-notice";
 import { ClientErrorListener } from "../components/client-error-listener";
+import { WebVitalsReporter } from "../components/web-vitals-reporter";
 import { ProductShell } from "../components/shell/product-shell";
 import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
 import { platformDoorCapabilities } from "../server/admin/actions";
@@ -292,6 +293,8 @@ export default async function RootLayout({
         <NavigationProgress />
         {/* …and a failure in the browser is heard about (renders nothing). */}
         <ClientErrorListener />
+        {/* …and how fast the page really was, for one visit in ten (SEO-1 Phase 8). */}
+        <WebVitalsReporter />
         {/* …and said to the person, when what they asked for never came back. */}
         <ActionFailureNotice />
         <AppLinkProvider>

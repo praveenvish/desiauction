@@ -1,7 +1,8 @@
 import {
   IMPORT_FIELD_LABELS,
   attributeImportField,
-  type MappableField,
+  type AttributeImportField,
+  type ImportField,
   type SportPack,
 } from "@desiauction/core";
 
@@ -143,8 +144,8 @@ export type QuestionKind = "Short answer" | "Multiple choice" | "Date" | "File u
 export interface TemplateQuestion {
   /** The question's title in the form — the column heading the import reads. */
   readonly heading: string;
-  /** The import field the heading is recognised as. */
-  readonly field: MappableField;
+  /** The import field the heading is recognised as (a sport's own detail is `attr:<key>`). */
+  readonly field: ImportField | AttributeImportField;
   readonly kind: QuestionKind;
   readonly required: boolean;
   /** Choices to offer, for a multiple-choice question. */
@@ -157,12 +158,15 @@ export interface TemplateQuestion {
  * labels (IMPORT_FIELD_LABELS) so they are recognised without mapping; role
  * choices are the pack's role labels, which the importer maps back to roles.
  *
- * Only fields the import reads are listed. Every sport's own details are: a
- * cricket pack's batting and bowling style are fixed import fields, and every
- * other pack's attributes (preferred foot, grip…) are `attr:` fields the
- * importer finds by the attribute's own label — which is the heading asked.
+ * Only fields the import reads are listed. Cricket's batting and bowling style
+ * are fixed import fields; every other sport's own details (preferred foot,
+ * grip, spiking hand…) are read by their headings since the import learned the
+ * pack's attributes (#183), titled here with the attribute's own label.
  */
 export function registrationTemplate(pack: SportPack): TemplateQuestion[] {
+  const cricketStyle = pack.attributes.filter(
+    (attribute) => attribute.key === "batting_style" || attribute.key === "bowling_style",
+  );
   return [
     { heading: IMPORT_FIELD_LABELS.name, field: "name", kind: "Short answer", required: true },
     {
@@ -179,14 +183,18 @@ export function registrationTemplate(pack: SportPack): TemplateQuestion[] {
       required: true,
       options: pack.roles.values.map((role) => role.label),
     },
-    ...pack.attributes.map((attribute) => ({
-      heading: attribute.label,
-      // A column-stored attribute (cricket's styles) is the fixed field of its
-      // column's name; every other one is the pack's `attr:` field.
-      field:
-        attribute.storage.kind === "column"
-          ? (attribute.storage.column as MappableField)
-          : attributeImportField(attribute.key),
+    ...pack.attributes
+      .filter((attribute) => !cricketStyle.includes(attribute))
+      .map((attribute) => ({
+        heading: attribute.label,
+        field: attributeImportField(attribute.key),
+        kind: "Multiple choice" as const,
+        required: false,
+        options: attribute.options.map((option) => option.label),
+      })),
+    ...cricketStyle.map((attribute) => ({
+      heading: IMPORT_FIELD_LABELS[attribute.key as "batting_style" | "bowling_style"],
+      field: attribute.key as ImportField,
       kind: "Multiple choice" as const,
       required: false,
       options: attribute.options.map((option) => option.label),

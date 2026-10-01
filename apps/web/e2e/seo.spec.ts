@@ -254,7 +254,7 @@ test.describe("SEO guardrail", () => {
       expect(page.robotsHeader, `${path} carries the noindex header`).toBe(NOINDEX_HEADER);
     }
     // Public by design, reachable without signing in, and not for search.
-    for (const path of ["/login", "/login?next=/players", "/blog", "/c?q=cup"]) {
+    for (const path of ["/login", "/login?next=/players", "/c?q=cup"]) {
       const page = await fetchPage(request, path);
       expect(page.status, `${path} answers`).toBe(200);
       expect(page.html, `${path} says noindex`).toMatch(

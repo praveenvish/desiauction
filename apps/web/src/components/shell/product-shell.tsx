@@ -292,6 +292,7 @@ function publicNav(pathname: string): PublicShellLink[] {
         // one recommended three empty rooms over the route to a human. The
         // pages remain live and findable in /search.
         { label: "Help centre", href: "/help" },
+        { label: "Guides", href: "/guides" },
         { label: "Rules & guidelines", href: "/rules-guidelines" },
         { label: "Support", href: "/support" },
         { label: "Legal", href: "/legal" },
@@ -819,6 +820,7 @@ export function ProductShell({
             label: "Help",
             links: [
               { label: "Help centre", href: "/help" },
+              { label: "Guides", href: "/guides" },
               { label: "Contact support", href: "/support" },
               { label: "Security", href: "/security" },
             ],

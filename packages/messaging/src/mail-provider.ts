@@ -1,4 +1,4 @@
-import { selectedProvider, type MailEnv } from "./mail-provider-config";
+import { selectedProvider, type MailEnv, type MailProviderName } from "./mail-provider-config";
 import { providerFetch, type ProviderResponse } from "./provider-fetch";
 import { signRequest } from "./sigv4";
 
@@ -7,8 +7,10 @@ export {
   resendConfigured,
   selectedProvider,
   sesConfigured,
+  zeptomailConfigured,
   type EmailProviderSetting,
   type MailEnv,
+  type MailProviderName,
 } from "./mail-provider-config";
 
 /**
@@ -50,7 +52,8 @@ export interface MailRequest {
   readonly headers?: Readonly<Record<string, string>>;
   /**
    * Labels the provider echoes back on delivery events (SES `EmailTags`).
-   * Keys and values are reduced to what SES accepts; Resend ignores them.
+   * Keys and values are reduced to what SES accepts; Resend ignores them, and
+   * ZeptoMail carries only `dispatch`, as its `client_reference`.
    */
   readonly tags?: Readonly<Record<string, string>>;
   /**
@@ -72,7 +75,7 @@ export type MailProviderResult =
     };
 
 export interface MailProvider {
-  readonly name: "resend" | "ses";
+  readonly name: MailProviderName;
   send(mail: MailRequest): Promise<MailProviderResult>;
 }
 
@@ -308,6 +311,124 @@ export function createSesProvider(config: SesProviderConfig): MailProvider {
   };
 }
 
+// ---------------------------------------------------------------------------
+// ZeptoMail (Zoho CPaaS) — the `v1.1/email` JSON API with a Send Mail token.
+
+/** India data centre: the account and its mail stay in India. */
+export const ZEPTOMAIL_DEFAULT_ENDPOINT = "https://cpaas.zoho.in/v1.1/email";
+
+export interface ZeptomailProviderConfig {
+  /** The Mail Agent's Send Mail token, without the `Zoho-enczapikey` prefix. */
+  readonly apiKey: string;
+  readonly from: string;
+  /** Another data centre's `.../v1.1/email`; India when unset. */
+  readonly endpoint?: string;
+  readonly transport?: MailTransport;
+}
+
+interface ZeptomailAddress {
+  readonly address: string;
+  readonly name?: string;
+}
+
+/**
+ * `DesiAuction <no-reply@mail.desiauction.in>` → address and name, the shape
+ * ZeptoMail wants in place of one header string. A bare address has no name.
+ */
+export function zeptomailAddress(mailbox: string): ZeptomailAddress {
+  const match = /^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(mailbox);
+  if (match === null) return { address: mailbox.trim() };
+  const name = (match[1] ?? "").trim();
+  const address = (match[2] ?? "").trim();
+  return name === "" ? { address } : { address, name };
+}
+
+export function zeptomailBody(mail: MailRequest, from: string): unknown {
+  const dispatch = mail.tags?.["dispatch"];
+  return {
+    from: zeptomailAddress(from),
+    to: [{ email_address: zeptomailAddress(mail.to) }],
+    subject: mail.subject,
+    textbody: mail.text,
+    ...(mail.html === undefined ? {} : { htmlbody: mail.html }),
+    ...(mail.replyTo === undefined ? {} : { reply_to: [zeptomailAddress(mail.replyTo)] }),
+    ...(mail.headers === undefined ? {} : { mime_headers: mail.headers }),
+    ...(mail.attachment === undefined
+      ? {}
+      : {
+          attachments: [
+            {
+              name: mail.attachment.filename,
+              mime_type: mail.attachment.contentType,
+              content: mail.attachment.contentBase64,
+            },
+          ],
+        }),
+    // Echoed back on bounce and complaint webhooks — how an event finds its
+    // dispatch (zeptomail-webhook.ts), the job SES tags do there.
+    ...(dispatch === undefined || dispatch === "" ? {} : { client_reference: dispatch }),
+    // Off, explicitly: open pixels and rewritten links are tracking nobody
+    // agreed to, and a rewritten sign-in or join link is one more hop to break.
+    track_opens: false,
+    track_clicks: false,
+  };
+}
+
+/**
+ * ZeptoMail answers errors in two shapes — `{ error: { code, message,
+ * details } }` and `{ data: { error_code, message } }` — so both are read.
+ */
+function zeptomailErrorDetail(body: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return body.slice(0, 200);
+  }
+  const record = (value: unknown): Record<string, unknown> =>
+    typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  const text = (value: unknown): string => (typeof value === "string" ? value : "");
+  const error = record(record(parsed)["error"]);
+  const data = record(record(parsed)["data"]);
+  const firstDetail = record(Array.isArray(error["details"]) ? error["details"][0] : undefined);
+  const code = text(error["code"]) || text(data["error_code"]);
+  const message = text(error["message"]) || text(data["message"]);
+  return [code, message, text(firstDetail["message"])]
+    .filter((part) => part !== "")
+    .join(": ")
+    .slice(0, 200);
+}
+
+export function createZeptomailProvider(config: ZeptomailProviderConfig): MailProvider {
+  const transport = config.transport ?? providerFetch;
+  const endpoint = config.endpoint ?? ZEPTOMAIL_DEFAULT_ENDPOINT;
+  return {
+    name: "zeptomail",
+    async send(mail) {
+      // No idempotency header exists here either: a retry after a lost
+      // response sends again, as with SES (docs/EMAIL_INFRASTRUCTURE.md).
+      const response = await transport(endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+          authorization: `Zoho-enczapikey ${config.apiKey}`,
+        },
+        body: JSON.stringify(zeptomailBody(mail, config.from)),
+      });
+      if (response.status >= 400) {
+        return {
+          ok: false,
+          status: response.status,
+          retryable: retryableStatus(response.status),
+          detail: zeptomailErrorDetail(response.body),
+        };
+      }
+      return { ok: true, messageId: readString(response.body, "request_id") };
+    },
+  };
+}
+
 function readString(body: string, key: string): string | null {
   try {
     const value = (JSON.parse(body) as Record<string, unknown>)[key];
@@ -344,6 +465,13 @@ export function mailProviderFromEnv(
         endpoint: env.EMAIL_API_ENDPOINT ?? "",
         apiKey: env.EMAIL_API_KEY ?? "",
         from: env.EMAIL_FROM ?? "",
+        ...transport,
+      });
+    case "zeptomail":
+      return createZeptomailProvider({
+        apiKey: env.ZEPTOMAIL_API_KEY ?? "",
+        from: env.EMAIL_FROM ?? "",
+        ...(set(env.ZEPTOMAIL_ENDPOINT) ? { endpoint: env.ZEPTOMAIL_ENDPOINT } : {}),
         ...transport,
       });
     case null:

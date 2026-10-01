@@ -119,7 +119,7 @@ export const COMPARISON_PAGES: readonly ComparisonPage[] = [
       {
         question: "Can I bring my Google Form responses across?",
         answer:
-          "Yes. Import the responses and the columns are matched for you: name, phone and role, plus each sport's own details, such as batting style, preferred foot or playing hand. Each row is checked before anything is saved.",
+          "Yes. Import the responses and their columns are matched for you — name, phone, role and the sport's own details, like batting style or preferred foot; each row is checked before anything is saved.",
       },
       {
         question: "Do we still use our WhatsApp group?",

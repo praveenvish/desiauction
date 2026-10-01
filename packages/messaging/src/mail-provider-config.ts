@@ -7,7 +7,9 @@
  * pull in.
  */
 
-export type EmailProviderSetting = "auto" | "dev" | "http" | "resend" | "ses";
+export type EmailProviderSetting = "auto" | "dev" | "http" | "resend" | "ses" | "zeptomail";
+
+export type MailProviderName = "resend" | "ses" | "zeptomail";
 
 export interface MailEnv {
   readonly EMAIL_PROVIDER?: EmailProviderSetting | undefined;
@@ -19,6 +21,8 @@ export interface MailEnv {
   readonly SES_SECRET_ACCESS_KEY?: string | undefined;
   readonly SES_CONFIGURATION_SET?: string | undefined;
   readonly SES_FEEDBACK_ADDRESS?: string | undefined;
+  readonly ZEPTOMAIL_API_KEY?: string | undefined;
+  readonly ZEPTOMAIL_ENDPOINT?: string | undefined;
 }
 
 const set = (value: string | undefined): value is string => value !== undefined && value !== "";
@@ -37,25 +41,38 @@ export function sesConfigured(env: MailEnv): boolean {
 }
 
 /**
+ * ZeptoMail (Zoho CPaaS) needs only its Send Mail token and a From address:
+ * the endpoint defaults to the India data centre (mail-provider.ts).
+ */
+export function zeptomailConfigured(env: MailEnv): boolean {
+  return set(env.ZEPTOMAIL_API_KEY) && set(env.EMAIL_FROM);
+}
+
+/**
  * Which provider the settings select, or null for none.
  *
  *   · dev          — none, even with credentials (the e2e suite's switch).
  *   · ses          — SES, and only SES.
+ *   · zeptomail    — ZeptoMail (Zoho CPaaS), and only ZeptoMail.
  *   · resend|http  — Resend (`http` is its historical name, kept so no
  *                    existing env file changes meaning).
  *   · auto         — Resend when configured (what `auto` always meant), else
- *                    SES when configured, else none.
+ *                    SES when configured, else none. ZeptoMail is never
+ *                    picked by `auto`: it is chosen by name, so adding its
+ *                    token to an env file cannot silently change provider.
  *
  * Null never means "silently drop": each caller turns it into its own honest
  * fallback — the dev inbox, the file outbox, `"unconfigured"` — and a
  * production process refuses to boot on it (env.ts in both tiers).
  */
-export function selectedProvider(env: MailEnv): "resend" | "ses" | null {
+export function selectedProvider(env: MailEnv): MailProviderName | null {
   switch (env.EMAIL_PROVIDER ?? "auto") {
     case "dev":
       return null;
     case "ses":
       return sesConfigured(env) ? "ses" : null;
+    case "zeptomail":
+      return zeptomailConfigured(env) ? "zeptomail" : null;
     case "resend":
     case "http":
       return resendConfigured(env) ? "resend" : null;

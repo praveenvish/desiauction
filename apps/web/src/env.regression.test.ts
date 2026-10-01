@@ -1,3 +1,4 @@
+import { LOCAL_FINOPS_STORAGE_DIR } from "@desiauction/messaging/finops-storage";
 import { describe, expect, it } from "vitest";
 
 import { parseEnv } from "./env";
@@ -76,6 +77,9 @@ describe("web env — development stays effortless", () => {
     expect(env.NODE_ENV).toBe("development");
     expect(env.OTP_PROVIDER).toBe("dev");
     expect(env.MEDIA_STORAGE).toBe("local");
+    // The literal resolveFinopsStorageDir recognises as "not configured" — if
+    // the two drift, a worktree's web tier stops sharing the seed's artifacts.
+    expect(env.FINOPS_STORAGE_DIR).toBe(LOCAL_FINOPS_STORAGE_DIR);
   });
 
   it("still refuses a missing DATABASE_URL", () => {
@@ -122,6 +126,31 @@ describe("web env — production refuses every dev-only default", () => {
 
     it("refuses a region that is not a region", () => {
       expect(() => parseEnv(raw({ ...SES_PROD, SES_REGION: "mumbai" }))).toThrow(/SES_REGION/);
+    });
+  });
+
+  describe("ZeptoMail (Zoho CPaaS) as the production mailer", () => {
+    const ZEPTO_PROD: Raw = {
+      ...PROD_OK,
+      EMAIL_API_ENDPOINT: undefined,
+      EMAIL_API_KEY: undefined,
+      EMAIL_PROVIDER: "zeptomail",
+      ZEPTOMAIL_API_KEY: "wSsVR61x-send-mail-token",
+      ZEPTOMAIL_WEBHOOK_KEY: "zm-webhook-auth-key-0123456789",
+    };
+
+    it("boots with ZeptoMail alone — no Resend or SES settings needed", () => {
+      expect(() => parseEnv(raw(ZEPTO_PROD))).not.toThrow();
+    });
+
+    it("refuses EMAIL_PROVIDER=zeptomail without its token, rather than quietly using Resend", () => {
+      expect(() => parseEnv(raw({ ...PROD_OK, EMAIL_PROVIDER: "zeptomail" }))).toThrow(/EMAIL/);
+    });
+
+    it("refuses an endpoint that is not a URL", () => {
+      expect(() => parseEnv(raw({ ...ZEPTO_PROD, ZEPTOMAIL_ENDPOINT: "cpaas.zoho.in" }))).toThrow(
+        /ZEPTOMAIL_ENDPOINT/,
+      );
     });
   });
 

@@ -50,6 +50,7 @@ import {
   advanceCompetitionAction,
   cloneCompetitionAction,
   setCompetitionVisibilityAction,
+  setSquadListingAction,
   updateCompetitionDetailsAction,
   type DetailsField,
   type SeasonOverviewView,
@@ -580,6 +581,45 @@ export function OverviewPanel({
       pendingFocusRef.current = "publish";
     } else {
       toast({ title: result.error ?? "Could not update.", tone: "danger" });
+    }
+  };
+
+  // SEO-1 Phase 5: the organizer's "list squads in search" switch.
+  const [squadBusy, setSquadBusy] = useState(false);
+  const setSquadListing = async (listed: boolean) => {
+    setSquadBusy(true);
+    const result = await release(setSquadListingAction(slug, listed), () => {
+      setSquadBusy(false);
+    });
+    if (result.ok) {
+      toast({
+        title: listed ? "Squads can be listed in search" : "Squads taken out of search",
+        tone: "success",
+      });
+      router.refresh();
+    } else {
+      toast({ title: result.error ?? "Could not update.", tone: "danger" });
+    }
+  };
+
+  // SEO-1 Phase 7: the embed snippet — the card in an iframe, and a plain link
+  // after it. The link is the backlink; a link inside the frame is ours.
+  const copyEmbedCode = async () => {
+    const origin = window.location.origin;
+    const name = view.competition.name
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    const code = [
+      `<iframe src="${origin}/embed/${slug}" title="${name} on DesiAuction" width="100%" height="210" style="border:0;max-width:480px" loading="lazy"></iframe>`,
+      `<p><a href="${origin}/c/${slug}">${name} — player auction on DesiAuction</a></p>`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(code);
+      toast({ title: "Embed code copied — paste it into your website", tone: "success" });
+    } catch {
+      toast({ title: "Couldn't copy the embed code.", tone: "danger" });
     }
   };
 
@@ -1265,6 +1305,73 @@ export function OverviewPanel({
                 </Button>
               </span>
             </li>
+            {isPublic && view.platformHold === null && view.squadListing !== null ? (
+              <li
+                className="ov-look"
+                data-set={view.squadListing.decision.indexable ? "" : undefined}
+                data-testid="squad-listing-row"
+              >
+                <span className="ov-look-thumb" aria-hidden>
+                  <IconUsers size={18} />
+                </span>
+                <span className="ov-look-text">
+                  <strong>
+                    Squads in search{" "}
+                    <Pill
+                      tone={view.squadListing.decision.indexable ? "green" : "neutral"}
+                      dot={view.squadListing.decision.indexable}
+                    >
+                      {view.squadListing.decision.indexable ? "Listed" : "Not listed"}
+                    </Pill>
+                  </strong>
+                  <span data-testid="squad-listing-status">
+                    {view.squadListing.decision.indexable
+                      ? "Search engines can find each team’s squad page, with its players’ names."
+                      : view.squadListing.decision.reason === "off"
+                        ? "Squad pages are shared by link only. Turn this on to let search engines list them."
+                        : view.squadListing.decision.reason === "no_players"
+                          ? "On. Squads are listed once players are approved and every one of them is a known adult."
+                          : `On, but not listed: ${String(view.squadListing.decision.blocking)} approved ${view.squadListing.decision.blocking === 1 ? "player has" : "players have"} no date of birth or ${view.squadListing.decision.blocking === 1 ? "is" : "are"} under 18. Squads are listed only when every player is a known adult.`}
+                  </span>
+                </span>
+                <span className="ov-look-actions">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={squadBusy}
+                    data-testid="toggle-squad-listing"
+                    onClick={() => void setSquadListing(!view.squadListing?.optedIn)}
+                  >
+                    {view.squadListing.optedIn ? "Turn off" : "Turn on"}
+                  </Button>
+                </span>
+              </li>
+            ) : null}
+            {isPublic && view.platformHold === null ? (
+              <li className="ov-look" data-testid="embed-row">
+                <span className="ov-look-thumb" aria-hidden>
+                  <IconGlobe size={18} />
+                </span>
+                <span className="ov-look-text">
+                  <strong>Embed on your website</strong>
+                  <span>
+                    A small card of this season for your club&apos;s own site, with a link back to
+                    the public page.
+                  </span>
+                </span>
+                <span className="ov-look-actions">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    data-testid="copy-embed-code"
+                    onClick={() => void copyEmbedCode()}
+                  >
+                    <IconCopy size={16} />
+                    Copy embed code
+                  </Button>
+                </span>
+              </li>
+            ) : null}
           </ul>
           {pass}
         </SectionCard>
