@@ -29,7 +29,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
 }
@@ -234,7 +235,8 @@ test("player journey: discover → multi-step register with draft recovery → t
     await expect(player.getByTestId("register-verify-form")).toHaveAttribute("data-step", "code", {
       timeout: 30_000,
     });
-    await player.getByLabel("6-digit code").fill(await latestOtp(PLAYER));
+    await player.getByLabel("6-digit code").clear();
+    await player.getByLabel("6-digit code").pressSequentially(await latestOtp(PLAYER));
     await player.getByRole("button", { name: "Verify and continue" }).click();
     await expect(player).toHaveURL(registerHere, { timeout: 30_000 });
 

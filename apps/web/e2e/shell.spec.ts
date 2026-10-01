@@ -23,7 +23,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 15_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // First-time onboarding is one question (2026-07-24 collapse) — then /home.
   await expect(page).toHaveURL(/\/onboarding/);

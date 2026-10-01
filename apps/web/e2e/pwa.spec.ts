@@ -271,7 +271,8 @@ async function signInFresh(page: Page): Promise<void> {
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
     timeout: 15_000,
   });
-  await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await latestOtp(phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill("Install Tester");

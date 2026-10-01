@@ -28,7 +28,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/);
   // PX-3: the name gate now guards every console route, not just /home — a
@@ -61,7 +62,8 @@ async function onboardWithName(page: Page, phone: string, name: string): Promise
     timeout: 30_000,
   });
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   await page.getByLabel("What should we call you?").fill(name);

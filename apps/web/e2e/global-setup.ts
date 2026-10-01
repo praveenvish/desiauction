@@ -146,7 +146,8 @@ async function warmSignIn(base: string): Promise<void> {
     );
     const { latestOtp } = await import("./otp");
     const code = await latestOtp(phone, 10_000);
-    await page.getByLabel("6-digit code").fill(code);
+    await page.getByLabel("6-digit code").clear();
+    await page.getByLabel("6-digit code").pressSequentially(code);
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await page.waitForURL(/\/onboarding/, { timeout: 20_000 });
     await page.getByLabel("What should we call you?").fill("Warmup");
