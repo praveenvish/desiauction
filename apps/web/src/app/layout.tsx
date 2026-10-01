@@ -12,6 +12,7 @@ import { unstable_rethrow } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { env } from "../env";
+import { splashImages } from "../lib/apple-splash";
 import { ReportProblemProvider } from "../components/report-problem/report-problem";
 import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
@@ -63,7 +64,14 @@ export const metadata: Metadata = {
   // these tags, not the manifest's display mode: without `capable` it opens
   // the site in a Safari frame. The status bar stays "default" (solid, above
   // the page), because "black-translucent" would draw it over every header.
-  appleWebApp: { capable: true, title: "DesiAuction", statusBarStyle: "default" },
+  // `startupImage`: the launch screen, one per screen and orientation
+  // (lib/apple-splash.ts); without a match iOS flashes white.
+  appleWebApp: {
+    capable: true,
+    title: "DesiAuction",
+    statusBarStyle: "default",
+    startupImage: splashImages().map(({ url, media }) => ({ url, media })),
+  },
 };
 
 // Console default is Daylight; live surfaces pin floodlight per C-4 (doc 18).

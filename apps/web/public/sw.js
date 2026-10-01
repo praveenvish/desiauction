@@ -29,7 +29,13 @@
  *     take-down guarantee (ops/deploy/site.caddy); a copy here would outlive it.
  *
  * Navigation preload is on: a page request starts the moment the worker is
- * woken, so the worker adds no wait to it.
+ * woken, so the worker adds no wait to it. EXCEPT IN FIREFOX, where a
+ * preload that fails (no network) fails the whole navigation, even though
+ * this worker catches it and answers with the offline screen: the browser's
+ * own error page wins. Measured, not assumed: with preload on, Firefox showed
+ * "Problem loading page" on every run; with it off, the offline screen on
+ * every run. Chromium and Safari use the worker's answer, as the spec says.
+ * Firefox pays a worker start-up on each page instead, and stays correct.
  *
  * IF THIS FILE EVER MISBEHAVES IN PRODUCTION, deploy it with every listener
  * replaced by the kill switch below. Browsers re-check this file on every
@@ -87,8 +93,11 @@ self.addEventListener("activate", (event) => {
           .filter((key) => key.startsWith(PREFIX) && !CURRENT_CACHES.has(key))
           .map((key) => caches.delete(key)),
       );
-      if (self.registration.navigationPreload !== undefined) {
-        await self.registration.navigationPreload.enable();
+      const preload = self.registration.navigationPreload;
+      if (preload !== undefined) {
+        // `disable` too, not just "don't enable": it is a stored setting, and
+        // must be undone wherever an earlier worker turned it on.
+        await (preloadBreaksOffline() ? preload.disable() : preload.enable());
       }
       await self.clients.claim();
     })(),
@@ -113,6 +122,11 @@ self.addEventListener("fetch", (event) => {
   }
   // Anything else is not answered here, so the browser fetches it as usual.
 });
+
+/** Firefox: see the note on navigation preload at the top of this file. */
+function preloadBreaksOffline() {
+  return /\bFirefox\//.test(self.navigator.userAgent);
+}
 
 /** A page: always the network's. The offline screen only when there is none. */
 async function navigate(event) {

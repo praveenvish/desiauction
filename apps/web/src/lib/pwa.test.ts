@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import manifest from "../app/manifest";
+import { splashImages } from "./apple-splash";
 import { installOffer, isAppleMobile } from "./pwa";
 
 const PUBLIC = path.resolve(__dirname, "../../public");
@@ -62,6 +63,35 @@ describe("manifest", () => {
   it("keeps the app's identity fixed", () => {
     // A changed id is a different app: every installed icon goes stale.
     expect(manifest().id).toBe("/");
+  });
+});
+
+describe("iOS launch screens", () => {
+  const images = splashImages();
+  const dir = path.join(PUBLIC, "brand/splash");
+
+  /** A PNG's own width and height, from its header (bytes 16–23). */
+  const pngSize = (file: string): [number, number] => {
+    const header = readFileSync(file).subarray(0, 24);
+    return [header.readUInt32BE(16), header.readUInt32BE(20)];
+  };
+
+  it("names each image and each screen once", () => {
+    expect(new Set(images.map((image) => image.url)).size).toBe(images.length);
+    expect(new Set(images.map((image) => image.media)).size).toBe(images.length);
+  });
+
+  it("has every image drawn, at exactly its screen's size (pnpm splash)", () => {
+    for (const image of images) {
+      const file = path.join(PUBLIC, image.url);
+      expect(existsSync(file), `${image.url} missing: run pnpm splash`).toBe(true);
+      expect(pngSize(file), image.url).toEqual([image.pixelWidth, image.pixelHeight]);
+    }
+  });
+
+  it("ships no image the list no longer names", () => {
+    const named = new Set(images.map((image) => path.basename(image.url)));
+    expect(readdirSync(dir).filter((file) => !named.has(file))).toEqual([]);
   });
 });
 
@@ -123,7 +153,11 @@ interface FakeEvent {
   settled: () => Promise<unknown>;
 }
 
-function loadWorker() {
+const CHROME_UA =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36";
+const FIREFOX_UA = "Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0";
+
+function loadWorker(userAgent = CHROME_UA) {
   const listeners = new Map<string, (event: unknown) => void>();
   const store = new Map<string, FakeCache>();
   const network = vi.fn<(request: Request) => Promise<Response>>();
@@ -140,12 +174,14 @@ function loadWorker() {
       store.get(options?.cacheName ?? "")?.match(request) ?? Promise.resolve(undefined),
   };
   const enablePreload = vi.fn(() => Promise.resolve());
+  const disablePreload = vi.fn(() => Promise.resolve());
   const self = {
     addEventListener: (type: string, listener: (event: unknown) => void) => {
       listeners.set(type, listener);
     },
     location: new URL(`${ORIGIN}/sw.js`),
-    registration: { navigationPreload: { enable: enablePreload } },
+    registration: { navigationPreload: { enable: enablePreload, disable: disablePreload } },
+    navigator: { userAgent },
     clients: { claim: () => Promise.resolve() },
     skipWaiting: () => Promise.resolve(),
   };
@@ -194,7 +230,7 @@ function loadWorker() {
     };
   };
 
-  return { network, store, enablePreload, lifecycle, dispatch };
+  return { network, store, enablePreload, disablePreload, lifecycle, dispatch };
 }
 
 const OFFLINE_PAGE = () =>
@@ -237,6 +273,16 @@ describe("sw.js", () => {
     expect(shell).toBeDefined();
     expect(worker.store.get(shell as string)?.entries.has(`${ORIGIN}/offline.html`)).toBe(true);
     expect(worker.enablePreload).toHaveBeenCalled();
+  });
+
+  it("keeps navigation preload off in Firefox, where a failed preload kills the offline screen", async () => {
+    const firefox = loadWorker(FIREFOX_UA);
+    firefox.network.mockImplementation(() => Promise.resolve(OFFLINE_PAGE()));
+    await firefox.lifecycle("install");
+    await firefox.lifecycle("activate");
+    expect(firefox.disablePreload).toHaveBeenCalled();
+    expect(firefox.enablePreload).not.toHaveBeenCalled();
+    expect(worker.disablePreload).not.toHaveBeenCalled();
   });
 
   it("never answers a write, another origin, the API, or a router fetch", () => {
