@@ -114,11 +114,33 @@ test("structured data carries the nonce too, on every page that has it", async (
   }
 });
 
+/**
+ * Load a page and let it hydrate — long enough for every script it runs, and
+ * every request those scripts make, to have met the policy.
+ *
+ * `load`, not `networkidle`: on main's CI (2026-10-01) /sports/cricket never
+ * went idle while it listed a season another spec had made live ("Night Cup",
+ * auction-experience.spec.ts) — most likely the production build prefetching
+ * that card's "Watch live" link. Which seasons are live depends on what the
+ * other specs are doing at that moment, so identical code passed on the PR and
+ * failed on main (new-screens-a11y.spec.ts made the same call for the board's
+ * socket). A violation fires while scripts load and hydrate, not
+ * after a quiet network, so nothing this test exists to catch is waited past.
+ */
+async function settle(page: Page, path: string): Promise<void> {
+  await page.goto(path, { waitUntil: "load" });
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestIdleCallback(() => resolve(), { timeout: 3_000 });
+      }),
+  );
+}
+
 test("public surfaces raise no policy violations", async ({ page }) => {
   const violations = watchViolations(page);
   for (const path of PUBLIC) {
-    await page.goto(path);
-    await page.waitForLoadState("networkidle");
+    await settle(page, path);
   }
   expect(violations).toEqual([]);
 });
@@ -128,8 +150,7 @@ test("console, administration and the live room raise no policy violations", asy
   await otpLogin(page, FOUNDER);
   const violations = watchViolations(page);
   for (const path of CONSOLE) {
-    await page.goto(path);
-    await page.waitForLoadState("networkidle");
+    await settle(page, path);
   }
   expect(violations).toEqual([]);
 });
