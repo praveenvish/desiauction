@@ -66,6 +66,19 @@ describe("manifest", () => {
   });
 });
 
+describe("iOS home-screen icon", () => {
+  it("is large enough that iOS only ever scales it down, and opaque (pnpm splash)", async () => {
+    // At 180px, the classic size, iOS upscaled it wherever it draws icons
+    // bigger (iOS 18 Large icons, App Library, Spotlight) and it looked soft.
+    const { default: sharp } = await import("sharp");
+    const icon = sharp(path.resolve(__dirname, "../app/apple-icon.png"));
+    const { width, height } = await icon.metadata();
+    expect([width, height]).toEqual([1024, 1024]);
+    // iOS paints transparent icon pixels black.
+    expect((await icon.stats()).isOpaque).toBe(true);
+  });
+});
+
 describe("iOS launch screens", () => {
   const images = splashImages();
   const dir = path.join(PUBLIC, "brand/splash");
