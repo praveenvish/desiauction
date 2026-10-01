@@ -164,8 +164,14 @@ Teams and squads: https://desiauction.in/c/{season-slug}
 ```
 
 The season page only exists for **published** seasons. Ask the organizer to
-publish before they stream. Engineering follow-up: a "Copy stream description"
-button on the season's live screen that fills these templates in (see §8).
+publish before they stream.
+
+**Built into the product:** Auction → Screens for the room → Broadcast overlay
+shows "For your YouTube stream", with the title, the description and the pinned
+comment filled in from the published season, each with a copy button. An
+unpublished season gets a note to publish first instead
+(`server/competition/stream-kit.ts`). The WhatsApp message stays manual, because
+it needs the YouTube link and the start time.
 
 ---
 
@@ -302,5 +308,5 @@ organic sign-ups. Review monthly.
 | Item | Trigger | Size |
 |---|---|---|
 | Swap `content/social.ts` placeholders for real profiles (feeds the footer and Organization `sameAs`) | Founder sends URLs (0.1) | Small |
-| "Copy stream description" button on the live screen, filling the §3 templates from the season | Any time | Small |
+| ~~"Copy stream description" button, filling the §3 templates from the season~~ | **Built:** Broadcast overlay pane | Done |
 | ~~`/case-studies/{slug}` registry and pages; un-noindex `/case-studies`; sitemap entry~~ | **Built:** switches on with the first registry entry | Done |
