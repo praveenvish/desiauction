@@ -1,7 +1,16 @@
 /**
- * Draws the iPhone/iPad launch screens listed in src/lib/apple-splash.ts:
- * the brand mark (public/brand/mark.svg, unchanged) centred on the app's
- * background colour, one PNG per screen and orientation.
+ * Draws what iOS shows for the installed app, from the brand's own vectors:
+ *
+ *   1. The HOME-SCREEN ICON (src/app/apple-icon.png) from the brand kit's
+ *      docs/brand/kit/favicon/apple-touch-icon.svg, unchanged, at 1024px.
+ *      It was 180px, the classic iPhone size, and iOS upscaled it wherever it
+ *      draws icons larger than that (iOS 18's Large icons, the App Library,
+ *      Spotlight), which is what made it soft. 1024 is the size Apple masters
+ *      native app icons at; iOS only ever scales it DOWN. Opaque, because iOS
+ *      paints transparent icon pixels black.
+ *   2. The LAUNCH SCREENS listed in src/lib/apple-splash.ts: the brand mark
+ *      (public/brand/mark.svg, unchanged) centred on the app's background
+ *      colour, one PNG per screen and orientation.
  *
  *   pnpm --filter @desiauction/web splash
  *
@@ -20,12 +29,22 @@ import { SPLASH_BACKGROUND, splashImages } from "../src/lib/apple-splash";
 const PUBLIC = path.resolve(import.meta.dirname, "../public");
 const OUT = path.join(PUBLIC, "brand/splash");
 const MARK = readFileSync(path.join(PUBLIC, "brand/mark.svg"));
+const ICON_SOURCE = readFileSync(
+  path.resolve(import.meta.dirname, "../../../docs/brand/kit/favicon/apple-touch-icon.svg"),
+);
+const APPLE_ICON_SIZE = 1024;
 
 // The mark's share of the screen's SHORT side: the same presence as Android's
 // splash icon, whichever way the device is held.
 const MARK_SHARE = 0.22;
 
 async function main(): Promise<void> {
+  await sharp(ICON_SOURCE, { density: 72 * (APPLE_ICON_SIZE / 64) })
+    .resize(APPLE_ICON_SIZE, APPLE_ICON_SIZE)
+    .flatten({ background: "#E6B24A" })
+    .png({ compressionLevel: 9, palette: true })
+    .toFile(path.resolve(import.meta.dirname, "../src/app/apple-icon.png"));
+
   mkdirSync(OUT, { recursive: true });
   const images = splashImages();
   const wanted = new Set(images.map((image) => path.basename(image.url)));

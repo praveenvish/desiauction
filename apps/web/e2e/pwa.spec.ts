@@ -54,6 +54,12 @@ test("the site describes itself as an installable app", async ({ page, request }
     "yes",
   );
 
+  // iOS's home-screen icon, large enough to be scaled only down.
+  const touchIcon = page.locator('link[rel="apple-touch-icon"]');
+  await expect(touchIcon).toHaveAttribute("sizes", "1024x1024");
+  const iconResponse = await request.get((await touchIcon.getAttribute("href")) ?? "");
+  expect(iconResponse.ok()).toBe(true);
+
   // iOS's launch screen: one link per screen and orientation, each one served.
   const startup = page.locator('link[rel="apple-touch-startup-image"]');
   await expect(startup).toHaveCount(splashImages().length);
