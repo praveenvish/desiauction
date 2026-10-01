@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { IMPORT_ALIAS_CLAIMS, IMPORT_FIELDS } from "./import-mapping";
+import {
+  IMPORT_ALIAS_CLAIMS,
+  IMPORT_FIELDS,
+  attributeAliasClaims,
+  normalizeHeader,
+  type ImportField,
+} from "./import-mapping";
+import { SPORTS } from "./sports";
 
 /**
  * ONE ALIAS, ONE FIELD.
@@ -42,5 +49,59 @@ describe("the header alias table", () => {
         field,
       );
     }
+  });
+});
+
+/**
+ * THE SAME RULE, FOR EVERY SPORT'S OWN ATTRIBUTES.
+ *
+ * A pack's `headerAliases` are looked up AFTER the fixed table, so an alias a
+ * fixed field also claims is dead — the column goes to the fixed field and the
+ * attribute never sees it. And two attributes of one pack claiming one header
+ * is the last-wins trap above, one level down.
+ */
+describe("every sport's attribute aliases", () => {
+  const fixed = new Map(IMPORT_ALIAS_CLAIMS);
+
+  it("are never shadowed by a fixed field", () => {
+    const shadowed = SPORTS.flatMap((pack) =>
+      attributeAliasClaims(pack)
+        .filter(([alias]) => fixed.has(alias))
+        .map(([alias, field]) => `${pack.key}: ${alias} → ${fixed.get(alias) ?? ""}, not ${field}`),
+    );
+    expect(shadowed).toEqual([]);
+  });
+
+  it("never claim one header for two attributes of the same pack", () => {
+    const shared = SPORTS.flatMap((pack) => {
+      const byAlias = new Map<string, Set<string>>();
+      for (const [alias, field] of attributeAliasClaims(pack)) {
+        byAlias.set(alias, (byAlias.get(alias) ?? new Set()).add(field));
+      }
+      return [...byAlias.entries()]
+        .filter(([, fields]) => fields.size > 1)
+        .map(([alias, fields]) => `${pack.key}: ${alias} → ${[...fields].join(" AND ")}`);
+    });
+    expect(shared).toEqual([]);
+  });
+
+  it("of a column-stored attribute are all read by that column's fixed field", () => {
+    // Cricket's styles are fixed fields, not `attr:` ones — so every wording
+    // the pack gives them must already land there, or the pack is promising a
+    // header the import does not keep.
+    const missed = SPORTS.flatMap((pack) =>
+      pack.attributes.flatMap((attribute) => {
+        const storage = attribute.storage;
+        if (storage.kind !== "column") {
+          return [];
+        }
+        expect(IMPORT_FIELDS).toContain(storage.column as ImportField);
+        return [attribute.key, attribute.label, ...attribute.headerAliases]
+          .map(normalizeHeader)
+          .filter((alias) => fixed.get(alias) !== storage.column)
+          .map((alias) => `${pack.key}: ${alias}`);
+      }),
+    );
+    expect(missed).toEqual([]);
   });
 });

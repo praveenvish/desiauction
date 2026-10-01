@@ -6,7 +6,14 @@
  * embedded newlines inside quotes are all handled.
  */
 
-import { DEFAULT_SPORT, parseRoleIn, type SportPack } from "./sports";
+import { attributeKeyOf } from "./import-attribute-field";
+import {
+  DEFAULT_SPORT,
+  attributeSpec,
+  parseAttributeIn,
+  parseRoleIn,
+  type SportPack,
+} from "./sports";
 import { parseCsvDate, type DateOrder } from "./csv-date";
 import { normalizePhone } from "./phone";
 import { parseFeeStatus, parseRupeesToPaise, type FeeStatus } from "./money";
@@ -68,6 +75,16 @@ export interface CsvRegistrationRow {
   isIcon: boolean | null;
   isCaptain: boolean | null;
   isRetained: boolean | null;
+  /**
+   * The season's own player detail — football's preferred foot, volleyball's
+   * spiking hand — keyed by the pack's attribute key and holding its OPTION
+   * key, never the spelling the file used. Only what the file supplied: an
+   * absent key means "did not say", exactly as a null does above.
+   *
+   * Cricket's two styles are not here; they are columns, and arrive as
+   * `battingStyle` / `bowlingStyle` as they always have.
+   */
+  attributes: Record<string, string>;
 }
 
 export interface CsvRowError {
@@ -482,6 +499,20 @@ export function parseRegistrationRecords(
     options?.knownTeams === undefined
       ? undefined
       : new Set(options.knownTeams.map(normalizeTeamName));
+  /*
+   * The pack's attribute columns this file carries (`attr:preferred_foot`).
+   * A column naming an attribute the season's pack does not declare — a saved
+   * mapping from a football season reused for a cricket one — is ignored, not
+   * refused: there is nowhere to store it, and failing every row over a column
+   * the organizer cannot act on would stop the whole import.
+   */
+  const attributeColumns = header.flatMap((name, at) => {
+    const key = attributeKeyOf(name);
+    const spec = key === null ? null : attributeSpec(pack, key);
+    return spec === null || spec.storage.kind !== "json"
+      ? []
+      : [{ key: spec.key, label: spec.label.toLowerCase(), field: name, at }];
+  });
 
   for (let r = 1; r < records.length; r++) {
     const line = r + 1; // 1-based, header is line 1
@@ -558,6 +589,26 @@ export function parseRegistrationRecords(
       return value === "" ? null : value;
     };
 
+    /*
+     * The pack's own attributes, held to the styles' contract: read through the
+     * option aliases the pack declares ("Left foot", "lefty"), "not me" read as
+     * blank, and anything else REFUSED by name so the value mapper can offer it.
+     */
+    const attributes: Record<string, string> = {};
+    const attributeErrors: { field: string; message: string }[] = [];
+    for (const column of attributeColumns) {
+      const raw = (fields[column.at] ?? "").trim();
+      if (raw === "" || isNotApplicable(raw)) {
+        continue;
+      }
+      const parsed = parseAttributeIn(pack, column.key, raw);
+      if (parsed === null) {
+        attributeErrors.push({ field: column.field, message: `unknown ${column.label} "${raw}"` });
+      } else {
+        attributes[column.key] = parsed;
+      }
+    }
+
     const check = validateNewPlayer(
       { name: rawName, phone: rawPhone, role: rawRole, basePriceBand: band },
       knownBands,
@@ -578,6 +629,10 @@ export function parseRegistrationRecords(
     if (bowlingStyle !== "" && parsedBowling === null) {
       rowErrors.push(`unknown bowling style "${bowlingStyle}"`);
       failed.add("bowling_style");
+    }
+    for (const error of attributeErrors) {
+      rowErrors.push(error.message);
+      failed.add(error.field);
     }
     if (dateOfBirth !== "" && parsedDob === null) {
       rowErrors.push(`unreadable date of birth "${dateOfBirth}" (use dd/mm/yyyy or yyyy-mm-dd)`);
@@ -700,6 +755,7 @@ export function parseRegistrationRecords(
       isIcon: iconFlag.value,
       isCaptain: captainFlag.value,
       isRetained: retainedFlag.value,
+      attributes,
     });
   }
 
