@@ -1,9 +1,12 @@
 /**
  * DesiAuction's social accounts, in the order the footer shows them.
  *
- * PLACEHOLDERS (2026-09-30): each `href` is the network's own home page until
- * the founder sends the real profile URLs. Replace the `href`s here — nothing
- * else in the app names an account. Remove an entry to drop its icon.
+ * ONLY LIVE PROFILES (2026-10-01). An icon is listed only once its account
+ * exists and was checked from a logged-out browser — a dead or generic link is
+ * worse than no icon, and every `href` here is also published to search
+ * engines as the organisation's `sameAs`. X, Facebook, LinkedIn and WhatsApp
+ * return when their profiles are confirmed (docs/operations/SOCIAL_SETUP_SHEET.md).
+ * Nothing else in the app names an account.
  */
 export type SocialNetwork = "instagram" | "youtube" | "whatsapp" | "x" | "linkedin" | "facebook";
 
@@ -15,10 +18,6 @@ export interface SocialAccount {
 }
 
 export const SOCIAL_ACCOUNTS: readonly SocialAccount[] = [
-  { network: "instagram", label: "Instagram", href: "https://www.instagram.com/" },
-  { network: "youtube", label: "YouTube", href: "https://www.youtube.com/" },
-  { network: "whatsapp", label: "WhatsApp", href: "https://www.whatsapp.com/" },
-  { network: "x", label: "X", href: "https://x.com/" },
-  { network: "linkedin", label: "LinkedIn", href: "https://www.linkedin.com/" },
-  { network: "facebook", label: "Facebook", href: "https://www.facebook.com/" },
+  { network: "instagram", label: "Instagram", href: "https://www.instagram.com/desiauction/" },
+  { network: "youtube", label: "YouTube", href: "https://www.youtube.com/@DesiAuction" },
 ];

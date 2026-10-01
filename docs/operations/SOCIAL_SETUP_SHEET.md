@@ -1,40 +1,60 @@
 # DesiAuction — social account setup sheet
 
-> Paste-ready. Every field, every platform, character-counted. 19 Aug 2026.
-> Domain `desiauction.in` is registered. Instagram `@desiauction` and Threads `@desiauction` are claimed.
+> Paste-ready. Every field, every platform, character-counted. Written 19 Aug 2026.
+> **Status updated 1 Oct 2026** by checking each public profile URL from outside (logged out).
+> Facebook and X hide profiles behind a login wall, so their state could not be confirmed that way — tick them by hand.
 
-## Handle policy (ratified)
+## Status at a glance (1 Oct 2026)
 
-| Platform | Handle | State |
-|---|---|---|
-| Instagram | `desiauction` | ✅ claimed |
-| Threads | `desiauction` | ✅ claimed |
-| **YouTube** | `desiauction` | **available — verified 404, 19 Aug** |
-| **LinkedIn** | `desiauction` | **available — verified "Page not found", 19 Aug** |
-| Facebook | `desiauctionofficial` | `desiauction` taken (dormant, unrelated) |
-| X | `desiauctionofficial` | `desiauction` taken (dormant, 0 posts) |
+| Platform | Handle | Profile URL | Account | Profile filled in | On the website |
+|---|---|---|---|---|---|
+| Instagram | `desiauction` | `https://www.instagram.com/desiauction/` | ✅ live — name `DesiAuction`, 0 posts | ⬜ bio, links, Business switch unconfirmed | ✅ linked |
+| Threads | `desiauction` | `https://www.threads.net/@desiauction` | ✅ live | ⬜ unconfirmed | — no footer icon |
+| YouTube | `@DesiAuction` | `https://www.youtube.com/@DesiAuction` | ✅ **live since 19 Aug** (channel `UCMp4rwKkqQlKaBtTSbO7kuw`) | ❌ description empty | ✅ linked |
+| LinkedIn | `desiauction` | `https://www.linkedin.com/company/desiauction` | ❌ **not created** (404, 1 Oct) | — | — removed until live |
+| Facebook | `desiauctionofficial` | `https://www.facebook.com/desiauctionofficial` | ❓ login wall — confirm by hand | ❓ | — removed until live |
+| X | `desiauctionofficial` | `https://x.com/desiauctionofficial` | ❓ login wall — confirm by hand | ❓ | — removed until live |
+| WhatsApp | Business number / Channel | — | ❓ not recorded | ❓ | — removed until live |
+
+`desiauction` is taken on Facebook and X by dormant, unrelated accounts (evidence at the bottom of this sheet), hence `desiauctionofficial` there.
 
 Display name is **`DesiAuction`** everywhere. One word, capital D, capital A. Never "Desi Auction" as two words — that form carries the adult-content search adjacency, and note that both squatted accounts use exactly that form.
 
 ---
 
+## The website's social links
+
+The footer's social icons and the homepage's search-engine data (`sameAs` in the Organization JSON-LD) use the same links. **Both come from one file: `apps/web/src/content/social.ts`.**
+
+**1 Oct:** the placeholders are gone. The footer now shows only **Instagram** and **YouTube** — the two profiles confirmed live. Rule: an icon goes back in only when its account exists *and* has a filled-in profile.
+
+- [ ] X / Facebook — once confirmed, add the URL back to `social.ts`
+- [ ] LinkedIn — create the Page, fill it, then add it back
+- [ ] WhatsApp — add the Channel invite or `https://wa.me/<number>` once one exists
+- [ ] Optional: add Threads (`social.ts` + a glyph in `apps/web/src/components/shell/social-links.tsx`)
+
+---
+
 ## Order of operations
 
-1. **Google Workspace on `desiauction.in`** → create `praveen@`, `social@`, `hello@`, `support@`, `privacy@`
-2. **YouTube** — as a **Brand Account**, signed in as `social@`
-3. **LinkedIn** Page — needs your personal profile as admin
-4. **Facebook** Page → then claim the username
-5. **X** — `desiauctionofficial`
-6. **Migrate Instagram's login email to `social@desiauction.in`**
-7. Meta Business Portfolio: Page → Portfolio → claim Page → connect Instagram → 2FA → verify domain
+1. ~~Google Workspace~~ → **Done differently:** mail is **Zoho Mail (free, India DC)**, live since 30 Aug. One mailbox `praveen@desiauction.in`; `social@`, `hello@`, `support@`, `privacy@` and the rest are **aliases** delivering into it.
+2. ~~YouTube~~ → **channel exists.** Confirm it is a **Brand Account**, then paste the description below (it is empty).
+3. **LinkedIn** Page — needs your personal profile as admin. **Still to do.**
+4. **Facebook** Page → then claim the username — confirm status.
+5. **X** — `desiauctionofficial` — confirm status.
+6. **Migrate Instagram's login email to `social@desiauction.in`** — now possible, the alias exists.
+7. Meta Business Portfolio: Page → Portfolio → claim Page → connect Instagram → 2FA → verify domain. (The same portfolio owns the WhatsApp Cloud API number used for product messages — see `docs/messaging/WHATSAPP_SETUP.md`.)
+8. **Update `social.ts`** with the real URLs (section above).
 
-Do step 1 first. Every account after it should be owned by `social@desiauction.in`, never a personal Gmail.
+Every account should be registered to `social@desiauction.in`, never a personal Gmail.
 
 ---
 
 # YOUTUBE
 
-**Create as a Brand Account, not a personal channel.** Personal channels cannot be transferred cleanly, and one day you will want to hand this over.
+> **1 Oct:** channel `@DesiAuction` exists; its description is empty. Check it is a Brand Account (YouTube Studio → Settings → Permissions shows "Brand Account"), then paste the fields below.
+
+**Must be a Brand Account, not a personal channel.** Personal channels cannot be transferred cleanly, and one day you will want to hand this over.
 
 **Channel name:** `DesiAuction`
 **Handle:** `@desiauction`
@@ -155,7 +175,7 @@ Live player auctions for community cricket tournaments. Every bid server-verifie
 
 ---
 
-# INSTAGRAM (already claimed — finish the setup)
+# INSTAGRAM (live, 0 posts on 1 Oct — finish the setup)
 
 **Username:** `desiauction` ✅
 
@@ -183,14 +203,14 @@ Every bid verified. Every rupee accounted for.
 **Settings to change now:**
 - [ ] Switch to **Business** (not Creator — Creator can't be claimed cleanly into a Business Portfolio)
 - [ ] **2FA via authenticator app**, not SMS
-- [ ] Change the account email to `social@desiauction.in` once Workspace is live
+- [ ] Change the account email to `social@desiauction.in` (the Zoho alias is live)
 
 **Highlights — create all 7 with covers:**
 `START` · `AUCTION` · `PROOF` · `PRICING` · `NIGHTS` · `PLAYERS` · `ASK`
 
 ---
 
-# THREADS (already claimed)
+# THREADS (live)
 
 Bio mirrors Instagram, shortened to 150:
 ```
