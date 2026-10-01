@@ -4,13 +4,17 @@ import { env } from "../../../../env";
 import { readCapped } from "../../../../lib/read-capped";
 import { logger, withRequestId } from "../../../../server/logger";
 import { ingestEmailReport, suppressEmailAddress } from "../../../../server/messaging/email-events";
-import { handleZeptomailWebhook } from "../../../../server/messaging/zeptomail-webhook";
+import {
+  handleZeptomailWebhook,
+  ZEPTOMAIL_KEY_HEADER,
+} from "../../../../server/messaging/zeptomail-webhook";
 
 /**
  * ZEPTOMAIL (ZOHO CPAAS) EVENTS — hard bounces and spam complaints for every
  * message sent through the Mail Agent (docs/EMAIL_INFRASTRUCTURE.md →
  * ZeptoMail). The SES route's twin: prove the caller before touching the
- * database, here by the `producer-signature` HMAC; the logic is
+ * database, here by the `X-Webhook-Key` header (or a `producer-signature`
+ * HMAC); the logic is
  * zeptomail-webhook.ts, the database half email-events.ts.
  *
  * `ZEPTOMAIL_WEBHOOK_KEY` unset means CLOSED (404), indistinguishable from absent.
@@ -31,7 +35,11 @@ async function handle(request: Request): Promise<NextResponse> {
     return new NextResponse(null, { status: 413 });
   }
   try {
-    const result = await handleZeptomailWebhook(raw, request.headers.get("producer-signature"), {
+    const headers = {
+      key: request.headers.get(ZEPTOMAIL_KEY_HEADER),
+      signature: request.headers.get("producer-signature"),
+    };
+    const result = await handleZeptomailWebhook(raw, headers, {
       key,
       now: () => Date.now(),
       suppress: (action) => suppressEmailAddress(action),
