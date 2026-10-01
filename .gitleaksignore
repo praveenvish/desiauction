@@ -18,3 +18,9 @@ b723d33622d7ed4db27d69121f341d7fae3e2ff5:packages/messaging/src/web-push.test.ts
 f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:30
 f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:38
 f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:45
+
+# A deliberately WRONG webhook key in the ZeptoMail webhook test (PR #186,
+# first commit): the value the 403 case sends, never a real credential. The
+# test now builds that value at runtime; this entry only stops the scanner
+# re-flagging the commit that had it as a literal.
+ee9a0b0561ac1d060bdf69f3abd89399f9398a65:apps/web/src/server/messaging/zeptomail-webhook.test.ts:generic-api-key:255
