@@ -75,6 +75,13 @@ export function isAppleMobile(userAgent: string, touchPoints: number): boolean {
   return /iPad|iPhone|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && touchPoints > 1);
 }
 
+declare global {
+  interface Window {
+    /** What lib/pwa-bootstrap.ts caught before this module was listening. */
+    __daInstall?: { prompt: Event | null; installed: boolean };
+  }
+}
+
 let deferred: BeforeInstallPromptEvent | null = null;
 let installed = false;
 let offer: InstallOffer = "none";
@@ -114,6 +121,12 @@ export function watchInstallability(): () => void {
     installed = true;
     recompute();
   };
+  // Whatever fired before hydration (pwa-bootstrap.ts), then everything after.
+  const early = window.__daInstall;
+  if (early !== undefined) {
+    deferred ??= early.prompt as BeforeInstallPromptEvent | null;
+    installed ||= early.installed;
+  }
   window.addEventListener("beforeinstallprompt", onPrompt);
   window.addEventListener("appinstalled", onInstalled);
   recompute();
@@ -134,6 +147,9 @@ export async function promptInstall(): Promise<"accepted" | "dismissed" | "unava
     return "unavailable";
   }
   deferred = null;
+  if (window.__daInstall !== undefined) {
+    window.__daInstall.prompt = null;
+  }
   recompute();
   try {
     await event.prompt();

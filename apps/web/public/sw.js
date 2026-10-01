@@ -57,7 +57,7 @@
 // value, when the page changes and this line does not. This line changing is
 // what makes browsers install a new worker, and the new worker is what stores
 // the new page.
-const OFFLINE_REVISION = "8d35f795";
+const OFFLINE_REVISION = "565c3285";
 
 const OFFLINE_URL = "/offline.html";
 const PREFIX = "da-";

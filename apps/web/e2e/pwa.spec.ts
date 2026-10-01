@@ -4,6 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { splashImages } from "../src/lib/apple-splash";
 import { axeClean } from "./axe";
+import { latestOtp } from "./otp";
 
 // THE INSTALLED APP, PROVEN IN A REAL BROWSER (public/sw.js, src/lib/pwa.ts).
 //
@@ -161,17 +162,17 @@ test.describe("server unreachable", () => {
     await page.evaluate(() => {
       window.location.assign("/pricing");
     });
-    await expect(page.getByRole("heading", { name: "You're offline" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /You.re offline/ })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/pricing");
     await axeClean(page, "offline screen");
 
     // Still down: Try again lands on the same screen, at the same address.
     await page.getByRole("link", { name: "Try again" }).click();
-    await expect(page.getByRole("heading", { name: "You're offline" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /You.re offline/ })).toBeVisible();
 
     await startServer();
     await page.getByRole("link", { name: "Try again" }).click();
-    await expect(page.getByRole("heading", { name: "You're offline" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /You.re offline/ })).toHaveCount(0);
     await expect(page.locator("main").first()).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/pricing");
   });
@@ -181,7 +182,7 @@ test.describe("server unreachable", () => {
     await underWorker(page, `${ORIGIN}/help`);
     await stopServer();
     await page.goto(`${ORIGIN}/features`);
-    await expect(page.getByRole("heading", { name: "You're offline" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /You.re offline/ })).toBeVisible();
     await axeClean(page, "offline screen (dark)");
   });
 });
@@ -202,14 +203,14 @@ test.describe("offline", () => {
 
     await context.setOffline(true);
     await page.goto("/pricing");
-    await expect(page.getByRole("heading", { name: "You're offline" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /You.re offline/ })).toBeVisible();
     // At the address that was asked for, so retrying means retrying THAT.
     expect(new URL(page.url()).pathname).toBe("/pricing");
     await axeClean(page, "offline screen");
 
     // Back online, it opens the page by itself: no tap, no timer.
     await context.setOffline(false);
-    await expect(page.getByRole("heading", { name: "You're offline" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /You.re offline/ })).toHaveCount(0);
     expect(new URL(page.url()).pathname).toBe("/pricing");
   });
 
@@ -246,5 +247,113 @@ test.describe("offline", () => {
     for (const path of stored) {
       expect(path === "/offline.html" || path.startsWith("/_next/static/"), path).toBe(true);
     }
+  });
+});
+
+/*
+ * THE INSTALL OFFER. Chromium fires `beforeinstallprompt` as soon as it judges
+ * the site installable, which can be before hydration; the root layout's
+ * inline bootstrap (lib/pwa-bootstrap.ts) catches it then. These fire it at
+ * DOMContentLoaded, before the app's own scripts have run, which is the case
+ * a React effect alone used to miss.
+ */
+async function signInFresh(page: Page): Promise<void> {
+  const phone = `7${String(Math.floor(Math.random() * 1e9)).padStart(9, "0")}`;
+  await page.goto("/login?method=phone");
+  await page.getByLabel("Mobile number").fill(phone);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
+    timeout: 15_000,
+  });
+  await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  await expect(page).toHaveURL(/\/onboarding/);
+  await page.getByLabel("What should we call you?").fill("Install Tester");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/\/home/);
+}
+
+test.describe("install offer", () => {
+  test("an install event fired before hydration still offers Install, and spends it", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "beforeinstallprompt is Chromium's own event");
+    await page.addInitScript(() => {
+      document.addEventListener("DOMContentLoaded", () => {
+        const event = Object.assign(new Event("beforeinstallprompt"), {
+          prompt: () => Promise.resolve(),
+          userChoice: Promise.resolve({ outcome: "dismissed" }),
+        });
+        window.dispatchEvent(event);
+      });
+    });
+    await signInFresh(page);
+
+    await page.goto("/account?section=notifications");
+    const row = page.getByTestId("install-app");
+    await expect(row).toHaveAttribute("data-offer", "prompt");
+    await axeClean(page, "account with the install offer");
+    await row.getByRole("button", { name: "Install" }).click();
+    // A prompt can be used once: answered, the offer is gone until the
+    // browser makes a new one.
+    await expect(row).toHaveCount(0);
+  });
+
+  test.describe("on an iPhone", () => {
+    // An iPhone runs WebKit; Gecko wearing an iPhone user agent is no real device.
+    test.skip(({ browserName }) => browserName === "firefox", "no iPhone runs Gecko");
+    test.use({
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+      viewport: { width: 390, height: 844 },
+    });
+
+    test("the offer is the two taps, since Safari has no install dialog", async ({ page }) => {
+      await signInFresh(page);
+      await page.goto("/account?section=notifications");
+      const row = page.getByTestId("install-app");
+      await expect(row).toHaveAttribute("data-offer", "ios");
+      const steps = row.getByRole("list", { name: "How to install on iPhone" });
+      await expect(steps.getByRole("listitem")).toHaveText([/Tap\s+Share/, /Add to Home Screen/]);
+      await expect(row.getByRole("button")).toHaveCount(0);
+      await axeClean(page, "account with the iPhone install steps");
+    });
+  });
+});
+
+/*
+ * THE LAYOUT'S PRE-PAINT SCRIPT IS REAL JAVASCRIPT.
+ *
+ * It was not: the theme bootstrap was imported into the server layout from a
+ * "use client" module, so every page received a client reference's source
+ * (`function(){throw Error("Attempted to call THEME_BOOTSTRAP() …")}`), a
+ * syntax error. Nothing failed loudly — the dark theme simply flashed light on
+ * every load. This reads what the server actually sends.
+ */
+test("the layout's inline script parses, and replays the theme before the app runs", async ({
+  page,
+  request,
+}) => {
+  const html = await (await request.get("/help")).text();
+  const inline = /<script nonce="[^"]*">([^<]*da-theme[^<]*)<\/script>/.exec(html)?.[1];
+  expect(inline, "the theme bootstrap is in the page").toBeDefined();
+  expect(inline).not.toContain("Attempted to call");
+  expect(() => new Function(inline ?? "")).not.toThrow();
+
+  await page.addInitScript(() => {
+    localStorage.setItem("da-theme", "floodlight");
+    document.addEventListener("DOMContentLoaded", () => {
+      const seen = window as unknown as { __seen?: unknown };
+      seen.__seen = {
+        theme: document.documentElement.getAttribute("data-theme"),
+        install: (window as { __daInstall?: unknown }).__daInstall !== undefined,
+      };
+    });
+  });
+  await page.goto("/help");
+  expect(await page.evaluate(() => (window as unknown as { __seen?: unknown }).__seen)).toEqual({
+    theme: "floodlight",
+    install: true,
   });
 });

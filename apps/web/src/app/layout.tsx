@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 
 import { env } from "../env";
 import { splashImages } from "../lib/apple-splash";
+import { INSTALL_BOOTSTRAP } from "../lib/pwa-bootstrap";
 import { ReportProblemProvider } from "../components/report-problem/report-problem";
 import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
@@ -21,7 +22,7 @@ import { AppInstall } from "../components/pwa/app-install";
 import { ClientErrorListener } from "../components/client-error-listener";
 import { WebVitalsReporter } from "../components/web-vitals-reporter";
 import { ProductShell } from "../components/shell/product-shell";
-import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
+import { THEME_BOOTSTRAP } from "../components/shell/theme-bootstrap";
 import { platformDoorCapabilities } from "../server/admin/actions";
 import { currentSession, logoutAction } from "../server/auth/actions";
 import { inboxState } from "../server/auth/security-events";
@@ -294,8 +295,9 @@ export default async function RootLayout({
     // before React hydrates, which is a deliberate server/client difference.
     <html lang="en" data-theme="daylight" suppressHydrationWarning>
       <body>
-        {/* Replay the remembered console theme before first paint (no flash).
-            The one inline script the app writes itself, so it carries the
+        {/* Replay the remembered console theme before first paint (no flash),
+            and catch the browser's install event before hydration
+            (lib/pwa-bootstrap.ts). The one inline script the app writes itself, so it carries the
             request's nonce like every script Next emits (middleware.ts).
             `suppressHydrationWarning`: browsers HIDE a nonce once the
             element is parsed (the attribute reads back as ""), so exfiltrating
@@ -306,7 +308,7 @@ export default async function RootLayout({
         <script
           nonce={nonce}
           suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP + INSTALL_BOOTSTRAP }}
         />
         {/* Every shell, every route: a click is answered before the network is. */}
         <NavigationProgress />
