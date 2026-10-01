@@ -13,7 +13,7 @@ import "./board.css";
 // /spectate. Where spectate is the ceremony (one lot, huge), the board is the
 // economy at a glance. Rendered "bare" (nav.ts); no commands, no owner data.
 export const metadata: Metadata = {
-  title: "Live board · DesiAuction",
+  title: "Live board",
   robots: { index: false, follow: false },
 };
 

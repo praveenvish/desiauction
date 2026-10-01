@@ -65,7 +65,7 @@ import { formatDate, formatDayDate, formatWallTime, istCalendarDate } from "../.
 import { formatCount } from "../../lib/plural";
 import { lineupWords } from "../../lib/lineup-words";
 
-export const metadata = { title: "My profile · DesiAuction" };
+export const metadata = { title: "My profile" };
 
 /**
  * MY PROFILE — everything about this person as a player, on one page: the

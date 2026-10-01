@@ -9,7 +9,7 @@ import "../../seasons/seasons.css";
 import "../admin.css";
 import { AdminPageHead } from "../admin-ui";
 
-export const metadata = { title: "Users · Platform admin · DesiAuction" };
+export const metadata = { title: "Users · Platform admin" };
 
 /** PX-9 §3 — User Administration. Gate first, then stream. Read-only. */
 export default async function AdminUsersPage({

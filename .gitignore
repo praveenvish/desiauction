@@ -6,6 +6,8 @@ node_modules/
 dist/
 .next/
 .next-e2e/
+# Lighthouse CI reports (apps/web/lighthouserc.json); CI uploads them as an artifact.
+.lighthouseci/
 # Every other distDir the tooling uses: preview (pnpm preview), perf and ad-hoc
 # comparison builds. Prettier 3 reads .gitignore, so this also keeps
 # format:check out of build output.

@@ -112,6 +112,17 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
   await page.getByTestId("confirm-publish").click();
   await expect(page.getByTestId("visibility-row")).toContainText("Live");
 
+  // SEO-1 Phase 5: once public, the organizer may let squads into search. On,
+  // it still lists nothing until players are approved and all are known adults.
+  const squads = page.getByTestId("squad-listing-row");
+  await expect(squads).toContainText("Not listed");
+  await expect(page.getByTestId("squad-listing-status")).toContainText("shared by link only");
+  await page.getByTestId("toggle-squad-listing").click();
+  await expect(page.getByTestId("squad-listing-status")).toContainText(
+    "Squads are listed once players are approved",
+  );
+  await expect(squads).toContainText("Not listed");
+
   // A second, never-published draft competition stays structurally absent.
   await page.goto("/seasons");
   await page.getByTestId("new-season").click();
@@ -138,9 +149,15 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
       `Monsoon Cup ${STAMP}`,
     );
     await expect(anon.locator('link[rel="canonical"]')).toHaveAttribute("href", /\/c\//);
-    const jsonLd = await anon.locator('script[type="application/ld+json"]').textContent();
-    expect(jsonLd).toContain('"@type":"SportsEvent"');
+    // SEO-1 Phase 2: the breadcrumb always; the SportsEvent only once a venue
+    // with an address is known (Google requires one). This season has no
+    // matches yet, so no venue, so no event markup rather than an invalid one.
+    const jsonLd = (
+      await anon.locator('script[type="application/ld+json"]').allTextContents()
+    ).join("\n");
+    expect(jsonLd).toContain('"@type":"BreadcrumbList"');
     expect(jsonLd).toContain(`Monsoon Cup ${STAMP}`);
+    expect(jsonLd).not.toContain('"@type":"SportsEvent"');
 
     // Share-card metadata (INV-1): the file-convention OG/Twitter image is injected
     // into the head, and the route itself serves a real PNG.
@@ -170,6 +187,26 @@ test("organizer publishes; the public can discover, and SEO surfaces are real", 
     expect(await robots?.text()).toContain("sitemap.xml");
     const sitemap = await anon.goto("/sitemap.xml");
     expect(await sitemap?.text()).toContain(publicUrl);
+
+    // SEO-1 Phase 7: the embed card — the ONE framable page — for a published
+    // season only, never indexed, and the rest of the site still unframeable.
+    const embedUrl = publicUrl.replace("/c/", "/embed/");
+    const embed = await anon.goto(embedUrl);
+    expect(embed?.status()).toBe(200);
+    const embedHeaders = embed?.headers() ?? {};
+    expect(embedHeaders["x-frame-options"]).toBeUndefined();
+    expect(embedHeaders["content-security-policy"]).toContain("frame-ancestors *");
+    expect(embedHeaders["x-robots-tag"]).toContain("noindex");
+    await expect(anon.getByTestId("embed-card")).toContainText(`Monsoon Cup ${STAMP}`);
+    await expect(anon.getByRole("link", { name: "Register" })).toHaveAttribute(
+      "href",
+      new RegExp(`${publicUrl}$`),
+    );
+    const hiddenEmbed = await anon.goto(privateSlugUrl.replace("/c/", "/embed/"));
+    expect(hiddenEmbed?.status()).toBe(404);
+    const page = await anon.goto(publicUrl);
+    expect(page?.headers()["x-frame-options"]).toBe("DENY");
+    expect(page?.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
   });
 });
 

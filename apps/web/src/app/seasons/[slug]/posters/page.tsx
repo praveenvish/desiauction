@@ -7,7 +7,7 @@ import "../../seasons.css";
 import "../_tabs/tabs.css";
 import "./posters.css";
 
-export const metadata = { title: "Posters · DesiAuction" };
+export const metadata = { title: "Posters" };
 
 /**
  * THE POSTER STUDIO.

@@ -8,7 +8,7 @@ import { LinkRow, LinkRows } from "../../components/public/public-kit";
 import "../content.css";
 
 export const metadata: Metadata = {
-  title: "Legal · DesiAuction",
+  title: "Legal",
   description: "Terms, privacy, refunds and the other documents that govern using DesiAuction.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/legal` },
 };

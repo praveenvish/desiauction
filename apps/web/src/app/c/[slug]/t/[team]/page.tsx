@@ -44,7 +44,7 @@ export async function generateMetadata({
   const { slug, team: teamSlug } = await params;
   const team = await teamView(slug, teamSlug);
   if (team === null) {
-    return { title: "Team · DesiAuction" };
+    return { title: "Team" };
   }
   const facts = teamFacts(team);
   const url = `${env.PUBLIC_BASE_URL}/c/${slug}/t/${teamSlug}`;
@@ -69,7 +69,11 @@ export async function generateMetadata({
     title: `${team.team.name} · ${team.competitionName}`,
     description,
     alternates: { canonical: url },
-    robots: { index: false, follow: true },
+    // Shared by link always; indexed only when the organizer opted in AND
+    // every approved player in the season is a known adult (SEO-1 Phase 5).
+    robots: team.squadListing.indexable
+      ? { index: true, follow: true }
+      : { index: false, follow: true },
     openGraph: {
       title: `${team.team.name} — squad`,
       description,

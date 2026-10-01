@@ -7,7 +7,7 @@ import "../../../../../seasons/seasons.css";
 import "../../../../../seasons/[slug]/money/money.css";
 import "../../finance.css";
 
-export const metadata = { title: "Document · DesiAuction" };
+export const metadata = { title: "Document" };
 
 /**
  * PX-8 §4 — Operations detail (PX-1 F2).

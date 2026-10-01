@@ -19,7 +19,7 @@ import "../content.css";
 import "../marketing.css";
 
 export const metadata: Metadata = {
-  title: "Help centre · DesiAuction",
+  title: "Help centre",
   description:
     "Guides for organizers, players and team owners — setup, registration, the live auction, settlement and finance.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/help` },

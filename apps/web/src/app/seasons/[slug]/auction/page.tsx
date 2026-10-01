@@ -28,7 +28,7 @@ import "../../seasons.css";
 import "./auction.css";
 import "./plan/plan.css";
 
-export const metadata = { title: "Auction · DesiAuction" };
+export const metadata = { title: "Auction" };
 
 /**
  * The header used to key off "an auction row exists" — so a COMPLETED auction

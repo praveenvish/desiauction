@@ -17,7 +17,7 @@ import { TournamentsBrowser, type ViewMode } from "./tournaments-browser";
 import "../seasons/seasons.css";
 import "./tournaments.css";
 
-export const metadata = { title: "Tournaments · DesiAuction" };
+export const metadata = { title: "Tournaments" };
 
 /**
  * The tournaments index — rail slot 2, built to Tournaments & Orgs.dc.html.

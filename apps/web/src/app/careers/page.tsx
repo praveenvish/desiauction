@@ -5,7 +5,7 @@ import { SUPPORT } from "../../content/support";
 import { ComingSoon } from "../../components/public/coming-soon";
 
 export const metadata: Metadata = {
-  title: "Careers · DesiAuction",
+  title: "Careers",
   description: "DesiAuction is not hiring yet — but we'd still like to hear from you.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/careers` },
   // Not in search results and not in the sitemap: a page whose whole content

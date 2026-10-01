@@ -36,7 +36,7 @@ import "../notifications.css";
 import "./analytics.css";
 
 export const metadata = {
-  title: "Delivery analytics · Notifications · Platform admin · DesiAuction",
+  title: "Delivery analytics · Notifications · Platform admin",
 };
 
 /**

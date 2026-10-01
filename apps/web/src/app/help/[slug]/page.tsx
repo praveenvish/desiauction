@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { IconArrowLeft } from "@desiauction/ui";
 
 import { env } from "../../../env";
+import { JsonLd } from "../../../components/seo/json-ld";
+import { breadcrumbJsonLd, faqPageJsonLd, techArticleJsonLd } from "../../../server/seo/json-ld";
 import { FAQS, HELP_ARTICLES, helpArticle, helpCategory } from "../../../content/help";
 import { PageBody, PageHero } from "../../../components/public/public-kit";
 import { ArticleView } from "../article-view";
@@ -21,14 +23,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   if (slug === "faq") {
-    return { title: "FAQ · Help · DesiAuction", description: "Frequently asked questions." };
+    return {
+      title: "FAQ · Help",
+      description: "Frequently asked questions about running a player auction on DesiAuction.",
+      alternates: { canonical: `${env.PUBLIC_BASE_URL}/help/faq` },
+    };
   }
   const article = helpArticle(slug);
   if (article === undefined) {
-    return { title: "Help · DesiAuction" };
+    return { title: "Help" };
   }
   return {
-    title: `${article.title} · Help · DesiAuction`,
+    title: `${article.title} · Help`,
     description: article.summary,
     alternates: { canonical: `${env.PUBLIC_BASE_URL}/help/${slug}` },
   };
@@ -41,9 +47,20 @@ export async function generateMetadata({
 export default async function HelpArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
+  const base = env.PUBLIC_BASE_URL;
   if (slug === "faq") {
     return (
       <main className="content-page">
+        {/* Every question and answer below is rendered in full, so it may be marked up. */}
+        <JsonLd
+          data={[
+            faqPageJsonLd(FAQS),
+            breadcrumbJsonLd(base, [
+              { name: "Help", path: "/help" },
+              { name: "FAQ", path: "/help/faq" },
+            ]),
+          ]}
+        />
         <PageHero
           size="compact"
           eyebrow={
@@ -76,11 +93,32 @@ export default async function HelpArticlePage({ params }: { params: Promise<{ sl
     notFound();
   }
   const category = helpCategory(article.category);
+  const path = `/help/${article.slug}`;
   return (
-    <ArticleView
-      title={article.title}
-      meta={`${category?.title ?? "Help"} · ${String(article.readMinutes)} min read`}
-      blocks={article.blocks}
-    />
+    <>
+      <JsonLd
+        data={[
+          techArticleJsonLd({
+            base,
+            path,
+            headline: article.title,
+            description: article.summary,
+            dateModified: article.updatedOn,
+          }),
+          breadcrumbJsonLd(base, [
+            { name: "Help", path: "/help" },
+            ...(category === undefined
+              ? []
+              : [{ name: category.title, path: `/help/category/${category.slug}` }]),
+            { name: article.title, path },
+          ]),
+        ]}
+      />
+      <ArticleView
+        title={article.title}
+        meta={`${category?.title ?? "Help"} · ${String(article.readMinutes)} min read`}
+        blocks={article.blocks}
+      />
+    </>
   );
 }

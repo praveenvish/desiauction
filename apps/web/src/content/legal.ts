@@ -154,7 +154,8 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
   {
     slug: "privacy",
     title: "Privacy Policy",
-    summary: "What we store, why, and your control over it.",
+    summary:
+      "What we store and why, what becomes public, who processes it, how long we keep it, and your rights over your data.",
     effective: "18 Sep 2026",
     versions: [BETA_DRAFT_2, BETA_DRAFT],
     blocks: [
@@ -317,7 +318,8 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
   {
     slug: "code-of-conduct",
     title: "Code of Conduct",
-    summary: "How we expect everyone on the platform to behave.",
+    summary:
+      "What we expect from everyone on the platform, what we do not tolerate, and how to report behaviour that crosses the line.",
     effective: "16 Jul 2026",
     versions: [BETA_DRAFT],
     blocks: [
@@ -432,7 +434,8 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
   {
     slug: "disclaimer",
     title: "Disclaimer",
-    summary: "The limits of what the platform is and does.",
+    summary:
+      "The limits of what the platform is and does: we record your tournament rather than run it, give no professional advice, and are in beta.",
     effective: "16 Jul 2026",
     versions: [BETA_DRAFT],
     blocks: [

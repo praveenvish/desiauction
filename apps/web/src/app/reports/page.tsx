@@ -30,7 +30,7 @@ import { formatCount } from "../../lib/plural";
 import { formatDate } from "../../lib/format-date";
 import { auctionStage, registrationStage, resultSentence, seasonStage } from "./reports-model";
 
-export const metadata = { title: "Reports · DesiAuction" };
+export const metadata = { title: "Reports" };
 
 function count(value: number): string {
   return formatCount(value);

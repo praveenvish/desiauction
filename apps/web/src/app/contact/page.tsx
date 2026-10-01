@@ -13,7 +13,7 @@ import { env } from "../../env";
  * redirect so browsers and crawlers learn the new address.
  */
 export const metadata: Metadata = {
-  title: "Support · DesiAuction",
+  title: "Support",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/support` },
 };
 

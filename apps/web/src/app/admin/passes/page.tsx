@@ -10,7 +10,7 @@ import { AdminEmpty, AdminPageHead } from "../admin-ui";
 import "../../seasons/seasons.css";
 import "../admin.css";
 
-export const metadata = { title: "Passes · Platform admin · DesiAuction" };
+export const metadata = { title: "Passes · Platform admin" };
 
 /**
  * THE PASS QUEUE — the one surface in administration that can change something.

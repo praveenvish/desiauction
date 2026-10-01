@@ -9,7 +9,7 @@ import "../../../_tabs/tabs.css";
 import "../../money.css";
 import "../../season-money.css";
 
-export const metadata = { title: "Case review · DesiAuction" };
+export const metadata = { title: "Case review" };
 
 /**
  * PX-7 E2 — Case review.

@@ -22,7 +22,7 @@ import { rolesOf } from "../../server/roles/roles";
 import { InboxList } from "./inbox-list";
 import "./inbox.css";
 
-export const metadata = { title: "Notifications · DesiAuction" };
+export const metadata = { title: "Notifications" };
 
 /** How many notices load. The old hard 10 could not show last week's decision. */
 const WINDOW = 50;

@@ -8,7 +8,7 @@ import "../../../../seasons/seasons.css";
 import "../../../../seasons/[slug]/money/money.css";
 import "../finance.css";
 
-export const metadata = { title: "Deliveries · DesiAuction" };
+export const metadata = { title: "Deliveries" };
 
 /**
  * PX-8 §2 — the Delivery workspace (PX-1 F1's Dispatches tab).

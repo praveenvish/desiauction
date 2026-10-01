@@ -11,7 +11,7 @@ import "../../../seasons/seasons.css";
 import "../../admin.css";
 import "../demos.css";
 
-export const metadata = { title: "Demo availability · Platform admin · DesiAuction" };
+export const metadata = { title: "Demo availability · Platform admin" };
 
 /**
  * THE HOURS SOMEBODY WILL ANSWER A CALL.

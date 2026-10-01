@@ -53,9 +53,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const header = await headerOf(slug);
   return header === null
-    ? { title: "Tournament · DesiAuction" }
+    ? { title: "Tournament" }
     : {
-        title: `${header.tournament.name} · DesiAuction`,
+        title: header.tournament.name,
         description: `The seasons of ${header.tournament.name}, run by ${header.tournament.orgName} on DesiAuction.`,
       };
 }

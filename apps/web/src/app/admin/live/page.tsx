@@ -8,7 +8,7 @@ import "../admin.css";
 import "./live.css";
 import { AdminPageHead } from "../admin-ui";
 
-export const metadata = { title: "Live · Platform admin · DesiAuction" };
+export const metadata = { title: "Live · Platform admin" };
 
 /**
  * THE LIVE BOARD — every auction running right now, refreshing itself.

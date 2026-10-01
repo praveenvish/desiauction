@@ -10,3 +10,11 @@
 # prove our encryption matches the standard byte for byte. Public by design —
 # not a credential of ours.
 b723d33622d7ed4db27d69121f341d7fae3e2ff5:packages/messaging/src/web-push.test.ts:generic-api-key:56
+
+# SEO-1 Phase 1 (f9772d26): the IndexNow unit test's fake, sequential-hex key.
+# Not a credential, and IndexNow keys are public by design (served at
+# /indexnow-key.txt). The test now uses a low-entropy value; these entries only
+# stop the scanner re-flagging the historical commit.
+f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:30
+f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:38
+f9772d26b7e72f5b4dadb87f4c30d513fbd1bf63:apps/web/src/server/seo/indexnow.test.ts:generic-api-key:45

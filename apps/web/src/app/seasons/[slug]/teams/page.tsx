@@ -15,7 +15,7 @@ import { TeamsPanel } from "./teams-panel";
 import "../../seasons.css";
 import "./teams.css";
 
-export const metadata = { title: "Teams · DesiAuction" };
+export const metadata = { title: "Teams" };
 
 // PX-4 Team Workspace: the franchise grid and, for a URL-selected team (?team=…),
 // the roster detail with buy prices. All derived from EXISTING reads (teams, the

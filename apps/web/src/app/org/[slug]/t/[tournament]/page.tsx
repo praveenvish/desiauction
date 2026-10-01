@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { tournamentView } from "../../../../../server/orgs/catalogue";
 
-export const metadata = { title: "Tournament · DesiAuction" };
+export const metadata = { title: "Tournament" };
 
 /**
  * A door, not a page (2026-09-25 polish).

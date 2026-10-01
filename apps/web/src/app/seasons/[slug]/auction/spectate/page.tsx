@@ -64,7 +64,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const view = await viewOf(slug);
   if (view === null) {
-    return { title: "Live auction · DesiAuction" };
+    return { title: "Live auction" };
   }
   const where = [view.orgName, view.location]
     .filter((part): part is string => part !== null && part !== "")
@@ -81,7 +81,7 @@ export async function generateMetadata({
       ? `${follow(view.competitionName)} No account needed.`
       : `${follow(view.competitionName)} ${where}. No account needed.`;
   return {
-    title: `${title} · DesiAuction`,
+    title: title,
     description,
     openGraph: { title, description, type: "website" },
     twitter: { card: "summary_large_image", title, description },

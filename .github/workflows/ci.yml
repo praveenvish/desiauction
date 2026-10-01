@@ -217,6 +217,26 @@ jobs:
       - run: pnpm --filter @desiauction/web exec playwright install --with-deps chromium
       - name: End-to-end journeys
         run: pnpm --filter @desiauction/web exec playwright test
+      # LIGHTHOUSE ON THE PUBLIC SURFACES (SEO-1 Phase 3; docs/57).
+      #
+      # docs/57 has always said Lighthouse CI gates the public pages, and until
+      # this step nothing ran it. The SEO category is a hard gate (score 100). It
+      # is what caught Next 15 streaming titles and descriptions into <body> for
+      # phones, Googlebot and the AI crawlers. Performance is REPORTED, not
+      # gated: a shared runner's numbers move run to run, and the first honest
+      # baseline has LCP over budget on the reference phone. docs/57 records
+      # that; the budget becomes a gate once there is a baseline to ratchet.
+      # Reuses this job's build (.next-e2e) and database.
+      - name: Lighthouse — SEO gate and performance report
+        working-directory: apps/web
+        run: npx --yes @lhci/cli@0.15.1 autorun --config=./lighthouserc.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse
+          path: apps/web/.lighthouseci/
+          retention-days: 14
+          if-no-files-found: ignore
       # THE 29 THIS JOB SILENTLY SKIPS.
       #
       # `/gallery` is dev-only, so on the precompiled server the four

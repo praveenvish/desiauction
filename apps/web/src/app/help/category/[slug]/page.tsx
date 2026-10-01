@@ -12,6 +12,8 @@ import {
   SideCard,
 } from "../../../../components/public/public-kit";
 import { env } from "../../../../env";
+import { JsonLd } from "../../../../components/seo/json-ld";
+import { breadcrumbJsonLd } from "../../../../server/seo/json-ld";
 import { HELP_CATEGORIES, helpArticlesIn, helpCategory } from "../../../../content/help";
 import "../../../content.css";
 
@@ -27,10 +29,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const category = helpCategory(slug);
   if (category === undefined) {
-    return { title: "Help · DesiAuction" };
+    return { title: "Help" };
   }
   return {
-    title: `${category.title} · Help · DesiAuction`,
+    title: `${category.title} · Help`,
     description: category.description,
     alternates: { canonical: `${env.PUBLIC_BASE_URL}/help/category/${slug}` },
   };
@@ -46,6 +48,12 @@ export default async function HelpCategoryPage({ params }: { params: Promise<{ s
   const articles = helpArticlesIn(slug);
   return (
     <main className="content-page">
+      <JsonLd
+        data={breadcrumbJsonLd(env.PUBLIC_BASE_URL, [
+          { name: "Help", path: "/help" },
+          { name: category.title, path: `/help/category/${category.slug}` },
+        ])}
+      />
       <PageHero
         size="compact"
         eyebrow={

@@ -17,7 +17,7 @@ import "../seasons/seasons.css";
 import "./admin.css";
 import "./overview.css";
 
-export const metadata = { title: "Platform admin · DesiAuction" };
+export const metadata = { title: "Platform admin" };
 
 /**
  * PX-9 §1 — the Platform Dashboard (PX-1 02 G1).

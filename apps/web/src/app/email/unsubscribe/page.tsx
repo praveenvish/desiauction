@@ -8,7 +8,7 @@ import "../../content.css";
 import "../../marketing.css";
 
 export const metadata: Metadata = {
-  title: "Unsubscribe · DesiAuction",
+  title: "Unsubscribe",
   description: "Stop one kind of email from DesiAuction.",
   // A utility page reached only from a mail; nothing here to find.
   robots: { index: false, follow: false },

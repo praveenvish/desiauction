@@ -16,7 +16,7 @@ import "../../../seasons/seasons.css";
 import "../../admin.css";
 import "../notifications.css";
 
-export const metadata = { title: "Suppressions · Notifications · Platform admin · DesiAuction" };
+export const metadata = { title: "Suppressions · Notifications · Platform admin" };
 
 /**
  * THE SUPPRESSION DESK (Notification Control Center, Phase 4).

@@ -11,7 +11,7 @@ import "../admin.css";
 import "./audit.css";
 import { AdminPageHead } from "../admin-ui";
 
-export const metadata = { title: "Audit · Platform admin · DesiAuction" };
+export const metadata = { title: "Audit · Platform admin" };
 
 /**
  * PX-9 §4 — the Audit Explorer.

@@ -10,7 +10,7 @@ import "../../seasons/seasons.css";
 import "../admin.css";
 import "./reviews.css";
 
-export const metadata = { title: "Reviews · Platform admin · DesiAuction" };
+export const metadata = { title: "Reviews · Platform admin" };
 
 /**
  * THE REVIEW DESK (FR-1 Phase 2) — ask for a review, then decide what is shown.

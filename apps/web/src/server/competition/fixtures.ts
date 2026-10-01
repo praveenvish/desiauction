@@ -717,6 +717,47 @@ export async function publishedSchedule(
   return { rows: rows.map(toSnapshot), total: countRow?.count ?? 0 };
 }
 
+/**
+ * WHERE A SEASON IS PLAYED, when that has a single answer (SEO-1 Phase 2).
+ *
+ * The season's own `location` is free text ("Jaipur"). The address a search
+ * engine needs for an event lives on the club's venue, and a season reaches
+ * it only through its matches. The answer is the one venue that every public,
+ * uncancelled match is played at, or null when there are no such matches or
+ * they are spread across more than one venue: a season at three grounds has
+ * no single address to state, and a guessed one is worse than none.
+ */
+export async function seasonVenueOf(
+  db: Db,
+  competitionId: string,
+): Promise<{ name: string; address: string | null; city: string | null } | null> {
+  const rows = await db
+    .selectDistinct({
+      id: venues.id,
+      name: venues.name,
+      address: venues.address,
+      city: venues.city,
+    })
+    .from(fixtures)
+    .innerJoin(grounds, eq(grounds.id, fixtures.groundId))
+    .innerJoin(venues, eq(venues.id, grounds.venueId))
+    .where(
+      and(
+        eq(fixtures.competitionId, competitionId),
+        inArray(
+          fixtures.status,
+          PUBLIC_FIXTURE_STATUSES.filter((status) => status !== "cancelled"),
+        ),
+      ),
+    )
+    .limit(2);
+  const [only, second] = rows;
+  if (only === undefined || second !== undefined) return null;
+  const clean = (value: string | null) =>
+    value === null || value.trim() === "" ? null : value.trim();
+  return { name: only.name, address: clean(only.address), city: clean(only.city) };
+}
+
 export async function competitionFixtureSnapshots(
   db: Db,
   competitionId: string,

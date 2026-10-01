@@ -7,7 +7,7 @@ import "../../../seasons.css";
 import "../auction.css";
 import "./replay.css";
 
-export const metadata = { title: "Replay · DesiAuction" };
+export const metadata = { title: "Replay" };
 
 export default async function ReplayPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

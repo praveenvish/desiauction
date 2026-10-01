@@ -6,7 +6,7 @@ import { EnginePanel } from "./engine-panel";
 import "../../../seasons.css";
 import "../auction.css";
 
-export const metadata = { title: "Engine · DesiAuction" };
+export const metadata = { title: "Engine" };
 
 export default async function EnginePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

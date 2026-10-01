@@ -1,4 +1,5 @@
 import { ButtonLink, IconMessageCircle, IconSearch, IconTrophy } from "@desiauction/ui";
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import "../components/public/public-kit.css";
@@ -13,6 +14,10 @@ import "./marketing.css";
 // white slab in an otherwise dark site. It now opens with the kit's band like
 // every other public page, and the dead end offers somewhere to go rather than
 // two buttons and nothing else.
+// The tab and any search result said only "DesiAuction" — the one page whose
+// title most needs to say what happened.
+export const metadata: Metadata = { title: "Page not found" };
+
 export default function NotFound() {
   return (
     <main className="content-page">

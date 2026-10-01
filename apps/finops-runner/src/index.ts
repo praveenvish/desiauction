@@ -1,6 +1,5 @@
-import { resolve } from "node:path";
-
 import { createDb } from "@desiauction/db";
+import { resolveFinopsStorageDir } from "@desiauction/messaging/finops-storage";
 import {
   bucketArtifactStoreFromEnv,
   finopsDeps,
@@ -77,7 +76,7 @@ const handle = createDb(env.DATABASE_URL);
 // web tier can read. Falls back to the filesystem store (same-host / local).
 const artifactStore = bucketArtifactStoreFromEnv(env) ?? undefined;
 const deps = finopsDeps(handle.db, {
-  storageDir: resolve(process.cwd(), env.FINOPS_STORAGE_DIR),
+  storageDir: resolveFinopsStorageDir(env.FINOPS_STORAGE_DIR, process.cwd()),
   ...(artifactStore === undefined ? {} : { artifacts: artifactStore }),
   // The adapters that reach a person — without this every document was
   // "delivered" to a no-op and a file on this container's disk (delivery.ts).

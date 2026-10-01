@@ -21,6 +21,23 @@ const CSP = [
   "form-action 'self'",
 ].join("; ");
 
+/*
+ * THE ONE PLACE ANOTHER SITE MAY FRAME US: /embed/* (SEO-1 Phase 7).
+ *
+ * An organizer pastes a small read-only card of their published season into
+ * their club's website. Everything else stays unframeable: the global rule
+ * below skips only /embed, and /embed gets the same headers minus
+ * X-Frame-Options, with `frame-ancestors *`. Embed pages render public data
+ * only (a private season is a 404), carry no form and no session-bound action,
+ * so being framed offers a clickjacker nothing to click.
+ */
+const EMBED_CSP = [
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors *",
+  "form-action 'self'",
+].join("; ");
+
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -58,6 +75,22 @@ export default {
   // design reviews. Dev-only either way; production never shows it.
   devIndicators: false,
   poweredByHeader: false,
+  /*
+   * TITLES AND DESCRIPTIONS GO IN <head>, FOR EVERY VISITOR (SEO-1 Phase 3).
+   *
+   * Next 15 streams metadata: a visitor it does not recognise as an HTML-only
+   * bot gets <title> and <meta name="description"> late, in the <body>, for
+   * JavaScript to hoist. Its default list of HTML-only bots omits the AI
+   * crawlers (GPTBot, OAI-SearchBot, ClaudeBot, PerplexityBot), which run no
+   * JavaScript, and Googlebot is deliberately left out of it. Lighthouse,
+   * emulating a phone, reported "no meta description" on every public page
+   * that had one.
+   *
+   * Matching every user agent turns streaming off. It costs nothing here: the
+   * root layout already awaits the session and shell reads before the first
+   * byte, so the head was never flushed early anyway.
+   */
+  htmlLimitedBots: /.*/,
   transpilePackages: ["@desiauction/core", "@desiauction/contracts", "@desiauction/ui"],
   /*
    * BARREL IMPORTS, RESOLVED TO THE MODULE THAT WAS ASKED FOR.
@@ -87,7 +120,18 @@ export default {
   serverExternalPackages: ["pino", "pino-pretty"],
   headers() {
     return Promise.resolve([
-      { source: "/:path*", headers: securityHeaders },
+      // Everything except /embed (see EMBED_CSP above).
+      { source: "/((?!embed(?:/|$)).*)", headers: securityHeaders },
+      {
+        source: "/embed/:path*",
+        headers: [
+          ...securityHeaders.filter(
+            (header) =>
+              header.key !== "X-Frame-Options" && header.key !== "Content-Security-Policy",
+          ),
+          { key: "Content-Security-Policy", value: EMBED_CSP },
+        ],
+      },
       // FR-1: a problem-report screenshot is a picture of somebody's screen,
       // served to one operator. Config headers REPLACE a route handler's own
       // header of the same name, so the stricter policy the route sets was
@@ -119,6 +163,10 @@ export default {
       // rule below must keep targeting /seasons/:path*, because those ARE the
       // real pages.
       { source: "/competitions", destination: "/tournaments?view=seasons", permanent: true },
+      // SEO-1 Phase 6: the /blog placeholder became /guides, with real
+      // articles. Permanent, so anything that linked to /blog lands there.
+      { source: "/blog", destination: "/guides", permanent: true },
+      { source: "/blog/:path*", destination: "/guides", permanent: true },
       { source: "/competitions/:path*", destination: "/seasons/:path*", permanent: true },
       // /admin/messaging (2026-09-28) was a second copy of Notifications — its
       // templates, delivery and suppression cards each had a tab there — and it

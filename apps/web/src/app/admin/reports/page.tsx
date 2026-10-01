@@ -11,7 +11,7 @@ import "../../seasons/seasons.css";
 import "../admin.css";
 import "./reports.css";
 
-export const metadata = { title: "Reports · Platform admin · DesiAuction" };
+export const metadata = { title: "Reports · Platform admin" };
 
 /**
  * THE REPORT DESK (FR-1 Phase 1) — what people told us was broken, and what we

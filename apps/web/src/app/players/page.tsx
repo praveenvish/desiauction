@@ -21,7 +21,7 @@ import "./players.css";
 import { formatCount } from "../../lib/plural";
 import { moneyFormat } from "../../lib/money";
 
-export const metadata = { title: "Players · DesiAuction" };
+export const metadata = { title: "Players" };
 
 const STATUS_TONE: Record<PlayerIndexRow["status"], KitTone> = {
   submitted: "blue",

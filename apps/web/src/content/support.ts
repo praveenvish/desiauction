@@ -5,6 +5,9 @@
  * form here pretends to file a ticket.
  */
 
+/** The one support inbox. Named once so the page, the structured data and anything else agree. */
+export const SUPPORT_EMAIL = "support@desiauction.in";
+
 export const SUPPORT = {
   intro:
     "We answer in person during beta. Tell us what's happening and we'll get back within a day — faster on auction night.",
@@ -15,8 +18,8 @@ export const SUPPORT = {
   channels: [
     {
       title: "Email",
-      detail: "support@desiauction.in",
-      href: "mailto:support@desiauction.in",
+      detail: SUPPORT_EMAIL,
+      href: `mailto:${SUPPORT_EMAIL}`,
       note: "Put AUCTION NIGHT in the subject if it's live — those go to the front of the queue. Include your tournament name if you have one.",
     },
   ],

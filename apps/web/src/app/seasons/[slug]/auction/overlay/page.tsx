@@ -14,7 +14,7 @@ import "./overlay.css";
 // new PRESENTATION of state that already ships. The shell renders it "bare"
 // (nav.ts), and overlay.css makes the page body transparent for compositing.
 export const metadata: Metadata = {
-  title: "Broadcast overlay · DesiAuction",
+  title: "Broadcast overlay",
   robots: { index: false, follow: false },
 };
 
