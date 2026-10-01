@@ -14,6 +14,8 @@ import {
 } from "./zeptomail-webhook";
 
 const KEY = "zm-webhook-auth-key-0123456789";
+/** Same length class as KEY, plainly not it — built, so no scanner reads it as a secret. */
+const WRONG = "not-the-webhook-key".padEnd(KEY.length + 2, "x");
 const NOW = Date.UTC(2026, 9, 1, 6, 0, 0);
 
 /** Two recipients, as in Zoho's preview — only one of them is the event's. */
@@ -125,7 +127,7 @@ describe("zeptomailKeyMatches — the X-Webhook-Key header", () => {
   });
 
   it("refuses another value, a prefix, no header, and an empty configured key", () => {
-    expect(zeptomailKeyMatches("wrong-key-0123456789abcdefgh", KEY)).toBe(false);
+    expect(zeptomailKeyMatches(WRONG, KEY)).toBe(false);
     expect(zeptomailKeyMatches(KEY.slice(0, -1), KEY)).toBe(false);
     expect(zeptomailKeyMatches(null, KEY)).toBe(false);
     expect(zeptomailKeyMatches("", "")).toBe(false);
@@ -252,7 +254,7 @@ describe("handleZeptomailWebhook — one POST, start to finish", () => {
 
   it("answers 403 to a wrong key, or no proof at all, without touching anything", async () => {
     for (const headers of [
-      { key: "wrong-key-0123456789abcdefgh", signature: null },
+      { key: WRONG, signature: null },
       { key: null, signature: null },
     ]) {
       const d = deps();
