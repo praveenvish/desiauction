@@ -107,6 +107,15 @@ export default defineConfig({
   use: {
     // localhost (not 127.0.0.1): WebAuthn rpID must suffix-match the host.
     baseURL: "http://localhost:3050",
+    // The precompiled server is a production build, and production registers
+    // a service worker (public/sw.js). It is ALLOWED, so every spec runs the
+    // product the way a phone does, worker included. That is safe for mocks
+    // because the worker answers only two things, navigations and
+    // /_next/static files; a `page.route` on anything else (router fetches,
+    // the API, other origins) still sees its request. A spec that must mock a
+    // NAVIGATION or a build file has to block the worker for itself:
+    //   test.use({ serviceWorkers: "block" });
+    serviceWorkers: "allow",
   },
   /*
    * TWO ENGINES, AND UNTIL NOW THERE WERE NONE DECLARED AT ALL.

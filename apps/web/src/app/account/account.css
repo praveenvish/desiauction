@@ -454,6 +454,86 @@ a.acct-check-row:hover {
   font-weight: var(--font-weight-semibold);
 }
 
+/* Install the app (components/pwa/install-app-panel.tsx): the real home-screen
+   icon, what it gives, and either the browser's Install button or, on an
+   iPhone, the two taps drawn with the symbols iOS shows. */
+.acct-install {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-lg);
+}
+
+.acct-install[data-offer="prompt"] {
+  align-items: center;
+}
+
+.acct-install-icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  /* iOS draws home-screen icons as a squircle at ~22% of their size. */
+  border-radius: 22%;
+  box-shadow: 0 0 0 1px var(--border-subtle);
+}
+
+.acct-install-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.acct-install-action {
+  flex: none;
+}
+
+.acct-install-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-primary);
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-line);
+}
+
+.acct-install-steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.acct-install-step {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: var(--text-xs-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.acct-install-glyph {
+  display: inline-block;
+  margin: 0 1px;
+  color: var(--text-accent);
+  vertical-align: -3px;
+}
+
+.acct-install-steps strong {
+  font-weight: var(--font-weight-semibold);
+}
+
 /* The shared switch rows (base.css), drawn here as real switches: a hairline
    list, the label on the left, the track on the right. Still a checkbox to
    every assistive technology — only its paint changes. */

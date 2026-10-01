@@ -46,6 +46,7 @@ import { LEGAL_IDENTITY } from "../../content/company";
 import { UNREAD_CAP } from "../../lib/inbox-cap";
 import { NewsletterForm } from "../../components/marketing/newsletter-form";
 import { personContact, personLabel } from "../../lib/person-label";
+import { promptInstall, useInstallOffer } from "../../lib/pwa";
 import { track } from "../../lib/telemetry";
 import { BrandMark, BrandWordmark } from "./brand";
 import { SocialLinks } from "./social-links";
@@ -321,6 +322,22 @@ export function ProductShell({
 }: ProductShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  /*
+   * "Install app", offered only where it can happen: the browser's own dialog
+   * where one is ready, the Share → Add to Home Screen steps on an iPhone, and
+   * nothing once installed or in a browser that cannot install.
+   */
+  const appInstallOffer = useInstallOffer();
+  const openInstall = (from: "menu" | "drawer") => {
+    if (appInstallOffer === "prompt") {
+      void promptInstall().then((outcome) => {
+        track("app.install_prompted", { outcome, from });
+      });
+      return;
+    }
+    track("app.install_steps_opened", { from });
+    router.push("/account?section=notifications");
+  };
   // The drawer remembers WHERE it was opened, so it is open only on that page:
   // navigating anywhere closes it in the same render, with no effect needed to
   // notice the route changed.
@@ -1104,6 +1121,17 @@ export function ProductShell({
                         router.push("/help");
                       },
                     },
+                    ...(appInstallOffer === "none"
+                      ? []
+                      : [
+                          {
+                            key: "install-app",
+                            label: "Install app",
+                            onSelect: () => {
+                              openInstall("menu");
+                            },
+                          },
+                        ]),
                     {
                       key: "report-problem",
                       label: "Report a problem",
@@ -1200,6 +1228,21 @@ export function ProductShell({
               <li className="shell-narrow-only">
                 <ThemeToggle variant="row" />
               </li>
+              {appInstallOffer === "none" ? null : (
+                <li>
+                  <button
+                    type="button"
+                    className="shell-drawer-link"
+                    data-testid="drawer-install-app"
+                    onClick={() => {
+                      setDrawerOpenOn(null);
+                      openInstall("drawer");
+                    }}
+                  >
+                    Install app
+                  </button>
+                </li>
+              )}
               <li>
                 <button
                   type="button"

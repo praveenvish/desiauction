@@ -12,14 +12,17 @@ import { unstable_rethrow } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { env } from "../env";
+import { splashImages } from "../lib/apple-splash";
+import { INSTALL_BOOTSTRAP } from "../lib/pwa-bootstrap";
 import { ReportProblemProvider } from "../components/report-problem/report-problem";
 import { AppLinkProvider } from "../components/shell/app-link-provider";
 import { NavigationProgress } from "../components/shell/navigation-progress";
 import { ActionFailureNotice } from "../components/action-failure-notice";
+import { AppInstall } from "../components/pwa/app-install";
 import { ClientErrorListener } from "../components/client-error-listener";
 import { WebVitalsReporter } from "../components/web-vitals-reporter";
 import { ProductShell } from "../components/shell/product-shell";
-import { THEME_BOOTSTRAP } from "../components/shell/theme-toggle";
+import { THEME_BOOTSTRAP } from "../components/shell/theme-bootstrap";
 import { platformDoorCapabilities } from "../server/admin/actions";
 import { currentSession, logoutAction } from "../server/auth/actions";
 import { inboxState } from "../server/auth/security-events";
@@ -58,6 +61,18 @@ export const metadata: Metadata = {
   // still decided by the route registry's header, and a page that states its
   // own `robots` (a squad page, a noindex page) replaces this whole object.
   robots: { "max-image-preview": "large" },
+  // The installed app on an iPhone (Share → Add to Home Screen). iOS reads
+  // these tags, not the manifest's display mode: without `capable` it opens
+  // the site in a Safari frame. The status bar stays "default" (solid, above
+  // the page), because "black-translucent" would draw it over every header.
+  // `startupImage`: the launch screen, one per screen and orientation
+  // (lib/apple-splash.ts); without a match iOS flashes white.
+  appleWebApp: {
+    capable: true,
+    title: "DesiAuction",
+    statusBarStyle: "default",
+    startupImage: splashImages().map(({ url, media }) => ({ url, media })),
+  },
 };
 
 // Console default is Daylight; live surfaces pin floodlight per C-4 (doc 18).
@@ -280,8 +295,9 @@ export default async function RootLayout({
     // before React hydrates, which is a deliberate server/client difference.
     <html lang="en" data-theme="daylight" suppressHydrationWarning>
       <body>
-        {/* Replay the remembered console theme before first paint (no flash).
-            The one inline script the app writes itself, so it carries the
+        {/* Replay the remembered console theme before first paint (no flash),
+            and catch the browser's install event before hydration
+            (lib/pwa-bootstrap.ts). The one inline script the app writes itself, so it carries the
             request's nonce like every script Next emits (middleware.ts).
             `suppressHydrationWarning`: browsers HIDE a nonce once the
             element is parsed (the attribute reads back as ""), so exfiltrating
@@ -292,7 +308,7 @@ export default async function RootLayout({
         <script
           nonce={nonce}
           suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP + INSTALL_BOOTSTRAP }}
         />
         {/* Every shell, every route: a click is answered before the network is. */}
         <NavigationProgress />
@@ -302,6 +318,8 @@ export default async function RootLayout({
         <WebVitalsReporter />
         {/* …and said to the person, when what they asked for never came back. */}
         <ActionFailureNotice />
+        {/* …and installs as an app, and says so when it is offline (sw.js). */}
+        <AppInstall register={env.NODE_ENV === "production"} />
         <AppLinkProvider>
           <ReportProblemProvider signedIn={session !== null} defaultEmail={session?.email ?? null}>
             <ProductShell

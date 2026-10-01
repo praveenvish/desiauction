@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { THEME_STORAGE_KEY } from "./theme-toggle";
+import { THEME_STORAGE_KEY } from "./theme-bootstrap";
 
 /**
  * RE-APPLY THE REMEMBERED THEME WHERE THE ROOT LAYOUT CANNOT.

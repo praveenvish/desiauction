@@ -57,7 +57,12 @@ export type ProductEventName =
   | "share.native_opened"
   | "share.video_made"
   | "share.video_shared"
-  | "share.video_saved";
+  | "share.video_saved"
+  // The installed app. `outcome` is the browser's answer to its own dialog;
+  // `from` names the door (avatar menu, account). Whether the offer is worth
+  // a menu slot is answered by these and nothing else.
+  | "app.install_prompted"
+  | "app.install_steps_opened";
 
 export type TelemetryProps = Record<string, string | number | boolean>;
 

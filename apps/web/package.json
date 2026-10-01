@@ -18,6 +18,7 @@
     "rls:verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/verify-rls.ts",
     "grants:verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/verify-grants.ts",
     "db:restore-verify": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/restore-verify.ts",
+    "splash": "node node_modules/tsx/dist/cli.mjs scripts/generate-splash.ts",
     "seed:demo": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/seed-demo.ts",
     "mail:deliverability": "node --env-file-if-exists=../../.env.local node_modules/tsx/dist/cli.mjs scripts/mail-deliverability.ts",
     "push:keys": "node node_modules/tsx/dist/cli.mjs scripts/push-keys.ts",
