@@ -20,6 +20,40 @@ Re-render after any copy edit: `mise exec -- node docs/brand/social-launch/rende
 
 ---
 
+## Live status (2026-10-01, evening)
+
+**Instagram `@desiauction`:** photo, name and bio are set. The first three
+text-card posts were deleted (recoverable in Recently deleted until 2026-10-31)
+and replaced by:
+
+- **Reel 01** `reels/reel-01-pov-bidding-war.mp4`: real footage of the site's
+  interactive demo, SOLD frame as the cover.
+- **Carousel 01** `instagram/carousel-01/`: "Every local auction has these 5 people."
+
+Bio now: "Your league. Your auction. Prime-time energy ⚡ / Owners bid live from
+their phones 📱 / Cricket + 11 more sports · Free in beta / 👇 desiauction.in"
+
+**LinkedIn "The DesiAuction":** headline, About and location (Jaipur) set; 20
+connection requests sent to event and operations professionals. The company
+page is still blocked ("not enough connections"). The profile photo was left
+blank on purpose: LinkedIn requires a real photo of the member on personal
+profiles, and a logo there risks the restriction that would block the page.
+
+**Still to do by hand (phone app or a click the browser can't make):**
+upload `linkedin/profile-banner-1584x396.png` as the LinkedIn cover; add the
+bio links and switch Instagram to a Business account in the app; sign in to
+Threads with "Continue with Instagram" and post the two Threads drafts below.
+
+### Threads drafts
+
+1. Every local league has an auction night. Most run it on a spreadsheet, a mic
+   and fourteen WhatsApp groups. We built DesiAuction so owners bid from their
+   phones and the whole hall watches the big screen. Free in beta → desiauction.in
+2. If you've ever run a local auction: what's the wildest argument you've seen
+   on auction night? 👇
+
+---
+
 ## Instagram — `@desiauction`
 
 | Field | Value |
@@ -42,7 +76,7 @@ Free in beta ↓
 2. `https://desiauction.in/help/auction-night?utm_source=instagram&utm_medium=bio&utm_campaign=always_on`
 3. `https://desiauction.in/pricing?utm_source=instagram&utm_medium=bio&utm_campaign=always_on`
 
-### Launch row: three posts, published in this order
+### First launch row (retired 2026-10-01, kept for the record)
 
 Instagram shows the newest post first, so the profile's top row reads
 **03 · 02 · 01** from left to right: the promise, the proof, the problem. Pin all
