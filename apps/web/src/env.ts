@@ -272,9 +272,11 @@ const envSchema = z.object({
   /** Another data centre's `.../v1.1/email`. Unset: India (cpaas.zoho.in). */
   ZEPTOMAIL_ENDPOINT: z.url().optional(),
   /**
-   * The Mail Agent webhook's authentication key — what signs each bounce and
-   * complaint event (`producer-signature`). Unset CLOSES
-   * /api/webhooks/zeptomail (404), the sibling webhooks' rule.
+   * The Mail Agent webhook's key. A secret WE generate (`openssl rand -hex 32`)
+   * and enter in Zoho CPaaS's webhook form as an authorization header
+   * (`X-DesiAuction-Webhook-Key`); a call proved by it — or by a
+   * `producer-signature` HMAC keyed with it — may suppress and report. Unset
+   * CLOSES /api/webhooks/zeptomail (404), the sibling webhooks' rule.
    */
   ZEPTOMAIL_WEBHOOK_KEY: z.string().min(16).optional(),
   /**

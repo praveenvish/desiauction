@@ -558,7 +558,7 @@ if (webMailer === "zeptomail") {
     "EMAIL_ZEPTOMAIL_WEBHOOK",
     Boolean(env.ZEPTOMAIL_WEBHOOK_KEY),
     "ZeptoMail bounce and complaint events reach the suppression list",
-    "set ZEPTOMAIL_WEBHOOK_KEY to the Mail Agent webhook's authentication key",
+    "generate a key (openssl rand -hex 32), set it as ZEPTOMAIL_WEBHOOK_KEY in web.env, and enter the same value in the Mail Agent webhook as header X-DesiAuction-Webhook-Key (docs/EMAIL_INFRASTRUCTURE.md)",
   );
 }
 

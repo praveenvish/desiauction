@@ -359,14 +359,28 @@ exists — a retry after a lost response can send twice, as with SES.
    do not touch the SES, Resend or Zoho Mail records.
 3. Submit the account review (transactional use case — reuse the SES text).
 4. Create a Mail Agent → copy its **Send Mail token** → `ZEPTOMAIL_API_KEY`.
-5. Mail Agent → Webhooks: URL `https://desiauction.in/api/webhooks/zeptomail`,
-   events **hard bounce, soft bounce, feedback loop**, set an authentication
-   key → `ZEPTOMAIL_WEBHOOK_KEY`.
+5. Generate the webhook key, `openssl rand -hex 32`, and put it on the host
+   **first**: `sudo set-secret production ZEPTOMAIL_WEBHOOK_KEY web.env`, then
+   restart web. (Unset, the endpoint answers 404 and Zoho's "Verify" fails;
+   the production preflight also refuses a deploy without it once
+   `EMAIL_PROVIDER=zeptomail`.)
+6. Mail Agent → Webhooks → Configure Webhook: URL
+   `https://desiauction.in/api/webhooks/zeptomail`, **Authorization headers**
+   name `X-DesiAuction-Webhook-Key`, value the key from step 5; events
+   **Hard bounces** and **Feedback loop** (soft bounces are ignored anyway).
+   Verify, then Add. The Zoho CPaaS form has no "authentication key" field of
+   its own — the header IS the proof.
 
-**Webhook:** `apps/web/src/server/messaging/zeptomail-webhook.ts`. Each POST is
-proved by `producer-signature: ts=…;s=<base64>;s-algorithm=HmacSHA256` —
-HMAC-SHA256 over the event, keyed with the webhook key; signatures older than
-24 h are refused. A hard bounce or a feedback-loop complaint suppresses the
+**Webhook:** `apps/web/src/server/messaging/zeptomail-webhook.ts`. A POST is
+proved by the `X-DesiAuction-Webhook-Key` header (or `Authorization: <key>` /
+`Bearer <key>`), compared in constant time, or by a
+`producer-signature: ts=…;s=<base64>;s-algorithm=HmacSHA256` HMAC keyed with
+the same key (signatures older than 24 h are refused). **Every call is answered
+200** except our own database failing (503, so Zoho retries): Zoho requires
+200 from its Verify call and from every event, so an unproved call is 200
+"ignored" — it suppresses and reports nothing — and logged at WARN as
+`zeptomail_webhook.unproved` (a real event there means the key in Zoho and in
+web.env disagree). A hard bounce or a feedback-loop complaint suppresses the
 address (`suppressEmailAddress`) and, when `client_reference` is present,
 reports it against the dispatch; soft bounces, opens and clicks are ignored.
 
