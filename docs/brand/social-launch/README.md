@@ -54,6 +54,33 @@ Threads with "Continue with Instagram" and post the two Threads drafts below.
 
 ---
 
+## Profile standard (2026-10-02) — every network follows this
+
+| Element | Standard |
+|---|---|
+| Display name | `DesiAuction` (Instagram's searchable name field: `DesiAuction · Player Auctions`) |
+| Photo | `docs/brand/kit/social/avatar-1080.png` — gold DA tile |
+| Cover | `build-covers.cjs`: the lit pitch — full lockup in one floodlight, `desiauction.in` under it. Same scene cut to each platform's safe area |
+| Core line | "Live player auctions for your league. Owners bid on their phones, the hall watches the big screen. 12 sports · Free in beta" |
+| Location | Jaipur, India |
+| Link | `desiauction.in` with `utm_source=<network>&utm_medium=bio&utm_campaign=always_on` |
+| Hero content | The product film "Registration se SOLD tak" — pinned / featured / trailer on every network |
+
+| Network | Handle | Cover | Bio = core line | Link | Hero pinned |
+|---|---|---|---|---|---|
+| Instagram | @desiauction | n/a | yes | **app only** | **pin in app** |
+| Threads | @desiauction | n/a | yes | yes | latest post |
+| YouTube | @DesiAuction | yes + DA watermark | description | site, IG, Threads, X | channel trailer; playlist "How DesiAuction Works" |
+| X | @thedesiauction | yes | yes | yes | pinned |
+| LinkedIn | The DesiAuction (personal) | yes | headline + About | Featured post | Featured |
+| Facebook | `thedesiauction` (free) | ready | — | — | — |
+
+**Needs the founder's phone:** Instagram bio link + Business account + pin the film
+Reel + story highlights; YouTube phone verification (unlocks clickable links in
+descriptions and Shorts → related video).
+
+---
+
 ## Product film rollout (2026-10-02)
 
 Source: the founder's 100 s Hinglish film "Registration se SOLD tak" (1920x1080,
