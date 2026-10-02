@@ -54,6 +54,44 @@ Threads with "Continue with Instagram" and post the two Threads drafts below.
 
 ---
 
+## Search: making "DesiAuction" return our site and every profile (2026-10-02)
+
+Goal: a search for **DesiAuction** shows desiauction.in first, then our
+profiles, then a Google knowledge panel. Google builds that from one *entity*,
+and it only trusts an entity whose name, logo, description and links agree
+everywhere.
+
+**Done**
+- One name (`DesiAuction`), one logo, one core line and one link on all six networks.
+- Every profile links to desiauction.in; the site footer links back to every
+  profile with `rel="me"` (two-way proof of ownership).
+- Homepage `Organization` JSON-LD lists the company's own profiles as `sameAs`
+  (`ORGANIZATION_PROFILES` in `apps/web/src/content/social.ts`); the personal
+  LinkedIn is linked but never claimed.
+- YouTube: country India, channel keywords, description, links, trailer, playlist.
+
+**After this branch deploys (week 1)**
+1. Google Search Console: request indexing for `/`; check the Rich Results test
+   shows the Organization with all five `sameAs`.
+2. Bing Webmaster Tools: import from Search Console, submit the sitemap.
+3. Search "DesiAuction" in a private window; note what ranks (baseline).
+
+**Weeks 2–6 — give Google more agreeing sources**
+4. LinkedIn company page as soon as the profile can create one; add it to
+   `SOCIAL_ACCOUNTS` (organization: true).
+5. Directory listings from `docs/seo/OUTREACH-KIT.md` (Crunchbase, Product Hunt,
+   G2, Capterra): same name, logo, description, links to the site and profiles.
+6. Post on a steady rhythm (3 a week): profiles rank for the brand name
+   faster when they are active. YouTube titles carry the searched phrase
+   ("cricket auction app", "player auction").
+7. Google Business Profile only if there is a real address to show; we are an
+   online service, so skip until then.
+
+**Do not**: use "IPL" in names, keywords or tags (trademark — the site avoids it
+on purpose), or buy followers (it poisons the entity signals above).
+
+---
+
 ## Profile standard (2026-10-02) — every network follows this
 
 | Element | Standard |
@@ -73,7 +111,7 @@ Threads with "Continue with Instagram" and post the two Threads drafts below.
 | YouTube | @DesiAuction | yes + DA watermark | description | site, IG, Threads, X | channel trailer; playlist "How DesiAuction Works" |
 | X | @thedesiauction | yes | yes | yes | pinned |
 | LinkedIn | The DesiAuction (personal) | yes | headline + About | Featured post | Featured |
-| Facebook | facebook.com/thedesiauction (in portfolio "DesiAuction" with Instagram) | yes (logo kept clear of the centred profile photo) | yes | website + Sign up button | film as Reel; same 4 stories |
+| Facebook | thedesiauction (in portfolio "DesiAuction" with Instagram) | yes (logo kept clear of the centred profile photo) | yes | website + Sign up button | film as Reel; same 4 stories |
 
 **Needs the founder's phone:** Instagram bio link + pin the film Reel + turn the
 4 live stories into highlights (START, AUCTION, PRICING, ASK, with the covers in
