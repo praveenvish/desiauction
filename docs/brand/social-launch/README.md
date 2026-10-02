@@ -54,6 +54,27 @@ Threads with "Continue with Instagram" and post the two Threads drafts below.
 
 ---
 
+## Product film rollout (2026-10-02)
+
+Source: the founder's 100 s Hinglish film "Registration se SOLD tak" (1920x1080,
+received via WhatsApp; not in git, no LFS here). `reels/build-film-vertical.cjs`
+makes the 9:16 cut. Uploads go through a 10 MB browser bridge, so both cuts are
+re-encoded HEVC 640 kbps two-pass (SSIM 0.994 against the source).
+
+| Network | Version | Status |
+|---|---|---|
+| YouTube | 16:9, chapters, channel trailer | live — https://youtu.be/eCisXjuCnVU |
+| YouTube | Reel 01 as a Short | live — https://youtube.com/shorts/FYR-Z2OH-Bs |
+| Instagram | 9:16 Reel | live |
+| LinkedIn | 16:9, custom thumbnail | live |
+| Threads | 9:16 | waiting: Threads is not logged in in the automation Chrome profile |
+| X, Facebook | — | waiting: confirm whether `@thedesiauction` on X is ours |
+
+The 2.5 s logo strike (`docs/brand/kit/motion/da-strike-lockup-1920x1080.mp4`)
+is the intro for future YouTube videos, not a post.
+
+---
+
 ## Instagram — `@desiauction`
 
 | Field | Value |
