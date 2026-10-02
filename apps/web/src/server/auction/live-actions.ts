@@ -798,3 +798,26 @@ export async function submitAuctionCommand(
       : await send();
   return ack;
 }
+
+export interface PracticeRoomState {
+  /** The practice running now, or null. */
+  practiceId: string | null;
+  /** The real auction has left `scheduled` — the night has begun. */
+  realStarted: boolean;
+}
+
+/**
+ * What the room's practice bar polls (0101): is a practice running, and has
+ * the night begun? Cheap by design — two indexed reads — so every phone in
+ * the room can ask every few seconds while the real auction waits to start.
+ */
+export async function practiceRoomStateAction(slug: string): Promise<PracticeRoomState | null> {
+  const gate = await liveGate(slug, { room: true });
+  if (gate === null) {
+    return null;
+  }
+  return {
+    practiceId: gate.practice?.practiceId ?? null,
+    realStarted: gate.practice === null && gate.auction.status !== "scheduled",
+  };
+}

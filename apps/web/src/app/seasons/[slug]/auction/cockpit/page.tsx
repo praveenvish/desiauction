@@ -1,7 +1,9 @@
 import { ButtonLink, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
+import { MoneyUnitProvider } from "../../../../../components/money-unit";
 import { cockpitView } from "../../../../../server/auction/conduct-actions";
+import { PracticeBar } from "../practice-bar";
 import { CockpitPanel } from "./cockpit-panel";
 import "../../../seasons.css";
 import "../auction.css";
@@ -20,7 +22,9 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
   }
   const status = view.view.auction.status;
   const finished = status === "completed" || status === "reconciled" || status === "abandoned";
-  return (
+  // A practice (0101) counts in points, and its records are not the night's.
+  const inPractice = view.practice?.inPractice === true;
+  const room = (
     // `cockpit-room` scopes the toast placement (desk.css): on a phone the gavel
     // bar is pinned to the foot, and notices rise above it.
     <div className="cockpit-room">
@@ -32,10 +36,21 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
               title stays (it is the page's heading); the doors move to the foot,
               where leaving belongs on the surface you leave last. */}
             <h1 className="auction-sr-only">{view.auctionName} — cockpit</h1>
+            <PracticeBar
+              slug={slug}
+              practice={view.practice}
+              watch={view.practice !== null || status === "scheduled"}
+            />
             <CockpitPanel slug={slug} view={view} />
             {/* After the night the closing card carries every door (the auction
                 page, ledger, replay, recap); the row below is the live room's. */}
-            {finished ? null : (
+            {finished ? null : inPractice ? (
+              <nav className="live-exits" aria-label="Other views">
+                <ButtonLink href={`/seasons/${slug}/auction`} variant="secondary">
+                  Practice settings
+                </ButtonLink>
+              </nav>
+            ) : (
               <nav className="live-exits" aria-label="Auction records and other views">
                 <span className="live-exits-label" aria-hidden>
                   Records &amp; other views
@@ -62,4 +77,5 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
       </ToastProvider>
     </div>
   );
+  return inPractice ? <MoneyUnitProvider unit="points">{room}</MoneyUnitProvider> : room;
 }

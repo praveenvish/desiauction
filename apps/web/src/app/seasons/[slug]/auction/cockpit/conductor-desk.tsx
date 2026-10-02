@@ -100,6 +100,7 @@ export function ConductorDesk({
   undoable,
   gavelRef,
   controls,
+  practice = false,
 }: {
   roles: readonly { key: string; label: string }[];
   snapshot: AuctionSnapshot | null;
@@ -119,6 +120,12 @@ export function ConductorDesk({
   undoable: boolean;
   gavelRef: Ref<GavelHandle>;
   controls: DeskControls;
+  /**
+   * A practice auction (0101) ends by "End practice", never by completing —
+   * completing is what sends the results. `controls.complete` is wired to the
+   * ending by the panel; this only says so in the words.
+   */
+  practice?: boolean;
 }) {
   const money = useMoney();
   const unit = useMoneyUnit();
@@ -135,10 +142,17 @@ export function ConductorDesk({
   // price row that names it in full.
   const shortOf = (teamName: string) =>
     teams.find((team) => team.name === teamName)?.shortName ?? teamName.split(" ")[0] ?? teamName;
-  const words = deskActionWords(action, {
-    amount: (value) => cardAmount(unit, value),
-    teamLabel: shortOf,
-  });
+  const words =
+    practice && action.kind === "complete"
+      ? {
+          label: "End practice",
+          shortLabel: "End practice",
+          why: "Every practice player has been called. End it, or run it again from the auction page.",
+        }
+      : deskActionWords(action, {
+          amount: (value) => cardAmount(unit, value),
+          teamLabel: shortOf,
+        });
   const claimed = (snapshot?.paddles ?? []).filter((paddle) => !paddle.released);
   // The clock runs against the window the lot is actually on: an extended lot
   // restarts on the anti-snipe clock, not the opening one.
@@ -331,9 +345,11 @@ export function ConductorDesk({
                 },
                 {
                   key: "complete",
-                  group: "Close the night",
-                  label: "Complete auction",
-                  detail: "Asks first. Cannot be undone",
+                  group: practice ? "Finish the practice" : "Close the night",
+                  label: practice ? "End practice" : "Complete auction",
+                  detail: practice
+                    ? "Everyone goes back to the real auction's waiting room"
+                    : "Asks first. Cannot be undone",
                   testId: "cockpit-complete",
                   onSelect: controls.complete,
                   disabled: stale,

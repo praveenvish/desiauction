@@ -12,11 +12,13 @@ import { notFound } from "next/navigation";
 import { PageTitle } from "../../../../components/shell/page-title";
 import { auctionDashboard } from "../../../../server/auction/actions";
 import { auctioneerPanelView } from "../../../../server/auction/auctioneer-actions";
+import { practiceCardView } from "../../../../server/auction/practice-actions";
 import { appointmentsPanelView } from "../../../../server/competition/appointment-actions";
 import { requireOnboarded } from "../../../../server/auth/onboarding-gate";
 import { standingsView } from "../../../../server/competition/fixture-actions";
 import { AuctionPanel } from "./auction-panel";
 import { AuctioneerPanel } from "./auctioneer-panel";
+import { PracticeCard } from "./practice-card";
 import "../../seasons.css";
 // The hub renders <BroadcastLinks>, and every rule that dresses it —
 // `.broadcast-row`, `.share-auction-button`, `.broadcast-url` — lives in
@@ -61,7 +63,7 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   // See /seasons: `auction/spectate` next door is public, so no gate layout.
   await requireOnboarded();
-  const [dashboard, auctioneers, appointments, table] = await Promise.all([
+  const [dashboard, auctioneers, appointments, table, practice] = await Promise.all([
     auctionDashboard(slug),
     auctioneerPanelView(slug),
     // Captains & icons still to be told — null unless this viewer may set them.
@@ -69,6 +71,8 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
     // How the squads are doing since the night (census 18) — the same read as
     // the Table tab, so the two cannot disagree.
     standingsView(slug),
+    // The practice auction (0101) — the season's managers only, before the night.
+    practiceCardView(slug),
   ]);
   if (dashboard === null) {
     notFound();
@@ -156,6 +160,9 @@ export default async function AuctionPage({ params }: { params: Promise<{ slug: 
                 </span>
               </div>
             </header>
+          ) : null}
+          {practice !== null && status === "scheduled" ? (
+            <PracticeCard slug={slug} card={practice} />
           ) : null}
           <AuctionPanel
             slug={slug}
