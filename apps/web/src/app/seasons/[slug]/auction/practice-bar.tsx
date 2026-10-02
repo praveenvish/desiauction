@@ -47,6 +47,10 @@ export function PracticeBar({
     }
     let stopped = false;
     const tick = async () => {
+      // A phone in a pocket asks nothing; it catches up the moment it is looked at.
+      if (document.visibilityState !== "visible") {
+        return;
+      }
       let state;
       try {
         state = await practiceRoomStateAction(slug);
@@ -71,9 +75,16 @@ export function PracticeBar({
       router.refresh();
     };
     const timer = window.setInterval(() => void tick(), POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void tick();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       stopped = true;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [watch, slug, shown, inPractice, router, toast]);
 

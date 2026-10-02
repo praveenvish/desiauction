@@ -105,9 +105,14 @@ export interface PracticeRoom {
  */
 const ROOM_COOKIE_PREFIX = "da-room-";
 
-async function roomPreference(competitionId: string): Promise<"practice" | "real"> {
+/**
+ * The practice this person stepped out of, if any. The choice names the
+ * practice, so a NEW practice (Run again, or tomorrow's) brings everyone back
+ * in rather than leaving someone in the waiting room by an old click.
+ */
+async function steppedOutOf(competitionId: string): Promise<string | null> {
   const value = (await cookies()).get(`${ROOM_COOKIE_PREFIX}${competitionId}`)?.value;
-  return value === "real" ? "real" : "practice";
+  return value?.startsWith("real:") === true ? value.slice("real:".length) : null;
 }
 
 export async function chooseRoomAction(slug: string, room: "practice" | "real"): Promise<void> {
@@ -117,8 +122,8 @@ export async function chooseRoomAction(slug: string, room: "practice" | "real"):
   }
   const store = await cookies();
   const name = `${ROOM_COOKIE_PREFIX}${gate.competition.id}`;
-  if (room === "real") {
-    store.set(name, "real", {
+  if (room === "real" && gate.practice !== null) {
+    store.set(name, `real:${gate.practice.practiceId}`, {
       path: "/",
       httpOnly: true,
       sameSite: "lax",
@@ -251,7 +256,7 @@ export async function auctionMemberGate(
   if (competition === null) {
     return null;
   }
-  const prefer = options.room === true ? await roomPreference(competition.id) : "real";
+  const outOf = options.room === true ? await steppedOutOf(competition.id) : null;
   return withTenantDb(
     dbHandle,
     { personId: session.personId, orgId: competition.orgId },
@@ -259,9 +264,14 @@ export async function auctionMemberGate(
       // THE ROOM resolves the practice while one runs (0101); every other
       // caller of this gate — setup, owner links, plans, the ledger — means the
       // real auction, always.
+      const room = options.room === true ? await roomAuctionOf(db, competition.id) : null;
       const resolved =
         options.room === true
-          ? await roomAuctionOf(db, competition.id, prefer)
+          ? room === null
+            ? null
+            : room.practice !== null && room.practice.id === outOf
+              ? { ...room, auction: room.real }
+              : room
           : await auctionOf(db, competition.id).then((real) =>
               real === null ? null : { auction: real, real, practice: null },
             );
@@ -812,12 +822,30 @@ export interface PracticeRoomState {
  * the room can ask every few seconds while the real auction waits to start.
  */
 export async function practiceRoomStateAction(slug: string): Promise<PracticeRoomState | null> {
-  const gate = await liveGate(slug, { room: true });
-  if (gate === null) {
+  // NOT the room gate: that one checks capabilities, reads the person's teams
+  // and may add an owner to the practice — fine once per page, wasteful every
+  // five seconds from every phone. Club membership is enough to learn whether
+  // a rehearsal is running; everything else is asked again by the refresh.
+  const session = await currentSession();
+  if (session === null) {
     return null;
   }
-  return {
-    practiceId: gate.practice?.practiceId ?? null,
-    realStarted: gate.practice === null && gate.auction.status !== "scheduled",
-  };
+  const competition = await resolveMemberCompetition(session.personId, slug);
+  if (competition === null) {
+    return null;
+  }
+  return withTenantDb(
+    dbHandle,
+    { personId: session.personId, orgId: competition.orgId },
+    async (db) => {
+      const room = await roomAuctionOf(db, competition.id);
+      if (room === null) {
+        return null;
+      }
+      return {
+        practiceId: room.practice?.id ?? null,
+        realStarted: room.real.status !== "scheduled",
+      };
+    },
+  );
 }

@@ -278,6 +278,12 @@ function isUniqueViolation(error: unknown, constraint: string): boolean {
   if (typeof error !== "object" || error === null) {
     return false;
   }
+  // The driver's error arrives wrapped ("Failed query: …") with the Postgres
+  // error as its `cause`; look there too.
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause !== undefined && cause !== error && isUniqueViolation(cause, constraint)) {
+    return true;
+  }
   const record = error as { code?: unknown; constraint_name?: unknown; message?: unknown };
   if (record.code !== "23505") {
     return false;
@@ -2282,7 +2288,7 @@ const PRACTICE_PLAYER_STATUSES = ["approved", "submitted"] as const;
  *
  * - the auction row (`kind = 'practice'`, the practice rules in `config`);
  * - `lotCount` sample lots, drawn from the season's own players (approved
- *   first, then by registration number) and queued straight away — the real
+ *   pool players first, then by registration number) and queued straight away — the real
  *   auction draws and queues its pool at setup, the practice has no setup;
  * - every ACTIVE paddle grant of the real auction, so each owner who has
  *   joined is in the practice with nothing to accept;
@@ -2307,6 +2313,20 @@ export async function createPracticeAuction(
   if (real.status !== "scheduled") {
     return { ok: false, reason: "real_not_scheduled" };
   }
+  const [running] = await db
+    .select({ id: auctions.id })
+    .from(auctions)
+    .where(
+      and(
+        eq(auctions.competitionId, real.competitionId),
+        eq(auctions.kind, "practice"),
+        sql`${auctions.status} <> 'abandoned'`,
+      ),
+    )
+    .limit(1);
+  if (running !== undefined) {
+    return { ok: false, reason: "exists" };
+  }
   const seasonTeams = await db
     .select({ id: teams.id })
     .from(teams)
@@ -2326,6 +2346,9 @@ export async function createPracticeAuction(
     )
     .orderBy(
       sql`case when ${registrations.status} = 'approved' then 0 else 1 end`,
+      // Players who will actually go under the hammer first: an icon, captain
+      // or retained player is drawn only when the pool runs short.
+      sql`case when ${preSignedSql} then 1 else 0 end`,
       asc(registrations.registrationNumber),
       asc(registrations.id),
     )
@@ -2368,10 +2391,16 @@ export async function createPracticeAuction(
     granted.add(row.personId);
     grants.push({ teamId: row.teamId, personId: row.personId });
   }
-  const held = new Set(heldPaddles.map((paddle) => paddle.teamId));
   const owned = new Set(grants.map((grant) => grant.teamId));
+  const ownerOf = new Set(grants.map((grant) => `${grant.teamId}:${grant.personId}`));
+  // A team with an owner is left for that owner to pick up, even if someone
+  // else holds its paddle tonight: in a practice the owner is the point.
+  const copied = heldPaddles.filter(
+    (paddle) => !owned.has(paddle.teamId) || ownerOf.has(`${paddle.teamId}:${paddle.personId}`),
+  );
+  const held = new Set(copied.map((paddle) => paddle.teamId));
   const roomPaddles = [
-    ...heldPaddles,
+    ...copied,
     // A team with an owner who has not picked up their paddle yet is left for
     // them: picking it up is part of what the practice teaches.
     ...seasonTeams

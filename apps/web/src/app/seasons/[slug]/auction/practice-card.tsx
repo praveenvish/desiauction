@@ -27,9 +27,8 @@ import {
 } from "../../../../server/auction/practice-actions";
 
 const STATE_WORDS: Record<PracticeTeamState, { label: string; tone: KitTone }> = {
-  ready: { label: "In the room", tone: "green" },
-  joined: { label: "Opened the link", tone: "blue" },
-  waiting: { label: "Not here yet", tone: "amber" },
+  ready: { label: "Ready to bid", tone: "green" },
+  waiting: { label: "Not bidding yet", tone: "amber" },
   organiser: { label: "You bid for this team", tone: "neutral" },
 };
 
@@ -149,7 +148,7 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
           </p>
           {withOwners > 0 ? (
             <p className="competitions-hint" data-testid="practice-joined">
-              {joined} of {withOwners} owners in the room.
+              {joined} of {withOwners} owners ready to bid. Owners pick up their paddle in the room, as on the night.
             </p>
           ) : null}
           <ul className="practice-teams" data-testid="practice-teams">

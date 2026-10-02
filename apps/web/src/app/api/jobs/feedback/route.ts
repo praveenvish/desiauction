@@ -7,6 +7,7 @@ import { sweepRegistrationDigests } from "../../../../server/competition/registr
 import { logger, withRequestId } from "../../../../server/logger";
 import { scheduledTemplateSync } from "../../../../server/messaging/provider-template-writer";
 import { sweepReviewAsks } from "../../../../server/reviews/review-sweep";
+import { endStalePractices } from "../../../../server/auction/practice-engine";
 import {
   purgeExpiredProblemReports,
   purgeSpentSecurityRecords,
@@ -63,7 +64,13 @@ async function handle(request: Request): Promise<NextResponse> {
   // own: this job already runs every fifteen minutes, and the refresh never
   // throws, so a Meta outage cannot fail the purge beside it.
   const templates = await scheduledTemplateSync();
+  // Practice auctions nobody ended (0101). Never allowed to fail the sweep.
+  const practices = await endStalePractices().catch((error: unknown) => {
+    logger().error({ err: error }, "practice.stale_sweep_failed");
+    return "failed" as const;
+  });
   return NextResponse.json({
+    practices,
     purged,
     security,
     whatsappInbound,

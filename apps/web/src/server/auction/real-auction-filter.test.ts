@@ -27,6 +27,7 @@ const PINNED_BY_ID: Record<string, string> = {
   "auction/owner-invite-lookup.ts": "takes the auction id from liveGate (real)",
   "auction/auction-notify.ts": "reads the kind of the id it is given and announces real only",
   "auction/practice-actions.ts": "reads the practice and real auctions by id",
+  "auction/practice-engine.ts": "finds forgotten PRACTICES to end them — practice on purpose",
   "auction/live-actions.ts": "the live ROOM: by the gate's auction id (practice on purpose)",
   "auction/conduct-actions.ts": "the cockpit and records: by the gate's auction id",
   "auction/owner-plan.ts": "by the plan gate's auction id (real)",

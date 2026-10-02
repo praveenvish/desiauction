@@ -16,6 +16,7 @@ import {
 } from "@desiauction/core";
 import {
   auctionOwnerInvites,
+  auctions,
   lots,
   paddleGrants,
   paddles,
@@ -49,9 +50,7 @@ import { endPractice } from "./practice-engine";
 export type PracticeTeamState =
   /** Their owner is in the room with the paddle in hand. */
   | "ready"
-  /** Their owner opened the link and still has to pick up the paddle. */
-  | "joined"
-  /** They have an owner who has not opened the link yet. */
+  /** They have an owner who has not picked up the practice paddle yet. */
   | "waiting"
   /** Nobody owns this team yet, so the organiser bids for it. */
   | "organiser";
@@ -155,7 +154,7 @@ async function practiceTeams(
   real: AuctionRecord,
   practice: AuctionRecord,
 ): Promise<PracticeTeam[]> {
-  const [teamRows, owners, held, grants] = await Promise.all([
+  const [teamRows, owners, held] = await Promise.all([
     db
       .select({ id: teams.id, name: teams.name })
       .from(teams)
@@ -166,10 +165,6 @@ async function practiceTeams(
       .select({ teamId: paddles.teamId, personId: paddles.personId })
       .from(paddles)
       .where(and(eq(paddles.auctionId, practice.id), isNull(paddles.releasedAt))),
-    db
-      .select({ teamId: paddleGrants.teamId, personId: paddleGrants.personId })
-      .from(paddleGrants)
-      .where(and(eq(paddleGrants.auctionId, practice.id), isNull(paddleGrants.revokedAt))),
   ]);
   const ownerIds = [...new Set([...owners.values()].flat())];
   const names =
@@ -181,7 +176,6 @@ async function practiceTeams(
           .where(inArray(people.id, ownerIds));
   const nameOf = new Map(names.map((row) => [row.id, row.name]));
   const holderOf = new Map(held.map((row) => [row.teamId, row.personId]));
-  const grantedTeams = new Set(grants.map((row) => row.teamId));
   return teamRows.map((team) => {
     const teamOwners = owners.get(team.id) ?? [];
     const holder = holderOf.get(team.id);
@@ -192,8 +186,6 @@ async function practiceTeams(
       state = "organiser";
     } else if (holder !== undefined && teamOwners.includes(holder)) {
       state = "ready";
-    } else if (grantedTeams.has(team.id) && holder === undefined) {
-      state = "joined";
     } else {
       state = "waiting";
     }
@@ -261,6 +253,14 @@ export async function practiceCardView(slug: string): Promise<PracticeCard | nul
   });
 }
 
+/**
+ * Practices one season may start in a day. Each is a few dozen rows that are
+ * kept (the log is append-only), so a stuck button or a script pressing Run
+ * again must not be able to grow a season without end. Twenty is far beyond
+ * any real rehearsal.
+ */
+const PRACTICES_PER_DAY = 20;
+
 /** Make a practice: every team, its owners, and teams × perTeam + 2 players. */
 async function startPractice(
   personId: string,
@@ -271,6 +271,22 @@ async function startPractice(
     const real = await auctionOf(db, competition.id);
     if (real === null) {
       return { ok: false, error: "Set up your auction first." };
+    }
+    const [today] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(auctions)
+      .where(
+        and(
+          eq(auctions.competitionId, competition.id),
+          eq(auctions.kind, "practice"),
+          sql`${auctions.createdAt} > now() - interval '1 day'`,
+        ),
+      );
+    if ((today?.count ?? 0) >= PRACTICES_PER_DAY) {
+      return {
+        ok: false,
+        error: `That's ${String(PRACTICES_PER_DAY)} practices today — the daily limit. You can start another tomorrow.`,
+      };
     }
     const [teamCountRow] = await db
       .select({ count: sql<number>`count(*)::int` })
