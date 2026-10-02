@@ -17,7 +17,8 @@ test("full OTP login journey with dev inbox, then logout", async ({ page }) => {
   const code = await latestOtp(PHONE);
   expect(code).toMatch(/^\d{6}$/);
 
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // PX-3: a brand-new (nameless) account is onboarded before the console —
   // and the name gate now guards every console route, /account included, so
@@ -41,7 +42,8 @@ test("a wrong code is rejected with a humane message that counts the rope left",
   await page.goto("/login");
   await page.getByLabel("Mobile number").fill(PHONE.replace(/^98/, "97"));
   await page.getByRole("button", { name: "Send code" }).click();
-  await page.getByLabel("6-digit code").fill("000000");
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially("000000");
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page.getByText("That code isn't right. 4 attempts left.")).toBeVisible();
 });

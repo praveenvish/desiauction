@@ -1,12 +1,14 @@
 /**
  * DesiAuction's social accounts, in the order the footer shows them.
  *
- * Real profiles only (2026-10-02). Every entry is a footer icon. An entry also
- * becomes an Organization `sameAs` in the site's structured data unless it sets
- * `organization: false` — that list tells Google which accounts ARE the company,
- * so a profile that belongs to a person (the LinkedIn admin profile, until the
- * company page exists) is linked but never claimed as the Organization.
- * Nothing else in the app names an account.
+ * ONLY LIVE PROFILES. An icon is listed only once its account exists and was
+ * checked from a logged-out browser — a dead or generic link is worse than no
+ * icon. Checked 2026-10-02: all six below load logged out. An entry also
+ * becomes an Organization `sameAs` in the structured data unless it sets
+ * `organization: false` — that list tells search engines which accounts ARE
+ * the company, so a profile that belongs to a person (the LinkedIn admin
+ * profile, until the company page exists) is linked but never claimed.
+ * WhatsApp returns when a Channel exists. Nothing else in the app names an account.
  */
 export type SocialNetwork =
   "instagram" | "youtube" | "whatsapp" | "x" | "linkedin" | "facebook" | "threads";

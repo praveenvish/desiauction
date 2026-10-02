@@ -66,7 +66,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
     await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", {
       timeout: 30_000,
     });
-    await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+    await page.getByLabel("6-digit code").clear();
+    await page.getByLabel("6-digit code").pressSequentially(await latestOtp(phone));
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await expect(page).not.toHaveURL(/\/login/);
   });
@@ -132,7 +133,12 @@ async function settle(page: Page, path: string): Promise<void> {
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {
-        requestIdleCallback(() => resolve(), { timeout: 3_000 });
+        // Safari has no requestIdleCallback; there, a quiet second stands in.
+        if (typeof requestIdleCallback === "function") {
+          requestIdleCallback(() => resolve(), { timeout: 3_000 });
+        } else {
+          setTimeout(resolve, 1_000);
+        }
       }),
   );
 }

@@ -120,11 +120,19 @@ async function warmRoutes(base: string): Promise<void> {
  * Best effort, like the routes above: if sign-in is genuinely broken this does
  * not fail setup and say so cryptically — it fails on the first real test,
  * with a real assertion and a real stack trace, which is a better bug report.
+ *
+ * The LAUNCH is inside the guard too. It used to sit above the `try`, so in a
+ * run that installs one engine and not Chromium (the nightly's Firefox and
+ * WebKit jobs install only their own) `chromium.launch()` threw "Executable
+ * doesn't exist" out of global setup, and the whole run died before its first
+ * test. That is how the nightly cross-browser jobs failed from 2026-09-23 on
+ * without ever running a journey on Firefox or Safari.
  */
 async function warmSignIn(base: string): Promise<void> {
   const { chromium } = await import("@playwright/test");
-  const browser = await chromium.launch();
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   try {
+    browser = await chromium.launch();
     const page = await browser.newPage({ baseURL: base });
     const phone = `80${String(Date.now()).slice(-8)}`;
     await page.goto("/login");
@@ -138,7 +146,8 @@ async function warmSignIn(base: string): Promise<void> {
     );
     const { latestOtp } = await import("./otp");
     const code = await latestOtp(phone, 10_000);
-    await page.getByLabel("6-digit code").fill(code);
+    await page.getByLabel("6-digit code").clear();
+    await page.getByLabel("6-digit code").pressSequentially(code);
     await page.getByRole("button", { name: "Verify and continue" }).click();
     await page.waitForURL(/\/onboarding/, { timeout: 20_000 });
     await page.getByLabel("What should we call you?").fill("Warmup");
@@ -147,7 +156,7 @@ async function warmSignIn(base: string): Promise<void> {
   } catch {
     // See above: a failure here surfaces on the first real test instead.
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }
 

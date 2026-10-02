@@ -22,7 +22,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   // before reading the inbox — the login.spec idiom; a bare read races the mint.
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // Signed-in landing is never the login page itself (avoid matching /competitions
   // that appears inside a ?next= query string on a still-unauthenticated /login).

@@ -807,6 +807,14 @@ export function ProductShell({
         // /case-studies, /api-docs and /careers are placeholders and are not
         // advertised anywhere until they have content.
         //
+        // TWELVE, NOT MORE (re-trimmed 2026-10-01 after it drifted to 17). A
+        // link earns a slot here only if the footer is its main way in: /for,
+        // /compare and /tools have no other inbound link (the sitemap aside),
+        // so they stay. Guides, Rules & guidelines and All policies (/legal)
+        // live in the header's Resources menu; Release notes is linked from
+        // /help and /support; Security from /features and /support. Adding a
+        // thirteenth means taking one out.
+        //
         // THE OPERATOR IDENTITY is not in the footer. It is published — as the
         // e-commerce and IT rules require — on /legal, /support and
         // /legal/grievances (`OperatorIdentityCard`), and every page's bottom
@@ -819,11 +827,16 @@ export function ProductShell({
             label: "Product",
             links: [
               { label: "Features", href: "/features" },
+              { label: "Pricing", href: "/pricing" },
+              { label: "Book a demo", href: "/schedule-demo" },
+            ],
+          },
+          {
+            label: "Explore",
+            links: [
               { label: "Sports", href: "/sports" },
               { label: "Who it's for", href: "/for" },
               { label: "Compare", href: "/compare" },
-              { label: "Pricing", href: "/pricing" },
-              { label: "Book a demo", href: "/schedule-demo" },
             ],
           },
           {
@@ -831,25 +844,15 @@ export function ProductShell({
             links: [
               { label: "Browse tournaments", href: "/c" },
               { label: "Try a mock auction", href: "/#playground" },
-              { label: "Rules & guidelines", href: "/rules-guidelines" },
               { label: "Free tools", href: "/tools" },
-            ],
-          },
-          {
-            label: "Help",
-            links: [
-              { label: "Help centre", href: "/help" },
-              { label: "Guides", href: "/guides" },
-              { label: "Contact support", href: "/support" },
-              { label: "Security", href: "/security" },
             ],
           },
           {
             label: "Company",
             links: [
               { label: "About us", href: "/about" },
-              { label: "Release notes", href: "/releases" },
-              { label: "All policies", href: "/legal" },
+              { label: "Help centre", href: "/help" },
+              { label: "Contact support", href: "/support" },
             ],
           },
         ]}

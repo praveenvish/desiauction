@@ -96,7 +96,8 @@ test("a signed-out visitor registers by mobile without ever visiting /login", as
   const form = page.getByTestId("register-verify-form");
   await expect(form).toHaveAttribute("data-step", "code", { timeout: 30_000 });
   // The code field is the SAME label /login uses.
-  await page.getByLabel("6-digit code").fill(await latestOtp(phone));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await latestOtp(phone));
   await page.getByRole("button", { name: "Verify and continue" }).click();
 
   // Signed in, on the same URL (ref intact), and the wizard carries on with
@@ -140,12 +141,14 @@ test("a wrong code is refused in place, and the right one still gets through", a
   });
   const code = await latestOtp(phone);
   const wrong = code === "000000" ? "111111" : "000000";
-  await page.getByLabel("6-digit code").fill(wrong);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(wrong);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page.getByText(/isn't right/)).toBeVisible({ timeout: 20_000 });
   await expect(page).toHaveURL(new RegExp(`${season.path}$`));
 
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page.getByTestId("register-step-profile")).toBeVisible({ timeout: 30_000 });
 });

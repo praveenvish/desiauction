@@ -22,7 +22,8 @@ async function otpLogin(page: Page, phone: string): Promise<void> {
   // before reading the inbox — the login.spec idiom; a bare read races the mint.
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code");
   const code = await latestOtp(phone);
-  await page.getByLabel("6-digit code").fill(code);
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(code);
   await page.getByRole("button", { name: "Verify and continue" }).click();
   // PX-3: new accounts land on /onboarding; join links keep their next= target.
   await expect(page).toHaveURL(/\/(home|join|onboarding)/);

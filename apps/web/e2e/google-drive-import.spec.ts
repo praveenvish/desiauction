@@ -2,6 +2,12 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { latestOtp } from "./otp";
 
+// This spec fakes network responses with `page.route`, so the service worker
+// is blocked for it: on WebKit, once a worker controls the page, page-level
+// routing never sees the page's requests (even ones the worker passes
+// through), and the fakes would go silently unused (playwright.config.ts).
+test.use({ serviceWorkers: "block" });
+
 /*
  * THE GOOGLE ROUTE, WITHOUT GOOGLE.
  *
@@ -119,7 +125,8 @@ async function organizerWithOpenSeason(page: Page, stamp: string): Promise<void>
   await page.getByLabel("Mobile number").fill(`77${stamp}`);
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-step", "code", COLD);
-  await page.getByLabel("6-digit code").fill(await latestOtp(`77${stamp}`));
+  await page.getByLabel("6-digit code").clear();
+  await page.getByLabel("6-digit code").pressSequentially(await latestOtp(`77${stamp}`));
   await page.getByRole("button", { name: "Verify and continue" }).click();
   await expect(page).not.toHaveURL(/\/login/, COLD);
   if (page.url().includes("/onboarding")) {
