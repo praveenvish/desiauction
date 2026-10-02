@@ -38,7 +38,7 @@ const season = {
 
 describe("organizationJsonLd", () => {
   it("never claims a social network's homepage as our profile", () => {
-    // content/social.ts still carries placeholders like "https://x.com/".
+    // Whatever content/social.ts lists must be real profiles, never a bare homepage.
     const org = organizationJsonLd({
       base: BASE,
       supportEmail: "support@desiauction.in",

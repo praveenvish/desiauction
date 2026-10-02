@@ -68,7 +68,8 @@ re-encoded HEVC 640 kbps two-pass (SSIM 0.994 against the source).
 | Instagram | 9:16 Reel | live |
 | LinkedIn | 16:9, custom thumbnail | live |
 | Threads | 9:16 | live, with profile photo, bio, link and the two text threads |
-| X, Facebook | — | waiting: confirm whether `@thedesiauction` on X is ours |
+| X `@thedesiauction` | 16:9, pinned | live, with header, logo, bio, Jaipur, link |
+| Facebook | — | not created yet (`thedesiauction` is free) |
 
 The 2.5 s logo strike (`docs/brand/kit/motion/da-strike-lockup-1920x1080.mp4`)
 is the intro for future YouTube videos, not a post.
