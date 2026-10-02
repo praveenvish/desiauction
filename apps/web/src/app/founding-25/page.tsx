@@ -12,7 +12,7 @@ import "../schedule-demo/demo.css";
 export const metadata: Metadata = {
   title: "Founding 25",
   description:
-    "Twenty-five organisers run a real player auction with DesiAuction and help shape it. Apply with your tournament — we set it up with you and stay with you through the night.",
+    "Twenty-five organisers run a real player auction with DesiAuction. Apply with your tournament — we set it up with you and stay with you through the night.",
   alternates: { canonical: `${env.PUBLIC_BASE_URL}/founding-25` },
 };
 
