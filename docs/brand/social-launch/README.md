@@ -67,7 +67,7 @@ re-encoded HEVC 640 kbps two-pass (SSIM 0.994 against the source).
 | YouTube | Reel 01 as a Short | live — https://youtube.com/shorts/FYR-Z2OH-Bs |
 | Instagram | 9:16 Reel | live |
 | LinkedIn | 16:9, custom thumbnail | live |
-| Threads | 9:16 | waiting: Threads is not logged in in the automation Chrome profile |
+| Threads | 9:16 | live, with profile photo, bio, link and the two text threads |
 | X, Facebook | — | waiting: confirm whether `@thedesiauction` on X is ours |
 
 The 2.5 s logo strike (`docs/brand/kit/motion/da-strike-lockup-1920x1080.mp4`)
