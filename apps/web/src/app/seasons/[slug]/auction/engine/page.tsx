@@ -29,6 +29,7 @@ export default async function EnginePage({ params }: { params: Promise<{ slug: s
               y≈400 on a laptop. */}
           <EnginePanel
             slug={slug}
+            auctionId={view.auctionId}
             record={{
               status: view.view.auction.status,
               events: view.view.eventCount,

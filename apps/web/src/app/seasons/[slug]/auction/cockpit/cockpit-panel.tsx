@@ -147,7 +147,7 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
       setPending(key);
       let ack;
       try {
-        ack = await submitAuctionCommand(slug, commandId(), type, payload);
+        ack = await submitAuctionCommand(slug, commandId(), type, payload, view.auctionId);
       } catch {
         // See live-panel.tsx: a rejected promise means the answer is missing, not
         // that the command failed, so the message says only that and sends the
@@ -169,9 +169,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
         return true;
       }
       toast({ title: commandRefusalMessage(ack.reason), tone: "danger" });
+      // The practice started or ended under this screen: show the room as it is.
+      if (ack.reason === "room_changed") {
+        router.refresh();
+      }
       return false;
     },
-    [slug, router, toast],
+    [slug, router, toast, view.auctionId],
   );
 
   /**
@@ -188,7 +192,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     let refusal: string | null = null;
     try {
       for (const lotId of lotIds) {
-        const ack = await submitAuctionCommand(slug, commandId(), "RequeueLot", { lotId });
+        const ack = await submitAuctionCommand(
+          slug,
+          commandId(),
+          "RequeueLot",
+          { lotId },
+          view.auctionId,
+        );
         if (!ack.accepted) {
           refusal = commandRefusalMessage(ack.reason);
           break;
@@ -256,7 +266,13 @@ export function CockpitPanel({ slug, view }: { slug: string; view: CockpitView }
     setPending("complete");
     let ack;
     try {
-      ack = await submitAuctionCommand(slug, commandId(), "CompleteAuction", payload);
+      ack = await submitAuctionCommand(
+        slug,
+        commandId(),
+        "CompleteAuction",
+        payload,
+        view.auctionId,
+      );
     } catch {
       toast({
         title:

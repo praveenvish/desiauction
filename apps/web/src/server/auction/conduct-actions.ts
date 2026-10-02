@@ -555,7 +555,7 @@ export type DiagnosticsResult =
 
 /** The recovery dashboard's feed — a conduct-gated proxy to the engine. */
 export async function engineDiagnosticsAction(slug: string): Promise<DiagnosticsResult> {
-  const gate = await liveGate(slug);
+  const gate = await liveGate(slug, { room: true });
   if (gate === null || !gate.canConduct) {
     return { ok: false, reason: "not_authorized" };
   }

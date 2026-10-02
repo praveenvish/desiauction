@@ -86,6 +86,12 @@ interface LiveGate {
    * true })`); every other gate is the real auction's and says null.
    */
   practice: PracticeRoom | null;
+  /**
+   * Both auctions the room could mean, server-side only (never serialised to a
+   * screen): a command names the auction its screen was showing, and is sent
+   * to that one if it is still one of these — see `submitAuctionCommand`.
+   */
+  rooms: { real: AuctionRecord; practice: AuctionRecord | null };
 }
 
 export interface PracticeRoom {
@@ -228,7 +234,7 @@ export async function participantTeamIds(
  */
 export async function liveGate(
   slug: string,
-  options: { room?: boolean } = {},
+  options: { room?: boolean; join?: boolean } = {},
 ): Promise<LiveGate | null> {
   const gate = await auctionMemberGate(slug, options);
   if (gate === null) {
@@ -249,7 +255,7 @@ export async function liveGate(
  */
 export async function auctionMemberGate(
   slug: string,
-  options: { room?: boolean } = {},
+  options: { room?: boolean; join?: boolean } = {},
 ): Promise<LiveGate | null> {
   const session = await requireSession(slug);
   const competition = await resolveMemberCompetition(session.personId, slug);
@@ -257,78 +263,141 @@ export async function auctionMemberGate(
     return null;
   }
   const outOf = options.room === true ? await steppedOutOf(competition.id) : null;
-  return withTenantDb(
-    dbHandle,
-    { personId: session.personId, orgId: competition.orgId },
-    async (db) => {
-      // THE ROOM resolves the practice while one runs (0101); every other
-      // caller of this gate — setup, owner links, plans, the ledger — means the
-      // real auction, always.
-      const room = options.room === true ? await roomAuctionOf(db, competition.id) : null;
-      const resolved =
-        options.room === true
-          ? room === null
-            ? null
-            : room.practice !== null && room.practice.id === outOf
-              ? { ...room, auction: room.real }
-              : room
-          : await auctionOf(db, competition.id).then((real) =>
-              real === null ? null : { auction: real, real, practice: null },
-            );
-      if (resolved === null) {
-        return null;
-      }
-      const { auction } = resolved;
-      const practice: PracticeRoom | null =
-        resolved.practice === null
+  const inTenant = <T>(fn: (db: Db) => Promise<T>): Promise<T> =>
+    withTenantDb(dbHandle, { personId: session.personId, orgId: competition.orgId }, fn);
+  const read = await inTenant(async (db) => {
+    // THE ROOM resolves the practice while one runs (0101); every other
+    // caller of this gate — setup, owner links, plans, the ledger — means the
+    // real auction, always.
+    const room = options.room === true ? await roomAuctionOf(db, competition.id) : null;
+    const resolved =
+      options.room === true
+        ? room === null
           ? null
-          : {
-              inPractice: auction.id === resolved.practice.id,
-              practiceId: resolved.practice.id,
-              realAuctionId: resolved.real.id,
-            };
-      const scope = { orgId: competition.orgId, competitionId: competition.id };
-      const [canConduct, canOverride, canManage] = await Promise.all([
-        canCompetition(db, session.personId, scope, "auction.conduct"),
-        canCompetition(db, session.personId, scope, "auction.override"),
-        canCompetition(db, session.personId, scope, "competition.manage"),
-      ]);
-      let teamsOf = await participantTeamIds(db, auction.id, session.personId);
-      /*
-       * AN OWNER WALKS STRAIGHT INTO THE PRACTICE. The practice copied every
-       * owner who had joined when it was made; one who joined since (or whose
-       * team the organiser was holding for them) is added the moment they open
-       * the room — the engine checks they own that team on the real auction.
-       */
-      if (practice?.inPractice === true) {
-        const realTeams = await participantTeamIds(db, resolved.real.id, session.personId);
-        const missing = realTeams.all.filter((teamId) => !teamsOf.all.includes(teamId));
-        if (missing.length > 0) {
-          for (const teamId of missing) {
-            await sendEngineCommand({
-              auctionId: auction.id,
-              type: "PracticeAddOwner",
-              actor: session.personId,
-              conduct: false,
-              payload: { teamId, personId: session.personId },
-            });
-          }
-          teamsOf = await participantTeamIds(db, auction.id, session.personId);
-        }
-      }
-      return {
-        personId: session.personId,
-        competition,
-        auction,
-        canConduct,
-        canOverride,
-        canManage,
-        myTeamIds: teamsOf.all,
-        planTeamIds: teamsOf.plan,
-        practice,
-      };
-    },
-  );
+          : room.practice !== null && room.practice.id === outOf
+            ? { ...room, auction: room.real }
+            : room
+        : await auctionOf(db, competition.id).then((real) =>
+            real === null ? null : { auction: real, real, practice: null },
+          );
+    if (resolved === null) {
+      return null;
+    }
+    const scope = { orgId: competition.orgId, competitionId: competition.id };
+    const [canConduct, canOverride, canManage, teamsOf] = await Promise.all([
+      canCompetition(db, session.personId, scope, "auction.conduct"),
+      canCompetition(db, session.personId, scope, "auction.override"),
+      canCompetition(db, session.personId, scope, "competition.manage"),
+      participantTeamIds(db, resolved.auction.id, session.personId),
+    ]);
+    const joinTeam =
+      options.join === true && resolved.practice !== null && resolved.auction.kind === "practice"
+        ? await practiceTeamToJoin(db, resolved.real.id, resolved.auction.id, session.personId)
+        : null;
+    return { resolved, canConduct, canOverride, canManage, teamsOf, joinTeam };
+  });
+  if (read === null) {
+    return null;
+  }
+  const { resolved, canConduct, canOverride, canManage, joinTeam } = read;
+  let { teamsOf } = read;
+  /*
+   * AN OWNER WALKS STRAIGHT INTO THE PRACTICE. The practice copied every owner
+   * who had joined when it was made; one who joined since is added the first
+   * time they open the room — the engine checks they own that team on the real
+   * auction. Only on a page view (`join`), never on a command, and AFTER the
+   * read's transaction: an engine round trip must not hold a pooled connection.
+   */
+  if (joinTeam !== null) {
+    const ack = await sendEngineCommand({
+      auctionId: resolved.auction.id,
+      type: "PracticeAddOwner",
+      actor: session.personId,
+      conduct: false,
+      payload: { teamId: joinTeam, personId: session.personId },
+    });
+    if (ack.accepted) {
+      teamsOf = await inTenant((db) =>
+        participantTeamIds(db, resolved.auction.id, session.personId),
+      );
+    }
+  }
+  const { auction } = resolved;
+  return {
+    personId: session.personId,
+    competition,
+    auction,
+    canConduct,
+    canOverride,
+    canManage,
+    myTeamIds: teamsOf.all,
+    planTeamIds: teamsOf.plan,
+    practice:
+      resolved.practice === null
+        ? null
+        : {
+            inPractice: auction.id === resolved.practice.id,
+            practiceId: resolved.practice.id,
+            realAuctionId: resolved.real.id,
+          },
+    rooms: { real: resolved.real, practice: resolved.practice },
+  };
+}
+
+/**
+ * The team this person should be added to the running practice for, or null.
+ *
+ * Only an OWNER — an accepted owner link or a paddle grant on the real
+ * auction; a paddle merely held (the organiser bidding for a team, DA-02) is
+ * not ownership, and the engine would refuse it on every page view. And only
+ * someone with no practice grant yet: one person, one team (invariant 18).
+ */
+async function practiceTeamToJoin(
+  db: Db,
+  realId: string,
+  practiceId: string,
+  personId: string,
+): Promise<string | null> {
+  const [inPractice] = await db
+    .select({ id: paddleGrants.id })
+    .from(paddleGrants)
+    .where(
+      and(
+        eq(paddleGrants.auctionId, practiceId),
+        eq(paddleGrants.personId, personId),
+        isNull(paddleGrants.revokedAt),
+      ),
+    )
+    .limit(1);
+  if (inPractice !== undefined) {
+    return null;
+  }
+  const [owned] = await db
+    .select({ teamId: auctionOwnerInvites.teamId })
+    .from(auctionOwnerInvites)
+    .where(
+      and(
+        eq(auctionOwnerInvites.auctionId, realId),
+        eq(auctionOwnerInvites.acceptedBy, personId),
+        isNull(auctionOwnerInvites.revokedAt),
+      ),
+    )
+    .limit(1);
+  if (owned !== undefined) {
+    return owned.teamId;
+  }
+  const [granted] = await db
+    .select({ teamId: paddleGrants.teamId })
+    .from(paddleGrants)
+    .where(
+      and(
+        eq(paddleGrants.auctionId, realId),
+        eq(paddleGrants.personId, personId),
+        isNull(paddleGrants.revokedAt),
+      ),
+    )
+    .limit(1);
+  return granted?.teamId ?? null;
 }
 
 export interface LiveAuctionView {
@@ -491,7 +560,7 @@ async function myPaddles(dbc: Db, auctionId: string, personId: string) {
 }
 
 export async function liveAuctionView(slug: string): Promise<LiveAuctionView | null> {
-  const gate = await liveGate(slug, { room: true });
+  const gate = await liveGate(slug, { room: true, join: true });
   if (gate === null) {
     return null;
   }
@@ -730,6 +799,15 @@ export async function submitAuctionCommand(
   commandId: string,
   type: string,
   payload: Record<string, unknown>,
+  /**
+   * The auction the screen was showing when the person pressed the button
+   * (0101). With a practice beside the night, "this season's room" can change
+   * under a screen — a co-organiser ends the practice — and a stale cockpit's
+   * Open would otherwise land on the REAL auction. The command goes to exactly
+   * this auction while it is still one of the room's; otherwise it is refused
+   * and the screen refreshes.
+   */
+  auctionId?: string,
 ): Promise<CommandAck> {
   // The id is the idempotency key and it comes from the browser, so its SHAPE
   // is part of the trust boundary: the engine keys its cache on it, and its own
@@ -738,10 +816,28 @@ export async function submitAuctionCommand(
   if (!isTransportCommandId(commandId)) {
     return { commandId, accepted: false, reason: "invalid_command_id", version: 0 };
   }
-  const gate = await liveGate(slug, { room: true });
-  if (gate === null) {
+  const roomGate = await liveGate(slug, { room: true });
+  if (roomGate === null) {
     return { commandId, accepted: false, reason: "unknown_auction", version: 0 };
   }
+  const target =
+    auctionId === undefined
+      ? roomGate.auction
+      : [roomGate.rooms.real, roomGate.rooms.practice].find((room) => room?.id === auctionId);
+  if (target === undefined || target === null) {
+    return { commandId, accepted: false, reason: "room_changed", version: 0 };
+  }
+  const gate: LiveGate =
+    target.id === roomGate.auction.id
+      ? roomGate
+      : {
+          ...roomGate,
+          auction: target,
+          practice:
+            roomGate.practice === null
+              ? null
+              : { ...roomGate.practice, inPractice: target.kind === "practice" },
+        };
   if (!isAuctionCommandType(type) || GATEWAY_BLOCKED.has(type)) {
     return { commandId, accepted: false, reason: "unknown_command", version: 0 };
   }
@@ -777,14 +873,17 @@ export async function submitAuctionCommand(
   if (type === "CompleteAuction" && gate.auction.kind === "practice") {
     return { commandId, accepted: false, reason: "illegal_transition", version: 0 };
   }
-  // OPENING THE NIGHT ENDS THE PRACTICE (0101). Every phone in the practice
-  // sees it end and moves to the real auction by itself. If the practice
-  // cannot be ended, the night does not open over the top of it.
-  if (type === "OpenAuction" && gate.practice !== null && !gate.practice.inPractice) {
-    const ended = await endPractice(gate.practice.practiceId, gate.personId);
-    if (!ended) {
-      return { commandId, accepted: false, reason: "practice_running", version: 0 };
+  // OPENING THE NIGHT ENDS THE PRACTICE (0101) — after the night has opened,
+  // never before: a refused open (paddles, queue) must not cost the room its
+  // rehearsal, and a practice the engine cannot end must not hold the night.
+  // Once the real auction leaves `scheduled` no screen shows the practice; the
+  // sweep ends any the engine missed.
+  if (type === "OpenAuction" && gate.auction.kind === "real" && gate.practice !== null) {
+    const opened = await send();
+    if (opened.accepted) {
+      await endPractice(gate.practice.practiceId, gate.personId);
     }
+    return opened;
   }
   if (type === "CompleteAuction") {
     return completeAuctionOnce(

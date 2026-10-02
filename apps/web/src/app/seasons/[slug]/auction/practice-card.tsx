@@ -148,7 +148,8 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
           </p>
           {withOwners > 0 ? (
             <p className="competitions-hint" data-testid="practice-joined">
-              {joined} of {withOwners} owners ready to bid. Owners pick up their paddle in the room, as on the night.
+              {joined} of {withOwners} owners ready to bid. Owners pick up their paddle in the room,
+              as on the night.
             </p>
           ) : null}
           <ul className="practice-teams" data-testid="practice-teams">
@@ -164,6 +165,10 @@ export function PracticeCard({ slug, card }: { slug: string; card: PracticeCardV
               </li>
             ))}
           </ul>
+          <p className="competitions-hint">
+            A practice with nothing happening for an hour ends by itself, and starting the real
+            auction ends it too.
+          </p>
           <div className="practice-actions">
             <ButtonLink href={`/seasons/${slug}/auction/cockpit`} data-testid="practice-cockpit">
               Open the cockpit

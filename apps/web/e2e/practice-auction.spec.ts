@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
+import { issuePaddleTo, queueAllFromSetup } from "./auction-tabs";
 import { latestOtp } from "./otp";
 
 /*
@@ -228,11 +229,9 @@ test("a practice runs in the season's own room, touches nothing, and hands over 
 
   // --- The night opens: the practice ends and every phone moves --------------
   for (const team of [ownerless, owners[0]?.team ?? ""]) {
-    await organizer.getByLabel("Issue a paddle to yourself for").selectOption({ label: team });
-    await organizer.getByTestId("issue-paddle").click();
-    await expect(organizer.getByText("Paddle issued").first()).toBeVisible(COLD);
+    await issuePaddleTo(organizer, team);
   }
-  await organizer.getByTestId("queue-all").click();
+  await queueAllFromSetup(organizer);
   await expect(organizer.getByTestId("lot-L001")).toContainText("queued", COLD);
   await organizer.getByTestId("accept-short-open").check();
   await organizer.getByTestId("auction-open").click();

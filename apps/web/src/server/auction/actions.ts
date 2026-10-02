@@ -531,15 +531,6 @@ async function conductCommand(
   if (auction === null) {
     return { ok: false, error: "Create the auction first." };
   }
-  // Opening the night ends the practice (0101), as it does from the cockpit.
-  if (type === "OpenAuction") {
-    const practice = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
-      practiceOf(db, gate.competition.id),
-    );
-    if (practice !== null && !(await endPractice(practice.id, gate.personId))) {
-      return { ok: false, reason: "practice_running", error: "practice_running" };
-    }
-  }
   const ack = await sendEngineCommand({
     auctionId: auction.id,
     type: type as never,
@@ -549,6 +540,17 @@ async function conductCommand(
   });
   if (!ack.accepted) {
     return { ok: false, reason: ack.reason ?? "", error: ack.reason ?? "Refused." };
+  }
+  // Opening the night ends the practice (0101), as it does from the cockpit —
+  // only once the night HAS opened, and never holding it up (the sweep ends a
+  // practice the engine could not).
+  if (type === "OpenAuction") {
+    const practice = await inCompetitionOrg(gate.personId, gate.competition, (db) =>
+      practiceOf(db, gate.competition.id),
+    );
+    if (practice !== null) {
+      await endPractice(practice.id, gate.personId);
+    }
   }
   return { ok: true, reason: ack.reason ?? "", version: ack.version };
 }
@@ -754,8 +756,6 @@ export async function auctionLifecycleAction(
       engine_unreachable: "The auction engine is offline.",
       engine_halted: "The engine halted fail-closed — run recovery from the cockpit.",
       command_failed: "The engine hit an error running that — check the feed, then try again.",
-      practice_running:
-        "The practice couldn't be ended, so the real auction hasn't started. Try again in a moment.",
     };
     return { ok: false, error: message[result.reason ?? ""] ?? "Refused." };
   }

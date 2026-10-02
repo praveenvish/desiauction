@@ -27,8 +27,18 @@ does reaches the season.
   - Teams nobody owns: the organiser holds their paddle.
 - **When a practice can exist.** Only while the real auction is `scheduled`, and only one at a time.
 - **Ending.**
-  - **Opening the real auction ends the practice first.** This is true from both the cockpit and the auction page, and every phone in the practice moves to the real auction by itself.
-  - A practice never *completes*. Completing sends results, so a practice ends by abort instead (**End practice**, or **Run again**, which ends it and starts a fresh one).
+  - **Opening the real auction ends the practice.** This happens right after the night has opened, from either the cockpit or the auction page.
+    - A refused open leaves the practice alone.
+    - A practice the engine cannot end never holds the night.
+  - Every phone in the practice moves to the real auction by itself.
+  - A practice never *completes*, because completing sends results. It ends by abort: **End practice** (organiser or auctioneer), or **Run again**, which ends it and starts a fresh one.
+  - It also ends by itself when any of these is true:
+    - nothing has happened in it for an hour;
+    - it is 4 hours old;
+    - the real auction has started.
+
+    This runs in the 15-minute sweep, and deploys never wait for a practice.
+- **Limits.** At most 20 practices per season per day.
 
 ## How it is built
 
@@ -46,9 +56,11 @@ does reaches the season.
   - `auctionOf` returns the real auction only.
   - `roomAuctionOf` returns the practice while one runs. Only the live-room gate uses it (`liveGate(slug, { room: true })`), and it honours the per-season room-switch cookie.
   - Every other query that finds auctions, lots, paddles, grants or owner links by season, org, person or player filters with `isRealAuction()` / `inRealAuction()`.
-  - `real-auction-filter.test.ts` scans `apps/web/src/server` and fails on a new reader that does neither.
+  - `real-auction-filter.test.ts` scans `apps/web/src` for readers of `auctions`, `lots`, `paddles`, `paddle_grants`, `auction_owner_invites`, `bids` and `auction_events`. It works per file: a file must carry the filter or be listed with the reason it reads one auction by id.
+- **Commands name their auction.** Every command from a room screen carries the auction that screen was showing. If that auction is no longer the room's, the command is refused (`room_changed`) and the screen refreshes, so a stale cockpit can never open the real night by mistake.
+- **Late owners.** An owner who joined after the practice started is added once, on their next page view (never on a command). The engine call runs after the read's transaction.
 - **Moving phones.**
-  - `PracticeBar` polls `practiceRoomStateAction` every 5 s while the real auction is waiting, and refreshes the room when a practice starts, restarts or ends.
+  - `PracticeBar` polls `practiceRoomStateAction` every 5 s while the real auction is waiting and the screen is visible. The poll is 2 reads, with no permission gate and no engine call. The bar refreshes the room when a practice starts, restarts or ends.
 - **Tests.**
   - `practice.regression.test.ts`: the aggregate, against Postgres.
   - `e2e/practice-auction.spec.ts`: the whole flow with an organiser and two owners.

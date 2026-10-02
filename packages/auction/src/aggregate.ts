@@ -2273,6 +2273,9 @@ export async function undoLastAction(
 // — its teams, its owners' bidding rights and its paddles — and what it never
 // touches is the season (see `AuctionRecord.kind`).
 
+/** Thrown inside the create transaction to roll it back: the night opened meanwhile. */
+class RealAuctionMoved extends Error {}
+
 export type CreatePracticeResult =
   | { ok: true; auctionId: string; lotCount: number }
   | {
@@ -2415,6 +2418,16 @@ export async function createPracticeAuction(
   const scope = { id: auctionId, orgId: real.orgId, kind: "practice" as const };
   try {
     await db.transaction(async (tx) => {
+      // The real auction may have opened since it was read: re-read it under a
+      // share lock, which an open (an UPDATE of that row) must wait for.
+      const [night] = await tx
+        .select({ status: auctions.status })
+        .from(auctions)
+        .where(eq(auctions.id, real.id))
+        .for("share");
+      if (night?.status !== "scheduled") {
+        throw new RealAuctionMoved();
+      }
       await tx.insert(auctions).values({
         id: auctionId,
         orgId: real.orgId,
@@ -2519,6 +2532,9 @@ export async function createPracticeAuction(
     if (isUniqueViolation(error, "auctions_competition_practice_uq")) {
       return { ok: false, reason: "exists" };
     }
+    if (error instanceof RealAuctionMoved) {
+      return { ok: false, reason: "real_not_scheduled" };
+    }
     throw error;
   }
   return { ok: true, auctionId, lotCount: players.length };
@@ -2617,12 +2633,30 @@ export async function addOwnerToPractice(
       ),
     )
     .limit(1);
+  // Handed back only when the holder is NOT one of the team's owners (the
+  // organiser standing in): a co-owner mid-bid keeps the paddle.
+  let release = false;
+  if (stand !== undefined && stand.personId !== personId) {
+    const [holderOwns] = await db
+      .select({ id: auctionOwnerInvites.id })
+      .from(auctionOwnerInvites)
+      .where(
+        and(
+          sql`${auctionOwnerInvites.auctionId} in ${realOfSeason}`,
+          eq(auctionOwnerInvites.teamId, teamId),
+          eq(auctionOwnerInvites.acceptedBy, stand.personId),
+          isNull(auctionOwnerInvites.revokedAt),
+        ),
+      )
+      .limit(1);
+    release = holderOwns === undefined;
+  }
   const correlationId = newId();
   const atMs = serverNowMs();
   const grantId = newId();
   try {
     await db.transaction(async (tx) => {
-      if (stand !== undefined && stand.personId !== personId) {
+      if (release && stand !== undefined) {
         await tx
           .update(paddles)
           .set({ releasedAt: new Date(atMs) })
@@ -2657,10 +2691,16 @@ export async function addOwnerToPractice(
         grantId,
       );
     });
-  } catch {
-    // A concurrent grant for the same person won (the 0042 unique): they are
-    // in the practice either way.
-    return { ok: true, added: false };
+  } catch (error) {
+    // A concurrent grant for the same person won (the 0042 uniques): they are
+    // in the practice either way. Anything else is a real failure.
+    if (
+      isUniqueViolation(error, "paddle_grants_auction_person_active_uq") ||
+      isUniqueViolation(error, "paddle_grants_active_uq")
+    ) {
+      return { ok: true, added: false };
+    }
+    throw error;
   }
   return { ok: true, added: true };
 }

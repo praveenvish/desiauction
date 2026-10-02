@@ -88,24 +88,30 @@ async function requireSession() {
   return session;
 }
 
-/** The season's manager, in their club's tenant, or null. */
+/**
+ * The season's manager, in their club's tenant, or null. `orConduct` also
+ * admits the appointed auctioneer — for ENDING a practice only, which runs in
+ * their cockpit and costs nothing; starting one stays with the season's
+ * managers, who own the room it borrows.
+ */
 async function manageGate(
   slug: string,
+  orConduct = false,
 ): Promise<{ personId: string; competition: CompetitionSummary } | null> {
   const session = await requireSession();
   const competition = await resolveMemberCompetition(session.personId, slug);
   if (competition === null) {
     return null;
   }
-  const manages = await inOrg(session.personId, competition, (db) =>
-    canCompetition(
-      db,
-      session.personId,
-      { orgId: competition.orgId, competitionId: competition.id },
-      "competition.manage",
-    ),
+  const scope = { orgId: competition.orgId, competitionId: competition.id };
+  const allowed = await inOrg(
+    session.personId,
+    competition,
+    async (db) =>
+      (await canCompetition(db, session.personId, scope, "competition.manage")) ||
+      (orConduct && (await canCompetition(db, session.personId, scope, "auction.conduct"))),
   );
-  return manages ? { personId: session.personId, competition } : null;
+  return allowed ? { personId: session.personId, competition } : null;
 }
 
 function inOrg<T>(
@@ -320,7 +326,7 @@ export async function startPracticeAction(
 
 /** End the running practice. Everyone in it moves to the real auction's room. */
 export async function endPracticeAction(slug: string): Promise<PracticeActionResult> {
-  const gate = await manageGate(slug);
+  const gate = await manageGate(slug, true);
   if (gate === null) {
     return { ok: false, error: "Only the season's organisers can end a practice." };
   }

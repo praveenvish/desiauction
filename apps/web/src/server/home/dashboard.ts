@@ -361,7 +361,13 @@ async function readClubSlice(
             scopeId: auditLog.scopeId,
           })
           .from(auditLog)
-          .where(inArray(auditLog.scopeId, [...scopeIds]))
+          .where(
+            and(
+              inArray(auditLog.scopeId, [...scopeIds]),
+              // A practice auction's steps are rehearsal, not club news (0101).
+              sql`coalesce(${auditLog.meta} ->> 'practice', '') <> 'true'`,
+            ),
+          )
           .orderBy(desc(auditLog.at))
           .limit(ACTIVITY_POOL)
       : Promise.resolve([]),

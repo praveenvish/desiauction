@@ -14,25 +14,30 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SERVER = join(__dirname, "..");
+// All of apps/web/src: server modules AND the server components under app/.
+const SERVER = join(__dirname, "..", "..");
 
-const READS_AUCTION_TABLES =
-  /from\((auctions|lots|paddles|paddleGrants|auctionOwnerInvites)\)|Join\((auctions|lots|paddles|paddleGrants|auctionOwnerInvites)\b|(from|join) \$\{(auctions|lots|paddles)\}|(from|join) auctions\b/;
+const TABLES = "auctions|lots|paddles|paddleGrants|auctionOwnerInvites|bids|auctionEvents";
+const READS_AUCTION_TABLES = new RegExp(
+  `from\\((${TABLES})\\)|Join\\((${TABLES})\\b|(from|join) \\$\\{(${TABLES})\\}|(from|join) (auctions|auction_events|bids)\\b`,
+);
 const SAYS_REAL = /isRealAuction|inRealAuction|kind\}? = 'real'|kind, "real"/;
 
 /** Files that read one auction by an id they were handed — never by season. */
 const PINNED_BY_ID: Record<string, string> = {
-  "auction/auction-overview.ts": "takes the auction id from its caller",
-  "auction/owner-acceptances.ts": "takes the auction id from its caller",
-  "auction/owner-invite-lookup.ts": "takes the auction id from liveGate (real)",
-  "auction/auction-notify.ts": "reads the kind of the id it is given and announces real only",
-  "auction/practice-actions.ts": "reads the practice and real auctions by id",
-  "auction/practice-engine.ts": "finds forgotten PRACTICES to end them — practice on purpose",
-  "auction/live-actions.ts": "the live ROOM: by the gate's auction id (practice on purpose)",
-  "auction/conduct-actions.ts": "the cockpit and records: by the gate's auction id",
-  "auction/owner-plan.ts": "by the plan gate's auction id (real)",
-  "orgs/organizer-notify.ts": "by an owner invite's auction id; practices have no invites",
-  "competition/captain-lock.ts": "by the roster auction id (registration-aggregate, real)",
+  "server/auction/auction-overview.ts": "takes the auction id from its caller",
+  "server/auction/owner-acceptances.ts": "takes the auction id from its caller",
+  "server/auction/owner-invite-lookup.ts": "takes the auction id from liveGate (real)",
+  "server/auction/auction-notify.ts":
+    "reads the kind of the id it is given and announces real only",
+  "server/auction/practice-actions.ts": "reads the practice and real auctions by id",
+  "server/auction/practice-engine.ts":
+    "finds forgotten PRACTICES to end them — practice on purpose",
+  "server/auction/live-actions.ts": "the live ROOM: by the gate's auction id (practice on purpose)",
+  "server/auction/conduct-actions.ts": "the cockpit and records: by the gate's auction id",
+  "server/auction/owner-plan.ts": "by the plan gate's auction id (real)",
+  "server/orgs/organizer-notify.ts": "by an owner invite's auction id; practices have no invites",
+  "server/competition/captain-lock.ts": "by the roster auction id (registration-aggregate, real)",
 };
 
 function sourceFiles(dir: string): string[] {
