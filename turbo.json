@@ -13,9 +13,9 @@
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
       "env": ["DATABASE_URL"]
     },
-    "lint": {},
-    "typecheck": {},
-    "test": {},
+    "lint": { "dependsOn": ["^build"] },
+    "typecheck": { "dependsOn": ["^build"] },
+    "test": { "dependsOn": ["^build"] },
     "test:integration": {
       "cache": false
     },
