@@ -1,7 +1,6 @@
-import { EmptyState, LoadingState, Pill, SectionCard } from "@desiauction/ui";
+import { EmptyState, Pill, SectionCard, ToastProvider } from "@desiauction/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 
 import { adminRoles } from "../../../server/admin/actions";
 import { platformGrantPageGate } from "../../../server/admin/authz";
@@ -24,16 +23,20 @@ export default async function AdminRolesPage() {
     notFound();
   }
   return (
-    <main className="registrations-dash">
-      <div className="dash-stack admin-stack">
-        <AdminPageHead actions={<InvitePerson options={ROLE_OPTIONS} />}>
-          Who can act on the platform. To give or remove a role, open the person.
-        </AdminPageHead>
-        <Suspense fallback={<LoadingState variant="page" />}>
+    <ToastProvider>
+      <main className="registrations-dash">
+        <div className="dash-stack admin-stack">
+          <AdminPageHead actions={<InvitePerson options={ROLE_OPTIONS} />}>
+            Who can act on the platform. To give or remove a role, open the person.
+          </AdminPageHead>
+          {/* Rendered whole, not streamed under <Suspense>: these pages carry
+              write controls, and a router.refresh() of a streamed boundary was
+              only committed on the NEXT unrelated update — the page showed the
+              old state for five seconds after every action (measured; AC-1). */}
           <Roles />
-        </Suspense>
-      </div>
-    </main>
+        </div>
+      </main>
+    </ToastProvider>
   );
 }
 

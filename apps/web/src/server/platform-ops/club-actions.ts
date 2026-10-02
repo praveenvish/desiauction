@@ -2,7 +2,6 @@
 
 import { organizations } from "@desiauction/db";
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { systemDb } from "../db";
 import { platformGrantGate } from "../admin/authz";
@@ -32,10 +31,9 @@ function isClubRole(value: string): value is ClubRole {
   return value === "org:owner" || value === "org:staff";
 }
 
-function done(slug: string, result: DeskResult): ClubDeskResult {
-  if (result.ok) {
-    revalidatePath(`/admin/orgs/${slug}`);
-  }
+/* No server-side revalidation: the desk refreshes itself (router.refresh), like
+   every admin desk — the page is dynamic, so there is no cache to invalidate. */
+function done(_slug: string, result: DeskResult): ClubDeskResult {
   return result;
 }
 

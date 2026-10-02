@@ -113,7 +113,7 @@ test("founder demo: sign in → platform health → find an org → inspect → 
     .getByRole("link", { name: "Demo Founder" })
     .first()
     .click();
-  await expect(page).toHaveURL(/\/admin\/users\/[^/]+$/);
+  await expect(page).toHaveURL(/\/admin\/people\/[^/]+$/);
   const grants = page.getByTestId("admin-user-grants");
   await expect(grants).toBeVisible();
   // Grants are shown as the capability SETS they are — the four partitions,

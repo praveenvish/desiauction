@@ -1,7 +1,7 @@
 import { ButtonLink, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
-import { MoneyUnitProvider } from "../../../../../components/money-unit";
+import { MoneyUnitOverride } from "../../../../../components/money-unit";
 import { liveAuctionView } from "../../../../../server/auction/live-actions";
 import { PracticeBar } from "../practice-bar";
 import { LivePanel } from "./live-panel";
@@ -49,6 +49,7 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
             <PracticeBar
               slug={slug}
               practice={view.practice}
+              realStarted={view.practice === null && view.status !== "scheduled"}
               watch={view.practice !== null || view.status === "scheduled"}
             />
             <LivePanel
@@ -99,5 +100,5 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
       </ToastProvider>
     </div>
   );
-  return inPractice ? <MoneyUnitProvider unit="points">{room}</MoneyUnitProvider> : room;
+  return <MoneyUnitOverride unit={inPractice ? "points" : null}>{room}</MoneyUnitOverride>;
 }

@@ -1,6 +1,5 @@
-import { LoadingState } from "@desiauction/ui";
+import { ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 
 import { adminPersonExists, adminUser } from "../../../../server/admin/actions";
 import { platformAdminPageGate } from "../../../../server/admin/authz";
@@ -30,13 +29,17 @@ export default async function AdminUserPage({ params }: { params: Promise<{ pers
     notFound();
   }
   return (
-    <main className="registrations-dash">
-      <div className="dash-stack admin-stack">
-        <Suspense fallback={<LoadingState variant="page" />}>
+    <ToastProvider>
+      <main className="registrations-dash">
+        <div className="dash-stack admin-stack">
+          {/* Rendered whole, not streamed under <Suspense>: these pages carry
+              write controls, and a router.refresh() of a streamed boundary was
+              only committed on the NEXT unrelated update — the page showed the
+              old state for five seconds after every action (measured; AC-1). */}
           <Detail personId={personId} />
-        </Suspense>
-      </div>
-    </main>
+        </div>
+      </main>
+    </ToastProvider>
   );
 }
 

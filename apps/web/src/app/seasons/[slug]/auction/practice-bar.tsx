@@ -2,7 +2,7 @@
 
 import { Button, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   chooseRoomAction,
@@ -29,10 +29,13 @@ export function PracticeBar({
   slug,
   practice,
   watch,
+  realStarted,
 }: {
   slug: string;
   practice: PracticeRoom | null;
   watch: boolean;
+  /** The night has begun (the real auction left `scheduled`). */
+  realStarted: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -40,6 +43,33 @@ export function PracticeBar({
   // The practice this screen was drawn for; a change means the room moved.
   const shown = practice?.practiceId ?? null;
   const inPractice = practice?.inPractice === true;
+
+  /*
+   * SAY WHY THE ROOM MOVED — however it moved. The poll below is one way a
+   * screen learns the practice ended; the live room's own socket (a snapshot
+   * of the aborted practice) is often faster and refreshes the page itself.
+   * So the words are tied to what the screen SHOWS changing, not to who
+   * noticed first: whenever this screen goes from inside a practice to none,
+   * or from none to one, it says so once.
+   */
+  const before = useRef({ shown, inPractice });
+  useEffect(() => {
+    const was = before.current;
+    before.current = { shown, inPractice };
+    if (was.shown === shown) {
+      return;
+    }
+    if (shown === null && was.inPractice) {
+      toast({
+        title: realStarted
+          ? "The practice is over — the real auction has started"
+          : "The practice has ended",
+        tone: "info",
+      });
+    } else if (was.shown === null && shown !== null && inPractice) {
+      toast({ title: "A practice auction has started — try the bidding", tone: "info" });
+    }
+  }, [shown, inPractice, realStarted, toast]);
 
   useEffect(() => {
     if (!watch) {
@@ -60,18 +90,7 @@ export function PracticeBar({
       if (stopped || state === null || state.practiceId === shown) {
         return;
       }
-      if (state.practiceId === null) {
-        if (inPractice) {
-          toast({
-            title: state.realStarted
-              ? "The practice is over — the real auction has started"
-              : "The practice has ended",
-            tone: "info",
-          });
-        }
-      } else if (shown === null) {
-        toast({ title: "A practice auction has started — try the bidding", tone: "info" });
-      }
+      // The refresh redraws the room; the effect above says what changed.
       router.refresh();
     };
     const timer = window.setInterval(() => void tick(), POLL_MS);
@@ -86,7 +105,7 @@ export function PracticeBar({
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [watch, slug, shown, inPractice, router, toast]);
+  }, [watch, slug, shown, router]);
 
   if (practice === null) {
     return null;

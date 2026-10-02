@@ -1,7 +1,7 @@
 import { ButtonLink, ToastProvider } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 
-import { MoneyUnitProvider } from "../../../../../components/money-unit";
+import { MoneyUnitOverride } from "../../../../../components/money-unit";
 import { cockpitView } from "../../../../../server/auction/conduct-actions";
 import { PracticeBar } from "../practice-bar";
 import { CockpitPanel } from "./cockpit-panel";
@@ -39,6 +39,7 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
             <PracticeBar
               slug={slug}
               practice={view.practice}
+              realStarted={view.practice === null && status !== "scheduled"}
               watch={view.practice !== null || status === "scheduled"}
             />
             <CockpitPanel slug={slug} view={view} />
@@ -77,5 +78,5 @@ export default async function CockpitPage({ params }: { params: Promise<{ slug: 
       </ToastProvider>
     </div>
   );
-  return inPractice ? <MoneyUnitProvider unit="points">{room}</MoneyUnitProvider> : room;
+  return <MoneyUnitOverride unit={inPractice ? "points" : null}>{room}</MoneyUnitOverride>;
 }

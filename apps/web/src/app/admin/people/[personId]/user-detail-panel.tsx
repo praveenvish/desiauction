@@ -57,10 +57,10 @@ export function UserDetailPanel({
     <>
       <PageTitle title={person.name ?? "Unnamed"} />
       <AdminPageHead
-        readOnly
+        readOnly={!detail.canManage}
         actions={
           <Link href="/admin/people" className="admin-head-button">
-            All users
+            All people
           </Link>
         }
       />

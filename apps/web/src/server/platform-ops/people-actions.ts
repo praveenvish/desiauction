@@ -2,7 +2,6 @@
 
 import { people } from "@desiauction/db";
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { db, systemDb } from "../db";
@@ -39,14 +38,6 @@ async function nameOf(personId: string): Promise<string> {
   return row?.name ?? "this person";
 }
 
-function refresh(personId?: string): void {
-  revalidatePath("/admin/people");
-  revalidatePath("/admin/roles");
-  if (personId !== undefined) {
-    revalidatePath(`/admin/people/${personId}`);
-  }
-}
-
 export async function grantRoleAction(
   personId: string,
   set: string,
@@ -69,7 +60,6 @@ export async function grantRoleAction(
   if (result.changed) {
     after(() => tellPerson(db, { personId }, "role_granted", { name: "", role, reason }));
   }
-  refresh(personId);
   return {
     ok: true,
     message: result.changed
@@ -100,7 +90,6 @@ export async function revokeRoleAction(
   if (result.changed) {
     after(() => tellPerson(db, { personId }, "role_revoked", { name: "", role, reason }));
   }
-  refresh(personId);
   return { ok: true, message: `${role} was removed from ${await nameOf(personId)}.` };
 }
 
@@ -118,7 +107,6 @@ export async function suspendAction(personId: string, reason: string): Promise<P
     return { ok: false, error: result.error };
   }
   after(() => tellPerson(db, { personId }, "suspended", { name: "", reason }));
-  refresh(personId);
   return {
     ok: true,
     message: `${await nameOf(personId)} is suspended and was signed out of ${String(result.signedOut)} device${result.signedOut === 1 ? "" : "s"}.`,
@@ -142,7 +130,6 @@ export async function unsuspendAction(
     return { ok: false, error: result.error };
   }
   after(() => tellPerson(db, { personId }, "unsuspended", { name: "", reason }));
-  refresh(personId);
   return { ok: true, message: `${await nameOf(personId)} can sign in again.` };
 }
 
@@ -160,7 +147,6 @@ export async function signOutEverywhereAction(
     reason: gate.operator.reason,
   });
   after(() => tellPerson(db, { personId }, "signed_out", { name: "", reason }));
-  refresh(personId);
   return {
     ok: true,
     message: `${await nameOf(personId)} was signed out of ${String(result.signedOut)} device${result.signedOut === 1 ? "" : "s"}.`,
@@ -199,7 +185,6 @@ export async function invitePersonAction(input: {
         reason: input.reason,
       }),
     );
-    refresh(result.personId);
     return {
       ok: true,
       message: `${input.name.trim()} is already on DesiAuction — they have ${roles} now.`,
@@ -211,7 +196,6 @@ export async function invitePersonAction(input: {
       tellPerson(db, { email }, "invited", { name: input.name, role: roles, reason: input.reason }),
     );
   }
-  refresh();
   return {
     ok: true,
     message: `Invitation saved. ${input.name.trim()} gets ${roles} the first time they sign in with ${input.contact.trim()} (within 14 days).`,

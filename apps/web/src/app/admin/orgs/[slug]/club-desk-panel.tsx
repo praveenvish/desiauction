@@ -2,7 +2,7 @@
 
 import { Button, Dialog, Field, Select, SectionCard, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 
 import { useStepUp, type GatedResult } from "../../../../components/admin/use-step-up";
 import type { ClubDesk } from "../../../../server/platform-ops/club";
@@ -63,7 +63,7 @@ export function ClubDeskPanel({
   const [contact, setContact] = useState("");
   const [role, setRole] = useState<"org:owner" | "org:staff">("org:staff");
   const [pick, setPick] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, start] = useTransition();
   const [link, setLink] = useState<{ message: string; url: string } | null>(null);
 
   const nameOf = (personId: string) =>
@@ -77,7 +77,7 @@ export function ClubDeskPanel({
     setAct(next);
   };
 
-  const submit = async () => {
+  const submit = () => {
     if (act === null) {
       return;
     }
@@ -119,8 +119,8 @@ export function ClubDeskPanel({
           });
       }
     };
-    setBusy(true);
-    try {
+    // One transition for the action and the refresh — see person-actions.tsx.
+    start(async () => {
       let outcome: ClubDeskResult | null = null;
       const result = await run(async (): Promise<GatedResult> => {
         outcome = await call();
@@ -138,9 +138,7 @@ export function ClubDeskPanel({
         toast({ title: finished.message, tone: "success" });
       }
       router.refresh();
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const needsContact = act?.kind === "add" || act?.kind === "transfer";
@@ -370,12 +368,7 @@ export function ClubDeskPanel({
             >
               Cancel
             </Button>
-            <Button
-              onClick={() => void submit()}
-              loading={busy}
-              disabled={!ready}
-              data-testid="desk-confirm"
-            >
+            <Button onClick={submit} loading={busy} disabled={!ready} data-testid="desk-confirm">
               {act === null ? "" : TITLE[act.kind]}
             </Button>
           </>

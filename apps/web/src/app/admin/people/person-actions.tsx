@@ -2,7 +2,7 @@
 
 import { Button, Dialog, Field, Select, useToast } from "@desiauction/ui";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 
 import { useStepUp, type GatedResult } from "../../../components/admin/use-step-up";
 import {
@@ -36,30 +36,35 @@ function useRunner() {
   const router = useRouter();
   const toast = useToast();
   const { run, dialog } = useStepUp();
-  const [busy, setBusy] = useState(false);
-  const go = async (act: () => Promise<PeopleActionResult>): Promise<boolean> => {
-    setBusy(true);
-    try {
-      let message = "";
-      const result = await run(async (): Promise<GatedResult> => {
-        const answer = await act();
-        if (answer.ok) {
-          message = answer.message;
-          return { ok: true };
+  const [busy, start] = useTransition();
+  /*
+   * Inside a transition, as every admin desk does it (pass-queue-panel.tsx):
+   * the action and the refresh that follows are one transition, so the page
+   * shows the new state as soon as it is fetched. Called outside one, the
+   * refresh queued behind the action and the page lagged by seconds.
+   */
+  const go = (act: () => Promise<PeopleActionResult>): Promise<boolean> =>
+    new Promise<boolean>((resolve) => {
+      start(async () => {
+        let message = "";
+        const result = await run(async (): Promise<GatedResult> => {
+          const answer = await act();
+          if (answer.ok) {
+            message = answer.message;
+            return { ok: true };
+          }
+          return answer;
+        });
+        if (!result.ok) {
+          toast({ title: result.error, tone: "danger" });
+          resolve(false);
+          return;
         }
-        return answer;
+        toast({ title: message, tone: "success" });
+        router.refresh();
+        resolve(true);
       });
-      if (!result.ok) {
-        toast({ title: result.error, tone: "danger" });
-        return false;
-      }
-      toast({ title: message, tone: "success" });
-      router.refresh();
-      return true;
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
   return { go, busy, stepUpDialog: dialog };
 }
 
