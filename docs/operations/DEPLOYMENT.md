@@ -76,6 +76,13 @@ grants, swaps the engine first so its single-writer lease is handed over
 cleanly, and fails the job unless `/readyz` answers on the new engine and web
 within 180 s. ops/deploy/README "How a deploy runs" has the step list.
 
+On a production deploy that has passed `/readyz`, the last step tells IndexNow
+(Bing, Yandex, Seznam, Naver) what the release changed: every page that is new
+or whose sitemap `<lastmod>` moved since the snapshot taken before the swap,
+plus the homepage (`scripts/indexnow-announce.mjs`). It exits 0 on every path,
+so it can never fail a deploy. Season pages are announced by the app itself
+when an organizer publishes or unpublishes them.
+
 **The first deploy onto an empty database** passes the freeze on its own: an
 unmigrated database has no `auctions` table, which the check reads as "nothing
 can be live" (any other error is still a refusal). Create the four roles
