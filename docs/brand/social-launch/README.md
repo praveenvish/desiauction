@@ -68,15 +68,16 @@ Threads with "Continue with Instagram" and post the two Threads drafts below.
 
 | Network | Handle | Cover | Bio = core line | Link | Hero pinned |
 |---|---|---|---|---|---|
-| Instagram | @desiauction | n/a | yes | **app only** | **pin in app** |
+| Instagram | @desiauction (Business, category Sports) | n/a | yes | **app only** | **pin in app**; 4 evergreen stories live (START, AUCTION, PRICING, ASK — `instagram/stories/`) |
 | Threads | @desiauction | n/a | yes | yes | latest post |
 | YouTube | @DesiAuction | yes + DA watermark | description | site, IG, Threads, X | channel trailer; playlist "How DesiAuction Works" |
 | X | @thedesiauction | yes | yes | yes | pinned |
 | LinkedIn | The DesiAuction (personal) | yes | headline + About | Featured post | Featured |
-| Facebook | `thedesiauction` (free) | ready | — | — | — |
+| Facebook | facebook.com/thedesiauction (in portfolio "DesiAuction" with Instagram) | yes (logo kept clear of the centred profile photo) | yes | website + Sign up button | film as Reel; same 4 stories |
 
-**Needs the founder's phone:** Instagram bio link + Business account + pin the film
-Reel + story highlights; YouTube phone verification (unlocks clickable links in
+**Needs the founder's phone:** Instagram bio link + pin the film Reel + turn the
+4 live stories into highlights (START, AUCTION, PRICING, ASK, with the covers in
+`instagram/highlights/`) within 24 h of 2026-10-02; YouTube phone verification (unlocks clickable links in
 descriptions and Shorts → related video).
 
 ---
@@ -96,7 +97,7 @@ re-encoded HEVC 640 kbps two-pass (SSIM 0.994 against the source).
 | LinkedIn | 16:9, custom thumbnail | live |
 | Threads | 9:16 | live, with profile photo, bio, link and the two text threads |
 | X `@thedesiauction` | 16:9, pinned | live, with header, logo, bio, Jaipur, link |
-| Facebook | — | not created yet (`thedesiauction` is free) |
+| Facebook | 16:9 as Reel (H.264 — Meta's web uploaders stall on HEVC/injected video; Business Suite's reel composer works) | live |
 
 The 2.5 s logo strike (`docs/brand/kit/motion/da-strike-lockup-1920x1080.mp4`)
 is the intro for future YouTube videos, not a post.

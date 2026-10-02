@@ -34,8 +34,9 @@ const COVERS = [
   ["youtube/banner-2560x1440.png", 2560, 1440, { x: 507, y: 508, w: 1546, h: 423 }],
   // Profile photo bottom-left; phones trim top and bottom.
   ["x/header-1500x500.png", 1500, 500, { x: 260, y: 50, w: 1200, h: 400 }],
-  // Phones crop the sides to roughly the centre 1280 px.
-  ["facebook/cover-1640x624.png", 1640, 624, { x: 180, y: 100, w: 1280, h: 424 }],
+  // Facebook centres the profile picture over the lower half of the cover,
+  // and phones crop the sides, so the logo sits high and central.
+  ["facebook/cover-1640x624.png", 1640, 624, { x: 280, y: 24, w: 1080, h: 300 }],
 ];
 
 const W0 = 1400;
