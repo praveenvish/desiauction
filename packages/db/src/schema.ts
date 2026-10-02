@@ -17,6 +17,7 @@ import {
   timestamp,
   unique,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 // IP-2_DESIGN §4. ids are ULIDs (char 26, app-generated via newId()).
@@ -75,6 +76,16 @@ export const people = pgTable("people", {
    * never opened /inbox on this build.
    */
   inboxSeenAt: ts("inbox_seen_at"),
+  /**
+   * SUSPENDED by a platform operator (0103, AC-1.2): every session stops on
+   * its next request and every sign-in refuses. Grants are kept, so lifting
+   * it restores the account exactly. At and reason are set together (CHECK).
+   */
+  suspendedAt: ts("suspended_at"),
+  suspendedReason: text("suspended_reason"),
+  suspendedBy: char("suspended_by", { length: 26 }).references((): AnyPgColumn => people.id, {
+    onDelete: "set null",
+  }),
 });
 
 /**
@@ -2414,6 +2425,34 @@ export const finopsSchedules = pgTable("finops_schedules", {
   nextDueMs: bigint("next_due_ms", { mode: "number" }).notNull(),
   lastFiredMs: bigint("last_fired_ms", { mode: "number" }),
 });
+
+// A superadmin's invitation to a platform role (0103, AC-1.2). It waits until
+// the phone or email is PROVEN at sign-in, then becomes grants. No tenant, no
+// RLS; read by the web tier only (engine and runner hold no grant on it).
+export const platformInvites = pgTable(
+  "platform_invites",
+  {
+    id: id(),
+    phone: text("phone"),
+    email: text("email"),
+    name: text("name").notNull(),
+    capabilitySets: text("capability_sets").array().notNull(),
+    invitedBy: char("invited_by", { length: 26 })
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    reason: text("reason").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+    expiresAt: ts("expires_at").notNull(),
+    acceptedBy: char("accepted_by", { length: 26 }).references(() => people.id, {
+      onDelete: "set null",
+    }),
+    acceptedAt: ts("accepted_at"),
+    revokedAt: ts("revoked_at"),
+  },
+  (table) => [
+    check("platform_invites_contact_check", sql`(${table.phone} is null) <> (${table.email} is null)`),
+  ],
+);
 
 // Every scheduled job's runs (0102, AC-1). The scheduler has no database, so
 // each job route records its own run. Platform-level, ZERO tenant data (the

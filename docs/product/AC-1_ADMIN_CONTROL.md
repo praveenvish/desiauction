@@ -61,27 +61,64 @@ Linear descriptions until they are started.
    `people`; `update (revoked_at)` on `sessions`; `update (stepped_up_at)` on
    `sessions`. `grants:verify` pins the new list.
 
-## 1.2 People & roles (DES-20)
+## 1.2 People & roles (DES-20) — built
 
-`/admin/users` becomes **`/admin/people`** (old address redirects).
+`/admin/users` becomes **`/admin/people`**. The old address redirects, with
+its query, in `next.config.mjs`.
 
-- **Find**: search by name, phone or email; filters *has a platform role*,
-  *suspended*.
-- **Invite person** (superadmin): phone or email, name, roles. Creates the
-  person if new and grants the roles now; their first sign-in finds them
-  waiting. An email says what they were given and where to sign in.
-  Visible at once on `/admin/roles` — never a hidden, dormant grant.
-- **Person page (360°)**: profile; clubs and their roles; platform roles;
-  sessions and devices (last seen, browser); recent activity (audit); recent
-  messages. Actions on the page:
-  - **Grant / revoke a platform role** — superadmin only.
-  - **Suspend / unsuspend** — with a reason. Suspending revokes every session
-    and refuses sign-in ("This account is suspended. Contact support.").
-    Never yourself, never a superadmin.
-  - **Sign out everywhere.**
-  Each: step-up, audit row with reason, email to the person.
-- **`/admin/roles`**: who holds each platform role now, and the history
-  (granted / revoked, by whom, when, why).
+- **Find**: search by name, phone or email. Filters: *Admin roles* and
+  *Suspended*. Rows show a red **Suspended** badge.
+- **Invite person** (superadmin): phone or email, name, roles and a reason.
+  - Someone already on DesiAuction with that **verified** contact gets the
+    roles at once.
+  - Anyone else gets a **waiting invitation** (`platform_invites`, 14 days)
+    that turns into grants the moment that phone or email is **proven** at
+    sign-in (`applyPlatformInvites`, called where every session is made).
+  - Nothing is ever created on someone's behalf, and no role sits on an
+    unproven contact. Email sign-in refuses an unverified, pre-claimed
+    address, which is why a pre-made account would have locked the invitee
+    out.
+- **Person page**: profile, an **Account** card, then clubs and roles,
+  seasons and activity.
+  - The Account card shows open or suspended (by whom, when, why), the
+    signed-in devices, and the last emails sent.
+  - Superadmin controls on that card: **Give a role**, **Remove** (each held
+    role), **Sign out everywhere**, **Suspend** / **Lift suspension**.
+  - Each control asks for a reason, then "Confirm it's you" if the session
+    needs it.
+- **`/admin/roles`** (superadmin): each role's holders, waiting invitations,
+  and the last 100 changes.
+- **Rules**:
+  - Never suspend yourself or a superadmin.
+  - Superadmin is neither grantable nor revocable in the app.
+  - Suspension keeps grants, so lifting it restores the account exactly.
+    Lifting does not wake old devices.
+- **Enforcement**:
+  - `getSessionByToken` joins `people.suspended_at`, so a suspended cookie
+    stops on its next request.
+  - Phone, email and passkey sign-in refuse a suspended account
+    (`auth.login.refused_suspended`).
+- **Telling people**: the `security.admin_action` email (six variants,
+  English and Hindi, with the reason) is sent after the response.
+  - It goes through the notification gate and is recorded in `email_sends`.
+  - It never contains a link or a code.
+  - A person with no verified email is not mailed. The audit row and their
+    next visit carry it.
+- **Which database role writes what**:
+  - `people`, `sessions` and `platform_invites` have no RLS, and the web tier
+    already writes them on **`desiauction_app`** (app-layer scoping, behind
+    `operatorFor`). Suspension and sign-out-everywhere use that role, so the
+    BYPASSRLS system role gains **no** access to `people` or `sessions`.
+  - Platform grants are written on **`desiauction_system`**, the only role
+    RLS lets write one. It gained exactly `update (revoked_at) on grants`.
+    That also fixes `seed:admin --revoke`, which only ever worked locally as
+    the owner.
+  - `grants:verify` pins this at column level.
+- **Search**: a plain `ilike`, keyset-paginated at 50, which is adequate for
+  an admin tool at today's size. Add a `pg_trgm` index if people grow past
+  ~100k.
+- **Proof**: `people-admin.posture.test.ts` drives every action under the
+  production roles.
 
 ## 1.3 Club roles desk (DES-21)
 

@@ -3454,3 +3454,45 @@ details[open] > summary .admin-health-caret {
     display: none;
   }
 }
+
+/* --- AC-1.2: people & roles ------------------------------------------------- */
+.admin-person-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.admin-device-list,
+.admin-role-holders,
+.admin-messages ul {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+.admin-account-suspension {
+  margin: 0 0 var(--space-2);
+  color: var(--danger-strong, var(--text-primary));
+}
+.admin-roles-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+.admin-role-choices {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  padding: 0;
+  border: 0;
+}
+.admin-role-choice {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.admin-invite {
+  display: flex;
+  justify-content: flex-end;
+}

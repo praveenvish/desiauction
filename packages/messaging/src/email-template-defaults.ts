@@ -365,6 +365,199 @@ const EMAIL_CHANGED: EmailTemplateSpec = {
   },
 };
 
+// --- Changes made by DesiAuction support (AC-1.2) ------------------------------
+
+/*
+ * Every change a platform operator makes to somebody's account is told to that
+ * person, with the operator's written reason, in one mail per act. Never a link
+ * to sign in and never a code: a forwarded copy must be harmless.
+ */
+const ADMIN_ACTION_VARIANTS = [
+  { id: "invited", label: "Invited to a role (before their first sign-in)" },
+  { id: "role_granted", label: "Given a role" },
+  { id: "role_revoked", label: "A role taken away" },
+  { id: "suspended", label: "Account suspended" },
+  { id: "unsuspended", label: "Suspension lifted" },
+  { id: "signed_out", label: "Signed out of every device" },
+] as const;
+
+const ROLE = text("role", "The platform role, in words.", "Support desk", "सपोर्ट डेस्क");
+const REASON_VAR = text(
+  "reason",
+  "The operator's reason, as they wrote it.",
+  "Helping with problem reports this month",
+  "इस महीने समस्या रिपोर्ट में मदद के लिए",
+  { required: true },
+);
+
+const ADMIN_FOOTNOTE = {
+  en: "You received this because DesiAuction support changed something on your account.",
+  hi: "आपको यह इसलिए मिला क्योंकि DesiAuction सपोर्ट ने आपके अकाउंट में कुछ बदला है।",
+};
+
+const ADMIN_ACTION: EmailTemplateSpec = {
+  kind: "security.admin_action",
+  format: "layout",
+  editable: true,
+  editableFields: LAYOUT_FIELDS,
+  languages: ["en", "hi"],
+  variants: ADMIN_ACTION_VARIANTS,
+  actions: HELP,
+  variables: [NAME, ROLE, REASON_VAR],
+  locked: [],
+  note: "Sent to the person an admin action was about, with the operator's reason. No sign-in link or code is ever added.",
+  defaults: {
+    en: {
+      variants: {
+        invited: layout({
+          subject: "You've been given {{role}} on DesiAuction",
+          preheader: "Sign in at desiauction.in with this address to start.",
+          heading: "Welcome to the DesiAuction team",
+          paragraphs: [
+            "Hi {{name}}, you've been given {{role}} on DesiAuction. Reason: {{reason}}",
+            "Sign in at desiauction.in with this email address — it is waiting for you. The invitation lasts 14 days.",
+          ],
+          after: [],
+          actions: { help: "Get help" },
+          footnote: ADMIN_FOOTNOTE.en,
+        }),
+        role_granted: layout({
+          subject: "You now have {{role}} on DesiAuction",
+          preheader: "It is on your account now.",
+          heading: "You've been given {{role}}",
+          paragraphs: [
+            "Hi {{name}}, {{role}} was added to your DesiAuction account. Reason: {{reason}}",
+          ],
+          after: [],
+          actions: { help: "Get help" },
+          footnote: ADMIN_FOOTNOTE.en,
+        }),
+        role_revoked: layout({
+          subject: "{{role}} was removed from your DesiAuction account",
+          preheader: "Nothing else on your account changed.",
+          heading: "{{role}} was removed",
+          paragraphs: [
+            "Hi {{name}}, {{role}} was removed from your DesiAuction account. Reason: {{reason}}",
+            "Nothing else on your account changed.",
+          ],
+          after: [],
+          actions: { help: "Get help" },
+          footnote: ADMIN_FOOTNOTE.en,
+        }),
+        suspended: layout({
+          subject: "Your DesiAuction account is suspended",
+          preheader: "You've been signed out everywhere.",
+          heading: "Your account is suspended",
+          paragraphs: [
+            "Hi {{name}}, DesiAuction support suspended your account and signed it out of every device. Reason: {{reason}}",
+            "Your clubs, seasons and records are kept exactly as they are. If you think this is a mistake, reply to this email.",
+          ],
+          after: [],
+          actions: { help: "Get help" },
+          footnote: ADMIN_FOOTNOTE.en,
+        }),
+        unsuspended: layout({
+          subject: "Your DesiAuction account is open again",
+          preheader: "You can sign in again.",
+          heading: "Your account is open again",
+          paragraphs: [
+            "Hi {{name}}, the suspension on your DesiAuction account was lifted, and everything is as you left it. Reason: {{reason}}",
+          ],
+          after: [],
+          actions: { help: "Get help" },
+          footnote: ADMIN_FOOTNOTE.en,
+        }),
+        signed_out: layout({
+          subject: "You were signed out of DesiAuction on every device",
+          preheader: "Sign in again whenever you're ready.",
+          heading: "Signed out everywhere",
+          paragraphs: [
+            "Hi {{name}}, DesiAuction support signed your account out of every device. Reason: {{reason}}",
+            "Sign in again with your usual phone or email whenever you're ready.",
+          ],
+          after: [],
+          actions: { help: "Get help" },
+          footnote: ADMIN_FOOTNOTE.en,
+        }),
+      },
+    },
+    hi: {
+      variants: {
+        invited: layout({
+          subject: "आपको DesiAuction पर {{role}} दिया गया है",
+          preheader: "शुरू करने के लिए इसी पते से desiauction.in पर साइन इन करें।",
+          heading: "DesiAuction टीम में आपका स्वागत है",
+          paragraphs: [
+            "नमस्ते {{name}}, आपको DesiAuction पर {{role}} दिया गया है। कारण: {{reason}}",
+            "इसी ईमेल पते से desiauction.in पर साइन इन करें — यह आपका इंतज़ार कर रहा है। यह न्योता 14 दिन तक चलेगा।",
+          ],
+          after: [],
+          actions: { help: "मदद लें" },
+          footnote: ADMIN_FOOTNOTE.hi,
+        }),
+        role_granted: layout({
+          subject: "अब आपके पास DesiAuction पर {{role}} है",
+          preheader: "यह अब आपके अकाउंट में है।",
+          heading: "आपको {{role}} दिया गया है",
+          paragraphs: [
+            "नमस्ते {{name}}, आपके DesiAuction अकाउंट में {{role}} जोड़ा गया है। कारण: {{reason}}",
+          ],
+          after: [],
+          actions: { help: "मदद लें" },
+          footnote: ADMIN_FOOTNOTE.hi,
+        }),
+        role_revoked: layout({
+          subject: "आपके DesiAuction अकाउंट से {{role}} हटा दिया गया",
+          preheader: "आपके अकाउंट में और कुछ नहीं बदला।",
+          heading: "{{role}} हटा दिया गया",
+          paragraphs: [
+            "नमस्ते {{name}}, आपके DesiAuction अकाउंट से {{role}} हटा दिया गया है। कारण: {{reason}}",
+            "आपके अकाउंट में और कुछ नहीं बदला।",
+          ],
+          after: [],
+          actions: { help: "मदद लें" },
+          footnote: ADMIN_FOOTNOTE.hi,
+        }),
+        suspended: layout({
+          subject: "आपका DesiAuction अकाउंट निलंबित कर दिया गया है",
+          preheader: "आपको सभी डिवाइस से साइन आउट कर दिया गया है।",
+          heading: "आपका अकाउंट निलंबित है",
+          paragraphs: [
+            "नमस्ते {{name}}, DesiAuction सपोर्ट ने आपका अकाउंट निलंबित किया है और सभी डिवाइस से साइन आउट कर दिया है। कारण: {{reason}}",
+            "आपके क्लब, सीज़न और रिकॉर्ड जैसे थे वैसे ही रखे गए हैं। अगर आपको लगता है कि यह गलती है, तो इस ईमेल का जवाब दें।",
+          ],
+          after: [],
+          actions: { help: "मदद लें" },
+          footnote: ADMIN_FOOTNOTE.hi,
+        }),
+        unsuspended: layout({
+          subject: "आपका DesiAuction अकाउंट फिर से खुल गया है",
+          preheader: "आप फिर से साइन इन कर सकते हैं।",
+          heading: "आपका अकाउंट फिर से खुल गया है",
+          paragraphs: [
+            "नमस्ते {{name}}, आपके DesiAuction अकाउंट का निलंबन हटा दिया गया है, और सब कुछ वैसा ही है जैसा आपने छोड़ा था। कारण: {{reason}}",
+          ],
+          after: [],
+          actions: { help: "मदद लें" },
+          footnote: ADMIN_FOOTNOTE.hi,
+        }),
+        signed_out: layout({
+          subject: "आपको सभी डिवाइस पर DesiAuction से साइन आउट कर दिया गया",
+          preheader: "जब चाहें फिर से साइन इन करें।",
+          heading: "हर जगह से साइन आउट",
+          paragraphs: [
+            "नमस्ते {{name}}, DesiAuction सपोर्ट ने आपके अकाउंट को सभी डिवाइस से साइन आउट कर दिया है। कारण: {{reason}}",
+            "जब चाहें अपने सामान्य फ़ोन या ईमेल से फिर से साइन इन करें।",
+          ],
+          after: [],
+          actions: { help: "मदद लें" },
+          footnote: ADMIN_FOOTNOTE.hi,
+        }),
+      },
+    },
+  },
+};
+
 // --- Registration decisions ------------------------------------------------------
 
 // "Manage emails" in the footer (email v2) is where these are switched off, so
@@ -3220,6 +3413,7 @@ export const EMAIL_TEMPLATES: Readonly<Record<EmailNotificationKind, EmailTempla
   "auth.email_code": EMAIL_CODE,
   "security.phone_changed": PHONE_CHANGED,
   "security.email_changed": EMAIL_CHANGED,
+  "security.admin_action": ADMIN_ACTION,
   "security.passkey_changed": PASSKEY_CHANGED,
   "security.account_deletion": ERASURE,
   "registration.received": RECEIVED,

@@ -180,6 +180,19 @@ const ENTRIES = [
     channels: ["email", "whatsapp"],
   },
   {
+    // AC-1.2: every change DesiAuction support makes to somebody's account —
+    // a role given or taken, a suspension and its end, a sign-out everywhere,
+    // an invitation — told to that person with the operator's reason.
+    key: "security.admin_action",
+    label: "Account changed by DesiAuction support",
+    description:
+      "Tells a person, with the operator's reason, when support gave or removed a platform role, suspended or reopened their account, signed them out everywhere, or invited them.",
+    audience: "account",
+    category: "security",
+    topic: "security",
+    channels: ["email"],
+  },
+  {
     // A passkey signs in with no code at all, so one added by somebody holding
     // a stolen session is a key they keep (email programme PR14). Removing
     // the owner's own passkey is the other half of a takeover.

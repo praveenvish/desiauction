@@ -242,7 +242,7 @@ describe("exactly one item is ever active", () => {
     "/account",
     "/help",
     "/admin",
-    "/admin/users",
+    "/admin/people",
     "/seasons/demo-pl/teams",
   ];
 

@@ -95,6 +95,12 @@ alter default privileges in schema public
 grant select, update on invites to desiauction_system;
 grant select on organizations to desiauction_system;
 grant insert on org_members, grants, audit_log to desiauction_system;
+-- AC-1.2: revoking a PLATFORM grant (/admin/people, and `seed:admin --revoke`)
+-- stamps revoked_at — and RLS lets no other role touch a platform-scoped row.
+-- One column: the system role can end a grant, never change whose or what it
+-- is, and never delete one (the history stays). Before this, the seed's
+-- --revoke worked only on a laptop, where it connects as the owner.
+grant update (revoked_at) on grants to desiauction_system;
 -- acceptInvite/acceptOwnerJoin tolerate an existing membership (ON CONFLICT
 -- DO NOTHING needs SELECT to detect the conflict target under postgres).
 grant select on org_members to desiauction_system;
@@ -279,5 +285,9 @@ revoke all on provider_template_mappings, provider_template_status, provider_tem
 revoke all on sessions, otp_codes, otp_inbox, passkey_credentials,
   email_verifications, push_subscriptions, email_sends
   from desiauction_engine, desiauction_runner;
+-- 0103: platform invitations hold the phone or email of someone who is not a
+-- user yet. Only the web tier (the admin writer, and sign-in applying them)
+-- reads them.
+revoke all on platform_invites from desiauction_engine, desiauction_runner;
 
 \echo 'roles ready: desiauction_app (nobypassrls) · desiauction_system (bypassrls, least-privilege)'

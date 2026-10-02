@@ -97,7 +97,7 @@ export function OverviewPanel({
           value={<KpiValue n={totals.people} />}
           label="Users"
           hint="With an account"
-          href="/admin/users"
+          href="/admin/people"
           linkComponent={Link}
         />
         <StatCard

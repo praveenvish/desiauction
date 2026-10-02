@@ -94,7 +94,9 @@ export type AdminSurface =
   /** The suppression desk: who we must not contact, looked up one at a time. */
   | "suppressions"
   /** Delivery analytics: counts only, never a recipient. */
-  | "delivery-analytics";
+  | "delivery-analytics"
+  /** AC-1.2: who holds which platform role, and pending invitations. */
+  | "roles";
 
 /**
  * Record that an administrator opened a surface.

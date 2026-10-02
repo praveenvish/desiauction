@@ -167,11 +167,11 @@ describe("pageIdentity", () => {
 
   it("puts administration under one root", () => {
     expect(pageIdentity("/admin", ctx)).toEqual({ crumbs: [], title: "Platform admin" });
-    expect(pageIdentity("/admin/users", ctx)).toEqual({
+    expect(pageIdentity("/admin/people", ctx)).toEqual({
       crumbs: [{ label: "Platform admin", href: "/admin" }],
-      title: "Users",
+      title: "People",
     });
-    expect(pageIdentity("/admin/users/01ABC", ctx).title).toBe("User");
+    expect(pageIdentity("/admin/people/01ABC", ctx).title).toBe("Person");
   });
 
   // The 404 underneath must be the whole answer: no title, no trail, nothing
@@ -233,6 +233,7 @@ describe("the admin tab strip agrees with the routes on disk", () => {
     "platform.privacy",
     "platform.support",
     "platform.moderate",
+    "platform.grant",
   ]);
 
   it("gives every admin route a section", () => {

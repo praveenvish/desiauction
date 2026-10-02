@@ -360,12 +360,12 @@ function AuditRow({
             {" by "}
             {/* A machine-derived row (a lot the timer closed, a sweep the
                 coordinator ran) is signed with the zero ULID. It rendered as a
-                literal "000000" linked to a /admin/users page that 404s by
+                literal "000000" linked to a /admin/people page that 404s by
                 design — a dead link to a person who does not exist. */}
             {isSystemActor(row.actor) ? (
               actorLabel(row.actor, row.actorName)
             ) : (
-              <Link href={`/admin/users/${row.actor}`}>{actorLabel(row.actor, row.actorName)}</Link>
+              <Link href={`/admin/people/${row.actor}`}>{actorLabel(row.actor, row.actorName)}</Link>
             )}
             {row.subject !== null ? (
               <>

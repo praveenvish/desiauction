@@ -3,6 +3,7 @@ import {
   auctions,
   auditLog,
   competitions,
+  emailSends,
   finopsJobs,
   finopsProfiles,
   grants,
@@ -10,7 +11,9 @@ import {
   organizations,
   orgMembers,
   people,
+  platformInvites,
   registrations,
+  sessions,
   settlementCases,
   sports,
   suppressions,
@@ -34,6 +37,7 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
@@ -50,7 +54,7 @@ import { isMatchAction } from "../../lib/event-names";
 import { matchNames } from "../competition/match-names";
 import { SMS_TEMPLATES } from "../messaging/templates";
 import { ADMIN_ACCESS_ACTION } from "./capabilities";
-import { countNoun, waitedFor } from "./format";
+import { countNoun, maskPersonContact, waitedFor } from "./format";
 import { containsPattern } from "../../lib/like-pattern";
 
 /**
@@ -1013,10 +1017,12 @@ export interface UserDirectoryRow {
   /** Seasons they entered as a player — the row says "Player · 2 seasons". */
   readonly seasons: number;
   readonly lastActivityAt: Date | null;
+  /** AC-1.2: the row says "Suspended" when this is set. */
+  readonly suspendedAt: Date | null;
 }
 
 /** PI-1 P6: the directory's profile-aware facets. */
-export type UserDirectoryFilter = "all" | "players" | "profiled";
+export type UserDirectoryFilter = "all" | "players" | "profiled" | "staff" | "suspended";
 
 export interface UserDirectory {
   readonly rows: readonly UserDirectoryRow[];
@@ -1032,7 +1038,13 @@ export interface UserDirectory {
 }
 
 const USER_PAGE = 50;
-const USER_FILTERS: readonly UserDirectoryFilter[] = ["all", "players", "profiled"];
+const USER_FILTERS: readonly UserDirectoryFilter[] = [
+  "all",
+  "players",
+  "profiled",
+  "staff",
+  "suspended",
+];
 
 async function userCursor(db: Db, after: string | undefined): Promise<SQL | undefined> {
   if (after === undefined || after === "") {
@@ -1087,7 +1099,13 @@ export async function userDirectory(
       ? sql`exists (select 1 from registrations r where r.person_id = ${people.id})`
       : f === "profiled"
         ? sql`exists (select 1 from player_profiles pp where pp.person_id = ${people.id})`
-        : undefined;
+        : f === "staff"
+          ? // AC-1.2: anyone holding a live PLATFORM role.
+            sql`exists (select 1 from grants g where g.person_id = ${people.id}
+                  and g.scope_type = 'platform' and g.revoked_at is null)`
+          : f === "suspended"
+            ? sql`${people.suspendedAt} is not null`
+            : undefined;
   const whereFor = (f: UserDirectoryFilter): SQL | undefined => {
     const facet = facetOf(f);
     return search === undefined ? facet : facet === undefined ? search : and(search, facet);
@@ -1103,6 +1121,7 @@ export async function userDirectory(
       phone: people.phone,
       email: people.email,
       createdAt: people.createdAt,
+      suspendedAt: people.suspendedAt,
       orgs: sql<number>`(select count(*)::int from org_members m where m.person_id = people.id)`,
       activeGrants: sql<number>`(select count(*)::int from grants g where g.person_id = people.id and g.revoked_at is null)`,
       seasons: sql<number>`(select count(distinct r.competition_id)::int from registrations r where r.person_id = people.id)`,
@@ -1221,6 +1240,12 @@ export interface UserDetail {
     sport: string;
     status: string;
   }[];
+  /** AC-1.2: suspended, by whom and why — null when the account is open. */
+  readonly suspension: { at: Date; reason: string; byName: string | null } | null;
+  /** AC-1.2: signed-in devices right now (live sessions), newest first. */
+  readonly devices: readonly { userAgent: string | null; createdAt: Date; lastSeenAt: Date }[];
+  /** AC-1.2: the last mails sent to this person — kind and outcome, never content. */
+  readonly messages: readonly { kind: string; outcome: string; at: Date }[];
 }
 
 export async function userDetail(db: Db, personId: string): Promise<UserDetail | null> {
@@ -1231,6 +1256,9 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
       phone: people.phone,
       email: people.email,
       createdAt: people.createdAt,
+      suspendedAt: people.suspendedAt,
+      suspendedReason: people.suspendedReason,
+      suspendedBy: people.suspendedBy,
     })
     .from(people)
     .where(eq(people.id, personId))
@@ -1238,64 +1266,105 @@ export async function userDetail(db: Db, personId: string): Promise<UserDetail |
   if (person === undefined) {
     return null;
   }
-  const [orgRows, seasonRows, grantRows, activity] = await Promise.all([
-    db
-      .select({ slug: organizations.slug, name: organizations.name, joinedAt: orgMembers.joinedAt })
-      .from(orgMembers)
-      .innerJoin(organizations, eq(organizations.id, orgMembers.orgId))
-      .where(eq(orgMembers.personId, personId))
-      .orderBy(asc(orgMembers.joinedAt)),
-    db
-      .select({
-        competitionName: competitions.name,
-        orgName: organizations.name,
-        startsOn: competitions.startsOn,
-        role: registrations.role,
-        sport: competitions.sport,
-        status: registrations.status,
-      })
-      .from(registrations)
-      .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
-      .innerJoin(organizations, eq(organizations.id, competitions.orgId))
-      .where(eq(registrations.personId, personId))
-      .orderBy(asc(competitions.startsOn))
-      .limit(50),
-    db
-      .select({
-        id: grants.id,
-        scopeType: grants.scopeType,
-        scopeId: grants.scopeId,
-        capabilitySet: grants.capabilitySet,
-        grantedBy: grants.grantedBy,
-        createdAt: grants.createdAt,
-        revokedAt: grants.revokedAt,
-        orgName: organizations.name,
-        granterName: people.name,
-      })
-      .from(grants)
-      .leftJoin(organizations, eq(organizations.id, grants.scopeId))
-      .leftJoin(people, eq(people.id, grants.grantedBy))
-      .where(eq(grants.personId, personId))
-      .orderBy(asc(grants.createdAt)),
-    db
-      .select({
-        id: auditLog.id,
-        action: auditLog.action,
-        actor: auditLog.actor,
-        actorName: people.name,
-        scopeType: auditLog.scopeType,
-        scopeId: auditLog.scopeId,
-        subject: auditLog.subject,
-        at: auditLog.at,
-      })
-      .from(auditLog)
-      .leftJoin(people, eq(people.id, auditLog.actor))
-      .where(eq(auditLog.actor, personId))
-      .orderBy(desc(auditLog.at))
-      .limit(15),
-  ]);
+  const { suspendedAt, suspendedReason, suspendedBy, ...profile } = person;
+  const [orgRows, seasonRows, grantRows, activity, deviceRows, messageRows, suspenderRows] =
+    await Promise.all([
+      db
+        .select({
+          slug: organizations.slug,
+          name: organizations.name,
+          joinedAt: orgMembers.joinedAt,
+        })
+        .from(orgMembers)
+        .innerJoin(organizations, eq(organizations.id, orgMembers.orgId))
+        .where(eq(orgMembers.personId, personId))
+        .orderBy(asc(orgMembers.joinedAt)),
+      db
+        .select({
+          competitionName: competitions.name,
+          orgName: organizations.name,
+          startsOn: competitions.startsOn,
+          role: registrations.role,
+          sport: competitions.sport,
+          status: registrations.status,
+        })
+        .from(registrations)
+        .innerJoin(competitions, eq(competitions.id, registrations.competitionId))
+        .innerJoin(organizations, eq(organizations.id, competitions.orgId))
+        .where(eq(registrations.personId, personId))
+        .orderBy(asc(competitions.startsOn))
+        .limit(50),
+      db
+        .select({
+          id: grants.id,
+          scopeType: grants.scopeType,
+          scopeId: grants.scopeId,
+          capabilitySet: grants.capabilitySet,
+          grantedBy: grants.grantedBy,
+          createdAt: grants.createdAt,
+          revokedAt: grants.revokedAt,
+          orgName: organizations.name,
+          granterName: people.name,
+        })
+        .from(grants)
+        .leftJoin(organizations, eq(organizations.id, grants.scopeId))
+        .leftJoin(people, eq(people.id, grants.grantedBy))
+        .where(eq(grants.personId, personId))
+        .orderBy(asc(grants.createdAt)),
+      db
+        .select({
+          id: auditLog.id,
+          action: auditLog.action,
+          actor: auditLog.actor,
+          actorName: people.name,
+          scopeType: auditLog.scopeType,
+          scopeId: auditLog.scopeId,
+          subject: auditLog.subject,
+          at: auditLog.at,
+        })
+        .from(auditLog)
+        .leftJoin(people, eq(people.id, auditLog.actor))
+        .where(eq(auditLog.actor, personId))
+        .orderBy(desc(auditLog.at))
+        .limit(15),
+      db
+        .select({
+          userAgent: sessions.userAgent,
+          createdAt: sessions.createdAt,
+          lastSeenAt: sessions.lastSeenAt,
+        })
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.personId, personId),
+            isNull(sessions.revokedAt),
+            gt(sessions.expiresAt, new Date()),
+          ),
+        )
+        .orderBy(desc(sessions.lastSeenAt))
+        .limit(20),
+      db
+        .select({ kind: emailSends.kind, outcome: emailSends.outcome, at: emailSends.createdAt })
+        .from(emailSends)
+        .where(eq(emailSends.personId, personId))
+        .orderBy(desc(emailSends.createdAt))
+        .limit(10),
+      suspendedBy === null
+        ? Promise.resolve([])
+        : db.select({ name: people.name }).from(people).where(eq(people.id, suspendedBy)).limit(1),
+    ]);
   return {
-    person,
+    person: profile,
+    suspension:
+      suspendedAt === null
+        ? null
+        : {
+            at: suspendedAt,
+            reason: suspendedReason ?? "",
+            byName: suspenderRows[0]?.name ?? null,
+          },
+    devices: deviceRows,
+    messages: messageRows,
     orgs: orgRows,
     grants: grantRows.map((row) => ({
       id: row.id,
@@ -1843,5 +1912,135 @@ export async function messagingOverview(
       failed: whatsappBy.get("failed") ?? 0,
       stops: whatsappStops[0]?.count ?? 0,
     },
+  };
+}
+
+// --- Platform roles (AC-1.2, /admin/roles) -----------------------------------------------
+
+export interface PlatformRoleHolder {
+  readonly personId: string;
+  readonly name: string | null;
+  readonly contact: string;
+  readonly since: Date;
+  readonly grantedByName: string | null;
+}
+
+export interface PlatformRolesView {
+  /** Every platform set, and who holds it now. */
+  readonly holders: readonly { set: string; people: readonly PlatformRoleHolder[] }[];
+  /** The last hundred grants and revocations, newest first. */
+  readonly history: readonly {
+    personId: string;
+    name: string | null;
+    set: string;
+    grantedByName: string | null;
+    createdAt: Date;
+    revokedAt: Date | null;
+  }[];
+  /** Invitations still waiting for a first sign-in. */
+  readonly invites: readonly {
+    id: string;
+    name: string;
+    contact: string;
+    sets: readonly string[];
+    invitedByName: string | null;
+    createdAt: Date;
+    expiresAt: Date;
+  }[];
+}
+
+/**
+ * WHO HOLDS WHAT ON THE PLATFORM — the superadmin's page. Reads the platform
+ * scope only (the singleton scope id), on the system pool like every admin
+ * projection; contacts are masked, as in every list.
+ */
+export async function platformRoles(db: Db, sets: readonly string[]): Promise<PlatformRolesView> {
+  const granter = sql<
+    string | null
+  >`(select g2.name from people g2 where g2.id = ${grants.grantedBy})`;
+  const [current, history, invites] = await Promise.all([
+    db
+      .select({
+        set: grants.capabilitySet,
+        personId: people.id,
+        name: people.name,
+        phone: people.phone,
+        email: people.email,
+        since: grants.createdAt,
+        grantedByName: granter,
+      })
+      .from(grants)
+      .innerJoin(people, eq(people.id, grants.personId))
+      .where(
+        and(
+          eq(grants.scopeType, "platform"),
+          eq(grants.scopeId, "00000000000000000000000000"),
+          isNull(grants.revokedAt),
+        ),
+      )
+      .orderBy(asc(grants.createdAt)),
+    db
+      .select({
+        personId: people.id,
+        name: people.name,
+        set: grants.capabilitySet,
+        grantedByName: granter,
+        createdAt: grants.createdAt,
+        revokedAt: grants.revokedAt,
+      })
+      .from(grants)
+      .innerJoin(people, eq(people.id, grants.personId))
+      .where(
+        and(eq(grants.scopeType, "platform"), eq(grants.scopeId, "00000000000000000000000000")),
+      )
+      .orderBy(desc(sql`coalesce(${grants.revokedAt}, ${grants.createdAt})`))
+      .limit(100),
+    db
+      .select({
+        id: platformInvites.id,
+        name: platformInvites.name,
+        phone: platformInvites.phone,
+        email: platformInvites.email,
+        sets: platformInvites.capabilitySets,
+        invitedByName: sql<
+          string | null
+        >`(select p.name from people p where p.id = ${platformInvites.invitedBy})`,
+        createdAt: platformInvites.createdAt,
+        expiresAt: platformInvites.expiresAt,
+      })
+      .from(platformInvites)
+      .where(
+        and(
+          isNull(platformInvites.acceptedAt),
+          isNull(platformInvites.revokedAt),
+          gt(platformInvites.expiresAt, new Date()),
+        ),
+      )
+      .orderBy(desc(platformInvites.createdAt))
+      .limit(100),
+  ]);
+  return {
+    holders: sets.map((set) => ({
+      set,
+      people: current
+        .filter((row) => row.set === set)
+        .map((row) => ({
+          personId: row.personId,
+          name: row.name,
+          contact: maskPersonContact(row),
+          since: row.since,
+          grantedByName: row.grantedByName,
+        })),
+    })),
+    history,
+    invites: invites.map((row) => ({
+      id: row.id,
+      name: row.name,
+      contact: maskPersonContact({ phone: row.phone, email: row.email }),
+      sets: row.sets,
+      invitedByName: row.invitedByName,
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+    })),
   };
 }

@@ -153,6 +153,10 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
         isNull(sessions.revokedAt),
         gt(sessions.expiresAt, new Date()),
         gt(sessions.createdAt, lifetimeFloor()),
+        // A SUSPENDED account opens nothing (0103): the cookie stops working on
+        // its next request, not when it expires. Checked here, where every
+        // request resolves its session, so no surface can forget it.
+        isNull(people.suspendedAt),
       ),
     )
     .limit(1);
@@ -264,4 +268,18 @@ export async function revokeOtherSessions(
     )
     .returning({ id: sessions.id });
   return revoked.length;
+}
+
+/** The words a suspended account sees at every sign-in door (AC-1.2). */
+export const SUSPENDED_MESSAGE =
+  "This account is suspended. If you think this is a mistake, write to support@desiauction.in.";
+
+/** Is this account suspended? Every sign-in path asks before it issues a session. */
+export async function isSuspended(db: Db, personId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ suspendedAt: people.suspendedAt })
+    .from(people)
+    .where(eq(people.id, personId))
+    .limit(1);
+  return row?.suspendedAt != null;
 }

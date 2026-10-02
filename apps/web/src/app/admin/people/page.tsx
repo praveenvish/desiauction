@@ -2,16 +2,21 @@ import { LoadingState } from "@desiauction/ui";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { adminUsers } from "../../../server/admin/actions";
+import { adminCanManagePeople, adminUsers } from "../../../server/admin/actions";
 import { platformAdminPageGate } from "../../../server/admin/authz";
+import { InvitePerson } from "./person-actions";
+import { ROLE_OPTIONS } from "./role-options";
 import { UsersPanel } from "./users-panel";
 import "../../seasons/seasons.css";
 import "../admin.css";
 import { AdminPageHead } from "../admin-ui";
 
-export const metadata = { title: "Users · Platform admin" };
+export const metadata = { title: "People · Platform admin" };
 
-/** PX-9 §3 — User Administration. Gate first, then stream. Read-only. */
+/**
+ * PX-9 §3 / AC-1.2 — People. Gate first, then stream. Read for every admin;
+ * a superadmin also gets Invite here and the controls on each person's page.
+ */
 export default async function AdminUsersPage({
   searchParams,
 }: {
@@ -24,7 +29,9 @@ export default async function AdminUsersPage({
   return (
     <main className="registrations-dash">
       <div className="dash-stack admin-stack">
-        <AdminPageHead readOnly>Everyone on the platform, and what they hold.</AdminPageHead>
+        <AdminPageHead readOnly={!(await adminCanManagePeople())}>
+          Everyone on the platform, and what they hold.
+        </AdminPageHead>
         <Suspense fallback={<LoadingState variant="page" />}>
           <Directory query={q} after={after} filter={filter} />
         </Suspense>
@@ -34,8 +41,12 @@ export default async function AdminUsersPage({
 }
 
 // PI-1 P6: URL-driven facet, parsed fail-closed like every admin filter.
-function parseUserFilter(value: string | undefined): "all" | "players" | "profiled" {
-  return value === "players" || value === "profiled" ? value : "all";
+function parseUserFilter(
+  value: string | undefined,
+): "all" | "players" | "profiled" | "staff" | "suspended" {
+  return value === "players" || value === "profiled" || value === "staff" || value === "suspended"
+    ? value
+    : "all";
 }
 
 async function Directory({
@@ -47,9 +58,18 @@ async function Directory({
   after: string | undefined;
   filter: string | undefined;
 }) {
-  const directory = await adminUsers(query, after, parseUserFilter(filter));
+  const [directory, canManage] = await Promise.all([
+    adminUsers(query, after, parseUserFilter(filter)),
+    adminCanManagePeople(),
+  ]);
   if (directory === null) {
     notFound();
   }
-  return <UsersPanel directory={directory} paged={after !== undefined} />;
+  return (
+    <UsersPanel
+      directory={directory}
+      paged={after !== undefined}
+      {...(canManage ? { invite: <InvitePerson options={ROLE_OPTIONS} /> } : {})}
+    />
+  );
 }

@@ -249,7 +249,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                 {grants.map((grant) => (
                   <tr key={grant.id}>
                     <td data-label="Person" data-cell="title">
-                      <Link href={`/admin/users/${grant.personId}`} className="admin-name">
+                      <Link href={`/admin/people/${grant.personId}`} className="admin-name">
                         {grant.name ?? grant.personId.slice(-6)}
                       </Link>
                       <span className="da-row-meta">{capabilityLabel(grant.capabilitySet)}</span>
@@ -295,7 +295,7 @@ export function OrgDetailPanel({ detail }: { detail: OrgDetail }) {
                     {/* The name falls back to the masked contact, so the link
                         itself can carry one — masked in a screenshot too. */}
                     <Link
-                      href={`/admin/users/${member.personId}`}
+                      href={`/admin/people/${member.personId}`}
                       className="admin-name"
                       {...(member.name === null ? { "data-private": "" } : {})}
                     >

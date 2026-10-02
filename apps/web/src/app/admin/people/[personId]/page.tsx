@@ -15,7 +15,7 @@ export const metadata = { title: "User · Platform admin" };
  *
  * GATE, then EXIST, then stream. The record check used to live inside the
  * Suspense boundary, which had already committed HTTP 200 — so
- * `/admin/users/00000000000000000000000000` and `/admin/users/NOTAULID` both
+ * `/admin/people/00000000000000000000000000` and `/admin/people/NOTAULID` both
  * returned 200 with a "this page doesn't exist" body, while the same URL
  * returned a hard 404 to a non-admin. Not a corner case: the audit explorer
  * links every actor to this route, and 704 of 3,720 audit rows name an actor

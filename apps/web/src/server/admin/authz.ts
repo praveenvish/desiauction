@@ -150,6 +150,20 @@ export async function isPlatformAdmin(): Promise<boolean> {
   return (await platformAdminGate()) !== null;
 }
 
+/** The superadmin's gate (AC-1.2): `platform.grant`, nothing else. */
+export async function platformGrantGate(): Promise<AdminIdentity | null> {
+  return gateOn("platform.grant");
+}
+
+/** The superadmin's PAGE gate: the evaluation, plus the access record. */
+export async function platformGrantPageGate(surface: AdminSurface): Promise<AdminIdentity | null> {
+  const operator = await platformGrantGate();
+  if (operator !== null) {
+    await recordAdminAccess(operator, surface, null);
+  }
+  return operator;
+}
+
 /**
  * The gate, for a PAGE — the same evaluation, plus the access record.
  *

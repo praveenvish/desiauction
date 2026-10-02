@@ -5,6 +5,7 @@ import {
   IconKey,
   IconLayers,
   IconTrophy,
+  IconUser,
   Pill,
   SectionCard,
 } from "@desiauction/ui";
@@ -28,6 +29,9 @@ import {
   scopeTypeLabel,
 } from "../../admin-ui";
 import { CopyId } from "../../copy-id";
+import { describeUserAgent } from "../../../../server/auth/user-agent";
+import { PersonActions } from "../person-actions";
+import { ROLE_OPTIONS } from "../role-options";
 
 /**
  * PX-9 §3 — the user inspector.
@@ -39,16 +43,23 @@ import { CopyId } from "../../copy-id";
  * The platform grant, if they hold one, appears here like any other row: the
  * platform is a scope, and staff authority is as visible as everyone else's.
  */
-export function UserDetailPanel({ detail }: { detail: UserDetail }) {
-  const { person, orgs, grants, activity } = detail;
+export function UserDetailPanel({
+  detail,
+}: {
+  detail: UserDetail & { canManage: boolean; operatorId: string };
+}) {
+  const { person, orgs, grants, activity, suspension, devices, messages } = detail;
   const active = grants.filter((grant) => grant.revokedAt === null);
+  const platformHeld = active
+    .filter((grant) => grant.scopeType === "platform")
+    .map((grant) => grant.capabilitySet);
   return (
     <>
       <PageTitle title={person.name ?? "Unnamed"} />
       <AdminPageHead
         readOnly
         actions={
-          <Link href="/admin/users" className="admin-head-button">
+          <Link href="/admin/people" className="admin-head-button">
             All users
           </Link>
         }
@@ -91,6 +102,64 @@ export function UserDetailPanel({ detail }: { detail: UserDetail }) {
           </div>
         </dl>
       </section>
+
+      {/* AC-1.2 — the account itself: is it open, where is it signed in, what
+          have we sent it. And, for a superadmin, the controls. */}
+      <SectionCard
+        icon={<IconUser />}
+        tone={suspension === null ? "neutral" : "red"}
+        title="Account"
+        description={
+          suspension === null
+            ? "Open — they can sign in."
+            : "Suspended — signed out everywhere, and sign-in is refused."
+        }
+        data-testid="admin-account"
+      >
+        {suspension === null ? null : (
+          <p className="admin-account-suspension" data-testid="admin-suspension">
+            Suspended {absoluteIst(suspension.at)}
+            {suspension.byName === null ? "" : ` by ${suspension.byName}`}. Reason:{" "}
+            {suspension.reason}
+          </p>
+        )}
+        <p className="admin-meta">
+          Signed in on {formatCount(devices.length)} device{devices.length === 1 ? "" : "s"}
+          {devices.length === 0 ? "." : ":"}
+        </p>
+        {devices.length === 0 ? null : (
+          <ul className="admin-device-list" data-testid="admin-devices">
+            {devices.map((device, index) => (
+              <li key={index}>
+                {describeUserAgent(device.userAgent) ?? "Unknown device"} · last seen{" "}
+                <RelativeTime at={device.lastSeenAt} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {messages.length === 0 ? null : (
+          <details className="admin-messages">
+            <summary>Last {formatCount(messages.length)} emails sent to them</summary>
+            <ul>
+              {messages.map((message, index) => (
+                <li key={index}>
+                  {message.kind} · {message.outcome} · <RelativeTime at={message.at} />
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        {detail.canManage ? (
+          <PersonActions
+            personId={person.id}
+            name={person.name ?? "This person"}
+            isSelf={person.id === detail.operatorId}
+            suspended={suspension !== null}
+            held={platformHeld}
+            options={ROLE_OPTIONS}
+          />
+        ) : null}
+      </SectionCard>
 
       <SectionCard
         icon={<IconKey />}

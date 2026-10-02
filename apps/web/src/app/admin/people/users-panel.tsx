@@ -9,6 +9,7 @@ import {
   ToolbarSpacer,
 } from "@desiauction/ui";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { formatCount, maskPersonContact } from "../../../server/admin/format";
 import type { UserDirectory } from "../../../server/admin/views";
@@ -21,6 +22,8 @@ const USER_FILTERS: readonly { key: UserDirectory["filter"]; label: string }[] =
   { key: "all", label: "Everyone" },
   { key: "players", label: "Players" },
   { key: "profiled", label: "With a profile" },
+  { key: "staff", label: "Admin roles" },
+  { key: "suspended", label: "Suspended" },
 ];
 
 function filterHref(query: string, filter: UserDirectory["filter"]): string {
@@ -28,23 +31,26 @@ function filterHref(query: string, filter: UserDirectory["filter"]): string {
   if (query !== "") params.set("q", query);
   if (filter !== "all") params.set("filter", filter);
   const qs = params.toString();
-  return qs === "" ? "/admin/users" : `/admin/users?${qs}`;
+  return qs === "" ? "/admin/people" : `/admin/people?${qs}`;
 }
 
 /** PX-9 §3 — the user directory. GET-form search, linkable results, no writes. */
 export function UsersPanel({
   directory,
   paged = false,
+  invite,
 }: {
   directory: UserDirectory;
   /** On a later page (a cursor is set): the pager offers the way back. */
   paged?: boolean;
+  /** AC-1.2: the superadmin's "Invite person" control, or nothing. */
+  invite?: ReactNode;
 }) {
   const { rows, total, platformTotal, query, nextCursor } = directory;
   const nextHref =
     nextCursor === null
       ? null
-      : `/admin/users?${new URLSearchParams({
+      : `/admin/people?${new URLSearchParams({
           ...(query === "" ? {} : { q: query }),
           // PI-1 P6: the facet must survive the page turn or "Next 50" resets it.
           ...(directory.filter === "all" ? {} : { filter: directory.filter }),
@@ -53,6 +59,7 @@ export function UsersPanel({
   return (
     <>
       <div className="admin-panel">
+        {invite}
         <AdminFilterForm testId="admin-user-search">
           <Toolbar>
             <ToolbarSearch
@@ -126,7 +133,7 @@ export function UsersPanel({
                             <span className="admin-monogram" aria-hidden>
                               {monogram(row.name)}
                             </span>
-                            <Link href={`/admin/users/${row.id}`} className="admin-name">
+                            <Link href={`/admin/people/${row.id}`} className="admin-name">
                               {row.name ?? "Unnamed"}
                             </Link>
                             {/* A fifty-row directory of full E.164 mobile numbers

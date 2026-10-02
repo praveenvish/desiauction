@@ -194,6 +194,8 @@ const IDENTITY_TABLES = [
   "email_verifications",
   "push_subscriptions",
   "email_sends",
+  // 0103: a platform invitation names someone who is not a user yet.
+  "platform_invites",
 ];
 
 const APP_WRITES_UNPROTECTED = [
@@ -237,6 +239,10 @@ const APP_WRITES_UNPROTECTED = [
   // The direct-send ledger (0094): every code, security, demo and review mail
   // records itself on the app pool. Most belong to no club — no tenant, no RLS.
   "email_sends",
+  // AC-1 (0102, 0103): each job route records its run; the admin writer and
+  // sign-in write platform invitations. Platform-level, no tenant, no RLS.
+  "job_runs",
+  "platform_invites",
 ];
 
 /**
@@ -540,6 +546,39 @@ async function main(): Promise<void> {
         failures.push(
           `  ${expectation.role} ${expectation.allowed ? "MUST" : "MUST NOT"} ` +
             `${expectation.verb} ${expectation.table} — ${expectation.why}`,
+        );
+      }
+    }
+
+    /*
+     * COLUMN-LEVEL: the one UPDATE the system role holds (AC-1.2). It may end a
+     * platform grant (revoked_at) and nothing else on it — never move a grant
+     * to another person, set or scope — and it holds no UPDATE on `people`
+     * (suspension is written on the app role, behind platform-ops).
+     */
+    const columnChecks: { table: string; column: string; allowed: boolean; why: string }[] = [
+      { table: "grants", column: "revoked_at", allowed: true, why: "revoking a platform grant" },
+      ...["person_id", "capability_set", "scope_type", "scope_id", "granted_by"].map((column) => ({
+        table: "grants",
+        column,
+        allowed: false,
+        why: "a grant is ended, never rewritten",
+      })),
+      ...["suspended_at", "phone", "email", "name"].map((column) => ({
+        table: "people",
+        column,
+        allowed: false,
+        why: "people are written on the app role, never the RLS-exempt one",
+      })),
+    ];
+    for (const check of columnChecks) {
+      const [row] = await handle.sql<{ ok: boolean }[]>`
+        select has_column_privilege('desiauction_system', ${"public." + check.table},
+          ${check.column}, 'UPDATE') as ok`;
+      if ((row?.ok ?? false) !== check.allowed) {
+        failures.push(
+          `  desiauction_system ${check.allowed ? "MUST" : "MUST NOT"} UPDATE ` +
+            `${check.table}.${check.column} — ${check.why}`,
         );
       }
     }

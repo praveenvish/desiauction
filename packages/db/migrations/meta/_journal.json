@@ -715,6 +715,13 @@
       "when": 1792512000000,
       "tag": "0102_admin_control_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1792598400000,
+      "tag": "0103_people_admin_control",
+      "breakpoints": true
     }
   ]
 }
