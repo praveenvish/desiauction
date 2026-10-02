@@ -429,6 +429,7 @@ describe("PX-10 · Search (navigation only)", () => {
       "/about",
       "/rules-guidelines",
       "/schedule-demo",
+      "/founding-25",
       "/legal",
       "/help",
       "/c",

@@ -158,6 +158,13 @@ export const SEARCH_INDEX: readonly SearchDoc[] = [
     "Book a live walkthrough",
     "demo walkthrough call sales talk to us book booking time slot appointment",
   ),
+  doc(
+    "Founding 25",
+    "/founding-25",
+    "Product",
+    "Apply to run your auction with us",
+    "founding 25 apply application launch cohort organiser organizer early access filmed",
+  ),
   // /careers, /blog and /api-docs are deliberately NOT here. The routes exist
   // but have nothing on them yet, and a search result that lands on an empty
   // page is worse than no result. Add each back the day it has something to

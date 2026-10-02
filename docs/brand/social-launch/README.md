@@ -113,10 +113,12 @@ on purpose), or buy followers (it poisons the entity signals above).
 | LinkedIn | The DesiAuction (personal) | yes | headline + About | Featured post | Featured |
 | Facebook | thedesiauction (in portfolio "DesiAuction" with Instagram) | yes (logo kept clear of the centred profile photo) | yes | website + Sign up button | film as Reel; same 4 stories |
 
-**Needs the founder's phone:** Instagram bio link + pin the film Reel + turn the
-4 live stories into highlights (START, AUCTION, PRICING, ASK, with the covers in
-`instagram/highlights/`) within 24 h of 2026-10-02; YouTube phone verification (unlocks clickable links in
-descriptions and Shorts → related video).
+**Done from the phone (2026-10-02):** the 4 live stories saved as highlights
+(START, AUCTION, PRICING, ASK, covers from `instagram/highlights/`).
+
+**Still needs the founder:** Instagram bio link (use `desiauction.in/founding-25`
+during the Founding 25 call, then the homepage) + pin the film Reel; YouTube
+advanced verification (Shorts → related video).
 
 ---
 

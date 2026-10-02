@@ -143,6 +143,7 @@ describe("isPublicPath", () => {
     "/about",
     "/schedule-demo",
     "/schedule-demo/pick",
+    "/founding-25",
     "/c",
     "/c/vpl-1-513q",
     "/c/vpl-1-513q/t/strikers",
