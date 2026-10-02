@@ -77,6 +77,8 @@ const COMMAND_REFUSAL_COPY: Record<string, string> = {
   no_players: "A practice needs players to sell. Add or approve some players first.",
   exists: "A practice is already set up for this season.",
   not_practice: "That only applies to a practice auction.",
+  practice_running:
+    "The practice couldn't be ended, so the real auction hasn't started. Try again in a moment.",
   // ENGINE HALTED. The single most serious state the runtime has — the ledger
   // and the projections disagreed, or a replay failed, so the engine STOPPED
   // rather than serve a state it cannot prove. Its ack reason is

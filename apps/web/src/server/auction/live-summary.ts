@@ -6,6 +6,7 @@ import {
 } from "@desiauction/core";
 import { lots, paddles, people, registrations, teams, type Db } from "@desiauction/db";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { inRealAuction } from "@desiauction/auction";
 import { preSignedSql } from "../competition/pre-signed";
 import {
   publicPhotoUrl,
@@ -259,7 +260,7 @@ export async function preSignedPlayers(
         // A captain named AFTER the night is a player the room already sold:
         // `resolvedLots` lists them with their price, and listing them here
         // too would seat one person twice on the squad board.
-        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold')`,
+        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${inRealAuction(lots.auctionId)})`,
       ),
     )
     .orderBy(asc(shownName));

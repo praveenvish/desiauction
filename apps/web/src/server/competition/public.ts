@@ -11,6 +11,7 @@ import {
   type PlayerPosterInput,
   type PosterMark,
 } from "@desiauction/core";
+import { inRealAuction, isRealAuction } from "@desiauction/auction";
 import {
   auctionEvents,
   auctions,
@@ -215,7 +216,7 @@ export async function publicCompetitionView(slug: string): Promise<PublicCompeti
     systemDb
       .select({ status: auctions.status, config: auctions.config })
       .from(auctions)
-      .where(eq(auctions.competitionId, row.id))
+      .where(and(eq(auctions.competitionId, row.id), isRealAuction()))
       .limit(1),
     teamsOf(systemDb, row.id),
     publishedSchedule(systemDb, row.id),
@@ -321,7 +322,7 @@ interface ShowcaseRow {
  * captain the room bought and the organizer named afterwards — that player's
  * public outcome is the sale.
  */
-const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold'))`;
+const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${inRealAuction(lots.auctionId)}))`;
 
 /**
  * The hammer price, when there was one: the registration's SOLD lot in a
@@ -333,7 +334,7 @@ const showcasePreSigned = sql<boolean>`(${preSignedSql} and not exists (select 1
  */
 const showcaseSoldPrice = sql<
   number | null
->`(select max(${lots.soldPrice}) from ${lots} inner join ${auctions} on ${auctions.id} = ${lots.auctionId} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${auctions.status} <> 'abandoned')::float8`;
+>`(select max(${lots.soldPrice}) from ${lots} inner join ${auctions} on ${auctions.id} = ${lots.auctionId} where ${lots.registrationId} = ${registrations.id} and ${lots.status} = 'sold' and ${auctions.status} <> 'abandoned' and ${isRealAuction()})::float8`;
 
 /**
  * The stored photo KEY a public surface may render, or null — the same two
@@ -696,6 +697,7 @@ export async function publicPlayerPoster(
         eq(lots.registrationId, player.registrationId),
         eq(auctions.competitionId, comp.id),
         ne(auctions.status, "abandoned"),
+        isRealAuction(),
       ),
     )
     .limit(1);
@@ -705,7 +707,13 @@ export async function publicPlayerPoster(
           await systemDb
             .select({ status: auctions.status })
             .from(auctions)
-            .where(and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned")))
+            .where(
+              and(
+                eq(auctions.competitionId, comp.id),
+                ne(auctions.status, "abandoned"),
+                isRealAuction(),
+              ),
+            )
             .limit(1)
         )[0]?.status ?? null)
       : null;
@@ -822,7 +830,13 @@ export async function myAuctionOutcome(
   const [auction] = await systemDb
     .select({ id: auctions.id, status: auctions.status })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, row.competitionId), ne(auctions.status, "abandoned")))
+    .where(
+      and(
+        eq(auctions.competitionId, row.competitionId),
+        ne(auctions.status, "abandoned"),
+        isRealAuction(),
+      ),
+    )
     .limit(1);
   const [lot] =
     auction === undefined
@@ -919,7 +933,9 @@ export async function publicCaseStudyFigures(slug: string): Promise<CaseStudyFig
     })
     .from(auctions)
     .leftJoin(lots, eq(lots.auctionId, auctions.id))
-    .where(and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned")));
+    .where(
+      and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned"), isRealAuction()),
+    );
   if (row === undefined || row.auctions === 0) {
     return null;
   }
@@ -969,6 +985,7 @@ export async function publicTopBuys(slug: string, limit = 3): Promise<PublicTopB
       and(
         eq(auctions.competitionId, comp.id),
         ne(auctions.status, "abandoned"),
+        isRealAuction(),
         eq(lots.status, "sold"),
         eq(registrations.status, "approved"),
       ),
@@ -1083,7 +1100,9 @@ export async function publicTeam(slug: string, teamSlug: string): Promise<Public
   const [auction] = await systemDb
     .select({ id: auctions.id, status: auctions.status, config: auctions.config })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned")))
+    .where(
+      and(eq(auctions.competitionId, comp.id), ne(auctions.status, "abandoned"), isRealAuction()),
+    )
     .limit(1);
 
   const member = {
@@ -1279,7 +1298,7 @@ const DIRECTORY_PAGE_SIZE = 12;
 const latestAuctionStatus = sql<string | null>`(
     select ${auctions.status}
     from ${auctions}
-    where ${auctions.competitionId} = ${competitions.id}
+    where ${auctions.competitionId} = ${competitions.id} and ${isRealAuction()}
     order by ${auctions.createdAt} desc
     limit 1
   )`;
@@ -1298,7 +1317,7 @@ const latestAuctionEventMs = sql<number | null>`(
     select max(${auctionEvents.atMs})
     from ${auctionEvents}
     join ${auctions} on ${auctions.id} = ${auctionEvents.auctionId}
-    where ${auctions.competitionId} = ${competitions.id}
+    where ${auctions.competitionId} = ${competitions.id} and ${isRealAuction()}
   )`;
 
 /**
@@ -1586,6 +1605,7 @@ export const myRegistrations = cache(async function myRegistrations(
       and(
         eq(auctions.competitionId, registrations.competitionId),
         ne(auctions.status, "abandoned"),
+        isRealAuction(),
       ),
     )
     .leftJoin(lots, and(eq(lots.registrationId, registrations.id), eq(lots.auctionId, auctions.id)))
@@ -1664,7 +1684,7 @@ export async function publicSeasonSitemap(limit = 5000): Promise<SeasonSitemapEn
           where fr.competition_id = "competitions"."id"),
         (select max(e.created_at) from auction_events e
            join auctions a on a.id = e.auction_id
-          where a.competition_id = "competitions"."id")
+          where a.competition_id = "competitions"."id" and a.kind = 'real')
       )`)}`.mapWith((value: string | Date) => new Date(value)),
     })
     .from(competitions)

@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
@@ -358,6 +359,7 @@ async function auctionsByStatusOf(db: Db): Promise<StatusLine[]> {
   return db
     .select({ status: auctions.status, count: sql<number>`count(*)::int` })
     .from(auctions)
+    .where(isRealAuction())
     .groupBy(auctions.status)
     .orderBy(asc(auctions.status));
 }
@@ -388,7 +390,7 @@ async function liveAuctionsOf(db: Db, nowMs: number): Promise<{ total: number; s
       stale: sql<number>`count(*) filter (where ${auctions.createdAt} < ${cutoff}::timestamptz)::int`,
     })
     .from(auctions)
-    .where(eq(auctions.status, "live"));
+    .where(and(eq(auctions.status, "live"), isRealAuction()));
   return { total: row?.total ?? 0, stale: row?.stale ?? 0 };
 }
 
@@ -409,7 +411,10 @@ export async function platformOverview(deps: FinopsDeps, db: Db): Promise<Platfo
     db.select({ n: sql<number>`count(*)::int` }).from(organizations),
     db.select({ n: sql<number>`count(*)::int` }).from(competitions),
     db.select({ n: sql<number>`count(*)::int` }).from(people),
-    db.select({ n: sql<number>`count(*)::int` }).from(auctions),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(auctions)
+      .where(isRealAuction()),
     db.select({ n: sql<number>`count(*)::int` }).from(settlementCases),
     db.select({ n: sql<number>`count(*)::int` }).from(finopsProfiles),
     auctionsByStatusOf(db),
@@ -581,7 +586,7 @@ export async function attentionQueue(
     })
     .from(auctions)
     .innerJoin(organizations, eq(organizations.id, auctions.orgId))
-    .where(and(eq(auctions.status, "live"), lt(auctions.createdAt, staleCutoff)))
+    .where(and(eq(auctions.status, "live"), lt(auctions.createdAt, staleCutoff), isRealAuction()))
     .groupBy(organizations.slug, organizations.name)
     .orderBy(asc(sql`min(${auctions.createdAt})`))
     .limit(20);
@@ -803,7 +808,7 @@ export async function organizationDirectory(
       createdAt: organizations.createdAt,
       competitions: sql<number>`(select count(*)::int from competitions c where c.org_id = organizations.id)`,
       members: sql<number>`(select count(*)::int from org_members m where m.org_id = organizations.id)`,
-      auctions: sql<number>`(select count(*)::int from auctions a where a.org_id = organizations.id)`,
+      auctions: sql<number>`(select count(*)::int from auctions a where a.org_id = organizations.id and a.kind = 'real')`,
       cases: sql<number>`(select count(*)::int from settlement_cases sc where sc.org_id = organizations.id)`,
       openCases: sql<number>`(select count(*)::int from settlement_cases sc where sc.org_id = organizations.id and sc.status not in ('closed', 'voided', 'settled'))`,
       settledCases: sql<number>`(select count(*)::int from settlement_cases sc where sc.org_id = organizations.id and sc.status = 'settled')`,
@@ -925,10 +930,10 @@ export async function organizationDetail(db: Db, slug: string): Promise<OrgDetai
         createdAt: competitions.createdAt,
         auctionStatus: sql<
           string | null
-        >`(select a.status from auctions a where a.competition_id = competitions.id order by a.created_at desc limit 1)`,
+        >`(select a.status from auctions a where a.competition_id = competitions.id and a.kind = 'real' order by a.created_at desc limit 1)`,
         auctionId: sql<
           string | null
-        >`(select a.id from auctions a where a.competition_id = competitions.id order by a.created_at desc limit 1)`,
+        >`(select a.id from auctions a where a.competition_id = competitions.id and a.kind = 'real' order by a.created_at desc limit 1)`,
         held: sql<boolean>`competitions.platform_hold_at is not null`,
         caseStatus: sql<
           string | null

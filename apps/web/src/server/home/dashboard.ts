@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
@@ -396,7 +397,7 @@ async function readClubSlice(
     db
       .select({ id: auctions.id, competitionId: auctions.competitionId, status: auctions.status })
       .from(auctions)
-      .where(inArray(auctions.competitionId, ids)),
+      .where(and(inArray(auctions.competitionId, ids), isRealAuction())),
     db
       .select({
         id: settlementCases.id,

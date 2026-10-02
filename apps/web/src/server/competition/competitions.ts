@@ -10,6 +10,7 @@ import {
   type EntryCategory,
   type MoneyUnit,
 } from "@desiauction/core";
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
@@ -487,7 +488,7 @@ export async function auctionUnitLocked(db: Db, competitionId: string): Promise<
   const [row] = await db
     .select({ id: auctions.id })
     .from(auctions)
-    .where(eq(auctions.competitionId, competitionId))
+    .where(and(eq(auctions.competitionId, competitionId), isRealAuction()))
     .limit(1);
   return row !== undefined;
 }
@@ -589,7 +590,13 @@ export async function setAuctionStart(
   const [auction] = await db
     .select({ status: auctions.status })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, competition.id), sql`${auctions.status} <> 'abandoned'`))
+    .where(
+      and(
+        eq(auctions.competitionId, competition.id),
+        isRealAuction(),
+        sql`${auctions.status} <> 'abandoned'`,
+      ),
+    )
     .limit(1);
   if (auction !== undefined && auction.status !== "scheduled") {
     return { ok: false, reason: "auction_started" };

@@ -76,7 +76,7 @@ export async function autoAskCandidates(
       select a.id as auction_id, a.org_id, min(e.created_at) as at
       from auctions a
       join auction_events e on e.auction_id = a.id and e.type = 'AuctionClosed'
-      where a.status in ('completed', 'reconciled')
+      where a.status in ('completed', 'reconciled') and a.kind = 'real'
       group by a.id, a.org_id
       having min(e.created_at) between ${from}::timestamptz and ${until}::timestamptz
     ),
@@ -162,7 +162,7 @@ export async function seasonsOwedAsks(now: Date = new Date()): Promise<
     select a.competition_id, 'auction_completed' as source
     from auctions a
     join auction_events e on e.auction_id = a.id and e.type = 'AuctionClosed'
-    where a.status in ('completed', 'reconciled')
+    where a.status in ('completed', 'reconciled') and a.kind = 'real'
     group by a.competition_id
     having min(e.created_at) between ${from}::timestamptz and ${until}::timestamptz
     union all

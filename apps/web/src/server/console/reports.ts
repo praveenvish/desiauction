@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import { roleOptions, type MoneyUnit } from "@desiauction/core";
 import { auctions, people, registrations, type Db } from "@desiauction/db";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
@@ -96,7 +97,13 @@ export async function seasonReportIn(
     db
       .select({ id: auctions.id, status: auctions.status, config: auctions.config })
       .from(auctions)
-      .where(and(eq(auctions.competitionId, competition.id), ne(auctions.status, "abandoned")))
+      .where(
+        and(
+          eq(auctions.competitionId, competition.id),
+          ne(auctions.status, "abandoned"),
+          isRealAuction(),
+        ),
+      )
       .limit(1),
     options.money
       ? db

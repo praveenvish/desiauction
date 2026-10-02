@@ -22,6 +22,7 @@ import {
   type TopBuyCount,
   type TopBuysPosterInput,
 } from "@desiauction/core";
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
@@ -447,6 +448,7 @@ async function playerPosterFrom(
             eq(lots.registrationId, registrationId),
             eq(auctions.competitionId, gated.competition.id),
             ne(auctions.status, "abandoned"),
+            isRealAuction(),
           ),
         )
         .limit(1);
@@ -482,6 +484,7 @@ async function playerPosterFrom(
                   and(
                     eq(auctions.competitionId, gated.competition.id),
                     ne(auctions.status, "abandoned"),
+                    isRealAuction(),
                   ),
                 )
                 .limit(1)
@@ -749,7 +752,13 @@ async function liveAuction(
   const [auction] = await db
     .select({ id: auctions.id, config: auctions.config })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, competitionId), ne(auctions.status, "abandoned")))
+    .where(
+      and(
+        eq(auctions.competitionId, competitionId),
+        ne(auctions.status, "abandoned"),
+        isRealAuction(),
+      ),
+    )
     .limit(1);
   return auction ?? null;
 }
@@ -1306,7 +1315,11 @@ async function pickerFrom(gated: Gate): Promise<PosterPicker> {
         .select({ id: auctions.id })
         .from(auctions)
         .where(
-          and(eq(auctions.competitionId, gated.competition.id), ne(auctions.status, "abandoned")),
+          and(
+            eq(auctions.competitionId, gated.competition.id),
+            ne(auctions.status, "abandoned"),
+            isRealAuction(),
+          ),
         )
         .limit(1);
       const liveAuctionId = live?.id ?? null;

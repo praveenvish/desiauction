@@ -10,6 +10,7 @@ import {
   type RegistrationStatus,
   type Tier,
 } from "@desiauction/core";
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctions,
   auditLog,
@@ -110,7 +111,7 @@ export async function rosterAuction(
   const [row] = await db
     .select({ id: auctions.id, status: auctions.status })
     .from(auctions)
-    .where(eq(auctions.competitionId, competitionId))
+    .where(and(eq(auctions.competitionId, competitionId), isRealAuction()))
     .orderBy(desc(auctions.createdAt))
     .limit(1)
     .for("share");

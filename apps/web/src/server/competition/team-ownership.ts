@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import { auctionOwnerInvites, auctions, paddles, withTenantDb, type Db } from "@desiauction/db";
 import { and, eq, isNull, ne } from "drizzle-orm";
 
@@ -55,6 +56,7 @@ export async function ownedTeamIdsOn(
           isNull(paddles.releasedAt),
           eq(auctions.competitionId, competitionId),
           ne(auctions.status, "abandoned"),
+          isRealAuction(),
         ),
       ),
     db
@@ -67,6 +69,7 @@ export async function ownedTeamIdsOn(
           isNull(auctionOwnerInvites.revokedAt),
           eq(auctions.competitionId, competitionId),
           ne(auctions.status, "abandoned"),
+          isRealAuction(),
         ),
       ),
   ]);

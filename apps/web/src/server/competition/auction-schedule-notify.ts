@@ -1,3 +1,4 @@
+import { isRealAuction } from "@desiauction/auction";
 import {
   auctionOwnerInvites,
   auctions,
@@ -51,7 +52,13 @@ export async function auctionPeopleOf(db: Db, competitionId: string): Promise<Au
   const [auction] = await db
     .select({ id: auctions.id })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, competitionId), ne(auctions.status, "abandoned")))
+    .where(
+      and(
+        eq(auctions.competitionId, competitionId),
+        isRealAuction(),
+        ne(auctions.status, "abandoned"),
+      ),
+    )
     .limit(1);
   const invited =
     auction === undefined
