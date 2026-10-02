@@ -218,7 +218,14 @@ export {
   DEFAULT_POINTS_AUCTION_CONFIG,
   pointsSlabs,
   defaultAuctionConfigFor,
+  PRACTICE_PURSE_POINTS,
+  PRACTICE_BASE_POINTS,
+  PRACTICE_SQUAD_SIZES,
+  isPracticeSquadSize,
+  practiceAuctionConfig,
+  practiceLotCount,
 } from "./auction";
+export type { PracticeSquadSize } from "./auction";
 export {
   buildAuctionSnapshot,
   canonicalJson,

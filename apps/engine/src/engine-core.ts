@@ -5,6 +5,7 @@ import {
   acceptOwnerInvite,
   claimPaddle,
   closeLot,
+  addOwnerToPractice,
   grantPaddle,
   inviteOwner,
   revokeOwnerInvite,
@@ -647,6 +648,7 @@ export class AuctionEngine {
         name: auctions.name,
         status: auctions.status,
         config: auctions.config,
+        kind: auctions.kind,
       })
       .from(auctions)
       .where(eq(auctions.id, auctionId))
@@ -1036,6 +1038,15 @@ export class AuctionEngine {
           return rejected("invalid_payload");
         }
         const result = await grantPaddle(db, auction, actor, teamId, personId);
+        return result.ok ? accept() : rejected(result.reason);
+      }
+      case "PracticeAddOwner": {
+        const teamId = this.str(envelope.payload, "teamId");
+        const personId = this.str(envelope.payload, "personId");
+        if (teamId === null || personId === null) {
+          return rejected("invalid_payload");
+        }
+        const result = await addOwnerToPractice(db, auction, actor, teamId, personId);
         return result.ok ? accept() : rejected(result.reason);
       }
       // Compensating undo (doc 41): conduct is not enough — the web gate must

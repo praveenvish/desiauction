@@ -362,7 +362,11 @@ export type AuctionCommandType =
   | "InviteOwner"
   | "RevokeOwnerInvite"
   | "AcceptOwnerInvite"
-  | "GrantPaddle";
+  | "GrantPaddle"
+  // 0101: an owner who joins while a practice is running is put in it. Sent by
+  // the web tier only (never from a browser); the aggregate re-checks that the
+  // person owns that team on the real auction.
+  | "PracticeAddOwner";
 
 export const AUCTION_COMMAND_TYPES: readonly AuctionCommandType[] = [
   "ClaimPaddle",
@@ -386,6 +390,7 @@ export const AUCTION_COMMAND_TYPES: readonly AuctionCommandType[] = [
   "RevokeOwnerInvite",
   "AcceptOwnerInvite",
   "GrantPaddle",
+  "PracticeAddOwner",
 ];
 
 export function isAuctionCommandType(value: string): value is AuctionCommandType {

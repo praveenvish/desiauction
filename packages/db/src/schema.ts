@@ -1546,6 +1546,15 @@ export const auctions = pgTable(
       .default("scheduled"),
     // AuctionConfig (doc 41), locked at creation; changes are audited overrides.
     config: jsonb("config").notNull(),
+    /*
+     * 'practice' (0101): the short rehearsal an organiser runs in the same
+     * season before the night. Same engine and screens; nothing it does reaches
+     * the season — every reader of "the season's auction" filters to 'real'
+     * (`isRealAuction` in @desiauction/auction).
+     */
+    kind: text("kind", { enum: ["real", "practice"] })
+      .notNull()
+      .default("real"),
     createdBy: char("created_by", { length: 26 })
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
@@ -1554,11 +1563,17 @@ export const auctions = pgTable(
   (table) => [
     index("auctions_org_idx").on(table.orgId),
     index("auctions_competition_idx").on(table.competitionId),
-    // At most ONE non-abandoned auction per competition (0029). createAuction
-    // checks this too, but read-then-insert cannot stop a race; this can.
+    // At most ONE non-abandoned REAL auction per competition (0029, 0101).
+    // createAuction checks this too, but read-then-insert cannot stop a race;
+    // this can.
     uniqueIndex("auctions_competition_active_uq")
       .on(table.competitionId)
-      .where(sql`${table.status} <> 'abandoned'`),
+      .where(sql`${table.status} <> 'abandoned' and ${table.kind} = 'real'`),
+    // And at most one practice beside it (0101).
+    uniqueIndex("auctions_competition_practice_uq")
+      .on(table.competitionId)
+      .where(sql`${table.status} <> 'abandoned' and ${table.kind} = 'practice'`),
+    check("auctions_kind_check", sql`${table.kind} in ('real', 'practice')`),
     /*
      * THE `enum:` ABOVE IS A TYPE, NOT A COLUMN DEFINITION.
      *

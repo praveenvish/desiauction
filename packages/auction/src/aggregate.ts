@@ -40,7 +40,7 @@ import {
   teams,
   type Db,
 } from "@desiauction/db";
-import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 // Input shapes (structural — web's CompetitionSummary and AuctionReadyProjection
 // satisfy them; the engine supplies them from its own reads). The package never
@@ -83,7 +83,17 @@ export interface AuctionRecord {
   name: string;
   status: AuctionStatus;
   config: AuctionConfig;
+  /**
+   * 'practice' (0101): the organiser's rehearsal in the same season. It runs on
+   * every rule below EXCEPT the ones that reach the season: a practice sale
+   * never places a player on a team, opening never redraws the pool from the
+   * season, and a practice never completes (it ends by abort) — so no results
+   * go out.
+   */
+  kind: AuctionKind;
 }
+
+export type AuctionKind = "real" | "practice";
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
@@ -108,7 +118,7 @@ const ENGINE_ACTOR = "00000000000000000000000000";
  */
 async function appendEvent(
   tx: Tx,
-  auction: { id: string; orgId: string },
+  auction: { id: string; orgId: string; kind?: AuctionKind },
   actorId: string,
   correlationId: string,
   atMs: number,
@@ -147,6 +157,8 @@ async function appendEvent(
       correlationId,
       eventSeq: String(seq),
       ...(reason !== undefined && reason !== "" ? { reason } : {}),
+      // So the club's activity log can tell rehearsal from the night (0101).
+      ...(auction.kind === "practice" ? { practice: "true" } : {}),
     },
   });
   return seq;
@@ -181,7 +193,13 @@ export async function createAuction(
   const [existing] = await db
     .select({ id: auctions.id })
     .from(auctions)
-    .where(and(eq(auctions.competitionId, competition.id), sql`${auctions.status} != 'abandoned'`))
+    .where(
+      and(
+        eq(auctions.competitionId, competition.id),
+        eq(auctions.kind, "real"),
+        sql`${auctions.status} != 'abandoned'`,
+      ),
+    )
     .limit(1);
   if (existing !== undefined) {
     return { ok: false, reason: "auction_exists" };
@@ -387,7 +405,9 @@ export async function auctionReadiness(db: Db, auctionId: string, auction?: Auct
   // whose registration still carries a stale teamId is not on anybody's squad,
   // and counting them let a short team pass the floor.
   let below = 0;
-  if (auction !== undefined) {
+  // A practice never completes (it ends by abort), and its squads are not the
+  // season's — the season's squad floor means nothing to it.
+  if (auction !== undefined && auction.kind !== "practice") {
     const [row] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(teams)
@@ -542,6 +562,11 @@ export async function transitionAuction(
   /** Conductor's explicit override of the soft squad-minimum guard (DA-06). */
   override = false,
 ): Promise<AuctionMutationResult> {
+  // A practice ends by abort, never by completion: completing is what
+  // announces results, and a rehearsal has none to announce.
+  if (auction.kind === "practice" && command === "complete") {
+    return { ok: false, reason: "illegal_transition" };
+  }
   const readiness = await auctionReadiness(db, auction.id, auction);
   const decision = auctionTransition(auction.status, command, readiness, override);
   if (!decision.ok) {
@@ -573,7 +598,13 @@ export async function transitionAuction(
       // Settled BEFORE `AuctionOpened`, which clears the last outcome: the room
       // goes live with nothing called, not with a captain's lot "withdrawn".
       // The same guard the machine applied, on the settled queue: nothing opens.
-      if (command === "open" && (await settlePool(tx, auction, actorId, correlationId, atMs)) < 1) {
+      // A practice's sample players were queued when it was made; settling it
+      // against the season's pool would pull every real player in.
+      if (
+        command === "open" &&
+        auction.kind !== "practice" &&
+        (await settlePool(tx, auction, actorId, correlationId, atMs)) < 1
+      ) {
         throw new EmptyQueueAtOpen();
       }
       await appendEvent(
@@ -847,13 +878,16 @@ export async function transitionLot(
     // registration the whole product reads — Teams, the roster export and the
     // public page all key on registrations.team_id. Icons never have a lot, so
     // their pre-signed assignment is structurally out of reach here.
-    if (command === "sell" && leading !== null) {
+    //
+    // A PRACTICE never writes here (0101): its sample players are the season's
+    // real players, and a rehearsal sale must not put one on a team.
+    if (command === "sell" && leading !== null && auction.kind !== "practice") {
       await tx
         .update(registrations)
         .set({ teamId: leading.teamId })
         .where(eq(registrations.id, lot.registrationId));
     }
-    if (command === "requeue" || command === "withdraw") {
+    if ((command === "requeue" || command === "withdraw") && auction.kind !== "practice") {
       await tx
         .update(registrations)
         .set({ teamId: null })
@@ -1005,18 +1039,25 @@ export async function placeBid(
   // APPROVED only, as settlePool reads the pool (go-live gate P1-9 / P3): a
   // withdrawn or rejected player with a stale teamId and a mark is on nobody's
   // squad, and counting them spent a real squad slot on a ghost.
-  const [preSignedRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(registrations)
-    .where(
-      and(
-        eq(registrations.competitionId, auction.competitionId),
-        eq(registrations.teamId, paddle.teamId),
-        eq(registrations.status, "approved"),
-        preSignedSql,
-        sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
-      ),
-    );
+  //
+  // A PRACTICE squad starts empty (0101): the season's pre-signed players are
+  // not on a rehearsal team, and counting them would fill a 2-place squad
+  // before the first lot.
+  const [preSignedRow] =
+    auction.kind === "practice"
+      ? [{ count: 0 }]
+      : await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(registrations)
+          .where(
+            and(
+              eq(registrations.competitionId, auction.competitionId),
+              eq(registrations.teamId, paddle.teamId),
+              eq(registrations.status, "approved"),
+              preSignedSql,
+              sql`not exists (select 1 from ${lots} where ${lots.registrationId} = ${registrations.id} and ${lots.auctionId} = ${auction.id} and ${lots.status} = 'sold')`,
+            ),
+          );
   const squadSize = (purseRow?.squad ?? 0) + (preSignedRow?.count ?? 0);
   const [roleRow] = await db
     .select({ role: registrations.role })
@@ -2194,10 +2235,13 @@ export async function undoLastAction(
     // an Icon or Retained player when the auction opened, and those marks
     // freeze with the roster from then on — so the captain mark here can only
     // have come from the sale, and it is undone with it.
-    await tx
-      .update(registrations)
-      .set({ teamId: null, isCaptain: false })
-      .where(eq(registrations.id, lot.registrationId));
+    // A practice sale never placed anyone (0101), so there is nothing to undo.
+    if (auction.kind !== "practice") {
+      await tx
+        .update(registrations)
+        .set({ teamId: null, isCaptain: false })
+        .where(eq(registrations.id, lot.registrationId));
+    }
     await appendEvent(
       tx,
       auction,
@@ -2211,4 +2255,383 @@ export async function undoLastAction(
     );
   });
   return { ok: true, lotId: target.lotId, kind: target.kind, compensatesSeq: target.atSeq };
+}
+
+// --- Practice auctions (0101) -------------------------------------------------------
+//
+// Before the night, the organiser runs a short practice in the SAME season so
+// every owner learns the bidding screens on their own phone, through the link
+// and sign-in they will use for real. A practice is an ordinary auction row
+// marked `kind = 'practice'`: the engine, the gauntlet, the timer and every
+// screen are the real ones. What it borrows from the real auction is the room
+// — its teams, its owners' bidding rights and its paddles — and what it never
+// touches is the season (see `AuctionRecord.kind`).
+
+export type CreatePracticeResult =
+  | { ok: true; auctionId: string; lotCount: number }
+  | {
+      ok: false;
+      reason: "not_real" | "real_not_scheduled" | "too_few_teams" | "no_players" | "exists";
+    };
+
+/** Registration statuses a sample player may be drawn from, best first. */
+const PRACTICE_PLAYER_STATUSES = ["approved", "submitted"] as const;
+
+/**
+ * Make a practice beside a SCHEDULED real auction, in one transaction:
+ *
+ * - the auction row (`kind = 'practice'`, the practice rules in `config`);
+ * - `lotCount` sample lots, drawn from the season's own players (approved
+ *   first, then by registration number) and queued straight away — the real
+ *   auction draws and queues its pool at setup, the practice has no setup;
+ * - every ACTIVE paddle grant of the real auction, so each owner who has
+ *   joined is in the practice with nothing to accept;
+ * - every ACTIVE paddle of the real auction, numbered in the same order;
+ * - for each team nobody holds a paddle for, a paddle in the organiser's
+ *   hand (DA-02, as on a night when an owner is not in the room), so every
+ *   team is in the practice and the room can open.
+ *
+ * Each row lands with the event the existing writers emit for it, byte for
+ * byte, so the engine replays a practice exactly as it replays the night.
+ */
+export async function createPracticeAuction(
+  db: Db,
+  real: AuctionRecord,
+  actorId: string,
+  config: AuctionConfig,
+  lotCount: number,
+): Promise<CreatePracticeResult> {
+  if (real.kind === "practice") {
+    return { ok: false, reason: "not_real" };
+  }
+  if (real.status !== "scheduled") {
+    return { ok: false, reason: "real_not_scheduled" };
+  }
+  const seasonTeams = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.competitionId, real.competitionId))
+    .orderBy(asc(teams.createdAt), asc(teams.id));
+  if (seasonTeams.length < 2) {
+    return { ok: false, reason: "too_few_teams" };
+  }
+  const players = await db
+    .select({ id: registrations.id })
+    .from(registrations)
+    .where(
+      and(
+        eq(registrations.competitionId, real.competitionId),
+        inArray(registrations.status, [...PRACTICE_PLAYER_STATUSES]),
+      ),
+    )
+    .orderBy(
+      sql`case when ${registrations.status} = 'approved' then 0 else 1 end`,
+      asc(registrations.registrationNumber),
+      asc(registrations.id),
+    )
+    .limit(Math.max(1, lotCount));
+  if (players.length === 0) {
+    return { ok: false, reason: "no_players" };
+  }
+  const [grantRows, acceptedRows, heldPaddles] = await Promise.all([
+    db
+      .select({ teamId: paddleGrants.teamId, personId: paddleGrants.personId })
+      .from(paddleGrants)
+      .where(and(eq(paddleGrants.auctionId, real.id), isNull(paddleGrants.revokedAt)))
+      .orderBy(asc(paddleGrants.createdAt), asc(paddleGrants.id)),
+    db
+      .select({ teamId: auctionOwnerInvites.teamId, personId: auctionOwnerInvites.acceptedBy })
+      .from(auctionOwnerInvites)
+      .where(
+        and(
+          eq(auctionOwnerInvites.auctionId, real.id),
+          isNotNull(auctionOwnerInvites.acceptedBy),
+          isNull(auctionOwnerInvites.revokedAt),
+        ),
+      )
+      .orderBy(asc(auctionOwnerInvites.acceptedAt), asc(auctionOwnerInvites.id)),
+    db
+      .select({ teamId: paddles.teamId, personId: paddles.personId })
+      .from(paddles)
+      .where(and(eq(paddles.auctionId, real.id), isNull(paddles.releasedAt)))
+      .orderBy(asc(paddles.paddleNumber)),
+  ]);
+  // An owner who accepted their link is in the practice even before the
+  // organiser grants their paddle: a rehearsal is for exactly those people.
+  // One grant per person (invariant 18), the real grant first.
+  const grants: { teamId: string; personId: string }[] = [];
+  const granted = new Set<string>();
+  for (const row of [...grantRows, ...acceptedRows]) {
+    if (row.personId === null || granted.has(row.personId)) {
+      continue;
+    }
+    granted.add(row.personId);
+    grants.push({ teamId: row.teamId, personId: row.personId });
+  }
+  const held = new Set(heldPaddles.map((paddle) => paddle.teamId));
+  const owned = new Set(grants.map((grant) => grant.teamId));
+  const roomPaddles = [
+    ...heldPaddles,
+    // A team with an owner who has not picked up their paddle yet is left for
+    // them: picking it up is part of what the practice teaches.
+    ...seasonTeams
+      .filter((team) => !held.has(team.id) && !owned.has(team.id))
+      .map((team) => ({ teamId: team.id, personId: actorId })),
+  ];
+
+  const auctionId = newId();
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  const name = `${real.name} — Practice`;
+  const scope = { id: auctionId, orgId: real.orgId, kind: "practice" as const };
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(auctions).values({
+        id: auctionId,
+        orgId: real.orgId,
+        competitionId: real.competitionId,
+        name,
+        status: "scheduled",
+        kind: "practice",
+        config,
+        createdBy: actorId,
+      });
+      await appendEvent(
+        tx,
+        scope,
+        actorId,
+        correlationId,
+        atMs,
+        "AuctionCreated",
+        { competitionId: real.competitionId, lotCount: players.length, name },
+        auctionId,
+      );
+      for (let i = 0; i < players.length; i++) {
+        const player = players[i];
+        if (player === undefined) {
+          continue;
+        }
+        const lotId = newId();
+        const number = lotNumber(i + 1);
+        const base = basePriceFor(config, null);
+        await tx.insert(lots).values({
+          id: lotId,
+          orgId: real.orgId,
+          auctionId,
+          registrationId: player.id,
+          lotNumber: number,
+          seq: i + 1,
+          basePrice: base,
+          status: "queued",
+        });
+        await appendEvent(
+          tx,
+          scope,
+          actorId,
+          correlationId,
+          atMs,
+          "LotPrepared",
+          { lotId, registrationId: player.id, lotNumber: number, basePrice: base },
+          lotId,
+        );
+        await appendEvent(tx, scope, actorId, correlationId, atMs, "LotQueued", { lotId }, lotId);
+      }
+      for (const grant of grants) {
+        const grantId = newId();
+        await tx.insert(paddleGrants).values({
+          id: grantId,
+          orgId: real.orgId,
+          auctionId,
+          teamId: grant.teamId,
+          personId: grant.personId,
+          grantedBy: actorId,
+        });
+        await appendEvent(
+          tx,
+          scope,
+          actorId,
+          correlationId,
+          atMs,
+          "PaddleGranted",
+          { grantId, teamId: grant.teamId, personId: grant.personId },
+          grantId,
+        );
+      }
+      for (let i = 0; i < roomPaddles.length; i++) {
+        const paddle = roomPaddles[i];
+        if (paddle === undefined) {
+          continue;
+        }
+        const paddleId = newId();
+        const number = paddleNumber(i + 1);
+        await tx.insert(paddles).values({
+          id: paddleId,
+          orgId: real.orgId,
+          auctionId,
+          teamId: paddle.teamId,
+          personId: paddle.personId,
+          paddleNumber: number,
+        });
+        await appendEvent(
+          tx,
+          scope,
+          actorId,
+          correlationId,
+          atMs,
+          "PaddleIssued",
+          { paddleId, teamId: paddle.teamId, personId: paddle.personId, paddleNumber: number },
+          paddleId,
+        );
+      }
+    });
+  } catch (error) {
+    // `auctions_competition_practice_uq`: a second organiser pressed Start at
+    // the same moment. Theirs stands; this one rolled back whole.
+    if (isUniqueViolation(error, "auctions_competition_practice_uq")) {
+      return { ok: false, reason: "exists" };
+    }
+    throw error;
+  }
+  return { ok: true, auctionId, lotCount: players.length };
+}
+
+/**
+ * AN OWNER WHO JOINS DURING A PRACTICE IS IN IT STRAIGHT AWAY.
+ *
+ * Runs in the ENGINE (command `PracticeAddOwner`), the single writer for the
+ * practice's events, after an owner accepts their link or is granted their
+ * paddle on the real auction. The practice gets the same grant, and if the
+ * organiser was holding that team's paddle for them, it is handed back so the
+ * owner can pick it up — the room then shows them their team exactly as it
+ * will on the night.
+ *
+ * It trusts no caller: the person must be an accepted owner (or a grantee) of
+ * that team on the REAL auction of the same season. Idempotent; quietly does
+ * nothing once the practice has ended.
+ */
+export type AddOwnerToPracticeResult =
+  | { ok: true; added: boolean }
+  | { ok: false; reason: "not_practice" | "terminal_auction" | "not_an_owner" };
+
+export async function addOwnerToPractice(
+  db: Db,
+  practice: AuctionRecord,
+  actorId: string,
+  teamId: string,
+  personId: string,
+): Promise<AddOwnerToPracticeResult> {
+  if (practice.kind !== "practice") {
+    return { ok: false, reason: "not_practice" };
+  }
+  if (
+    practice.status === "completed" ||
+    practice.status === "reconciled" ||
+    practice.status === "abandoned"
+  ) {
+    return { ok: false, reason: "terminal_auction" };
+  }
+  const realOfSeason = sql`(select ${auctions.id} from ${auctions}
+    where ${auctions.competitionId} = ${practice.competitionId}
+      and ${auctions.kind} = 'real' and ${auctions.status} <> 'abandoned')`;
+  const [owner] = await db
+    .select({ id: auctionOwnerInvites.id })
+    .from(auctionOwnerInvites)
+    .where(
+      and(
+        sql`${auctionOwnerInvites.auctionId} in ${realOfSeason}`,
+        eq(auctionOwnerInvites.teamId, teamId),
+        eq(auctionOwnerInvites.acceptedBy, personId),
+        isNull(auctionOwnerInvites.revokedAt),
+      ),
+    )
+    .limit(1);
+  const [grantee] =
+    owner !== undefined
+      ? [owner]
+      : await db
+          .select({ id: paddleGrants.id })
+          .from(paddleGrants)
+          .where(
+            and(
+              sql`${paddleGrants.auctionId} in ${realOfSeason}`,
+              eq(paddleGrants.teamId, teamId),
+              eq(paddleGrants.personId, personId),
+              isNull(paddleGrants.revokedAt),
+            ),
+          )
+          .limit(1);
+  if (grantee === undefined) {
+    return { ok: false, reason: "not_an_owner" };
+  }
+  const [existing] = await db
+    .select({ id: paddleGrants.id })
+    .from(paddleGrants)
+    .where(
+      and(
+        eq(paddleGrants.auctionId, practice.id),
+        eq(paddleGrants.personId, personId),
+        isNull(paddleGrants.revokedAt),
+      ),
+    )
+    .limit(1);
+  if (existing !== undefined) {
+    return { ok: true, added: false };
+  }
+  const [stand] = await db
+    .select({ id: paddles.id, personId: paddles.personId })
+    .from(paddles)
+    .where(
+      and(
+        eq(paddles.auctionId, practice.id),
+        eq(paddles.teamId, teamId),
+        isNull(paddles.releasedAt),
+      ),
+    )
+    .limit(1);
+  const correlationId = newId();
+  const atMs = serverNowMs();
+  const grantId = newId();
+  try {
+    await db.transaction(async (tx) => {
+      if (stand !== undefined && stand.personId !== personId) {
+        await tx
+          .update(paddles)
+          .set({ releasedAt: new Date(atMs) })
+          .where(eq(paddles.id, stand.id));
+        await appendEvent(
+          tx,
+          practice,
+          actorId,
+          correlationId,
+          atMs,
+          "PaddleReleased",
+          { paddleId: stand.id, teamId },
+          stand.id,
+        );
+      }
+      await tx.insert(paddleGrants).values({
+        id: grantId,
+        orgId: practice.orgId,
+        auctionId: practice.id,
+        teamId,
+        personId,
+        grantedBy: actorId,
+      });
+      await appendEvent(
+        tx,
+        practice,
+        actorId,
+        correlationId,
+        atMs,
+        "PaddleGranted",
+        { grantId, teamId, personId },
+        grantId,
+      );
+    });
+  } catch {
+    // A concurrent grant for the same person won (the 0042 unique): they are
+    // in the practice either way.
+    return { ok: true, added: false };
+  }
+  return { ok: true, added: true };
 }

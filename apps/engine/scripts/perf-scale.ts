@@ -367,6 +367,7 @@ async function runLotScale(lotCount: number): Promise<void> {
     name: "scale",
     status: "live" as const,
     config: CONFIG,
+    kind: "real" as const,
   };
   const snapGen: number[] = [];
   for (let i = 0; i < 10; i++) {
