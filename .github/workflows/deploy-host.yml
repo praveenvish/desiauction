@@ -192,6 +192,15 @@ jobs:
           target: /srv/apps/desiauction/${{ inputs.environment }}
           strip_components: 2
 
+      # The sitemap as the OLD site serves it, so the announce step after the
+      # swap can tell search engines only what this release changed
+      # (scripts/indexnow-announce.mjs). Production only: it is the one host
+      # with an IndexNow key. Read-only, and it can never fail a deploy.
+      - name: Snapshot the sitemap before the swap
+        if: ${{ inputs.environment == 'production' }}
+        continue-on-error: true
+        run: node scripts/indexnow-announce.mjs snapshot https://desiauction.in "$RUNNER_TEMP/sitemap-before.xml"
+
       # --- On the host: gate, migrate, swap, prove ---------------------------
       #
       # ORDER MATTERS AND IS FORWARD-ONLY. Migrations run before the new images
@@ -432,3 +441,17 @@ jobs:
             docker logout ghcr.io >/dev/null
             trap - ERR
             echo "deployed ${NEW_TAG} (previous: ${PREV_TAG})"
+
+      # --- Tell search engines what this release changed ---------------------
+      #
+      # Runs only once the swap above has passed /readyz. Submits to IndexNow
+      # (Bing, Yandex, Seznam, Naver) every page that is new or whose sitemap
+      # <lastmod> moved, plus the homepage, whose footer and schema no page
+      # date reflects. Google does not take part; it reads the sitemap.
+      # Season pages are already announced by the app when they change
+      # (apps/web/src/server/seo/indexnow.ts). It never fails a deploy that
+      # has succeeded: the script exits 0 on every path.
+      - name: Announce changed pages to IndexNow
+        if: ${{ inputs.environment == 'production' }}
+        continue-on-error: true
+        run: node scripts/indexnow-announce.mjs announce https://desiauction.in "$RUNNER_TEMP/sitemap-before.xml"
