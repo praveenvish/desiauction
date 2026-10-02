@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { FAQS } from "../../content/help";
 import { PRICING } from "../../content/marketing";
-import { SOCIAL_ACCOUNTS } from "../../content/social";
+import { ORGANIZATION_PROFILES, SOCIAL_ACCOUNTS } from "../../content/social";
 import {
   breadcrumbJsonLd,
   faqPageJsonLd,
@@ -42,10 +42,17 @@ describe("organizationJsonLd", () => {
     const org = organizationJsonLd({
       base: BASE,
       supportEmail: "support@desiauction.in",
-      profiles: SOCIAL_ACCOUNTS.map((account) => account.href),
+      profiles: ORGANIZATION_PROFILES,
     });
     const claimed = (org["sameAs"] as string[] | undefined) ?? [];
     expect(claimed.every(isProfileUrl)).toBe(true);
+  });
+
+  it("links every footer profile but claims only the company's own as sameAs", () => {
+    expect(SOCIAL_ACCOUNTS.every((account) => isProfileUrl(account.href))).toBe(true);
+    // The LinkedIn admin profile is a person, not the Organization.
+    expect(ORGANIZATION_PROFILES.some((href) => href.includes("linkedin.com/in/"))).toBe(false);
+    expect(ORGANIZATION_PROFILES).toContain("https://www.instagram.com/desiauction/");
   });
 
   it("keeps real profiles and has a stable id every other entity points at", () => {
