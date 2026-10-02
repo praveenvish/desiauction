@@ -25,9 +25,37 @@ import styles from "./demo-request-form.module.css";
  * puts the message in `aria-describedby` AND a `role="alert"`, keeps native
  * `required` on the control, and moves focus to the first failing field after a
  * rejected submit. A hand-rolled error paragraph here would have none of that.
+ *
+ * ONE FORM, TWO DOORS. `/founding-25` posts the same request with its own
+ * source (migration 0100), so an application lands on the same desk as a demo
+ * request. Only the words change: an applicant is not booking a call, and a
+ * button that says so would be the first untrue thing they read.
  */
 export function DemoRequestForm({ source }: { source: string }) {
   const [state, formAction, pending] = useActionState(requestDemoAction, {});
+  const founding = source === "founding-25";
+
+  if (state.success === true && founding) {
+    return (
+      <div className={styles["done"]} data-testid="demo-request-done">
+        <p className={styles["doneHead"]}>
+          <IconCheck width={20} height={20} aria-hidden />
+          Application received.
+        </p>
+        <p className={styles["doneBody"]}>
+          A person reads every one. We&apos;ll call or WhatsApp you within two working days to talk
+          about your auction night — and nothing is filmed without your written permission.
+        </p>
+        <p className={styles["doneBody"]}>
+          Meanwhile, set up your season:{" "}
+          <Link href="/login" className={styles["pickLink"]}>
+            Start your auction
+          </Link>{" "}
+          — everything you build carries over.
+        </p>
+      </div>
+    );
+  }
 
   if (state.success === true) {
     return (
@@ -197,7 +225,11 @@ export function DemoRequestForm({ source }: { source: string }) {
           rows={3}
           maxLength={2000}
           className={styles["note"]}
-          placeholder="What worries you — and which sport, if it's another one"
+          placeholder={
+            founding
+              ? "Where it's held, how many players, what usually goes wrong"
+              : "What worries you — and which sport, if it's another one"
+          }
         />
       </div>
 
@@ -211,10 +243,12 @@ export function DemoRequestForm({ source }: { source: string }) {
 
       <div className={styles["actions"]}>
         <Button type="submit" size="lg" loading={pending}>
-          Book a demo
+          {founding ? "Apply for the Founding 25" : "Book a demo"}
         </Button>
         <p className={styles["assurance"]}>
-          One working day, usually less. We use your number to arrange the demo and nothing else.
+          {founding
+            ? "We use your number to talk about your application and nothing else."
+            : "One working day, usually less. We use your number to arrange the demo and nothing else."}
         </p>
       </div>
     </form>

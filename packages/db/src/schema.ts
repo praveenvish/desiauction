@@ -2497,7 +2497,7 @@ export const demoRequests = pgTable(
     /** Their words: the most useful column for whoever answers. */
     note: text("note"),
     source: text("source", {
-      enum: ["schedule-demo", "pricing", "landing", "help", "other"],
+      enum: ["schedule-demo", "pricing", "landing", "help", "founding-25", "other"],
     }).notNull(),
     /** Throttling only; ages out with the row. */
     requestIp: text("request_ip"),

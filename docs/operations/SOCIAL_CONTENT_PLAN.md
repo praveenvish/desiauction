@@ -86,7 +86,7 @@ Already live: product film (all networks), Reel 01 (POV bidding war), carousel
 |---|---|---|---|
 | Mon | IG/FB/YT Shorts | **Reel:** "2 minute mein season ready" — real screen capture of creating a season | A |
 | Tue | IG | **Carousel:** "How auction night works" — the 4 beats (link → bid → big screen → receipts) | A |
-| Wed | All | **Founding 25 call:** "We're picking 25 organisers to run their auction free. We film the night (with your permission)." CTA: DM / form | B |
+| Wed | All | **Founding 25 call:** "We're picking 25 organisers to run their auction free. We film the night (with your permission)." CTA: desiauction.in/founding-25 (link in bio; `?utm_source=<network>`) | B |
 | Thu | IG/FB/YT Shorts | **Reel:** "Ek link. Seedha WhatsApp pe." — player registration from one link | A |
 | Fri | IG | **Ledger card (T7):** "A bid, once recorded, cannot be edited or deleted. By anyone. Including us." | C |
 | Sat | IG/FB/YT Shorts | **Reel:** the big-screen moment — phone bid → screen updates | A |
@@ -151,7 +151,9 @@ Followers are reported but never the goal.
 
 ## 7. Open decisions (REQUIRES INPUT)
 
-1. How organisers apply to the Founding 25 — a Google Form, a site page, or DM only.
+1. ~~How organisers apply to the Founding 25.~~ **Decided 2026-10-02: a site page,
+   `/founding-25`** — the demo-request form with its own source (migration 0100), so
+   applications land on `/admin/demos` beside demo requests. DMs asking to join get the link.
 2. Who gives written filming consent and where it's stored (DPDP: consent with withdrawal and a grievance contact).
 3. WhatsApp Business number and Channel.
 4. Whether to commit the original master plan if found.

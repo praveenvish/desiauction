@@ -93,6 +93,8 @@ export function shellKind(pathname: string): ShellKind {
     pathname.startsWith("/security") ||
     pathname.startsWith("/rules-guidelines") ||
     pathname.startsWith("/schedule-demo") ||
+    // The launch cohort's application form — the demo form with its own source.
+    pathname.startsWith("/founding-25") ||
     // A booking link opens in whatever browser the mail was read in, often
     // with a live session — without this the person's own demo would arrive
     // framed in the organizer console.
