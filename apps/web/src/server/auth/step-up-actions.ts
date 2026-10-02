@@ -36,7 +36,6 @@ export async function requestStepUpAction(): Promise<StepUpRequestState> {
     result = await requestStepUpCode(db, sender, {
       personId: session.personId,
       requestIp: clientIp(await headers(), env.TRUSTED_PROXY_COUNT),
-      globalPerHour: env.OTP_GLOBAL_HOURLY_CAP,
     });
   } catch (error) {
     if (error instanceof OtpSendError) {

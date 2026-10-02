@@ -38,7 +38,17 @@ export function useStepUp(): {
 
   const send = async () => {
     setPhase({ at: "sending" });
-    const sent = await requestStepUpAction();
+    let sent;
+    try {
+      sent = await requestStepUpAction();
+    } catch {
+      // Never left on "Sending you a code…": the caller gets an answer.
+      finish({
+        ok: false,
+        error: "We couldn't reach DesiAuction. Check your connection and try again.",
+      });
+      return;
+    }
     if (!sent.ok) {
       finish({ ok: false, error: sent.error });
       return;
@@ -67,13 +77,20 @@ export function useStepUp(): {
 
   const confirm = async (sentTo: string) => {
     setPhase({ at: "checking", sentTo });
-    const checked = await confirmStepUpAction(code);
-    if (!checked.ok) {
-      setPhase({ at: "code", sentTo, error: checked.error });
-      return;
+    try {
+      const checked = await confirmStepUpAction(code);
+      if (!checked.ok) {
+        setPhase({ at: "code", sentTo, error: checked.error });
+        return;
+      }
+      const action = pending.current?.action;
+      finish(action === undefined ? { ok: false, error: "Try again." } : await action());
+    } catch {
+      finish({
+        ok: false,
+        error: "Something went wrong before that finished. Check the page, then try again.",
+      });
     }
-    const action = pending.current?.action;
-    finish(action === undefined ? { ok: false, error: "Try again." } : await action());
   };
 
   const open = phase.at !== "closed";

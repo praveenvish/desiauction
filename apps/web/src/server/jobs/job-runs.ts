@@ -37,7 +37,9 @@ export async function recordJobRun(job: string, run: () => Promise<Response>): P
     .clone()
     .json()
     .catch(() => ({}));
-  await write(job, startedAt, response.ok, summaryOf(detail));
+  // The sweeps answer 200 with a part marked "failed" when one sub-job broke
+  // and the rest ran: that run did not work, and the record must say so.
+  await write(job, startedAt, response.ok && !mentionsFailure(detail), summaryOf(detail));
   return response;
 }
 
@@ -53,6 +55,19 @@ async function write(
     .catch((error: unknown) => {
       logger().warn({ err: error, job }, "job_runs.not_recorded");
     });
+}
+
+function mentionsFailure(value: unknown): boolean {
+  if (value === "failed") {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.some(mentionsFailure);
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.values(value).some(mentionsFailure);
+  }
+  return false;
 }
 
 /** A plain-object summary, capped: the row is a ledger line, not a payload store. */

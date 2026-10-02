@@ -142,11 +142,19 @@ describe("the club roles desk under the production roles", () => {
     expect(audit[0]?.meta).toMatchObject({ via: "admin", reason: REASON });
   });
 
-  it("someone who never signed in gets the club's own invitation link", async () => {
+  it("someone who never signed in gets a STAFF link — never an unaddressed owner link", async () => {
+    expect(
+      await desk.addClubRoleAction({
+        slug,
+        contact: phoneOf(9),
+        role: "org:owner",
+        reason: REASON,
+      }),
+    ).toMatchObject({ ok: false });
     const result = await desk.addClubRoleAction({
       slug,
       contact: phoneOf(9),
-      role: "org:owner",
+      role: "org:staff",
       reason: REASON,
     });
     expect(result).toMatchObject({ ok: true });

@@ -122,10 +122,19 @@ export function ClubDeskPanel({
     // One transition for the action and the refresh — see person-actions.tsx.
     start(async () => {
       let outcome: ClubDeskResult | null = null;
-      const result = await run(async (): Promise<GatedResult> => {
-        outcome = await call();
-        return outcome.ok ? { ok: true } : outcome;
-      });
+      let result: GatedResult;
+      try {
+        result = await run(async (): Promise<GatedResult> => {
+          outcome = await call();
+          return outcome.ok ? { ok: true } : outcome;
+        });
+      } catch {
+        toast({
+          title: "We couldn't reach DesiAuction. Reload the page to see what changed.",
+          tone: "danger",
+        });
+        return;
+      }
       if (!result.ok) {
         toast({ title: result.error, tone: "danger" });
         return;

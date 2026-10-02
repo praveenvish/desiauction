@@ -294,6 +294,9 @@ export async function unsuspendPerson(
   if (updated.length === 0) {
     return { ok: false, error: "That account isn't suspended." };
   }
+  // A sign-in that slipped in during the suspension (it passed the check a
+  // moment before the suspension committed) must not wake up now.
+  await revokeAllSessions(app, input.personId);
   await platformAudit(system, {
     actor: input.operator,
     action: "person.unsuspended",
@@ -307,7 +310,10 @@ export async function signOutEverywhere(
   app: Db,
   system: Db,
   input: { operator: string; personId: string; reason: string },
-): Promise<{ ok: true; signedOut: number }> {
+): Promise<{ ok: true; signedOut: number } | { ok: false; error: string }> {
+  if (input.personId !== input.operator && (await isSuperadmin(system, input.personId))) {
+    return { ok: false, error: "Another superadmin can't be signed out from here." };
+  }
   const signedOut = await revokeAllSessions(app, input.personId);
   await platformAudit(system, {
     actor: input.operator,
@@ -431,23 +437,77 @@ export async function applyPlatformInvites(app: Db, system: Db, personId: string
     );
   let applied = 0;
   for (const invite of waiting) {
+    // An invitation stands on its inviter's authority: one sent by somebody
+    // who is no longer a superadmin is not honoured (it stays waiting, visible
+    // on /admin/roles, for a current superadmin to cancel).
+    if (!(await isSuperadmin(system, invite.invitedBy))) {
+      continue;
+    }
     const claimed = await app
       .update(platformInvites)
       .set({ acceptedAt: new Date(), acceptedBy: personId })
-      .where(and(eq(platformInvites.id, invite.id), isNull(platformInvites.acceptedAt)))
+      .where(
+        and(
+          eq(platformInvites.id, invite.id),
+          isNull(platformInvites.acceptedAt),
+          isNull(platformInvites.revokedAt),
+        ),
+      )
       .returning({ id: platformInvites.id });
     if (claimed.length === 0) {
       continue;
     }
-    for (const set of invite.capabilitySets) {
-      await grantPlatformRole(system, {
-        operator: invite.invitedBy,
-        personId,
-        set,
-        reason: invite.reason,
-      });
+    try {
+      for (const set of invite.capabilitySets) {
+        const granted = await grantPlatformRole(system, {
+          operator: invite.invitedBy,
+          personId,
+          set,
+          reason: invite.reason,
+        });
+        if (!granted.ok) {
+          throw new Error(granted.error);
+        }
+      }
+    } catch (error) {
+      // Not spent unless it took: hand the invitation back so the next
+      // sign-in tries again (grants are idempotent, so a partial run is safe).
+      await app
+        .update(platformInvites)
+        .set({ acceptedAt: null, acceptedBy: null })
+        .where(eq(platformInvites.id, invite.id));
+      throw error;
     }
     applied++;
   }
   return applied;
+}
+
+/** Cancel a waiting invitation (a mistyped contact, a change of plan). */
+export async function cancelPlatformInvite(
+  app: Db,
+  system: Db,
+  input: { operator: string; inviteId: string; reason: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const cancelled = await app
+    .update(platformInvites)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(platformInvites.id, input.inviteId),
+        isNull(platformInvites.acceptedAt),
+        isNull(platformInvites.revokedAt),
+      ),
+    )
+    .returning({ id: platformInvites.id });
+  if (cancelled.length === 0) {
+    return { ok: false, error: "That invitation was already used or cancelled." };
+  }
+  await platformAudit(system, {
+    actor: input.operator,
+    action: "platform.invite.cancelled",
+    subject: input.inviteId,
+    meta: { reason: input.reason },
+  });
+  return { ok: true };
 }

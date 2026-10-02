@@ -8,6 +8,7 @@ import { db, systemDb } from "../db";
 import { operatorFor, type OperatorRefusal } from "./guard";
 import {
   ROLE_WORDS,
+  cancelPlatformInvite,
   grantPlatformRole,
   invitePerson,
   isGrantable,
@@ -90,7 +91,12 @@ export async function revokeRoleAction(
   if (result.changed) {
     after(() => tellPerson(db, { personId }, "role_revoked", { name: "", role, reason }));
   }
-  return { ok: true, message: `${role} was removed from ${await nameOf(personId)}.` };
+  return {
+    ok: true,
+    message: result.changed
+      ? `${role} was removed from ${await nameOf(personId)}.`
+      : `${await nameOf(personId)} didn't have ${role}.`,
+  };
 }
 
 export async function suspendAction(personId: string, reason: string): Promise<PeopleActionResult> {
@@ -146,6 +152,9 @@ export async function signOutEverywhereAction(
     personId,
     reason: gate.operator.reason,
   });
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
   after(() => tellPerson(db, { personId }, "signed_out", { name: "", reason }));
   return {
     ok: true,
@@ -200,4 +209,20 @@ export async function invitePersonAction(input: {
     ok: true,
     message: `Invitation saved. ${input.name.trim()} gets ${roles} the first time they sign in with ${input.contact.trim()} (within 14 days).`,
   };
+}
+
+export async function cancelInviteAction(
+  inviteId: string,
+  reason: string,
+): Promise<PeopleActionResult> {
+  const gate = await operatorFor("platform.grant", { reason });
+  if (!gate.ok) {
+    return gate;
+  }
+  const result = await cancelPlatformInvite(db, systemDb, {
+    operator: gate.operator.personId,
+    inviteId,
+    reason: gate.operator.reason,
+  });
+  return result.ok ? { ok: true, message: "Invitation cancelled." } : result;
 }

@@ -6,6 +6,7 @@ import { useState, useTransition, type ReactNode } from "react";
 
 import { useStepUp, type GatedResult } from "../../../components/admin/use-step-up";
 import {
+  cancelInviteAction,
   grantRoleAction,
   invitePersonAction,
   revokeRoleAction,
@@ -47,14 +48,25 @@ function useRunner() {
     new Promise<boolean>((resolve) => {
       start(async () => {
         let message = "";
-        const result = await run(async (): Promise<GatedResult> => {
-          const answer = await act();
-          if (answer.ok) {
-            message = answer.message;
-            return { ok: true };
-          }
-          return answer;
-        });
+        let result: GatedResult;
+        try {
+          result = await run(async (): Promise<GatedResult> => {
+            const answer = await act();
+            if (answer.ok) {
+              message = answer.message;
+              return { ok: true };
+            }
+            return answer;
+          });
+        } catch {
+          // A dropped connection: say so, and never leave the buttons busy.
+          toast({
+            title: "We couldn't reach DesiAuction. Reload the page to see what changed.",
+            tone: "danger",
+          });
+          resolve(false);
+          return;
+        }
         if (!result.ok) {
           toast({ title: result.error, tone: "danger" });
           resolve(false);
@@ -405,5 +417,64 @@ export function InvitePerson({ options }: { options: readonly RoleOption[] }) {
       </Dialog>
       {stepUpDialog}
     </div>
+  );
+}
+
+/** "Cancel" on a waiting invitation (/admin/roles) — superadmin only. */
+export function CancelInvite({ inviteId, name }: { inviteId: string; name: string }) {
+  const { go, busy, stepUpDialog } = useRunner();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          setReason("");
+          setOpen(true);
+        }}
+        data-testid={`admin-cancel-invite-${inviteId}`}
+      >
+        Cancel
+      </Button>
+      <Dialog
+        open={open}
+        onClose={() => {
+          setOpen(false);
+        }}
+        title="Cancel this invitation?"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setOpen(false);
+              }}
+            >
+              Keep it
+            </Button>
+            <Button
+              loading={busy}
+              disabled={reason.trim().length < 10}
+              onClick={() =>
+                void go(() => cancelInviteAction(inviteId, reason)).then((done) => {
+                  if (done) {
+                    setOpen(false);
+                  }
+                })
+              }
+              data-testid="admin-cancel-invite-confirm"
+            >
+              Cancel invitation
+            </Button>
+          </>
+        }
+      >
+        <p>{name} won&apos;t get these roles when they sign in. Nothing else changes.</p>
+        <ReasonField value={reason} onChange={setReason} />
+      </Dialog>
+      {stepUpDialog}
+    </>
   );
 }

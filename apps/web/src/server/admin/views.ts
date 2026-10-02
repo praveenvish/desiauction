@@ -1038,14 +1038,6 @@ export interface UserDirectory {
 }
 
 const USER_PAGE = 50;
-const USER_FILTERS: readonly UserDirectoryFilter[] = [
-  "all",
-  "players",
-  "profiled",
-  "staff",
-  "suspended",
-];
-
 async function userCursor(db: Db, after: string | undefined): Promise<SQL | undefined> {
   if (after === undefined || after === "") {
     return undefined;
@@ -1133,20 +1125,33 @@ export async function userDirectory(
     .where(pageWhere)
     .orderBy(desc(people.createdAt), desc(people.id))
     .limit(USER_PAGE + 1);
-  const [facetRows, everything] = await Promise.all([
-    Promise.all(
-      USER_FILTERS.map((f) =>
-        db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(people)
-          .where(whereFor(f)),
-      ),
-    ),
-    db.select({ n: sql<number>`count(*)::int` }).from(people),
-  ]);
-  const counts = Object.fromEntries(
-    USER_FILTERS.map((f, index) => [f, facetRows[index]?.[0]?.n ?? 0]),
-  ) as Record<UserDirectoryFilter, number>;
+  // ONE pass over `people` for every facet's count and the platform total
+  // (AC-1.2): six separate counts, each a scan under a search term, grew with
+  // the platform on every page view. `filter (where …)` asks them together.
+  const facetCount = (f: UserDirectoryFilter) => {
+    const condition = whereFor(f);
+    return condition === undefined
+      ? sql<number>`count(*)::int`
+      : sql<number>`(count(*) filter (where ${condition}))::int`;
+  };
+  const [tally] = await db
+    .select({
+      all: facetCount("all"),
+      players: facetCount("players"),
+      profiled: facetCount("profiled"),
+      staff: facetCount("staff"),
+      suspended: facetCount("suspended"),
+      everyone: sql<number>`count(*)::int`,
+    })
+    .from(people);
+  const counts: Record<UserDirectoryFilter, number> = {
+    all: tally?.all ?? 0,
+    players: tally?.players ?? 0,
+    profiled: tally?.profiled ?? 0,
+    staff: tally?.staff ?? 0,
+    suspended: tally?.suspended ?? 0,
+  };
+  const everything = [{ n: tally?.everyone ?? 0 }];
   const more = rows.length > USER_PAGE;
   const page = more ? rows.slice(0, USER_PAGE) : rows;
   return {

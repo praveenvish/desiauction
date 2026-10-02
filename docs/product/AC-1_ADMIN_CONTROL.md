@@ -56,10 +56,15 @@ Linear descriptions until they are started.
 5. **Posture template.** `platform-ops.posture.test.ts`: every platform-ops
    writer runs under the production roles (`desiauction_app`,
    `desiauction_system`) and proves what each role can and cannot write.
-6. **Role grants.** `desiauction_system` gains exactly: `insert` on
-   `job_runs`; `update (suspended_at, suspended_reason, suspended_by)` on
-   `people`; `update (revoked_at)` on `sessions`; `update (stepped_up_at)` on
-   `sessions`. `grants:verify` pins the new list.
+6. **Role grants (as built).**
+   - `job_runs`, `platform_invites`, `people` (suspension) and `sessions`
+     (sign-out, step-up) are written on `desiauction_app`. These tables have
+     no RLS; the web tier already writes them, and `operatorFor` is the lock.
+   - `desiauction_system` gains exactly one privilege:
+     `update (revoked_at) on grants`, to end a platform grant.
+   - `grants:verify` pins this at column level: the system role may not
+     update any other grant column, or `people` at all.
+   - Engine and runner may not read `platform_invites`.
 
 ## 1.2 People & roles (DES-20) — built
 
@@ -182,9 +187,13 @@ under the production roles.
   joins `people.suspended_at`). A suspended person's existing cookie stops
   working on the next request, not at expiry.
 - New sign-ins are refused at every code-verify path: phone, email, passkey.
-- Live auction sockets use short-lived tickets minted per page. Revoking the
-  sessions stops new tickets; an open socket ends when its ticket window
-  rolls over.
+- Bidding and every other action go through the session, so they stop at
+  once.
+- A live-auction socket already open is checked only when it connects. Its
+  ticket lasts up to 24 h plus a 24 h grace window, so a suspended owner's
+  open tab can keep *receiving* that auction's feed until it reconnects or
+  the window ends. It cannot act on it. Shortening that window is a
+  separate engine change, if ever needed.
 - A suspended person's grants are kept, so unsuspending restores them exactly.
 
 **Evidence**
@@ -217,7 +226,7 @@ under the production roles.
 - A posture test for each writer, under `desiauction_app` and
   `desiauction_system`. Each must show:
   - what it can write;
-  - that the app role cannot write a platform grant or a suspension;
+  - that the app role cannot write a platform grant;
   - that a non-superadmin is refused even with a valid step-up.
 
 ## Done when

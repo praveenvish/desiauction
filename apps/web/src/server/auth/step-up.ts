@@ -5,7 +5,7 @@ import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import { maskContact } from "../admin/format";
 import { boundSubject, codeDigest } from "./code-digest";
-import { DEFAULT_GLOBAL_PER_HOUR, consumeCode, requestOtp } from "./otp";
+import { consumeCode, requestOtp } from "./otp";
 import type { OtpSender } from "./otp-sender";
 import { withSendLock } from "./send-lock";
 
@@ -78,7 +78,7 @@ export type StepUpRequest =
 export async function requestStepUpCode(
   db: Db,
   sender: OtpSender,
-  input: { personId: string; requestIp: string | null; globalPerHour?: number },
+  input: { personId: string; requestIp: string | null },
 ): Promise<StepUpRequest> {
   const channel = await channelOf(db, input.personId);
   if (channel === null) {
@@ -87,13 +87,16 @@ export async function requestStepUpCode(
   if (channel.kind === "phone") {
     // The sign-in path's own throttles and delivery, purpose-bound and bound
     // to the asking account (the phone-change precedent).
+    // NOT the platform-wide cap: a flood of sign-in codes must never leave
+    // every admin unable to confirm it's them in the middle of the attack. The
+    // per-number and per-address caps still bound it.
     const sent = await requestOtp(
       db,
       sender,
       channel.destination,
       input.requestIp,
       "step_up",
-      input.globalPerHour,
+      Number.MAX_SAFE_INTEGER,
       input.personId,
     );
     return sent.ok
@@ -133,13 +136,7 @@ export async function requestStepUpCode(
           return { ok: false, reason: "hourly-limit" };
         }
       }
-      const [platform] = (await tx
-        .select({ count: sql<number>`count(*)::int` })
-        .from(emailVerifications)
-        .where(gt(emailVerifications.createdAt, since))) as [{ count: number }];
-      if (platform.count >= (input.globalPerHour ?? DEFAULT_GLOBAL_PER_HOUR)) {
-        return { ok: false, reason: "busy" };
-      }
+      // No platform-wide cap here, for the reason the phone path gives above.
       const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
       await tx.insert(emailVerifications).values({
         id: newId(),

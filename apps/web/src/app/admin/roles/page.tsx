@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { adminRoles } from "../../../server/admin/actions";
 import { platformGrantPageGate } from "../../../server/admin/authz";
 import { AdminPageHead, RelativeTime } from "../admin-ui";
-import { InvitePerson } from "../people/person-actions";
+import { CancelInvite, InvitePerson } from "../people/person-actions";
 import { ROLE_OPTIONS, roleLabel } from "../people/role-options";
 import "../../seasons/seasons.css";
 import "../admin.css";
@@ -102,7 +102,8 @@ async function Roles() {
                   · invited <RelativeTime at={invite.createdAt} />
                   {invite.invitedByName === null ? "" : ` by ${invite.invitedByName}`} · lapses{" "}
                   <RelativeTime at={invite.expiresAt} />
-                </span>
+                </span>{" "}
+                <CancelInvite inviteId={invite.id} name={invite.name} />
               </li>
             ))}
           </ul>

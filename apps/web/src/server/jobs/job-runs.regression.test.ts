@@ -30,12 +30,24 @@ describe("job_runs", () => {
     expect(row?.finishedAt).not.toBeNull();
   });
 
+  it("a 200 with a sub-sweep marked failed is recorded as not ok", async () => {
+    await recordJobRun(JOB, () =>
+      Promise.resolve(Response.json({ purged: 1, registrationDigests: "failed" })),
+    );
+    const rows = (await db.select().from(jobRuns).where(eq(jobRuns.job, JOB))).filter(
+      (row) => (row.detail as Record<string, unknown>)["registrationDigests"] === "failed",
+    );
+    expect(rows[0]?.ok).toBe(false);
+  });
+
   it("a run that throws is recorded as failed, and still throws", async () => {
     await expect(
       recordJobRun(JOB, () => Promise.reject(new Error("provider down"))),
     ).rejects.toThrow("provider down");
-    const failed = (await rows()).filter((row) => row.ok === false);
-    expect(failed[0]?.detail).toEqual({ error: "provider down" });
+    const thrown = (await rows()).find(
+      (row) => (row.detail as Record<string, unknown>)["error"] !== undefined,
+    );
+    expect(thrown).toMatchObject({ ok: false, detail: { error: "provider down" } });
     await db.delete(jobRuns).where(eq(jobRuns.job, JOB));
   });
 });

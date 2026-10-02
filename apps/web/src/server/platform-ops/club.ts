@@ -66,7 +66,12 @@ async function personByContact(system: Db, contact: string) {
     return { error: "Enter a 10-digit Indian mobile number or an email address." } as const;
   }
   const [person] = await system
-    .select({ id: people.id, name: people.name })
+    .select({
+      id: people.id,
+      name: people.name,
+      suspendedAt: people.suspendedAt,
+      erasedAt: people.erasedAt,
+    })
     .from(people)
     .where(
       target.kind === "phone"
@@ -74,6 +79,12 @@ async function personByContact(system: Db, contact: string) {
         : and(sql`lower(${people.email}) = ${target.email}`, isNotNull(people.emailVerifiedAt)),
     )
     .limit(1);
+  // A suspended or erased account takes no club role.
+  if (person !== undefined && (person.suspendedAt !== null || person.erasedAt !== null)) {
+    return {
+      error: "That account is suspended or deleted, so it can't hold a club role.",
+    } as const;
+  }
   return { person: person ?? null } as const;
 }
 
@@ -118,6 +129,15 @@ export async function addClubRole(
     return { ok: false, error: found.error };
   }
   if (found.person === null) {
+    // An unaddressed OWNER link would make whoever opens a forwarded copy the
+    // club's owner — its money included. Owners must have signed in first;
+    // a link is offered for staff only.
+    if (input.role === "org:owner") {
+      return {
+        ok: false,
+        error: `Nobody has signed in with ${input.contact.trim()} yet. Ask them to sign in to DesiAuction once, then make them an owner — or add them as staff now with a link.`,
+      };
+    }
     const invite = await inOrg(input.operator, org.id, async (db) => {
       const created = await createInvite(db, org.id, input.operator, input.role);
       await deskAudit(db, org.id, {

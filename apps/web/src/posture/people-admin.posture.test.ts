@@ -214,6 +214,32 @@ describe("/admin/people under the production roles", () => {
     expect(await applyPlatformInvites(db, systemDb, newcomer)).toBe(0);
   });
 
+  it("a waiting invitation can be cancelled, and then never applies", async () => {
+    const contact = phoneOf(7);
+    expect(
+      await actions.invitePersonAction({
+        contact,
+        name: "Mistyped Person",
+        sets: ["platform:admin"],
+        reason: REASON,
+      }),
+    ).toMatchObject({ ok: true });
+    const [invite] = await owner
+      .select({ id: platformInvites.id })
+      .from(platformInvites)
+      .where(eq(platformInvites.phone, contact));
+    expect(await actions.cancelInviteAction(invite?.id ?? "", REASON)).toMatchObject({
+      ok: true,
+    });
+    const stranger = await person("Mailbox Owner", 7);
+    expect(await applyPlatformInvites(db, systemDb, stranger)).toBe(0);
+    expect(await holds(stranger, "platform:admin")).toBe(false);
+  });
+
+  it("another superadmin can't be signed out from here", async () => {
+    expect(await actions.signOutEverywhereAction(other, REASON)).toMatchObject({ ok: false });
+  });
+
   it("someone already on DesiAuction gets the role at once", async () => {
     expect(
       await actions.invitePersonAction({
