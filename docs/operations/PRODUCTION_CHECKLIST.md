@@ -163,6 +163,29 @@ This is the ledger. The ORDER to do it in, with a proof for each step, is
   `EMAIL_FROM` (same values as `web.env`); the runner refuses to boot in
   production without them. ☐E WhatsApp remains.
 - ☐E Provider health monitoring (poll provider status into the finops supervisor's component list)
+- ☐F **Google Drive photos and Sheet sync (2026-10-02).** Without these the
+  Photos tab shows only "Drop player photos here", with no Google option and
+  nothing saying why. That was production's state until now; no deploy step
+  sets them. In Google Cloud project "desiauction" (owner
+  thedesiauction@gmail.com):
+  1. APIs & Services → Library: enable **Google Picker API** and **Google Drive API**.
+  2. OAuth consent screen: External, scope `.../auth/drive.file`, **Publish**
+     it (in "Testing" only listed test users can sign in).
+  3. Credentials → OAuth client ID → Web application. Authorized JavaScript
+     origins: `https://desiauction.in` (and `https://www.desiauction.in` if
+     served there), plus staging's origin.
+  4. Credentials → API key. Restrict it: APIs → Google Picker API only;
+     websites → the same origins, as `https://desiauction.in/*`.
+  5. Project settings: copy the **project number** (digits, not the id).
+  6. On the host, add to `/srv/apps/desiauction/<env>/web.env`, then in that
+     folder `docker compose up -d web` (env files are read at container start):
+     `GOOGLE_PICKER_CLIENT_ID`, `GOOGLE_PICKER_API_KEY`, `GOOGLE_PICKER_APP_ID`.
+  Check: import a players file that has a photo-link column (Google Drive
+  links), then open Import → Photos: "Get photos from Google Drive" is shown.
+  Players imported without that column get "Import from your form again"
+  instead; the Drive button needs the links. All three values are public by
+  design (the Picker runs in the browser); the origin restrictions are what
+  protect the key.
 
 ## 4 · Observability (PRP-1 §4)
 

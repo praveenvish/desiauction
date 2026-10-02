@@ -484,10 +484,10 @@ export function PhotoImportPanel({
           ) : (
             <>
               <p>
-                <strong>Photos from your Google Form can come in by themselves.</strong> None of
-                your players has a photo link from a form yet. If your form asked for a photo,
-                import its responses again — nobody is added twice — and we&apos;ll pick the links
-                up.
+                <strong>Photos in Google Drive can come in by themselves.</strong> Your player list
+                has no photo links yet. Add a column with each player&apos;s Google Drive photo link
+                (a Google Form&apos;s photo question already gives you one), then import the list
+                again — nobody is added twice — and each photo lands on its own player.
               </p>
               {onGoToPlayers !== undefined ? (
                 <Button
