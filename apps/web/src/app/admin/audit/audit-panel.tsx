@@ -365,7 +365,9 @@ function AuditRow({
             {isSystemActor(row.actor) ? (
               actorLabel(row.actor, row.actorName)
             ) : (
-              <Link href={`/admin/people/${row.actor}`}>{actorLabel(row.actor, row.actorName)}</Link>
+              <Link href={`/admin/people/${row.actor}`}>
+                {actorLabel(row.actor, row.actorName)}
+              </Link>
             )}
             {row.subject !== null ? (
               <>

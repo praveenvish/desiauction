@@ -2450,7 +2450,10 @@ export const platformInvites = pgTable(
     revokedAt: ts("revoked_at"),
   },
   (table) => [
-    check("platform_invites_contact_check", sql`(${table.phone} is null) <> (${table.email} is null)`),
+    check(
+      "platform_invites_contact_check",
+      sql`(${table.phone} is null) <> (${table.email} is null)`,
+    ),
   ],
 );
 
