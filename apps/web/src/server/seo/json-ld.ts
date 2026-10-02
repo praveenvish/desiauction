@@ -56,9 +56,9 @@ export function organizationId(base: string): string {
 }
 
 /**
- * A social profile counts only when it names an account. The footer still
- * carries each network's bare homepage as a placeholder (content/social.ts),
- * and claiming "https://x.com/" as our identity would be false.
+ * A social profile counts only when it names an account. content/social.ts
+ * once carried each network's bare homepage as a placeholder, and claiming
+ * "https://x.com/" as our identity would be false; this guard stays.
  */
 export function isProfileUrl(href: string): boolean {
   try {
