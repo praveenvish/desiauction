@@ -29,7 +29,7 @@ test.describe.configure({ mode: "serial" });
 const FOUNDER = "9999000001";
 const ORG_OWNER = "9999000002";
 
-const ADMIN_ROUTES = ["/admin", "/admin/orgs", "/admin/users", "/admin/audit", "/admin/health"];
+const ADMIN_ROUTES = ["/admin", "/admin/orgs", "/admin/people", "/admin/audit", "/admin/health"];
 
 async function otpLogin(page: Page, phone: string): Promise<void> {
   // Serialized per phone across workers: see withSignInLock in otp.ts.
@@ -125,7 +125,7 @@ test("founder demo: sign in → platform health → find an org → inspect → 
   // …including the platform grant itself, on the platform scope.
   await expect(grants).toContainText("Platform admin");
   await expect(grants).toContainText("The platform");
-  await axeClean(page, "/admin/users/[personId]");
+  await axeClean(page, "/admin/people/[personId]");
 
   // --- Reviews audit history -------------------------------------------------
   await page.getByRole("link", { name: /Everything this person did/ }).click();

@@ -128,8 +128,9 @@ describe("the admin write door under the production roles", () => {
     expect(await operatorFor("platform.grant", { reason: REASON })).toMatchObject({ ok: false });
     await signIn(supportOnly);
     const refused = await operatorFor("platform.grant", { reason: REASON });
+    // Refused outright — not asked to confirm: no code would help them.
     expect(refused).toMatchObject({ ok: false });
-    expect("stepUp" in refused && refused.stepUp === true).toBe(false);
+    expect(refused).not.toMatchObject({ stepUp: true });
   });
 
   it("asks a superadmin for a reason, then to confirm it's them", async () => {

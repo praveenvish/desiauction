@@ -190,9 +190,12 @@ under the production roles.
 **Evidence**
 
 - Every action writes one append-only `audit_log` row with the actor, the
-  target, the reason (required, 10–500 characters) and the step-up time.
-- The person affected is told by email through the outbox (durable, retried),
-  never a fire-and-forget send.
+  target and the reason (required, 10–500 characters).
+- The person affected is told by email after the response, the same way every
+  security alert is sent:
+  - through the notification gate;
+  - every attempt and its outcome recorded in `email_sends`;
+  - a failed send never undoes the change.
 - Invite and grant emails never contain a sign-in link or code: "sign in at
   desiauction.in with this phone/email". This keeps a forwarded email
   harmless.
@@ -200,8 +203,9 @@ under the production roles.
 **Scale**
 
 - `/admin/people` uses keyset pagination (50 per page).
-- Name search uses a `pg_trgm` index on `people.name`; phone and email
-  search use their existing unique indexes.
+- Name search is a plain `ilike` (adequate at today's size). Add a
+  `pg_trgm` index past ~100k people. Phone and email search use their
+  existing unique indexes.
 - `job_runs` is indexed on `(job, started_at desc)` and pruned by the 1.5
   cleanup job (90 days).
 - Admin reads that span every club (directory, roles) stay on the system
