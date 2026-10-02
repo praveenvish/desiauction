@@ -3496,3 +3496,11 @@ details[open] > summary .admin-health-caret {
   display: flex;
   justify-content: flex-end;
 }
+.club-desk {
+  display: grid;
+  gap: var(--space-3);
+}
+.club-desk-season h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md-size, 1rem);
+}

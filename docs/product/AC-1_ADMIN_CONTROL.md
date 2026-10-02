@@ -120,22 +120,33 @@ its query, in `next.config.mjs`.
 - **Proof**: `people-admin.posture.test.ts` drives every action under the
   production roles.
 
-## 1.3 Club roles desk (DES-21)
+## 1.3 Club roles desk (DES-21) — built
 
-A **Members** tab on `/admin/orgs/[slug]` so support can act for a club that
-is stuck:
+A **Club roles desk** card on `/admin/orgs/[slug]`, for a superadmin
+(`platform.grant`). Making someone a club's owner hands them its money, so
+this is not every support operator's desk.
 
-- **Add an owner** or **transfer ownership** (grant the new owner, then
-  revoke the old one — the last-owner guard always holds).
-- **Add staff.**
-- **Assign / remove a season's auctioneer.**
-- **Re-issue a team-owner link** (revokes the old one, mints a new one).
+- **Add an owner or staff**:
+  - Someone already signed in becomes a member and holds the role now.
+  - Anyone else gets the club's own invitation link for that role (7 days).
+    Support copies and sends it.
+- **Remove** a role. The last owner is never removed (`lastOwnerRefuses`).
+- **Transfer ownership** in one transaction: the new owner is added and the
+  old one steps down, so the club is never without an owner. The new owner
+  must have signed in once.
+- **Assign or remove** a season's auctioneer. The club's own rules apply:
+  the person must be a member, and must not own a team.
+- **New team-owner link**:
+  - Every unused link for the team is withdrawn and a fresh one minted, both
+    through the auction engine (its single writer).
+  - Refused when the team's owner has already joined.
 
-Each needs a written reason, step-up, and is recorded in the club's audit log.
-Writes go through `inOrg(operator, org)` on the app role using the existing
-org functions (`issueGrant`, `revokeGrants`, `assignAuctioneer`, …).
-A person not yet in the club is added as a member first (by phone or email,
-created if new), as an invite would.
+Every act needs a reason and step-up, and adds an `admin.club.*` row with
+`via: admin` and the reason to the club's own audit log. Writes use the
+club's own functions inside its boundary on `desiauction_app` (`inOrg`),
+never the system pool. RLS accepts them for a club the superadmin does not
+belong to; `club-desk.posture.test.ts` proves this and the club's rules
+under the production roles.
 
 ## Security and scale (applies to 1.1–1.3)
 
