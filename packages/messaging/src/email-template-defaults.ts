@@ -107,6 +107,10 @@ const CODE_EXPIRY = {
     en: "Enter it on your account page to confirm this address. It expires in 15 minutes.",
     hi: "इस पते को पक्का करने के लिए इसे अपने अकाउंट पेज पर डालें। यह 15 मिनट में खत्म हो जाएगा।",
   },
+  step_up: {
+    en: "It expires in 10 minutes and cannot be used to sign in.",
+    hi: "यह 10 मिनट में खत्म हो जाएगा और इससे साइन-इन नहीं किया जा सकता।",
+  },
 } as const;
 
 const EMAIL_CODE: EmailTemplateSpec = {
@@ -119,6 +123,7 @@ const EMAIL_CODE: EmailTemplateSpec = {
     { id: "login", label: "Sign-in" },
     { id: "signup", label: "Sign-up" },
     { id: "email_change", label: "Confirm a new address" },
+    { id: "step_up", label: "Confirm it's you (admin)" },
   ],
   actions: [],
   variables: [
@@ -132,7 +137,7 @@ const EMAIL_CODE: EmailTemplateSpec = {
       },
     ),
   ],
-  locked: (["login", "signup", "email_change"] as const).map((variant) => ({
+  locked: (["login", "signup", "email_change", "step_up"] as const).map((variant) => ({
     id: `expiry-${variant}`,
     field: "after" as const,
     variants: [variant],
@@ -182,6 +187,19 @@ const EMAIL_CODE: EmailTemplateSpec = {
           ],
           footnote: "You received this because this address was added to a DesiAuction account.",
         }),
+        // A risky admin act asks for a fresh code (AC-1). It proves presence
+        // and nothing else — the line under the code says it cannot sign in.
+        step_up: layout({
+          subject: "{{code}} is your code to confirm it's you",
+          preheader: "Enter it in DesiAuction admin to continue. It works for 10 minutes.",
+          heading: "Confirm it's you",
+          paragraphs: ["Enter this code in DesiAuction to confirm an admin action."],
+          after: [
+            CODE_EXPIRY.step_up.en,
+            "Didn't ask for this? Someone signed in as you may be trying an admin action. Sign out of every device from your account page and tell support.",
+          ],
+          footnote: "You received this because an admin action was started on your account.",
+        }),
       },
     },
     hi: {
@@ -218,6 +236,17 @@ const EMAIL_CODE: EmailTemplateSpec = {
             "आपने यह नहीं माँगा? इस ईमेल को अनदेखा करें। कोड डाले बिना यह पता नहीं जुड़ेगा।",
           ],
           footnote: "आपको यह इसलिए मिला क्योंकि यह पता एक DesiAuction अकाउंट में जोड़ा गया था।",
+        }),
+        step_up: layout({
+          subject: "{{code}} — यह आप ही हैं, पक्का करने का कोड",
+          preheader: "आगे बढ़ने के लिए इसे DesiAuction एडमिन में डालें। यह 10 मिनट तक चलेगा।",
+          heading: "पक्का करें कि यह आप हैं",
+          paragraphs: ["एडमिन काम पक्का करने के लिए यह कोड DesiAuction में डालें।"],
+          after: [
+            CODE_EXPIRY.step_up.hi,
+            "आपने यह नहीं माँगा? हो सकता है आपके नाम से साइन-इन किया कोई व्यक्ति एडमिन काम करने की कोशिश कर रहा हो। अकाउंट पेज से सभी डिवाइस से साइन-आउट करें और सपोर्ट को बताएँ।",
+          ],
+          footnote: "आपको यह इसलिए मिला क्योंकि आपके अकाउंट पर एक एडमिन काम शुरू किया गया था।",
         }),
       },
     },

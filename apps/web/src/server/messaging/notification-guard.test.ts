@@ -144,6 +144,8 @@ const RAW_SENDERS: readonly { token: string; allowed: Readonly<Record<string, st
     allowed: {
       "server/auth/otp-sender.ts": "defines it",
       "server/auth/actions.ts": "constructs it; every send is requestOtp, which asks the gate",
+      "server/auth/step-up-actions.ts":
+        "constructs it for the admin step-up code; the send is requestOtp, which asks the gate",
     },
   },
   {

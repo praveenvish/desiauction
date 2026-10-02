@@ -32,11 +32,13 @@ Linear descriptions until they are started.
 
 ## 1.1 Foundation (DES-19)
 
-1. **`platform:superadmin`** — capability `platform.grant` plus everything
-   `platform:admin` can see. Minted only by `pnpm seed:admin --set
-   platform:superadmin`. The seed (and the app) refuse to revoke the last
-   active superadmin. The app can grant and revoke every other platform set,
-   never superadmin.
+1. **`platform:superadmin`**: capability `platform.grant` and nothing else.
+   - It follows the platform's rule that every set is one power. Seeing the
+     console is `platform:admin`'s, so the founder holds both.
+   - Only `pnpm seed:admin --set platform:superadmin` can mint one.
+   - The seed locks the live superadmin grants before counting them and
+     refuses to revoke the last one.
+   - The app can grant and revoke every other platform set, never superadmin.
 2. **Step-up code.** `sessions.stepped_up_at`, set when a session is created
    from a code and when a step-up code is verified. Risky admin actions require
    `stepped_up_at` within 10 minutes; otherwise the screen opens **"Confirm

@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { env } from "../../../../env";
+import { recordJobRun } from "../../../../server/jobs/job-runs";
 import { sweepRegistrationDigests } from "../../../../server/competition/registration-digest";
 import { logger, withRequestId } from "../../../../server/logger";
 import { scheduledTemplateSync } from "../../../../server/messaging/provider-template-writer";
@@ -84,6 +85,7 @@ async function handle(request: Request): Promise<NextResponse> {
   });
 }
 
-export function POST(request: Request): Promise<NextResponse> {
-  return withRequestId(request.headers, () => handle(request));
+export function POST(request: Request): Promise<Response> {
+  // Every run, and how it went, lands in job_runs for /admin (AC-1.1).
+  return withRequestId(request.headers, () => recordJobRun("feedback", () => handle(request)));
 }

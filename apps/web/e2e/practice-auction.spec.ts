@@ -237,12 +237,14 @@ test("a practice runs in the season's own room, touches nothing, and hands over 
   await organizer.getByTestId("auction-open").click();
   await expect(organizer.getByTestId("auction-status")).toHaveText("live", COLD);
   await expect(organizer.getByTestId("practice-card")).toHaveCount(0);
+  // The phone says why it moved (the toast fades, so it is read first)…
+  await expect(
+    bidderB.getByText("The practice is over — the real auction has started"),
+  ).toBeVisible(MOVE);
+  // …and every phone is in the real room now.
   for (const page of [bidderA, bidderB]) {
     await expect(page.getByTestId("practice-bar")).toHaveCount(0, MOVE);
   }
-  await expect(
-    bidderB.getByText("The practice is over — the real auction has started"),
-  ).toBeVisible(COLD);
 
   for (const { ctx } of owners) {
     await ctx.close();

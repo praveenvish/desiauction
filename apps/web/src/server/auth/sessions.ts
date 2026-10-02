@@ -93,6 +93,9 @@ export async function createSession(
     tokenHash: hashToken(token),
     expiresAt,
     userAgent,
+    // A session is only ever made from a proof — a code or a passkey — so it
+    // starts stepped up: an admin is not asked again straight after signing in.
+    steppedUpAt: new Date(),
   });
   return { token, expiresAt };
 }
@@ -111,6 +114,8 @@ export interface SessionInfo {
   name: string | null;
   /** When this session was signed in — the proof-of-presence clock for step-up. */
   signedInAt: Date;
+  /** The last proof of presence on THIS session (admin step-up, step-up.ts). */
+  steppedUpAt: Date | null;
 }
 
 /**
@@ -135,6 +140,7 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
       personId: sessions.personId,
       createdAt: sessions.createdAt,
       lastSeenAt: sessions.lastSeenAt,
+      steppedUpAt: sessions.steppedUpAt,
       phone: people.phone,
       email: people.email,
       name: people.name,
@@ -172,6 +178,7 @@ export async function getSessionByToken(db: Db, token: string): Promise<SessionI
     email: row.email,
     name: row.name,
     signedInAt: row.createdAt,
+    steppedUpAt: row.steppedUpAt,
   };
 }
 

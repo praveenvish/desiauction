@@ -708,6 +708,13 @@
       "when": 1792425600000,
       "tag": "0101_practice_auctions",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1792512000000,
+      "tag": "0102_admin_control_foundation",
+      "breakpoints": true
     }
   ]
 }

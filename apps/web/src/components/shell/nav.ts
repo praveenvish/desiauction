@@ -979,7 +979,8 @@ export type PlatformDoorCapability =
   | "platform.moderate"
   | "platform.privacy"
   | "platform.pass"
-  | "platform.demo";
+  | "platform.demo"
+  | "platform.grant";
 
 /** A team this person owns, or a season they were appointed to run. */
 export interface NavScope {
@@ -1081,6 +1082,8 @@ const PLATFORM_DOORS: [PlatformDoorCapability, string][] = [
   ["platform.privacy", "/admin/erasure"],
   ["platform.pass", "/admin/passes"],
   ["platform.demo", "/admin/demos"],
+  // A superadmin without the console grant lands on the one page that is theirs.
+  ["platform.grant", "/admin/roles"],
 ];
 
 export function operatorDoorHref(held: readonly PlatformDoorCapability[]): string | null {

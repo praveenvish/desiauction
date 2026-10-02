@@ -131,6 +131,7 @@ describe("the registry", () => {
       ["login"],
       ["signup"],
       ["email_change"],
+      ["step_up"],
     ]);
     for (const kind of ["security.phone_changed", "security.email_changed"] as const) {
       expect(EMAIL_TEMPLATES[kind].locked.map((block) => block.id)).toEqual(["if-not-you"]);

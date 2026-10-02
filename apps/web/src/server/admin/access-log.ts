@@ -20,7 +20,7 @@ import { logger } from "../logger";
  * Against that stood a genuinely valuable property: administration is PROVABLY
  * read-only, and that proof is held by three locks — a structural one (`views.ts`
  * imports only tables and read-only snapshots), a merge-time one (the
- * `admin-is-read-only` dependency-cruiser rule), and a runtime one
+ * `admin-writes-only-through-platform-ops` dependency-cruiser rule), and a runtime one
  * (`admin-foundation.regression.test.ts`, which drives every projection through
  * a db handle that throws on any mutation). Access logging is a write, and the
  * cheap way to add it is to loosen all three until they no longer say anything.

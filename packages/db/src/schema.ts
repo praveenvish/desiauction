@@ -240,7 +240,7 @@ export const emailVerifications = pgTable(
      * must not silently confirm an address change. That bug already happened on
      * the phone side once; this table is not going to repeat it.
      */
-    purpose: text("purpose", { enum: ["email_change", "login"] })
+    purpose: text("purpose", { enum: ["email_change", "login", "step_up"] })
       .notNull()
       .default("email_change"),
     expiresAt: ts("expires_at").notNull(),
@@ -306,6 +306,12 @@ export const sessions = pgTable(
     expiresAt: ts("expires_at").notNull(),
     revokedAt: ts("revoked_at"),
     userAgent: text("user_agent"),
+    /**
+     * Proof of presence on THIS session (0102): set when the session is made
+     * from a code and again when a step-up code is entered. A risky admin act
+     * needs it within ten minutes; a second session does not inherit it.
+     */
+    steppedUpAt: ts("stepped_up_at"),
   },
   (table) => [index("sessions_person_idx").on(table.personId)],
 );
@@ -588,7 +594,7 @@ export const otpCodes = pgTable(
      * number change on the same phone. Purposes stay phone-shaped — email
      * codes live in `email_verifications`, which says what it is.
      */
-    purpose: text("purpose", { enum: ["login", "phone_change"] })
+    purpose: text("purpose", { enum: ["login", "phone_change", "step_up"] })
       .notNull()
       .default("login"),
     expiresAt: ts("expires_at").notNull(),
@@ -2408,6 +2414,25 @@ export const finopsSchedules = pgTable("finops_schedules", {
   nextDueMs: bigint("next_due_ms", { mode: "number" }).notNull(),
   lastFiredMs: bigint("last_fired_ms", { mode: "number" }),
 });
+
+// Every scheduled job's runs (0102, AC-1). The scheduler has no database, so
+// each job route records its own run. Platform-level, ZERO tenant data (the
+// finops_schedules posture): no org_id, no RLS.
+export const jobRuns = pgTable(
+  "job_runs",
+  {
+    id: id(),
+    job: text("job").notNull(),
+    startedAt: ts("started_at").notNull().defaultNow(),
+    finishedAt: ts("finished_at"),
+    ok: boolean("ok"),
+    detail: jsonb("detail").notNull().default({}),
+  },
+  (table) => [
+    index("job_runs_job_started_idx").on(table.job, table.startedAt.desc()),
+    index("job_runs_started_idx").on(table.startedAt),
+  ],
+);
 
 // Home page "Stay updated" capture. Platform-level, ZERO tenant data (same
 // posture as finops_schedules above) — no org_id, no RLS.

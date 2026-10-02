@@ -58,7 +58,7 @@ import { containsPattern } from "../../lib/like-pattern";
  *
  * READ ONLY, structurally. This module imports no writer, no server action and
  * no command from any domain: only tables and the certified FinOps SNAPSHOTS.
- * The `admin-is-read-only` dependency-cruiser rule keeps it that way at merge
+ * The `admin-writes-only-through-platform-ops` dependency-cruiser rule keeps it that way at merge
  * time, and the foundation suite proves it at runtime by driving every function
  * here through a db handle that throws on insert/update/delete.
  *

@@ -122,7 +122,7 @@ grant select on fixtures, grounds, venues to desiauction_system;
 --
 -- The tension is real and belongs in the open: this role is BYPASSRLS, so its
 -- read surface crosses every tenant. What contains it is that only the admin
--- explorer and the named token paths use this pool, `admin-is-read-only` is
+-- explorer and the named token paths use this pool, `admin-writes-only-through-platform-ops` is
 -- machine-enforced by depcruise, and grants:verify pins the write list. The
 -- right long-term shape is those org-scoped reads moving to the tenant pool
 -- inside a withTenantDb boundary, leaving this role the platform surface it

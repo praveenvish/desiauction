@@ -36,7 +36,7 @@ export function phoneCodeDigest(
   boundTo?: string,
 ): string {
   return codeDigest(
-    purpose === "login" ? "otp:login" : "otp:phone_change",
+    purpose === "login" ? "otp:login" : purpose === "step_up" ? "otp:step_up" : "otp:phone_change",
     boundTo === undefined ? phone : boundSubject(boundTo, phone),
     code,
   );
@@ -48,7 +48,7 @@ export function phoneCodeDigest(
  * change on the same phone, and vice versa. The default keeps every existing
  * caller (and the protecting suites) on the login path unchanged.
  */
-export type OtpPurpose = "login" | "phone_change";
+export type OtpPurpose = "login" | "phone_change" | "step_up";
 
 export type RequestOtpResult =
   { ok: true } | { ok: false; reason: "invalid-phone" | "cooldown" | "hourly-limit" | "busy" };
