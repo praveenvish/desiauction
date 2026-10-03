@@ -5,7 +5,7 @@
 
 **Why this, Monday:** no India match on Monday (the West Indies T20Is start Tue 6 Oct), so
 this is the week-1 organiser post (pillar A). It is the most relatable organiser pain: chasing
-200 names on WhatsApp and a Google Sheet. The claim is the site's own words: *"One link
+200 names on WhatsApp and a spreadsheet. The claim is the site's own words: *"One link
 registers players — players sign themselves up from one WhatsApp link"* and *"share the
 registration link, approve the players who sign up"* (`marketing.ts`).
 
@@ -41,7 +41,7 @@ Production: a capture spec like `capture-practice.spec.ts` for the registration 
 **Threads** (video, topic DesiAuction): "200 players ke naam WhatsApp pe ek-ek karke? Ek link bhejo — players khud register. desiauction.in #DesiAuction"
 **X:** same as Threads + `#CricketTournament`.
 
-Comment prompt (pinned first comment): "Aapke tournament mein registration kaise hota hai — Google Form, WhatsApp, ya register-copy? 👇"
+Comment prompt (pinned first comment): "Aapke tournament mein registration kaise hota hai — online form, WhatsApp list, ya register-copy? 👇"
 
 ## When
 
