@@ -244,6 +244,11 @@ test("a practice runs in the season's own room, touches nothing, and hands over 
   // …and every phone is in the real room now.
   for (const page of [bidderA, bidderB]) {
     await expect(page.getByTestId("practice-bar")).toHaveCount(0, MOVE);
+    // …and the room behind the bar is the night's, without a reload: not the
+    // ended practice's "complete" screen, and never its points read as rupees.
+    await expect(page.getByTestId("live-status")).toHaveText(/live/i, MOVE);
+    await expect(page.locator("main")).not.toContainText("Auction complete", { ignoreCase: true });
+    await expect(page.locator("main")).not.toContainText("₹11");
   }
 
   for (const { ctx } of owners) {

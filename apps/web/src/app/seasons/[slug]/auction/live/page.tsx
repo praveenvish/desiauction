@@ -52,7 +52,12 @@ export default async function LiveAuctionPage({ params }: { params: Promise<{ sl
               realStarted={view.practice === null && view.status !== "scheduled"}
               watch={view.practice !== null || view.status === "scheduled"}
             />
+            {/* Keyed by the auction it shows: when the room moves (a practice
+              ends, the night opens) the panel starts over on the new auction —
+              its own socket and state — instead of holding the old one's last
+              snapshot. The bar above stays mounted, so its "why" line survives. */}
             <LivePanel
+              key={view.auctionId}
               slug={slug}
               view={view}
               exits={
