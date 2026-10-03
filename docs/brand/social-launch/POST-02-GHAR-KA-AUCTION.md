@@ -26,13 +26,27 @@ every frame: *Scripted for fun · demo auction · points, not money*.
 
 | File | Use |
 |---|---|
-| `reels/reel-02-ghar-ka-auction.mp4` | The Reel: 25 s, 1080×1920, H.264 + AAC, 5.7 MB. Instagram, Facebook, YouTube Shorts, Threads, X |
+| `reels/reel-02-ghar-ka-auction.mp4` | The Reel: 26 s, 1080×1920, H.264 + AAC, −14 LUFS. Instagram, Facebook, YouTube Shorts, Threads, X |
 | `reels/reel-02-ghar-ka-auction-cover.jpg` | Cover / thumbnail (the SOLD beat) |
 | `instagram/stories/05-ghar-ka-poll.png` | Story 1 (Sun night): add the **poll sticker** in the empty space |
 | `instagram/stories/06-ghar-ka-result.png` | Story 2 (Mon morning): add the **link sticker** |
 
 Rebuild: `reels/build-reel-02-ghar-ka-auction.cjs`, `reels/build-ghar-ka-stories.cjs`
 (captures: `reels/capture-ghar-ka-auction.spec.ts`, see its header).
+
+**Sound:** an original score made for this reel (`reels/score-ghar-ka.cjs`) —
+we own every sample, so it can't be muted or claimed. Dhol-style bhangra groove
+from the first frame; a bell on each bid, rising with the price; a comic
+"wah-wah" when Beta loses the tie; the band stops and a heartbeat builds while
+Dadi waits; a big hit when she bids; gavel knocks and the DesiAuction sting on
+SOLD. Mixed to −14 LUFS (Instagram's loudness), no silent gaps. Post it with
+the Reel's own sound — don't add a library track over it.
+
+**Brand:** the DesiAuction logo sits on every frame; the caption names it in
+the story ("Ladai band. DesiAuction pe auction!"); the end card holds the full
+logo for 4 s with what DesiAuction is, in the site's own words: "Live player
+auctions for your league, in any of 12 sports. Owners bid from their phones,
+the hall watches the big screen." Both Stories carry the logo too.
 
 ## Schedule (IST)
 
@@ -72,7 +86,7 @@ The first hour after posting: reply to every comment (replies below).
 >
 > #GharKaAuction #AuctionNight #CricketAuction #LocalCricket #DesiAuction
 
-Cover: `reel-02-ghar-ka-auction-cover.jpg`. Audio: the Reel's own sound (no film
+Cover: `reel-02-ghar-ka-auction-cover.jpg`. Audio: the Reel's own score (no film
 songs — business accounts get muted; if a track is added, only from Instagram's
 commercial-use library). Location tag: none.
 
