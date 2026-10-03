@@ -1,6 +1,6 @@
 # Post 07 — "Match day" (India vs West Indies, 1st T20I) · Tue 6 Oct 2026
 
-> Plan for founder approval (2026-10-03). Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md)
+> Plan approved by the founder 2026-10-03; Reel and result card built, awaiting final approval. Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md)
 > §1a (no controversy) and §1b (ride the day's cricket moment; payoff first; short).
 
 **The moment:** India vs West Indies, 1st T20I, Lucknow, **7:00 pm IST** (toss ~6:30), the
@@ -22,7 +22,7 @@ players, points), labelled.
 
 | Time | On screen | Caption on frame |
 |---|---|---|
-| 0.0–2.0 | **Payoff:** a phone showing **SOLD** (practice auction, "You won Arjun") | "Aaj raat stadium mein T20. 🏏 **Is Sunday — aapke ground ka auction?**" |
+| 0.0–2.0 | **Payoff:** a phone showing **SOLD** (practice auction, "You won Arjun") | "Aaj raat T20. 🏏 **Is Sunday — aapka auction?**" (shortened to fit two lines) |
 | 2.0–3.5 | Organiser's review card: "7 players are waiting for a decision" | "Players: **ek link** se register." |
 | 3.5–5.2 | Two owners' phones mid-bid | "Owners: **phone se boli.**" |
 | 5.2–6.2 | SOLD again, the hammer | "**SOLD.** 🔨" |
@@ -53,9 +53,10 @@ Text card in brand style, posted within an hour of the finish (~11 pm). Pre-appr
 
 If India loses, or there's no result: **post nothing** — never a loss joke, never a dig.
 
-## Build
+## Build (done 2026-10-03)
 
-`reels/build-reel-07-match-day.cjs` from the Reel 06 template, using
-`.work/practice/phoneB-sold.png`, `phoneA-outbid.png`, `phoneB-leading.png` and
-`.work/ek-link/review-7.png`. Result card: `build-social-card.cjs`-style still, 1080×1920
-(Story) and 1080×1350 (feed).
+- Reel: `reels/reel-07-match-day.mp4` (11.0 s, 1080×1920, 3.0 MB) + `reels/reel-07-match-day-cover.jpg`;
+  `reels/build-reel-07-match-day.cjs` (captures copied into `.work/match-day/` from
+  `.work/practice/` and `.work/ek-link/`).
+- Result card: `cards/match-result-india-1-0-1080x1920.png` (Story) and
+  `cards/match-result-india-1-0-1080x1350.png` (feed); `reels/build-match-result-card.cjs`.
