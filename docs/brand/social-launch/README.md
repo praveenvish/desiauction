@@ -142,6 +142,44 @@ re-encoded HEVC 640 kbps two-pass (SSIM 0.994 against the source).
 The 2.5 s logo strike (`docs/brand/kit/motion/da-strike-lockup-1920x1080.mp4`)
 is the intro for future YouTube videos, not a post.
 
+### Film v2 — re-cut for the no-controversy checklist (2026-10-03, awaiting founder approval)
+
+v1 breaks [`SOCIAL_CONTENT_PLAN.md` §1a](../../operations/SOCIAL_CONTENT_PLAN.md):
+"Ab IPL jaisa." on the logo card (rule 2) and "2 minute mein season ready." as the
+organiser headline (rule 1), plus "2 minute" / "100 seconds" in the captions.
+`reels/build-film-recut.cjs` replaces the two lines in the film's own type; nothing
+else changes (same 100 s, audio untouched — music and effects, no voice-over):
+
+| Time | v1 | v2 |
+|---|---|---|
+| 10.3–12.0 s | Tournament ka auction. **Ab IPL jaisa.** | Tournament ka auction. **Ab phone pe.** |
+| 12.4–24.0 s | **2 minute mein season ready.** | **Season ready, bina kaagaz.** |
+
+Files (not in git): `film/film-01-registration-se-sold-tak-16x9-v2.mp4`,
+`reels/film-01-registration-se-sold-tak-9x16-v2.mp4` (`build-film-vertical.cjs` on v2;
+its organiser label now reads "Season ready, bina kaagaz").
+
+**v2 captions** (the v1 captions minus the time claims, plus #DesiAuction):
+
+- Instagram / Facebook: v1 caption with the first bullet "✅ Season ready, bina kaagaz";
+  ends `#cricketauction #playerauction #localcricket #cricketindia #DesiAuction`.
+- X (pin it): "Sunday ka tournament. 200 players. Aur auction… kaagaz pe? 😅
+  Registration se SOLD tak, ek hi jagah 👇 desiauction.in #DesiAuction"
+- LinkedIn: v1 text with "a 100-second film" → "a short film" and "the organiser sets
+  up the season in two minutes" → "the organiser sets up the season"; hashtags
+  `#SportsTech #Cricket #StartupIndia #DesiAuction`. Video via the YouTube link card.
+- YouTube: title and description unchanged (no time claim), chapters still match.
+
+**Swap plan** (no platform lets a published video file be replaced):
+
+| Network | v1 | v2 |
+|---|---|---|
+| YouTube | set v1 to Private (reversible) | upload v2; make it the channel trailer |
+| Instagram | Archive (reversible) | post the 9:16 v2 |
+| Facebook | delete the v1 reel | post v2 from `facebook.com/reels/create` |
+| X | delete, unpin | post 16:9 v2, pin |
+| LinkedIn | delete | post the v2 YouTube link card |
+
 ---
 
 ## Instagram — `@desiauction`

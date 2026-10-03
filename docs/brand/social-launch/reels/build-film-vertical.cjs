@@ -25,12 +25,13 @@ const GEIST = path.join(
 );
 const FILM = path.resolve(process.argv[2]);
 const WORK = path.join(__dirname, ".work");
-const OUT = path.join(__dirname, "film-01-registration-se-sold-tak-9x16.mp4");
+// Named after the source: film-01-…-16x9[-v2].mp4 → film-01-…-9x16[-v2].mp4
+const OUT = path.join(__dirname, path.basename(FILM).replace("16x9", "9x16"));
 
 // Acts of the film (seconds), from its scene cuts. Labels match its own words.
 const ACTS = [
   [0, 13.5, "Sunday ka tournament", "Aur auction? Kaagaz pe."],
-  [13.5, 24.1, "01 · Organiser", "2 minute mein season ready"],
+  [13.5, 24.1, "01 · Organiser", "Season ready, bina kaagaz"],
   [24.1, 36.1, "02 · Players", "Ek link. Seedha WhatsApp pe."],
   [36.1, 44.1, "03 · Team owners", "Har owner ko ek invite link"],
   [44.1, 64.1, "04 · Auction night", "Phone se boli, big screen pe turant"],
