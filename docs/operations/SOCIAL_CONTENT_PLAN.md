@@ -62,6 +62,10 @@ later. Every post is checked against this list before approval.
 8. **Comments:** reply once, politely, with facts; hide abuse; never argue;
    complaints go to DM within the hour.
 9. **Approval:** the founder approves every post before it goes out.
+10. **#DesiAuction on every post, every platform** (founder, 2026-10-03):
+    in the caption/description on Instagram, Facebook, YouTube and LinkedIn;
+    in the post or a self-reply on X; on Threads (one topic per post) as the
+    topic of the post or of a reply in the thread when the topic is the news.
 
 ---
 

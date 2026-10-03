@@ -53,15 +53,17 @@ Rebuild: `reels/build-reel-03-ek-take.cjs` (captures: `reels/capture-practice.sp
   > Owner pehli baar app khole aur poora hall dekh raha ho? Isliye pehle practice auction: same link, same screens, 100 points, kuch count nahi hota — aur asli auction shuru hote hi har phone khud switch.
   > Demo auction · fictional players · points, not money.
   > Rehearse it tonight — free: https://desiauction.in/?utm_source=youtube&utm_medium=social&utm_campaign=ek_take
-  > #Shorts #CricketAuction #AuctionNight
+  > #Shorts #CricketAuction #AuctionNight #DesiAuction
 
 **Threads** (with the video):
 > Auction night ka ek hi take hota hai. 🎬 Pehle practice auction: same link, same screens, 100 points, kuch count nahi hota — aur asli auction shuru hote hi har phone khud switch.
-> Rehearse it tonight — free: desiauction.in/?utm_source=threads&utm_medium=social&utm_campaign=ek_take
+> Rehearse it tonight — free: desiauction.in/?utm_source=threads&utm_medium=social&utm_campaign=ek_take #DesiAuction
+
+(Threads takes one topic per post: #DesiAuction is it. Attach the video before typing the link.)
 
 **X `@thedesiauction`** (with the video):
 > Auction night ka ek hi take hota hai. 🎬 Pehle practice auction: same link, same screens, kuch count nahi hota. Asli auction shuru → har phone khud switch.
-> Rehearse it tonight — free: desiauction.in/?utm_source=x&utm_medium=social&utm_campaign=ek_take #AuctionNight
+> Rehearse it tonight — free: desiauction.in/?utm_source=x&utm_medium=social&utm_campaign=ek_take #AuctionNight #DesiAuction
 
 ## Links
 

@@ -47,17 +47,32 @@ the bridge to us is honest (local leagues are where players get picked).
 > India. Gold. 🥇🥇 Asian Games 2026 cricket — men aur women, dono teams ne title defend kiya. Congratulations, India!
 > Har champion ki shuruaat gali se hoti hai. 🏏 #AsianGames2026
 
+Reply in the thread: "Apne league ka player auction chalao — phones se boli, big screen pe live. 🏏 desiauction.in #DesiAuction" (one topic per Threads post, so the brand tag goes in the reply).
+
 **X `@thedesiauction`:**
 > India. Gold. 🥇🥇 Men + women — dono teams ne Asian Games cricket title defend kiya. Congratulations, India!
 > Har champion ki shuruaat gali se hoti hai. 🏏 #AsianGames2026 #IndianCricket
+
+Self-reply: "Apne league ka player auction chalao — phones se boli, big screen pe live. 🏏 desiauction.in/?utm_source=x&utm_medium=social&utm_campaign=double_gold #DesiAuction"
 
 **LinkedIn** (text post; put the YouTube Short link FIRST so LinkedIn shows the video card):
 > India won both cricket golds at the Asian Games 2026 — the men's and the women's teams each defended their title. Congratulations to both squads. 🥇🥇
 > Every one of those players started somewhere local: a gully side, a club trial, a tournament where somebody said "SOLD" for the first time. That's the night we build for.
 > <YouTube Short link>
 > desiauction.in/?utm_source=linkedin&utm_medium=social&utm_campaign=double_gold
+> #AsianGames2026 #IndianCricket #Cricket #DesiAuction
 
-## Status
+## Posted (2026-10-03, founder-approved)
 
-- YouTube: uploaded as a **private draft**, with the title, description, "not for kids", "no paid promotion" and "AI use: No" all set. Copyright check: no issues. Not published: the posting step was stopped for founder confirmation.
-- Instagram, Facebook, Threads, X, LinkedIn: not posted.
+| Network | Link |
+|---|---|
+| YouTube Short | https://youtube.com/shorts/eaWm6_AlE7s |
+| Instagram Reel | https://www.instagram.com/desiauction/p/DeBtiXwCCaE/ |
+| Facebook Reel (Page) | https://www.facebook.com/reel/1397954679062017 |
+| Threads | https://www.threads.com/@desiauction/post/DeBt8rBjAPd (+ #DesiAuction reply) |
+| X `@thedesiauction` | https://x.com/thedesiauction/status/2106313527413923932 (+ #DesiAuction self-reply) |
+| LinkedIn | https://www.linkedin.com/feed/update/urn:li:activity:7512081525660872704/ |
+
+Facebook: the first upload from `facebook.com/reels/create` silently failed; the retry
+(a remuxed copy, since Facebook refuses a duplicate file) published once. Check the
+Business Suite content list for duplicates before retrying.

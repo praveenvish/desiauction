@@ -131,9 +131,9 @@ commercial-use library). Location tag: none.
 **Threads — Sunday reply (with the Reel)**
 > Humne ghar mein remote ka auction kar diya. Spoiler: Dadi. 🏆
 > desiauction.in/?utm_source=threads&utm_medium=social&utm_campaign=ghar_ka_auction
-> #CricketAuction
+> #DesiAuction
 
-**X `@thedesiauction`** — same as Threads, one hashtag: `#GharKaAuction`.
+**X `@thedesiauction`** — same as Threads, hashtags `#GharKaAuction #DesiAuction`.
 
 **Story 1 poll sticker:** question "Remote kiske paas?" — options **Papa /
 Mummy / Beta / Dadi** (tap "Add option" for the third and fourth; if the app
