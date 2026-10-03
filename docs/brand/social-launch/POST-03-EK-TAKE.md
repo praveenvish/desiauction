@@ -26,8 +26,13 @@ phones kept the ended practice on screen.
 
 | File | Use |
 |---|---|
-| `reels/reel-03-ek-take.mp4` | The Reel: 22.8 s, 1080×1920, H.264 + AAC, −14 LUFS, original score |
-| `reels/reel-03-ek-take-cover.jpg` | Cover (the hand-over beat) |
+| `reels/reel-03-ek-take.mp4` | The Reel: 14.8 s, 1080×1920, H.264 + AAC, original score |
+| `reels/reel-03-ek-take-cover.jpg` | Cover (the hand-over, before → after) |
+
+**Recut 2026-10-03 (payoff first, §1b):** frame one is the hand-over — the same
+phone in PRACTICE and then in the real auction ("The practice is over — the real
+auction has started") — then how it works in five fast beats. The old "owner
+freezes" opener is gone; 22.8 s → 14.8 s.
 
 Rebuild: `reels/build-reel-03-ek-take.cjs` (captures: `reels/capture-practice.spec.ts`).
 

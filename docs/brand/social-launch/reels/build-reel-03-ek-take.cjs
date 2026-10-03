@@ -1,4 +1,4 @@
-// build-reel-03-ek-take.cjs — "Ek take." 9:16 Reel, ~22 s. The practice auction.
+// build-reel-03-ek-take.cjs — "Ek take." 9:16 Reel, ~15 s. The practice auction.
 //
 // Auction night has one take: an owner who meets the bidding screen for the
 // first time in front of the whole hall freezes. So the organiser runs a
@@ -90,15 +90,23 @@ const card = (name, width = 1000) =>
 const phoneTop = (name, height) =>
   `<div class="phone" style="width:640px;height:${height}px"><img src="${img(name)}"></div>`;
 
+// The same phone before and after the hand-over: PRACTICE on the left, the real
+// auction (with its "the practice is over" notice) on the right.
+const beforeAfter = (before, after) => `<div style="display:flex;align-items:center;gap:14px">
+  <div><p class="tag" style="font:600 34px/1 Clash;margin:0 0 14px 8px;color:#9FB0CC">Practice</p>${phone(before, 440)}</div>
+  <div style="font:600 84px/1 Clash;color:#E6B24A">→</div>
+  <div><p class="tag" style="font:600 34px/1 Clash;margin:0 0 14px 8px;color:#E6B24A">Asli auction</p>${phone(after, 440)}</div></div>`;
+
 // [id, seconds, html, sound]
+// Payoff first (SOCIAL_CONTENT_PLAN.md §1b rule 2): frame one is the hand-over,
+// then how it works in fast beats. ~15 s with the strike and the end card.
 const BEATS = [
-  ["b01", 2.6, frame("Auction night. Poora hall dekh raha hai. Owner ko <em>bid karna nahi aata.</em> 😬", phoneTop("phoneA-lot", 1150)), null],
-  ["b02", 2.4, frame("Isliye pehle: <em>PRACTICE auction.</em> 🎯", card("card-start"), { who: "ORGANISER" }), "gavel"],
-  ["b03", 2.2, frame("Same link. <em>Same screens.</em>", phoneTop("phoneA-ready", 1150), { who: "OWNER" }), null],
-  ["b04", 2.4, frame("100 points. Bid karo, galti karo — <em>kuch count nahi hota.</em>", `${phone("phoneA-outbid", 470)}${phone("phoneB-leading", 470)}`), "bid"],
-  ["b05", 2.0, frame("SOLD bhi <em>practice mein.</em> 🔨", phoneTop("phoneB-sold", 1150)), "bid"],
-  ["b06", 2.2, frame("Organiser ko dikhta hai: <em>kaun ready hai.</em>", card("card-ready", 840), { who: "ORGANISER" }), "wait"],
-  ["b07", 2.8, frame("Asli auction shuru → <em>har phone khud switch.</em> ✅", `${phone("phoneB-handover", 470)}${phone("phoneA-real", 470)}`), "dadi"],
+  ["b07", 1.9, frame("Practice khatam. Asli auction shuru → <em>har phone khud switch.</em> ✅", beforeAfter("phoneB-before", "phoneB-handover")), "dadi"],
+  ["b02", 1.6, frame("Kaise? Pehle <em>PRACTICE auction.</em> 🎯", card("card-start"), { who: "ORGANISER" }), "gavel"],
+  ["b03", 1.4, frame("Same link. <em>Same screens.</em>", phoneTop("phoneA-ready", 1150), { who: "OWNER" }), null],
+  ["b04", 1.8, frame("100 points. Bid karo, galti karo — <em>kuch count nahi hota.</em>", `${phone("phoneA-outbid", 470)}${phone("phoneB-leading", 470)}`), "bid"],
+  ["b05", 1.4, frame("SOLD bhi <em>practice mein.</em> 🔨", phoneTop("phoneB-sold", 1150)), "sold"],
+  ["b06", 1.5, frame("Organiser ko dikhta hai: <em>kaun ready hai.</em>", card("card-ready", 840), { who: "ORGANISER" }), "bid"],
 ];
 
 const END = `<!doctype html><meta charset="utf-8"><style>${CSS}
@@ -117,7 +125,7 @@ h1 em{font-style:normal;color:#E6B24A}
 <div><span class="u">desiauction.in</span></div>
 <div class="label">Demo auction · fictional players · points, not money</div>
 </div>`;
-const END_SECONDS = 4.2; // long enough to read what DesiAuction is
+const END_SECONDS = 3.2; // long enough to read the line and the address
 
 function ff(args) {
   execFileSync("ffmpeg", ["-loglevel", "error", "-y", ...args], { stdio: "inherit" });
