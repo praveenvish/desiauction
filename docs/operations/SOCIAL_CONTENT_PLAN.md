@@ -67,13 +67,47 @@ later. Every post is checked against this list before approval.
     in the post or a self-reply on X; on Threads (one topic per post) as the
     topic of the post or of a reply in the thread when the topic is the news.
 
+### 1b. What reaches people — learned from the first posts (3 Oct 2026, founder)
+
+Data, first ~6 h (views): Double Gold newsjack — Facebook 235, YouTube 156,
+Instagram 32. Ghar Ka Auction family skit — Facebook 49, Instagram 34, YouTube 6.
+Brand card — Facebook 77. About 16% of Facebook viewers stayed past 3 s; average
+watch 3–5 s on 17–26 s reels; about 2 likes per reel, no shares or comments yet.
+
+The founder's direction: **a post every day, planned properly, built on what
+reaches people.** Every post is planned against these rules:
+
+1. **Ride the day's cricket moment.** A big match, a title, a record (Asian
+   Games, IPL auction season, a famous last-ball finish) is our biggest reach
+   lever: the newsjack did 3–5× everything else. Same day, within hours, and
+   always inside §1a (no player names or faces, no team or board marks, no
+   flags, no opponents mocked).
+2. **The first second is the payoff.** Open on the moment itself — SOLD, the
+   hammer, "Dadi ne 45 bola", the big screen flipping — then explain. Never
+   open on setup or a logo; the logo comes at the end.
+3. **Short.** 7–15 s for reach Reels and Shorts; longer only for how-tos.
+   Words on screen in the first frame, big enough to read on mute.
+4. **One idea per post**, said in Hinglish the way an organiser would say it.
+5. **Topical hashtags + ours:** the day's tag (#AsianGames2026, #IndianCricket…),
+   2–3 cricket-auction tags, and #DesiAuction (§1a rule 10).
+6. **A reason to share or comment:** tag-a-friend, "aapke ghar mein kaun?",
+   a question organisers answer. Ask for one action, not several.
+7. **Post when people scroll:** 7–9 pm IST weekdays; Sunday evening for family
+   content; within 2–3 h of a news moment.
+8. **Measure the next day** (views, 3-second holds, shares, link clicks via UTM)
+   and write one line here on what to do differently.
+
+Every day the plan names: the post, the hook in the first second, the network
+cuts, captions, hashtags, and the time. The founder approves before anything
+goes out (§1a rule 9).
+
 ---
 
 ## 2. Content pillars
 
 | Pillar | Share | What it is | Format |
 |---|---|---|---|
-| **A. Run your auction** | 30% | How-tos for organisers: setup in 2 minutes, one WhatsApp registration link, owner invites, the big screen, receipts | Screen-capture Reels, carousels, YouTube how-tos |
+| **A. Run your auction** | 30% | How-tos for organisers: season setup, one WhatsApp registration link, owner invites, the big screen, receipts | Screen-capture Reels, carousels, YouTube how-tos |
 | **B. Auction nights** | 25% | Real Founding 25 nights: the room, the big screen, the SOLD moment — with written consent | Reels, YouTube long-form, Stories |
 | **C. Proof** | 15% | Why nobody argues: server-verified bids, append-only ledger, numbered receipts, recovery when a phone dies | Ledger cards (T7), short explainers |
 | **D. Owner strategy** | 15% | Purse planning, bid ladders, when to stop — useful to the people in the room | Carousels, Threads/X threads |
@@ -93,8 +127,8 @@ teams and 40 players", "Tournaments started during beta stay free forever".
 
 | Network | Per week | Notes |
 |---|---|---|
-| Instagram | 3 Reels + 1 carousel + Stories most days | Reels carry reach; carousels carry saves |
-| YouTube | 1 long video (when footage exists) + 3 Shorts | Shorts = the IG Reels, re-cut 9:16 |
+| Instagram | **1 Reel every day** (founder, 2026-10-03) + Stories most days; a carousel when it fits | Reels carry reach; carousels carry saves |
+| YouTube | 1 Short every day (the day's Reel) + 1 long video when footage exists | Shorts = the IG Reels, re-cut 9:16 |
 | Facebook | mirror IG via Business Suite | Reels composer works from the desktop (H.264) |
 | Threads / X | 1 a day, text-first | Organiser questions, owner strategy, build notes |
 | LinkedIn | 2 founder-voice posts | The problem, the build, lessons |
