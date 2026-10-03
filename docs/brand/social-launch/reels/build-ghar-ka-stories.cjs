@@ -51,6 +51,15 @@ ${logo}
 <div class="slot"></div>
 <div class="label">@desiauction</div></div>`;
 
+// For a story posted without a poll sticker (web uploads can't add one): the
+// same card with the question answered by replies instead.
+const pollReply = poll.replace(
+  '<div class="slot"></div>',
+  `<div class="slot" style="flex-direction:column;gap:28px;font:600 64px/1.15 Clash;color:#E6B24A">
+  <span>Papa · Mummy<br>Beta · Dadi?</span>
+  <span style="font:600 40px/1.3 Geist;color:#9FB0CC">Reply karke batao 👇</span></div>`,
+);
+
 const result = `<!doctype html><meta charset="utf-8"><style>${CSS}</style><div class="s">
 ${logo}
 <p class="k">GHAR KA AUCTION · RESULT</p>
@@ -59,12 +68,21 @@ ${logo}
 <p class="p" style="text-align:center">SOLD, without the shouting.<br>Apna auction chalao — free.</p>
 <div class="label">Demo auction · points, not money</div></div>`;
 
+// For a story with a platform link button at the bottom (Facebook "Learn
+// More"): the label moves up, clear of the button, so it is always readable.
+const resultButton = result.replace(
+  '<div class="label">Demo auction · points, not money</div>',
+  '<p class="p" style="text-align:center;font-size:30px;margin-top:28px;color:#6f7f99">Demo auction · points, not money</p>',
+);
+
 (async () => {
   const browser = await chromium.launch({ executablePath: CHROME, args: ["--force-color-profile=srgb"] });
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   for (const [name, html] of [
     ["05-ghar-ka-poll", poll],
+    ["05b-ghar-ka-poll-reply", pollReply],
     ["06-ghar-ka-result", result],
+    ["06b-ghar-ka-result-button", resultButton],
   ]) {
     await page.setContent(html, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready);

@@ -32,7 +32,17 @@ every frame: *Scripted for fun · demo auction · points, not money*.
 | Threads | https://www.threads.com/@desiauction/post/DeBfn4wDHWc | Video + short text + threads UTM link |
 | X `@thedesiauction` | https://x.com/thedesiauction/status/2106281873240641973 | Video + short text + x UTM link, #GharKaAuction |
 
-Not posted (not requested yet): the two Stories.
+**Stories (2026-10-03, posted from the computer at the founder's choice):**
+
+- **Facebook Page stories — live:** `05b-ghar-ka-poll-reply.png` (no poll sticker
+  on the web, so the card asks for replies instead) and
+  `06b-ghar-ka-result-button.png` with a "Learn More" web-link button to
+  `desiauction.in/?utm_source=facebook&utm_medium=story&utm_campaign=ghar_ka_auction`
+  (the label is lifted above the button so it is never covered).
+- **Instagram stories — not posted:** Instagram's website has no story upload,
+  and Business Suite's composer cannot be driven from a browser tool. Post from
+  the phone app: `05-ghar-ka-poll.png` + poll sticker, then `06-ghar-ka-result.png`
+  + link sticker.
 
 **Upload notes for next time:** Business Suite's reel composer builds its file
 input on click (not automatable) — use `facebook.com/reels/create` as the Page.
