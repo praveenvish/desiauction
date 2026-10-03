@@ -1,6 +1,6 @@
 # Post 06 — "Ek link." (players register themselves) · Mon 5 Oct 2026
 
-> Plan for founder approval (2026-10-03). Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md)
+> Plan approved by the founder 2026-10-03; Reel built, awaiting final approval. Rules: [`SOCIAL_CONTENT_PLAN.md`](../../operations/SOCIAL_CONTENT_PLAN.md)
 > §1a (no controversy) and §1b (what reaches people).
 
 **Why this, Monday:** no India match on Monday (the West Indies T20Is start Tue 6 Oct), so
@@ -23,8 +23,11 @@ registration link, approve the players who sign up"* (`marketing.ts`).
 
 Every frame labelled: *Demo auction · fictional players*. Original score (`score-ghar-ka.cjs`).
 No player counts or times that aren't on screen; no WhatsApp logo or UI (rule 6).
-Production: a capture spec like `capture-practice.spec.ts` for the registration flow, then
-`build-reel-06-ek-link.cjs` from the Reel 03 template.
+Built: `reels/reel-06-ek-link.mp4` (14.0 s, 1080×1920, H.264 + AAC) and
+`reels/reel-06-ek-link-cover.jpg`. Captures: `reels/capture-ek-link.spec.ts`; build:
+`reels/build-reel-06-ek-link.cjs`. The share block's address (a dev URL) is blurred,
+not redrawn; the payoff is the organiser's real review card ("1 → 4 → 7 players are
+waiting for a decision") over the player's real "You're registered for Sunday Cup".
 
 ## Captions
 
