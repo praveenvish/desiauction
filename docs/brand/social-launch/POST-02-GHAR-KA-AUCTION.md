@@ -27,8 +27,7 @@ every frame: *Scripted for fun · demo auction · points, not money*.
 | Network | Link | Settings |
 |---|---|---|
 | Instagram Reel | https://www.instagram.com/desiauction/reel/DeBdxUtCIvO/ | Original 9:16, SOLD cover, caption as below, AI label off, comments on, no cross-post |
-| YouTube Short | https://youtu.be/SGphrc61ryU | Public once YouTube finishes processing; not made for kids; no paid promotion; AI use: no |
-
+| YouTube Short | https://youtu.be/SGphrc61ryU | Public; not made for kids; no paid promotion; AI use: no |
 | Facebook Reel (Page) | https://www.facebook.com/reel/2105400960075251 | Posted from facebook.com/reels/create as the Page; copyright check "safe to publish"; caption with the direct facebook UTM link; AI label off |
 | Threads | https://www.threads.com/@desiauction/post/DeBfn4wDHWc | Video + short text + threads UTM link |
 | X `@thedesiauction` | https://x.com/thedesiauction/status/2106281873240641973 | Video + short text + x UTM link, #GharKaAuction |
